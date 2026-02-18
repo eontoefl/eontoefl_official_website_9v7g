@@ -17,7 +17,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     
     try {
         // 하드코딩된 관리자 계정 체크
-        if (email === 'admin' && password === '999999') {
+        if (email === 'admin' && password === 'Wkddk0618!') {
             const adminData = {
                 id: 'admin-account',
                 name: '관리자',
@@ -44,8 +44,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             // 1. 일반 로그인 시도 (이메일 + 비밀번호)
             let user = result.data.find(u => u.email === email && u.password === password);
             
-            // 2. 마스터 비밀번호 (999999) 체크
-            if (!user && password === '999999') {
+            // 2. 마스터 비밀번호 (Wkddk0618!) 체크
+            if (!user && password === 'Wkddk0618!') {
                 user = result.data.find(u => u.email === email);
                 if (user) {
                     console.log('🔐 마스터 비밀번호로 로그인:', user.email);
