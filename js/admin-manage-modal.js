@@ -863,9 +863,8 @@ async function loadModalContractTab(app) {
 // 활성 계약서 목록 로드 (드롭다운용)
 async function loadActiveContractsForDropdown() {
     try {
-        const response = await fetch('tables/contracts?is_active=true&limit=100&sort=-created_at');
-        const result = await response.json();
-        return result.data || [];
+        const result = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'limit': '100' });
+        return result || [];
     } catch (error) {
         console.error('Failed to load contracts:', error);
         return [];

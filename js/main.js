@@ -47,11 +47,10 @@ async function loadReviews() {
     const container = document.getElementById('reviewsContainer');
     
     try {
-        const response = await fetch('tables/reviews?limit=100');
-        const data = await response.json();
+        const result = await supabaseAPI.get('reviews', { limit: 100 });
         
-        if (data.data && data.data.length > 0) {
-            container.innerHTML = data.data.map(review => `
+        if (result.data && result.data.length > 0) {
+            container.innerHTML = result.data.map(review => `
                 <div class="review-card">
                     <div class="review-header">
                         <div class="review-student">

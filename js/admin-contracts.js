@@ -33,8 +33,7 @@ async function loadContracts() {
 // 모든 계약서 로드
 async function loadAllContracts() {
     try {
-        const response = await fetch('tables/contracts?limit=1000&sort=-created_at');
-        const result = await response.json();
+        const result = await supabaseAPI.get('contracts', { limit: 1000, sort: '-created_at' });
         
         if (result.data) {
             allContracts = result.data;
@@ -70,8 +69,7 @@ async function loadAllContracts() {
 // 사용 중인 학생 수 계산
 async function calculateUsageCount() {
     try {
-        const response = await fetch('tables/applications?limit=1000');
-        const result = await response.json();
+        const result = await supabaseAPI.get('applications', { limit: 1000 });
         
         if (result.data) {
             allContracts.forEach(contract => {
@@ -283,20 +281,16 @@ async function saveNewContract() {
     }
     
     try {
-        const response = await fetch('tables/contracts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                version: version,
-                title: title,
-                content: content,
-                is_active: true,
-                created_at: Date.now(),
-                updated_at: Date.now()
-            })
+        const result = await supabaseAPI.post('contracts', {
+            version: version,
+            title: title,
+            content: content,
+            is_active: true,
+            created_at: Date.now(),
+            updated_at: Date.now()
         });
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 새 계약서가 등록되었습니다!');
             
             // 폼 초기화

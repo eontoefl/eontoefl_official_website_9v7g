@@ -15,12 +15,11 @@ document.getElementById('findIdForm').addEventListener('submit', async (e) => {
     
     try {
         // Fetch all users
-        const response = await fetch('tables/users?limit=1000');
-        const data = await response.json();
+        const result = await supabaseAPI.get('users', { limit: 1000 });
         
-        if (data.data && data.data.length > 0) {
+        if (result.data && result.data.length > 0) {
             // Find user by name and phone
-            const user = data.data.find(u => 
+            const user = result.data.find(u => 
                 u.name === name && u.phone === phone
             );
             

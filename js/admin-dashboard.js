@@ -14,11 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // 대시보드 데이터 로드
 async function loadDashboardData() {
     try {
-        const response = await fetch('tables/applications?limit=1000');
-        const data = await response.json();
+        const result = await supabaseAPI.get('applications', { limit: 1000 });
         
-        if (data.data && data.data.length > 0) {
-            const applications = data.data;
+        if (result.data && result.data.length > 0) {
+            const applications = result.data;
             
             // 통계 업데이트
             updateStatistics(applications);

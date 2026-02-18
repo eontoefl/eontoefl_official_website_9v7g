@@ -10,11 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Load all users
 async function loadUsers() {
     try {
-        const response = await fetch('tables/users?limit=1000&sort=-created_at');
-        const data = await response.json();
+        const result = await supabaseAPI.get('users', { limit: 1000, sort: '-created_at' });
         
-        if (data.data) {
-            allUsers = data.data;
+        if (result.data) {
+            allUsers = result.data;
             displayUsers(allUsers);
             updateStats(allUsers);
         }

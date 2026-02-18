@@ -23,16 +23,9 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     submitBtn.disabled = true;
     
     try {
-        const response = await fetch('tables/users', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
+        const result = await supabaseAPI.post('users', formData);
         
-        if (response.ok) {
-            const result = await response.json();
+        if (result) {
             
             // Show success message
             showAlert('회원가입이 완료되었습니다! 로그인 후 이용해주세요.', 'success');

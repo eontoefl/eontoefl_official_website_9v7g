@@ -320,51 +320,36 @@ async function saveGuide() {
     
     try {
         // 1. 기존 가이드 체크
-        const checkResponse = await fetch('tables/guide_content?limit=1');
-        const checkResult = await checkResponse.json();
+        const checkResult = await supabaseAPI.get('guide_content', { limit: 1 });
         
         const guideData = {
-            sections: sections,
-            updated_at: now,
+            content: { sections: sections },
+            updated_at: Date.now(),
             updated_by: userData.email
         };
         
-        let saveResponse;
+        let saveResult;
         if (checkResult.data && checkResult.data.length > 0) {
             // 업데이트
             const existingId = checkResult.data[0].id;
-            saveResponse = await fetch(`tables/guide_content/${existingId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(guideData)
-            });
+            saveResult = await supabaseAPI.put('guide_content', existingId, guideData);
         } else {
             // 새로 생성
-            guideData.id = 'current';
-            saveResponse = await fetch('tables/guide_content', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(guideData)
-            });
+            saveResult = await supabaseAPI.post('guide_content', guideData);
         }
         
-        if (!saveResponse.ok) throw new Error('Failed to save guide');
+        if (!saveResult) throw new Error('Failed to save guide');
         
         // 2. 버전 저장
         const versionData = {
-            content: JSON.stringify(sections),
-            created_at: now,
-            created_by: userData.email,
-            version_name: `버전 ${new Date().toLocaleString('ko-KR')}`
+            content: { sections: sections },
+            created_at: Date.now(),
+            created_by: userData.email
         };
         
-        const versionResponse = await fetch('tables/guide_versions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(versionData)
-        });
+        const versionResult = await supabaseAPI.post('guide_versions', versionData);
         
-        if (!versionResponse.ok) throw new Error('Failed to save version');
+        if (!versionResult) throw new Error('Failed to save version');
         
         alert('✅ 저장되었습니다!');
         
@@ -377,8 +362,7 @@ async function saveGuide() {
 // 버전 관리 모달
 async function showVersionHistory() {
     try {
-        const response = await fetch('tables/guide_versions?limit=20&sort=-created_at');
-        const result = await response.json();
+        const result = await supabaseAPI.get('guide_versions', { limit: 20, sort: '-created_at' });
         
         const versionList = document.getElementById('versionList');
         

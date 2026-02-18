@@ -84,11 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // 신청서 데이터 로드
 async function loadApplications() {
     try {
-        const response = await fetch('tables/applications?limit=1000');
-        const data = await response.json();
+        const result = await supabaseAPI.get('applications', { limit: 1000 });
         
-        if (data.data && data.data.length > 0) {
-            allApplications = data.data;
+        if (result.data && result.data.length > 0) {
+            allApplications = result.data;
             applyFilters();
         } else {
             document.getElementById('loading').style.display = 'none';

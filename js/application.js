@@ -41,11 +41,10 @@ async function loadApplicationsList() {
     listLoading.classList.add('show');
     
     try {
-        const response = await fetch('tables/applications?limit=1000&sort=-created_at');
-        const data = await response.json();
+        const result = await supabaseAPI.get('applications', { limit: 1000, sort: '-created_at' });
         
-        if (data.data && data.data.length > 0) {
-            allApplications = data.data;
+        if (result.data && result.data.length > 0) {
+            allApplications = result.data;
             
             // Update total count
             document.getElementById('totalCount').textContent = allApplications.length;

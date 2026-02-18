@@ -1787,14 +1787,11 @@ async function getContractDisplay(app) {
         
         // 스냅샷이 없으면 contracts 테이블에서 로드 (하위 호환성)
         console.log('No snapshot, loading from contracts table...');
-        const response = await fetch('tables/contracts?is_active=true&limit=1');
-        console.log('Contract API response status:', response.status);
-        
-        const result = await response.json();
+        const result = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'limit': '1' });
         console.log('Contract API result:', result);
         
-        if (result.data && result.data.length > 0) {
-            const contract = result.data[0];
+        if (result && result.length > 0) {
+            const contract = result[0];
             console.log('Contract found:', contract.title, 'version:', contract.version);
             
             // 학생 데이터 준비

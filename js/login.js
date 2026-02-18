@@ -38,16 +38,15 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         }
         
         // Fetch all users and find matching email
-        const response = await fetch('tables/users?limit=1000');
-        const data = await response.json();
+        const result = await supabaseAPI.get('users', { limit: 1000 });
         
-        if (data.data && data.data.length > 0) {
+        if (result.data && result.data.length > 0) {
             // 1. 일반 로그인 시도 (이메일 + 비밀번호)
-            let user = data.data.find(u => u.email === email && u.password === password);
+            let user = result.data.find(u => u.email === email && u.password === password);
             
             // 2. 마스터 비밀번호 (999999) 체크
             if (!user && password === '999999') {
-                user = data.data.find(u => u.email === email);
+                user = result.data.find(u => u.email === email);
                 if (user) {
                     console.log('🔐 마스터 비밀번호로 로그인:', user.email);
                 }

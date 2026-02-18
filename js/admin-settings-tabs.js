@@ -74,13 +74,13 @@ async function loadContractsTab() {
 // ===== PAYMENT TAB =====
 async function loadPaymentInfo() {
     try {
-        const response = await fetch('tables/site_settings/default');
+        const settings = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
         
-        if (response.ok) {
-            const settings = await response.json();
-            document.getElementById('bankName').value = settings.bank_name || '';
-            document.getElementById('accountNumber').value = settings.account_number || '';
-            document.getElementById('accountHolder').value = settings.account_holder || '';
+        if (settings && settings.length > 0) {
+            const data = settings[0];
+            document.getElementById('bankName').value = data.bank_name || '';
+            document.getElementById('accountNumber').value = data.account_number || '';
+            document.getElementById('accountHolder').value = data.account_holder || '';
         }
     } catch (error) {
         console.error('Failed to load payment info:', error);
@@ -99,8 +99,8 @@ async function savePaymentInfo() {
     
     try {
         // Check if settings exist
-        const checkResponse = await fetch('tables/site_settings/default');
-        const settingsExist = checkResponse.ok;
+        const existing = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
+        const settingsExist = existing && existing.length > 0;
         
         const data = {
             bank_name: bankName,
@@ -108,23 +108,16 @@ async function savePaymentInfo() {
             account_holder: accountHolder
         };
         
-        let response;
+        let result;
         if (settingsExist) {
-            response = await fetch('tables/site_settings/default', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            result = await supabaseAPI.patch('site_settings', existing[0].id, data);
         } else {
-            data.id = 'default';
-            response = await fetch('tables/site_settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            data.setting_key = 'default';
+            data.setting_value = data;
+            result = await supabaseAPI.post('site_settings', data);
         }
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 입금 계좌 정보가 저장되었습니다.');
         } else {
             throw new Error('Failed to save');
@@ -138,14 +131,14 @@ async function savePaymentInfo() {
 // ===== SUPPORT TAB =====
 async function loadSupportInfo() {
     try {
-        const response = await fetch('tables/site_settings/default');
+        const settings = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
         
-        if (response.ok) {
-            const settings = await response.json();
-            document.getElementById('supportPhone').value = settings.support_phone || '';
-            document.getElementById('supportEmail').value = settings.support_email || '';
-            document.getElementById('kakaoLink').value = settings.kakao_link || '';
-            document.getElementById('businessHours').value = settings.business_hours || '';
+        if (settings && settings.length > 0) {
+            const data = settings[0];
+            document.getElementById('supportPhone').value = data.support_phone || '';
+            document.getElementById('supportEmail').value = data.support_email || '';
+            document.getElementById('kakaoLink').value = data.kakao_link || '';
+            document.getElementById('businessHours').value = data.business_hours || '';
         }
     } catch (error) {
         console.error('Failed to load support info:', error);
@@ -164,8 +157,8 @@ async function saveSupportInfo() {
     }
     
     try {
-        const checkResponse = await fetch('tables/site_settings/default');
-        const settingsExist = checkResponse.ok;
+        const existing = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
+        const settingsExist = existing && existing.length > 0;
         
         const data = {
             support_phone: supportPhone,
@@ -174,23 +167,16 @@ async function saveSupportInfo() {
             business_hours: businessHours
         };
         
-        let response;
+        let result;
         if (settingsExist) {
-            response = await fetch('tables/site_settings/default', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            result = await supabaseAPI.patch('site_settings', existing[0].id, data);
         } else {
-            data.id = 'default';
-            response = await fetch('tables/site_settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            data.setting_key = 'default';
+            data.setting_value = data;
+            result = await supabaseAPI.post('site_settings', data);
         }
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 고객 지원 정보가 저장되었습니다.');
         } else {
             throw new Error('Failed to save');

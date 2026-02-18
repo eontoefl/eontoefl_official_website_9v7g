@@ -1179,9 +1179,9 @@ function formatNotificationTime(timestamp) {
  */
 async function getSiteSettings() {
     try {
-        const response = await fetch('tables/site_settings/default');
-        if (response.ok) {
-            return await response.json();
+        const result = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
+        if (result && result.length > 0) {
+            return result[0];
         }
     } catch (error) {
         console.error('사이트 설정 로드 실패:', error);

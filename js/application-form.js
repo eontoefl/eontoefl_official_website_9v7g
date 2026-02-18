@@ -219,19 +219,11 @@ function setupFormSubmission() {
 
         try {
             // Submit to applications table
-            const response = await fetch('tables/applications', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
+            const result = await supabaseAPI.post('applications', formData);
 
-            if (!response.ok) {
+            if (!result) {
                 throw new Error('신청서 제출에 실패했습니다.');
             }
-
-            const result = await response.json();
 
             // Clear auto-saved data
             localStorage.removeItem('iontoefl_form_draft');
