@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수강 후기 - 이온토플</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://www.genspark.ai/api/files/s/efTK9mFF" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="reviews.html" class="active">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="reviews.html#notice"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html#reviews"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="reviews.html#materials"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header">
+        <div class="container">
+            <h1>커뮤니티</h1>
+            <p>이온토플과 함께하는 학습 커뮤니티</p>
+        </div>
+    </section>
+
+    <!-- Page Layout (Sidebar + Content) -->
+    <div class="page-layout">
+        <div class="container">
+            <div class="layout-wrapper">
+                <!-- Left Sidebar Navigation -->
+                <aside class="sidebar">
+                    <nav class="sidebar-nav">
+                        <div class="sidebar-title">커뮤니티</div>
+                        <a href="#notice">
+                            <i class="fas fa-bullhorn"></i>
+                            공지사항
+                        </a>
+                        <a href="#reviews" class="active">
+                            <i class="fas fa-star"></i>
+                            수강 후기
+                        </a>
+                        <a href="#materials">
+                            <i class="fas fa-book"></i>
+                            학습 자료
+                        </a>
+                        <a href="faq.html">
+                            <i class="fas fa-question-circle"></i>
+                            FAQ
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="main-content">
+                    <!-- 공지사항 -->
+                    <section id="notice" class="content-section">
+                        <h2>공지사항</h2>
+                        <p>이온토플의 최신 소식과 공지사항을 확인하세요.</p>
+
+                        <div style="margin-top: 32px;">
+                            <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                                <!-- 공지사항 아이템 1 -->
+                                <div style="display: flex; align-items: center; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                            <span style="background: #667eea; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">중요</span>
+                                            <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #1e293b;">2024년 봄학기 개강 안내</h3>
+                                        </div>
+                                        <p style="font-size: 14px; color: #64748b; margin: 0;">3월 4일(월)부터 봄학기가 시작됩니다. 개강 일정을 확인하세요.</p>
+                                    </div>
+                                    <div style="text-align: right; margin-left: 24px;">
+                                        <div style="font-size: 13px; color: #94a3b8;">2024.02.15</div>
+                                        <i class="fas fa-chevron-right" style="color: #cbd5e1; font-size: 12px; margin-top: 4px;"></i>
+                                    </div>
+                                </div>
+
+                                <!-- 공지사항 아이템 2 -->
+                                <div style="display: flex; align-items: center; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                            <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #1e293b;">설 연휴 휴무 안내</h3>
+                                        </div>
+                                        <p style="font-size: 14px; color: #64748b; margin: 0;">2월 9일(금)~11일(일)은 설 연휴로 휴무입니다.</p>
+                                    </div>
+                                    <div style="text-align: right; margin-left: 24px;">
+                                        <div style="font-size: 13px; color: #94a3b8;">2024.02.05</div>
+                                        <i class="fas fa-chevron-right" style="color: #cbd5e1; font-size: 12px; margin-top: 4px;"></i>
+                                    </div>
+                                </div>
+
+                                <!-- 공지사항 아이템 3 -->
+                                <div style="display: flex; align-items: center; padding: 20px 24px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                            <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #1e293b;">신규 모의고사 자료 업데이트</h3>
+                                        </div>
+                                        <p style="font-size: 14px; color: #64748b; margin: 0;">2024년 최신 TOEFL 기출 경향을 반영한 모의고사가 업로드되었습니다.</p>
+                                    </div>
+                                    <div style="text-align: right; margin-left: 24px;">
+                                        <div style="font-size: 13px; color: #94a3b8;">2024.01.28</div>
+                                        <i class="fas fa-chevron-right" style="color: #cbd5e1; font-size: 12px; margin-top: 4px;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 수강 후기 -->
+                    <section id="reviews" class="content-section">
+                        <h2>수강 후기</h2>
+                        <p>이온토플과 함께 목표를 달성한 학생들의 생생한 이야기를 들어보세요.</p>
+
+                        <!-- 통계 박스 -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 32px 0;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 12px; text-align: center; color: white;">
+                                <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">95%</div>
+                                <div style="font-size: 14px; opacity: 0.9;">목표 달성률</div>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 24px; border-radius: 12px; text-align: center; color: white;">
+                                <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">1,200+</div>
+                                <div style="font-size: 14px; opacity: 0.9;">수강생</div>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 24px; border-radius: 12px; text-align: center; color: white;">
+                                <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">15+</div>
+                                <div style="font-size: 14px; opacity: 0.9;">평균 점수 상승</div>
+                            </div>
+                        </div>
+
+                        <!-- 후기 목록 -->
+                        <div id="reviewsContainer" class="reviews-grid" style="margin-top: 40px;">
+                            <!-- 로딩 중 표시 -->
+                            <div id="reviewsLoading" style="grid-column: 1/-1; text-align: center; padding: 60px 20px;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #9480c5; margin-bottom: 16px;"></i>
+                                <p style="color: #64748b;">후기를 불러오는 중...</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 학습 자료 -->
+                    <section id="materials" class="content-section">
+                        <h2>학습 자료</h2>
+                        <p>수강생들을 위한 다양한 학습 자료를 제공합니다.</p>
+
+                        <div class="highlight-box" style="margin-top: 32px; background: #fff3cd; border-left-color: #ffc107;">
+                            <p style="color: #856404; margin: 0;">
+                                <i class="fas fa-lock" style="margin-right: 8px;"></i>
+                                <strong>학습 자료는 수강생 전용입니다.</strong><br>
+                                로그인 후 이용하실 수 있습니다.
+                            </p>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 32px;">
+                            <div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 24px; transition: all 0.3s;" onmouseover="this.style.borderColor='#9480c5'; this.style.transform='translateY(-4px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                                    <i class="fas fa-file-pdf" style="font-size: 24px; color: white;"></i>
+                                </div>
+                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e293b;">Reading 핵심 자료</h3>
+                                <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 16px;">Reading 영역의 핵심 전략과 기출 문제 분석 자료</p>
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                                    <span style="font-size: 13px; color: #94a3b8;">
+                                        <i class="fas fa-file" style="margin-right: 4px;"></i>
+                                        PDF 12개
+                                    </span>
+                                    <button style="background: none; border: none; color: #9480c5; font-weight: 600; cursor: pointer; font-size: 14px;">
+                                        다운로드 <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 24px; transition: all 0.3s;" onmouseover="this.style.borderColor='#9480c5'; this.style.transform='translateY(-4px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                                    <i class="fas fa-headphones" style="font-size: 24px; color: white;"></i>
+                                </div>
+                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e293b;">Listening 연습 문제</h3>
+                                <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 16px;">실전 대비 Listening 연습 문제와 스크립트</p>
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                                    <span style="font-size: 13px; color: #94a3b8;">
+                                        <i class="fas fa-file" style="margin-right: 4px;"></i>
+                                        MP3 24개
+                                    </span>
+                                    <button style="background: none; border: none; color: #9480c5; font-weight: 600; cursor: pointer; font-size: 14px;">
+                                        다운로드 <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 24px; transition: all 0.3s;" onmouseover="this.style.borderColor='#9480c5'; this.style.transform='translateY(-4px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                                    <i class="fas fa-pen-fancy" style="font-size: 24px; color: white;"></i>
+                                </div>
+                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e293b;">Writing 템플릿</h3>
+                                <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 16px;">고득점을 위한 Writing 템플릿과 예시 답안</p>
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                                    <span style="font-size: 13px; color: #94a3b8;">
+                                        <i class="fas fa-file" style="margin-right: 4px;"></i>
+                                        DOCX 8개
+                                    </span>
+                                    <button style="background: none; border: none; color: #9480c5; font-weight: 600; cursor: pointer; font-size: 14px;">
+                                        다운로드 <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 24px; transition: all 0.3s;" onmouseover="this.style.borderColor='#9480c5'; this.style.transform='translateY(-4px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+                                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                                    <i class="fas fa-microphone" style="font-size: 24px; color: white;"></i>
+                                </div>
+                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e293b;">Speaking 연습</h3>
+                                <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 16px;">Speaking 주제별 연습 문제와 모범 답안</p>
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                                    <span style="font-size: 13px; color: #94a3b8;">
+                                        <i class="fas fa-file" style="margin-right: 4px;"></i>
+                                        MP3 16개
+                                    </span>
+                                    <button style="background: none; border: none; color: #9480c5; font-weight: 600; cursor: pointer; font-size: 14px;">
+                                        다운로드 <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CTA 버튼 -->
+                    <div style="text-align: center; margin-top: 60px; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+                        <h3 style="color: white; font-size: 24px; font-weight: 700; margin-bottom: 16px;">이온토플과 함께 시작하세요</h3>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin-bottom: 24px;">지금 신청하고 목표 점수를 달성하세요</p>
+                        <div style="display: flex; gap: 16px; justify-content: center;">
+                            <a href="application-form.html" class="btn-primary" style="background: white; color: #667eea;">지금 신청하기</a>
+                            <a href="programs.html" class="btn-secondary" style="border-color: white; color: white;">프로그램 보기</a>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">TOEFL 전문 교육기관으로<br>여러분의 목표 달성을 돕습니다</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="about.html">소개</a></li>
+                        <li><a href="programs.html">프로그램</a></li>
+                        <li><a href="pricing.html">가격</a></li>
+                        <li><a href="reviews.html">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-links">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><i class="fas fa-envelope"></i> info@iontoefl.com</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구 테헤란로 123</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/common.js"></script>
+    <script>
+        // 사이드바 활성화 스크립트
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarLinks = document.querySelectorAll('.sidebar-nav a[href^="#"]');
+            const sections = document.querySelectorAll('.content-section');
+
+            // 스크롤 시 현재 섹션 하이라이트
+            window.addEventListener('scroll', function() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (pageYOffset >= sectionTop - 100) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                sidebarLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            // 클릭 시 부드러운 스크롤
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetSection = document.getElementById(targetId);
+                    if (targetSection) {
+                        window.scrollTo({
+                            top: targetSection.offsetTop - 100,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+
+            // 수강 후기 로드
+            loadReviews();
+        });
+
+        // 수강 후기 로드 함수
+        async function loadReviews() {
+            try {
+                // 임시 샘플 데이터 (실제로는 DB에서 가져옴)
+                const sampleReviews = [
+                    {
+                        name: "김○○",
+                        program: "고급반",
+                        score_before: 85,
+                        score_after: 108,
+                        rating: 5,
+                        content: "체계적인 커리큘럼과 꼼꼼한 피드백 덕분에 목표 점수를 달성할 수 있었습니다. 특히 Writing과 Speaking 파트에서 많은 도움을 받았습니다.",
+                        date: "2024.01.20"
+                    },
+                    {
+                        name: "이○○",
+                        program: "중급반",
+                        score_before: 72,
+                        score_after: 95,
+                        rating: 5,
+                        content: "강사님의 열정적인 수업과 1:1 맞춤 관리가 정말 인상적이었습니다. 23점이나 올릴 수 있었어요!",
+                        date: "2024.01.15"
+                    },
+                    {
+                        name: "박○○",
+                        program: "단기 집중반",
+                        score_before: 88,
+                        score_after: 105,
+                        rating: 5,
+                        content: "단기간에 점수를 올려야 해서 고민이 많았는데, 집중 관리 덕분에 17점 상승했습니다. 감사합니다!",
+                        date: "2024.01.10"
+                    },
+                    {
+                        name: "최○○",
+                        program: "기초반",
+                        score_before: 55,
+                        score_after: 78,
+                        rating: 5,
+                        content: "영어 기초가 부족했는데 차근차근 실력을 쌓을 수 있었습니다. 선생님들이 정말 친절하세요.",
+                        date: "2024.01.05"
+                    },
+                    {
+                        name: "정○○",
+                        program: "고급반",
+                        score_before: 92,
+                        score_after: 112,
+                        rating: 5,
+                        content: "고득점을 위한 세밀한 전략과 노하우를 배울 수 있었습니다. 특히 실전 모의고사가 큰 도움이 되었어요.",
+                        date: "2023.12.28"
+                    },
+                    {
+                        name: "강○○",
+                        program: "중급반",
+                        score_before: 68,
+                        score_after: 89,
+                        rating: 5,
+                        content: "처음에는 80점도 어려울 것 같았는데 선생님들의 도움으로 89점까지 올릴 수 있었습니다!",
+                        date: "2023.12.20"
+                    }
+                ];
+
+                displayReviews(sampleReviews);
+            } catch (error) {
+                console.error('후기 로드 오류:', error);
+                document.getElementById('reviewsLoading').innerHTML = `
+                    <div style="text-align: center; color: #ef4444;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 32px; margin-bottom: 16px;"></i>
+                        <p>후기를 불러오는데 실패했습니다.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 후기 표시 함수
+        function displayReviews(reviews) {
+            const container = document.getElementById('reviewsContainer');
+            
+            if (reviews.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px;">
+                        <i class="fas fa-inbox" style="font-size: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
+                        <p style="color: #64748b;">등록된 후기가 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const reviewsHTML = reviews.map(review => {
+                const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
+                const scoreIncrease = review.score_after - review.score_before;
+                
+                return `
+                    <div class="review-card">
+                        <div class="review-header">
+                            <div>
+                                <div class="review-name">${review.name}</div>
+                                <div class="review-program">${review.program}</div>
+                            </div>
+                            <div class="review-rating" style="color: #fbbf24; font-size: 18px;">${stars}</div>
+                        </div>
+                        <div class="review-score">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <div>
+                                    <div style="font-size: 12px; color: #94a3b8; margin-bottom: 4px;">수강 전</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: #64748b;">${review.score_before}</div>
+                                </div>
+                                <i class="fas fa-arrow-right" style="color: #9480c5; font-size: 20px;"></i>
+                                <div>
+                                    <div style="font-size: 12px; color: #94a3b8; margin-bottom: 4px;">수강 후</div>
+                                    <div style="font-size: 24px; font-weight: 700; color: #667eea;">${review.score_after}</div>
+                                </div>
+                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px;">
+                                    +${scoreIncrease}점 ↑
+                                </div>
+                            </div>
+                        </div>
+                        <div class="review-content">${review.content}</div>
+                        <div class="review-date">${review.date}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = reviewsHTML;
+        }
+    </script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>

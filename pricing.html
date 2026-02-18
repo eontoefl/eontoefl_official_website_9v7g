@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수강료 안내 - 이온토플</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://www.genspark.ai/api/files/s/efTK9mFF" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html" class="active">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="reviews.html">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="reviews.html#notice"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="reviews.html#materials"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header">
+        <div class="container">
+            <h1>수강료 안내</h1>
+            <p>합리적인 가격으로 최고의 교육을 제공합니다</p>
+        </div>
+    </section>
+
+    <!-- Page Layout (Sidebar + Content) -->
+    <div class="page-layout">
+        <div class="container">
+            <div class="layout-wrapper">
+                <!-- Left Sidebar Navigation -->
+                <aside class="sidebar">
+                    <nav class="sidebar-nav">
+                        <div class="sidebar-title">가격 안내</div>
+                        <a href="#fees" class="active">
+                            <i class="fas fa-money-bill-wave"></i>
+                            수강료 안내
+                        </a>
+                        <a href="#discounts">
+                            <i class="fas fa-percent"></i>
+                            할인 혜택
+                        </a>
+                        <a href="#refund">
+                            <i class="fas fa-undo"></i>
+                            환불 규정
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="main-content">
+                    <!-- 수강료 안내 -->
+                    <section id="fees" class="content-section">
+                        <h2>수강료 안내</h2>
+                        <p>모든 수강료는 교재비, 학습 자료, 모의고사 비용이 포함된 가격입니다.</p>
+                        
+                        <div class="pricing-grid" style="margin-top: 40px;">
+                            <div class="pricing-card">
+                                <div class="pricing-header">
+                                    <h3 class="pricing-title">기초반</h3>
+                                    <div class="pricing-price">
+                                        <span class="price-amount">980,000</span>
+                                        <span class="price-unit">원</span>
+                                    </div>
+                                    <div class="pricing-period">12주 과정</div>
+                                </div>
+                                <ul class="pricing-features">
+                                    <li><i class="fas fa-check"></i> 주 3회 수업 (36회)</li>
+                                    <li><i class="fas fa-check"></i> 학습 자료 제공</li>
+                                    <li><i class="fas fa-check"></i> 온라인 복습 자료</li>
+                                    <li><i class="fas fa-check"></i> 모의고사 4회</li>
+                                </ul>
+                                <a href="application-form.html" class="btn-outline">신청하기</a>
+                            </div>
+                            <div class="pricing-card">
+                                <div class="pricing-header">
+                                    <h3 class="pricing-title">중급반</h3>
+                                    <div class="pricing-price">
+                                        <span class="price-amount">1,280,000</span>
+                                        <span class="price-unit">원</span>
+                                    </div>
+                                    <div class="pricing-period">10주 과정</div>
+                                </div>
+                                <ul class="pricing-features">
+                                    <li><i class="fas fa-check"></i> 주 4회 수업 (40회)</li>
+                                    <li><i class="fas fa-check"></i> 학습 자료 제공</li>
+                                    <li><i class="fas fa-check"></i> 온라인 복습 자료</li>
+                                    <li><i class="fas fa-check"></i> 모의고사 10회</li>
+                                    <li><i class="fas fa-check"></i> 1:1 상담 월 2회</li>
+                                </ul>
+                                <a href="application-form.html" class="btn-outline">신청하기</a>
+                            </div>
+                            <div class="pricing-card featured">
+                                <div class="pricing-badge">추천</div>
+                                <div class="pricing-header">
+                                    <h3 class="pricing-title">고급반</h3>
+                                    <div class="pricing-price">
+                                        <span class="price-amount">1,580,000</span>
+                                        <span class="price-unit">원</span>
+                                    </div>
+                                    <div class="pricing-period">8주 과정</div>
+                                </div>
+                                <ul class="pricing-features">
+                                    <li><i class="fas fa-check"></i> 주 5회 수업 (40회)</li>
+                                    <li><i class="fas fa-check"></i> 프리미엄 학습 자료</li>
+                                    <li><i class="fas fa-check"></i> 온라인 복습 자료</li>
+                                    <li><i class="fas fa-check"></i> 모의고사 무제한</li>
+                                    <li><i class="fas fa-check"></i> 1:1 상담 주 1회</li>
+                                    <li><i class="fas fa-check"></i> 개인별 학습 플랜</li>
+                                </ul>
+                                <a href="application-form.html" class="btn-primary">신청하기</a>
+                            </div>
+                            <div class="pricing-card">
+                                <div class="pricing-header">
+                                    <h3 class="pricing-title">단기 집중반</h3>
+                                    <div class="pricing-price">
+                                        <span class="price-amount">1,980,000</span>
+                                        <span class="price-unit">원</span>
+                                    </div>
+                                    <div class="pricing-period">4주 과정</div>
+                                </div>
+                                <ul class="pricing-features">
+                                    <li><i class="fas fa-check"></i> 주 5회 수업 (20회)</li>
+                                    <li><i class="fas fa-check"></i> 프리미엄 학습 자료</li>
+                                    <li><i class="fas fa-check"></i> 매일 모의고사</li>
+                                    <li><i class="fas fa-check"></i> 1:1 맞춤 관리</li>
+                                    <li><i class="fas fa-check"></i> 개인별 약점 분석</li>
+                                    <li><i class="fas fa-check"></i> 24시간 질의응답</li>
+                                </ul>
+                                <a href="application-form.html" class="btn-outline">신청하기</a>
+                            </div>
+                        </div>
+
+                        <div class="highlight-box" style="margin-top: 40px;">
+                            <h3 style="color: #5b21b6; margin-bottom: 12px;">💡 알아두세요</h3>
+                            <ul style="margin: 0; padding-left: 20px;">
+                                <li style="margin-bottom: 8px;">수강료는 VAT 별도 금액입니다.</li>
+                                <li style="margin-bottom: 8px;">결제는 계좌이체, 신용카드, 카카오페이로 가능합니다.</li>
+                                <li style="margin-bottom: 8px;">분할납부는 무이자 2~3개월까지 가능합니다.</li>
+                                <li>단체 등록 시 별도 할인이 적용됩니다.</li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <!-- 할인 혜택 -->
+                    <section id="discounts" class="content-section">
+                        <h2>할인 혜택</h2>
+                        <p>다양한 할인 혜택으로 더욱 합리적인 가격에 수강하실 수 있습니다.</p>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 32px;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px; border-radius: 16px; color: white; text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">
+                                    <i class="fas fa-user-friends"></i>
+                                </div>
+                                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: white;">친구 추천 할인</h3>
+                                <p style="font-size: 32px; font-weight: 700; margin-bottom: 8px;">5%</p>
+                                <p style="font-size: 14px; opacity: 0.9;">친구를 추천하고 함께 등록하시면<br>두 분 모두 5% 할인</p>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 32px; border-radius: 16px; color: white; text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </div>
+                                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: white;">재등록 할인</h3>
+                                <p style="font-size: 32px; font-weight: 700; margin-bottom: 8px;">10%</p>
+                                <p style="font-size: 14px; opacity: 0.9;">이온토플 수강 이력이 있는<br>재등록 학생 할인</p>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 32px; border-radius: 16px; color: white; text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: white;">단체 등록 할인</h3>
+                                <p style="font-size: 32px; font-weight: 700; margin-bottom: 8px;">15%</p>
+                                <p style="font-size: 14px; opacity: 0.9;">3명 이상 단체로<br>등록하시는 경우</p>
+                            </div>
+                            <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 32px; border-radius: 16px; color: white; text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: white;">조기 등록 할인</h3>
+                                <p style="font-size: 32px; font-weight: 700; margin-bottom: 8px;">7%</p>
+                                <p style="font-size: 14px; opacity: 0.9;">개강 4주 전<br>조기 등록 시</p>
+                            </div>
+                        </div>
+
+                        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px 24px; border-radius: 8px; margin-top: 40px;">
+                            <h3 style="color: #856404; margin-bottom: 12px;">
+                                <i class="fas fa-exclamation-triangle"></i> 할인 적용 안내
+                            </h3>
+                            <ul style="margin: 0; padding-left: 20px; color: #856404;">
+                                <li style="margin-bottom: 8px;">할인은 중복 적용되지 않으며, 최대 할인율이 적용됩니다.</li>
+                                <li style="margin-bottom: 8px;">할인 혜택은 등록 시점의 정책을 따릅니다.</li>
+                                <li>자세한 사항은 상담 시 문의해주세요.</li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <!-- 환불 규정 -->
+                    <section id="refund" class="content-section">
+                        <h2>환불 규정</h2>
+                        <p>학원의 설립·운영 및 과외교습에 관한 법률 제18조 및 동법 시행령 제18조 제3항에 따른 환불 규정입니다.</p>
+
+                        <div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 32px;">
+                            <div style="background: #f8f9fa; padding: 20px 24px; border-bottom: 2px solid #e2e8f0;">
+                                <h3 style="font-size: 18px; font-weight: 600; margin: 0; color: #1e293b;">
+                                    <i class="fas fa-calendar-check" style="color: #9480c5; margin-right: 8px;"></i>
+                                    수강 시작 전 환불
+                                </h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background: #f8f4ff;">
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">환불 시점</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">환불 금액</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">수강 시작 전</td>
+                                            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #667eea;">전액 환불</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div style="background: white; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 24px;">
+                            <div style="background: #f8f9fa; padding: 20px 24px; border-bottom: 2px solid #e2e8f0;">
+                                <h3 style="font-size: 18px; font-weight: 600; margin: 0; color: #1e293b;">
+                                    <i class="fas fa-calendar-times" style="color: #9480c5; margin-right: 8px;"></i>
+                                    수강 시작 후 환불
+                                </h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background: #f8f4ff;">
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">환불 시점</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">환불 금액</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">총 수업시간의 1/3 경과 전</td>
+                                            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">이미 납부한 수강료의 2/3 환불</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">총 수업시간의 1/2 경과 전</td>
+                                            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">이미 납부한 수강료의 1/2 환불</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 12px;">총 수업시간의 1/2 경과 후</td>
+                                            <td style="padding: 12px; font-weight: 600; color: #ef4444;">환불 불가</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="highlight-box" style="margin-top: 32px;">
+                            <h3 style="color: #5b21b6; margin-bottom: 12px;">
+                                <i class="fas fa-info-circle"></i> 환불 신청 방법
+                            </h3>
+                            <ol style="margin: 0; padding-left: 20px;">
+                                <li style="margin-bottom: 8px;"><strong>방문 신청:</strong> 학원 방문 후 환불 신청서 작성</li>
+                                <li style="margin-bottom: 8px;"><strong>전화 신청:</strong> 02-1234-5678로 전화 후 환불 의사 전달</li>
+                                <li style="margin-bottom: 8px;"><strong>이메일 신청:</strong> info@iontoefl.com으로 환불 신청 메일 발송</li>
+                                <li><strong>처리 기간:</strong> 신청일로부터 7영업일 이내 처리</li>
+                            </ol>
+                        </div>
+
+                        <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 20px 24px; border-radius: 8px; margin-top: 24px;">
+                            <h3 style="color: #991b1b; margin-bottom: 12px;">
+                                <i class="fas fa-times-circle"></i> 환불 불가 사항
+                            </h3>
+                            <ul style="margin: 0; padding-left: 20px; color: #991b1b;">
+                                <li style="margin-bottom: 8px;">수강료를 할인받고 등록한 경우, 환불 시 할인 전 금액 기준으로 계산됩니다.</li>
+                                <li style="margin-bottom: 8px;">제공받은 교재 및 학습 자료는 환불 금액에서 차감됩니다.</li>
+                                <li>학원 운영에 심각한 지장을 초래한 경우 환불이 제한될 수 있습니다.</li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <!-- CTA 버튼 -->
+                    <div style="text-align: center; margin-top: 60px; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+                        <h3 style="color: white; font-size: 24px; font-weight: 700; margin-bottom: 16px;">수강료 관련 문의</h3>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin-bottom: 24px;">궁금하신 사항은 언제든 문의해주세요</p>
+                        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                            <a href="application-form.html" class="btn-primary" style="background: white; color: #667eea;">지금 신청하기</a>
+                            <a href="tel:02-1234-5678" class="btn-secondary" style="border-color: white; color: white;">
+                                <i class="fas fa-phone"></i> 전화 상담
+                            </a>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">TOEFL 전문 교육기관으로<br>여러분의 목표 달성을 돕습니다</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="about.html">소개</a></li>
+                        <li><a href="programs.html">프로그램</a></li>
+                        <li><a href="pricing.html">가격</a></li>
+                        <li><a href="reviews.html">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-links">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><i class="fas fa-envelope"></i> info@iontoefl.com</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구 테헤란로 123</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/common.js"></script>
+    <script>
+        // 사이드바 활성화 스크립트
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
+            const sections = document.querySelectorAll('.content-section');
+
+            // 스크롤 시 현재 섹션 하이라이트
+            window.addEventListener('scroll', function() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (pageYOffset >= sectionTop - 100) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                sidebarLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            // 클릭 시 부드러운 스크롤
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetSection = document.getElementById(targetId);
+                    if (targetSection) {
+                        window.scrollTo({
+                            top: targetSection.offsetTop - 100,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>

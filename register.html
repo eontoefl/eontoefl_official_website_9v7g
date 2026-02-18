@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입 - 이온토플</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://www.genspark.ai/api/files/s/efTK9mFF" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="reviews.html">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="reviews.html#notice"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="reviews.html#materials"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Register Form -->
+    <div class="form-container">
+        <div class="form-header">
+            <h1 class="form-title">10초 간편 회원가입</h1>
+            <p class="form-subtitle">간단한 정보만 입력하고 바로 시작하세요</p>
+        </div>
+
+        <div class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 12px; font-size: 13px; color: #64748b;">처리 중입니다...</p>
+        </div>
+
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="name" class="form-label required">이름</label>
+                <input type="text" id="name" name="name" class="form-input" placeholder="홍길동" required>
+                <div class="form-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="email" class="form-label required">이메일</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="example@email.com" required>
+                <div class="form-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone" class="form-label required">전화번호</label>
+                <input type="tel" id="phone" name="phone" class="form-input" placeholder="010-1234-5678" required>
+                <div class="form-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label required">비밀번호</label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="6자 이상 입력" required minlength="6">
+                <div class="form-error"></div>
+            </div>
+
+            <button type="submit" class="form-submit" id="submitBtn">
+                <i class="fas fa-user-plus"></i> 회원가입 완료
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <p style="font-size: 12px; color: #64748b;">
+                이미 회원이신가요? 
+                <a href="application.html" style="color: #2563eb; font-weight: 600;">바로 신청하기</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">TOEFL 전문 교육기관으로<br>여러분의 목표 달성을 돕습니다</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="index.html#about">소개</a></li>
+                        <li><a href="index.html#programs">프로그램</a></li>
+                        <li><a href="index.html#pricing">가격</a></li>
+                        <li><a href="index.html#reviews">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">학생 서비스</h4>
+                    <ul class="footer-links">
+                        <li><a href="register.html">회원가입</a></li>
+                        <li><a href="application.html">상담 신청</a></li>
+                        <li><a href="application.html">신청하기</a></li>
+                        <li><a href="admin.html">관리자</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><i class="fas fa-envelope"></i> info@iontoefl.com</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="js/common.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/register.js"></script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>

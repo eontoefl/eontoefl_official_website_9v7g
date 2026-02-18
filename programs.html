@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로그램 안내 - 이온토플</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://www.genspark.ai/api/files/s/efTK9mFF" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html" class="active">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="reviews.html">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="reviews.html#notice"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="reviews.html#materials"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header">
+        <div class="container">
+            <h1>프로그램 안내</h1>
+            <p>당신의 레벨과 목표에 맞는 프로그램을 선택하세요</p>
+        </div>
+    </section>
+
+    <!-- Page Layout (Sidebar + Content) -->
+    <div class="page-layout">
+        <div class="container">
+            <div class="layout-wrapper">
+                <!-- Left Sidebar Navigation -->
+                <aside class="sidebar">
+                    <nav class="sidebar-nav">
+                        <div class="sidebar-title">프로그램</div>
+                        <a href="#basic" class="active">
+                            <i class="fas fa-seedling"></i>
+                            토플 기초반
+                        </a>
+                        <a href="#intermediate">
+                            <i class="fas fa-chart-line"></i>
+                            토플 중급반
+                        </a>
+                        <a href="#advanced">
+                            <i class="fas fa-crown"></i>
+                            토플 고급반
+                        </a>
+                        <a href="#intensive">
+                            <i class="fas fa-bolt"></i>
+                            토플 단기 집중반
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="main-content">
+                    <!-- 기초반 -->
+                    <div id="basic" class="content-section">
+                        <h2>토플 기초반</h2>
+                        <div class="program-card">
+                            <div class="program-badge">기초</div>
+                            <h3 class="program-title">TOEFL 입문자를 위한 기초 다지기 과정</h3>
+                            <p class="program-desc">영어 기초부터 토플 시험 구조까지 체계적으로 학습합니다. 처음 토플을 접하시는 분들을 위한 완벽한 입문 과정입니다.</p>
+                            
+                            <h3 style="margin-top: 32px; font-size: 18px;">📚 커리큘럼</h3>
+                            <ul class="program-features">
+                                <li><i class="fas fa-check"></i> 영어 기초 문법 집중 학습</li>
+                                <li><i class="fas fa-check"></i> Reading & Listening 기본기 완성</li>
+                                <li><i class="fas fa-check"></i> 토플 시험 구조 이해</li>
+                                <li><i class="fas fa-check"></i> 주 3회 수업 (12주 과정)</li>
+                            </ul>
+                            
+                            <div class="highlight-box" style="margin-top: 24px;">
+                                <p><strong>🎯 목표 점수:</strong> 60~80점</p>
+                            </div>
+                            
+                            <div style="margin-top: 24px;">
+                                <a href="application-form.html" class="btn-primary">지금 신청하기</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 중급반 -->
+                    <div id="intermediate" class="content-section">
+                        <h2>토플 중급반</h2>
+                        <div class="program-card">
+                            <div class="program-badge">중급</div>
+                            <h3 class="program-title">실전 점수 향상을 위한 핵심 전략 과정</h3>
+                            <p class="program-desc">4개 영역을 균형있게 학습하며 실전 감각을 키웁니다. Speaking과 Writing 집중 훈련으로 고득점을 달성합니다.</p>
+                            
+                            <h3 style="margin-top: 32px; font-size: 18px;">📚 커리큘럼</h3>
+                            <ul class="program-features">
+                                <li><i class="fas fa-check"></i> 4개 영역 균형 학습</li>
+                                <li><i class="fas fa-check"></i> Speaking & Writing 집중 훈련</li>
+                                <li><i class="fas fa-check"></i> 실전 모의고사 매주 실시</li>
+                                <li><i class="fas fa-check"></i> 주 4회 수업 (10주 과정)</li>
+                            </ul>
+                            
+                            <div class="highlight-box" style="margin-top: 24px;">
+                                <p><strong>🎯 목표 점수:</strong> 80~100점</p>
+                            </div>
+                            
+                            <div style="margin-top: 24px;">
+                                <a href="application-form.html" class="btn-primary">지금 신청하기</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 고급반 -->
+                    <div id="advanced" class="content-section">
+                        <h2>토플 고급반</h2>
+                        <div class="program-card featured">
+                            <div class="program-badge popular">인기</div>
+                            <h3 class="program-title">명문대 진학을 위한 고득점 달성 과정</h3>
+                            <p class="program-desc">100점 이상 고득점을 목표로 하는 학생들을 위한 최상급 과정입니다. 고난도 문제 공략법과 실전 시뮬레이션을 통해 목표 점수를 달성합니다.</p>
+                            
+                            <h3 style="margin-top: 32px; font-size: 18px;">📚 커리큘럼</h3>
+                            <ul class="program-features">
+                                <li><i class="fas fa-check"></i> 고난도 문제 공략법</li>
+                                <li><i class="fas fa-check"></i> 실전 시뮬레이션 집중</li>
+                                <li><i class="fas fa-check"></i> 개인별 약점 보완 학습</li>
+                                <li><i class="fas fa-check"></i> 주 5회 수업 (8주 과정)</li>
+                            </ul>
+                            
+                            <div class="highlight-box" style="margin-top: 24px; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-left-color: #f59e0b;">
+                                <p style="color: #9a3412;"><strong>🏆 목표 점수:</strong> 100점 이상 (최상위권)</p>
+                            </div>
+                            
+                            <h3 style="margin-top: 32px; font-size: 18px;">✨ 특별 혜택</h3>
+                            <ul class="program-features">
+                                <li><i class="fas fa-star"></i> 1:1 맞춤 학습 플랜 제공</li>
+                                <li><i class="fas fa-star"></i> 주 1회 개인 상담</li>
+                                <li><i class="fas fa-star"></i> 프리미엄 학습 자료 제공</li>
+                                <li><i class="fas fa-star"></i> 모의고사 무제한</li>
+                            </ul>
+                            
+                            <div style="margin-top: 24px;">
+                                <a href="application-form.html" class="btn-primary">지금 신청하기</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 단기 집중반 -->
+                    <div id="intensive" class="content-section">
+                        <h2>토플 단기 집중반</h2>
+                        <div class="program-card">
+                            <div class="program-badge">특별</div>
+                            <h3 class="program-title">빠른 시일 내 점수가 필요한 분들을 위한 특별 과정</h3>
+                            <p class="program-desc">단기간에 집중적으로 학습하여 빠르게 목표 점수를 달성합니다. 매일 3시간 수업과 개인별 맞춤 관리로 최단기간 최대 효과를 얻을 수 있습니다.</p>
+                            
+                            <h3 style="margin-top: 32px; font-size: 18px;">📚 커리큘럼</h3>
+                            <ul class="program-features">
+                                <li><i class="fas fa-check"></i> 매일 3시간 집중 수업</li>
+                                <li><i class="fas fa-check"></i> 개인별 맞춤 학습 플랜</li>
+                                <li><i class="fas fa-check"></i> 매일 모의고사 & 피드백</li>
+                                <li><i class="fas fa-check"></i> 주 5회 수업 (4주 과정)</li>
+                            </ul>
+                            
+                            <div class="highlight-box" style="margin-top: 24px;">
+                                <p><strong>⚡ 목표:</strong> 단기간 20+ 점 상승</p>
+                            </div>
+                            
+                            <h3 style="margin-top: 32px; font-size: 18px;">🎯 이런 분들께 추천합니다</h3>
+                            <ul class="program-features">
+                                <li><i class="fas fa-user-check"></i> 급하게 토플 점수가 필요한 분</li>
+                                <li><i class="fas fa-user-check"></i> 단기간 집중 학습을 원하시는 분</li>
+                                <li><i class="fas fa-user-check"></i> 기존 점수에서 20점 이상 향상이 필요한 분</li>
+                                <li><i class="fas fa-user-check"></i> 방학 기간을 활용하고 싶은 학생</li>
+                            </ul>
+                            
+                            <div style="margin-top: 24px;">
+                                <a href="application-form.html" class="btn-primary">지금 신청하기</a>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>이온토플</h3>
+                    <p>전문 TOEFL 교육 기관</p>
+                </div>
+                <div class="footer-section">
+                    <h3>빠른 링크</h3>
+                    <ul class="footer-links">
+                        <li><a href="about.html">소개</a></li>
+                        <li><a href="programs.html">프로그램</a></li>
+                        <li><a href="pricing.html">가격</a></li>
+                        <li><a href="reviews.html">후기</a></li>
+                        <li><a href="application.html">신청하기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>문의</h3>
+                    <p>이메일: info@iontoefl.com</p>
+                    <p>전화: 02-1234-5678</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/common.js"></script>
+    <script>
+        // 사이드바 스크롤 활성화
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('.content-section');
+            const navLinks = document.querySelectorAll('.sidebar-nav a');
+            const sidebar = document.querySelector('.sidebar');
+            const sidebarNav = document.querySelector('.sidebar-nav');
+
+            // Sticky 상태 디버깅
+            console.log('=== Sidebar Debug Info ===');
+            console.log('Sidebar element:', sidebar);
+            console.log('SidebarNav element:', sidebarNav);
+            
+            if (sidebarNav) {
+                const computedStyle = window.getComputedStyle(sidebarNav);
+                console.log('Position:', computedStyle.position);
+                console.log('Top:', computedStyle.top);
+                console.log('Display:', computedStyle.display);
+            }
+
+            if (sidebar) {
+                const parentStyle = window.getComputedStyle(sidebar.parentElement);
+                console.log('Parent overflow:', parentStyle.overflow);
+                console.log('Parent height:', parentStyle.height);
+            }
+
+            // 스크롤 시 위치 추적
+            let scrollCount = 0;
+            window.addEventListener('scroll', () => {
+                scrollCount++;
+                if (scrollCount % 50 === 0 && sidebarNav) { // 50번마다 한 번씩 로그
+                    const rect = sidebarNav.getBoundingClientRect();
+                    console.log(`Scroll ${scrollCount}: top=${rect.top}px`);
+                }
+
+                // 활성 링크 업데이트
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (window.pageYOffset >= sectionTop - 200) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === `#${current}`) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            // 부드러운 스크롤
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetId = link.getAttribute('href');
+                    const targetSection = document.querySelector(targetId);
+                    if (targetSection) {
+                        const offsetTop = targetSection.offsetTop - 100;
+                        window.scrollTo({
+                            top: offsetTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>

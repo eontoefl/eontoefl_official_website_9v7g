@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>계약서 관리 - 이온토플 관리자</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-contracts.html" class="admin-nav-link active">
+                    <i class="fas fa-file-contract"></i> 계약서 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1 class="admin-title">📄 계약서 관리</h1>
+            <p class="admin-subtitle">학생에게 제공할 계약서를 관리하세요</p>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading" id="loading" style="padding: 40px 20px;">
+            <div class="spinner"></div>
+            <p style="margin-top: 12px; font-size: 13px; color: #64748b;">로딩 중...</p>
+        </div>
+
+        <!-- Contract Management -->
+        <div id="contractManagement" style="display: none;">
+            
+            <!-- Active Contracts List -->
+            <div class="form-container" style="margin-bottom: 24px;">
+                <div class="form-header">
+                    <h2 class="form-title">
+                        <i class="fas fa-check-circle" style="color: #22c55e;"></i> 
+                        활성 계약서 목록
+                    </h2>
+                </div>
+                
+                <div id="activeContractsList" style="padding: 20px;">
+                    <!-- Will be filled by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Inactive Contracts (Collapsible) -->
+            <div class="form-container" style="margin-bottom: 24px;">
+                <div class="form-header" style="cursor: pointer;" onclick="toggleInactiveContracts()">
+                    <h2 class="form-title" style="display: flex; align-items: center; gap: 12px;">
+                        <i class="fas fa-archive" style="color: #94a3b8;"></i> 
+                        비활성 계약서 
+                        <span id="inactiveCount" style="background: #e2e8f0; color: #64748b; padding: 4px 12px; border-radius: 12px; font-size: 14px;">0개</span>
+                        <i class="fas fa-chevron-down" id="inactiveToggleIcon" style="margin-left: auto; color: #94a3b8;"></i>
+                    </h2>
+                </div>
+                
+                <div id="inactiveContractsList" style="display: none; padding: 20px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                    <!-- Will be filled by JavaScript -->
+                </div>
+            </div>
+
+            <!-- New Contract Form -->
+            <div class="form-container">
+                <div class="form-header">
+                    <h2 class="form-title">
+                        <i class="fas fa-plus-circle" style="color: #9480c5;"></i> 
+                        새 계약서 작성
+                    </h2>
+                </div>
+
+                <!-- Load Existing Contract Option -->
+                <div style="padding: 20px; background: #f0f9ff; border-left: 4px solid #3b82f6; border-radius: 8px; margin: 20px;">
+                    <p style="font-size: 14px; color: #1e40af; font-weight: 600; margin-bottom: 12px;">
+                        <i class="fas fa-lightbulb"></i> 기존 계약서를 기반으로 새 버전을 만들 수 있습니다
+                    </p>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <select id="loadContractSelect" style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                            <option value="">기존 계약서 선택...</option>
+                        </select>
+                        <button type="button" class="btn-secondary" onclick="loadExistingContract()">
+                            <i class="fas fa-download"></i> 불러오기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Form -->
+                <div style="padding: 20px;">
+                    <div class="form-group">
+                        <label for="newContractVersion" style="display: flex; align-items: center; gap: 8px;">
+                            버전 
+                            <span style="background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                                <i class="fas fa-lock"></i> 자동 생성
+                            </span>
+                        </label>
+                        <input type="text" id="newContractVersion" readonly style="background: #f1f5f9; cursor: not-allowed;">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newContractTitle">계약서 제목</label>
+                        <input type="text" id="newContractTitle" placeholder="예: 이온토플 수강 계약서" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newContractContent">계약서 내용</label>
+                        
+                        <!-- Syntax Guide -->
+                        <div style="margin-bottom: 12px;">
+                            <button type="button" class="btn-outline" onclick="toggleSyntaxGuide()" style="font-size: 13px; padding: 6px 12px;">
+                                <i class="fas fa-info-circle"></i> 문법 가이드 보기
+                            </button>
+                        </div>
+                        
+                        <div id="syntaxGuide" style="display: none; margin-bottom: 16px; padding: 16px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 13px; line-height: 1.6;">
+                            <p style="font-weight: 600; margin-bottom: 8px; color: #92400e;">📚 계약서 작성 문법:</p>
+                            <ul style="margin: 0; padding-left: 20px;">
+                                <li><code>{변수명}</code> - 자동 변수 (예: {name}, {final_price})</li>
+                                <li><code>{{input:필드ID:안내문구}}</code> - 자유 입력 칸</li>
+                                <li><code>{{copy:내용}}</code> - 따라쓰기 칸</li>
+                            </ul>
+                            <p style="margin-top: 8px; color: #92400e; font-size: 12px;">
+                                💡 사용 가능한 변수: name, email, phone, assigned_program, schedule_start, schedule_end, final_price, contract_date
+                            </p>
+                        </div>
+                        
+                        <textarea id="newContractContent" rows="20" placeholder="계약서 내용을 입력하세요..." required style="font-family: 'Pretendard', sans-serif; font-size: 14px; line-height: 1.8;"></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button type="button" class="btn-secondary" onclick="previewNewContract()">
+                            <i class="fas fa-eye"></i> 미리보기
+                        </button>
+                        <button type="button" class="btn-primary" onclick="saveNewContract()">
+                            <i class="fas fa-save"></i> 등록하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; overflow-y: auto;">
+        <div style="max-width: 900px; margin: 40px auto; background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <div style="padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 20px; font-weight: 700; margin: 0;">
+                    <i class="fas fa-eye"></i> 계약서 미리보기
+                </h2>
+                <button onclick="closePreview()" style="background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="previewContent" style="padding: 40px; max-height: 70vh; overflow-y: auto;">
+                <!-- Preview content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/admin-utils.js"></script>
+    <script src="js/contract-utils.js"></script>
+    <script src="js/admin-contracts.js"></script>
+</body>
+</html>

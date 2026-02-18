@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신청서 관리 - 이온토플 관리자</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link active">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1 class="admin-title">📋 신청서 관리</h1>
+            <p class="admin-subtitle">모든 신청서를 조회하고 관리하세요</p>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="admin-card">
+            <div class="admin-filters">
+                <input type="text" 
+                       id="searchInput" 
+                       class="admin-search-input" 
+                       placeholder="🔍 이름, 이메일, 전화번호로 검색...">
+                
+                <select id="statusFilter" class="admin-select">
+                    <option value="all">전체 상태</option>
+                    <option value="접수완료">접수완료</option>
+                    <option value="검토중">검토중</option>
+                    <option value="승인">승인</option>
+                    <option value="거부">거부</option>
+                    <option value="보류">보류</option>
+                </select>
+                
+                <select id="programFilter" class="admin-select">
+                    <option value="all">전체 프로그램</option>
+                    <option value="내벨업챌린지 - Fast">내벨업챌린지 - Fast</option>
+                    <option value="내벨업챌린지 - Standard">내벨업챌린지 - Standard</option>
+                    <option value="상담 후 결정">상담 후 결정</option>
+                </select>
+                
+                <select id="sortBy" class="admin-select">
+                    <option value="newest">최신순</option>
+                    <option value="oldest">오래된순</option>
+                    <option value="name">이름순</option>
+                </select>
+                
+                <button class="admin-btn admin-btn-primary" onclick="downloadExcel()">
+                    <i class="fas fa-download"></i> 엑셀 다운로드
+                </button>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="admin-card" id="bulkActionsCard" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="font-weight: 600; color: var(--admin-primary);">
+                        <span id="selectedCount">0</span>개 선택됨
+                    </span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="admin-btn admin-btn-success admin-btn-sm" onclick="bulkApprove()">
+                        <i class="fas fa-check"></i> 일괄 승인
+                    </button>
+                    <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="bulkReject()">
+                        <i class="fas fa-times"></i> 일괄 거부
+                    </button>
+                    <button class="admin-btn admin-btn-outline admin-btn-sm" onclick="clearSelection()">
+                        <i class="fas fa-times-circle"></i> 선택 해제
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Applications Table -->
+        <div class="admin-card">
+            <!-- Loading State -->
+            <div class="admin-loading" id="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>데이터를 불러오는 중...</p>
+            </div>
+
+            <!-- Table -->
+            <div id="applicationsTable" style="display: none; overflow-x: auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                            </th>
+                            <th>이름</th>
+                            <th>이메일</th>
+                            <th>전화번호</th>
+                            <th>프로그램</th>
+                            <th>신청일</th>
+                            <th>상태</th>
+                            <th>액션</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+                
+                <!-- Pagination -->
+                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 13px; color: var(--admin-secondary);">
+                        전체 <span id="totalCount">0</span>건 중 <span id="displayCount">0</span>건 표시
+                    </div>
+                    <div id="pagination" style="display: flex; gap: 8px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div class="admin-empty" id="emptyState" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <p class="admin-empty-title">신청서가 없습니다</p>
+                <p class="admin-empty-text">검색 조건을 변경하거나 필터를 초기화해보세요</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리 모달 -->
+    <div id="manageModal" class="manage-modal">
+        <div class="manage-modal-overlay" onclick="closeManageModal()"></div>
+        <div class="manage-modal-content">
+            <!-- 모달 헤더 -->
+            <div class="manage-modal-header">
+                <h2><i class="fas fa-cog"></i> 신청서 관리 - <span id="modalStudentName"></span></h2>
+                <button class="manage-modal-close" onclick="closeManageModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- 모달 탭 네비게이션 -->
+            <div class="manage-modal-tabs">
+                <button class="modal-tab active" data-modal-tab="info" onclick="switchModalTab('info')">
+                    <i class="fas fa-info-circle"></i> 기본정보
+                </button>
+                <button class="modal-tab" data-modal-tab="analysis" onclick="switchModalTab('analysis')">
+                    <i class="fas fa-clipboard-check"></i> 개별분석
+                </button>
+                <button class="modal-tab" data-modal-tab="contract" onclick="switchModalTab('contract')">
+                    <i class="fas fa-file-signature"></i> 계약&입금
+                </button>
+                <button class="modal-tab" data-modal-tab="usage" onclick="switchModalTab('usage')">
+                    <i class="fas fa-rocket"></i> 이용방법
+                </button>
+                <button class="modal-tab" data-modal-tab="shipping" onclick="switchModalTab('shipping')">
+                    <i class="fas fa-truck"></i> 택배발송&알림톡
+                </button>
+            </div>
+            
+            <!-- 모달 바디 -->
+            <div class="manage-modal-body">
+                <div id="modalTabInfo" class="modal-tab-content">
+                    <!-- 기본정보 내용 -->
+                </div>
+                
+                <div id="modalTabAnalysis" class="modal-tab-content" style="display: none;">
+                    <!-- 개별분석 내용 -->
+                </div>
+                
+                <div id="modalTabContract" class="modal-tab-content" style="display: none;">
+                    <!-- 계약&입금 내용 -->
+                </div>
+                
+                <div id="modalTabUsage" class="modal-tab-content" style="display: none;">
+                    <!-- 이용방법 내용 -->
+                </div>
+                
+                <div id="modalTabShipping" class="modal-tab-content" style="display: none;">
+                    <!-- 택배발송 내용 -->
+                </div>
+            </div>
+            
+            <!-- 모달 푸터 -->
+            <div class="manage-modal-footer">
+                <button class="btn-secondary" onclick="openStudentView()">
+                    <i class="fas fa-external-link-alt"></i> 학생 화면 보기
+                </button>
+                <button class="btn-secondary" onclick="closeManageModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="js/admin-utils.js"></script>
+    <script src="js/admin-manage-modal.js"></script>
+    <script src="js/admin-applications.js"></script>
+</body>
+</html>

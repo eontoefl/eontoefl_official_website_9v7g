@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내벨업챌린지 이용방법 상세 가이드 - 이온토플</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8f4ff 0%, #faf5ff 100%);
+            padding: 40px 20px;
+        }
+        
+        .guide-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            padding: 60px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .guide-header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 40px;
+            border-bottom: 3px solid #9480c5;
+        }
+        
+        .guide-header h1 {
+            font-size: 42px;
+            font-weight: 800;
+            color: #6d28d9;
+            margin: 0 0 16px 0;
+        }
+        
+        .guide-header p {
+            font-size: 18px;
+            color: #64748b;
+            margin: 0;
+        }
+        
+        .guide-section {
+            margin-bottom: 48px;
+        }
+        
+        .guide-section h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 24px 0;
+            padding-left: 20px;
+            border-left: 6px solid #9480c5;
+        }
+        
+        .guide-section h3 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #475569;
+            margin: 32px 0 16px 0;
+        }
+        
+        .guide-section p {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #334155;
+            margin: 0 0 16px 0;
+        }
+        
+        .guide-section ul, .guide-section ol {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #334155;
+            margin: 0 0 16px 0;
+            padding-left: 32px;
+        }
+        
+        .guide-section li {
+            margin-bottom: 12px;
+        }
+        
+        .info-box {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 24px 0;
+        }
+        
+        .info-box h4 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e40af;
+            margin: 0 0 12px 0;
+        }
+        
+        .info-box p {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #1e40af;
+            margin: 0;
+        }
+        
+        .warning-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 24px 0;
+        }
+        
+        .warning-box h4 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #991b1b;
+            margin: 0 0 12px 0;
+        }
+        
+        .warning-box p {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #991b1b;
+            margin: 0;
+        }
+        
+        .success-box {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 24px 0;
+        }
+        
+        .success-box h4 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #166534;
+            margin: 0 0 12px 0;
+        }
+        
+        .success-box p {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #166534;
+            margin: 0;
+        }
+        
+        .image-placeholder {
+            background: #f1f5f9;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 60px 20px;
+            text-align: center;
+            margin: 24px 0;
+            color: #64748b;
+        }
+        
+        .image-placeholder i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: #94a3b8;
+        }
+        
+        .cta-button {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%);
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 16px;
+            font-size: 20px;
+            font-weight: 700;
+            margin: 48px 0;
+            transition: all 0.3s;
+            box-shadow: 0 4px 16px rgba(148, 128, 197, 0.4);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(148, 128, 197, 0.5);
+        }
+        
+        @media (max-width: 768px) {
+            .guide-container {
+                padding: 40px 24px;
+            }
+            
+            .guide-header h1 {
+                font-size: 32px;
+            }
+            
+            .guide-section h2 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="guide-container">
+        <!-- 헤더 -->
+        <div class="guide-header">
+            <h1>📖 내벨업챌린지 이용방법</h1>
+            <p>자세한 이용 가이드를 확인하세요</p>
+        </div>
+        
+        <!-- 로딩 상태 -->
+        <div id="loadingState" style="text-align: center; padding: 60px 20px;">
+            <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #9480c5; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <p style="margin-top: 20px; color: #64748b;">가이드를 불러오는 중...</p>
+        </div>
+        
+        <!-- 동적 콘텐츠 영역 -->
+        <div id="guideContent"></div>
+        
+        <!-- 기본 섹션 (백업용 - DB 로드 실패 시 표시) -->
+        <div id="defaultContent" style="display: none;">
+        <!-- 섹션 1: 시작하기 -->
+        <div class="guide-section">
+            <h2><i class="fas fa-rocket" style="color: #9480c5; margin-right: 12px;"></i>1. 시작하기</h2>
+            <p>
+                내벨업챌린지에 오신 것을 환영합니다! 본 가이드는 챌린지를 효과적으로 활용하기 위한 단계별 안내입니다.
+            </p>
+            
+            <h3>📌 첫 단계</h3>
+            <ol>
+                <li><strong>플랫폼 로그인:</strong> 제공받은 URL로 접속하여 이메일과 비밀번호로 로그인하세요.</li>
+                <li><strong>대시보드 확인:</strong> 로그인 후 대시보드에서 학습 진도와 과제를 확인할 수 있습니다.</li>
+                <li><strong>학습 계획 수립:</strong> 개별분석 결과를 바탕으로 학습 계획을 세워보세요.</li>
+            </ol>
+            
+            <div class="info-box">
+                <h4><i class="fas fa-lightbulb"></i> TIP</h4>
+                <p>
+                    첫 주는 플랫폼에 익숙해지는 시간입니다. 진단 테스트를 통해 현재 실력을 파악하고,
+                    맞춤 학습 계획을 확인하세요. 궁금한 점은 카카오톡으로 언제든 문의하세요!
+                </p>
+            </div>
+            
+            <!-- 이미지 추가 영역 -->
+            <div class="image-placeholder">
+                <i class="fas fa-image"></i>
+                <p>여기에 플랫폼 로그인 화면 스크린샷을 추가하세요</p>
+                <small style="font-size: 13px; color: #94a3b8;">
+                    예: &lt;img src="images/login-screen.png" alt="로그인 화면" style="width: 100%; border-radius: 8px;"&gt;
+                </small>
+            </div>
+        </div>
+        
+        <!-- 섹션 2: 내벨업테스트룸 -->
+        <div class="guide-section">
+            <h2><i class="fas fa-clipboard-check" style="color: #3b82f6; margin-right: 12px;"></i>2. 내벨업테스트룸 사용법</h2>
+            <p>
+                내벨업테스트룸은 실제 모의고사 풀이, 2단계 오답시스템, 채점, 해설, 모범답안,
+                인증률 체크 및 기록 등을 제공하는 올인원 프로그램입니다.
+            </p>
+            
+            <h3>🎯 주요 기능</h3>
+            <ul>
+                <li><strong>모의고사 풀이:</strong> 실제 시험과 동일한 환경에서 연습하세요.</li>
+                <li><strong>2단계 오답시스템:</strong> 틀린 문제를 체계적으로 분석하고 복습하세요.</li>
+                <li><strong>자동 채점:</strong> 즉시 점수 확인 및 섹션별 분석을 받으세요.</li>
+                <li><strong>상세 해설:</strong> 모범답안과 함께 문제별 해설을 확인하세요.</li>
+                <li><strong>인증률 관리:</strong> 과제 인증률이 자동으로 기록됩니다.</li>
+            </ul>
+            
+            <div class="warning-box">
+                <h4><i class="fas fa-exclamation-triangle"></i> 중요</h4>
+                <p>
+                    내벨업테스트룸 액세스 이후에는 환불이 불가능합니다.
+                    매주 목요일에 일괄 액세스가 제공되며, 먼저 시작하고 싶은 경우 개별 요청 가능합니다.
+                </p>
+            </div>
+            
+            <!-- 이미지 추가 영역 -->
+            <div class="image-placeholder">
+                <i class="fas fa-image"></i>
+                <p>여기에 테스트룸 대시보드 스크린샷을 추가하세요</p>
+            </div>
+        </div>
+        
+        <!-- 섹션 3: 학습 루틴 -->
+        <div class="guide-section">
+            <h2><i class="fas fa-calendar-alt" style="color: #f59e0b; margin-right: 12px;"></i>3. 추천 학습 루틴</h2>
+            
+            <h3>📅 주간 학습 계획</h3>
+            <ul>
+                <li><strong>월~금:</strong> 매일 2시간 이상 플랫폼 학습 + 주간 과제 진행</li>
+                <li><strong>토요일:</strong> 모의고사 풀이 + 오답 정리</li>
+                <li><strong>일요일:</strong> 주간 복습 + 다음 주 계획 수립</li>
+            </ul>
+            
+            <h3>⏰ 일일 학습 권장 시간</h3>
+            <ul>
+                <li>리딩: 40분</li>
+                <li>리스닝: 30분</li>
+                <li>스피킹: 30분</li>
+                <li>라이팅: 20분</li>
+            </ul>
+            
+            <div class="success-box">
+                <h4><i class="fas fa-trophy"></i> 성공 TIP</h4>
+                <p>
+                    목표 점수를 달성한 학생들의 공통점은 "꾸준함"입니다.
+                    매일 같은 시간에 학습하는 습관을 만들고, 과제 인증률 95% 이상을 유지하세요.
+                    그러면 10만원 보증금을 전액 환급받으실 수 있습니다!
+                </p>
+            </div>
+        </div>
+        
+        <!-- 섹션 4: 실물 택배 -->
+        <div class="guide-section">
+            <h2><i class="fas fa-box" style="color: #22c55e; margin-right: 12px;"></i>4. 실물 택배 안내</h2>
+            <p>
+                빈 노트테이킹, 보카 실물책, 연필, 연필깎이 등 수기로 작성해야 하는 학습 자료를
+                실물 택배로 제공합니다.
+            </p>
+            
+            <h3>📦 배송 일정</h3>
+            <ul>
+                <li>출고: 챌린지 시작 전 목~금요일</li>
+                <li>도착: 출고 다음날 (특별한 일이 없는 한)</li>
+            </ul>
+            
+            <div class="info-box">
+                <h4><i class="fas fa-info-circle"></i> 참고</h4>
+                <p>
+                    실물 교재 열람 시 환불 가능 금액에서 50,000원이 제외됩니다.
+                    택배 수령 후 교재 상태를 확인하시고, 문제가 있다면 즉시 연락 주세요.
+                </p>
+            </div>
+        </div>
+        
+        <!-- 섹션 5: 과제 인증률 -->
+        <div class="guide-section">
+            <h2><i class="fas fa-chart-line" style="color: #ef4444; margin-right: 12px;"></i>5. 과제 인증률과 보증금 환급</h2>
+            <p>
+                과제 인증률에 따라 보증금 환급 금액이 달라집니다.
+            </p>
+            
+            <h3>💰 환급 기준</h3>
+            <ul>
+                <li><strong>95% 이상:</strong> 100,000원 전액 환급 🎉</li>
+                <li><strong>70~94%:</strong> 부분 환급 (인증률에 비례)</li>
+                <li><strong>70% 미만:</strong> 환급 불가 ❌</li>
+            </ul>
+            
+            <h3>📊 인증률 계산 방법</h3>
+            <p>
+                과제 인증률 = (제출한 과제 수 ÷ 전체 과제 수) × 100
+            </p>
+            
+            <div class="warning-box">
+                <h4><i class="fas fa-exclamation-circle"></i> 환불 불가 조건</h4>
+                <p>
+                    • 내벨업테스트룸 액세스 이후<br>
+                    • 과제 인증률 70% 미만<br>
+                    • 실물 교재 열람 시 환불 가능 금액에서 50,000원 제외
+                </p>
+            </div>
+        </div>
+        
+        <!-- 섹션 6: 문의 및 지원 -->
+        <div class="guide-section">
+            <h2><i class="fas fa-headset" style="color: #06b6d4; margin-right: 12px;"></i>6. 문의 및 지원</h2>
+            <p>
+                학습 중 궁금한 점이나 도움이 필요하시면 언제든지 연락 주세요.
+            </p>
+            
+            <h3>💬 소통 채널</h3>
+            <ul>
+                <li><strong>카카오톡:</strong> 학습 관련 문의, 과제 제출, 긴급 문의</li>
+                <li><strong>사이트 댓글:</strong> 신청 및 진행 과정만 진행</li>
+            </ul>
+            
+            <div class="success-box">
+                <h4><i class="fas fa-comments"></i> 빠른 응답</h4>
+                <p>
+                    카카오톡 문의는 평일 09:00~18:00 사이에 가장 빠르게 답변드립니다.
+                    긴급한 문의는 문자 메시지 앞에 "[긴급]"을 표시해주세요.
+                </p>
+            </div>
+        </div>
+        </div>
+        </div>
+        
+        <!-- 하단 CTA -->
+        <div id="footerCTA">
+            <a href="javascript:window.close();" class="cta-button">
+                <i class="fas fa-check-circle"></i> 이해했습니다! 창 닫기
+            </a>
+            
+            <p style="text-align: center; font-size: 14px; color: #64748b; margin-top: 40px;">
+                💡 이 가이드는 관리자 페이지의 "사이트 설정 → 이용방법 안내 설정 → 상세 가이드" 탭에서<br>
+                언제든지 수정하실 수 있습니다.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Script for Dynamic Loading -->
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <script>
+        // 페이지 로드 시 가이드 불러오기
+        document.addEventListener('DOMContentLoaded', async () => {
+            // URL에서 preview 모드 체크
+            const urlParams = new URLSearchParams(window.location.search);
+            const isPreviewMode = urlParams.get('preview') === 'true';
+            
+            if (isPreviewMode) {
+                // 미리보기 모드: localStorage에서 불러오기
+                loadPreviewGuide();
+            } else {
+                // 일반 모드: DB에서 불러오기
+                await loadGuideFromDB();
+            }
+        });
+        
+        // 미리보기 가이드 로드
+        function loadPreviewGuide() {
+            const previewData = localStorage.getItem('guide_preview');
+            
+            if (!previewData) {
+                showError('미리보기 데이터를 찾을 수 없습니다.');
+                return;
+            }
+            
+            try {
+                const sections = JSON.parse(previewData);
+                renderGuide(sections);
+            } catch (error) {
+                console.error('Preview load error:', error);
+                showError('미리보기 데이터를 불러올 수 없습니다.');
+            }
+        }
+        
+        // DB에서 가이드 로드
+        async function loadGuideFromDB() {
+            try {
+                const response = await fetch('tables/guide_content?limit=1');
+                const result = await response.json();
+                
+                if (result.data && result.data.length > 0 && result.data[0].sections) {
+                    const sections = result.data[0].sections;
+                    renderGuide(sections);
+                } else {
+                    // DB에 데이터가 없으면 기본 콘텐츠 표시
+                    showDefaultContent();
+                }
+            } catch (error) {
+                console.error('Failed to load guide:', error);
+                showDefaultContent();
+            }
+        }
+        
+        // 가이드 렌더링
+        function renderGuide(sections) {
+            const loadingState = document.getElementById('loadingState');
+            const guideContent = document.getElementById('guideContent');
+            
+            if (loadingState) loadingState.style.display = 'none';
+            
+            if (!sections || sections.length === 0) {
+                showDefaultContent();
+                return;
+            }
+            
+            const html = sections.map(section => `
+                <div class="guide-section">
+                    ${section.title ? `<h2>${escapeHtml(section.title)}</h2>` : ''}
+                    ${section.content ? `<p style="white-space: pre-wrap;">${escapeHtml(section.content)}</p>` : ''}
+                    ${section.image ? `<img src="${section.image}" alt="${escapeHtml(section.title || 'Guide Image')}" style="width: 100%; border-radius: 12px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">` : ''}
+                    ${section.video ? `
+                        <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; margin: 20px 0;">
+                            <iframe src="${section.video}" 
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" 
+                                    allowfullscreen></iframe>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            
+            guideContent.innerHTML = html;
+        }
+        
+        // 기본 콘텐츠 표시
+        function showDefaultContent() {
+            const loadingState = document.getElementById('loadingState');
+            const guideContent = document.getElementById('guideContent');
+            const defaultContent = document.getElementById('defaultContent');
+            
+            if (loadingState) loadingState.style.display = 'none';
+            
+            if (defaultContent) {
+                guideContent.innerHTML = defaultContent.innerHTML;
+                defaultContent.remove();
+            }
+        }
+        
+        // 에러 표시
+        function showError(message) {
+            const loadingState = document.getElementById('loadingState');
+            const guideContent = document.getElementById('guideContent');
+            
+            if (loadingState) loadingState.style.display = 'none';
+            
+            guideContent.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #f59e0b; margin-bottom: 20px;"></i>
+                    <p style="font-size: 16px; color: #64748b;">${message}</p>
+                    <button onclick="location.reload()" style="margin-top: 20px; padding: 12px 24px; background: #9480c5; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                        <i class="fas fa-redo"></i> 다시 시도
+                    </button>
+                </div>
+            `;
+        }
+        
+        // HTML 이스케이프
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

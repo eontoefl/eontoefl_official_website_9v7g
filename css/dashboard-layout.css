@@ -1,0 +1,264 @@
+/* 새로운 대시보드 레이아웃 전용 CSS */
+
+/* 진행상황 섹션 - 가로 배치 */
+.progress-section {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    margin-bottom: 0px;
+}
+
+/* 원형 퍼센티지 */
+.progress-circle {
+    flex-shrink: 0;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: conic-gradient(
+        #9480c5 0deg, 
+        #9480c5 var(--progress-deg), 
+        #e2e8f0 var(--progress-deg), 
+        #e2e8f0 360deg
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.progress-circle-inner {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-percentage {
+    font-size: 22px;
+    font-weight: 700;
+    color: #9480c5;
+    line-height: 1;
+}
+
+.progress-label {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 6px;
+    font-weight: 400;
+}
+
+/* 타임라인 바 섹션 */
+.timeline-bar-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.timeline-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 60px;
+}
+
+.timeline-bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    position: relative;
+    padding: 0 0px 0 0px;
+    gap: 20px;
+    margin-left: -10px;
+}
+
+.timeline-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    z-index: 2;
+}
+
+.timeline-step-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    margin-bottom: 10px;
+    transition: all 0.3s;
+}
+
+.timeline-step-icon.completed {
+    background: #77bf7e;
+    color: white;
+}
+
+.timeline-step-icon.current {
+    background: #f59e0b;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.timeline-step-icon.pending {
+    background: #e2e8f0;
+    color: #94a3b8;
+}
+
+.timeline-step-label {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    max-width: 100px;
+    line-height: 1.3;
+    word-break: keep-all;
+    white-space: pre-line;
+}
+
+.timeline-step.completed .timeline-step-label {
+    color: #77bf7e;
+    font-weight: 600;
+}
+
+.timeline-step.current .timeline-step-label {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+/* 타임라인 연결선 */
+.timeline-bar::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 5%;
+    right: 5%;
+    height: 2px;
+    background: #e2e8f0;
+    z-index: 1;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+    }
+}
+
+/* 빠른 메뉴 그리드 2x3 */
+.quick-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.quick-menu-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.3s;
+    cursor: pointer;
+    min-height: 100px;
+}
+
+.quick-menu-button:hover {
+    background: white;
+    border-color: #9480c5;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(148, 128, 197, 0.2);
+}
+
+.quick-menu-button.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.quick-menu-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+}
+
+.quick-menu-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    text-align: center;
+    line-height: 1.3;
+}
+
+/* 왼쪽 컬럼 */
+.dashboard-left {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+}
+
+/* 오른쪽 컬럼 */
+.dashboard-right {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+}
+
+/* 프로그램 액션 버튼을 오른쪽 컬럼 하단에 고정 */
+.dashboard-right .program-actions {
+    margin-top: 0;
+}
+
+/* 반응형 */
+@media (max-width: 968px) {
+    .progress-section {
+        flex-direction: column;
+        gap: 24px;
+    }
+    
+    .timeline-bar {
+        overflow-x: auto;
+        padding-bottom: 10px;
+    }
+    
+    .timeline-step {
+        min-width: 70px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .quick-menu-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .progress-circle {
+        width: 140px;
+        height: 140px;
+    }
+    
+    .progress-circle-inner {
+        width: 110px;
+        height: 110px;
+    }
+    
+    .progress-percentage {
+        font-size: 36px;
+    }
+}

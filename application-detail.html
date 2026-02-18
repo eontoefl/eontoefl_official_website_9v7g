@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신청서 상세 - 이온토플</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://www.genspark.ai/api/files/s/efTK9mFF" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html" class="active">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="reviews.html">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="reviews.html#notice"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="reviews.html#materials"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header" style="padding: 60px 0 40px 0;">
+        <div class="container">
+            <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 16px;">
+                <a href="application.html" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-arrow-left"></i> 목록으로 돌아가기
+                </a>
+                <span style="color: rgba(255,255,255,0.4);">|</span>
+                <a href="my-dashboard.html" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-tachometer-alt"></i> 내 대시보드로
+                </a>
+            </div>
+            <h1 id="detailTitle">신청서 상세</h1>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
+                <div id="detailStatus"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Loading -->
+    <div class="loading" id="detailLoading" style="padding: 80px 20px;">
+        <div class="spinner"></div>
+        <p style="margin-top: 12px; font-size: 13px; color: #64748b;">로딩 중...</p>
+    </div>
+
+    <!-- Page Layout (Sidebar + Content) -->
+    <div class="page-layout" id="detailCard" style="display: none;">
+        <div class="container">
+            <div class="layout-wrapper">
+                <!-- Sidebar (STEP Navigation) -->
+                <aside class="sidebar">
+                    <nav class="sidebar-nav">
+                        <div class="sidebar-title">신청 진행 단계</div>
+                        <a href="#" data-tab="tabInfo" class="step-nav-link active">
+                            <i class="fas fa-file-alt"></i> <span style="display: inline-block; margin-right: 8px;">STEP 1</span><br>
+                            <span style="font-size: 12px; font-weight: 400; color: #64748b;">접수</span>
+                        </a>
+                        <a href="#" data-tab="tabStudentAnalysis" class="step-nav-link">
+                            <i class="fas fa-check-circle"></i> <span style="display: inline-block; margin-right: 8px;">STEP 2</span><br>
+                            <span style="font-size: 12px; font-weight: 400; color: #64748b;">승인받기</span>
+                        </a>
+                        <a href="#" data-tab="tabContract" class="step-nav-link">
+                            <i class="fas fa-clipboard-check"></i> <span style="display: inline-block; margin-right: 8px;">STEP 3</span><br>
+                            <span style="font-size: 12px; font-weight: 400; color: #64748b;">계약서</span>
+                        </a>
+                        <a href="#" data-tab="tabPayment" class="step-nav-link">
+                            <i class="fas fa-credit-card"></i> <span style="display: inline-block; margin-right: 8px;">STEP 4</span><br>
+                            <span style="font-size: 12px; font-weight: 400; color: #64748b;">입금</span>
+                        </a>
+                        <a href="#" data-tab="tabUsage" class="step-nav-link">
+                            <i class="fas fa-rocket"></i> <span style="display: inline-block; margin-right: 8px;">STEP 5</span><br>
+                            <span style="font-size: 12px; font-weight: 400; color: #64748b;">세팅</span>
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="main-content">
+                    <!-- Tab Contents -->
+                    <div id="tabInfo" class="tab-content active">
+                        <!-- 신청서 기본 정보 (STEP 1) -->
+                    </div>
+
+                    <div id="tabStudentAnalysis" class="tab-content" style="display: none;">
+                        <!-- 승인 여부 검토 (STEP 2) -->
+                    </div>
+
+                    <div id="tabContract" class="tab-content" style="display: none;">
+                        <!-- 개별 분석 & 플랜 제작 (STEP 3) -->
+                    </div>
+
+                    <div id="tabPayment" class="tab-content" style="display: none;">
+                        <!-- 프로그램 확정 & 결제 (STEP 4) -->
+                    </div>
+
+                    <div id="tabUsage" class="tab-content" style="display: none;">
+                        <!-- 프로그램 시작 (STEP 5) -->
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+                        <i class="fas fa-list"></i> 목록으로
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" style="display: none; text-align: center; padding: 80px 20px;">
+                <i class="fas fa-exclamation-circle" style="font-size: 64px; color: #ef4444; margin-bottom: 20px;"></i>
+                <p style="font-size: 18px; color: #1e293b; font-weight: 600; margin-bottom: 8px;">신청서를 찾을 수 없습니다</p>
+                <p id="errorDetail" style="font-size: 14px; color: #64748b; margin-bottom: 32px;">존재하지 않거나 삭제된 신청서입니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Admin Dashboard Button (관리자만 표시) -->
+    <a href="admin-dashboard.html" id="adminDashboardBtn" 
+       style="display: none; position: fixed; bottom: 30px; left: 30px; width: 70px; height: 70px; 
+              background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); 
+              color: white; border-radius: 16px; 
+              align-items: center; justify-content: center; 
+              box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4); 
+              font-size: 28px; z-index: 9999; 
+              transition: all 0.3s ease; text-decoration: none;
+              border: 3px solid rgba(255, 255, 255, 0.2);" 
+       title="관리자 대시보드" 
+       onmouseover="this.style.transform='translateY(-6px) scale(1.05)'; this.style.boxShadow='0 12px 32px rgba(124, 58, 237, 0.5)';" 
+       onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 24px rgba(124, 58, 237, 0.4)';">
+        <i class="fas fa-crown"></i>
+    </a>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">TOEFL 전문 교육기관으로<br>여러분의 목표 달성을 돕습니다</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="index.html#about">소개</a></li>
+                        <li><a href="index.html#programs">프로그램</a></li>
+                        <li><a href="index.html#pricing">가격</a></li>
+                        <li><a href="index.html#reviews">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">학생 서비스</h4>
+                    <ul class="footer-links">
+                        <li><a href="register.html">회원가입</a></li>
+                        <li><a href="application.html">신청하기</a></li>
+                        <li><a href="my-application.html">신청서 조회</a></li>
+                        <li><a href="admin.html">관리자</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><i class="fas fa-envelope"></i> info@iontoefl.com</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="js/common.js"></script>
+    <script src="js/admin-utils.js"></script>
+    <script src="js/contract-utils.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/application-detail.js"></script>
+    <script>
+        // Sidebar Step Navigation
+        document.addEventListener('DOMContentLoaded', () => {
+            const stepLinks = document.querySelectorAll('.step-nav-link');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            stepLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetTab = link.getAttribute('data-tab');
+                    
+                    // Remove active class from all links
+                    stepLinks.forEach(l => l.classList.remove('active'));
+                    // Add active class to clicked link
+                    link.classList.add('active');
+                    
+                    // Hide all tabs
+                    tabContents.forEach(tab => tab.style.display = 'none');
+                    // Show target tab
+                    const targetElement = document.getElementById(targetTab);
+                    if (targetElement) {
+                        targetElement.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>

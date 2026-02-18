@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 대시보드 - 이온토플</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link active">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1 class="admin-title">📊 관리자 대시보드</h1>
+            <p class="admin-subtitle">신청서 현황과 통계를 한눈에 확인하세요</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card" onclick="filterByStatus('all')">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">전체 신청</span>
+                    <div class="stat-card-icon primary">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="totalApplications">-</div>
+                <div class="stat-card-label">Total Applications</div>
+                <div class="stat-card-trend">
+                    <span class="trend-up">
+                        <i class="fas fa-arrow-up"></i> 최근 7일: <span id="recentCount">-</span>건
+                    </span>
+                </div>
+            </div>
+
+            <div class="stat-card" onclick="filterByStatus('접수완료')">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">대기중</span>
+                    <div class="stat-card-icon warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="pendingApplications">-</div>
+                <div class="stat-card-label">Pending Review</div>
+                <div class="stat-card-trend">
+                    <span class="trend-warning" id="urgentCount">
+                        <i class="fas fa-exclamation-triangle"></i> 긴급: <span>-</span>건
+                    </span>
+                </div>
+            </div>
+
+            <div class="stat-card" onclick="filterByStatus('승인')">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">승인</span>
+                    <div class="stat-card-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="approvedApplications">-</div>
+                <div class="stat-card-label">Approved</div>
+                <div class="stat-card-trend">
+                    <span style="color: #64748b;">
+                        <i class="fas fa-chart-line"></i> 승인율: <span id="approvalRate">-</span>%
+                    </span>
+                </div>
+            </div>
+
+            <div class="stat-card" onclick="filterByStatus('거부')">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">거부</span>
+                    <div class="stat-card-icon danger">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="rejectedApplications">-</div>
+                <div class="stat-card-label">Rejected</div>
+                <div class="stat-card-trend">
+                    <span style="color: #64748b;">
+                        <i class="fas fa-info-circle"></i> 전체의 <span id="rejectionRate">-</span>%
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 긴급 처리 필요 -->
+        <div class="admin-card" id="urgentCard" style="display: none;">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-bell" style="color: #ef4444;"></i> 긴급 처리 필요
+                </h2>
+                <a href="admin-applications.html?filter=urgent" class="admin-card-action">
+                    전체 보기 <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <div id="urgentList"></div>
+        </div>
+
+        <!-- 최근 신청서 -->
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-history"></i> 최근 신청서
+                </h2>
+                <a href="admin-applications.html" class="admin-card-action">
+                    전체 보기 <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            <!-- Loading State -->
+            <div class="admin-loading" id="recentLoading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>데이터를 불러오는 중...</p>
+            </div>
+
+            <!-- Recent Applications Table -->
+            <div id="recentApplications" style="display: none;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>이름</th>
+                            <th>프로그램</th>
+                            <th>신청일</th>
+                            <th>상태</th>
+                            <th>액션</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div class="admin-empty" id="recentEmpty" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <p class="admin-empty-title">신청서가 없습니다</p>
+                <p class="admin-empty-text">새로운 신청서가 접수되면 여기에 표시됩니다</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/admin-utils.js"></script>
+    <script src="js/admin-dashboard.js"></script>
+</body>
+</html>

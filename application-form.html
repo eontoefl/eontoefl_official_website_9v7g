@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수강 신청서 작성 - 이온토플</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+    <link rel="stylesheet" href="css/application-form.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://www.genspark.ai/api/files/s/efTK9mFF" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html" class="active">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="reviews.html">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="reviews.html#notice"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="reviews.html#materials"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Form Container -->
+    <div class="form-container">
+        <div class="form-header">
+            <h1>이온토플 신청서</h1>
+            <p class="form-description">모든 항목을 정확히 작성해주세요. 상세한 정보는 승인률을 상승시킵니다 : )</p>
+        </div>
+
+        <form id="applicationForm" class="application-form">
+            
+            <!-- Section 1: 필독 & 기본정보 (통합) -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">1</span>
+                    <h2>필독 사항 확인 및 기본 정보</h2>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="confirm_materials" required>
+                        <span style="position: relative; top: -1.5px;">홈페이지 또는 블로그에 게재된 <strong>필독 공지사항</strong>을 모두 읽었으며, 내용을 확인했습니다.</span>
+                    </label>
+                </div>
+
+                <div class="two-column-grid">
+                    <div class="form-group">
+                        <label>성함</label>
+                        <input type="text" name="name" placeholder="성함" required>
+                    </div>
+                    <div class="form-group">
+                        <label>연락처</label>
+                        <input type="tel" name="phone" placeholder="010-1234-5678" required>
+                    </div>
+                </div>
+
+                <div class="two-column-grid">
+                    <div class="form-group">
+                        <label>이메일</label>
+                        <input type="email" name="email" placeholder="example@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>주소 (택배 받을 정확한 주소)</label>
+                        <input type="text" name="address" placeholder="예: 서울특별시 강남구 OO로 123, 456호" required>
+                        <small>택배 발송을 위해 정확한 주소를 입력해주세요 (동/호수 포함)</small>
+                    </div>
+                </div>
+
+                <div class="subsection-title">환불 계좌 정보</div>
+                <div class="form-group">
+                    <input type="text" name="bank_account" placeholder="은행명 계좌번호 예금주 (예: 신한 110-123-456789 홍길동)" required>
+                    <small>환불이 필요한 경우를 대비한 정보입니다</small>
+                </div>
+            </div>
+
+            <!-- Section 2: 직업 정보 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">2</span>
+                    <h2>직업 정보</h2>
+                </div>
+                <div class="form-group">
+                    <label>직업</label>
+                    <input type="text" name="occupation" placeholder="예: 대학생, 직장인, 취준생 등" required>
+                    <small>토플 종사자가 아닌지 확인하기 위한 항목입니다. 편하신 곳까지만 작성해주세요.</small>
+                </div>
+            </div>
+
+            <!-- Section 3: 현재 토플 점수 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">3</span>
+                    <h2>현재 토플 점수</h2>
+                </div>
+                <div class="form-group">
+                    <label class="radio-label">
+                        <input type="radio" name="has_toefl_score" value="yes" required>
+                        <span style="position: relative; top: -1.8px;">있음</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="has_toefl_score" value="no" required>
+                        <span style="position: relative; top: -1.8px;">없음</span>
+                    </label>
+                </div>
+
+                <div id="toeflScoreSection" style="display: none;">
+                    <!-- Tab buttons -->
+                    <div class="version-tabs">
+                        <button type="button" class="version-tab active" data-tab="old-score">
+                            개정전 (0-120점)
+                        </button>
+                        <button type="button" class="version-tab" data-tab="new-score">
+                            개정후 (1-6 레벨)
+                        </button>
+                    </div>
+                    
+                    <input type="hidden" name="score_version" value="old">
+
+                    <!-- 개정전 점수 입력 -->
+                    <div id="oldScoreSection" class="version-content active">
+                        <div class="score-group">
+                            <div class="form-group">
+                                <label>Reading</label>
+                                <input type="number" name="score_reading_old" min="0" max="30" placeholder="0-30">
+                            </div>
+                            <div class="form-group">
+                                <label>Listening</label>
+                                <input type="number" name="score_listening_old" min="0" max="30" placeholder="0-30">
+                            </div>
+                            <div class="form-group">
+                                <label>Speaking</label>
+                                <input type="number" name="score_speaking_old" min="0" max="30" placeholder="0-30">
+                            </div>
+                            <div class="form-group">
+                                <label>Writing</label>
+                                <input type="number" name="score_writing_old" min="0" max="30" placeholder="0-30">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 개정후 점수 입력 -->
+                    <div id="newScoreSection" class="version-content">
+                        <div class="score-group">
+                            <div class="form-group">
+                                <label>Reading</label>
+                                <input type="number" name="score_reading_new" min="1" max="6" step="0.5" placeholder="1-6">
+                            </div>
+                            <div class="form-group">
+                                <label>Listening</label>
+                                <input type="number" name="score_listening_new" min="1" max="6" step="0.5" placeholder="1-6">
+                            </div>
+                            <div class="form-group">
+                                <label>Writing</label>
+                                <input type="number" name="score_writing_new" min="1" max="6" step="0.5" placeholder="1-6">
+                            </div>
+                            <div class="form-group">
+                                <label>Speaking</label>
+                                <input type="number" name="score_speaking_new" min="1" max="6" step="0.5" placeholder="1-6">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>기타 추가 설명</label>
+                        <textarea name="score_history" rows="3" placeholder="점수 관련 추가로 전달하고 싶은 내용이 있다면 자유롭게 작성해주세요"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: 영어 실력 평가 (핵심) - 점수 없을 때만 -->
+            <div class="form-section writing-section-clean" id="writingSection" style="display: none;">
+                <div class="section-header">
+                    <span class="section-number">4</span>
+                    <h2>영어 실력 평가</h2>
+                </div>
+                <p class="section-description">
+                    아래 두 질문에 대해 <strong>영어로</strong> 각각 5-7문장씩 작성해주세요. 문법, 철자가 완벽하지 않아도 괜찮습니다.
+                </p>
+                
+                <div style="background: #fff3cd; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+                    <p style="margin: 0 0 0.75rem 0; font-weight: 600; color: #856404;">⚠️ 중요한 안내</p>
+                    <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem; line-height: 1.6; color: #856404;">
+                        <strong>잘 쓸려고 할수록, 문법 단어를 안 틀리려고 수정하고 검색하고 사전 찾아보고 할수록</strong> 저는 여러분의 영어실력을 <strong>'잘못'파악</strong>하게 됩니다. 그러면 모든 방향은 틀어지게 됩니다. <strong>솔직하게 나의 영어 밑낯을 보여주세요.</strong>
+                    </p>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; line-height: 1.6; color: #856404;">
+                        <strong>※ 위 내용을 번역/해석하는게 아니라</strong> 나의 <strong>"답변"을 작성</strong>하시는 겁니다. 잘못 이해하신 분들이 계셔서 말씀드려요.
+                    </p>
+                </div>
+
+                <div class="writing-prompt">
+                    <div class="prompt-number">Question 1</div>
+                    <p class="prompt-text">What are your hobbies or interests, and why do you enjoy them?</p>
+                    <div class="form-group">
+                        <textarea name="writing_sample_1" rows="6" placeholder="Write in English (5-7 sentences)..."></textarea>
+                    </div>
+                </div>
+
+                <div class="writing-prompt">
+                    <div class="prompt-number">Question 2</div>
+                    <p class="prompt-text">Describe a challenge you faced recently and how you dealt with it.</p>
+                    <div class="form-group">
+                        <textarea name="writing_sample_2" rows="6" placeholder="Write in English (5-7 sentences)..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: 학습 현황 (통합) -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">5</span>
+                    <h2>학습 현황</h2>
+                </div>
+                
+                <div class="form-group">
+                    <label>현재 토플 공부 방법</label>
+                    <textarea name="current_study_method" rows="4" placeholder="독학, 인강, 학원 등 구체적으로 작성" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>하루 평균 공부 가능 시간</label>
+                    <select name="daily_study_time" required>
+                        <option value="">선택</option>
+                        <option value="1시간 미만">1시간 미만</option>
+                        <option value="1-2시간">1-2시간</option>
+                        <option value="2-3시간">2-3시간</option>
+                        <option value="3-4시간">3-4시간</option>
+                        <option value="4-5시간">4-5시간</option>
+                        <option value="5시간 이상">5시간 이상</option>
+                    </select>
+                    <small>주말과 평일을 합산한 총 평균 시간을 선택해주세요</small>
+                </div>
+            </div>
+
+            <!-- Section 6: 목표 점수 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">6</span>
+                    <h2>목표 점수</h2>
+                </div>
+                
+                <!-- Tab buttons -->
+                <div class="version-tabs">
+                    <button type="button" class="version-tab active" data-tab="new-target">
+                        개정후 (1-6 레벨)
+                    </button>
+                    <button type="button" class="version-tab" data-tab="old-target">
+                        개정전 (0-120점)
+                    </button>
+                </div>
+                
+                <input type="hidden" name="target_version" value="new">
+
+                <!-- 개정후 목표 점수 -->
+                <div id="newTargetSection" class="version-content active">
+                    <div class="form-group">
+                        <label>지원 기관의 최소 커트라인 (Total)</label>
+                        <input type="number" name="target_cutoff_new" min="1" max="6" step="0.5" placeholder="예: 4.5" required>
+                        <small>네 섹션의 평균을 0.5 단위로 반올림한 값</small>
+                    </div>
+
+                    <div class="subsection-title">영역별 최소 요구 점수 (있는 경우)</div>
+                    <div class="score-group">
+                        <div class="form-group">
+                            <label>Reading</label>
+                            <input type="number" name="target_reading_new" min="1" max="6" step="0.5" placeholder="선택">
+                        </div>
+                        <div class="form-group">
+                            <label>Listening</label>
+                            <input type="number" name="target_listening_new" min="1" max="6" step="0.5" placeholder="선택">
+                        </div>
+                        <div class="form-group">
+                            <label>Writing</label>
+                            <input type="number" name="target_writing_new" min="1" max="6" step="0.5" placeholder="선택">
+                        </div>
+                        <div class="form-group">
+                            <label>Speaking</label>
+                            <input type="number" name="target_speaking_new" min="1" max="6" step="0.5" placeholder="선택">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 개정전 목표 점수 -->
+                <div id="oldTargetSection" class="version-content">
+                    <div class="notice-box" style="background: #fff3cd; padding: 16px; margin-bottom: 20px; border-radius: 8px;">
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-exclamation-triangle" style="color: #ff9800; font-size: 20px; margin-top: 2px;"></i>
+                            <div style="flex: 1;">
+                                <strong style="color: #e65100; display: block; margin-bottom: 8px;">TOEFL 점수체계 변경 안내</strong>
+                                <p style="margin: 0; line-height: 1.6; color: #666;">
+                                    2026년 1월 21일부로 TOEFL 점수체계가 기존 0-120점 만점에서 <strong>1-6 레벨 체계</strong>로 공식 변경되었습니다. 
+                                    전환 기간(2년) 동안 0-120점 체계도 사용 가능하나, 많은 교육기관들이 이미 1-6 레벨 기준으로 요구사항을 공지하고 있습니다. 
+                                    <br><br>
+                                    <strong style="color: #e65100;">지원하시는 기관의 최신 공지사항을 반드시 확인하시고, 가능한 경우 '개정후' 탭에서 1-6 레벨로 입력해 주시기 바랍니다.</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>지원 기관의 최소 커트라인 (Total)</label>
+                        <input type="number" name="target_cutoff_old" min="0" max="120" placeholder="예: 90" required>
+                    </div>
+
+                    <div class="subsection-title">영역별 최소 요구 점수 (있는 경우)</div>
+                    <div class="score-group">
+                        <div class="form-group">
+                            <label>Reading</label>
+                            <input type="number" name="target_reading_old" min="0" max="30" placeholder="선택">
+                        </div>
+                        <div class="form-group">
+                            <label>Listening</label>
+                            <input type="number" name="target_listening_old" min="0" max="30" placeholder="선택">
+                        </div>
+                        <div class="form-group">
+                            <label>Speaking</label>
+                            <input type="number" name="target_speaking_old" min="0" max="30" placeholder="선택">
+                        </div>
+                        <div class="form-group">
+                            <label>Writing</label>
+                            <input type="number" name="target_writing_old" min="0" max="30" placeholder="선택">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>목표 점수에 대한 추가 설명</label>
+                    <textarea name="target_note" rows="3" placeholder="목표 점수와 관련하여 추가로 전달하고 싶은 내용이 있다면 자유롭게 작성해주세요 (선택)"></textarea>
+                </div>
+            </div>
+
+            <!-- Section 7: 마감 기한 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">7</span>
+                    <h2>마감 기한</h2>
+                </div>
+                
+                <div class="form-group">
+                    <label>마지막으로 응시 가능한 시험일</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <select name="submission_deadline_year" required style="flex: 1;">
+                            <option value="">연도</option>
+                        </select>
+                        <select name="submission_deadline_month" required style="flex: 1;">
+                            <option value="">월</option>
+                            <option value="01">1월</option>
+                            <option value="02">2월</option>
+                            <option value="03">3월</option>
+                            <option value="04">4월</option>
+                            <option value="05">5월</option>
+                            <option value="06">6월</option>
+                            <option value="07">7월</option>
+                            <option value="08">8월</option>
+                            <option value="09">9월</option>
+                            <option value="10">10월</option>
+                            <option value="11">11월</option>
+                            <option value="12">12월</option>
+                        </select>
+                        <select name="submission_deadline_day" style="flex: 1;">
+                            <option value="">일 (선택)</option>
+                        </select>
+                    </div>
+                    <small>ETS 홈페이지에서 가능한 시험 날짜를 확인하고 <strong>마지막으로 응시 가능한 시험일</strong>을 입력해주세요. 너무 먼 날짜라면 연도와 월만 입력해도 됩니다.</small>
+                </div>
+                <div class="form-group">
+                    <label>희망 목표 달성 시점</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <select name="preferred_completion_year" style="flex: 1;">
+                            <option value="">연도 (선택)</option>
+                        </select>
+                        <select name="preferred_completion_month" style="flex: 1;">
+                            <option value="">월 (선택)</option>
+                            <option value="01">1월</option>
+                            <option value="02">2월</option>
+                            <option value="03">3월</option>
+                            <option value="04">4월</option>
+                            <option value="05">5월</option>
+                            <option value="06">6월</option>
+                            <option value="07">7월</option>
+                            <option value="08">8월</option>
+                            <option value="09">9월</option>
+                            <option value="10">10월</option>
+                            <option value="11">11월</option>
+                            <option value="12">12월</option>
+                        </select>
+                        <select name="preferred_completion_day" style="flex: 1;">
+                            <option value="">일 (선택)</option>
+                        </select>
+                    </div>
+                    <small>개인적으로 목표를 달성하고 싶은 날짜 (선택)</small>
+                </div>
+            </div>
+
+            <!-- Section 8: 토플 필요 이유 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">8</span>
+                    <h2>토플 점수가 필요한 이유</h2>
+                </div>
+                <div class="form-group">
+                    <label>목적</label>
+                    <select name="toefl_reason" required>
+                        <option value="">선택</option>
+                        <option value="대학원 진학">대학원 진학 (국내)</option>
+                        <option value="유학">유학 (해외)</option>
+                        <option value="교환학생">교환학생</option>
+                        <option value="취업">취업</option>
+                        <option value="졸업요건">졸업 요건</option>
+                        <option value="장학금">장학금</option>
+                        <option value="자기계발">자기계발</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>상세 설명</label>
+                    <textarea name="toefl_reason_detail" rows="4" placeholder="구체적인 이유나 목표" required></textarea>
+                </div>
+            </div>
+
+            <!-- Section 9: 기억에 남는 블로그 글 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">9</span>
+                    <h2>가장 기억에 남는 블로그 글</h2>
+                </div>
+                <div class="form-group">
+                    <textarea name="memorable_blog_content" rows="4" placeholder="이온토플 블로그/인스타그램에서 읽은 글 중 인상 깊었던 내용 (선택)"></textarea>
+                </div>
+            </div>
+
+            <!-- Section 10: 프로그램 및 일정 (통합) -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">10</span>
+                    <h2>프로그램 및 일정</h2>
+                </div>
+                
+                <div class="two-column-grid">
+                    <div class="form-group">
+                        <label>희망 프로그램</label>
+                        <select name="preferred_program" required>
+                            <option value="">선택</option>
+                            <option value="내벨업챌린지 - Fast">내벨업챌린지 - Fast</option>
+                            <option value="내벨업챌린지 - Standard">내벨업챌린지 - Standard</option>
+                            <option value="상담 후 결정">상담 후 결정</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>희망 수업 시작 시기</label>
+                        <input type="date" name="preferred_start_date" required>
+                        <small>수업은 <strong>매주 일요일</strong>에만 시작 가능합니다</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>프로그램 관련 추가 의견</label>
+                    <textarea name="program_note" rows="2" placeholder="질문이나 요청사항 (선택)"></textarea>
+                </div>
+            </div>
+
+            <!-- Section 11: 유입 경로 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">11</span>
+                    <h2>이온토플을 알게 된 경로</h2>
+                </div>
+                
+                <div class="two-column-grid">
+                    <div class="form-group">
+                        <label>검색 키워드</label>
+                        <input type="text" name="referral_search_keyword" placeholder="예: 토플 과외">
+                    </div>
+                    <div class="form-group">
+                        <label>소셜 미디어</label>
+                        <select name="referral_social_media">
+                            <option value="">해당없음</option>
+                            <option value="인스타그램">인스타그램</option>
+                            <option value="페이스북">페이스북</option>
+                            <option value="유튜브">유튜브</option>
+                            <option value="카카오톡">카카오톡</option>
+                            <option value="네이버">네이버</option>
+                            <option value="기타">기타</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>지인 추천</label>
+                    <label class="radio-label">
+                        <input type="radio" name="referral_from_friend" value="yes">
+                        <span style="position: relative; top: 1px;">예</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="referral_from_friend" value="no" checked>
+                        <span style="position: relative; top: 1px;">아니오</span>
+                    </label>
+                </div>
+
+                <div class="form-group" id="referralFriendNameGroup" style="display: none;">
+                    <input type="text" name="referral_friend_name" placeholder="추천인 성함 (선택)">
+                </div>
+
+                <div class="form-group">
+                    <label>기타 경로</label>
+                    <textarea name="referral_other" rows="2" placeholder="기타 경로나 추가 설명 (선택)"></textarea>
+                </div>
+            </div>
+
+            <!-- Section 12: 추가 전달 사항 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">12</span>
+                    <h2>추가 전달 사항</h2>
+                </div>
+                <div class="form-group">
+                    <textarea name="additional_notes" rows="4" placeholder="기타 전달하고 싶은 내용이나 궁금한 점 (선택)"></textarea>
+                </div>
+            </div>
+
+            <!-- Section 13: 개인정보 동의 -->
+            <div class="form-section privacy-section">
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="privacy_agreement" required>
+                        <span style="position: relative; top: 1px;">개인정보 수집 및 이용에 동의합니다. <a href="#" id="privacyPolicyLink">(개인정보 처리방침 보기)</a></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="window.history.back()">
+                    <i class="fas fa-arrow-left"></i> 취소
+                </button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-paper-plane"></i> 신청서 제출
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content success-modal">
+            <div class="success-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2>신청서가 제출되었습니다!</h2>
+            <p>신청서가 성공적으로 접수되었습니다.<br>담당자가 곧 확인하고 연락드릴 예정입니다.</p>
+            <p class="reminder-text">영업일 기준 1일 이내로 연락드리겠습니다. 조금만 기다려 주세요!</p>
+            <button class="btn-primary" onclick="window.location.href='application.html'">
+                <i class="fas fa-list"></i> 신청 내역 확인
+            </button>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacyModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="closePrivacyModal">&times;</span>
+            <h2>개인정보 처리방침</h2>
+            <div class="privacy-content">
+                <h3>1. 수집하는 개인정보 항목</h3>
+                <p>이온토플은 수강 신청 및 상담을 위해 다음의 개인정보를 수집합니다:</p>
+                <ul>
+                    <li>필수항목: 성명, 연락처, 이메일, 주소, 은행계좌정보, 카카오톡 ID</li>
+                    <li>선택항목: 직업, 토플 점수, 학습 이력, 기타 상담 관련 정보</li>
+                </ul>
+
+                <h3>2. 개인정보의 수집 및 이용 목적</h3>
+                <ul>
+                    <li>수강 신청 접수 및 상담</li>
+                    <li>맞춤형 수업 진행 및 학습 관리</li>
+                    <li>수업 자료 제공 및 공지사항 전달</li>
+                    <li>환불 등 계약 이행</li>
+                </ul>
+
+                <h3>3. 개인정보의 보유 및 이용 기간</h3>
+                <p>수집된 개인정보는 수강 종료 후 1년간 보관되며, 관계 법령에 따라 보존할 필요가 있는 경우 해당 기간 동안 보관됩니다.</p>
+
+                <h3>4. 개인정보의 제3자 제공</h3>
+                <p>이온토플은 원칙적으로 수강생의 개인정보를 제3자에게 제공하지 않습니다.</p>
+
+                <h3>5. 개인정보 처리의 위탁</h3>
+                <p>원활한 서비스 제공을 위해 일부 업무를 외부에 위탁할 수 있으며, 이 경우 관련 법령에 따라 안전하게 관리됩니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/application-form.js"></script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>

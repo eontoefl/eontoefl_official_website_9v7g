@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 대시보드 - EONTOEFL</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard-layout.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+            padding-bottom: 60px;
+        }
+
+        /* Navigation */
+        nav {
+            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+            padding: 20px 0;
+            box-shadow: 0 4px 12px rgba(148, 128, 197, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        nav .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            text-decoration: none;
+            position: relative;
+            top: -5px;
+        }
+
+        nav .menu {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+            align-items: center;
+        }
+
+        nav .menu a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        nav .menu a:hover {
+            opacity: 0.8;
+        }
+
+        /* Dashboard Container */
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        /* Welcome Section */
+        .welcome-section {
+            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 24px rgba(148, 128, 197, 0.2);
+        }
+
+        .welcome-section h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .welcome-section p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 7fr 3fr;
+            gap: 24px;
+            margin-bottom: 30px;
+            align-items: start;
+        }
+        
+        .dashboard-left,
+        .dashboard-right {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Card Base Style */
+        .dashboard-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .card-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .card-icon {
+            font-size: 24px;
+        }
+
+        /* Progress Card */
+        .progress-info {
+            margin-bottom: 20px;
+        }
+
+        .progress-bar-container {
+            background: #e2e8f0;
+            border-radius: 12px;
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #77bf7e 0%, #5da863 100%);
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.6s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .current-step {
+            font-size: 16px;
+            font-weight: 600;
+            color: #9480c5;
+            margin-bottom: 20px;
+        }
+
+        .step-list {
+            list-style: none;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+        }
+
+        .step-item:last-child {
+            border-bottom: none;
+        }
+
+        .step-item i {
+            font-size: 16px;
+        }
+
+        .step-completed {
+            color: #77bf7e;
+        }
+
+        .step-current {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        .step-pending {
+            color: #cbd5e1;
+        }
+
+        /* Shipping Card */
+        .shipping-status {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .shipping-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .shipping-status.preparing {
+            color: #f59e0b;
+        }
+
+        .shipping-status.shipped {
+            color: #3b82f6;
+        }
+
+        .shipping-status.delivered {
+            color: #77bf7e;
+        }
+
+        .shipping-info {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .shipping-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        .shipping-info-label {
+            color: #64748b;
+        }
+
+        .shipping-info-value {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .tracking-button {
+            width: 100%;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .tracking-button:hover {
+            transform: scale(1.02);
+        }
+
+        .tracking-button:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Quick Menu */
+        .quick-menu {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        .menu-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .menu-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .menu-button:hover {
+            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+            color: white;
+            border-color: #9480c5;
+            transform: translateY(-2px);
+        }
+
+        .menu-button i {
+            font-size: 18px;
+        }
+
+        /* Program Info */
+        .program-info {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        .program-details {
+            /* 회색 컨테이너 제거 */
+            margin-bottom: 20px;
+        }
+
+        .program-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .program-row:last-child {
+            border-bottom: none;
+        }
+
+        .program-label {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .program-value {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 14px;
+        }
+
+        .program-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .program-button {
+            flex: 1;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .program-button:hover {
+            transform: scale(1.02);
+        }
+
+        .program-button.secondary {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            color: #9480c5;
+            border: 2px solid #9480c5;
+        }
+
+        /* Notifications */
+        .notifications {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .notification-list {
+            list-style: none;
+        }
+
+        .notification-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+            transition: background 0.2s;
+        }
+
+        .notification-item:hover {
+            background: #f1f5f9;
+        }
+
+        .notification-icon {
+            font-size: 20px;
+            color: #9480c5;
+            margin-top: 2px;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-message {
+            font-size: 14px;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+
+        .notification-time {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+        }
+
+        .loading i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .welcome-section h1 {
+                font-size: 24px;
+            }
+
+            .menu-buttons {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .program-actions {
+                flex-direction: column;
+            }
+
+            nav .menu {
+                gap: 15px;
+                font-size: 14px;
+            }
+        }
+
+        /* 지금 해야 할 일 Styles */
+        .action-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .action-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .action-item.urgent {
+            background: #fef3c7;
+        }
+
+        .action-item:hover {
+            background: #f1f5f9;
+            transform: translateX(4px);
+        }
+
+        .action-item.urgent:hover {
+            background: #fde68a;
+        }
+
+        .action-icon {
+            font-size: 28px;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        .action-content {
+            flex: 1;
+        }
+
+        .action-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .action-deadline {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .action-button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            text-decoration: none;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-button:hover {
+            transform: scale(1.05);
+        }
+
+        /* 타임라인 Styles */
+        .timeline-item {
+            display: flex;
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid #f1f5f9;
+            position: relative;
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-item.future {
+            opacity: 0.6;
+        }
+
+        .timeline-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .timeline-content {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .timeline-text {
+            flex: 1;
+        }
+
+        .timeline-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 20px;
+            margin-top: 10px;
+        }
+
+        .timeline-description {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .timeline-date {
+            font-size: 12px;
+            color: #94a3b8;
+            white-space: nowrap;
+            padding-top: 2px;
+        }
+
+        /* 빠른 링크 Styles */
+        .quick-link-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .quick-link-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .quick-link-item:hover:not(.disabled) {
+            background: #f1f5f9;
+            transform: translateX(4px);
+        }
+
+        .quick-link-item.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .quick-link-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .quick-link-content {
+            flex: 1;
+        }
+
+        .quick-link-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 2px;
+        }
+
+        .quick-link-description {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .quick-link-arrow {
+            font-size: 16px;
+            color: #9480c5;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">
+                <img src="https://www.genspark.ai/api/files/s/BAnPOPvw" alt="ION TOEFL" style="height: 30px; width: auto; vertical-align: middle; position: relative; top: 5px;">
+            </a>
+            <ul class="menu" id="navMenu">
+                <li><a href="index.html">홈</a></li>
+                <li><a href="index.html#programs">프로그램</a></li>
+                <li><a href="my-dashboard.html" class="active">내 대시보드</a></li>
+                <li><a href="#" id="logoutBtn">로그아웃</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Dashboard Container -->
+    <div class="dashboard-container">
+        <!-- Loading State -->
+        <div id="loadingState" class="loading">
+            <i class="fas fa-spinner"></i>
+            <p>대시보드를 불러오는 중...</p>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" style="display: none;">
+            <!-- Welcome Section -->
+            <div class="welcome-section">
+                <h1 id="welcomeMessage">👋 환영합니다!</h1>
+                <p>내벨업챌린지 진행 현황을 확인하고 관리하세요.</p>
+            </div>
+
+            <!-- Main Grid: 7:3 Layout -->
+            <div class="dashboard-grid">
+                <!-- 왼쪽 70% -->
+                <div class="dashboard-left">
+                    <!-- 진행상황 (원형 + 타임라인바) -->
+                    <div class="progress-section" id="progressSectionNew">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+
+                    <!-- 지금 해야 할 일 -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span class="card-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 6px; color: white; font-size: 14px; font-weight: 700;">✓</span>
+                            <h2>지금 해야 할 일</h2>
+                        </div>
+                        <div id="actionItemsContent">
+                            <!-- Action items will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- 활동 타임라인 -->
+                    <div class="dashboard-card" style="display: flex; flex-direction: column;">
+                        <div class="card-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink: 0;" class="card-icon">
+                                <rect x="4" y="5" width="16" height="2" rx="1" fill="#9480c5"/>
+                                <rect x="4" y="11" width="16" height="2" rx="1" fill="#9480c5" opacity="0.7"/>
+                                <rect x="4" y="17" width="16" height="2" rx="1" fill="#9480c5" opacity="0.4"/>
+                                <circle cx="2" cy="6" r="1.5" fill="#9480c5"/>
+                                <circle cx="2" cy="12" r="1.5" fill="#9480c5" opacity="0.7"/>
+                                <circle cx="2" cy="18" r="1.5" fill="#9480c5" opacity="0.4"/>
+                            </svg>
+                            <h2>활동 타임라인</h2>
+                        </div>
+                        <div id="timelineContent" style="flex: 1; overflow-y: auto;">
+                            <!-- Timeline will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 오른쪽 30% -->
+                <div class="dashboard-right">
+                    <!-- 빠른 메뉴 (2x3 그리드) -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink: 0;" class="card-icon">
+                                <rect x="3" y="3" width="8" height="8" rx="1.5" fill="#9480c5"/>
+                                <rect x="13" y="3" width="8" height="8" rx="1.5" fill="#9480c5" opacity="0.7"/>
+                                <rect x="3" y="13" width="8" height="8" rx="1.5" fill="#9480c5" opacity="0.7"/>
+                                <rect x="13" y="13" width="8" height="8" rx="1.5" fill="#9480c5" opacity="0.4"/>
+                            </svg>
+                            <h2>빠른 메뉴</h2>
+                        </div>
+                        <div class="quick-menu-grid" id="quickMenuGrid">
+                            <!-- Quick menu buttons will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- 내 프로그램 정보 -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink: 0;" class="card-icon">
+                                <rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="#9480c5" stroke-width="1.5"/>
+                                <line x1="8" y1="7" x2="16" y2="7" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round"/>
+                                <line x1="8" y1="11" x2="14" y2="11" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+                                <line x1="8" y1="15" x2="12" y2="15" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+                            </svg>
+                            <h2>내 프로그램 정보</h2>
+                        </div>
+                        <div class="program-details" id="programDetails">
+                            <!-- Program details will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- 배송 정보 -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span class="card-icon">📦</span>
+                            <h2>배송 정보</h2>
+                        </div>
+                        <div id="shippingContent">
+                            <!-- Shipping content will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- 프로그램 액션 버튼 -->
+                    <div class="program-actions" id="programActions">
+                        <!-- Program action buttons will be populated by JavaScript -->
+                    </div>
+                    
+                    <!-- 설정 -->
+                    <div class="dashboard-card" style="margin-top: 20px;">
+                        <div class="card-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink: 0;" class="card-icon">
+                                <circle cx="12" cy="12" r="3" fill="none" stroke="#9480c5" stroke-width="1.5"/>
+                                <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
+                            <h2>설정</h2>
+                        </div>
+                        <div style="padding: 16px;">
+                            <a href="change-password.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border: 1px solid #e5e7eb; border-radius: 10px; text-decoration: none; transition: all 0.3s; cursor: pointer;">
+                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-key" style="color: white; font-size: 18px;"></i>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">비밀번호 변경</div>
+                                    <div style="font-size: 12px; color: #64748b;">계정 보안을 위해 주기적으로 변경하세요</div>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #cbd5e1;"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
