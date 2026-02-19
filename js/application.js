@@ -264,7 +264,7 @@ function displayApplications() {
                     <div style="font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-lock" style="color: #94a3b8; font-size: 12px;"></i>
                         ${escapeHtml(title)}
-                        ${isMine ? '<span style="display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; margin-left: 4px;"><i class="fas fa-user" style="font-size: 9px;"></i>내 신청서</span>' : ''}
+                        ${isMine ? '<span style="display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 20px; height: 20px; border-radius: 50%; margin-left: 4px;" title="내 신청서"><i class="fas fa-user" style="font-size: 9px;"></i></span>' : ''}
                     </div>
                 </td>
                 <td style="font-weight: 600;">${escapeHtml(maskName(app.name) || '이름 없음')}</td>
