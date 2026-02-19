@@ -330,9 +330,27 @@ function clearSelection() {
 // 선택 카운트 업데이트
 function updateSelectionCount() {
     document.getElementById('selectedCount').textContent = selectedIds.size;
-    document.getElementById('bulkActionsCard').style.display = 
-        selectedIds.size > 0 ? 'block' : 'none';
+    // 선택 수에 따라 버튼 스타일 변경
+    const btn = document.getElementById('bulkMenuBtn');
+    if (btn) {
+        btn.style.background = selectedIds.size > 0 ? '#8b5cf6' : '#475569';
+    }
 }
+
+// 일괄처리 드롭다운 토글
+function toggleBulkMenu() {
+    const dropdown = document.getElementById('bulkDropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+}
+
+// 드롭다운 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('bulkDropdown');
+    const btn = document.getElementById('bulkMenuBtn');
+    if (dropdown && btn && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
+});
 
 // 빠른 승인
 async function quickApprove(id) {
@@ -512,19 +530,28 @@ async function bulkConfirmDeposit() {
         return;
     }
 
-    if (!confirm(`${selectedIds.size}명의 입금을 확인 처리하시겠습니까?\n\n각 학생의 최종 입금금액(final_price)으로 자동 처리됩니다.`)) return;
+    const amount = prompt(`${selectedIds.size}명의 입금을 확인합니다.\n\n입금 금액을 입력하세요 (숫자만):`, '890000');
+    if (!amount) return;
+
+    const numAmount = parseInt(amount.replace(/[^0-9]/g, ''));
+    if (!numAmount || numAmount <= 0) {
+        alert('올바른 금액을 입력해주세요.');
+        return;
+    }
+
+    if (!confirm(`${selectedIds.size}명의 입금을 ${numAmount.toLocaleString()}원으로 확인 처리하시겠습니까?`)) return;
 
     try {
-        const promises = Array.from(selectedIds).map(async (id) => {
-            const app = await supabaseAPI.getById('applications', id);
-            const amount = app?.final_price || 0;
-            return supabaseAPI.patch('applications', id, {
-                deposit_confirmed_by_admin: true,
-                deposit_confirmed_by_admin_at: Date.now(),
-                deposit_amount: amount,
-                current_step: 5
-            });
-        });
+        const updateData = {
+            deposit_confirmed_by_admin: true,
+            deposit_confirmed_by_admin_at: Date.now(),
+            deposit_amount: numAmount,
+            current_step: 5
+        };
+
+        const promises = Array.from(selectedIds).map(id =>
+            supabaseAPI.patch('applications', id, updateData)
+        );
 
         await Promise.all(promises);
         alert(`✅ ${selectedIds.size}명의 입금이 확인되었습니다!`);
@@ -535,7 +562,6 @@ async function bulkConfirmDeposit() {
         alert('일부 입금확인에 실패했습니다.');
     }
 }
-
 
 // ===== 일괄 이용방법 전달 =====
 async function bulkSendGuide() {
