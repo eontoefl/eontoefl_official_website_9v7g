@@ -24,7 +24,7 @@ function loadAnalysisForm(app) {
         const hasAnalysis = app.analysis_status && app.analysis_content;
     
         // 학생용 링크 생성
-        const studentLink = `${window.location.origin}/analysis.html?id=${app.id}`;
+        const studentLink = `${window.location.origin}/application-detail.html?id=${app.id}#step2`;
     
         const formHTML = `
         ${hasAnalysis ? `
@@ -470,7 +470,7 @@ async function saveAnalysis(event) {
         const result = await supabaseAPI.patch('applications', currentApplication.id, updateData);
         
         if (result) {
-            const studentLink = `${window.location.origin}/analysis.html?id=${currentApplication.id}`;
+            const studentLink = `${window.location.origin}/application-detail.html?id=${currentApplication.id}#step2`;
             alert(`✅ 개별분석지가 저장되었습니다!\n\n학생용 링크:\n${studentLink}\n\n위 링크를 학생에게 전달해주세요.\n(페이지 새로고침 후 링크 복사 버튼이 표시됩니다)`);
             location.reload();
         } else {

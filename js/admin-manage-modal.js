@@ -189,7 +189,7 @@ function loadModalAnalysisTab(app) {
     const cursorStyle = hasAnalysis ? '' : 'cursor: pointer;';
     
     // 학생용 링크 생성
-    const studentLink = `${window.location.origin}/analysis.html?id=${app.id}`;
+    const studentLink = `${window.location.origin}/application-detail.html?id=${app.id}#step2`;
     
     let html = `
         ${hasAnalysis ? `
@@ -547,7 +547,7 @@ async function saveModalAnalysis(event) {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
         
         if (updatedApp) {
-            alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
+            alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/application-detail.html?id=${currentManageApp.id}#step2`);
             
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;
@@ -574,7 +574,7 @@ function previewAnalysis(appId) {
     
     // 현재 페이지의 base URL을 기준으로 상대 경로 생성
     const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '');
-    const previewUrl = `${baseUrl}/analysis.html?id=${appId}`;
+    const previewUrl = `${baseUrl}/application-detail.html?id=${appId}#step2`;
     
     console.log('Preview URL:', previewUrl);
     
