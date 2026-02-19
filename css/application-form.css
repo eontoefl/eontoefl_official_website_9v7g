@@ -664,6 +664,13 @@ label:has(+ textarea[required])::after,
     font-weight: 700;
 }
 
+/* radio/checkbox label에는 자동 별표 제거 */
+.no-auto-required label::after,
+.no-auto-required .radio-label::after,
+.no-auto-required .radio-label span::after {
+    content: '' !important;
+}
+
 /* Tab system for score/target versions */
 .version-tabs {
     display: flex;
@@ -767,7 +774,8 @@ label:has(+ textarea[required])::after,
 
 .writing-section-clean .section-description {
     background: #f9f9f9;
-    border-left: 3px solid #9480c5;
+    border-left: none;
+    font-size: inherit;
 }
 
 .writing-section-clean .writing-prompt {
