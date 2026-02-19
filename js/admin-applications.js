@@ -530,28 +530,19 @@ async function bulkConfirmDeposit() {
         return;
     }
 
-    const amount = prompt(`${selectedIds.size}명의 입금을 확인합니다.\n\n입금 금액을 입력하세요 (숫자만):`, '890000');
-    if (!amount) return;
-
-    const numAmount = parseInt(amount.replace(/[^0-9]/g, ''));
-    if (!numAmount || numAmount <= 0) {
-        alert('올바른 금액을 입력해주세요.');
-        return;
-    }
-
-    if (!confirm(`${selectedIds.size}명의 입금을 ${numAmount.toLocaleString()}원으로 확인 처리하시겠습니까?`)) return;
+    if (!confirm(`${selectedIds.size}명의 입금을 확인 처리하시겠습니까?\n\n각 학생의 최종 입금금액(final_price)으로 자동 처리됩니다.`)) return;
 
     try {
-        const updateData = {
-            deposit_confirmed_by_admin: true,
-            deposit_confirmed_by_admin_at: Date.now(),
-            deposit_amount: numAmount,
-            current_step: 5
-        };
-
-        const promises = Array.from(selectedIds).map(id =>
-            supabaseAPI.patch('applications', id, updateData)
-        );
+        const promises = Array.from(selectedIds).map(async (id) => {
+            const app = await supabaseAPI.getById('applications', id);
+            const amount = app?.final_price || 0;
+            return supabaseAPI.patch('applications', id, {
+                deposit_confirmed_by_admin: true,
+                deposit_confirmed_by_admin_at: Date.now(),
+                deposit_amount: amount,
+                current_step: 5
+            });
+        });
 
         await Promise.all(promises);
         alert(`✅ ${selectedIds.size}명의 입금이 확인되었습니다!`);
