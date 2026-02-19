@@ -128,7 +128,7 @@ async function loadApplicationDetail() {
             // 비로그인 상태
             if (!userData) {
                 alert('⚠️ 로그인이 필요합니다.\n\n신청서를 확인하려면 로그인해주세요.');
-                window.location.href = 'login.html';
+                window.location.href = `login.html?redirect=${encodeURIComponent(window.location.href)}`;
                 return;
             }
             
