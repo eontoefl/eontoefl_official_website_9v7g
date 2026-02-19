@@ -162,12 +162,6 @@ function setupConditionalFields() {
             const newTargetInputs = document.getElementById('newTargetSection').querySelectorAll('input');
             oldTargetInputs.forEach(input => input.required = false);
             newTargetInputs.forEach(input => input.required = false);
-            
-            // 활성 탭의 총점만 필수
-            const oldCutoff = document.querySelector('input[name="target_cutoff_old"]');
-            const newCutoff = document.querySelector('input[name="target_cutoff_new"]');
-            if (oldCutoff) oldCutoff.required = isOld;
-            if (newCutoff) newCutoff.required = !isOld;
         });
     });
 
@@ -633,6 +627,20 @@ function validateForm() {
                 }
             }
         }
+    }
+
+    // 목표 점수: 개정후 또는 개정전 Total 중 하나는 입력해야 함
+    const targetCutoffNew = document.querySelector('input[name="target_cutoff_new"]');
+    const targetCutoffOld = document.querySelector('input[name="target_cutoff_old"]');
+    const hasNewTarget = targetCutoffNew && targetCutoffNew.value.trim() !== '';
+    const hasOldTarget = targetCutoffOld && targetCutoffOld.value.trim() !== '';
+    
+    if (!hasNewTarget && !hasOldTarget) {
+        alert('목표 점수의 커트라인(Total)을 개정후 또는 개정전 중 하나는 입력해주세요.');
+        // 현재 활성 탭의 input에 포커스
+        const activeTarget = document.querySelector('.version-content.active input[name="target_cutoff_new"], .version-content.active input[name="target_cutoff_old"]');
+        if (activeTarget) activeTarget.focus();
+        return false;
     }
 
     return true;
