@@ -175,6 +175,14 @@ function loadModalInfoTab(app) {
             </div>
         </div>
         ` : ''}
+        
+        <!-- 관리자: 신청서 수정 버튼 -->
+        <div style="margin-top: 24px; text-align: right;">
+            <button onclick="window.open('application-form.html?edit=${app.id}', '_blank')" 
+                    style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
+                <i class="fas fa-pen"></i> 신청서 수정하기
+            </button>
+        </div>
     `;
 }
 

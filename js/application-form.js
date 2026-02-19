@@ -278,9 +278,9 @@ async function initEditMode(appId) {
             return;
         }
 
-        // 본인 신청서인지 확인
+        // 본인 신청서인지 확인 (관리자는 모든 신청서 수정 가능)
         const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-        if (!userData || app.email !== userData.email) {
+        if (!userData || (userData.role !== 'admin' && app.email !== userData.email)) {
             alert('본인의 신청서만 수정할 수 있습니다.');
             window.location.href = 'application.html';
             return;
