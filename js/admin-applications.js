@@ -56,6 +56,30 @@ function getAdminActionMessage(app) {
     return { text: '세팅 완료', color: '#22c55e', bgColor: '#dcfce7' };
 }
 
+// 앱 상태를 필터 카테고리로 분류
+function getAppStageFilter(app) {
+    // 1. 개별분석 미등록
+    if (!app.analysis_status || !app.analysis_content) return 'need_analysis';
+    // 2. 학생 동의 대기
+    if (!app.student_agreed_at) return 'student_waiting';
+    // 3. 계약서 미발송
+    if (!app.contract_sent) return 'need_contract';
+    // 4. 계약서 동의 대기
+    if (!app.contract_agreed) return 'student_waiting';
+    // 5. 학생 입금 대기
+    if (!app.deposit_confirmed_by_student) return 'student_waiting';
+    // 6. 관리자 입금확인 필요
+    if (!app.deposit_confirmed_by_admin) return 'need_deposit';
+    // 7. 이용방법 전달 필요
+    if (!app.guide_sent) return 'need_guide';
+    // 8. 택배 발송 필요
+    if (!app.shipping_completed) return 'need_shipping';
+    // 9. 알림톡 예약 필요
+    if (!app.kakaotalk_notification_sent) return 'need_kakao';
+    // 10. 완료
+    return 'completed';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // 관리자 권한 체크
     requireAdmin();
@@ -115,9 +139,8 @@ function applyFilters() {
             (app.email && app.email.toLowerCase().includes(searchTerm)) ||
             (app.phone && app.phone.toLowerCase().includes(searchTerm));
         
-        // 상태 필터
-        const matchesStatus = statusFilter === 'all' || 
-            (app.status || '접수완료') === statusFilter;
+        // 상태 필터 (프로세스 단계 기반)
+        const matchesStatus = statusFilter === 'all' || getAppStageFilter(app) === statusFilter;
         
         // 프로그램 필터
         const matchesProgram = programFilter === 'all' || 
