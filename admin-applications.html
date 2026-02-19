@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>신청서 관리 - 이온토플 관리자</title>
-    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
     
     <!-- Pretendard Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
@@ -66,11 +65,14 @@
                 
                 <select id="statusFilter" class="admin-select">
                     <option value="all">전체 상태</option>
-                    <option value="접수완료">접수완료</option>
-                    <option value="검토중">검토중</option>
-                    <option value="승인">승인</option>
-                    <option value="거부">거부</option>
-                    <option value="보류">보류</option>
+                    <option value="student_waiting">⏳ 학생 액션 대기</option>
+                    <option value="need_analysis">📝 개별분석 필요</option>
+                    <option value="need_contract">📋 계약서 발송 필요</option>
+                    <option value="need_deposit">💰 입금확인 필요</option>
+                    <option value="need_guide">📖 이용방법 전달 필요</option>
+                    <option value="need_shipping">📦 택배 발송 필요</option>
+                    <option value="need_kakao">💬 알림톡 예약 필요</option>
+                    <option value="completed">✅ 세팅 완료</option>
                 </select>
                 
                 <select id="programFilter" class="admin-select">
