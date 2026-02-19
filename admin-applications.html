@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>신청서 관리 - 이온토플 관리자</title>
-    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
     
     <!-- Pretendard Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
@@ -100,12 +99,21 @@
                         <span id="selectedCount">0</span>개 선택됨
                     </span>
                 </div>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button class="admin-btn admin-btn-success admin-btn-sm" onclick="bulkApprove()">
                         <i class="fas fa-check"></i> 일괄 승인
                     </button>
                     <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="bulkReject()">
                         <i class="fas fa-times"></i> 일괄 거부
+                    </button>
+                    <button class="admin-btn admin-btn-sm" onclick="showBulkContractModal()" style="background: #8b5cf6; color: white;">
+                        <i class="fas fa-file-contract"></i> 일괄 계약서 발송
+                    </button>
+                    <button class="admin-btn admin-btn-sm" onclick="bulkConfirmDeposit()" style="background: #059669; color: white;">
+                        <i class="fas fa-won-sign"></i> 일괄 입금확인
+                    </button>
+                    <button class="admin-btn admin-btn-sm" onclick="bulkSendGuide()" style="background: #f59e0b; color: white;">
+                        <i class="fas fa-book"></i> 일괄 이용방법 전달
                     </button>
                     <button class="admin-btn admin-btn-outline admin-btn-sm" onclick="clearSelection()">
                         <i class="fas fa-times-circle"></i> 선택 해제
