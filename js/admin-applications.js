@@ -173,7 +173,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}
+                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
@@ -193,8 +193,8 @@ function displayApplications() {
                     </div>
                 </td>
                 <td>
-                    <div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${app.deleted ? '#fef2f2' : actionMessage.bgColor}; color: ${app.deleted ? '#ef4444' : actionMessage.color};">
-                        ${app.deleted ? '🗑️ 삭제됨' : actionMessage.text}
+                    <div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">
+                        ${actionMessage.text}
                     </div>
                 </td>
                 <td>
@@ -417,6 +417,160 @@ async function bulkReject() {
     } catch (error) {
         console.error('Bulk rejection error:', error);
         alert('일부 신청서 거부에 실패했습니다.');
+    }
+}
+
+// ===== 일괄 계약서 발송 =====
+async function showBulkContractModal() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    // 활성 계약서 목록 불러오기
+    try {
+        const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'limit': '100' });
+        
+        if (!contracts || contracts.length === 0) {
+            alert('활성화된 계약서가 없습니다.\n\n계약서 관리에서 먼저 계약서를 등록해주세요.');
+            return;
+        }
+
+        // 선택 모달 생성
+        const options = contracts.map(c => `<option value="${c.id}">${c.version} - ${c.title}</option>`).join('');
+        
+        const modal = document.createElement('div');
+        modal.id = 'bulkContractModal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000;';
+        modal.innerHTML = `
+            <div style="background:white; border-radius:12px; padding:32px; max-width:450px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <h3 style="margin:0 0 8px 0; font-size:18px;">📋 일괄 계약서 발송</h3>
+                <p style="margin:0 0 20px 0; color:#64748b; font-size:14px;">${selectedIds.size}명에게 계약서를 발송합니다.</p>
+                <select id="bulkContractSelect" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; margin-bottom:20px;">
+                    <option value="">계약서를 선택하세요...</option>
+                    ${options}
+                </select>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button onclick="document.getElementById('bulkContractModal').remove()" style="padding:10px 20px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:14px;">취소</button>
+                    <button onclick="executeBulkContract()" style="padding:10px 20px; background:#8b5cf6; color:white; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;">발송하기</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    } catch (error) {
+        console.error('Load contracts error:', error);
+        alert('계약서 목록을 불러오는데 실패했습니다.');
+    }
+}
+
+async function executeBulkContract() {
+    const selectId = document.getElementById('bulkContractSelect').value;
+    if (!selectId) {
+        alert('계약서를 선택해주세요.');
+        return;
+    }
+
+    try {
+        const contract = await supabaseAPI.getById('contracts', selectId);
+        if (!contract) {
+            alert('계약서를 찾을 수 없습니다.');
+            return;
+        }
+
+        if (!confirm(`${selectedIds.size}명에게 "${contract.version} - ${contract.title}" 계약서를 발송하시겠습니까?`)) return;
+
+        const updateData = {
+            contract_sent: true,
+            contract_sent_at: Date.now(),
+            contract_template_id: contract.id,
+            contract_version: contract.version,
+            contract_title: contract.title,
+            contract_snapshot: contract.content,
+            current_step: 3
+        };
+
+        const promises = Array.from(selectedIds).map(id =>
+            supabaseAPI.patch('applications', id, updateData)
+        );
+
+        await Promise.all(promises);
+        document.getElementById('bulkContractModal').remove();
+        alert(`✅ ${selectedIds.size}명에게 계약서가 발송되었습니다!`);
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk contract error:', error);
+        alert('일부 계약서 발송에 실패했습니다.');
+    }
+}
+
+// ===== 일괄 입금확인 =====
+async function bulkConfirmDeposit() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    const amount = prompt(`${selectedIds.size}명의 입금을 확인합니다.\n\n입금 금액을 입력하세요 (숫자만):`, '890000');
+    if (!amount) return;
+
+    const numAmount = parseInt(amount.replace(/[^0-9]/g, ''));
+    if (!numAmount || numAmount <= 0) {
+        alert('올바른 금액을 입력해주세요.');
+        return;
+    }
+
+    if (!confirm(`${selectedIds.size}명의 입금을 ${numAmount.toLocaleString()}원으로 확인 처리하시겠습니까?`)) return;
+
+    try {
+        const updateData = {
+            deposit_confirmed_by_admin: true,
+            deposit_confirmed_by_admin_at: Date.now(),
+            deposit_amount: numAmount,
+            current_step: 5
+        };
+
+        const promises = Array.from(selectedIds).map(id =>
+            supabaseAPI.patch('applications', id, updateData)
+        );
+
+        await Promise.all(promises);
+        alert(`✅ ${selectedIds.size}명의 입금이 확인되었습니다!`);
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk deposit confirm error:', error);
+        alert('일부 입금확인에 실패했습니다.');
+    }
+}
+
+// ===== 일괄 이용방법 전달 =====
+async function bulkSendGuide() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    if (!confirm(`${selectedIds.size}명에게 이용방법을 전달하시겠습니까?\n\n학생들의 "이용방법" 탭이 활성화됩니다.`)) return;
+
+    try {
+        const updateData = {
+            guide_sent: true,
+            guide_sent_at: Date.now()
+        };
+
+        const promises = Array.from(selectedIds).map(id =>
+            supabaseAPI.patch('applications', id, updateData)
+        );
+
+        await Promise.all(promises);
+        alert(`✅ ${selectedIds.size}명에게 이용방법이 전달되었습니다!`);
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk guide send error:', error);
+        alert('일부 이용방법 전달에 실패했습니다.');
     }
 }
 
