@@ -113,7 +113,7 @@ async function savePaymentInfo() {
             result = await supabaseAPI.patch('site_settings', existing[0].id, data);
         } else {
             data.setting_key = 'default';
-            data.setting_value = data;
+            data.setting_value = 'default';
             result = await supabaseAPI.post('site_settings', data);
         }
         
@@ -172,7 +172,7 @@ async function saveSupportInfo() {
             result = await supabaseAPI.patch('site_settings', existing[0].id, data);
         } else {
             data.setting_key = 'default';
-            data.setting_value = data;
+            data.setting_value = 'default';
             result = await supabaseAPI.post('site_settings', data);
         }
         
