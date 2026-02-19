@@ -24,8 +24,7 @@ function checkAdminAuth() {
 // 기존 가이드 로드
 async function loadGuide() {
     try {
-        const response = await fetch(`tables/guide_content?limit=1`);
-        const result = await response.json();
+        const result = await supabaseAPI.get('guide_content', { limit: 1 });
         
         if (result.data && result.data.length > 0) {
             const guide = result.data[0];
@@ -409,8 +408,7 @@ async function restoreVersion(versionId) {
     }
     
     try {
-        const response = await fetch(`tables/guide_versions/${versionId}`);
-        const version = await response.json();
+        const version = await supabaseAPI.getById('guide_versions', versionId);
         
         sections = JSON.parse(version.content);
         renderSections();

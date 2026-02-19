@@ -467,13 +467,9 @@ async function saveAnalysis(event) {
     };
     
     try {
-        const response = await fetch(`tables/applications/${currentApplication.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const result = await supabaseAPI.patch('applications', currentApplication.id, updateData);
         
-        if (response.ok) {
+        if (result) {
             const studentLink = `${window.location.origin}/analysis.html?id=${currentApplication.id}`;
             alert(`✅ 개별분석지가 저장되었습니다!\n\n학생용 링크:\n${studentLink}\n\n위 링크를 학생에게 전달해주세요.\n(페이지 새로고침 후 링크 복사 버튼이 표시됩니다)`);
             location.reload();
@@ -591,17 +587,13 @@ async function sendContract(appId) {
     }
 
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const result = await supabaseAPI.patch('applications', appId, {
                 contract_sent: true,
                 contract_sent_at: Date.now(),
                 current_step: 3  // STEP 3: 계약서 단계
-            })
         });
 
-        if (response.ok) {
+        if (result) {
             alert('✅ 계약서가 발송되었습니다!\n\n학생이 24시간 내에 동의해야 합니다.');
             location.reload();
         } else {
@@ -932,20 +924,14 @@ async function confirmDepositByAdmin(appId) {
     }
 
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const app = await supabaseAPI.patch('applications', appId, {
                 deposit_confirmed_by_admin: true,
                 deposit_confirmed_by_admin_at: Date.now(),
                 deposit_amount: amount,
                 current_step: 5
-            })
         });
 
-        if (response.ok) {
-            const app = await response.json();
-            
+        if (app) {
             // 알림 생성
             await createNotification({
                 application_id: appId,
@@ -975,19 +961,13 @@ async function sendUsageGuide(appId) {
     }
 
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const app = await supabaseAPI.patch('applications', appId, {
                 guide_sent: true,
                 guide_sent_at: Date.now()
                 // current_step은 5에서 유지
-            })
         });
 
-        if (response.ok) {
-            const app = await response.json();
-            
+        if (app) {
             // 알림 생성
             await createNotification({
                 application_id: appId,
@@ -1011,15 +991,11 @@ async function sendUsageGuide(appId) {
 // 테스트룸 액세스 토글
 async function toggleTestroomAccess(appId, checked) {
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const result = await supabaseAPI.patch('applications', appId, {
                 challenge_access_granted: checked
-            })
         });
 
-        if (response.ok) {
+        if (result) {
             if (checked) {
                 alert('✅ 테스트룸 액세스가 체크되었습니다.\n학생 화면에 "테스트룸 액세스 완료" 안내가 표시됩니다.');
             } else {
@@ -1030,7 +1006,6 @@ async function toggleTestroomAccess(appId, checked) {
             alert('❌ 업데이트에 실패했습니다.');
             // 원래 상태로 복구
             document.getElementById(`testroom-access-${appId}`).checked = !checked;
-        }
     } catch (error) {
         console.error('Toggle testroom access error:', error);
         alert('❌ 오류가 발생했습니다.');
@@ -1049,19 +1024,13 @@ async function confirmShipping(appId) {
     }
     
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const app = await supabaseAPI.patch('applications', appId, {
                 shipping_completed: true,
                 shipping_completed_at: Date.now(),
                 shipping_tracking_number: trackingNumber
-            })
         });
         
-        if (response.ok) {
-            const app = await response.json();
-            
+        if (app) {
             // 알림 생성
             await createNotification({
                 application_id: appId,
@@ -1183,23 +1152,15 @@ function addShippingSection(app) {
  */
 async function createNotification(notificationData) {
     try {
-        const response = await fetch('tables/notifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                application_id: notificationData.application_id,
-                user_email: notificationData.user_email,
-                type: notificationData.type,
-                icon: notificationData.icon || 'fa-bell',
-                message: notificationData.message,
-                is_read: false,
-                created_at: Date.now()
-            })
+        await supabaseAPI.post('notifications', {
+            application_id: notificationData.application_id,
+            user_email: notificationData.user_email,
+            type: notificationData.type,
+            icon: notificationData.icon || 'fa-bell',
+            message: notificationData.message,
+            is_read: false,
+            created_at: Date.now()
         });
-
-        if (!response.ok) {
-            console.error('알림 생성 실패:', await response.text());
-        }
     } catch (error) {
         console.error('알림 생성 중 오류:', error);
     }

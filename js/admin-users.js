@@ -153,13 +153,9 @@ async function changeUserLevel(userId, newLevel) {
     }
     
     try {
-        const response = await fetch(`tables/users/${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ level: parseInt(newLevel) })
-        });
+        const result = await supabaseAPI.patch('users', userId, { level: parseInt(newLevel) });
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 등급이 변경되었습니다.');
             loadUsers();
         } else {
@@ -190,13 +186,9 @@ async function confirmResetPassword() {
     if (!selectedUserId) return;
     
     try {
-        const response = await fetch(`tables/users/${selectedUserId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: '000000' })
-        });
+        const result = await supabaseAPI.patch('users', selectedUserId, { password: '000000' });
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 비밀번호가 000000으로 초기화되었습니다.\n\n회원에게 임시 비밀번호를 전달해주세요.');
             closeResetPasswordModal();
             loadUsers();
@@ -218,13 +210,9 @@ async function toggleBlock(userId, currentBlocked) {
     }
     
     try {
-        const response = await fetch(`tables/users/${userId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blocked: !currentBlocked })
-        });
+        const result = await supabaseAPI.patch('users', userId, { blocked: !currentBlocked });
         
-        if (response.ok) {
+        if (result) {
             alert(`✅ ${action}되었습니다.`);
             loadUsers();
         } else {

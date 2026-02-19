@@ -14,14 +14,12 @@ async function loadAnalysis() {
     }
     
     try {
-        const response = await fetch(`tables/applications/${applicationId}`);
+        const application = await supabaseAPI.getById('applications', applicationId);
         
-        if (!response.ok) {
+        if (!application) {
             showError();
             return;
         }
-        
-        const application = await response.json();
         
         // 개별분석이 완료되지 않은 경우
         if (!application.analysis_status || application.analysis_status === 'pending') {
@@ -281,20 +279,14 @@ async function submitAgreement(applicationId) {
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
     
     try {
-        const response = await fetch(`tables/applications/${applicationId}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
+        const result = await supabaseAPI.patch('applications', applicationId, {
                 student_program_agreed: true,
                 student_schedule_agreed: true,
                 student_agreed_at: new Date().toISOString(),
                 current_step: 3
-            })
         });
         
-        if (!response.ok) {
+        if (!result) {
             throw new Error('Failed to submit agreement');
         }
         

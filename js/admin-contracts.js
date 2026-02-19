@@ -322,16 +322,12 @@ async function deactivateContract(contractId) {
     if (!confirm(message)) return;
     
     try {
-        const response = await fetch(`tables/contracts/${contractId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                is_active: false,
-                updated_at: Date.now()
-            })
+        const result = await supabaseAPI.patch('contracts', contractId, {
+            is_active: false,
+            updated_at: Date.now()
         });
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 비활성화되었습니다.');
             await loadAllContracts();
         } else {
@@ -348,16 +344,12 @@ async function reactivateContract(contractId) {
     if (!confirm('이 계약서를 다시 활성화하시겠습니까?')) return;
     
     try {
-        const response = await fetch(`tables/contracts/${contractId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                is_active: true,
-                updated_at: Date.now()
-            })
+        const result = await supabaseAPI.patch('contracts', contractId, {
+            is_active: true,
+            updated_at: Date.now()
         });
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 재활성화되었습니다.');
             await loadAllContracts();
         } else {
@@ -384,16 +376,9 @@ async function deleteContract(contractId) {
     }
     
     try {
-        const response = await fetch(`tables/contracts/${contractId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok || response.status === 204) {
-            alert('✅ 삭제되었습니다.');
-            await loadAllContracts();
-        } else {
-            alert('❌ 삭제에 실패했습니다.');
-        }
+        await supabaseAPI.delete('contracts', contractId);
+        alert('✅ 삭제되었습니다.');
+        await loadAllContracts();
     } catch (error) {
         console.error('Delete error:', error);
         alert('❌ 오류가 발생했습니다.');

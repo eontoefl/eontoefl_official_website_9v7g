@@ -46,10 +46,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSettings() {
     try {
         console.log('Loading site settings...');
-        const response = await fetch('tables/site_settings/default');
+        const result = await supabaseAPI.getById('site_settings', 'default');
         
-        if (response.ok) {
-            currentSettings = await response.json();
+        if (result) {
+            currentSettings = result;
             console.log('Settings loaded:', currentSettings);
             
             // 폼에 데이터 채우기
@@ -96,10 +96,7 @@ async function loadSettings() {
 // 기본 설정 생성
 async function createDefaultSettings() {
     try {
-        const response = await fetch('tables/site_settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const result = await supabaseAPI.post('site_settings', {
                 id: 'default',
                 bank_name: '국민은행',
                 account_number: '123-456-789012',
@@ -114,10 +111,9 @@ async function createDefaultSettings() {
                 communication_guide: '',
                 usage_guide_url: 'usage-guide.html',
                 updated_at: Date.now()
-            })
         });
         
-        if (!response.ok) {
+        if (!result) {
             throw new Error('Failed to create default settings');
         }
         
@@ -165,10 +161,7 @@ async function saveSettings() {
     }
     
     try {
-        const response = await fetch('tables/site_settings/default', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const result = await supabaseAPI.put('site_settings', 'default', {
                 id: 'default',
                 bank_name: bankName,
                 account_number: accountNumber,
@@ -183,10 +176,9 @@ async function saveSettings() {
                 communication_guide: communicationGuide,
                 usage_guide_url: usageGuideUrl,
                 updated_at: Date.now()
-            })
         });
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 설정이 저장되었습니다!');
             await loadSettings();
         } else {
@@ -201,9 +193,9 @@ async function saveSettings() {
 // 설정 조회 함수 (다른 페이지에서 사용)
 async function getSiteSettings() {
     try {
-        const response = await fetch('tables/site_settings/default');
-        if (response.ok) {
-            return await response.json();
+        const result = await supabaseAPI.getById('site_settings', 'default');
+        if (result) {
+            return result;
         }
         return null;
     } catch (error) {

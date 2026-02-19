@@ -339,13 +339,9 @@ async function quickApprove(id) {
     if (!confirm('이 신청서를 승인하시겠습니까?')) return;
     
     try {
-        const response = await fetch(`tables/applications/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: '승인' })
-        });
+        const result = await supabaseAPI.patch('applications', id, { status: '승인' });
         
-        if (response.ok) {
+        if (result) {
             alert('승인되었습니다.');
             loadApplications();
         } else {
@@ -362,13 +358,9 @@ async function quickReject(id) {
     if (!confirm('이 신청서를 거부하시겠습니까?')) return;
     
     try {
-        const response = await fetch(`tables/applications/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: '거부' })
-        });
+        const result = await supabaseAPI.patch('applications', id, { status: '거부' });
         
-        if (response.ok) {
+        if (result) {
             alert('거부되었습니다.');
             loadApplications();
         } else {
@@ -391,11 +383,7 @@ async function bulkApprove() {
     
     try {
         const promises = Array.from(selectedIds).map(id =>
-            fetch(`tables/applications/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: '승인' })
-            })
+            supabaseAPI.patch('applications', id, { status: '승인' })
         );
         
         await Promise.all(promises);
@@ -419,11 +407,7 @@ async function bulkReject() {
     
     try {
         const promises = Array.from(selectedIds).map(id =>
-            fetch(`tables/applications/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: '거부' })
-            })
+            supabaseAPI.patch('applications', id, { status: '거부' })
         );
         
         await Promise.all(promises);

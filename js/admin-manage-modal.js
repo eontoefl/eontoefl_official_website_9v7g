@@ -6,13 +6,11 @@ let currentManageApp = null;
 async function openManageModal(appId) {
     try {
         // 데이터 로드
-        const response = await fetch(`tables/applications/${appId}`);
-        if (!response.ok) {
+        const app = await supabaseAPI.getById('applications', appId);
+        if (!app) {
             alert('❌ 신청서를 불러올 수 없습니다.');
             return;
         }
-        
-        const app = await response.json();
         currentManageApp = app;
         
         // 모달 표시
@@ -542,17 +540,12 @@ async function saveModalAnalysis(event) {
     };
     
     try {
-        const response = await fetch(`tables/applications/${currentManageApp.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
         
-        if (response.ok) {
+        if (updatedApp) {
             alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
             
             // 앱 데이터 업데이트
-            const updatedApp = await response.json();
             currentManageApp = updatedApp;
             
             // 탭 새로고침
@@ -880,8 +873,7 @@ async function previewSelectedContract() {
     }
     
     try {
-        const response = await fetch(`tables/contracts/${selectId}`);
-        const contract = await response.json();
+        const contract = await supabaseAPI.getById('contracts', selectId);
         
         if (contract) {
             // 샘플 데이터로 미리보기
@@ -1096,8 +1088,7 @@ async function executeContractChange(appId, wasAgreed) {
     
     try {
         // 새 계약서 가져오기
-        const contractResponse = await fetch(`tables/contracts/${newContractId}`);
-        const contract = await contractResponse.json();
+        const contract = await supabaseAPI.getById('contracts', newContractId);
         
         if (!contract) {
             alert('계약서를 찾을 수 없습니다.');
@@ -1131,13 +1122,9 @@ async function executeContractChange(appId, wasAgreed) {
         }
         
         // 업데이트
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const updatedApp = await supabaseAPI.patch('applications', appId, updateData);
         
-        if (response.ok) {
+        if (updatedApp) {
             document.getElementById('changeContractModal').remove();
             
             if (wasAgreed) {
@@ -1146,7 +1133,6 @@ async function executeContractChange(appId, wasAgreed) {
                 alert(`✅ 계약서가 변경되었습니다!\n\n버전: ${contract.version}`);
             }
             
-            const updatedApp = await response.json();
             currentManageApp = updatedApp;
             loadModalTab('contract');
         } else {
@@ -1169,8 +1155,7 @@ async function sendContractFromModal(appId) {
     
     try {
         // 선택한 계약서 가져오기
-        const contractResponse = await fetch(`tables/contracts/${selectId}`);
-        const contract = await contractResponse.json();
+        const contract = await supabaseAPI.getById('contracts', selectId);
         
         if (!contract) {
             alert('계약서를 찾을 수 없습니다.');
@@ -1182,10 +1167,7 @@ async function sendContractFromModal(appId) {
         }
         
         // 스냅샷 저장
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const updatedApp = await supabaseAPI.patch('applications', appId, {
                 contract_sent: true,
                 contract_sent_at: Date.now(),
                 contract_template_id: contract.id,
@@ -1193,12 +1175,10 @@ async function sendContractFromModal(appId) {
                 contract_title: contract.title,
                 contract_snapshot: contract.content,  // 스냅샷!
                 current_step: 3  // STEP 3: 계약서 단계
-            })
         });
         
-        if (response.ok) {
+        if (updatedApp) {
             alert(`✅ 계약서가 발송되었습니다!\n\n버전: ${contract.version}\n학생이 24시간 내에 동의해야 합니다.`);
-            const updatedApp = await response.json();
             currentManageApp = updatedApp;
             loadModalTab('contract');
         } else {
@@ -1218,20 +1198,15 @@ async function confirmDepositFromModal(appId) {
     }
     
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const updatedApp = await supabaseAPI.patch('applications', appId, {
                 deposit_confirmed_by_admin: true,
                 deposit_confirmed_by_admin_at: Date.now(),
                 deposit_amount: parseInt(amount),
                 current_step: 5
-            })
         });
         
-        if (response.ok) {
+        if (updatedApp) {
             alert('✅ 입금이 확인되었습니다!');
-            const updatedApp = await response.json();
             currentManageApp = updatedApp;
             loadModalTab('contract');
         } else {
@@ -1313,19 +1288,14 @@ async function sendUsageGuideFromModal(appId) {
     }
     
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const updatedApp = await supabaseAPI.patch('applications', appId, {
                 guide_sent: true,
                 guide_sent_at: Date.now()
                 // current_step은 5에서 유지
-            })
         });
         
-        if (response.ok) {
+        if (updatedApp) {
             alert('✅ 이용방법이 전달되었습니다!');
-            const updatedApp = await response.json();
             currentManageApp = updatedApp;
             loadModalTab('usage');
         } else {
@@ -1356,15 +1326,9 @@ async function markShippingCompletedFromModal(appId) {
             updateData.shipping_tracking_number = trackingNumber.trim();
         }
         
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const app = await supabaseAPI.patch('applications', appId, updateData);
         
-        if (response.ok) {
-            const app = await response.json();
-            
+        if (app) {
             // 알림 생성
             await createNotification({
                 application_id: appId,
@@ -1608,18 +1572,12 @@ async function scheduleKakaoNotification(appId) {
     }
     
     try {
-        const response = await fetch(`tables/applications/${appId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        const app = await supabaseAPI.patch('applications', appId, {
                 kakaotalk_notification_sent: true,
                 kakaotalk_notification_sent_at: Date.now()
-            })
         });
         
-        if (response.ok) {
-            const app = await response.json();
-            
+        if (app) {
             // 알림 생성
             await createNotification({
                 application_id: appId,
@@ -1644,23 +1602,15 @@ async function scheduleKakaoNotification(appId) {
 // 알림 생성 함수
 async function createNotification(notificationData) {
     try {
-        const response = await fetch('tables/notifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                application_id: notificationData.application_id,
-                user_email: notificationData.user_email,
-                type: notificationData.type,
-                icon: notificationData.icon || 'fa-bell',
-                message: notificationData.message,
-                is_read: false,
-                created_at: Date.now()
-            })
+        await supabaseAPI.post('notifications', {
+            application_id: notificationData.application_id,
+            user_email: notificationData.user_email,
+            type: notificationData.type,
+            icon: notificationData.icon || 'fa-bell',
+            message: notificationData.message,
+            is_read: false,
+            created_at: Date.now()
         });
-
-        if (!response.ok) {
-            console.error('알림 생성 실패:', await response.text());
-        }
     } catch (error) {
         console.error('알림 생성 중 오류:', error);
     }

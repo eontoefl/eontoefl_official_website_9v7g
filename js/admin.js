@@ -18,11 +18,10 @@ async function loadApplications() {
     showLoading(true);
     
     try {
-        const response = await fetch('tables/applications?limit=1000&sort=-created_at');
-        const data = await response.json();
+        const result = await supabaseAPI.get('applications', { limit: 1000, sort: '-created_at' });
         
-        if (data.data) {
-            allApplications = data.data;
+        if (result.data) {
+            allApplications = result.data;
             filterApplications();
         } else {
             document.getElementById('applicationsBody').innerHTML = 
@@ -229,15 +228,9 @@ async function updateStatus(id, newStatus) {
     }
     
     try {
-        const response = await fetch(`tables/applications/${id}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: newStatus })
-        });
+        const result = await supabaseAPI.patch('applications', id, { status: newStatus });
         
-        if (response.ok) {
+        if (result) {
             showAlert(`신청서가 ${newStatus} 처리되었습니다.`, 'success');
             await loadApplications();
             closeModal('detailModal');
@@ -255,15 +248,9 @@ async function saveComment(id) {
     const comment = document.getElementById('adminComment').value.trim();
     
     try {
-        const response = await fetch(`tables/applications/${id}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ admin_comment: comment })
-        });
+        const result = await supabaseAPI.patch('applications', id, { admin_comment: comment });
         
-        if (response.ok) {
+        if (result) {
             showAlert('댓글이 저장되었습니다.', 'success');
             await loadApplications();
             closeModal('detailModal');
