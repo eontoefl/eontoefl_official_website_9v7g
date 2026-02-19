@@ -2,6 +2,7 @@
 let allApplications = [];
 let currentPage = 1;
 const itemsPerPage = 15;
+let deleteTargetId = null;
 
 /**
  * 이름 마스킹 처리 (김영희 → 김*희)
@@ -29,8 +30,131 @@ function isMyApplication(app) {
     return userEmail && app.email === userEmail;
 }
 
+/**
+ * 개별분석 등록 여부 확인
+ */
+function hasAnalysis(app) {
+    return app.analysis_status && app.analysis_content;
+}
+
+/**
+ * 액션 메뉴 토글 (position: fixed로 뷰포트 기준 배치)
+ */
+function toggleActionMenu(e, appId) {
+    e.stopPropagation();
+    // 기존 열린 메뉴 닫기
+    document.querySelectorAll('.action-dropdown').forEach(el => {
+        if (el.id !== 'menu-' + appId) {
+            el.style.display = 'none';
+        }
+    });
+    const menu = document.getElementById('menu-' + appId);
+    
+    if (menu.style.display === 'block') {
+        menu.style.display = 'none';
+    } else {
+        // 버튼 위치 기준으로 fixed 포지션 계산
+        const btn = e.currentTarget;
+        const rect = btn.getBoundingClientRect();
+        
+        menu.style.position = 'fixed';
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.right = (window.innerWidth - rect.right) + 'px';
+        menu.style.left = 'auto';
+        menu.style.display = 'block';
+    }
+}
+
+/**
+ * 수정하기
+ */
+function editApplication(e, appId) {
+    e.stopPropagation();
+    const app = allApplications.find(a => a.id === appId);
+    if (!app) return;
+    
+    if (hasAnalysis(app)) {
+        alert('개별분석이 이미 등록되어 수정할 수 없습니다.');
+        return;
+    }
+    
+    window.location.href = 'application-form.html?edit=' + appId;
+}
+
+/**
+ * 삭제하기 모달 열기
+ */
+function openDeleteModal(e, appId) {
+    e.stopPropagation();
+    const app = allApplications.find(a => a.id === appId);
+    if (!app) return;
+    
+    if (hasAnalysis(app)) {
+        alert('개별분석이 이미 등록되어 삭제할 수 없습니다.');
+        return;
+    }
+    
+    deleteTargetId = appId;
+    document.getElementById('deleteModal').style.display = 'block';
+    // 메뉴 닫기
+    document.querySelectorAll('.action-dropdown').forEach(el => el.style.display = 'none');
+}
+
+/**
+ * 삭제 모달 닫기
+ */
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    deleteTargetId = null;
+}
+
+/**
+ * 신청서 삭제 실행
+ */
+async function confirmDelete() {
+    if (!deleteTargetId) return;
+    
+    const btn = document.getElementById('confirmDeleteBtn');
+    btn.textContent = '삭제 중...';
+    btn.disabled = true;
+    
+    try {
+        await supabaseAPI.delete('applications', deleteTargetId);
+        closeDeleteModal();
+        
+        // 삭제 완료 알림
+        alert('신청서가 삭제되었습니다.');
+        
+        // 목록 새로고침
+        await loadApplicationsList();
+    } catch (error) {
+        console.error('Delete failed:', error);
+        alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+        btn.textContent = '삭제하기';
+        btn.disabled = false;
+    }
+}
+
+// 삭제 확인 버튼 이벤트
 document.addEventListener('DOMContentLoaded', () => {
     loadApplicationsList();
+    
+    // 삭제 확인 버튼
+    setTimeout(() => {
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        if (confirmBtn) confirmBtn.addEventListener('click', confirmDelete);
+    }, 100);
+    
+    // 문서 클릭 시 메뉴 닫기
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.action-dropdown').forEach(el => el.style.display = 'none');
+    });
+    
+    // 스크롤 시 메뉴 닫기
+    window.addEventListener('scroll', () => {
+        document.querySelectorAll('.action-dropdown').forEach(el => el.style.display = 'none');
+    }, true);
 });
 
 // Load Applications List
@@ -44,18 +168,19 @@ async function loadApplicationsList() {
         const result = await supabaseAPI.get('applications', { limit: 1000, sort: '-created_at' });
         
         if (result.data && result.data.length > 0) {
-            allApplications = result.data;
+            // 삭제된 신청서 필터링
+            allApplications = result.data.filter(app => !app.deleted);
             
             // Update total count
             document.getElementById('totalCount').textContent = allApplications.length;
             
             displayApplications();
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
         }
     } catch (error) {
         console.error('Failed to load applications:', error);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:60px;color:#ef4444;">목록을 불러오는데 실패했습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:#ef4444;">목록을 불러오는데 실패했습니다.</td></tr>';
     } finally {
         listLoading.classList.remove('show');
     }
@@ -77,12 +202,10 @@ function displayApplications() {
         let statusIcon = '';
         
         if (!app.analysis_status || !app.analysis_content) {
-            // 신청서 제출 ~ 관리자 분석 등록 전
             statusText = '승인 검토중';
             statusClass = 'status-reviewing';
             statusIcon = 'fa-clock';
         } else {
-            // 관리자 분석 등록 후
             if (app.analysis_status === '승인') {
                 statusText = '승인';
                 statusClass = 'status-approved';
@@ -104,29 +227,34 @@ function displayApplications() {
         
         const timeAgo = getTimeAgo(app.created_at);
         
-        // 제목 생성
-        let title = `${app.program || app.preferred_program || '프로그램'} 신청`;
+        // 제목 - application_title 필드 우선, 없으면 기존 방식
+        let title = app.application_title || `${app.program || app.preferred_program || '프로그램'} 신청`;
         if (app.admin_comment) {
             title += ' 💬';
         }
         
-        // 본인 신청서 여부 확인
+        // 본인 신청서 여부
         const isMine = isMyApplication(app);
+        const analysisRegistered = hasAnalysis(app);
         
-        // 목표 점수 표시
-        let targetDisplay = '';
-        if (app.target_cutoff_old) {
-            targetDisplay = `목표: ${app.target_cutoff_old}점`;
-        } else if (app.target_cutoff_new) {
-            targetDisplay = `목표: ${app.target_cutoff_new} 레벨`;
-        }
-        
-        // 현재 점수 표시
-        let currentDisplay = '';
-        if (app.total_score) {
-            currentDisplay = app.score_version === 'new' ? `현재: ${app.total_score} 레벨` : `현재: ${app.total_score}점`;
-        } else {
-            currentDisplay = '점수 없음';
+        // 액션 버튼 (내 신청서일 때만)
+        let actionCell = '<td></td>';
+        if (isMine) {
+            actionCell = `
+                <td style="text-align:center; position:relative;" onclick="event.stopPropagation()">
+                    <button onclick="toggleActionMenu(event, '${app.id}')" style="background:none; border:none; cursor:pointer; padding:6px 10px; border-radius:6px; color:#64748b; font-size:16px;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div id="menu-${app.id}" class="action-dropdown" style="display:none; background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:10000; min-width:140px; overflow:hidden;">
+                        <button onclick="editApplication(event, '${app.id}')" style="display:flex; align-items:center; gap:8px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:#1e293b; font-family:inherit; text-align:left;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                            <i class="fas fa-pen" style="color:#9480c5; font-size:12px; width:16px;"></i> 수정하기
+                        </button>
+                        <button onclick="openDeleteModal(event, '${app.id}')" style="display:flex; align-items:center; gap:8px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:#ef4444; font-family:inherit; text-align:left;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
+                            <i class="fas fa-trash" style="font-size:12px; width:16px;"></i> 삭제하기
+                        </button>
+                    </div>
+                </td>
+            `;
         }
         
         return `
@@ -147,6 +275,7 @@ function displayApplications() {
                     </span>
                 </td>
                 <td style="font-size: 12px; color: #64748b;">${timeAgo}</td>
+                ${actionCell}
             </tr>
         `;
     }).join('');

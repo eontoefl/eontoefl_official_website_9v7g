@@ -1,5 +1,9 @@
 // Application Form JavaScript
 
+// 편집 모드 전역 변수
+let isEditMode = false;
+let editApplicationId = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     
     // Check if user is logged in
@@ -34,14 +38,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form submission
     setupFormSubmission();
 
-    // Auto-save to localStorage (optional enhancement)
-    setupAutoSave();
-    
     // Setup Sunday-only date picker
     setupSundayOnlyDatePicker();
     
     // Setup date dropdowns
     setupDateDropdowns();
+
+    // 초기 상태: 비활성 탭의 required 해제
+    cleanupInactiveTabRequired();
+
+    // 편집 모드 확인 (URL 파라미터 ?edit=ID)
+    const urlParams = new URLSearchParams(window.location.search);
+    const editId = urlParams.get('edit');
+    if (editId) {
+        initEditMode(editId);
+    } else {
+        // 새 신청서 작성 시에만 자동 저장
+        setupAutoSave();
+    }
 });
 
 // Setup conditional field visibility
@@ -64,6 +78,14 @@ function setupConditionalFields() {
                 // Make writing fields optional
                 document.querySelector('textarea[name="writing_sample_1"]').required = false;
                 document.querySelector('textarea[name="writing_sample_2"]').required = false;
+                
+                // 현재 활성 탭의 총점에 required 설정
+                const scoreVersion = document.querySelector('input[name="score_version"]');
+                const isOldActive = !scoreVersion || scoreVersion.value === 'old';
+                const oldTotal = document.querySelector('input[name="score_total_old"]');
+                const newTotal = document.querySelector('input[name="score_total_new"]');
+                if (oldTotal) oldTotal.required = isOldActive;
+                if (newTotal) newTotal.required = !isOldActive;
             } else {
                 // No score - hide score section, show writing section
                 toeflScoreSection.style.display = 'none';
@@ -73,8 +95,8 @@ function setupConditionalFields() {
                 document.querySelector('textarea[name="writing_sample_1"]').required = true;
                 document.querySelector('textarea[name="writing_sample_2"]').required = true;
                 
-                // Remove score field requirements
-                const scoreInputs = toeflScoreSection.querySelectorAll('input[required]');
+                // Remove ALL score field requirements
+                const scoreInputs = toeflScoreSection.querySelectorAll('input');
                 scoreInputs.forEach(input => input.required = false);
             }
         });
@@ -98,17 +120,17 @@ function setupConditionalFields() {
             document.getElementById('oldScoreSection').classList.toggle('active', isOld);
             document.getElementById('newScoreSection').classList.toggle('active', !isOld);
             
-            // Update required fields - 총점만 필수, 섹션별 점수는 선택
+            // Update required fields - 활성 탭의 총점만 필수, 비활성 탭은 모두 해제
             const oldTotal = document.querySelector('input[name="score_total_old"]');
             const newTotal = document.querySelector('input[name="score_total_new"]');
-            const oldSectionInputs = document.getElementById('oldScoreSection').querySelectorAll('.score-input-old');
-            const newSectionInputs = document.getElementById('newScoreSection').querySelectorAll('.score-input-new');
             
-            // 섹션별 점수는 항상 선택
-            oldSectionInputs.forEach(input => input.required = false);
-            newSectionInputs.forEach(input => input.required = false);
+            // 비활성 탭의 모든 required 해제
+            const oldAllInputs = document.getElementById('oldScoreSection').querySelectorAll('input');
+            const newAllInputs = document.getElementById('newScoreSection').querySelectorAll('input');
+            oldAllInputs.forEach(input => input.required = false);
+            newAllInputs.forEach(input => input.required = false);
             
-            // 총점만 필수
+            // 활성 탭의 총점만 필수
             if (oldTotal) oldTotal.required = isOld;
             if (newTotal) newTotal.required = !isOld;
         });
@@ -126,7 +148,7 @@ function setupConditionalFields() {
             this.classList.add('active');
             
             // Update hidden input
-            const targetVersionInput = document.querySelectorAll('input[name="target_version"]')[1]; // Second one for target
+            const targetVersionInput = document.querySelector('input[name="target_version"]');
             if (targetVersionInput) {
                 targetVersionInput.value = isOld ? 'old' : 'new';
             }
@@ -135,10 +157,15 @@ function setupConditionalFields() {
             document.getElementById('oldTargetSection').classList.toggle('active', isOld);
             document.getElementById('newTargetSection').classList.toggle('active', !isOld);
             
-            // Update required field
+            // 비활성 탭의 모든 required 해제
+            const oldTargetInputs = document.getElementById('oldTargetSection').querySelectorAll('input');
+            const newTargetInputs = document.getElementById('newTargetSection').querySelectorAll('input');
+            oldTargetInputs.forEach(input => input.required = false);
+            newTargetInputs.forEach(input => input.required = false);
+            
+            // 활성 탭의 총점만 필수
             const oldCutoff = document.querySelector('input[name="target_cutoff_old"]');
             const newCutoff = document.querySelector('input[name="target_cutoff_new"]');
-            
             if (oldCutoff) oldCutoff.required = isOld;
             if (newCutoff) newCutoff.required = !isOld;
         });
@@ -189,6 +216,19 @@ function setupScoreTotalCalculation() {
     // 총점 직접 입력 방식이므로 별도 계산 로직 불필요
 }
 
+// 비활성 탭의 모든 required 해제
+function cleanupInactiveTabRequired() {
+    const sections = ['oldScoreSection', 'newScoreSection', 'oldTargetSection', 'newTargetSection'];
+    sections.forEach(id => {
+        const section = document.getElementById(id);
+        if (section && !section.classList.contains('active')) {
+            section.querySelectorAll('input[required]').forEach(input => {
+                input.required = false;
+            });
+        }
+    });
+}
+
 // Setup privacy policy modal
 function setupPrivacyModal() {
     const privacyModal = document.getElementById('privacyModal');
@@ -211,6 +251,267 @@ function setupPrivacyModal() {
     });
 }
 
+// 편집 모드 초기화
+async function initEditMode(appId) {
+    isEditMode = true;
+    editApplicationId = appId;
+
+    // UI 변경: 상단에 수정 중 배너 표시
+    const formHeader = document.querySelector('.form-header');
+    if (formHeader) {
+        const editBanner = document.createElement('div');
+        editBanner.id = 'editModeBanner';
+        editBanner.style.cssText = 'background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #f59e0b; border-radius: 10px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;';
+        editBanner.innerHTML = `
+            <i class="fas fa-pen-to-square" style="color: #d97706; font-size: 20px;"></i>
+            <div>
+                <strong style="color: #92400e; font-size: 15px;">신청서 수정 모드</strong>
+                <p style="color: #a16207; font-size: 13px; margin: 2px 0 0 0;">기존에 제출한 내용을 수정하고 있습니다. 수정 후 하단의 "수정하기" 버튼을 눌러주세요.</p>
+            </div>
+        `;
+        formHeader.insertAdjacentElement('afterend', editBanner);
+    }
+
+    // 버튼 변경: 제출 → 수정하기
+    const submitBtn = document.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> 수정하기';
+    }
+
+    // 페이지 타이틀 변경
+    document.title = '신청서 수정 - 이온토플';
+    const formTitle = document.querySelector('.form-header h1');
+    if (formTitle) {
+        formTitle.textContent = '신청서 수정';
+    }
+
+    // 기존 데이터 불러오기
+    try {
+        const app = await supabaseAPI.getById('applications', appId);
+        if (!app) {
+            alert('신청서를 찾을 수 없습니다.');
+            window.location.href = 'application.html';
+            return;
+        }
+
+        // 본인 신청서인지 확인
+        const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+        if (!userData || app.email !== userData.email) {
+            alert('본인의 신청서만 수정할 수 있습니다.');
+            window.location.href = 'application.html';
+            return;
+        }
+
+        // 개별분석 등록 여부 확인
+        if (app.analysis_status && app.analysis_content) {
+            alert('개별분석이 이미 등록되어 수정할 수 없습니다.');
+            window.location.href = 'application.html';
+            return;
+        }
+
+        // 폼에 데이터 채우기
+        populateFormData(app);
+
+    } catch (error) {
+        console.error('Failed to load application for editing:', error);
+        alert('신청서 데이터를 불러오는 데 실패했습니다.');
+        window.location.href = 'application.html';
+    }
+}
+
+// 기존 데이터로 폼 채우기
+function populateFormData(app) {
+    const form = document.getElementById('applicationForm');
+    if (!form) return;
+
+    // 텍스트/이메일/tel 입력 필드
+    const textFields = [
+        'application_title', 'name', 'phone', 'email', 'address', 'bank_account',
+        'occupation', 'score_history', 'current_study_method',
+        'target_note', 'toefl_reason_detail', 'memorable_blog_content',
+        'preferred_program', 'program_note',
+        'referral_search_keyword', 'referral_social_media', 'referral_friend_name',
+        'referral_other', 'additional_notes'
+    ];
+
+    textFields.forEach(field => {
+        const input = form.querySelector(`[name="${field}"]`);
+        if (input && app[field] !== null && app[field] !== undefined) {
+            input.value = app[field];
+        }
+    });
+
+    // 숫자 입력 필드 (점수)
+    const numberFields = [
+        'score_reading_old', 'score_listening_old', 'score_speaking_old', 'score_writing_old', 'score_total_old',
+        'score_reading_new', 'score_listening_new', 'score_writing_new', 'score_speaking_new', 'score_total_new',
+        'target_cutoff_new', 'target_reading_new', 'target_listening_new', 'target_writing_new', 'target_speaking_new',
+        'target_cutoff_old', 'target_reading_old', 'target_listening_old', 'target_speaking_old', 'target_writing_old'
+    ];
+
+    numberFields.forEach(field => {
+        const input = form.querySelector(`[name="${field}"]`);
+        if (input && app[field] !== null && app[field] !== undefined) {
+            input.value = app[field];
+        }
+    });
+
+    // textarea 필드
+    const textareaFields = ['writing_sample_1', 'writing_sample_2'];
+    textareaFields.forEach(field => {
+        const textarea = form.querySelector(`textarea[name="${field}"]`);
+        if (textarea && app[field]) {
+            textarea.value = app[field];
+        }
+    });
+
+    // 라디오 버튼
+    if (app.has_toefl_score) {
+        const radio = form.querySelector(`input[name="has_toefl_score"][value="${app.has_toefl_score}"]`);
+        if (radio) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // 지인 추천 라디오
+    if (app.referral_from_friend) {
+        const radio = form.querySelector(`input[name="referral_from_friend"][value="${app.referral_from_friend}"]`);
+        if (radio) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // 체크박스
+    if (app.confirm_materials) {
+        const cb = form.querySelector('input[name="confirm_materials"]');
+        if (cb) cb.checked = true;
+    }
+    if (app.privacy_agreement) {
+        const cb = form.querySelector('input[name="privacy_agreement"]');
+        if (cb) cb.checked = true;
+    }
+
+    // 선택 필드 (select)
+    const selectFields = ['daily_study_time', 'toefl_reason'];
+    selectFields.forEach(field => {
+        const select = form.querySelector(`select[name="${field}"]`);
+        if (select && app[field]) {
+            select.value = app[field];
+        }
+    });
+
+    // 점수 버전 탭 전환
+    // DB에 score_version이 null/잘못된 경우: 실제 데이터로 판단
+    let actualScoreVersion = app.score_version;
+    
+    if (!actualScoreVersion || actualScoreVersion === 'new') {
+        // null이거나 new인데 실제 old 데이터만 있으면 → old
+        if (!app.score_total_new && app.score_total_old) {
+            actualScoreVersion = 'old';
+        }
+    }
+    if (!actualScoreVersion || actualScoreVersion === 'old') {
+        // null이거나 old인데 실제 new 데이터만 있으면 → new
+        if (!app.score_total_old && app.score_total_new) {
+            actualScoreVersion = 'new';
+        }
+    }
+    // 그래도 null이면 기본값 old (HTML 기본 활성 탭)
+    if (!actualScoreVersion) actualScoreVersion = 'old';
+    
+    const scoreTabName = actualScoreVersion === 'old' ? 'old-score' : 'new-score';
+    const scoreTab = document.querySelector(`[data-tab="${scoreTabName}"]`);
+    if (scoreTab) scoreTab.click();
+
+    // 목표 점수 버전 탭 전환
+    // DB에 target_version이 null/잘못된 경우: 실제 데이터로 판단
+    let actualTargetVersion = app.target_version;
+    
+    if (!actualTargetVersion || actualTargetVersion === 'new') {
+        if (!app.target_cutoff_new && app.target_cutoff_old) {
+            actualTargetVersion = 'old';
+        }
+    }
+    if (!actualTargetVersion || actualTargetVersion === 'old') {
+        if (!app.target_cutoff_old && app.target_cutoff_new) {
+            actualTargetVersion = 'new';
+        }
+    }
+    // 그래도 null이면: 데이터가 있는 쪽, 둘다 없으면 기본 new (HTML 기본 활성 탭)
+    if (!actualTargetVersion) {
+        actualTargetVersion = app.target_cutoff_old ? 'old' : 'new';
+    }
+    
+    const targetTabName = actualTargetVersion === 'old' ? 'old-target' : 'new-target';
+    const targetTab = document.querySelector(`[data-tab="${targetTabName}"]`);
+    if (targetTab) targetTab.click();
+
+    // 🔒 안전장치: 비활성 탭의 모든 required를 강제 해제
+    // (DB에 target_version이 잘못 저장된 경우 대비)
+    setTimeout(() => {
+        // 현재 토플 점수 - 비활성 탭
+        const oldScoreSection = document.getElementById('oldScoreSection');
+        const newScoreSection = document.getElementById('newScoreSection');
+        if (oldScoreSection && !oldScoreSection.classList.contains('active')) {
+            oldScoreSection.querySelectorAll('input').forEach(i => i.required = false);
+        }
+        if (newScoreSection && !newScoreSection.classList.contains('active')) {
+            newScoreSection.querySelectorAll('input').forEach(i => i.required = false);
+        }
+        
+        // 목표 점수 - 비활성 탭
+        const oldTargetSection = document.getElementById('oldTargetSection');
+        const newTargetSection = document.getElementById('newTargetSection');
+        if (oldTargetSection && !oldTargetSection.classList.contains('active')) {
+            oldTargetSection.querySelectorAll('input').forEach(i => i.required = false);
+        }
+        if (newTargetSection && !newTargetSection.classList.contains('active')) {
+            newTargetSection.querySelectorAll('input').forEach(i => i.required = false);
+        }
+    }, 100);
+
+    // 날짜 필드 (submission_deadline, preferred_completion)
+    if (app.submission_deadline) {
+        const parts = app.submission_deadline.split('-');
+        if (parts[0]) {
+            const yearSelect = form.querySelector('select[name="submission_deadline_year"]');
+            if (yearSelect) yearSelect.value = parts[0];
+        }
+        if (parts[1]) {
+            const monthSelect = form.querySelector('select[name="submission_deadline_month"]');
+            if (monthSelect) monthSelect.value = parts[1];
+        }
+        if (parts[2]) {
+            const daySelect = form.querySelector('select[name="submission_deadline_day"]');
+            if (daySelect) daySelect.value = parts[2];
+        }
+    }
+
+    if (app.preferred_completion) {
+        const parts = app.preferred_completion.split('-');
+        if (parts[0]) {
+            const yearSelect = form.querySelector('select[name="preferred_completion_year"]');
+            if (yearSelect) yearSelect.value = parts[0];
+        }
+        if (parts[1]) {
+            const monthSelect = form.querySelector('select[name="preferred_completion_month"]');
+            if (monthSelect) monthSelect.value = parts[1];
+        }
+        if (parts[2]) {
+            const daySelect = form.querySelector('select[name="preferred_completion_day"]');
+            if (daySelect) daySelect.value = parts[2];
+        }
+    }
+
+    // 수업 시작 희망일
+    if (app.preferred_start_date) {
+        const startDateInput = form.querySelector('input[name="preferred_start_date"]');
+        if (startDateInput) startDateInput.value = app.preferred_start_date;
+    }
+}
+
 // Setup form submission
 function setupFormSubmission() {
     const form = document.getElementById('applicationForm');
@@ -229,26 +530,43 @@ function setupFormSubmission() {
         // Show loading state
         const submitBtn = form.querySelector('button[type="submit"]');
         const originalBtnText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 제출 중...';
+        submitBtn.innerHTML = isEditMode 
+            ? '<i class="fas fa-spinner fa-spin"></i> 수정 중...'
+            : '<i class="fas fa-spinner fa-spin"></i> 제출 중...';
         submitBtn.disabled = true;
 
         try {
-            // Submit to applications table
-            const result = await supabaseAPI.post('applications', formData);
+            let result;
+            
+            if (isEditMode && editApplicationId) {
+                // 수정 모드: PATCH로 업데이트
+                formData.updated_date = new Date().toISOString();
+                result = await supabaseAPI.patch('applications', editApplicationId, formData);
+                
+                if (!result) {
+                    throw new Error('신청서 수정에 실패했습니다.');
+                }
+                
+                // 수정 완료 모달 표시
+                showEditSuccessModal();
+            } else {
+                // 새 신청서: POST로 생성
+                result = await supabaseAPI.post('applications', formData);
 
-            if (!result) {
-                throw new Error('신청서 제출에 실패했습니다.');
+                if (!result) {
+                    throw new Error('신청서 제출에 실패했습니다.');
+                }
+
+                // Clear auto-saved data
+                localStorage.removeItem('iontoefl_form_draft');
+
+                // Show success modal
+                showSuccessModal();
             }
-
-            // Clear auto-saved data
-            localStorage.removeItem('iontoefl_form_draft');
-
-            // Show success modal
-            showSuccessModal();
 
         } catch (error) {
             console.error('Error submitting application:', error);
-            alert('신청서 제출 중 오류가 발생했습니다. 다시 시도해주세요.');
+            alert(isEditMode ? '신청서 수정 중 오류가 발생했습니다. 다시 시도해주세요.' : '신청서 제출 중 오류가 발생했습니다. 다시 시도해주세요.');
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
         }
@@ -388,12 +706,38 @@ function collectFormData() {
     return data;
 }
 
-// Show success modal
+// Show success modal (새 신청서 제출)
 function showSuccessModal() {
     const modal = document.getElementById('successModal');
     modal.style.display = 'block';
 
     // Close modal when clicking outside
+    window.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            window.location.href = 'application.html';
+        }
+    });
+}
+
+// Show edit success modal (수정 완료)
+function showEditSuccessModal() {
+    const modal = document.getElementById('successModal');
+    // 모달 내용 변경
+    const modalContent = modal.querySelector('.success-modal');
+    if (modalContent) {
+        modalContent.innerHTML = `
+            <div class="success-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2>신청서가 수정되었습니다!</h2>
+            <p>신청서가 성공적으로 수정되었습니다.<br>변경된 내용이 반영되었습니다.</p>
+            <button class="btn-primary" onclick="window.location.href='application.html'">
+                <i class="fas fa-list"></i> 신청 내역 확인
+            </button>
+        `;
+    }
+    modal.style.display = 'block';
+
     window.addEventListener('click', function(e) {
         if (e.target === modal) {
             window.location.href = 'application.html';
