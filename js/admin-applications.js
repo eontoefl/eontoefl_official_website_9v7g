@@ -173,7 +173,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
+                    ${escapeHtml(app.name)}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
@@ -193,8 +193,8 @@ function displayApplications() {
                     </div>
                 </td>
                 <td>
-                    <div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">
-                        ${actionMessage.text}
+                    <div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${app.deleted ? '#fef2f2' : actionMessage.bgColor}; color: ${app.deleted ? '#ef4444' : actionMessage.color};">
+                        ${app.deleted ? '🗑️ 삭제됨' : actionMessage.text}
                     </div>
                 </td>
                 <td>
