@@ -38,10 +38,11 @@ function hasAnalysis(app) {
 }
 
 /**
- * 액션 메뉴 토글 (position: fixed로 뷰포트 기준 배치)
+ * 액션 메뉴 토글 (position: fixed로 뷰포트 기준 배치 - 뱃지 기준)
  */
 function toggleActionMenu(e, appId) {
     e.stopPropagation();
+    e.preventDefault();
     // 기존 열린 메뉴 닫기
     document.querySelectorAll('.action-dropdown').forEach(el => {
         if (el.id !== 'menu-' + appId) {
@@ -53,14 +54,14 @@ function toggleActionMenu(e, appId) {
     if (menu.style.display === 'block') {
         menu.style.display = 'none';
     } else {
-        // 버튼 위치 기준으로 fixed 포지션 계산
-        const btn = e.currentTarget;
-        const rect = btn.getBoundingClientRect();
+        // 뱃지 위치 기준으로 fixed 포지션 계산
+        const badge = e.currentTarget;
+        const rect = badge.getBoundingClientRect();
         
         menu.style.position = 'fixed';
-        menu.style.top = (rect.bottom + 4) + 'px';
-        menu.style.right = (window.innerWidth - rect.right) + 'px';
-        menu.style.left = 'auto';
+        menu.style.top = (rect.bottom + 6) + 'px';
+        menu.style.left = rect.left + 'px';
+        menu.style.right = 'auto';
         menu.style.display = 'block';
     }
 }
@@ -176,11 +177,11 @@ async function loadApplicationsList() {
             
             displayApplications();
         } else {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
         }
     } catch (error) {
         console.error('Failed to load applications:', error);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:#ef4444;">목록을 불러오는데 실패했습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:60px;color:#ef4444;">목록을 불러오는데 실패했습니다.</td></tr>';
     } finally {
         listLoading.classList.remove('show');
     }
@@ -237,24 +238,18 @@ function displayApplications() {
         const isMine = isMyApplication(app);
         const analysisRegistered = hasAnalysis(app);
         
-        // 액션 버튼 (내 신청서일 때만)
-        let actionCell = '<td></td>';
+        // 내 신청서 뱃지 (클릭 시 수정/삭제 드롭다운)
+        let myBadge = '';
         if (isMine) {
-            actionCell = `
-                <td style="text-align:center; position:relative;" onclick="event.stopPropagation()">
-                    <button onclick="toggleActionMenu(event, '${app.id}')" style="background:none; border:none; cursor:pointer; padding:6px 10px; border-radius:6px; color:#64748b; font-size:16px;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <div id="menu-${app.id}" class="action-dropdown" style="display:none; background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:10000; min-width:140px; overflow:hidden;">
-                        <button onclick="editApplication(event, '${app.id}')" style="display:flex; align-items:center; gap:8px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:#1e293b; font-family:inherit; text-align:left;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
-                            <i class="fas fa-pen" style="color:#9480c5; font-size:12px; width:16px;"></i> 수정하기
-                        </button>
-                        <button onclick="openDeleteModal(event, '${app.id}')" style="display:flex; align-items:center; gap:8px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:#ef4444; font-family:inherit; text-align:left;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
-                            <i class="fas fa-trash" style="font-size:12px; width:16px;"></i> 삭제하기
-                        </button>
-                    </div>
-                </td>
-            `;
+            myBadge = `<span onclick="toggleActionMenu(event, '${app.id}')" style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; width:22px; height:22px; border-radius:50%; margin-left:6px; cursor:pointer; flex-shrink:0; transition:transform 0.15s, box-shadow 0.15s;" onmouseover="this.style.transform='scale(1.15)'; this.style.boxShadow='0 2px 8px rgba(102,126,234,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'" title="내 신청서 - 클릭하여 관리"><i class="fas fa-user" style="font-size:10px;"></i></span>`;
+            myBadge += `<div id="menu-${app.id}" class="action-dropdown" style="display:none; background:white; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:10000; min-width:140px; overflow:hidden;">
+                <button onclick="editApplication(event, '${app.id}')" style="display:flex; align-items:center; gap:8px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:#1e293b; font-family:inherit; text-align:left;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+                    <i class="fas fa-pen" style="color:#9480c5; font-size:12px; width:16px;"></i> 수정하기
+                </button>
+                <button onclick="openDeleteModal(event, '${app.id}')" style="display:flex; align-items:center; gap:8px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:#ef4444; font-family:inherit; text-align:left;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
+                    <i class="fas fa-trash" style="font-size:12px; width:16px;"></i> 삭제하기
+                </button>
+            </div>`;
         }
         
         return `
@@ -264,7 +259,7 @@ function displayApplications() {
                     <div style="font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-lock" style="color: #94a3b8; font-size: 12px;"></i>
                         ${escapeHtml(title)}
-                        ${isMine ? '<span style="display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; margin-left: 4px;"><i class="fas fa-user" style="font-size: 9px;"></i>내 신청서</span>' : ''}
+                        ${myBadge}
                     </div>
                 </td>
                 <td style="font-weight: 600;">${escapeHtml(maskName(app.name) || '이름 없음')}</td>
@@ -275,7 +270,6 @@ function displayApplications() {
                     </span>
                 </td>
                 <td style="font-size: 12px; color: #64748b;">${timeAgo}</td>
-                ${actionCell}
             </tr>
         `;
     }).join('');
