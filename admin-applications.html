@@ -85,35 +85,32 @@
                     <option value="name">이름순</option>
                 </select>
                 
+                <div style="position: relative; display: inline-block;">
+                    <button class="admin-btn admin-btn-primary" onclick="toggleBulkMenu()" id="bulkMenuBtn" style="background: #475569;">
+                        <i class="fas fa-tasks"></i> 일괄처리 (<span id="selectedCount">0</span>)
+                    </button>
+                    <div id="bulkDropdown" style="display:none; position:absolute; top:100%; right:0; margin-top:6px; background:white; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.15); min-width:220px; z-index:1000; overflow:hidden;">
+                        <div style="padding:8px 0;">
+                            <button onclick="showBulkContractModal()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#334155; text-align:left;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+                                <i class="fas fa-file-contract" style="color:#8b5cf6; width:18px; text-align:center;"></i> 계약서 발송
+                            </button>
+                            <button onclick="bulkConfirmDeposit()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#334155; text-align:left;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+                                <i class="fas fa-won-sign" style="color:#059669; width:18px; text-align:center;"></i> 입금확인 처리
+                            </button>
+                            <button onclick="bulkSendGuide()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#334155; text-align:left;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+                                <i class="fas fa-book" style="color:#f59e0b; width:18px; text-align:center;"></i> 이용방법 전달
+                            </button>
+                            <div style="border-top:1px solid #e2e8f0; margin:4px 0;"></div>
+                            <button onclick="clearSelection()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#94a3b8; text-align:left;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+                                <i class="fas fa-times-circle" style="width:18px; text-align:center;"></i> 선택 해제
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <button class="admin-btn admin-btn-primary" onclick="downloadExcel()">
                     <i class="fas fa-download"></i> 엑셀 다운로드
                 </button>
-            </div>
-        </div>
-
-        <!-- Bulk Actions -->
-        <div class="admin-card" id="bulkActionsCard" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <span style="font-weight: 600; color: var(--admin-primary);">
-                        <span id="selectedCount">0</span>개 선택됨
-                    </span>
-                </div>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    </button>
-                    <button class="admin-btn admin-btn-sm" onclick="showBulkContractModal()" style="background: #8b5cf6; color: white;">
-                        <i class="fas fa-file-contract"></i> 일괄 계약서 발송
-                    </button>
-                    <button class="admin-btn admin-btn-sm" onclick="bulkConfirmDeposit()" style="background: #059669; color: white;">
-                        <i class="fas fa-won-sign"></i> 일괄 입금확인
-                    </button>
-                    <button class="admin-btn admin-btn-sm" onclick="bulkSendGuide()" style="background: #f59e0b; color: white;">
-                        <i class="fas fa-book"></i> 일괄 이용방법 전달
-                    </button>
-                    <button class="admin-btn admin-btn-outline admin-btn-sm" onclick="clearSelection()">
-                        <i class="fas fa-times-circle"></i> 선택 해제
-                    </button>
-                </div>
             </div>
         </div>
 
