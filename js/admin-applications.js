@@ -164,7 +164,7 @@ function displayApplications() {
         const isSelected = selectedIds.has(app.id);
         
         return `
-            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}">
+            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted ? 'opacity: 0.55;' : ''}">
                 <td>
                     <input type="checkbox" 
                            class="app-checkbox" 
@@ -173,7 +173,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}
+                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
