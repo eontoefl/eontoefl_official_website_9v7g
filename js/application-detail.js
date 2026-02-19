@@ -117,12 +117,10 @@ async function loadApplicationDetail() {
     
     try {
         console.log('Fetching application with ID:', id);
-        const response = await fetch(`tables/applications/${id}`);
-        console.log('Response status:', response.status);
+        const app = await supabaseAPI.getById('applications', id);
         
-        if (response.ok) {
-            const app = await response.json();
-            console.log('Application loaded:', JSON.stringify(app, null, 2));
+        if (app) {
+            console.log('Application loaded');
             
             // 접근 권한 체크
             const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
@@ -154,11 +152,9 @@ async function loadApplicationDetail() {
             console.log('Showing detail card...');
             detailCard.style.display = 'block';
         } else {
-            console.error('Response not OK:', response.status, response.statusText);
-            const errorText = await response.text();
-            console.error('Error response:', errorText);
+            console.error('Application not found');
             errorMessage.style.display = 'block';
-            document.getElementById('errorDetail').textContent = `서버 오류: ${response.status} ${response.statusText}`;
+            document.getElementById('errorDetail').textContent = '신청서를 찾을 수 없습니다.';
         }
     } catch (error) {
         console.error('Failed to load application:', error);
@@ -710,13 +706,9 @@ async function saveAdminChanges() {
             admin_comment: newComment
         };
         
-        const response = await fetch(`tables/applications/${app.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const result = await supabaseAPI.patch('applications', app.id, updateData);
         
-        if (response.ok) {
+        if (result) {
             alert('✅ 변경사항이 저장되었습니다!');
             closeAdminPanel();
             // 페이지 새로고침
@@ -1000,21 +992,15 @@ async function submitStudentAgreement() {
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
     
     try {
-        const response = await fetch(`tables/applications/${currentApplication.id}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                student_program_agreed: true,
-                student_schedule_agreed: true,
-                student_agreed_at: new Date().toISOString(),
-                current_step: 3,
-                status: '학생동의완료'
-            })
+        const result = await supabaseAPI.patch('applications', currentApplication.id, {
+            student_program_agreed: true,
+            student_schedule_agreed: true,
+            student_agreed_at: new Date().toISOString(),
+            current_step: 3,
+            status: '학생동의완료'
         });
         
-        if (!response.ok) {
+        if (!result) {
             throw new Error('Failed to submit agreement');
         }
         
@@ -2080,15 +2066,10 @@ async function submitContractAgreement() {
             current_step: 4
         };
 
-        const response = await fetch(`tables/applications/${globalApplication.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const updatedApp = await supabaseAPI.patch('applications', globalApplication.id, updateData);
 
-        if (!response.ok) throw new Error('Failed to update');
+        if (!updatedApp) throw new Error('Failed to update');
 
-        const updatedApp = await response.json();
         globalApplication = updatedApp;
 
         alert('✅ 계약 동의가 완료되었습니다!\n\n입금 안내로 자동 진행됩니다.');
@@ -2508,15 +2489,10 @@ async function confirmDeposit() {
             current_step: 7  // STEP 7: 입금 대기 중
         };
 
-        const response = await fetch(`tables/applications/${globalApplication.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
+        const updatedApp = await supabaseAPI.patch('applications', globalApplication.id, updateData);
 
-        if (!response.ok) throw new Error('Failed to update');
+        if (!updatedApp) throw new Error('Failed to update');
 
-        const updatedApp = await response.json();
         globalApplication = updatedApp;
 
         alert('✅ 입금 완료 알림이 전송되었습니다!\n\n관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.');
@@ -2863,16 +2839,12 @@ async function startChallenge() {
     }
 
     try {
-        const response = await fetch(`tables/applications/${globalApplication.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                // current_step은 5에서 유지
-                challenge_start_date: Date.now()
-            })
+        const result = await supabaseAPI.patch('applications', globalApplication.id, {
+            // current_step은 5에서 유지
+            challenge_start_date: Date.now()
         });
 
-        if (response.ok) {
+        if (result) {
             alert('🎉 챌린지가 시작되었습니다!\n\n매일 꾸준히 학습하며 목표 점수를 달성하세요. 파이팅! 💪');
             location.reload();
         } else {
