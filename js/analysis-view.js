@@ -1,5 +1,13 @@
 // Analysis View JavaScript
 document.addEventListener('DOMContentLoaded', () => {
+    // 로그인 체크
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user'));
+    if (!userData) {
+        // 미로그인 → 로그인 페이지로 (현재 URL을 redirect 파라미터로 전달)
+        const currentUrl = encodeURIComponent(window.location.href);
+        window.location.href = `login.html?redirect=${currentUrl}`;
+        return;
+    }
     loadAnalysis();
 });
 
@@ -18,6 +26,13 @@ async function loadAnalysis() {
         
         if (!application) {
             showError();
+            return;
+        }
+        
+        // 권한 체크: 본인 신청서이거나 관리자만 열람 가능
+        const userData = JSON.parse(localStorage.getItem('iontoefl_user'));
+        if (userData.role !== 'admin' && userData.email !== application.email && userData.email !== application.user_email) {
+            showError('이 분석지를 열람할 권한이 없습니다.');
             return;
         }
         

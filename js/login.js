@@ -106,7 +106,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     const userData = localStorage.getItem('iontoefl_user');
     if (userData) {
-        // Already logged in, redirect to home
-        window.location.href = 'index.html';
+        // Already logged in, redirect
+        const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+        window.location.href = redirectUrl || 'index.html';
     }
 });
