@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개별분석지 - 이온토플</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        .analysis-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .analysis-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .analysis-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+        }
+        
+        .analysis-date {
+            font-size: 14px;
+            color: #64748b;
+        }
+        
+        .analysis-status {
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .status-approved {
+            background: #dcfce7;
+            color: #166534;
+            border: 2px solid #22c55e;
+        }
+        
+        .status-conditional {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #eab308;
+        }
+        
+        .status-rejected {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+        
+        .analysis-section {
+            margin-bottom: 32px;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-content {
+            line-height: 1.8;
+            color: #1e293b;
+            white-space: pre-wrap;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-weight: 600;
+            color: #1e293b;
+            text-align: right;
+        }
+        
+        .price-total {
+            padding-top: 16px;
+            margin-top: 16px;
+            border-top: 2px solid #eab308;
+        }
+        
+        .price-total .info-label,
+        .price-total .info-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #92400e;
+        }
+        
+        .agreement-section {
+            background: #fef2f2;
+            border: 2px solid #fecaca;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .agreement-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #991b1b;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .agreement-warning {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .agreement-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .agreement-checkbox:hover {
+            background: #f8fafc;
+        }
+        
+        .agreement-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        
+        .agreement-checkbox label {
+            flex: 1;
+            cursor: pointer;
+            line-height: 1.6;
+            color: #1e293b;
+        }
+        
+        .submit-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);
+        }
+        
+        .submit-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(148, 128, 197, 0.4);
+        }
+        
+        .submit-button:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        
+        .timer-warning {
+            background: #fffbeb;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .timer-icon {
+            font-size: 24px;
+            color: #f59e0b;
+        }
+        
+        .timer-text {
+            flex: 1;
+        }
+        
+        .timer-countdown {
+            font-size: 20px;
+            font-weight: 700;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <a href="index.html" class="logo">
+                    <img src="https://www.genspark.ai/api/files/s/Jg1o4lDG" alt="이온토플" style="height: 32px;">
+                </a>
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <ul class="nav-menu" id="navMenu">
+                    <li><a href="index.html#about">소개</a></li>
+                    <li><a href="index.html#programs">프로그램</a></li>
+                    <li><a href="index.html#pricing">가격</a></li>
+                    <li><a href="index.html#reviews">후기</a></li>
+                    <li><a href="application.html">신청하기</a></li>
+                    <li id="authButtons">
+                        <a href="login.html">LOGIN</a>
+                        <span style="color: #cbd5e1; margin: 0 8px;">|</span>
+                        <a href="register.html">JOIN</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="analysis-container">
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 12px; font-size: 14px; color: #64748b;">개별분석지를 불러오는 중...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="errorMessage" style="display: none;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #ef4444; margin-bottom: 16px;"></i>
+            <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">개별분석지를 찾을 수 없습니다</h2>
+            <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
+                아직 분석이 완료되지 않았거나 잘못된 링크입니다.
+            </p>
+            <a href="my-application.html" class="btn-primary">
+                <i class="fas fa-arrow-left"></i> 신청서 조회로 돌아가기
+            </a>
+        </div>
+
+        <!-- Analysis Content -->
+        <div id="analysisContent" style="display: none;">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4 class="footer-heading">이온토플</h4>
+                    <p class="footer-text">최고의 토플 교육 서비스를 제공합니다.</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="index.html">홈</a></li>
+                        <li><a href="index.html#about">소개</a></li>
+                        <li><a href="index.html#programs">프로그램</a></li>
+                        <li><a href="index.html#reviews">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">학생 서비스</h4>
+                    <ul class="footer-links">
+                        <li><a href="register.html">회원가입</a></li>
+                        <li><a href="application.html">신청하기</a></li>
+                        <li><a href="my-application.html">신청서 조회</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><i class="fas fa-envelope"></i> info@iontoefl.com</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="js/admin-utils.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/analysis-view.js"></script>
+</body>
+</html>
