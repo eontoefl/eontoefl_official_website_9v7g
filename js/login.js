@@ -83,9 +83,10 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 // 관리자든 일반 회원이든 모두 홈으로 이동
                 showAlert('로그인 성공! 환영합니다.', 'success');
                 
-                // Redirect after 1 second
+                // Redirect 파라미터가 있으면 해당 페이지로, 없으면 홈으로
+                const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    window.location.href = redirectUrl || 'index.html';
                 }, 1000);
             } else {
                 showAlert('이메일 또는 비밀번호가 일치하지 않습니다.', 'error');
