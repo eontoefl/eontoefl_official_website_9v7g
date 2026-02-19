@@ -79,13 +79,7 @@ function setupConditionalFields() {
                 document.querySelector('textarea[name="writing_sample_1"]').required = false;
                 document.querySelector('textarea[name="writing_sample_2"]').required = false;
                 
-                // 현재 활성 탭의 총점에 required 설정
-                const scoreVersion = document.querySelector('input[name="score_version"]');
-                const isOldActive = !scoreVersion || scoreVersion.value === 'old';
-                const oldTotal = document.querySelector('input[name="score_total_old"]');
-                const newTotal = document.querySelector('input[name="score_total_new"]');
-                if (oldTotal) oldTotal.required = isOldActive;
-                if (newTotal) newTotal.required = !isOldActive;
+                // 현재 토플 점수 총점은 required 설정하지 않음 (validateForm에서 커스텀 검증)
             } else {
                 // No score - hide score section, show writing section
                 toeflScoreSection.style.display = 'none';
@@ -124,15 +118,11 @@ function setupConditionalFields() {
             const oldTotal = document.querySelector('input[name="score_total_old"]');
             const newTotal = document.querySelector('input[name="score_total_new"]');
             
-            // 비활성 탭의 모든 required 해제
+            // 모든 점수 필드 required 해제 (validateForm에서 커스텀 검증)
             const oldAllInputs = document.getElementById('oldScoreSection').querySelectorAll('input');
             const newAllInputs = document.getElementById('newScoreSection').querySelectorAll('input');
             oldAllInputs.forEach(input => input.required = false);
             newAllInputs.forEach(input => input.required = false);
-            
-            // 활성 탭의 총점만 필수
-            if (oldTotal) oldTotal.required = isOld;
-            if (newTotal) newTotal.required = !isOld;
         });
     });
 
@@ -597,6 +587,17 @@ function validateForm() {
 
     // Validate TOEFL scores if provided (old version)
     if (hasToeflScore && hasToeflScore.value === 'yes') {
+        // 총점: 개정전 또는 개정후 중 하나는 입력해야 함
+        const scoreTotalOld = document.querySelector('input[name="score_total_old"]');
+        const scoreTotalNew = document.querySelector('input[name="score_total_new"]');
+        const hasOldScore = scoreTotalOld && scoreTotalOld.value.trim() !== '';
+        const hasNewScore = scoreTotalNew && scoreTotalNew.value.trim() !== '';
+        
+        if (!hasOldScore && !hasNewScore) {
+            alert('현재 토플 점수의 Overall Score를 개정전 또는 개정후 중 하나는 입력해주세요.');
+            return false;
+        }
+
         const scoreVersion = document.querySelector('input[name="score_version"]:checked');
         
         if (scoreVersion && scoreVersion.value === 'old') {
