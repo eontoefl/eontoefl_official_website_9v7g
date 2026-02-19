@@ -98,12 +98,19 @@ function setupConditionalFields() {
             document.getElementById('oldScoreSection').classList.toggle('active', isOld);
             document.getElementById('newScoreSection').classList.toggle('active', !isOld);
             
-            // Update required fields
-            const oldInputs = document.getElementById('oldScoreSection').querySelectorAll('input[type="number"]');
-            const newInputs = document.getElementById('newScoreSection').querySelectorAll('input[type="number"]');
+            // Update required fields - 총점만 필수, 섹션별 점수는 선택
+            const oldTotal = document.querySelector('input[name="score_total_old"]');
+            const newTotal = document.querySelector('input[name="score_total_new"]');
+            const oldSectionInputs = document.getElementById('oldScoreSection').querySelectorAll('.score-input-old');
+            const newSectionInputs = document.getElementById('newScoreSection').querySelectorAll('.score-input-new');
             
-            oldInputs.forEach(input => input.required = isOld);
-            newInputs.forEach(input => input.required = !isOld);
+            // 섹션별 점수는 항상 선택
+            oldSectionInputs.forEach(input => input.required = false);
+            newSectionInputs.forEach(input => input.required = false);
+            
+            // 총점만 필수
+            if (oldTotal) oldTotal.required = isOld;
+            if (newTotal) newTotal.required = !isOld;
         });
     });
 
@@ -138,7 +145,7 @@ function setupConditionalFields() {
     });
 
     // Format new TOEFL score inputs to always show .0 for whole numbers
-    const newScoreInputs = document.querySelectorAll('input[name="target_cutoff_new"], input[name="target_reading_new"], input[name="target_listening_new"], input[name="target_writing_new"], input[name="target_speaking_new"]');
+    const newScoreInputs = document.querySelectorAll('input[name="target_cutoff_new"], input[name="target_reading_new"], input[name="target_listening_new"], input[name="target_writing_new"], input[name="target_speaking_new"], input[name="score_reading_new"], input[name="score_listening_new"], input[name="score_writing_new"], input[name="score_speaking_new"], input[name="score_total_new"]');
     
     newScoreInputs.forEach(input => {
         input.addEventListener('blur', function() {
@@ -177,76 +184,9 @@ function setupConditionalFields() {
     }
 }
 
-// Setup Score Total Calculation
+// Setup Score Total Calculation (직접 기입 방식 - 자동계산 없음)
 function setupScoreTotalCalculation() {
-    // 개정전 (Old Score) - 단순 합계 (0-120)
-    const oldScoreInputs = document.querySelectorAll('.score-input-old');
-    const totalValueOld = document.getElementById('totalValueOld');
-    const totalScoreOld = document.getElementById('totalScoreOld');
-    
-    oldScoreInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            calculateOldTotal();
-        });
-    });
-    
-    function calculateOldTotal() {
-        const reading = parseFloat(document.querySelector('input[name="score_reading_old"]').value) || null;
-        const listening = parseFloat(document.querySelector('input[name="score_listening_old"]').value) || null;
-        const speaking = parseFloat(document.querySelector('input[name="score_speaking_old"]').value) || null;
-        const writing = parseFloat(document.querySelector('input[name="score_writing_old"]').value) || null;
-        
-        // 하나라도 비어있으면 계산 안함
-        if (reading === null || listening === null || speaking === null || writing === null) {
-            totalValueOld.textContent = '네 섹션을 모두 입력하세요';
-            totalValueOld.classList.add('placeholder');
-            totalScoreOld.classList.remove('has-score');
-            return;
-        }
-        
-        // 네 섹션 모두 다 더하기
-        const total = reading + listening + speaking + writing;
-        
-        totalValueOld.textContent = `${total}점 / 120점`;
-        totalValueOld.classList.remove('placeholder');
-        totalScoreOld.classList.add('has-score');
-    }
-    
-    // 개정후 (New Score) - 평균의 0.5 단위 반올림 (1-6)
-    const newScoreInputs = document.querySelectorAll('.score-input-new');
-    const totalValueNew = document.getElementById('totalValueNew');
-    const totalScoreNew = document.getElementById('totalScoreNew');
-    
-    newScoreInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            calculateNewTotal();
-        });
-    });
-    
-    function calculateNewTotal() {
-        const reading = parseFloat(document.querySelector('input[name="score_reading_new"]').value) || null;
-        const listening = parseFloat(document.querySelector('input[name="score_listening_new"]').value) || null;
-        const writing = parseFloat(document.querySelector('input[name="score_writing_new"]').value) || null;
-        const speaking = parseFloat(document.querySelector('input[name="score_speaking_new"]').value) || null;
-        
-        // 하나라도 비어있으면 계산 안함
-        if (reading === null || listening === null || writing === null || speaking === null) {
-            totalValueNew.textContent = '네 섹션을 모두 입력하세요';
-            totalValueNew.classList.add('placeholder');
-            totalScoreNew.classList.remove('has-score');
-            return;
-        }
-        
-        // 네 섹션 평균 구하기
-        const average = (reading + listening + writing + speaking) / 4;
-        
-        // 0.5 단위로 반올림
-        const total = Math.round(average * 2) / 2;
-        
-        totalValueNew.textContent = `${total.toFixed(1)} / 6.0`;
-        totalValueNew.classList.remove('placeholder');
-        totalScoreNew.classList.add('has-score');
-    }
+    // 총점 직접 입력 방식이므로 별도 계산 로직 불필요
 }
 
 // Setup privacy policy modal
@@ -426,18 +366,16 @@ function collectFormData() {
     delete data.preferred_completion_month;
     delete data.preferred_completion_day;
 
-    // Calculate total score for old version if TOEFL scores provided
+    // Use directly entered total score
     if (data.has_toefl_score === 'yes' && data.score_version === 'old') {
-        if (data.score_reading_old && data.score_listening_old && data.score_speaking_old && data.score_writing_old) {
-            data.total_score = data.score_reading_old + data.score_listening_old + data.score_speaking_old + data.score_writing_old;
+        if (data.score_total_old) {
+            data.total_score = data.score_total_old;
         }
     }
     
-    // Calculate total score for new version (average rounded to 0.5)
     if (data.has_toefl_score === 'yes' && data.score_version === 'new') {
-        if (data.score_reading_new && data.score_listening_new && data.score_speaking_new && data.score_writing_new) {
-            const avg = (data.score_reading_new + data.score_listening_new + data.score_speaking_new + data.score_writing_new) / 4;
-            data.total_score = Math.round(avg * 2) / 2; // Round to nearest 0.5
+        if (data.score_total_new) {
+            data.total_score = data.score_total_new;
         }
     }
 
