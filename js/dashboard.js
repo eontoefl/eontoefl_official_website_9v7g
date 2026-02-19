@@ -489,7 +489,7 @@ async function renderQuickMenuGrid(app) {
             iconColor: '#9480c5',
             title: '플랫폼\n바로가기',
             link: platformUrl,
-            available: !!app.deposit_confirmed_by_admin_at,
+            available: !!app.guide_sent,
             external: true
         },
         {
@@ -1017,9 +1017,9 @@ function renderProgramInfo(app) {
     };
 
     programActions.innerHTML = `
-        <a href="${platformUrl}" target="_blank" class="program-button">
-            <i class="fas fa-external-link-alt"></i> 플랫폼 바로가기
-        </a>
+        <a href="${platformUrl}" target="_blank" class="program-button" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
+    <i class="fas fa-external-link-alt"></i> 플랫폼 바로가기
+</a>
         <a href="usage-guide.html" target="_blank" class="program-button secondary" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
             <i class="fas fa-book"></i> 이용방법 보기
         </a>
