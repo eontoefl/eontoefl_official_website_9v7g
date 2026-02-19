@@ -296,15 +296,13 @@ function loadModalAnalysisTab(app) {
                         </tr>
                         </tbody>
                     </table>
-                    ${app.additional_discount && app.additional_discount > 0 ? `
-                    <div style="margin-top: 12px;">
+                    <div id="discountReasonWrapper" style="margin-top: 12px; display: ${app.additional_discount && app.additional_discount > 0 ? 'block' : 'none'};">
                         <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 4px;">할인 사유</label>
                         <input type="text" name="discount_reason" value="${app.discount_reason || ''}" 
                                ${readOnly}
                                placeholder="할인 사유 입력"
                                style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     </div>
-                    ` : ''}
                 </div>
             </div>
             
@@ -416,6 +414,12 @@ function calculateModalPrice() {
     
     document.getElementById('displayAdditionalDiscount').textContent = '-' + additionalDiscount.toLocaleString() + '원';
     document.getElementById('displayFinalPrice').textContent = finalPrice.toLocaleString() + '원';
+    
+    // 추가 할인 금액에 따라 할인 사유란 표시/숨김
+    const reasonWrapper = document.getElementById('discountReasonWrapper');
+    if (reasonWrapper) {
+        reasonWrapper.style.display = additionalDiscount > 0 ? 'block' : 'none';
+    }
 }
 
 // 결과 선택 시각적 피드백
