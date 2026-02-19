@@ -39,7 +39,7 @@ async function loadDashboard() {
         const result = await supabaseAPI.query('applications', { 'email': `eq.${currentUser.email}`, 'limit': '100' });
         
         // 정확한 이메일 매칭 필터링
-        const matchedApplications = result?.filter(app => app.email === currentUser.email || app.user_email === currentUser.email);
+        const matchedApplications = result?.filter(app => !app.deleted && (app.email === currentUser.email || app.user_email === currentUser.email));
         
         if (!matchedApplications || matchedApplications.length === 0) {
             showEmptyState();
