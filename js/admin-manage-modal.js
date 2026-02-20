@@ -93,17 +93,43 @@ function loadModalInfoTab(app) {
         targetDisplay = '없음 (고고익선 🚀)';
     } else if (app.target_cutoff_old) {
         targetDisplay = `${app.target_cutoff_old}점`;
-    } else if (app.target_level_reading || app.target_level_listening || app.target_level_speaking || app.target_level_writing) {
-        targetDisplay = `Reading ${app.target_level_reading || '-'} / Listening ${app.target_level_listening || '-'} / Speaking ${app.target_level_speaking || '-'} / Writing ${app.target_level_writing || '-'}`;
+        const parts = [];
+        if (app.target_reading_old) parts.push(`R:${app.target_reading_old}`);
+        if (app.target_listening_old) parts.push(`L:${app.target_listening_old}`);
+        if (app.target_speaking_old) parts.push(`S:${app.target_speaking_old}`);
+        if (app.target_writing_old) parts.push(`W:${app.target_writing_old}`);
+        if (parts.length) targetDisplay += ` (${parts.join(' / ')})`;
+    } else if (app.target_cutoff_new) {
+        targetDisplay = `${app.target_cutoff_new} 레벨`;
+        const parts = [];
+        if (app.target_reading_new) parts.push(`R:${app.target_reading_new}`);
+        if (app.target_listening_new) parts.push(`L:${app.target_listening_new}`);
+        if (app.target_speaking_new) parts.push(`S:${app.target_speaking_new}`);
+        if (app.target_writing_new) parts.push(`W:${app.target_writing_new}`);
+        if (parts.length) targetDisplay += ` (${parts.join(' / ')})`;
     }
     
     // 현재 점수
     let currentDisplay = '';
-    if (app.score_total_old) {
-        currentDisplay = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
-    } else if (app.score_level_reading || app.score_level_listening || app.score_level_speaking || app.score_level_writing) {
-        currentDisplay = `R:${app.score_level_reading || '-'} / L:${app.score_level_listening || '-'} / S:${app.score_level_speaking || '-'} / W:${app.score_level_writing || '-'}`;
+    if (app.has_toefl_score === 'yes') {
+        if (app.score_total_old) {
+            currentDisplay = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
+        } else if (app.score_total_new) {
+            currentDisplay = `총점 ${app.score_total_new} 레벨 (R:${app.score_reading_new || '-'} / L:${app.score_listening_new || '-'} / S:${app.score_speaking_new || '-'} / W:${app.score_writing_new || '-'})`;
+        }
     }
+
+    // 알게 된 경로
+    let referralDisplay = '';
+    const referralParts = [];
+    if (app.referral_source && app.referral_source.length) {
+        referralParts.push(Array.isArray(app.referral_source) ? app.referral_source.join(', ') : app.referral_source);
+    }
+    if (app.referral_search_keyword) referralParts.push(`검색어: ${app.referral_search_keyword}`);
+    if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
+    if (app.referral_from_friend === 'yes' && app.referral_friend_name) referralParts.push(`지인: ${app.referral_friend_name}`);
+    if (app.referral_other) referralParts.push(`기타: ${app.referral_other}`);
+    referralDisplay = referralParts.join(' / ') || '-';
     
     container.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
@@ -112,15 +138,23 @@ function loadModalInfoTab(app) {
                 <h3 class="info-card-title"><i class="fas fa-user"></i> 기본 정보</h3>
                 <div class="info-item">
                     <label>이름</label>
-                    <div>${app.name}</div>
+                    <div>${app.name || '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>이메일</label>
-                    <div>${app.email}</div>
+                    <div>${app.email || '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>전화번호</label>
-                    <div>${app.phone}</div>
+                    <div>${app.phone || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>주소</label>
+                    <div>${app.address || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>입금 계좌</label>
+                    <div>${app.bank_account || '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>직업</label>
@@ -132,16 +166,28 @@ function loadModalInfoTab(app) {
             <div class="info-card">
                 <h3 class="info-card-title"><i class="fas fa-chart-line"></i> 점수 정보</h3>
                 <div class="info-item">
+                    <label>토플 점수 유무</label>
+                    <div>${app.has_toefl_score === 'yes' ? '있음' : app.has_toefl_score === 'no' ? '없음' : '-'}</div>
+                </div>
+                <div class="info-item">
                     <label>현재 점수</label>
                     <div>${currentDisplay || '미제출'}</div>
+                </div>
+                <div class="info-item">
+                    <label>점수 이력</label>
+                    <div style="white-space: pre-wrap;">${app.score_history || '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>목표 점수</label>
                     <div>${targetDisplay || '미입력'}</div>
                 </div>
                 <div class="info-item">
-                    <label>목표 기한</label>
-                    <div>${app.target_deadline ? new Date(app.target_deadline).toLocaleDateString('ko-KR') : '-'}</div>
+                    <label>목표 점수 메모</label>
+                    <div style="white-space: pre-wrap;">${app.target_note || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>마감 기한</label>
+                    <div>${app.submission_deadline || '-'}</div>
                 </div>
             </div>
             
@@ -150,7 +196,7 @@ function loadModalInfoTab(app) {
                 <h3 class="info-card-title"><i class="fas fa-clipboard"></i> 신청 정보</h3>
                 <div class="info-item">
                     <label>신청일</label>
-                    <div>${new Date(app.submitted_date).toLocaleDateString('ko-KR')}</div>
+                    <div>${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>희망 프로그램</label>
@@ -161,22 +207,70 @@ function loadModalInfoTab(app) {
                     <div>${app.preferred_start_date || '-'}</div>
                 </div>
                 <div class="info-item">
+                    <label>프로그램 관련 의견</label>
+                    <div style="white-space: pre-wrap;">${app.program_note || '-'}</div>
+                </div>
+                <div class="info-item">
                     <label>현재 단계</label>
                     <div>STEP ${app.current_step || 1}</div>
                 </div>
             </div>
         </div>
         
-        <!-- 추가 정보 섹션 -->
-        ${app.address ? `
+        <!-- 학습 정보 -->
         <div class="info-card" style="margin-top: 24px;">
-            <h3 class="info-card-title"><i class="fas fa-map-marker-alt"></i> 배송 정보</h3>
-            <div class="info-item">
-                <label>주소</label>
-                <div>${app.address}</div>
+            <h3 class="info-card-title"><i class="fas fa-book-reader"></i> 학습 정보</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                <div class="info-item">
+                    <label>현재 공부 방법</label>
+                    <div style="white-space: pre-wrap;">${app.current_study_method || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>토플 필요 이유</label>
+                    <div>${app.toefl_reason || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>토플 필요 이유 상세</label>
+                    <div style="white-space: pre-wrap;">${app.toefl_reason_detail || '-'}</div>
+                </div>
             </div>
         </div>
+
+        <!-- 라이팅 샘플 -->
+        ${app.writing_sample_1 || app.writing_sample_2 ? `
+        <div class="info-card" style="margin-top: 24px;">
+            <h3 class="info-card-title"><i class="fas fa-pen-fancy"></i> 라이팅 샘플</h3>
+            ${app.writing_sample_1 ? `
+            <div class="info-item">
+                <label>라이팅 샘플 1</label>
+                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.writing_sample_1}</div>
+            </div>` : ''}
+            ${app.writing_sample_2 ? `
+            <div class="info-item" style="margin-top: 12px;">
+                <label>라이팅 샘플 2</label>
+                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.writing_sample_2}</div>
+            </div>` : ''}
+        </div>
         ` : ''}
+
+        <!-- 기타 정보 -->
+        <div class="info-card" style="margin-top: 24px;">
+            <h3 class="info-card-title"><i class="fas fa-info-circle"></i> 기타 정보</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                <div class="info-item">
+                    <label>기억에 남는 블로그 글</label>
+                    <div style="white-space: pre-wrap;">${app.memorable_blog_content || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>이온토플을 알게 된 경로</label>
+                    <div>${referralDisplay}</div>
+                </div>
+                <div class="info-item">
+                    <label>추가 전달사항</label>
+                    <div style="white-space: pre-wrap;">${app.additional_notes || '-'}</div>
+                </div>
+            </div>
+        </div>
         
         <!-- 관리자: 신청서 수정 버튼 -->
         <div style="margin-top: 24px; text-align: right;">
