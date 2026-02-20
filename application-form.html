@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>수강 신청서 작성 - 이온토플</title>
-    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
     <link rel="stylesheet" href="css/style.css">
@@ -407,6 +406,14 @@
                     <label>목표 점수에 대한 추가 설명</label>
                     <textarea name="target_note" rows="3" placeholder="목표 점수와 관련하여 추가로 전달하고 싶은 내용이 있다면 자유롭게 작성해주세요 (선택)"></textarea>
                 </div>
+
+                <div class="form-group" style="margin-top: 16px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; font-weight: 500;">
+                        <input type="checkbox" name="no_target_score" id="noTargetScore" onchange="toggleTargetScore(this.checked)" style="width: 18px; height: 18px; accent-color: #22c55e;">
+                        <span>목표 점수가 따로 없습니다 (고고익선 🚀)</span>
+                    </label>
+                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #6b7280;">체크하시면 위의 목표 점수를 입력하지 않아도 됩니다.</small>
+                </div>
             </div>
 
             <!-- Section 7: 마감 기한 -->
@@ -482,7 +489,9 @@
                     <label>목적</label>
                     <select name="toefl_reason" required>
                         <option value="">선택</option>
+                        <option value="대학교 진학">대학교 진학</option>
                         <option value="대학원 진학">대학원 진학 (국내)</option>
+                        <option value="편입">편입</option>
                         <option value="유학">유학 (해외)</option>
                         <option value="교환학생">교환학생</option>
                         <option value="취업">취업</option>
