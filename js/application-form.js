@@ -331,7 +331,7 @@ async function initEditMode(appId) {
             return;
         }
 
-        // 개별분석 등록 여부 확인
+        // 개별분석 등록 여부 확인 (관리자는 수정 가능)
         if (userData.role !== 'admin' && app.analysis_status && app.analysis_content) {
             alert('개별분석이 이미 등록되어 수정할 수 없습니다.');
             window.location.href = 'application.html';
@@ -596,7 +596,7 @@ function setupFormSubmission() {
                 }
 
                 // Clear auto-saved data
-                localStorage.removeItem('iontoefl_form_draft');
+                localStorage.removeItem(getDraftKey());
 
                 // Show success modal
                 showSuccessModal();
@@ -828,18 +828,25 @@ function showEditSuccessModal() {
 }
 
 // Auto-save form data to localStorage
+function getDraftKey() {
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const email = userData?.email || 'unknown';
+    return `iontoefl_form_draft_${email}`;
+}
+
 function setupAutoSave() {
     const form = document.getElementById('applicationForm');
     let autoSaveTimeout;
+    const draftKey = getDraftKey();
 
     // Check for existing draft
-    const savedDraft = localStorage.getItem('iontoefl_form_draft');
+    const savedDraft = localStorage.getItem(draftKey);
     if (savedDraft) {
         const shouldRestore = confirm('저장된 작성 중인 신청서가 있습니다. 불러오시겠습니까?');
         if (shouldRestore) {
             restoreFormData(JSON.parse(savedDraft));
         } else {
-            localStorage.removeItem('iontoefl_form_draft');
+            localStorage.removeItem(draftKey);
         }
     }
 
@@ -852,7 +859,7 @@ function setupAutoSave() {
             for (let [key, value] of formData.entries()) {
                 data[key] = value;
             }
-            localStorage.setItem('iontoefl_form_draft', JSON.stringify(data));
+            localStorage.setItem(draftKey, JSON.stringify(data));
             
             // Show save indicator (optional)
             showSaveIndicator();
