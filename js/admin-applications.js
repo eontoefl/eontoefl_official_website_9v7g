@@ -606,6 +606,69 @@ async function bulkSendGuide() {
     }
 }
 
+// ===== 택배송장출력 (선택된 학생) =====
+async function bulkExportShipping() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    // 드롭다운 닫기
+    const dropdown = document.getElementById('bulkDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    try {
+        const ids = Array.from(selectedIds);
+        const apps = [];
+        for (const id of ids) {
+            const app = await supabaseAPI.getById('applications', id);
+            if (app) apps.push(app);
+        }
+
+        if (apps.length === 0) {
+            alert('선택된 신청서 정보를 불러올 수 없습니다.');
+            return;
+        }
+
+        // 엑셀 데이터 생성 (지정된 컬럼 형식)
+        const shippingData = apps.map(app => ({
+            '받는분성명': app.name || '',
+            '받는분전화번호': app.phone || '',
+            '받는분기타연락처': '',
+            '받는분주소(전체, 분할)': app.address || '',
+            '품목명': '이온토플',
+            '기본운임': '',
+            '운임구분': '신용',
+            '박스타입': '극소',
+            '배송메세지1': ''
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(shippingData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '택배송장');
+
+        // 컬럼 너비 설정
+        ws['!cols'] = [
+            { wch: 12 },  // 받는분성명
+            { wch: 15 },  // 받는분전화번호
+            { wch: 15 },  // 받는분기타연락처
+            { wch: 40 },  // 받는분주소
+            { wch: 12 },  // 품목명
+            { wch: 10 },  // 기본운임
+            { wch: 10 },  // 운임구분
+            { wch: 10 },  // 박스타입
+            { wch: 20 }   // 배송메세지1
+        ];
+
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        XLSX.writeFile(wb, `택배송장_${today}_${apps.length}건.xlsx`);
+        alert(`✅ ${apps.length}건의 택배송장이 다운로드되었습니다.`);
+    } catch (error) {
+        console.error('Shipping export error:', error);
+        alert('택배송장 출력 중 오류가 발생했습니다.');
+    }
+}
+
 // 엑셀 다운로드
 function downloadExcel() {
     if (filteredApplications.length === 0) {
