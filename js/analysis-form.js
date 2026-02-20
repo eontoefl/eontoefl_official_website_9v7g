@@ -239,7 +239,7 @@ function loadAnalysisForm(app) {
                 </div>
                 <textarea name="analysis_content" 
                           class="analysis-textarea" 
-                          placeholder="예시:&#10;&#10;${app.name}님의 현재 토플 점수와 목표를 분석한 결과, 내벨업챌린지 Fast 프로그램이 가장 적합하다고 판단됩니다.&#10;&#10;[현재 상황]&#10;• 현재 점수: ${app.total_score || '점수 없음'}&#10;• 목표 점수: ${app.target_cutoff_old || app.target_cutoff_new || '미설정'}&#10;• 데드라인: ${app.submission_deadline || '미설정'}&#10;&#10;[추천 이유]&#10;(여기에 상세한 분석 내용을 작성하세요)&#10;&#10;[학습 계획]&#10;(프로그램 진행 방식을 설명하세요)"
+                          placeholder="예시:&#10;&#10;${app.name}님의 현재 토플 점수와 목표를 분석한 결과, 내벨업챌린지 Fast 프로그램이 가장 적합하다고 판단됩니다.&#10;&#10;[현재 상황]&#10;• 현재 점수: ${app.total_score || '점수 없음'}&#10;• 목표 점수: ${app.no_target_score ? '없음 (고고익선)' : (app.target_cutoff_old || app.target_cutoff_new || '미설정')}&#10;• 데드라인: ${app.submission_deadline || '미설정'}&#10;&#10;[추천 이유]&#10;(여기에 상세한 분석 내용을 작성하세요)&#10;&#10;[학습 계획]&#10;(프로그램 진행 방식을 설명하세요)"
                           required>${app.analysis_content || ''}</textarea>
             </div>
 

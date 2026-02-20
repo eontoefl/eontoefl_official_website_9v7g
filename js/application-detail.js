@@ -128,7 +128,7 @@ async function loadApplicationDetail() {
             // 비로그인 상태
             if (!userData) {
                 alert('⚠️ 로그인이 필요합니다.\n\n신청서를 확인하려면 로그인해주세요.');
-                window.location.href = `login.html?redirect=${encodeURIComponent(window.location.href)}`;
+                window.location.href = 'login.html';
                 return;
             }
             
@@ -219,7 +219,9 @@ function displayApplicationDetail(app) {
     
     // 목표 점수 표시
     let targetDisplay = '';
-    if (app.target_cutoff_old) {
+    if (app.no_target_score) {
+        targetDisplay = '없음 (고고익선 🚀)';
+    } else if (app.target_cutoff_old) {
         targetDisplay = `${app.target_cutoff_old}점`;
     } else if (app.target_cutoff_new) {
         targetDisplay = `${formatNewScore(app.target_cutoff_new)} 레벨`;

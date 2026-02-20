@@ -4,6 +4,51 @@
 let isEditMode = false;
 let editApplicationId = null;
 
+// 목표점수 없음 체크박스 토글
+function toggleTargetScore(checked) {
+    const targetSection = document.querySelector('#newTargetSection, #oldTargetSection');
+    const allTargetInputs = document.querySelectorAll(
+        '#newTargetSection input[type="number"], #oldTargetSection input[type="number"]'
+    );
+    const versionTabs = document.querySelectorAll('[data-tab="old-target"], [data-tab="new-target"]');
+    const targetNote = document.querySelector('textarea[name="target_note"]');
+    
+    if (checked) {
+        // 비활성화
+        allTargetInputs.forEach(input => {
+            input.disabled = true;
+            input.required = false;
+            input.style.opacity = '0.4';
+            input.style.pointerEvents = 'none';
+        });
+        versionTabs.forEach(tab => {
+            tab.disabled = true;
+            tab.style.opacity = '0.4';
+            tab.style.pointerEvents = 'none';
+        });
+        if (targetNote) {
+            targetNote.disabled = true;
+            targetNote.style.opacity = '0.4';
+        }
+    } else {
+        // 활성화
+        allTargetInputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.pointerEvents = 'auto';
+        });
+        versionTabs.forEach(tab => {
+            tab.disabled = false;
+            tab.style.opacity = '1';
+            tab.style.pointerEvents = 'auto';
+        });
+        if (targetNote) {
+            targetNote.disabled = false;
+            targetNote.style.opacity = '1';
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     
     // Check if user is logged in
@@ -287,7 +332,7 @@ async function initEditMode(appId) {
         }
 
         // 개별분석 등록 여부 확인
-        if (userData.role !== 'admin' && app.analysis_status && app.analysis_content) {
+        if (app.analysis_status && app.analysis_content) {
             alert('개별분석이 이미 등록되어 수정할 수 없습니다.');
             window.location.href = 'application.html';
             return;
@@ -375,6 +420,15 @@ function populateFormData(app) {
     if (app.privacy_agreement) {
         const cb = form.querySelector('input[name="privacy_agreement"]');
         if (cb) cb.checked = true;
+    }
+
+    // 목표점수 없음 체크박스 복원
+    if (app.no_target_score) {
+        const noTargetCb = document.getElementById('noTargetScore');
+        if (noTargetCb) {
+            noTargetCb.checked = true;
+            toggleTargetScore(true);
+        }
     }
 
     // 선택 필드 (select)
@@ -704,6 +758,25 @@ function collectFormData() {
         if (data.score_total_new) {
             data.total_score = data.score_total_new;
         }
+    }
+
+    // 목표점수 없음 체크박스 처리
+    const noTargetCheckbox = document.getElementById('noTargetScore');
+    data.no_target_score = noTargetCheckbox ? noTargetCheckbox.checked : false;
+    
+    // 목표점수 없음이면 목표 점수 필드 초기화
+    if (data.no_target_score) {
+        data.target_cutoff_new = null;
+        data.target_cutoff_old = null;
+        data.target_reading_new = null;
+        data.target_listening_new = null;
+        data.target_writing_new = null;
+        data.target_speaking_new = null;
+        data.target_reading_old = null;
+        data.target_listening_old = null;
+        data.target_speaking_old = null;
+        data.target_writing_old = null;
+        data.target_note = null;
     }
 
     // Set status

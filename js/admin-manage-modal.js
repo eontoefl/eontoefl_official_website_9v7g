@@ -89,7 +89,9 @@ function loadModalInfoTab(app) {
     
     // 목표 점수
     let targetDisplay = '';
-    if (app.target_cutoff_old) {
+    if (app.no_target_score) {
+        targetDisplay = '없음 (고고익선 🚀)';
+    } else if (app.target_cutoff_old) {
         targetDisplay = `${app.target_cutoff_old}점`;
     } else if (app.target_level_reading || app.target_level_listening || app.target_level_speaking || app.target_level_writing) {
         targetDisplay = `Reading ${app.target_level_reading || '-'} / Listening ${app.target_level_listening || '-'} / Speaking ${app.target_level_speaking || '-'} / Writing ${app.target_level_writing || '-'}`;
