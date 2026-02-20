@@ -220,19 +220,17 @@ function loadModalInfoTab(app) {
         <!-- 학습 정보 -->
         <div class="info-card" style="margin-top: 24px;">
             <h3 class="info-card-title"><i class="fas fa-book-reader"></i> 학습 정보</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
-                <div class="info-item">
-                    <label>현재 공부 방법</label>
-                    <div style="white-space: pre-wrap;">${app.current_study_method || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>토플 필요 이유</label>
-                    <div>${app.toefl_reason || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>토플 필요 이유 상세</label>
-                    <div style="white-space: pre-wrap;">${app.toefl_reason_detail || '-'}</div>
-                </div>
+            <div class="info-item">
+                <label>토플 필요 이유</label>
+                <div>${app.toefl_reason || '-'}</div>
+            </div>
+            <div class="info-item" style="margin-top: 12px;">
+                <label>토플 필요 이유 상세</label>
+                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.toefl_reason_detail || '-'}</div>
+            </div>
+            <div class="info-item" style="margin-top: 12px;">
+                <label>현재 공부 방법</label>
+                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.current_study_method || '-'}</div>
             </div>
         </div>
 
@@ -256,19 +254,17 @@ function loadModalInfoTab(app) {
         <!-- 기타 정보 -->
         <div class="info-card" style="margin-top: 24px;">
             <h3 class="info-card-title"><i class="fas fa-info-circle"></i> 기타 정보</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
-                <div class="info-item">
-                    <label>기억에 남는 블로그 글</label>
-                    <div style="white-space: pre-wrap;">${app.memorable_blog_content || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>이온토플을 알게 된 경로</label>
-                    <div>${referralDisplay}</div>
-                </div>
-                <div class="info-item">
-                    <label>추가 전달사항</label>
-                    <div style="white-space: pre-wrap;">${app.additional_notes || '-'}</div>
-                </div>
+            <div class="info-item">
+                <label>기억에 남는 블로그 글</label>
+                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.memorable_blog_content || '-'}</div>
+            </div>
+            <div class="info-item" style="margin-top: 12px;">
+                <label>이온토플을 알게 된 경로</label>
+                <div>${referralDisplay}</div>
+            </div>
+            <div class="info-item" style="margin-top: 12px;">
+                <label>추가 전달사항</label>
+                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.additional_notes || '-'}</div>
             </div>
         </div>
         
