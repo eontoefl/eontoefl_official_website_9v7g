@@ -174,10 +174,6 @@ function loadModalInfoTab(app) {
                     <div>${currentDisplay || '미제출'}</div>
                 </div>
                 <div class="info-item">
-                    <label>점수 이력</label>
-                    <div style="white-space: pre-wrap;">${app.score_history || '-'}</div>
-                </div>
-                <div class="info-item">
                     <label>목표 점수</label>
                     <div>${targetDisplay || '미입력'}</div>
                 </div>
@@ -205,6 +201,14 @@ function loadModalInfoTab(app) {
                 <div class="info-item">
                     <label>희망 시작일</label>
                     <div>${app.preferred_start_date || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>희망 목표 달성 시점</label>
+                    <div>${app.preferred_completion || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>하루 평균 공부 가능 시간</label>
+                    <div>${app.daily_study_time || '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>프로그램 관련 의견</label>
@@ -348,13 +352,13 @@ async function downloadApplicationTxt(appId) {
             `[ 점수 정보 ]`,
             `7. 토플 점수 유무 : ${app.has_toefl_score === 'yes' ? '있음' : app.has_toefl_score === 'no' ? '없음' : '-'}`,
             `8. 현재 점수 : ${currentScore}`,
-            `9. 점수 이력 : ${app.score_history || '-'}`,
-            `10. 목표 점수 : ${targetScore}`,
-            `11. 목표 점수 메모 : ${app.target_note || '-'}`,
-            `12. 마감 기한 : ${app.submission_deadline || '-'}`,
+            `9. 목표 점수 : ${targetScore}`,
+            `10. 목표 점수 메모 : ${app.target_note || '-'}`,
+            `11. 마감 기한 : ${app.submission_deadline || '-'}`,
             ``,
             `[ 학습 정보 ]`,
-            `13. 현재 공부 방법 : ${app.current_study_method || '-'}`,
+            `12. 현재 공부 방법 : ${app.current_study_method || '-'}`,
+            `13. 하루 평균 공부 가능 시간 : ${app.daily_study_time || '-'}`,
             `14. 토플 필요 이유 : ${app.toefl_reason || '-'}`,
             `15. 토플 필요 이유 상세 : ${app.toefl_reason_detail || '-'}`,
             ``,
@@ -369,12 +373,13 @@ async function downloadApplicationTxt(appId) {
             `18. 신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}`,
             `19. 희망 프로그램 : ${app.preferred_program || '-'}`,
             `20. 희망 시작일 : ${app.preferred_start_date || '-'}`,
-            `21. 프로그램 관련 의견 : ${app.program_note || '-'}`,
+            `21. 희망 목표 달성 시점 : ${app.preferred_completion || '-'}`,
+            `22. 프로그램 관련 의견 : ${app.program_note || '-'}`,
             ``,
             `[ 기타 정보 ]`,
-            `22. 기억에 남는 블로그 글 : ${app.memorable_blog_content || '-'}`,
-            `23. 이온토플을 알게 된 경로 : ${referralText}`,
-            `24. 추가 전달사항 : ${app.additional_notes || '-'}`,
+            `23. 기억에 남는 블로그 글 : ${app.memorable_blog_content || '-'}`,
+            `24. 이온토플을 알게 된 경로 : ${referralText}`,
+            `25. 추가 전달사항 : ${app.additional_notes || '-'}`,
             ``,
             `========================================`,
         ];
@@ -392,10 +397,12 @@ async function downloadApplicationTxt(appId) {
         alert('다운로드에 실패했습니다.');
     }
 }
-    // ===== 개별분석 탭 =====
+
+// ===== 개별분석 탭 =====
 function loadModalAnalysisTab(app) {
     const container = document.getElementById('modalTabAnalysis');
     const hasAnalysis = app.analysis_status && app.analysis_content;
+    
     // 읽기 전용/수정 모드 설정 (저장된 분석이 있으면 읽기 전용)
     const readOnly = hasAnalysis ? 'disabled' : '';
     const pointerEvents = hasAnalysis ? 'pointer-events: none; opacity: 0.7;' : '';
