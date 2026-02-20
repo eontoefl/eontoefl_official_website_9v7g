@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학습 관리 - 이온토플 관리자</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-study.html" class="admin-nav-link active">
+                    <i class="fas fa-book-reader"></i> 학습 관리
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1 class="admin-title">📚 학습 관리</h1>
+            <p class="admin-subtitle">수강생 학습 현황과 인증 데이터를 관리합니다</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">진행 중 학생</span>
+                    <div class="stat-card-icon primary">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="activeStudents">-</div>
+                <div class="stat-card-label">Active Students</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">어제 미제출</span>
+                    <div class="stat-card-icon danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="yesterdayMissing">-</div>
+                <div class="stat-card-label">Yesterday Missing</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">평균 인증률</span>
+                    <div class="stat-card-icon success">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="avgAuthRate">-</div>
+                <div class="stat-card-label">Average Auth Rate</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">알림</span>
+                    <div class="stat-card-icon warning">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="alertCount">-</div>
+                <div class="stat-card-label">Fraud + 연속미제출</div>
+            </div>
+        </div>
+
+        <!-- 오늘의 알림판 -->
+        <div class="admin-card" id="alertBoard" style="margin-bottom: 24px;">
+            <div class="admin-card-header" style="margin-bottom: 16px;">
+                <h2 class="admin-card-title">
+                    <i class="fas fa-bell" style="color: #f59e0b;"></i> 오늘의 알림판
+                </h2>
+                <span id="alertBadge" style="background: #ef4444; color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; display: none;">0</span>
+            </div>
+            <div id="alertList">
+                <div style="padding: 20px; text-align: center; color: #94a3b8;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px;"></i>
+                    <p style="margin-top: 8px;">알림 확인 중...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="admin-card" style="margin-bottom: 24px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+                <div style="position: relative; flex: 1; min-width: 200px;">
+                    <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="text" id="searchInput" class="admin-input" placeholder="이름 검색..." 
+                           style="padding-left: 36px;" oninput="applyFilters()">
+                </div>
+                <select id="programFilter" class="admin-select" onchange="applyFilters()">
+                    <option value="">전체 프로그램</option>
+                    <option value="Fast">Fast</option>
+                    <option value="Standard">Standard</option>
+                </select>
+                <select id="weekFilter" class="admin-select" onchange="applyFilters()">
+                    <option value="">전체 주차</option>
+                    <option value="1">1주차</option>
+                    <option value="2">2주차</option>
+                    <option value="3">3주차</option>
+                    <option value="4">4주차</option>
+                    <option value="5">5주차</option>
+                    <option value="6">6주차</option>
+                    <option value="7">7주차</option>
+                    <option value="8">8주차</option>
+                </select>
+                <select id="sortBy" class="admin-select" onchange="applyFilters()">
+                    <option value="authRate_asc">인증률 낮은 순</option>
+                    <option value="authRate_desc">인증률 높은 순</option>
+                    <option value="lastActivity_asc">최근 활동 오래된 순</option>
+                    <option value="name_asc">이름 가나다순</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Student Table -->
+        <div class="admin-card">
+            <!-- Loading -->
+            <div class="admin-loading" id="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>학습 데이터를 불러오는 중...</p>
+            </div>
+
+            <!-- Table -->
+            <div id="studyTable" style="display: none; overflow-x: auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>이름</th>
+                            <th>프로그램</th>
+                            <th>주차</th>
+                            <th>인증률</th>
+                            <th>추세</th>
+                            <th>등급</th>
+                            <th>이번 주</th>
+                            <th>제출률</th>
+                            <th>최근 활동</th>
+                            <th>액션</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studyTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" style="display: none; text-align: center; padding: 60px 20px; color: #94a3b8;">
+                <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px;"></i>
+                <p style="font-size: 16px;">진행 중인 학생이 없습니다</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin-utils.js"></script>
+    <script src="js/admin-study.js"></script>
+</body>
+</html>
