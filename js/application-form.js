@@ -332,7 +332,7 @@ async function initEditMode(appId) {
         }
 
         // 개별분석 등록 여부 확인
-        if (app.analysis_status && app.analysis_content) {
+        if (userData.role !== 'admin' && app.analysis_status && app.analysis_content) {
             alert('개별분석이 이미 등록되어 수정할 수 없습니다.');
             window.location.href = 'application.html';
             return;
