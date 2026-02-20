@@ -268,8 +268,12 @@ function loadModalInfoTab(app) {
             </div>
         </div>
         
-        <!-- 관리자: 신청서 수정 버튼 -->
-        <div style="margin-top: 24px; text-align: right;">
+        <!-- 관리자: 신청서 수정 / 다운로드 버튼 -->
+        <div style="margin-top: 24px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="downloadApplicationTxt('${app.id}')" 
+                    style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
+                <i class="fas fa-download"></i> 다운로드
+            </button>
             <button onclick="window.open('application-form.html?edit=${app.id}', '_blank')" 
                     style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
                 <i class="fas fa-pen"></i> 신청서 수정하기
@@ -278,10 +282,116 @@ function loadModalInfoTab(app) {
     `;
 }
 
-// ===== 개별분석 탭 =====
-function loadModalAnalysisTab(app) {
-    const container = document.getElementById('modalTabAnalysis');
-    const hasAnalysis = app.analysis_status && app.analysis_content;
+// ===== 신청서 TXT 다운로드 =====
+async function downloadApplicationTxt(appId) {
+    try {
+        const app = await supabaseAPI.getById('applications', appId);
+        if (!app) { alert('신청서를 불러올 수 없습니다.'); return; }
+
+        // 현재 점수 텍스트
+        let currentScore = '없음';
+        if (app.has_toefl_score === 'yes') {
+            if (app.score_total_old) {
+                currentScore = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
+            } else if (app.score_total_new) {
+                currentScore = `총점 ${app.score_total_new} 레벨 (R:${app.score_reading_new || '-'} / L:${app.score_listening_new || '-'} / S:${app.score_speaking_new || '-'} / W:${app.score_writing_new || '-'})`;
+            }
+        }
+
+        // 목표 점수 텍스트
+        let targetScore = '미입력';
+        if (app.no_target_score) {
+            targetScore = '없음 (고고익선)';
+        } else if (app.target_cutoff_old) {
+            targetScore = `${app.target_cutoff_old}점`;
+            const parts = [];
+            if (app.target_reading_old) parts.push(`R:${app.target_reading_old}`);
+            if (app.target_listening_old) parts.push(`L:${app.target_listening_old}`);
+            if (app.target_speaking_old) parts.push(`S:${app.target_speaking_old}`);
+            if (app.target_writing_old) parts.push(`W:${app.target_writing_old}`);
+            if (parts.length) targetScore += ` (${parts.join(' / ')})`;
+        } else if (app.target_cutoff_new) {
+            targetScore = `${app.target_cutoff_new} 레벨`;
+            const parts = [];
+            if (app.target_reading_new) parts.push(`R:${app.target_reading_new}`);
+            if (app.target_listening_new) parts.push(`L:${app.target_listening_new}`);
+            if (app.target_speaking_new) parts.push(`S:${app.target_speaking_new}`);
+            if (app.target_writing_new) parts.push(`W:${app.target_writing_new}`);
+            if (parts.length) targetScore += ` (${parts.join(' / ')})`;
+        }
+
+        // 알게 된 경로
+        const referralParts = [];
+        if (app.referral_source && app.referral_source.length) {
+            referralParts.push(Array.isArray(app.referral_source) ? app.referral_source.join(', ') : app.referral_source);
+        }
+        if (app.referral_search_keyword) referralParts.push(`검색어: ${app.referral_search_keyword}`);
+        if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
+        if (app.referral_from_friend === 'yes' && app.referral_friend_name) referralParts.push(`지인: ${app.referral_friend_name}`);
+        if (app.referral_other) referralParts.push(`기타: ${app.referral_other}`);
+        const referralText = referralParts.join(' / ') || '-';
+
+        const lines = [
+            `========================================`,
+            `  이온토플 신청서`,
+            `  다운로드 일시: ${new Date().toLocaleString('ko-KR')}`,
+            `========================================`,
+            ``,
+            `[ 기본 정보 ]`,
+            `1. 이름 : ${app.name || '-'}`,
+            `2. 이메일 : ${app.email || '-'}`,
+            `3. 전화번호 : ${app.phone || '-'}`,
+            `4. 주소 : ${app.address || '-'}`,
+            `5. 입금 계좌 : ${app.bank_account || '-'}`,
+            `6. 직업 : ${app.occupation || '-'}`,
+            ``,
+            `[ 점수 정보 ]`,
+            `7. 토플 점수 유무 : ${app.has_toefl_score === 'yes' ? '있음' : app.has_toefl_score === 'no' ? '없음' : '-'}`,
+            `8. 현재 점수 : ${currentScore}`,
+            `9. 점수 이력 : ${app.score_history || '-'}`,
+            `10. 목표 점수 : ${targetScore}`,
+            `11. 목표 점수 메모 : ${app.target_note || '-'}`,
+            `12. 마감 기한 : ${app.submission_deadline || '-'}`,
+            ``,
+            `[ 학습 정보 ]`,
+            `13. 현재 공부 방법 : ${app.current_study_method || '-'}`,
+            `14. 토플 필요 이유 : ${app.toefl_reason || '-'}`,
+            `15. 토플 필요 이유 상세 : ${app.toefl_reason_detail || '-'}`,
+            ``,
+            `[ 라이팅 샘플 ]`,
+            `16. 라이팅 샘플 1 :`,
+            `${app.writing_sample_1 || '-'}`,
+            ``,
+            `17. 라이팅 샘플 2 :`,
+            `${app.writing_sample_2 || '-'}`,
+            ``,
+            `[ 신청 정보 ]`,
+            `18. 신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}`,
+            `19. 희망 프로그램 : ${app.preferred_program || '-'}`,
+            `20. 희망 시작일 : ${app.preferred_start_date || '-'}`,
+            `21. 프로그램 관련 의견 : ${app.program_note || '-'}`,
+            ``,
+            `[ 기타 정보 ]`,
+            `22. 기억에 남는 블로그 글 : ${app.memorable_blog_content || '-'}`,
+            `23. 이온토플을 알게 된 경로 : ${referralText}`,
+            `24. 추가 전달사항 : ${app.additional_notes || '-'}`,
+            ``,
+            `========================================`,
+        ];
+
+        const content = lines.join('\n');
+        const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `신청서_${app.name || '이름없음'}_${app.phone || '번호없음'}_${app.occupation || '직업없음'}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Download error:', error);
+        alert('다운로드에 실패했습니다.');
+    }
+}
     
     // 읽기 전용/수정 모드 설정 (저장된 분석이 있으면 읽기 전용)
     const readOnly = hasAnalysis ? 'disabled' : '';
