@@ -994,19 +994,44 @@ async function submitStudentAgreement() {
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
     
     try {
-        const result = await supabaseAPI.patch('applications', currentApplication.id, {
+        // 1. 학생 동의 처리
+        const agreementData = {
             student_program_agreed: true,
             student_schedule_agreed: true,
             student_agreed_at: new Date().toISOString(),
             current_step: 3,
             status: '학생동의완료'
-        });
+        };
+
+        // 2. 활성 계약서 자동 조회 → 자동 발송
+        try {
+            const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'limit': '1' });
+            if (contracts && contracts.length > 0) {
+                const contract = contracts[0];
+                agreementData.contract_sent = true;
+                agreementData.contract_sent_at = Date.now();
+                agreementData.contract_template_id = contract.id;
+                agreementData.contract_version = contract.version;
+                agreementData.contract_title = contract.title;
+                agreementData.contract_snapshot = contract.content;
+                agreementData.current_step = 4;
+                agreementData.status = '계약서발송완료';
+            }
+        } catch (contractError) {
+            console.warn('계약서 자동 발송 실패, 수동 발송 필요:', contractError);
+            // 계약서 조회 실패해도 동의 처리는 진행
+        }
+
+        const result = await supabaseAPI.patch('applications', currentApplication.id, agreementData);
         
         if (!result) {
             throw new Error('Failed to submit agreement');
         }
         
-        alert('✅ 동의가 완료되었습니다!\n\n다음 단계 진행을 위해 관리자가 곧 연락드리겠습니다.');
+        const hasContract = agreementData.contract_sent;
+        alert(hasContract 
+            ? '✅ 동의가 완료되었습니다!\n\n계약서가 자동으로 발송되었습니다.\n계약서 내용을 확인해주세요.' 
+            : '✅ 동의가 완료되었습니다!\n\n다음 단계 진행을 위해 관리자가 곧 연락드리겠습니다.');
         location.reload();
         
     } catch (error) {
