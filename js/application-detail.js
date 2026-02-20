@@ -1032,7 +1032,7 @@ async function submitStudentAgreement() {
         alert(hasContract 
             ? '✅ 동의가 완료되었습니다!\n\n계약서가 자동으로 발송되었습니다.\n계약서 내용을 확인해주세요.' 
             : '✅ 동의가 완료되었습니다!\n\n다음 단계 진행을 위해 관리자가 곧 연락드리겠습니다.');
-        location.reload();
+        window.location.href = `application-detail.html?id=${currentApplication.id}#step3`;
         
     } catch (error) {
         console.error('Failed to submit agreement:', error);
