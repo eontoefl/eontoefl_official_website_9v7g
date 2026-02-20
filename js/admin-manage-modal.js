@@ -392,7 +392,10 @@ async function downloadApplicationTxt(appId) {
         alert('다운로드에 실패했습니다.');
     }
 }
-    
+    // ===== 개별분석 탭 =====
+function loadModalAnalysisTab(app) {
+    const container = document.getElementById('modalTabAnalysis');
+    const hasAnalysis = app.analysis_status && app.analysis_content;
     // 읽기 전용/수정 모드 설정 (저장된 분석이 있으면 읽기 전용)
     const readOnly = hasAnalysis ? 'disabled' : '';
     const pointerEvents = hasAnalysis ? 'pointer-events: none; opacity: 0.7;' : '';
