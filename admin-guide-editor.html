@@ -4,13 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>상세 가이드 편집기 - 이온토플</title>
-    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
     
     <!-- Pretendard Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Quill.js -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
@@ -25,6 +27,7 @@
                 <i class="fas fa-arrow-left"></i> 뒤로
             </button>
             <h1 class="editor-title">📝 상세 가이드 편집기</h1>
+            <span id="saveStatus" class="save-status"></span>
         </div>
         <div class="topbar-right">
             <button class="btn-outline" onclick="showVersionHistory()" title="이전 버전으로 되돌리기">
@@ -41,17 +44,15 @@
 
     <!-- Main Editor Layout -->
     <div class="editor-container">
-        <!-- Left Panel: Edit Form -->
+        <!-- Left Panel: Quill Editor -->
         <div class="editor-panel edit-panel">
             <div class="panel-header">
                 <h2><i class="fas fa-edit"></i> 편집 영역</h2>
-                <button class="btn-primary btn-sm" onclick="addSection()">
-                    <i class="fas fa-plus"></i> 섹션 추가
-                </button>
+                <span style="font-size:12px; color:#94a3b8;">서식 있는 텍스트를 그대로 붙여넣기 가능</span>
             </div>
             
-            <div class="sections-container" id="sectionsContainer">
-                <!-- 섹션들이 동적으로 추가됩니다 -->
+            <div class="quill-wrapper">
+                <div id="quillEditor"></div>
             </div>
         </div>
 
@@ -62,10 +63,12 @@
             </div>
             
             <div class="preview-container" id="previewContainer">
-                <div class="preview-content">
+                <div class="preview-content" id="previewContent">
                     <p style="text-align: center; color: #94a3b8; margin-top: 100px;">
                         <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
-                        섹션을 추가하고 내용을 입력하면<br>실시간으로 미리보기가 표시됩니다.
+                        내용을 입력하면 실시간으로 미리보기가 표시됩니다.<br>
+                        외부에서 서식이 있는 텍스트를 복사·붙여넣기하면<br>
+                        그대로 반영됩니다.
                     </p>
                 </div>
             </div>
@@ -83,12 +86,14 @@
             </div>
             <div class="modal-body">
                 <div id="versionList" style="max-height: 400px; overflow-y: auto;">
-                    <!-- 버전 목록이 동적으로 추가됩니다 -->
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Quill.js -->
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+    
     <!-- Scripts -->
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-guide-editor.js"></script>
