@@ -987,7 +987,7 @@ async function renderProgramInfo(app) {
         </div>
         <div class="program-row">
             <span class="program-label">플랫폼</span>
-            <span class="program-value">${app.platform_url || 'https://study.iontoefl.com'}</span>
+            <span class="program-value">${platformUrl}</span>
         </div>
         <div class="program-row">
             <span class="program-label">로그인 ID</span>
