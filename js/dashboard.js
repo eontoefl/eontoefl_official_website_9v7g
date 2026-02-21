@@ -39,7 +39,7 @@ async function loadDashboard() {
         const result = await supabaseAPI.query('applications', { 'email': `eq.${currentUser.email}`, 'limit': '100' });
         
         // 정확한 이메일 매칭 필터링
-        const matchedApplications = result?.filter(app => !app.deleted && (app.email === currentUser.email || app.user_email === currentUser.email));
+        const matchedApplications = result?.filter(app => app.email === currentUser.email || app.user_email === currentUser.email);
         
         if (!matchedApplications || matchedApplications.length === 0) {
             showEmptyState();
@@ -489,7 +489,7 @@ async function renderQuickMenuGrid(app) {
             iconColor: '#9480c5',
             title: '플랫폼\n바로가기',
             link: platformUrl,
-            available: !!app.guide_sent,
+            available: !!app.deposit_confirmed_by_admin_at,
             external: true
         },
         {
@@ -962,10 +962,15 @@ function renderProgramInfo(app) {
     let platformUrl = 'https://study.iontoefl.com';
     let loginGuide = '이메일로 발송된 비밀번호를 사용하세요';
     
-    getSiteSettings().then(settings => {
-        platformUrl = settings.platform_url || platformUrl;
-        loginGuide = settings.platform_login_guide || loginGuide;
-    });
+    try {
+        const settings = await getSiteSettings();
+        if (settings) {
+            platformUrl = settings.platform_url || platformUrl;
+            loginGuide = settings.platform_login_guide || loginGuide;
+        }
+    } catch(e) {
+        console.warn('사이트 설정 로드 실패, 기본값 사용:', e);
+    }
 
     programDetails.innerHTML = `
         <div class="program-row">
@@ -1000,13 +1005,13 @@ function renderProgramInfo(app) {
     `;
 
     // 비밀번호 토글 함수를 전역으로 추가
+    const _savedLoginGuide = loginGuide;
     window.togglePassword = function() {
         const passwordText = document.getElementById('passwordText');
         const passwordIcon = document.getElementById('passwordIcon');
-        const loginGuide = '${loginGuide}';
         
         if (passwordText.textContent === '••••••••') {
-            passwordText.textContent = loginGuide;
+            passwordText.textContent = _savedLoginGuide;
             passwordIcon.classList.remove('fa-eye');
             passwordIcon.classList.add('fa-eye-slash');
         } else {
@@ -1017,9 +1022,9 @@ function renderProgramInfo(app) {
     };
 
     programActions.innerHTML = `
-        <a href="${platformUrl}" target="_blank" class="program-button" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
-    <i class="fas fa-external-link-alt"></i> 플랫폼 바로가기
-</a>
+        <a href="${platformUrl}" target="_blank" class="program-button">
+            <i class="fas fa-external-link-alt"></i> 플랫폼 바로가기
+        </a>
         <a href="usage-guide.html" target="_blank" class="program-button secondary" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
             <i class="fas fa-book"></i> 이용방법 보기
         </a>
