@@ -36,19 +36,17 @@ async function loadStudyData() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // 진행 중인 학생 필터링 (schedule_start 지남 & schedule_end 안 지남)
+        // 진행 중인 학생 필터링 (입금확인 + 시작일 설정됨 + 종료일+7일 안 지남)
         const activeApps = (apps || []).filter(app => {
             if (!app.schedule_start) return false;
-            const start = new Date(app.schedule_start);
             const end = app.schedule_end ? new Date(app.schedule_end) : null;
-            // 시작일이 지났고, 종료일이 없거나 아직 안 지난 경우
             // 종료일 + 7일 여유 (마지막 주 데이터 확인용)
             if (end) {
                 const endPlus7 = new Date(end);
                 endPlus7.setDate(endPlus7.getDate() + 7);
-                return start <= today && today <= endPlus7;
+                return today <= endPlus7;
             }
-            return start <= today;
+            return true;
         });
 
         if (activeApps.length === 0) {
