@@ -73,6 +73,10 @@
                     <i class="fas fa-headset"></i>
                     <span>고객 지원 정보</span>
                 </a>
+                <a href="#platform" class="settings-nav-item" onclick="switchTab('platform', event)">
+                    <i class="fas fa-desktop"></i>
+                    <span>플랫폼 접속 정보</span>
+                </a>
                 <a href="#usage-guide" class="settings-nav-item" onclick="switchTab('usage-guide', event)">
                     <i class="fas fa-book"></i>
                     <span>이용방법 안내</span>
@@ -286,6 +290,61 @@
 
                     <div class="form-actions">
                         <button type="button" class="btn-primary" onclick="saveSupportInfo()">
+                            <i class="fas fa-save"></i> 저장하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: 플랫폼 접속 정보 -->
+            <div id="tab-platform" class="settings-tab">
+                <div class="settings-tab-header">
+                    <h1>📡 플랫폼 접속 정보</h1>
+                    <p>학생들에게 안내되는 학습 플랫폼 로그인 정보를 관리하세요</p>
+                </div>
+
+                <div class="form-container">
+                    <div style="padding: 16px 20px; background: #f0f9ff; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                        <p style="font-size: 14px; color: #1e40af; margin: 0;">
+                            <i class="fas fa-info-circle"></i>
+                            여기서 설정한 정보는 학생 승인 시 안내 메시지와 대시보드에 표시됩니다.
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="platformUrl">
+                            <i class="fas fa-link" style="color: #6366f1;"></i> 플랫폼 URL
+                        </label>
+                        <input type="url" id="platformUrl" placeholder="예: https://study.iontoefl.com">
+                        <small style="color: #64748b;">학생이 접속하는 학습 플랫폼 주소입니다</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="platformLoginId">
+                            <i class="fas fa-user" style="color: #6366f1;"></i> 기본 로그인 ID 안내
+                        </label>
+                        <input type="text" id="platformLoginId" placeholder="예: 학생 이메일 주소와 동일">
+                        <small style="color: #64748b;">학생에게 안내할 로그인 ID 규칙 (예: 이메일, 이름 등)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="platformLoginPw">
+                            <i class="fas fa-key" style="color: #6366f1;"></i> 기본 비밀번호 안내
+                        </label>
+                        <input type="text" id="platformLoginPw" placeholder="예: 초기 비밀번호 1234 (로그인 후 변경)">
+                        <small style="color: #64748b;">학생에게 안내할 초기 비밀번호 또는 안내 문구</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="platformLoginGuide">
+                            <i class="fas fa-clipboard-list" style="color: #6366f1;"></i> 로그인 상세 안내
+                        </label>
+                        <textarea id="platformLoginGuide" rows="6" placeholder="로그인 방법에 대한 상세 안내를 입력하세요...&#10;&#10;예:&#10;1. 위 URL에 접속하세요.&#10;2. 이메일 주소로 로그인하세요.&#10;3. 초기 비밀번호는 별도 이메일로 발송됩니다." style="font-family: 'Pretendard', sans-serif; font-size: 14px; line-height: 1.6;"></textarea>
+                        <small style="color: #64748b;">줄바꿈을 포함한 상세 안내 문구 (승인 메시지에 포함됩니다)</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-primary" onclick="savePlatformInfo()">
                             <i class="fas fa-save"></i> 저장하기
                         </button>
                     </div>
