@@ -23,6 +23,8 @@ function switchTab(tabName, event) {
         loadPaymentInfo();
     } else if (tabName === 'support') {
         loadSupportInfo();
+    } else if (tabName === 'platform') {
+        loadPlatformInfo();
     } else if (tabName === 'usage-guide') {
         loadUsageGuideTab();
     }
@@ -178,6 +180,65 @@ async function saveSupportInfo() {
         
         if (result) {
             alert('✅ 고객 지원 정보가 저장되었습니다.');
+        } else {
+            throw new Error('Failed to save');
+        }
+    } catch (error) {
+        console.error('Save error:', error);
+        alert('❌ 저장 중 오류가 발생했습니다.');
+    }
+}
+
+// ===== PLATFORM TAB =====
+async function loadPlatformInfo() {
+    try {
+        const settings = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
+        
+        if (settings && settings.length > 0) {
+            const data = settings[0];
+            document.getElementById('platformUrl').value = data.platform_url || '';
+            document.getElementById('platformLoginId').value = data.platform_login_id || '';
+            document.getElementById('platformLoginPw').value = data.platform_login_pw || '';
+            document.getElementById('platformLoginGuide').value = data.platform_login_guide || '';
+        }
+    } catch (error) {
+        console.error('Failed to load platform info:', error);
+    }
+}
+
+async function savePlatformInfo() {
+    const platformUrl = document.getElementById('platformUrl').value.trim();
+    const platformLoginId = document.getElementById('platformLoginId').value.trim();
+    const platformLoginPw = document.getElementById('platformLoginPw').value.trim();
+    const platformLoginGuide = document.getElementById('platformLoginGuide').value.trim();
+    
+    if (!platformUrl) {
+        alert('⚠️ 플랫폼 URL을 입력해주세요.');
+        return;
+    }
+    
+    try {
+        const existing = await supabaseAPI.query('site_settings', { 'setting_key': 'eq.default' });
+        const settingsExist = existing && existing.length > 0;
+        
+        const data = {
+            platform_url: platformUrl,
+            platform_login_id: platformLoginId,
+            platform_login_pw: platformLoginPw,
+            platform_login_guide: platformLoginGuide
+        };
+        
+        let result;
+        if (settingsExist) {
+            result = await supabaseAPI.patch('site_settings', existing[0].id, data);
+        } else {
+            data.setting_key = 'default';
+            data.setting_value = 'default';
+            result = await supabaseAPI.post('site_settings', data);
+        }
+        
+        if (result) {
+            alert('✅ 플랫폼 접속 정보가 저장되었습니다.');
         } else {
             throw new Error('Failed to save');
         }
