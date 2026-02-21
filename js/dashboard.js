@@ -55,7 +55,7 @@ async function loadDashboard() {
         renderTimeline(application);      // 새로 추가: 타임라인
         await renderQuickMenuGrid(application);  // 새로 추가: 빠른 메뉴 그리드
         renderShipping(application);
-        renderProgramInfo(application);
+        await renderProgramInfo(application);
         
         // 로딩 숨기고 콘텐츠 표시
         document.getElementById('loadingState').style.display = 'none';
@@ -921,7 +921,7 @@ function renderQuickMenu(app) {
 /**
  * 프로그램 정보 렌더링
  */
-function renderProgramInfo(app) {
+async function renderProgramInfo(app) {
     const programDetails = document.getElementById('programDetails');
     const programActions = document.getElementById('programActions');
 
