@@ -1,370 +1,198 @@
-// Admin Guide Editor JavaScript
-let sections = [];
-let currentGuideId = 'current';
+// ===== 상세 가이드 편집기 (Quill.js WYSIWYG) =====
 
-// 페이지 로드 시 실행
+let quill = null;
+let currentGuideId = null;
+let lastSavedHtml = '';
+
+// ===== 초기화 =====
 document.addEventListener('DOMContentLoaded', () => {
-    // 관리자 권한 체크
     checkAdminAuth();
-    
-    // 기존 가이드 로드
+    initQuillEditor();
     loadGuide();
 });
 
 // 관리자 권한 체크
 function checkAdminAuth() {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-    
     if (!userData || userData.role !== 'admin') {
         alert('⚠️ 관리자만 접근할 수 있습니다.');
         window.location.href = 'index.html';
     }
 }
 
-// 기존 가이드 로드
+// ===== Quill 에디터 초기화 =====
+function initQuillEditor() {
+    quill = new Quill('#quillEditor', {
+        theme: 'snow',
+        placeholder: '여기에 내용을 입력하거나, 외부에서 서식이 있는 텍스트를 붙여넣기 하세요...',
+        modules: {
+            toolbar: [
+                // 헤더
+                [{ header: [1, 2, 3, false] }],
+                // 기본 서식
+                ['bold', 'italic', 'underline', 'strike'],
+                // 색상
+                [{ color: [] }, { background: [] }],
+                // 리스트
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                // 정렬
+                [{ align: [] }],
+                // 들여쓰기
+                [{ indent: '-1' }, { indent: '+1' }],
+                // 미디어
+                ['link', 'image', 'video'],
+                // 인용, 코드
+                ['blockquote', 'code-block'],
+                // 초기화
+                ['clean']
+            ]
+        }
+    });
+
+    // 실시간 미리보기 업데이트
+    quill.on('text-change', () => {
+        updatePreview();
+    });
+}
+
+// ===== 실시간 미리보기 =====
+function updatePreview() {
+    const html = quill.root.innerHTML;
+    const previewContent = document.getElementById('previewContent');
+
+    if (!html || html === '<p><br></p>') {
+        previewContent.innerHTML = `
+            <p style="text-align: center; color: #94a3b8; margin-top: 100px;">
+                <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                내용을 입력하면 실시간으로 미리보기가 표시됩니다.
+            </p>
+        `;
+        return;
+    }
+
+    previewContent.innerHTML = `<div class="ql-editor preview-rendered">${html}</div>`;
+}
+
+// ===== 가이드 불러오기 =====
 async function loadGuide() {
+    setSaveStatus('loading', '불러오는 중...');
+
     try {
         const result = await supabaseAPI.get('guide_content', { limit: 1 });
-        
+
         if (result.data && result.data.length > 0) {
             const guide = result.data[0];
-            sections = guide.sections || [];
             currentGuideId = guide.id;
+
+            // 새 포맷 (html) 또는 기존 포맷 (sections) 둘 다 호환
+            if (guide.html) {
+                quill.root.innerHTML = guide.html;
+                lastSavedHtml = guide.html;
+            } else if (guide.content && guide.content.sections) {
+                // 기존 섹션 포맷 → HTML로 변환
+                const html = convertSectionsToHtml(guide.content.sections);
+                quill.root.innerHTML = html;
+                lastSavedHtml = html;
+            } else if (guide.sections) {
+                const html = convertSectionsToHtml(guide.sections);
+                quill.root.innerHTML = html;
+                lastSavedHtml = html;
+            }
+
+            updatePreview();
+            setSaveStatus('saved', '최종 저장됨');
         } else {
-            // 기본 섹션 추가
-            sections = [{
-                id: generateId(),
-                title: '이용 방법 안내',
-                content: '여기에 내용을 입력하세요.',
-                image: '',
-                video: ''
-            }];
+            setSaveStatus('', '');
         }
-        
-        renderSections();
-        updatePreview();
     } catch (error) {
         console.error('Failed to load guide:', error);
-        // 에러 시 기본 섹션
-        sections = [{
-            id: generateId(),
-            title: '이용 방법 안내',
-            content: '여기에 내용을 입력하세요.',
-            image: '',
-            video: ''
-        }];
-        renderSections();
-        updatePreview();
+        setSaveStatus('error', '불러오기 실패');
     }
 }
 
-// 섹션 렌더링
-function renderSections() {
-    const container = document.getElementById('sectionsContainer');
-    
-    if (sections.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-inbox"></i>
-                <p>섹션이 없습니다.<br>"섹션 추가" 버튼을 클릭하여 시작하세요.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = sections.map((section, index) => `
-        <div class="section-card" data-section-id="${section.id}">
-            <div class="section-header">
-                <span class="section-number">섹션 ${index + 1}</span>
-                <div class="section-actions">
-                    ${index > 0 ? `<button class="btn-icon-sm" onclick="moveSectionUp(${index})" title="위로 이동">
-                        <i class="fas fa-arrow-up"></i>
-                    </button>` : ''}
-                    ${index < sections.length - 1 ? `<button class="btn-icon-sm" onclick="moveSectionDown(${index})" title="아래로 이동">
-                        <i class="fas fa-arrow-down"></i>
-                    </button>` : ''}
-                    <button class="btn-icon-sm danger" onclick="removeSection(${index})" title="삭제">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>📌 제목</label>
-                <input type="text" 
-                       value="${escapeHtml(section.title)}" 
-                       oninput="updateSection(${index}, 'title', this.value)"
-                       placeholder="섹션 제목을 입력하세요">
-            </div>
-            
-            <div class="form-group">
-                <label>📝 내용</label>
-                <textarea oninput="updateSection(${index}, 'content', this.value)"
-                          placeholder="내용을 입력하세요">${escapeHtml(section.content)}</textarea>
-            </div>
-            
-            <div class="form-group">
-                <label>🖼️ 이미지</label>
-                <div class="image-upload-area" 
-                     onclick="document.getElementById('imageInput-${index}').click()"
-                     ondrop="handleDrop(event, ${index})"
-                     ondragover="handleDragOver(event)"
-                     ondragleave="handleDragLeave(event)">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <p>클릭하거나 이미지를 드래그하여 업로드</p>
-                </div>
-                <input type="file" 
-                       id="imageInput-${index}" 
-                       accept="image/*" 
-                       style="display: none;"
-                       onchange="handleImageUpload(event, ${index})">
-                ${section.image ? `
-                    <div class="image-preview">
-                        <img src="${section.image}" alt="미리보기">
-                        <button class="remove-image" onclick="removeImage(${index})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                ` : ''}
-                <input type="text" 
-                       value="${escapeHtml(section.image)}" 
-                       oninput="updateSection(${index}, 'image', this.value)"
-                       placeholder="또는 이미지 URL을 입력하세요"
-                       style="margin-top: 8px;">
-            </div>
-            
-            <div class="form-group">
-                <label>🎬 영상 URL (YouTube, Vimeo 등)</label>
-                <input type="text" 
-                       value="${escapeHtml(section.video)}" 
-                       oninput="updateSection(${index}, 'video', this.value)"
-                       placeholder="https://www.youtube.com/embed/VIDEO_ID">
-            </div>
-        </div>
-    `).join('');
+// 기존 섹션 포맷 → HTML 변환 (하위 호환)
+function convertSectionsToHtml(sections) {
+    if (!sections || sections.length === 0) return '';
+
+    return sections.map(s => {
+        let html = '';
+        if (s.title) html += `<h2>${escapeHtml(s.title)}</h2>`;
+        if (s.content) html += `<p>${escapeHtml(s.content).replace(/\n/g, '<br>')}</p>`;
+        if (s.image) html += `<p><img src="${s.image}" alt="${escapeHtml(s.title || '')}"></p>`;
+        if (s.video) html += `<p><iframe src="${s.video}" frameborder="0" allowfullscreen></iframe></p>`;
+        return html;
+    }).join('');
 }
 
-// 섹션 추가
-function addSection() {
-    const newSection = {
-        id: generateId(),
-        title: '',
-        content: '',
-        image: '',
-        video: ''
-    };
-    
-    sections.push(newSection);
-    renderSections();
-    updatePreview();
-    
-    // 스크롤을 새로 추가된 섹션으로 이동
-    setTimeout(() => {
-        const container = document.getElementById('sectionsContainer');
-        container.scrollTop = container.scrollHeight;
-    }, 100);
-}
-
-// 섹션 업데이트
-function updateSection(index, field, value) {
-    sections[index][field] = value;
-    updatePreview();
-}
-
-// 섹션 위로 이동
-function moveSectionUp(index) {
-    if (index === 0) return;
-    
-    [sections[index - 1], sections[index]] = [sections[index], sections[index - 1]];
-    renderSections();
-    updatePreview();
-}
-
-// 섹션 아래로 이동
-function moveSectionDown(index) {
-    if (index === sections.length - 1) return;
-    
-    [sections[index], sections[index + 1]] = [sections[index + 1], sections[index]];
-    renderSections();
-    updatePreview();
-}
-
-// 섹션 삭제
-function removeSection(index) {
-    if (!confirm('이 섹션을 삭제하시겠습니까?')) return;
-    
-    sections.splice(index, 1);
-    renderSections();
-    updatePreview();
-}
-
-// 이미지 제거
-function removeImage(index) {
-    sections[index].image = '';
-    renderSections();
-    updatePreview();
-}
-
-// 이미지 업로드 처리
-function handleImageUpload(event, index) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-        alert('이미지 파일만 업로드할 수 있습니다.');
-        return;
-    }
-    
-    // 파일을 Base64로 변환
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        sections[index].image = e.target.result;
-        renderSections();
-        updatePreview();
-    };
-    reader.readAsDataURL(file);
-}
-
-// 드래그앤드롭 이벤트
-function handleDragOver(event) {
-    event.preventDefault();
-    event.currentTarget.classList.add('dragover');
-}
-
-function handleDragLeave(event) {
-    event.currentTarget.classList.remove('dragover');
-}
-
-function handleDrop(event, index) {
-    event.preventDefault();
-    event.currentTarget.classList.remove('dragover');
-    
-    const file = event.dataTransfer.files[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-        alert('이미지 파일만 업로드할 수 있습니다.');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        sections[index].image = e.target.result;
-        renderSections();
-        updatePreview();
-    };
-    reader.readAsDataURL(file);
-}
-
-// 실시간 미리보기 업데이트
-function updatePreview() {
-    const previewContainer = document.getElementById('previewContainer');
-    
-    if (sections.length === 0) {
-        previewContainer.innerHTML = `
-            <div class="preview-content">
-                <p style="text-align: center; color: #94a3b8; margin-top: 100px;">
-                    <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
-                    섹션을 추가하고 내용을 입력하면<br>실시간으로 미리보기가 표시됩니다.
-                </p>
-            </div>
-        `;
-        return;
-    }
-    
-    const previewHtml = `
-        <div class="preview-content">
-            ${sections.map((section, index) => `
-                <div class="preview-section">
-                    ${section.title ? `<h2>${escapeHtml(section.title)}</h2>` : ''}
-                    ${section.content ? `<p>${escapeHtml(section.content)}</p>` : ''}
-                    ${section.image ? `<img src="${section.image}" alt="${escapeHtml(section.title)}">` : ''}
-                    ${section.video ? `
-                        <div class="video-container">
-                            <iframe src="${section.video}" allowfullscreen></iframe>
-                        </div>
-                    ` : ''}
-                </div>
-            `).join('')}
-        </div>
-    `;
-    
-    previewContainer.innerHTML = previewHtml;
-}
-
-// 전체 미리보기 (새 탭)
-function previewFullPage() {
-    // 임시로 localStorage에 저장
-    localStorage.setItem('guide_preview', JSON.stringify(sections));
-    window.open('usage-guide.html?preview=true', '_blank');
-}
-
-// 저장
+// ===== 저장 =====
 async function saveGuide() {
-    if (sections.length === 0) {
-        alert('⚠️ 최소 1개 이상의 섹션을 추가해주세요.');
+    const html = quill.root.innerHTML;
+
+    if (!html || html === '<p><br></p>') {
+        alert('⚠️ 내용을 입력해주세요.');
         return;
     }
-    
-    // 제목이 비어있는 섹션 체크
-    const emptySections = sections.filter(s => !s.title.trim());
-    if (emptySections.length > 0) {
-        if (!confirm('제목이 비어있는 섹션이 있습니다.\n그래도 저장하시겠습니까?')) {
-            return;
-        }
-    }
-    
+
+    setSaveStatus('saving', '저장 중...');
     const userData = JSON.parse(localStorage.getItem('iontoefl_user'));
-    const now = new Date().toISOString();
-    
+
     try {
-        // 1. 기존 가이드 체크
-        const checkResult = await supabaseAPI.get('guide_content', { limit: 1 });
-        
         const guideData = {
-            content: { sections: sections },
+            html: html,
+            content: { html: html },  // 호환성
             updated_at: Date.now(),
             updated_by: userData.email
         };
-        
+
         let saveResult;
-        if (checkResult.data && checkResult.data.length > 0) {
-            // 업데이트
-            const existingId = checkResult.data[0].id;
-            saveResult = await supabaseAPI.put('guide_content', existingId, guideData);
+        if (currentGuideId) {
+            saveResult = await supabaseAPI.put('guide_content', currentGuideId, guideData);
         } else {
-            // 새로 생성
-            saveResult = await supabaseAPI.post('guide_content', guideData);
+            const checkResult = await supabaseAPI.get('guide_content', { limit: 1 });
+            if (checkResult.data && checkResult.data.length > 0) {
+                currentGuideId = checkResult.data[0].id;
+                saveResult = await supabaseAPI.put('guide_content', currentGuideId, guideData);
+            } else {
+                saveResult = await supabaseAPI.post('guide_content', guideData);
+                if (saveResult) currentGuideId = saveResult.id;
+            }
         }
-        
-        if (!saveResult) throw new Error('Failed to save guide');
-        
-        // 2. 버전 저장
+
+        if (!saveResult) throw new Error('저장 실패');
+
+        // 버전 저장
         const versionData = {
-            content: { sections: sections },
+            html: html,
+            content: { html: html },
             created_at: Date.now(),
             created_by: userData.email
         };
-        
-        const versionResult = await supabaseAPI.post('guide_versions', versionData);
-        
-        if (!versionResult) throw new Error('Failed to save version');
-        
-        alert('✅ 저장되었습니다!');
-        
+        await supabaseAPI.post('guide_versions', versionData);
+
+        lastSavedHtml = html;
+        setSaveStatus('saved', '저장 완료!');
+        setTimeout(() => setSaveStatus('saved', '최종 저장됨'), 2000);
+
     } catch (error) {
         console.error('Save error:', error);
+        setSaveStatus('error', '저장 실패');
         alert('❌ 저장 중 오류가 발생했습니다.\n\n' + error.message);
     }
 }
 
-// 버전 관리 모달
+// ===== 전체 미리보기 =====
+function previewFullPage() {
+    const html = quill.root.innerHTML;
+    localStorage.setItem('guide_preview_html', html);
+    window.open('usage-guide.html?preview=true', '_blank');
+}
+
+// ===== 버전 관리 =====
 async function showVersionHistory() {
     try {
         const result = await supabaseAPI.get('guide_versions', { limit: 20, sort: '-created_at' });
-        
         const versionList = document.getElementById('versionList');
-        
+
         if (!result.data || result.data.length === 0) {
             versionList.innerHTML = `
                 <div class="empty-state">
@@ -376,11 +204,11 @@ async function showVersionHistory() {
             versionList.innerHTML = result.data.map(version => `
                 <div class="version-item">
                     <div class="version-info">
-                        <h4>${escapeHtml(version.version_name || '버전')}</h4>
+                        <h4>${version.version_name || '저장 버전'}</h4>
                         <p>
                             <i class="fas fa-clock"></i> ${new Date(version.created_at).toLocaleString('ko-KR')}
                             <span style="margin-left: 12px;">
-                                <i class="fas fa-user"></i> ${escapeHtml(version.created_by)}
+                                <i class="fas fa-user"></i> ${escapeHtml(version.created_by || '-')}
                             </span>
                         </p>
                     </div>
@@ -392,54 +220,87 @@ async function showVersionHistory() {
                 </div>
             `).join('');
         }
-        
+
         document.getElementById('versionModal').style.display = 'flex';
-        
+
     } catch (error) {
         console.error('Failed to load versions:', error);
         alert('❌ 버전 목록을 불러오는 중 오류가 발생했습니다.');
     }
 }
 
-// 버전 복원
 async function restoreVersion(versionId) {
-    if (!confirm('이 버전으로 복원하시겠습니까?\n현재 작업 중인 내용은 사라집니다.')) {
-        return;
-    }
-    
+    if (!confirm('이 버전으로 복원하시겠습니까?\n현재 작업 중인 내용은 사라집니다.')) return;
+
     try {
         const version = await supabaseAPI.getById('guide_versions', versionId);
-        
-        sections = JSON.parse(version.content);
-        renderSections();
+
+        // 새 포맷 (html) 또는 기존 포맷 (sections) 호환
+        let html = '';
+        if (version.html) {
+            html = version.html;
+        } else if (version.content) {
+            if (typeof version.content === 'string') {
+                // 기존: JSON 문자열로 저장된 sections
+                try {
+                    const sections = JSON.parse(version.content);
+                    html = convertSectionsToHtml(sections);
+                } catch (e) {
+                    html = version.content;
+                }
+            } else if (version.content.html) {
+                html = version.content.html;
+            } else if (version.content.sections) {
+                html = convertSectionsToHtml(version.content.sections);
+            }
+        }
+
+        quill.root.innerHTML = html;
         updatePreview();
         closeVersionModal();
-        
+        setSaveStatus('', '복원됨 - 저장 필요');
+
         alert('✅ 버전이 복원되었습니다.\n저장 버튼을 클릭하여 적용하세요.');
-        
+
     } catch (error) {
         console.error('Failed to restore version:', error);
         alert('❌ 버전 복원 중 오류가 발생했습니다.');
     }
 }
 
-// 버전 모달 닫기
 function closeVersionModal() {
     document.getElementById('versionModal').style.display = 'none';
 }
 
-// 뒤로가기
+// ===== 저장 상태 표시 =====
+function setSaveStatus(type, text) {
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+
+    const colors = {
+        loading: '#3b82f6',
+        saving: '#f59e0b',
+        saved: '#22c55e',
+        error: '#ef4444',
+        '': '#94a3b8'
+    };
+
+    el.style.color = colors[type] || '#94a3b8';
+    el.innerHTML = type === 'loading' || type === 'saving'
+        ? `<i class="fas fa-spinner fa-spin"></i> ${text}`
+        : text;
+}
+
+// ===== 뒤로가기 =====
 function goBack() {
-    if (confirm('저장하지 않은 내용은 사라집니다.\n뒤로 가시겠습니까?')) {
-        window.location.href = 'admin-settings.html';
+    const currentHtml = quill ? quill.root.innerHTML : '';
+    if (currentHtml !== lastSavedHtml) {
+        if (!confirm('저장하지 않은 변경사항이 있습니다.\n뒤로 가시겠습니까?')) return;
     }
+    window.location.href = 'admin-settings.html';
 }
 
-// 유틸리티 함수
-function generateId() {
-    return 'section-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-}
-
+// ===== 유틸리티 =====
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
