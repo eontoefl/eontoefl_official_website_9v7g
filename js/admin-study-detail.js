@@ -205,16 +205,22 @@ function renderSummaryCards() {
     const totalAuthRate = authRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
     const avgAuthRate = totalDeadlinedTasks > 0 ? Math.round(totalAuthRate / totalDeadlinedTasks) : 0;
 
+    // ── 시작일 경과 판단 (다음날부터 등급/환급 산정) ──
+    const isBeforeGrading = !start || toDateStr(today) <= toDateStr(start);
+
     // ── 등급 ──
-    let grade = 'D', gradeColor = '#ef4444';
-    if (avgAuthRate >= 90) { grade = 'A'; gradeColor = '#22c55e'; }
-    else if (avgAuthRate >= 75) { grade = 'B'; gradeColor = '#3b82f6'; }
-    else if (avgAuthRate >= 60) { grade = 'C'; gradeColor = '#f59e0b'; }
+    let grade = '-', gradeColor = '#94a3b8';
+    if (!isBeforeGrading) {
+        grade = 'D'; gradeColor = '#ef4444';
+        if (avgAuthRate >= 90) { grade = 'A'; gradeColor = '#22c55e'; }
+        else if (avgAuthRate >= 75) { grade = 'B'; gradeColor = '#3b82f6'; }
+        else if (avgAuthRate >= 60) { grade = 'C'; gradeColor = '#f59e0b'; }
+    }
 
     // ── 환급 예상 ──
-    const deposit = app.deposit_amount || app.final_price || 0;
+    const deposit = 100000; // 보증금 고정 10만원
     const refundRates = { A: 1.0, B: 0.8, C: 0.5, D: 0 };
-    const expectedRefund = Math.round(deposit * (refundRates[grade] || 0));
+    const expectedRefund = isBeforeGrading ? '-' : Math.round(deposit * (refundRates[grade] || 0));
 
     // ── 잔여일 ──
     const end = getScheduleEnd(app);
@@ -222,28 +228,40 @@ function renderSummaryCards() {
 
     // ── 제출률 ──
     const submittedTasks = records.length;
-    const submitRate = totalDeadlinedTasks > 0 ? Math.round((submittedTasks / totalDeadlinedTasks) * 100) : 0;
+    const submitRate = totalDeadlinedTasks > 0 
+        ? Math.round((submittedTasks / totalDeadlinedTasks) * 100) 
+        : 0;
+
+    // ── 인증률/제출률 표시값 ──
+    const authDisplay = totalDeadlinedTasks > 0 ? `${avgAuthRate}%` : (submittedTasks > 0 ? '진행 중' : '-');
+    const submitDisplay = totalDeadlinedTasks > 0 ? `${submitRate}%` : (submittedTasks > 0 ? '진행 중' : '-');
+    const authSubText = totalDeadlinedTasks > 0 
+        ? `인증 합계 ${totalAuthRate} / 마감 ${totalDeadlinedTasks}건`
+        : (submittedTasks > 0 ? `오늘 ${submittedTasks}건 제출 (마감 전)` : '마감된 과제 없음');
+    const submitSubText = totalDeadlinedTasks > 0
+        ? `제출 ${submittedTasks} / 마감 ${totalDeadlinedTasks}건`
+        : (submittedTasks > 0 ? `오늘 ${submittedTasks}건 제출 (마감 전)` : '마감된 과제 없음');
 
     const container = document.getElementById('summaryCards');
     container.innerHTML = `
         <!-- 인증률 -->
         <div class="detail-stat-card">
-            <div class="stat-icon" style="background:${avgAuthRate >= 75 ? '#dcfce7' : avgAuthRate >= 60 ? '#fef3c7' : '#fef2f2'}; color:${avgAuthRate >= 75 ? '#22c55e' : avgAuthRate >= 60 ? '#f59e0b' : '#ef4444'};">
+            <div class="stat-icon" style="background:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 75 ? '#dcfce7' : avgAuthRate >= 60 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 75 ? '#22c55e' : avgAuthRate >= 60 ? '#f59e0b' : '#ef4444') : '#94a3b8'};">
                 <i class="fas fa-shield-alt"></i>
             </div>
-            <div class="stat-value" style="color:${avgAuthRate >= 75 ? '#22c55e' : avgAuthRate >= 60 ? '#f59e0b' : '#ef4444'};">${avgAuthRate}%</div>
+            <div class="stat-value" style="color:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 75 ? '#22c55e' : avgAuthRate >= 60 ? '#f59e0b' : '#ef4444') : '#64748b'};">${authDisplay}</div>
             <div class="stat-label">인증률</div>
-            <div class="stat-sub">인증 합계 ${totalAuthRate} / 마감 ${totalDeadlinedTasks}건</div>
+            <div class="stat-sub">${authSubText}</div>
         </div>
 
         <!-- 등급 -->
         <div class="detail-stat-card">
-            <div class="stat-icon" style="background:${gradeColor}20; color:${gradeColor};">
+            <div class="stat-icon" style="background:${isBeforeGrading ? '#f1f5f9' : gradeColor + '20'}; color:${gradeColor};">
                 <i class="fas fa-award"></i>
             </div>
-            <div class="stat-value" style="color:${gradeColor};">${grade}</div>
+            <div class="stat-value" style="color:${gradeColor};">${isBeforeGrading ? '산정 전' : grade}</div>
             <div class="stat-label">현재 등급</div>
-            <div class="stat-sub">A≥90 B≥75 C≥60 D&lt;60</div>
+            <div class="stat-sub">${isBeforeGrading ? '시작일 다음날부터 산정' : 'A≥90 B≥75 C≥60 D&lt;60'}</div>
         </div>
 
         <!-- 환급 예상 -->
@@ -251,9 +269,9 @@ function renderSummaryCards() {
             <div class="stat-icon" style="background:#dbeafe; color:#3b82f6;">
                 <i class="fas fa-coins"></i>
             </div>
-            <div class="stat-value">${expectedRefund > 0 ? expectedRefund.toLocaleString() : '0'}</div>
+            <div class="stat-value">${isBeforeGrading ? '산정 전' : (expectedRefund > 0 ? expectedRefund.toLocaleString() : '0')}</div>
             <div class="stat-label">환급 예상 (원)</div>
-            <div class="stat-sub">보증금 ${deposit.toLocaleString()}원 × ${Math.round((refundRates[grade] || 0) * 100)}%</div>
+            <div class="stat-sub">${isBeforeGrading ? '시작일 다음날부터 산정' : '보증금 ' + deposit.toLocaleString() + '원 × ' + Math.round((refundRates[grade] || 0) * 100) + '%'}</div>
         </div>
 
         <!-- 잔여일 -->
@@ -271,9 +289,9 @@ function renderSummaryCards() {
             <div class="stat-icon" style="background:#ecfdf5; color:#10b981;">
                 <i class="fas fa-clipboard-check"></i>
             </div>
-            <div class="stat-value">${submitRate}%</div>
+            <div class="stat-value">${submitDisplay}</div>
             <div class="stat-label">제출률</div>
-            <div class="stat-sub">제출 ${submittedTasks} / 마감 ${totalDeadlinedTasks}건</div>
+            <div class="stat-sub">${submitSubText}</div>
         </div>
     `;
 }

@@ -139,13 +139,19 @@ async function loadStudyData() {
             if (thisWeekAvg > lastWeekAvg + 5) { trend = '↑'; trendColor = '#22c55e'; }
             else if (thisWeekAvg < lastWeekAvg - 5) { trend = '↓'; trendColor = '#ef4444'; }
 
-            // 등급
-            let grade = 'D';
-            if (avgAuthRate >= 90) grade = 'A';
-            else if (avgAuthRate >= 75) grade = 'B';
-            else if (avgAuthRate >= 60) grade = 'C';
+            // 시작일 경과 판단 (다음날부터 등급 산정)
+            const isBeforeGrading = today.toISOString().split('T')[0] <= startDate.toISOString().split('T')[0];
 
-            const gradeColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
+            // 등급
+            let grade = '-';
+            if (!isBeforeGrading) {
+                grade = 'D';
+                if (avgAuthRate >= 90) grade = 'A';
+                else if (avgAuthRate >= 75) grade = 'B';
+                else if (avgAuthRate >= 60) grade = 'C';
+            }
+
+            const gradeColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444', '-': '#94a3b8' };
 
             // 이번 주 잔디 (일~금)
             const weekGrass = [];
@@ -167,12 +173,17 @@ async function loadStudyData() {
                 const uniqueTypes = new Set(dayRecords.map(r => r.task_type));
                 if (uniqueTypes.size >= 4) weekGrass.push('🟩');
                 else if (uniqueTypes.size > 0) weekGrass.push('🟨');
-                else weekGrass.push('🟥');
+                else {
+                    // 오늘이면 진행 중, 과거면 미제출
+                    const isToday = checkDate.toISOString().split('T')[0] === today.toISOString().split('T')[0];
+                    weekGrass.push(isToday ? '⬜' : '🟥');
+                }
             }
 
             // 제출률
             const submittedTasks = myRecords.length;
             const submitRate = totalDeadlinedTasks > 0 ? Math.round((submittedTasks / totalDeadlinedTasks) * 100) : 0;
+            const submitDisplay = totalDeadlinedTasks > 0 ? `${submitRate}%` : (submittedTasks > 0 ? '진행 중' : '-');
 
             // 최근 활동
             const lastActivity = myRecords.length > 0 
@@ -214,6 +225,7 @@ async function loadStudyData() {
                 gradeColor: gradeColors[grade],
                 weekGrass,
                 submitRate,
+                submitDisplay,
                 lastActivity,
                 daysSinceActivity,
                 consecutiveMissing,
@@ -357,7 +369,7 @@ function renderTable() {
                         ${s.weekGrass.map(g => `<span>${g}</span>`).join('')}
                     </div>
                 </td>
-                <td>${s.submitRate}%</td>
+                <td>${s.submitDisplay}</td>
                 <td>${lastActivityText}</td>
                 <td>
                     <button onclick="window.location.href='admin-study-detail.html?id=${s.userId}'" 
