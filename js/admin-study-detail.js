@@ -222,9 +222,19 @@ function renderSummaryCards() {
     const refundRates = { A: 1.0, B: 0.8, C: 0.5, D: 0 };
     const expectedRefund = isBeforeGrading ? '-' : Math.round(deposit * (refundRates[grade] || 0));
 
-    // ── 잔여일 ──
+    // ── 잔여일 (학습일 기준: 토요일 제외, 주 6일) ──
     const end = getScheduleEnd(app);
-    const remainingDays = end ? Math.max(0, Math.ceil((end - today) / (1000 * 60 * 60 * 24))) : '-';
+    let remainingDays = '-';
+    if (end && start) {
+        let count = 0;
+        const checkDate = new Date(today);
+        checkDate.setDate(checkDate.getDate() + 1); // 내일부터 카운트
+        while (checkDate <= end) {
+            if (checkDate.getDay() !== 6) count++; // 토요일 제외
+            checkDate.setDate(checkDate.getDate() + 1);
+        }
+        remainingDays = count;
+    }
 
     // ── 제출률 ──
     const submittedTasks = records.length;
