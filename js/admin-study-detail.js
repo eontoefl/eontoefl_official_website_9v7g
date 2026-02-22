@@ -187,16 +187,17 @@ function renderSummaryCards() {
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
 
-    // ── 마감 과제 수 계산 ──
+    // ── 마감 과제 수 계산 (오늘 제외, 어제까지만 마감) ──
     const tasksPerDay = 4;
     const daysPerWeek = 6; // 일~금
     const elapsedWeeks = Math.min(currentWeek, totalWeeks);
     const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-    // 일요일 시작 기준: 일=1일차, 월=2, 화=3, 수=4, 목=5, 금=6, 토=0(쉬는날)
-    const daysThisWeek = currentWeek <= totalWeeks
-        ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek + 1)  // 토=6일 다 지남, 일~금=dayOfWeek+1
+    // 일요일 시작: 일=0일 마감(오늘), 월=1일 마감(어제 일만), ..., 토=5일 마감(일~목)
+    // 오늘은 아직 진행중이므로 어제까지만 카운트
+    const daysDeadlinedThisWeek = currentWeek <= totalWeeks
+        ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)  // 토=6일 전부 마감, 일=0, 월=1, ..., 금=5
         : 0;
-    const clampedDaysThisWeek = Math.min(daysThisWeek, daysPerWeek);
+    const clampedDaysThisWeek = Math.min(daysDeadlinedThisWeek, daysPerWeek);
     const completedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
     const totalDeadlinedTasks = completedDays * tasksPerDay;
 
@@ -308,6 +309,7 @@ function renderGrassGrid() {
             cellDate.setDate(cellDate.getDate() + d);
             const dateStr = toDateStr(cellDate);
             const dayName = DAY_NAMES[cellDate.getDay()];
+            const isToday = toDateStr(cellDate) === toDateStr(today);
 
             if (cellDate > today) {
                 // 미도래
@@ -325,7 +327,10 @@ function renderGrassGrid() {
             if (count >= 4) {
                 html += `<div class="grass-cell grass-done" data-tooltip="${dateStr} (${dayName}) ${count}종 완료">✅</div>`;
             } else if (count > 0) {
-                html += `<div class="grass-cell grass-partial" data-tooltip="${dateStr} (${dayName}) ${count}/4종 제출">${count}</div>`;
+                html += `<div class="grass-cell grass-partial" data-tooltip="${dateStr} (${dayName}) ${count}/4종 제출${isToday ? ' (진행중)' : ''}">${count}</div>`;
+            } else if (isToday) {
+                // 오늘은 아직 진행 중
+                html += `<div class="grass-cell grass-pending" data-tooltip="${dateStr} (${dayName}) 진행 중">⬜</div>`;
             } else {
                 html += `<div class="grass-cell grass-missed" data-tooltip="${dateStr} (${dayName}) 미제출">❌</div>`;
             }

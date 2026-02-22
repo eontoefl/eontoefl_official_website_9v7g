@@ -93,17 +93,17 @@ async function loadStudyData() {
             const programType = (app.assigned_program || app.preferred_program || '').includes('Fast') ? 'Fast' : 'Standard';
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
-            // 마감된 과제 수 계산 (하루 4개 과제, 주 6일)
+            // 마감된 과제 수 계산 (하루 4개 과제, 주 6일, 오늘 제외 어제까지만 마감)
             const tasksPerDay = 4;
             const daysPerWeek = 6;
             const elapsedWeeks = Math.min(currentWeek, totalWeeks);
             // 이번 주 경과 일수 (일요일 시작 기준, 주 6일: 일~금)
             const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-            // 일요일 시작: 일=1일차, 월=2, 화=3, 수=4, 목=5, 금=6, 토=0(쉬는날)
-            const daysThisWeek = currentWeek <= totalWeeks
-                ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek + 1)
+            // 오늘은 아직 진행중이므로 어제까지만 카운트
+            const daysDeadlinedThisWeek = currentWeek <= totalWeeks
+                ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
                 : 0;
-            const clampedDaysThisWeek = Math.min(daysThisWeek, daysPerWeek);
+            const clampedDaysThisWeek = Math.min(daysDeadlinedThisWeek, daysPerWeek);
             const completedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
             const totalDeadlinedTasks = completedDays * tasksPerDay;
 
