@@ -99,8 +99,12 @@ async function loadStudyData() {
             const elapsedWeeks = Math.min(currentWeek, totalWeeks);
             // 이번 주 경과 일수 (일요일 시작 기준, 주 6일: 일~금)
             const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-            const daysThisWeek = currentWeek <= totalWeeks ? Math.min(dayOfWeek === 0 ? 0 : dayOfWeek, daysPerWeek) : 0;
-            const completedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + daysThisWeek;
+            // 일요일 시작: 일=1일차, 월=2, 화=3, 수=4, 목=5, 금=6, 토=0(쉬는날)
+            const daysThisWeek = currentWeek <= totalWeeks
+                ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek + 1)
+                : 0;
+            const clampedDaysThisWeek = Math.min(daysThisWeek, daysPerWeek);
+            const completedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
             const totalDeadlinedTasks = completedDays * tasksPerDay;
 
             // 인증률 계산
