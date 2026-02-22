@@ -76,6 +76,28 @@ async function loadStudyData() {
         const authRecords = await supabaseAPI.query('tr_auth_records', { 'limit': '10000' });
         const allAuthRecords = (authRecords || []).filter(r => userIds.includes(r.user_id));
 
+        // 4.5. 스케줄 데이터 로드 (일별 과제 수 참조용)
+        const scheduleData = await supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' });
+        // 룩업: { 'standard': { '1_sunday': 3, '1_monday': 3, ... }, 'fast': { ... } }
+        const scheduleLookup = {};
+        const dayNameToEng = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
+        (scheduleData || []).forEach(s => {
+            const prog = (s.program || '').toLowerCase();
+            if (!scheduleLookup[prog]) scheduleLookup[prog] = {};
+            const taskCount = [s.section1, s.section2, s.section3, s.section4].filter(v => v && v.trim() !== '').length;
+            scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
+        });
+
+        // 헬퍼: 특정 주차/요일의 과제 수 반환
+        function getTaskCount(programType, week, dayIndex) {
+            const prog = programType.toLowerCase();
+            const dayEng = dayNameToEng[dayIndex];
+            if (!dayEng) return 0;
+            const lookup = scheduleLookup[prog];
+            if (!lookup) return 0;
+            return lookup[`${week}_${dayEng}`] || 0;
+        }
+
         // 5. 학생별 데이터 조합
         allStudentData = activeApps.map(app => {
             const user = userMap[app.email];
@@ -93,21 +115,29 @@ async function loadStudyData() {
             const programType = (app.assigned_program || app.preferred_program || '').includes('Fast') ? 'Fast' : 'Standard';
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
-            // 마감된 과제 수 계산 (하루 4개 과제, 주 6일)
-            // 기본: 어제까지 마감 + 선제 완료(4종 다 제출한 날은 마감 전이라도 포함)
-            const tasksPerDay = 4;
+            // ── 마감 과제 수 계산 (스케줄 기반 일별 과제 수 동적 적용) ──
             const daysPerWeek = 6;
             const elapsedWeeks = Math.min(currentWeek, totalWeeks);
             const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-            // 어제까지 마감된 일수
+
+            // 어제까지 마감된 과제 수 (일별 과제 수를 스케줄에서 참조)
+            let baseDeadlinedTasks = 0;
+            // 지난 주차 (1주차 ~ elapsedWeeks-1주차) 전체
+            for (let w = 1; w < elapsedWeeks; w++) {
+                for (let d = 0; d < 6; d++) { // 일~금
+                    baseDeadlinedTasks += getTaskCount(programType, w, d);
+                }
+            }
+            // 이번 주 어제까지 (오늘 제외)
             const daysDeadlinedThisWeek = currentWeek <= totalWeeks
                 ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
                 : 0;
-            const clampedDaysThisWeek = Math.min(daysDeadlinedThisWeek, daysPerWeek);
-            const baseDeadlinedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
+            for (let d = 0; d < Math.min(daysDeadlinedThisWeek, daysPerWeek); d++) {
+                baseDeadlinedTasks += getTaskCount(programType, elapsedWeeks, d);
+            }
 
-            // 선제 완료: 오늘/미래 날짜 중 4종 과제를 모두 완료한 날 수 추가
-            let earlyCompletedDays = 0;
+            // 선제 완료: 오늘/미래 날짜 중 해당일 과제를 모두 완료한 날의 과제 수 추가
+            let earlyCompletedTasks = 0;
             const todayStr = today.toISOString().split('T')[0];
             const endDate = app.schedule_end ? new Date(app.schedule_end) : null;
             if (endDate) endDate.setHours(0, 0, 0, 0);
@@ -115,18 +145,20 @@ async function loadStudyData() {
             for (let scanDate = new Date(today); scanDate <= scanEnd; scanDate.setDate(scanDate.getDate() + 1)) {
                 if (scanDate < startDate) continue;
                 const scanDay = scanDate.getDay();
-                if (scanDay === 6) continue; // 토요일 제외
+                if (scanDay === 6) continue;
                 const scanStr = scanDate.toISOString().split('T')[0];
-                // 이미 마감 카운트에 포함된 날은 스킵
                 if (scanStr < todayStr) continue;
-                // 해당 날짜에 4종 이상 제출했는지 확인
+                // 해당 날짜의 주차/요일 계산
+                const diffFromStart = Math.floor((scanDate - startDate) / 86400000);
+                const scanWeek = Math.floor(diffFromStart / 7) + 1;
+                const requiredTasks = getTaskCount(programType, scanWeek, scanDay);
+                if (requiredTasks <= 0) continue;
                 const dayRecs = myRecords.filter(r => new Date(r.completed_at).toISOString().split('T')[0] === scanStr);
                 const uniqueTypes = new Set(dayRecs.map(r => r.task_type));
-                if (uniqueTypes.size >= 4) earlyCompletedDays++;
+                if (uniqueTypes.size >= requiredTasks) earlyCompletedTasks += requiredTasks;
             }
 
-            const completedDays = baseDeadlinedDays + earlyCompletedDays;
-            const totalDeadlinedTasks = completedDays * tasksPerDay;
+            const totalDeadlinedTasks = baseDeadlinedTasks + earlyCompletedTasks;
 
             // 인증률 계산
             const totalAuthRate = myAuthRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
@@ -178,6 +210,7 @@ async function loadStudyData() {
 
             // 이번 주 잔디 (일~금)
             const weekGrass = [];
+            const cw = Math.min(currentWeek, totalWeeks);
             for (let d = 0; d < 6; d++) {
                 const checkDate = new Date(thisWeekStart);
                 checkDate.setDate(checkDate.getDate() + d);
@@ -186,6 +219,9 @@ async function loadStudyData() {
                 const isToday = dateStr === todayStr;
                 const isFuture = checkDate > today;
 
+                // 해당 날짜의 스케줄 과제 수
+                const requiredTasks = getTaskCount(programType, cw, checkDate.getDay());
+
                 // 해당 날짜 제출 기록 확인 (미래/오늘 포함)
                 const dayRecords = myRecords.filter(r => {
                     const rDate = new Date(r.completed_at).toISOString().split('T')[0];
@@ -193,8 +229,8 @@ async function loadStudyData() {
                 });
                 const uniqueTypes = new Set(dayRecords.map(r => r.task_type));
 
-                if (uniqueTypes.size >= 4) {
-                    weekGrass.push('🟩'); // 4종 완료
+                if (requiredTasks > 0 && uniqueTypes.size >= requiredTasks) {
+                    weekGrass.push('🟩'); // 해당일 과제 전부 완료
                 } else if (uniqueTypes.size > 0) {
                     weekGrass.push('🟨'); // 일부 제출
                 } else if (isFuture || isToday) {

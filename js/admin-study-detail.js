@@ -4,6 +4,18 @@
 let studentData = null;      // { user, app, records, authRecords }
 let allTaskRows = [];         // 과제 테이블용 가공 데이터
 let filteredTaskRows = [];    // 필터링된 과제 데이터
+let scheduleLookup = {};      // 스케줄 룩업: { 'standard': { '1_sunday': 3, ... }, 'fast': { ... } }
+const DAY_INDEX_TO_ENG = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
+
+// 스케줄 기반 일별 과제 수 반환
+function getTaskCountForDay(programType, week, dayIndex) {
+    const prog = programType.toLowerCase();
+    const dayEng = DAY_INDEX_TO_ENG[dayIndex];
+    if (!dayEng) return 0;
+    const lookup = scheduleLookup[prog];
+    if (!lookup) return 0;
+    return lookup[`${week}_${dayEng}`] || 0;
+}
 
 // ===== 초기화 =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -75,6 +87,16 @@ async function loadStudentDetail() {
             'order': 'created_at.desc'
         });
         studentData.authRecords = authRecords || [];
+
+        // 5. 스케줄 데이터 로드
+        const scheduleData = await supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' });
+        scheduleLookup = {};
+        (scheduleData || []).forEach(s => {
+            const prog = (s.program || '').toLowerCase();
+            if (!scheduleLookup[prog]) scheduleLookup[prog] = {};
+            const taskCount = [s.section1, s.section2, s.section3, s.section4].filter(v => v && v.trim() !== '').length;
+            scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
+        });
 
         // 렌더링
         loading.style.display = 'none';
@@ -187,35 +209,49 @@ function renderSummaryCards() {
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
 
-    // ── 마감 과제 수 계산 (기본: 어제까지 + 선제 완료일 포함) ──
-    const tasksPerDay = 4;
+    // ── 마감 과제 수 계산 (스케줄 기반 일별 과제 수 동적 적용) ──
+    const programType = getProgram(app); // 'Fast' or 'Standard'
     const daysPerWeek = 6; // 일~금
     const elapsedWeeks = Math.min(currentWeek, totalWeeks);
     const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
+
+    // 어제까지 마감된 과제 수 (일별 과제 수를 스케줄에서 참조)
+    let baseDeadlinedTasks = 0;
+    // 지난 주차 전체
+    for (let w = 1; w < elapsedWeeks; w++) {
+        for (let d = 0; d < 6; d++) { // 일~금
+            baseDeadlinedTasks += getTaskCountForDay(programType, w, d);
+        }
+    }
+    // 이번 주 어제까지 (오늘 제외)
     const daysDeadlinedThisWeek = currentWeek <= totalWeeks
         ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
         : 0;
-    const clampedDaysThisWeek = Math.min(daysDeadlinedThisWeek, daysPerWeek);
-    const baseDeadlinedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
+    for (let d = 0; d < Math.min(daysDeadlinedThisWeek, daysPerWeek); d++) {
+        baseDeadlinedTasks += getTaskCountForDay(programType, elapsedWeeks, d);
+    }
 
-    // 선제 완료: 오늘/미래 날짜 중 4종 과제를 모두 완료한 날 수 추가
-    let earlyCompletedDays = 0;
+    // 선제 완료: 오늘/미래 날짜 중 해당일 과제를 모두 완료한 날의 과제 수 추가
+    let earlyCompletedTasks = 0;
     const todayStr = toDateStr(today);
     const scheduleEnd = getScheduleEnd(app);
     const scanEnd = scheduleEnd || new Date(start.getTime() + totalWeeks * 7 * 86400000);
     for (let scanDate = new Date(today); scanDate <= scanEnd; scanDate.setDate(scanDate.getDate() + 1)) {
         if (scanDate < start) continue;
         const scanDay = scanDate.getDay();
-        if (scanDay === 6) continue; // 토요일 제외
+        if (scanDay === 6) continue;
         const scanStr = toDateStr(scanDate);
-        if (scanStr < todayStr) continue; // 이미 마감 카운트에 포함된 날 스킵
+        if (scanStr < todayStr) continue;
+        const diffFromStart = Math.floor((scanDate - start) / 86400000);
+        const scanWeek = Math.floor(diffFromStart / 7) + 1;
+        const requiredTasks = getTaskCountForDay(programType, scanWeek, scanDay);
+        if (requiredTasks <= 0) continue;
         const dayRecs = records.filter(r => toDateStr(new Date(r.completed_at)) === scanStr);
         const uniqueTypes = new Set(dayRecs.map(r => r.task_type));
-        if (uniqueTypes.size >= 4) earlyCompletedDays++;
+        if (uniqueTypes.size >= requiredTasks) earlyCompletedTasks += requiredTasks;
     }
 
-    const completedDays = baseDeadlinedDays + earlyCompletedDays;
-    const totalDeadlinedTasks = completedDays * tasksPerDay;
+    const totalDeadlinedTasks = baseDeadlinedTasks + earlyCompletedTasks;
 
     // ── 인증률 ──
     const totalAuthRate = authRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
@@ -340,6 +376,8 @@ function renderGrassGrid() {
     dayLabels.forEach(d => { html += `<div class="grass-day-label">${d}</div>`; });
     html += `</div>`;
 
+    const programType = getProgram(app); // 'Fast' or 'Standard'
+
     for (let w = 1; w <= totalWeeks; w++) {
         const weekStart = new Date(start);
         weekStart.setDate(weekStart.getDate() + (w - 1) * 7);
@@ -356,6 +394,9 @@ function renderGrassGrid() {
             const isToday = dateStr === toDateStr(today);
             const isFuture = cellDate > today;
 
+            // 해당 날짜의 스케줄 과제 수
+            const requiredTasks = getTaskCountForDay(programType, w, cellDate.getDay());
+
             // 해당 날짜의 과제 수 (미래/오늘 포함하여 항상 확인)
             const dayRecords = records.filter(r => {
                 return toDateStr(new Date(r.completed_at)) === dateStr;
@@ -363,10 +404,10 @@ function renderGrassGrid() {
             const uniqueTypes = new Set(dayRecords.map(r => r.task_type));
             const count = uniqueTypes.size;
 
-            if (count >= 4) {
-                html += `<div class="grass-cell grass-done" data-tooltip="${dateStr} (${dayName}) ${count}종 완료">✅</div>`;
+            if (requiredTasks > 0 && count >= requiredTasks) {
+                html += `<div class="grass-cell grass-done" data-tooltip="${dateStr} (${dayName}) ${count}/${requiredTasks}종 완료">✅</div>`;
             } else if (count > 0) {
-                html += `<div class="grass-cell grass-partial" data-tooltip="${dateStr} (${dayName}) ${count}/4종 제출${isToday ? ' (진행중)' : ''}">${count}</div>`;
+                html += `<div class="grass-cell grass-partial" data-tooltip="${dateStr} (${dayName}) ${count}/${requiredTasks}종 제출${isToday ? ' (진행중)' : ''}">${count}</div>`;
             } else if (isFuture || isToday) {
                 html += `<div class="grass-cell grass-pending" data-tooltip="${dateStr} (${dayName}) ${isToday ? '진행 중' : '미도래'}">⬜</div>`;
             } else {
@@ -650,28 +691,54 @@ function generateWeeklyCheckData() {
     const weekRecordIds = new Set(weekRecords.map(r => r.id));
     const weekAuth = authRecords.filter(r => weekRecordIds.has(r.study_record_id));
 
+    const programType = getProgram(app);
+
     // 일별 통계
     const dailyStats = [];
+    let weekTasksDue = 0; // 마감된 과제 수 합계
     for (let d = 0; d < 6; d++) {
         const cellDate = new Date(weekStart);
         cellDate.setDate(cellDate.getDate() + d);
         const dateStr = toDateStr(cellDate);
         const dayName = DAY_NAMES[cellDate.getDay()];
+        const requiredTasks = getTaskCountForDay(programType, weekVal, cellDate.getDay());
 
         if (cellDate > today) {
-            dailyStats.push({ dateStr, dayName, status: '미도래', count: 0 });
+            // 미래이지만 선제 완료 확인
+            const dayRecs = weekRecords.filter(r => toDateStr(new Date(r.completed_at)) === dateStr);
+            const types = new Set(dayRecs.map(r => r.task_type));
+            if (requiredTasks > 0 && types.size >= requiredTasks) {
+                dailyStats.push({ dateStr, dayName, status: `✅ 완료 (${types.size}/${requiredTasks})`, count: types.size, required: requiredTasks });
+                weekTasksDue += requiredTasks;
+            } else if (types.size > 0) {
+                dailyStats.push({ dateStr, dayName, status: `🟨 ${types.size}/${requiredTasks} (진행중)`, count: types.size, required: requiredTasks });
+            } else {
+                dailyStats.push({ dateStr, dayName, status: '미도래', count: 0, required: requiredTasks });
+            }
             continue;
         }
 
         const dayRecs = weekRecords.filter(r => toDateStr(new Date(r.completed_at)) === dateStr);
         const types = new Set(dayRecs.map(r => r.task_type));
-        const status = types.size >= 4 ? '✅ 완료' : types.size > 0 ? `🟨 ${types.size}/4` : '❌ 미제출';
-        dailyStats.push({ dateStr, dayName, status, count: types.size });
+        const isToday = dateStr === toDateStr(today);
+        let status;
+        if (requiredTasks > 0 && types.size >= requiredTasks) {
+            status = `✅ 완료 (${types.size}/${requiredTasks})`;
+            weekTasksDue += requiredTasks;
+        } else if (types.size > 0) {
+            status = `🟨 ${types.size}/${requiredTasks}${isToday ? ' (진행중)' : ''}`;
+            if (!isToday) weekTasksDue += requiredTasks; // 과거 미완료일은 마감에 포함
+        } else if (isToday) {
+            status = '진행 중';
+        } else {
+            status = '❌ 미제출';
+            weekTasksDue += requiredTasks; // 과거 미제출도 마감에 포함
+        }
+        dailyStats.push({ dateStr, dayName, status, count: types.size, required: requiredTasks });
     }
 
     // 주차 인증률 합계
     const weekAuthTotal = weekAuth.reduce((s, r) => s + (r.auth_rate || 0), 0);
-    const weekTasksDue = dailyStats.filter(d => d.status !== '미도래').length * 4;
     const weekAuthRate = weekTasksDue > 0 ? Math.round(weekAuthTotal / weekTasksDue) : 0;
 
     // 오답노트 & 메모 작성 수
