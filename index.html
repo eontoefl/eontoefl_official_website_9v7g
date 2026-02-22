@@ -439,58 +439,6 @@
         <i class="fas fa-comment"></i>
     </a>
 
-    <!-- 공지 팝업 모달 -->
-    <div id="noticeModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:99999; display:flex; align-items:center; justify-content:center;">
-        <div style="background:white; border-radius:16px; max-width:480px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden; animation:noticeSlideIn 0.3s ease;">
-            <!-- 헤더 -->
-            <div style="background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%); padding:20px 24px; display:flex; align-items:center; gap:10px;">
-                <span style="font-size:24px;">📢</span>
-                <span style="color:white; font-size:18px; font-weight:700;">안내(필독)</span>
-            </div>
-            <!-- 본문 -->
-            <div style="padding:28px 24px; font-size:15px; line-height:1.8; color:#334155;">
-                <p style="margin-bottom:16px;">
-                    어제 밤새 테스트를 돌리는 중인데, 현재 <strong style="color:#ef4444;">데이터베이스 공격으로 추정되는 트래픽/시도</strong>가 있어 일부 환경에서 <strong>오류(저장/제출/로딩)</strong>나 <strong>화면 깨짐</strong>이 발생할 수 있습니다.
-                </p>
-                <p style="margin-bottom:0; padding:16px; background:#f0fdf4; border-left:4px solid #22c55e; border-radius:0 8px 8px 0; font-size:14px; color:#166534; line-height:1.7;">
-                    불편이 크시거나 오류가 반복되면 <strong>바로 연락 주세요.</strong><br>
-                    해당 분들께는 더 단순한 버전<strong>(문제풀이 사이트 + 해설 사이트)</strong>으로 전환해서 진행하실 수 있게 도와드릴게요!<br><br>
-                    전환해도 진행은 깔끔하고 불편하지 않게 구성되어 있으니 걱정 마시고 연락 주세요!! 😊
-                </p>
-            </div>
-            <!-- 하단 버튼 -->
-            <div style="padding:0 24px 24px; display:flex; gap:10px;">
-                <button onclick="closeNotice(true)" style="flex:1; padding:12px; border:1px solid #e2e8f0; border-radius:8px; background:white; color:#64748b; font-size:13px; cursor:pointer;">오늘 하루 안 보기</button>
-                <button onclick="closeNotice(false)" style="flex:1; padding:12px; border:none; border-radius:8px; background:linear-gradient(135deg,#9480c5 0%,#7a62b0 100%); color:white; font-size:14px; font-weight:600; cursor:pointer;">확인</button>
-            </div>
-        </div>
-    </div>
-    <style>
-        @keyframes noticeSlideIn {
-            from { opacity:0; transform:translateY(-20px); }
-            to { opacity:1; transform:translateY(0); }
-        }
-    </style>
-    <script>
-    (function(){
-        var KEY = 'notice_hide_until';
-        var hideUntil = localStorage.getItem(KEY);
-        if (hideUntil && new Date().getTime() < Number(hideUntil)) {
-            document.getElementById('noticeModal').style.display = 'none';
-            return;
-        }
-        document.getElementById('noticeModal').style.display = 'flex';
-    })();
-    function closeNotice(hideToday) {
-        if (hideToday) {
-            var tomorrow = new Date();
-            tomorrow.setHours(24,0,0,0);
-            localStorage.setItem('notice_hide_until', tomorrow.getTime());
-        }
-        document.getElementById('noticeModal').style.display = 'none';
-    }
-    </script>
-
     <script src="js/supabase-config.js"></script>
 <script src="js/common.js"></script>
 <script src="js/main.js"></script>
