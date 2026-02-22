@@ -110,6 +110,8 @@ async function loadStudyData() {
             // 인증률 계산
             const totalAuthRate = myAuthRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
             const avgAuthRate = totalDeadlinedTasks > 0 ? Math.round(totalAuthRate / totalDeadlinedTasks) : 0;
+            const submittedTasksCount = myRecords.length;
+            const authDisplay = totalDeadlinedTasks > 0 ? `${avgAuthRate}%` : (submittedTasksCount > 0 ? '진행 중' : '-');
 
             // 이번 주 / 저번 주 인증률 (추세 계산용)
             const thisWeekStart = new Date(startDate);
@@ -158,25 +160,26 @@ async function loadStudyData() {
             for (let d = 0; d < 6; d++) {
                 const checkDate = new Date(thisWeekStart);
                 checkDate.setDate(checkDate.getDate() + d);
-                
-                if (checkDate > today) {
-                    weekGrass.push('⬜'); // 아직 안 된 날
-                    continue;
-                }
-
                 const dateStr = checkDate.toISOString().split('T')[0];
+                const todayStr = today.toISOString().split('T')[0];
+                const isToday = dateStr === todayStr;
+                const isFuture = checkDate > today;
+
+                // 해당 날짜 제출 기록 확인 (미래/오늘 포함)
                 const dayRecords = myRecords.filter(r => {
                     const rDate = new Date(r.completed_at).toISOString().split('T')[0];
                     return rDate === dateStr;
                 });
-
                 const uniqueTypes = new Set(dayRecords.map(r => r.task_type));
-                if (uniqueTypes.size >= 4) weekGrass.push('🟩');
-                else if (uniqueTypes.size > 0) weekGrass.push('🟨');
-                else {
-                    // 오늘이면 진행 중, 과거면 미제출
-                    const isToday = checkDate.toISOString().split('T')[0] === today.toISOString().split('T')[0];
-                    weekGrass.push(isToday ? '⬜' : '🟥');
+
+                if (uniqueTypes.size >= 4) {
+                    weekGrass.push('🟩'); // 4종 완료
+                } else if (uniqueTypes.size > 0) {
+                    weekGrass.push('🟨'); // 일부 제출
+                } else if (isFuture || isToday) {
+                    weekGrass.push('⬜'); // 미도래 또는 오늘 (제출 없음)
+                } else {
+                    weekGrass.push('🟥'); // 과거 미제출
                 }
             }
 
@@ -219,6 +222,7 @@ async function loadStudyData() {
                 currentWeek: Math.min(currentWeek, totalWeeks),
                 totalWeeks,
                 avgAuthRate,
+                authDisplay,
                 trend,
                 trendColor,
                 grade,
@@ -226,6 +230,7 @@ async function loadStudyData() {
                 weekGrass,
                 submitRate,
                 submitDisplay,
+                totalDeadlinedTasks,
                 lastActivity,
                 daysSinceActivity,
                 consecutiveMissing,
@@ -317,17 +322,18 @@ function renderTable() {
     emptyState.style.display = 'none';
 
     tbody.innerHTML = filteredStudentData.map(s => {
-        // 행 스타일
+        // 행 스타일 (마감 과제가 있는 학생만 경고 표시)
         let rowStyle = '';
-        if (s.avgAuthRate < 50) rowStyle += 'background: #fef2f2;';
-        if (s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
+        if (s.totalDeadlinedTasks > 0 && s.avgAuthRate < 50) rowStyle += 'background: #fef2f2;';
+        if (s.totalDeadlinedTasks > 0 && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
 
-        // 이름 경고
-        const nameWarning = s.daysSinceActivity >= 3 ? ' ⚠️' : '';
+        // 이름 경고 (마감 과제가 있는 학생만)
+        const nameWarning = (s.totalDeadlinedTasks > 0 && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
 
         // 인증률 색상
         let authColor = '#22c55e';
-        if (s.avgAuthRate < 60) authColor = '#ef4444';
+        if (s.totalDeadlinedTasks === 0) authColor = '#64748b';
+        else if (s.avgAuthRate < 60) authColor = '#ef4444';
         else if (s.avgAuthRate < 75) authColor = '#f59e0b';
         else if (s.avgAuthRate < 90) authColor = '#3b82f6';
 
@@ -354,7 +360,7 @@ function renderTable() {
                 </td>
                 <td>${s.currentWeek}/${s.totalWeeks}주</td>
                 <td>
-                    <span style="color:${authColor}; font-weight:700;">${s.avgAuthRate}%</span>
+                    <span style="color:${authColor}; font-weight:700;">${s.authDisplay}</span>
                 </td>
                 <td>
                     <span style="color:${s.trendColor}; font-size:18px; font-weight:700;">${s.trend}</span>
