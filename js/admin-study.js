@@ -93,18 +93,39 @@ async function loadStudyData() {
             const programType = (app.assigned_program || app.preferred_program || '').includes('Fast') ? 'Fast' : 'Standard';
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
-            // 마감된 과제 수 계산 (하루 4개 과제, 주 6일, 오늘 제외 어제까지만 마감)
+            // 마감된 과제 수 계산 (하루 4개 과제, 주 6일)
+            // 기본: 어제까지 마감 + 선제 완료(4종 다 제출한 날은 마감 전이라도 포함)
             const tasksPerDay = 4;
             const daysPerWeek = 6;
             const elapsedWeeks = Math.min(currentWeek, totalWeeks);
-            // 이번 주 경과 일수 (일요일 시작 기준, 주 6일: 일~금)
             const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-            // 오늘은 아직 진행중이므로 어제까지만 카운트
+            // 어제까지 마감된 일수
             const daysDeadlinedThisWeek = currentWeek <= totalWeeks
                 ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
                 : 0;
             const clampedDaysThisWeek = Math.min(daysDeadlinedThisWeek, daysPerWeek);
-            const completedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
+            const baseDeadlinedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
+
+            // 선제 완료: 오늘/미래 날짜 중 4종 과제를 모두 완료한 날 수 추가
+            let earlyCompletedDays = 0;
+            const todayStr = today.toISOString().split('T')[0];
+            const endDate = app.schedule_end ? new Date(app.schedule_end) : null;
+            if (endDate) endDate.setHours(0, 0, 0, 0);
+            const scanEnd = endDate || new Date(startDate.getTime() + totalWeeks * 7 * 86400000);
+            for (let scanDate = new Date(today); scanDate <= scanEnd; scanDate.setDate(scanDate.getDate() + 1)) {
+                if (scanDate < startDate) continue;
+                const scanDay = scanDate.getDay();
+                if (scanDay === 6) continue; // 토요일 제외
+                const scanStr = scanDate.toISOString().split('T')[0];
+                // 이미 마감 카운트에 포함된 날은 스킵
+                if (scanStr < todayStr) continue;
+                // 해당 날짜에 4종 이상 제출했는지 확인
+                const dayRecs = myRecords.filter(r => new Date(r.completed_at).toISOString().split('T')[0] === scanStr);
+                const uniqueTypes = new Set(dayRecs.map(r => r.task_type));
+                if (uniqueTypes.size >= 4) earlyCompletedDays++;
+            }
+
+            const completedDays = baseDeadlinedDays + earlyCompletedDays;
             const totalDeadlinedTasks = completedDays * tasksPerDay;
 
             // 인증률 계산

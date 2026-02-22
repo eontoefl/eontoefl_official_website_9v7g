@@ -187,18 +187,34 @@ function renderSummaryCards() {
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
 
-    // ── 마감 과제 수 계산 (오늘 제외, 어제까지만 마감) ──
+    // ── 마감 과제 수 계산 (기본: 어제까지 + 선제 완료일 포함) ──
     const tasksPerDay = 4;
     const daysPerWeek = 6; // 일~금
     const elapsedWeeks = Math.min(currentWeek, totalWeeks);
     const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-    // 일요일 시작: 일=0일 마감(오늘), 월=1일 마감(어제 일만), ..., 토=5일 마감(일~목)
-    // 오늘은 아직 진행중이므로 어제까지만 카운트
     const daysDeadlinedThisWeek = currentWeek <= totalWeeks
-        ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)  // 토=6일 전부 마감, 일=0, 월=1, ..., 금=5
+        ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
         : 0;
     const clampedDaysThisWeek = Math.min(daysDeadlinedThisWeek, daysPerWeek);
-    const completedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
+    const baseDeadlinedDays = (Math.max(0, elapsedWeeks - 1) * daysPerWeek) + clampedDaysThisWeek;
+
+    // 선제 완료: 오늘/미래 날짜 중 4종 과제를 모두 완료한 날 수 추가
+    let earlyCompletedDays = 0;
+    const todayStr = toDateStr(today);
+    const scheduleEnd = getScheduleEnd(app);
+    const scanEnd = scheduleEnd || new Date(start.getTime() + totalWeeks * 7 * 86400000);
+    for (let scanDate = new Date(today); scanDate <= scanEnd; scanDate.setDate(scanDate.getDate() + 1)) {
+        if (scanDate < start) continue;
+        const scanDay = scanDate.getDay();
+        if (scanDay === 6) continue; // 토요일 제외
+        const scanStr = toDateStr(scanDate);
+        if (scanStr < todayStr) continue; // 이미 마감 카운트에 포함된 날 스킵
+        const dayRecs = records.filter(r => toDateStr(new Date(r.completed_at)) === scanStr);
+        const uniqueTypes = new Set(dayRecs.map(r => r.task_type));
+        if (uniqueTypes.size >= 4) earlyCompletedDays++;
+    }
+
+    const completedDays = baseDeadlinedDays + earlyCompletedDays;
     const totalDeadlinedTasks = completedDays * tasksPerDay;
 
     // ── 인증률 ──
@@ -337,15 +353,10 @@ function renderGrassGrid() {
             cellDate.setDate(cellDate.getDate() + d);
             const dateStr = toDateStr(cellDate);
             const dayName = DAY_NAMES[cellDate.getDay()];
-            const isToday = toDateStr(cellDate) === toDateStr(today);
+            const isToday = dateStr === toDateStr(today);
+            const isFuture = cellDate > today;
 
-            if (cellDate > today) {
-                // 미도래
-                html += `<div class="grass-cell grass-pending" data-tooltip="${dateStr} (${dayName}) 미도래">⬜</div>`;
-                continue;
-            }
-
-            // 해당 날짜의 과제 수
+            // 해당 날짜의 과제 수 (미래/오늘 포함하여 항상 확인)
             const dayRecords = records.filter(r => {
                 return toDateStr(new Date(r.completed_at)) === dateStr;
             });
@@ -356,9 +367,8 @@ function renderGrassGrid() {
                 html += `<div class="grass-cell grass-done" data-tooltip="${dateStr} (${dayName}) ${count}종 완료">✅</div>`;
             } else if (count > 0) {
                 html += `<div class="grass-cell grass-partial" data-tooltip="${dateStr} (${dayName}) ${count}/4종 제출${isToday ? ' (진행중)' : ''}">${count}</div>`;
-            } else if (isToday) {
-                // 오늘은 아직 진행 중
-                html += `<div class="grass-cell grass-pending" data-tooltip="${dateStr} (${dayName}) 진행 중">⬜</div>`;
+            } else if (isFuture || isToday) {
+                html += `<div class="grass-cell grass-pending" data-tooltip="${dateStr} (${dayName}) ${isToday ? '진행 중' : '미도래'}">⬜</div>`;
             } else {
                 html += `<div class="grass-cell grass-missed" data-tooltip="${dateStr} (${dayName}) 미제출">❌</div>`;
             }
