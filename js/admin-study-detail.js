@@ -385,6 +385,13 @@ function buildTaskRows() {
         const attemptStr = r.attempt > 1 ? ` (${r.attempt}차)` : '';
         const taskName = `${typeLabel}${moduleStr}${attemptStr}`;
 
+        // 노트 텍스트: error_note_text 또는 memo_text (입문서 등)
+        const hasErrorNote = !!(r.error_note_text && r.error_note_text.trim());
+        const hasMemo = !!(r.memo_text && r.memo_text.trim());
+        const noteContent = hasErrorNote ? r.error_note_text : (hasMemo ? r.memo_text : '');
+        const noteWc = noteContent ? (r.error_note_word_count || noteContent.length) : 0;
+        const noteType = hasErrorNote ? 'error_note' : (hasMemo ? 'memo' : null);
+
         return {
             dateStr,
             dayName,
@@ -395,9 +402,10 @@ function buildTaskRows() {
             total: r.total || 0,
             authRate: auth ? (auth.auth_rate || 0) : '-',
             submittedTime: formatKSTTime(r.completed_at),
-            hasNote: !!(r.error_note_text && r.error_note_text.trim()),
-            noteText: r.error_note_text || '',
-            noteWordCount: r.error_note_word_count || 0,
+            hasNote: !!noteContent,
+            noteText: noteContent,
+            noteWordCount: noteWc,
+            noteType,
             isFraud,
             rawDate: new Date(r.completed_at),
             recordId: r.id
@@ -540,8 +548,11 @@ function renderNotes() {
 
     notesList.innerHTML = notes.map((n, idx) => {
         const tags = [];
+        // 노트 타입 태그
+        if (n.noteType === 'memo') tags.push('<span class="tag" style="background:#dbeafe; color:#2563eb;">📝 메모</span>');
+        else tags.push('<span class="tag" style="background:#fef3c7; color:#d97706;">📋 오답노트</span>');
         if (n.isFraud) tags.push('<span class="tag tag-fraud">⚠️ Fraud</span>');
-        if (n.noteWordCount < 20) tags.push('<span class="tag tag-short">짧은 노트</span>');
+        if (n.noteType === 'error_note' && n.noteWordCount < 20) tags.push('<span class="tag tag-short">짧은 노트</span>');
 
         const preview = n.noteText.length > 200 ? n.noteText.substring(0, 200) + '...' : n.noteText;
         const needsToggle = n.noteText.length > 200;
@@ -643,8 +654,10 @@ function generateWeeklyCheckData() {
     const weekTasksDue = dailyStats.filter(d => d.status !== '미도래').length * 4;
     const weekAuthRate = weekTasksDue > 0 ? Math.round(weekAuthTotal / weekTasksDue) : 0;
 
-    // 오답노트 작성 수
-    const weekNotes = weekRecords.filter(r => r.error_note_text && r.error_note_text.trim()).length;
+    // 오답노트 & 메모 작성 수
+    const weekErrorNotes = weekRecords.filter(r => r.error_note_text && r.error_note_text.trim());
+    const weekMemos = weekRecords.filter(r => r.memo_text && r.memo_text.trim());
+    const weekTotalNotes = weekErrorNotes.length + weekMemos.length;
 
     // fraud 수
     const weekFraud = weekAuth.filter(r => r.fraud_flag || r.no_selection_flag || r.no_text_flag || (r.focus_lost_count > 3)).length;
@@ -658,12 +671,36 @@ function generateWeeklyCheckData() {
     text += `── 일별 현황 ──\n`;
     dailyStats.forEach(d => {
         text += `  ${d.dayName} (${d.dateStr}): ${d.status}\n`;
+
+        // 해당 날짜의 과제 상세
+        const dayRecs = weekRecords.filter(r => toDateStr(new Date(r.completed_at)) === d.dateStr);
+        dayRecs.forEach(r => {
+            const typeLabel = getTaskTypeLabel(r.task_type);
+            const moduleStr = r.module_number ? ` M${r.module_number}` : '';
+            const scoreStr = r.total > 0 ? `${r.score}/${r.total}` : `${r.score}`;
+            text += `    └ ${typeLabel}${moduleStr}: ${scoreStr}\n`;
+
+            // 오답노트
+            if (r.error_note_text && r.error_note_text.trim()) {
+                const preview = r.error_note_text.trim().length > 100 
+                    ? r.error_note_text.trim().substring(0, 100) + '...' 
+                    : r.error_note_text.trim();
+                text += `      📝 오답노트: ${preview}\n`;
+            }
+            // 메모 (입문서 등)
+            if (r.memo_text && r.memo_text.trim()) {
+                const preview = r.memo_text.trim().length > 100 
+                    ? r.memo_text.trim().substring(0, 100) + '...' 
+                    : r.memo_text.trim();
+                text += `      📝 메모: ${preview}\n`;
+            }
+        });
     });
     text += `\n`;
     text += `── 주간 요약 ──\n`;
     text += `  제출 과제: ${weekRecords.length}건\n`;
     text += `  인증률 합계: ${weekAuthTotal} / 마감 ${weekTasksDue}건 → ${weekAuthRate}%\n`;
-    text += `  오답노트: ${weekNotes}건 작성\n`;
+    text += `  오답노트: ${weekErrorNotes.length}건 / 메모: ${weekMemos.length}건 (합계 ${weekTotalNotes}건)\n`;
     if (weekFraud > 0) {
         text += `  ⚠️ Fraud 감지: ${weekFraud}건\n`;
     }
