@@ -257,8 +257,8 @@ function renderSummaryCards() {
     const totalAuthRate = authRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
     const avgAuthRate = totalDeadlinedTasks > 0 ? Math.round(totalAuthRate / totalDeadlinedTasks) : 0;
 
-    // ── 시작일 경과 판단 (다음날부터 등급/환급 산정) ──
-    const isBeforeGrading = !start || toDateStr(today) <= toDateStr(start);
+    // ── 등급/환급 산정 여부 (마감 과제가 있으면 산정) ──
+    const isBeforeGrading = totalDeadlinedTasks <= 0;
 
     // ── 등급 ──
     let grade = '-', gradeColor = '#94a3b8';
@@ -323,7 +323,7 @@ function renderSummaryCards() {
             </div>
             <div class="stat-value" style="color:${gradeColor};">${isBeforeGrading ? '산정 전' : grade}</div>
             <div class="stat-label">현재 등급</div>
-            <div class="stat-sub">${isBeforeGrading ? '시작일 다음날부터 산정' : 'A≥90 B≥75 C≥60 D&lt;60'}</div>
+            <div class="stat-sub">${isBeforeGrading ? '과제 완료 시 산정' : 'A≥90 B≥75 C≥60 D&lt;60'}</div>
         </div>
 
         <!-- 환급 예상 -->
@@ -333,7 +333,7 @@ function renderSummaryCards() {
             </div>
             <div class="stat-value">${isBeforeGrading ? '산정 전' : (expectedRefund > 0 ? expectedRefund.toLocaleString() : '0')}</div>
             <div class="stat-label">환급 예상 (원)</div>
-            <div class="stat-sub">${isBeforeGrading ? '시작일 다음날부터 산정' : '보증금 ' + deposit.toLocaleString() + '원 × ' + Math.round((refundRates[grade] || 0) * 100) + '%'}</div>
+            <div class="stat-sub">${isBeforeGrading ? '과제 완료 시 산정' : '보증금 ' + deposit.toLocaleString() + '원 × ' + Math.round((refundRates[grade] || 0) * 100) + '%'}</div>
         </div>
 
         <!-- 잔여일 -->

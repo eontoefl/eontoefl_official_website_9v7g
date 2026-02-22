@@ -194,8 +194,8 @@ async function loadStudyData() {
             if (thisWeekAvg > lastWeekAvg + 5) { trend = '↑'; trendColor = '#22c55e'; }
             else if (thisWeekAvg < lastWeekAvg - 5) { trend = '↓'; trendColor = '#ef4444'; }
 
-            // 시작일 경과 판단 (다음날부터 등급 산정)
-            const isBeforeGrading = today.toISOString().split('T')[0] <= startDate.toISOString().split('T')[0];
+            // 등급/환급 산정 여부 (마감 과제가 있으면 산정)
+            const isBeforeGrading = totalDeadlinedTasks <= 0;
 
             // 등급
             let grade = '-';
