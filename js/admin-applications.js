@@ -955,7 +955,7 @@ async function submitTrackingBulk() {
 
     for (const item of toUpdate) {
         try {
-            await supabaseAPI.update('applications', item.appId, {
+            await supabaseAPI.patch('applications', item.appId, {
                 shipping_tracking_number: item.tracking,
                 shipping_courier: 'CJ대한통운',
                 shipping_completed: true,
