@@ -120,6 +120,10 @@
                 <button class="admin-btn admin-btn-primary" onclick="downloadExcel()">
                     <i class="fas fa-download"></i> 엑셀 다운로드
                 </button>
+
+                <button class="admin-btn admin-btn-primary" onclick="openTrackingUploadModal()" style="background: #0ea5e9;">
+                    <i class="fas fa-truck"></i> 📦 운송장 일괄등록
+                </button>
             </div>
         </div>
 
@@ -143,7 +147,7 @@
                             <th>이메일</th>
                             <th>전화번호</th>
                             <th>프로그램</th>
-                            <th>신청일</th>
+                            <th>챌린지 시작일</th>
                             <th>상태</th>
                             <th>액션</th>
                         </tr>
@@ -231,6 +235,63 @@
                     <i class="fas fa-external-link-alt"></i> 학생 화면 보기
                 </button>
                 <button class="btn-secondary" onclick="closeManageModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 운송장 일괄등록 모달 -->
+    <div id="trackingUploadModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:none; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <!-- 모달 헤더 -->
+            <div style="padding:24px 28px 16px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; font-size:20px; color:#1e293b;">📦 운송장 일괄등록</h2>
+                <button onclick="closeTrackingUploadModal()" style="background:none; border:none; cursor:pointer; font-size:20px; color:#94a3b8; padding:4px;">&times;</button>
+            </div>
+
+            <!-- 업로드 영역 -->
+            <div id="trackingUploadArea" style="padding:28px;">
+                <div id="trackingDropZone" style="border:2px dashed #cbd5e1; border-radius:12px; padding:48px 24px; text-align:center; cursor:pointer; transition:all 0.2s;"
+                     onclick="document.getElementById('trackingFileInput').click()">
+                    <i class="fas fa-cloud-upload-alt" style="font-size:48px; color:#94a3b8; margin-bottom:16px; display:block;"></i>
+                    <p style="font-size:16px; color:#475569; margin:0 0 8px; font-weight:600;">택배 예약현황 엑셀 파일을 드래그하거나 클릭하세요</p>
+                    <p style="font-size:13px; color:#94a3b8; margin:0;">.xlsx 파일 지원</p>
+                </div>
+                <input type="file" id="trackingFileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleTrackingFile(this.files[0])">
+            </div>
+
+            <!-- 매칭 결과 미리보기 (파싱 후 표시) -->
+            <div id="trackingPreview" style="display:none; padding:0 28px 28px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 style="margin:0; font-size:16px; color:#1e293b;">매칭 결과 미리보기</h3>
+                    <div>
+                        <span id="trackingMatchCount" style="font-size:13px; color:#059669; font-weight:600;"></span>
+                        <span id="trackingFailCount" style="font-size:13px; color:#ef4444; font-weight:600; margin-left:12px;"></span>
+                    </div>
+                </div>
+                <div style="max-height:300px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#f8fafc; position:sticky; top:0;">
+                                <th style="padding:10px 12px; text-align:left; color:#64748b; font-weight:600;">상태</th>
+                                <th style="padding:10px 12px; text-align:left; color:#64748b; font-weight:600;">받는분</th>
+                                <th style="padding:10px 12px; text-align:left; color:#64748b; font-weight:600;">전화번호</th>
+                                <th style="padding:10px 12px; text-align:left; color:#64748b; font-weight:600;">운송장번호</th>
+                                <th style="padding:10px 12px; text-align:left; color:#64748b; font-weight:600;">비고</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trackingPreviewBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- 버튼 -->
+                <div style="display:flex; gap:12px; margin-top:20px; justify-content:flex-end;">
+                    <button onclick="resetTrackingUpload()" style="padding:10px 20px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; font-size:14px; color:#64748b;">
+                        <i class="fas fa-redo"></i> 다시 선택
+                    </button>
+                    <button id="trackingSubmitBtn" onclick="submitTrackingBulk()" style="padding:10px 24px; border:none; background:#0ea5e9; color:white; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;">
+                        <i class="fas fa-check"></i> 일괄 등록
+                    </button>
+                </div>
             </div>
         </div>
     </div>
