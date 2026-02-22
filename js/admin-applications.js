@@ -210,9 +210,9 @@ function displayApplications() {
                     </span>
                 </td>
                 <td style="font-size: 13px; color: #64748b;">
-                    ${formatDateOnly(app.created_at)}
+                    ${app.schedule_start ? formatDateOnly(app.schedule_start) : '<span style="color:#94a3b8;">미정</span>'}
                     <div style="font-size: 11px; color: #94a3b8;">
-                        ${getRelativeTime(app.created_at)}
+                        ${app.schedule_start ? getRelativeTime(app.schedule_start) : ''}
                     </div>
                 </td>
                 <td>
@@ -702,4 +702,291 @@ function downloadExcel() {
     // 파일 다운로드
     const fileName = `이온토플_신청서_${formatDateOnly(Date.now())}.xlsx`;
     XLSX.writeFile(wb, fileName);
+}
+
+// ===== 운송장 일괄등록 =====
+let trackingMatchResults = []; // 매칭 결과 저장
+
+function openTrackingUploadModal() {
+    const modal = document.getElementById('trackingUploadModal');
+    modal.style.display = 'flex';
+    resetTrackingUpload();
+}
+
+function closeTrackingUploadModal() {
+    document.getElementById('trackingUploadModal').style.display = 'none';
+    resetTrackingUpload();
+}
+
+function resetTrackingUpload() {
+    document.getElementById('trackingUploadArea').style.display = 'block';
+    document.getElementById('trackingPreview').style.display = 'none';
+    document.getElementById('trackingFileInput').value = '';
+    trackingMatchResults = [];
+}
+
+// 드래그 앤 드롭 설정
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('trackingDropZone');
+    if (!dropZone) return;
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#0ea5e9';
+        dropZone.style.background = '#f0f9ff';
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#cbd5e1';
+        dropZone.style.background = 'transparent';
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#cbd5e1';
+        dropZone.style.background = 'transparent';
+        const file = e.dataTransfer.files[0];
+        if (file) handleTrackingFile(file);
+    });
+});
+
+// 엑셀 파일 파싱
+function handleTrackingFile(file) {
+    if (!file) return;
+    if (!file.name.match(/\.xlsx?$/i)) {
+        alert('엑셀 파일(.xlsx)만 업로드 가능합니다.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+            if (rows.length === 0) {
+                alert('엑셀 파일에 데이터가 없습니다.');
+                return;
+            }
+
+            matchTrackingData(rows);
+        } catch (err) {
+            console.error('엑셀 파싱 에러:', err);
+            alert('엑셀 파일을 읽을 수 없습니다. 파일 형식을 확인해주세요.');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// 이름 + 전화번호 중간4자리로 매칭
+function matchTrackingData(rows) {
+    trackingMatchResults = [];
+
+    // 엑셀 컬럼명 자동 감지 (받는분, 전화번호, 운송장번호)
+    // 엑셀에 "받는분" 컬럼이 2개 있을 수 있으므로 (보내는/받는) 뒤쪽 것을 사용
+    const sampleRow = rows[0];
+    const keys = Object.keys(sampleRow);
+
+    // "받는분" 키 찾기 - 뒤쪽에 있는 것
+    let recipientKey = null;
+    let recipientPhoneKey = null;
+    let trackingKey = null;
+
+    // 키 이름으로 직접 매칭
+    for (const key of keys) {
+        if (key === '운송장번호') trackingKey = key;
+    }
+
+    // "받는분" 과 그 바로 다음 "전화번호" 찾기
+    // 엑셀에서 동일한 컬럼명이 있으면 뒤의 것은 "_1" 등이 붙음
+    for (let i = keys.length - 1; i >= 0; i--) {
+        if (!recipientKey && (keys[i] === '받는분' || keys[i].match(/^받는분/))) {
+            recipientKey = keys[i];
+            // 바로 다음 키가 전화번호인지 확인
+            if (i + 1 < keys.length && keys[i + 1].match(/전화번호/)) {
+                recipientPhoneKey = keys[i + 1];
+            }
+        }
+    }
+
+    // 전화번호 키가 여러 개일 수 있음 - 뒤쪽 것 사용
+    if (!recipientPhoneKey) {
+        for (let i = keys.length - 1; i >= 0; i--) {
+            if (keys[i].match(/전화번호/)) {
+                recipientPhoneKey = keys[i];
+                break;
+            }
+        }
+    }
+
+    if (!recipientKey || !trackingKey) {
+        alert(`엑셀에서 필수 컬럼을 찾을 수 없습니다.\n필요: 받는분, 운송장번호\n발견된 컬럼: ${keys.join(', ')}`);
+        return;
+    }
+
+    // 각 행 매칭
+    rows.forEach(row => {
+        const name = String(row[recipientKey] || '').trim();
+        const phone = String(row[recipientPhoneKey] || '').trim();
+        const tracking = String(row[trackingKey] || '').trim();
+
+        if (!name || !tracking) return; // 빈 행 스킵
+
+        // 전화번호에서 중간 4자리 추출 (010-XXXX-****)
+        const phoneMid = extractPhoneMid(phone);
+
+        // DB에서 매칭 (allApplications 사용)
+        const matched = allApplications.filter(app => {
+            if (app.name !== name) return false;
+            if (phoneMid && app.phone) {
+                const appPhoneMid = extractPhoneMid(app.phone);
+                return appPhoneMid === phoneMid;
+            }
+            return true; // 전화번호 없으면 이름만으로 매칭
+        });
+
+        if (matched.length === 1) {
+            // 이미 운송장이 등록된 경우 체크
+            if (matched[0].shipping_tracking_number) {
+                trackingMatchResults.push({
+                    name, phone, tracking,
+                    status: 'skip',
+                    message: `이미 등록됨 (${matched[0].shipping_tracking_number})`,
+                    appId: null
+                });
+            } else {
+                trackingMatchResults.push({
+                    name, phone, tracking,
+                    status: 'matched',
+                    message: matched[0].email,
+                    appId: matched[0].id
+                });
+            }
+        } else if (matched.length > 1) {
+            trackingMatchResults.push({
+                name, phone, tracking,
+                status: 'fail',
+                message: `동명이인 ${matched.length}명 (전화번호로 구별 불가)`,
+                appId: null
+            });
+        } else {
+            trackingMatchResults.push({
+                name, phone, tracking,
+                status: 'fail',
+                message: '신청서를 찾을 수 없음',
+                appId: null
+            });
+        }
+    });
+
+    renderTrackingPreview();
+}
+
+// 전화번호 중간 4자리 추출
+function extractPhoneMid(phone) {
+    if (!phone) return '';
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    // 010XXXXXXXX (11자리) → 중간 4자리 = [3..7]
+    if (cleaned.length >= 7) {
+        return cleaned.substring(3, 7);
+    }
+    return '';
+}
+
+// 매칭 미리보기 렌더링
+function renderTrackingPreview() {
+    document.getElementById('trackingUploadArea').style.display = 'none';
+    document.getElementById('trackingPreview').style.display = 'block';
+
+    const matchCount = trackingMatchResults.filter(r => r.status === 'matched').length;
+    const failCount = trackingMatchResults.filter(r => r.status === 'fail').length;
+    const skipCount = trackingMatchResults.filter(r => r.status === 'skip').length;
+
+    document.getElementById('trackingMatchCount').textContent = `✅ 매칭 성공: ${matchCount}건`;
+    document.getElementById('trackingFailCount').textContent = 
+        (failCount > 0 ? `❌ 실패: ${failCount}건` : '') +
+        (skipCount > 0 ? ` ⏭️ 이미등록: ${skipCount}건` : '');
+
+    const tbody = document.getElementById('trackingPreviewBody');
+    tbody.innerHTML = trackingMatchResults.map(r => {
+        const statusIcon = r.status === 'matched' ? '✅' : r.status === 'skip' ? '⏭️' : '❌';
+        const rowColor = r.status === 'matched' ? '' : r.status === 'skip' ? 'background:#f8fafc;' : 'background:#fef2f2;';
+        return `<tr style="${rowColor}">
+            <td style="padding:8px 12px;">${statusIcon}</td>
+            <td style="padding:8px 12px;">${escapeHtml(r.name)}</td>
+            <td style="padding:8px 12px;">${escapeHtml(r.phone)}</td>
+            <td style="padding:8px 12px; font-family:monospace; font-size:12px;">${escapeHtml(r.tracking)}</td>
+            <td style="padding:8px 12px; font-size:12px; color:#64748b;">${escapeHtml(r.message)}</td>
+        </tr>`;
+    }).join('');
+
+    // 매칭 성공 건이 없으면 등록 버튼 비활성화
+    const submitBtn = document.getElementById('trackingSubmitBtn');
+    if (matchCount === 0) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+        submitBtn.style.cursor = 'not-allowed';
+    } else {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.cursor = 'pointer';
+    }
+}
+
+// 일괄 등록 실행
+async function submitTrackingBulk() {
+    const toUpdate = trackingMatchResults.filter(r => r.status === 'matched');
+    if (toUpdate.length === 0) {
+        alert('등록할 건이 없습니다.');
+        return;
+    }
+
+    if (!confirm(`매칭된 ${toUpdate.length}건의 운송장번호를 등록하고 발송완료 처리하시겠습니까?`)) {
+        return;
+    }
+
+    const submitBtn = document.getElementById('trackingSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+
+    let successCount = 0;
+    const failedItems = [];
+
+    for (const item of toUpdate) {
+        try {
+            await supabaseAPI.update('applications', item.appId, {
+                shipping_tracking_number: item.tracking,
+                shipping_courier: 'CJ대한통운',
+                shipping_completed: true,
+                shipping_completed_at: Date.now()
+            });
+            successCount++;
+        } catch (err) {
+            console.error(`운송장 등록 실패: ${item.name}`, err);
+            failedItems.push(item.name);
+        }
+    }
+
+    // 결과 알림
+    let message = `✅ ${successCount}건 운송장 등록 및 발송완료 처리되었습니다.`;
+
+    const skipped = trackingMatchResults.filter(r => r.status === 'fail');
+    const alreadyDone = trackingMatchResults.filter(r => r.status === 'skip');
+
+    if (failedItems.length > 0) {
+        message += `\n\n❌ 등록 실패 ${failedItems.length}건:\n${failedItems.join(', ')}\n(발송완료 처리도 되지 않았습니다)`;
+    }
+    if (skipped.length > 0) {
+        message += `\n\n⚠️ 매칭 실패로 스킵된 ${skipped.length}건:\n${skipped.map(s => `${s.name} - ${s.message}`).join('\n')}`;
+    }
+    if (alreadyDone.length > 0) {
+        message += `\n\n⏭️ 이미 등록된 ${alreadyDone.length}건:\n${alreadyDone.map(s => s.name).join(', ')}`;
+    }
+
+    alert(message);
+    closeTrackingUploadModal();
+
+    // 테이블 새로고침
+    await loadApplications();
 }
