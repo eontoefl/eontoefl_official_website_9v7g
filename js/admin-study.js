@@ -125,30 +125,40 @@ async function loadStudyData() {
             const totalDeadlinedTasks = stats.calc_tasks_due || 0;
             const submittedTasksCount = stats.calc_tasks_submitted || 0;
 
-            // 시작 전 여부
-            const isBeforeStart = today < startDate;
+            // ── calc_tasks_due 기준 분기 (테스트룸 개발자와 합의) ──
+            // calc_tasks_due > 0 → 시작됨
+            // calc_tasks_due = 0 → 시작 전
+            const submitRate = stats.calc_submit_rate || 0;
+            const authSum = stats.calc_auth_sum || 0;
 
-            // ── 인증률 표시 (숫자는 테스트룸 것, 텍스트만 공홈에서 조합) ──
-            let authDisplay = '-';
+            // ── 제출률 표시 ──
+            let submitDisplay;
+            if (totalDeadlinedTasks > 0) {
+                submitDisplay = `${submitRate}%`;
+            } else if (submittedTasksCount > 0) {
+                submitDisplay = `${submittedTasksCount}건 미리 완료 🎉`;
+            } else {
+                submitDisplay = '0%';
+            }
+
+            // ── 인증률 표시 ──
+            let authDisplay;
             if (totalDeadlinedTasks > 0) {
                 authDisplay = `${avgAuthRate}%`;
-            } else if (isBeforeStart && submittedTasksCount > 0) {
-                authDisplay = `${submittedTasksCount}건 선제출`;
+            } else if (submittedTasksCount > 0) {
+                authDisplay = `${avgAuthRate}%`;
+            } else {
+                authDisplay = '-';
             }
 
             // ── 등급 표시 ──
-            const isBeforeGrading = isBeforeStart || totalDeadlinedTasks <= 0;
-            const gradeColor = isBeforeGrading ? '#94a3b8' : getGradeColor(grade);
-            const displayGrade = isBeforeGrading ? '-' : grade;
-
-            // ── 제출률 표시 ──
-            const submitRate = stats.calc_submit_rate || 0;
-            let submitDisplay = '-';
+            let displayGrade = '-';
+            let gradeColor = '#94a3b8';
             if (totalDeadlinedTasks > 0) {
-                submitDisplay = `${submitRate}%`;
-            } else if (isBeforeStart && submittedTasksCount > 0) {
-                submitDisplay = `${submittedTasksCount}건 미리 완료 🎉`;
+                displayGrade = grade;
+                gradeColor = getGradeColor(grade);
             }
+            // calc_tasks_due = 0 → 무조건 "-" / 시작 후 산정
 
             // ── 추세 (이번 주 vs 저번 주 — 여전히 auth_records 기반) ──
             const thisWeekStart = new Date(startDate);
@@ -344,14 +354,14 @@ function renderTable() {
     tbody.innerHTML = filteredStudentData.map(s => {
         // 행 스타일
         let rowStyle = '';
-        if (s.totalDeadlinedTasks > 0 && s.avgAuthRate < 50) rowStyle += 'background: #fef2f2;';
-        if (s.totalDeadlinedTasks > 0 && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
+        if (s.grade !== '-' && s.avgAuthRate < 50) rowStyle += 'background: #fef2f2;';
+        if (s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
 
-        const nameWarning = (s.totalDeadlinedTasks > 0 && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
+        const nameWarning = (s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
 
         // 인증률 색상 (등급 기준 연동)
         let authColor = '#22c55e';
-        if (s.totalDeadlinedTasks === 0) authColor = '#64748b';
+        if (s.grade === '-') authColor = '#64748b';
         else if (s.avgAuthRate < 70) authColor = '#ef4444';
         else if (s.avgAuthRate < 80) authColor = '#f97316';
         else if (s.avgAuthRate < 90) authColor = '#f59e0b';
