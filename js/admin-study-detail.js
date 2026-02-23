@@ -209,20 +209,15 @@ function renderProfileHeader() {
 // ===== 요약 카드 4개 (테스트룸 마이페이지와 동일) =====
 function renderSummaryCards() {
     const { app, stats } = studentData;
-    // 챌린지 현황도 새벽 4시 기준 (테스트룸과 동일)
+    // effective_date = 새벽 4시 컷오프 반영 (00:00~03:59는 전날)
     const today = getEffectiveToday();
-    const totalWeeks = getTotalWeeks(app);
     const start = getScheduleStart(app);
-    const end = getScheduleEnd(app);
-    // 총 일수 (시작일~종료일, 토요일 제외)
-    let totalDays = 0;
-    if (start && end) {
-        const d = new Date(start);
-        while (d <= end) {
-            if (d.getDay() !== 6) totalDays++;
-            d.setDate(d.getDate() + 1);
-        }
-    }
+    const programType = getProgram(app);
+
+    // 총 기간 (토요일 포함, 주차 고정)
+    // fast = 28일(4주), standard = 56일(8주)
+    // 일요일 시작 → N주차 토요일 종료
+    const totalDays = programType === 'Fast' ? 28 : 56;
 
     // ── ★ tr_student_stats에서 읽기 (계산 없이 그대로) ──
     const authRate = stats.calc_auth_rate || 0;
@@ -233,36 +228,32 @@ function renderSummaryCards() {
     const tasksSubmitted = stats.calc_tasks_submitted || 0;
     const authSum = stats.calc_auth_sum || 0;
 
-    // ── 카드1: 챌린지 현황 (applications 기반) ──
+    // ── 카드1: 챌린지 현황 ──
+    // dplus = DATEDIFF(effective_date, schedule_start_date)
+    // dplus = CLAMP(0, total_days)
+    // remaining = total_days - dplus
     let challengeValue = '-';
     let challengeSub = '';
-    if (start && end) {
-        if (today < start) {
+    if (start) {
+        const dplusRaw = Math.round((today - start) / (1000 * 60 * 60 * 24));
+        const dplus = Math.max(0, Math.min(dplusRaw, totalDays));
+        const remaining = Math.max(0, totalDays - dplus);
+
+        if (dplusRaw < 0) {
             // 시작 전: D-N
-            const dDay = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+            const dDay = Math.abs(dplusRaw);
             const startDay = ['일','월','화','수','목','금','토'][start.getDay()];
             challengeValue = `D-${dDay}`;
             challengeSub = `${start.getMonth()+1}/${start.getDate()}(${startDay}) 시작 예정`;
-        } else if (today > end) {
+        } else if (dplus >= totalDays) {
             // 종료
+            const endDate = new Date(start);
+            endDate.setDate(endDate.getDate() + totalDays - 1);
             challengeValue = '종료';
-            challengeSub = `${end.getMonth()+1}/${end.getDate()} 종료됨`;
+            challengeSub = `${endDate.getMonth()+1}/${endDate.getDate()} 종료됨`;
         } else {
-            // 진행 중: D+N / 총일수 (잔여 N일)
-            let elapsed = 0;
-            let remaining = 0;
-            const d1 = new Date(start);
-            while (d1 <= today) {
-                if (d1.getDay() !== 6) elapsed++;
-                d1.setDate(d1.getDate() + 1);
-            }
-            const d2 = new Date(today);
-            d2.setDate(d2.getDate() + 1);
-            while (d2 <= end) {
-                if (d2.getDay() !== 6) remaining++;
-                d2.setDate(d2.getDate() + 1);
-            }
-            challengeValue = `D+${elapsed} / ${totalDays}일`;
+            // 진행 중
+            challengeValue = `D+${dplus} / ${totalDays}일`;
             challengeSub = `잔여 ${remaining}일`;
         }
     }
