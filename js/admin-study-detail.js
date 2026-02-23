@@ -90,6 +90,7 @@ async function loadStudentDetail() {
 
         // 5. 스케줄 데이터 로드
         const scheduleData = await supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' });
+        studentData.scheduleRaw = scheduleData || [];
         scheduleLookup = {};
         (scheduleData || []).forEach(s => {
             const prog = (s.program || '').toLowerCase();
@@ -98,9 +99,8 @@ async function loadStudentDetail() {
             scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
         });
 
-        // 6. ★ tr_student_stats (테스트룸이 계산한 인증률/등급/제출률/환급)
-        const statsRes = await supabaseAPI.query('tr_student_stats', { 'user_id': `eq.${userId}` });
-        studentData.stats = (statsRes && statsRes.length > 0) ? statsRes[0] : {};
+        // 6. 등급 규칙 로드
+        studentData.gradeRules = await loadGradeRules();
 
         // 렌더링
         loading.style.display = 'none';
@@ -208,30 +208,14 @@ function renderProfileHeader() {
 
 // ===== 요약 카드 4개 (테스트룸 마이페이지와 동일) =====
 function renderSummaryCards() {
-    const { app, stats } = studentData;
-    // effective_date = 새벽 4시 컷오프 반영 (00:00~03:59는 전날)
+    const { app, records, authRecords, scheduleRaw, gradeRules } = studentData;
     const today = getEffectiveToday();
     const start = getScheduleStart(app);
     const programType = getProgram(app);
-
-    // 총 기간 (토요일 포함, 주차 고정)
-    // fast = 28일(4주), standard = 56일(8주)
-    // 일요일 시작 → N주차 토요일 종료
+    const totalWeeks = getTotalWeeks(app);
     const totalDays = programType === 'Fast' ? 28 : 56;
 
-    // ── ★ tr_student_stats에서 읽기 (계산 없이 그대로) ──
-    const authRate = stats.calc_auth_rate || 0;
-    const grade = stats.calc_grade || '-';
-    const submitRate = stats.calc_submit_rate || 0;
-    const refundAmount = stats.calc_refund_amount || 0;
-    const tasksDue = stats.calc_tasks_due || 0;
-    const tasksSubmitted = stats.calc_tasks_submitted || 0;
-    const authSum = stats.calc_auth_sum || 0;
-
     // ── 카드1: 챌린지 현황 ──
-    // dplus = DATEDIFF(effective_date, schedule_start_date)
-    // dplus = CLAMP(0, total_days)
-    // remaining = total_days - dplus
     let challengeValue = '-';
     let challengeSub = '';
     if (start) {
@@ -240,72 +224,74 @@ function renderSummaryCards() {
         const remaining = Math.max(0, totalDays - dplus);
 
         if (dplusRaw < 0) {
-            // 시작 전: D-N
             const dDay = Math.abs(dplusRaw);
-            const startDay = ['일','월','화','수','목','금','토'][start.getDay()];
+            const startDay = ['일','월','화','수','목','금','토'][start.getUTCDay()];
             challengeValue = `D-${dDay}`;
-            challengeSub = `${start.getMonth()+1}/${start.getDate()}(${startDay}) 시작 예정`;
+            challengeSub = `${start.getUTCMonth()+1}/${start.getUTCDate()}(${startDay}) 시작 예정`;
         } else if (dplus >= totalDays) {
-            // 종료
             const endDate = new Date(start);
-            endDate.setDate(endDate.getDate() + totalDays - 1);
+            endDate.setUTCDate(endDate.getUTCDate() + totalDays - 1);
             challengeValue = '종료';
-            challengeSub = `${endDate.getMonth()+1}/${endDate.getDate()} 종료됨`;
+            challengeSub = `${endDate.getUTCMonth()+1}/${endDate.getUTCDate()} 종료됨`;
         } else {
-            // 진행 중
             challengeValue = `D+${dplus} / ${totalDays}일`;
             challengeSub = `잔여 ${remaining}일`;
         }
     }
 
-    // ── 카드2: 제출률 (calc_tasks_due 기준 3분기) ──
+    // ── 직접 계산: 도래 과제 목록 ──
+    const dueTasks = start ? getDueTaskList(scheduleRaw, programType, start, today, totalWeeks) : [];
+    const totalSubmitted = (records || []).length;
+
+    // ── 카드2: 제출률 (직접 계산) ──
+    const submitResult = calcSubmitRate(dueTasks, records || []);
     let submitDisplay, submitSub;
-    if (tasksDue > 0) {
-        // 시작 후: 정상 표시
-        submitDisplay = `${submitRate}%`;
-        submitSub = `${tasksSubmitted}/${tasksDue}개 완료`;
-    } else if (tasksDue === 0 && tasksSubmitted > 0) {
-        // 시작 전 + 선제출 있음
-        submitDisplay = `${tasksSubmitted}건 미리 완료 🎉`;
+    if (submitResult.tasksDue > 0) {
+        submitDisplay = `${submitResult.submitRate}%`;
+        submitSub = `${submitResult.tasksSubmitted}/${submitResult.tasksDue}개 완료`;
+    } else if (totalSubmitted > 0) {
+        submitDisplay = `${totalSubmitted}건 미리 완료 🎉`;
         submitSub = '시작 전 선제출';
     } else {
-        // 시작 전 + 제출 없음
         submitDisplay = '0%';
         submitSub = '아직 제출된 과제가 없어요';
     }
 
-    // ── 카드3: 인증률 (calc_tasks_due 기준 3분기) ──
+    // ── 카드3: 인증률 (직접 계산) ──
+    const authResult = calcAuthRate(dueTasks, authRecords || []);
     let authDisplay, authSub;
-    if (tasksDue > 0) {
-        // 시작 후: 정상 표시
-        authDisplay = `${authRate}%`;
-        authSub = `인증 합계 ${authSum} / 마감 ${tasksDue}건`;
-    } else if (tasksDue === 0 && tasksSubmitted > 0) {
-        // 시작 전 + 선제출 있음
-        authDisplay = `${authRate}%`;
-        authSub = `인증 합계 ${authSum} / 제출 ${tasksSubmitted}건 (시작 전)`;
+    if (dueTasks.length > 0) {
+        authDisplay = `${authResult.authRate}%`;
+        authSub = `인증 합계 ${authResult.authSum} / 마감 ${dueTasks.length}건`;
+    } else if (totalSubmitted > 0) {
+        // 시작 전 선제출: auth_records에서 합산
+        let preAuthSum = 0;
+        (authRecords || []).forEach(r => { preAuthSum += (r.auth_rate || 0); });
+        const preAuthRate = totalSubmitted > 0 ? Math.round(preAuthSum / totalSubmitted) : 0;
+        authDisplay = `${preAuthRate}%`;
+        authSub = `인증 합계 ${preAuthSum} / 제출 ${totalSubmitted}건 (시작 전)`;
     } else {
-        // 시작 전 + 제출 없음
         authDisplay = '데이터 없음';
         authSub = '';
     }
 
-    // ── 카드4: 등급 & 환급 (calc_tasks_due 기준 3분기) ──
+    // ── 카드4: 등급 & 환급 (직접 계산) ──
+    const deposit = app.deposit_amount || 0;
     let gradeDisplay, gradeSub;
-    if (tasksDue > 0) {
-        // 시작 후: 테스트룸 등급 그대로
-        gradeDisplay = grade;
-        gradeSub = `${grade}등급 · 환급 ${refundAmount > 0 ? refundAmount.toLocaleString() : '0'}원`;
+    if (dueTasks.length > 0) {
+        const gradeResult = getGradeFromRules(authResult.authRate, gradeRules || [], deposit);
+        gradeDisplay = gradeResult.grade;
+        gradeSub = `${gradeResult.grade}등급 · 환급 ${gradeResult.refundAmount > 0 ? gradeResult.refundAmount.toLocaleString() : '0'}원`;
     } else {
-        // 시작 전: tasks_due = 0
         gradeDisplay = '-';
         gradeSub = '시작 후 산정';
     }
-    const gradeColor = (gradeDisplay !== '-') ? getGradeColor(grade) : '#94a3b8';
+    const gradeColor = (gradeDisplay !== '-') ? getGradeColor(gradeDisplay) : '#94a3b8';
 
-    // ── 인증률 색상 ──
+    // ── 색상 ──
+    const authRateNum = dueTasks.length > 0 ? authResult.authRate : 0;
     const authColor = (authDisplay !== '데이터 없음' && authDisplay !== '-')
-        ? (authRate >= 95 ? '#22c55e' : authRate >= 90 ? '#3b82f6' : authRate >= 80 ? '#f59e0b' : authRate >= 70 ? '#f97316' : '#ef4444')
+        ? (authRateNum >= 95 ? '#22c55e' : authRateNum >= 90 ? '#3b82f6' : authRateNum >= 80 ? '#f59e0b' : authRateNum >= 70 ? '#f97316' : '#ef4444')
         : '#64748b';
 
     const container = document.getElementById('summaryCards');
@@ -332,7 +318,7 @@ function renderSummaryCards() {
 
         <!-- 카드3: 인증률 -->
         <div class="detail-stat-card">
-            <div class="stat-icon" style="background:${(authDisplay !== '데이터 없음' && authDisplay !== '-') ? (authRate >= 80 ? '#dcfce7' : authRate >= 70 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${authColor};">
+            <div class="stat-icon" style="background:${(authDisplay !== '데이터 없음' && authDisplay !== '-') ? (authRateNum >= 80 ? '#dcfce7' : authRateNum >= 70 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${authColor};">
                 <i class="fas fa-shield-alt"></i>
             </div>
             <div class="stat-value" style="color:${authColor};">${authDisplay}</div>
