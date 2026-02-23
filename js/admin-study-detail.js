@@ -209,14 +209,20 @@ function renderProfileHeader() {
 // ===== 요약 카드 4개 (테스트룸 마이페이지와 동일) =====
 function renderSummaryCards() {
     const { app, stats } = studentData;
-    // D-day는 KST 기준 오늘 날짜 (테스트룸과 동일, 새벽4시 컷오프 아님)
-    // UTC 자정으로 통일해서 시간대 오프셋 제거
-    const kstNow = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
-    const todayReal = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
+    // 챌린지 현황도 새벽 4시 기준 (테스트룸과 동일)
+    const today = getEffectiveToday();
     const totalWeeks = getTotalWeeks(app);
-    const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
     const end = getScheduleEnd(app);
+    // 총 일수 (시작일~종료일, 토요일 제외)
+    let totalDays = 0;
+    if (start && end) {
+        const d = new Date(start);
+        while (d <= end) {
+            if (d.getDay() !== 6) totalDays++;
+            d.setDate(d.getDate() + 1);
+        }
+    }
 
     // ── ★ tr_student_stats에서 읽기 (계산 없이 그대로) ──
     const authRate = stats.calc_auth_rate || 0;
@@ -231,23 +237,32 @@ function renderSummaryCards() {
     let challengeValue = '-';
     let challengeSub = '';
     if (start && end) {
-        if (todayReal < start) {
-            const dDay = Math.ceil((start - todayReal) / (1000 * 60 * 60 * 24));
+        if (today < start) {
+            // 시작 전: D-N
+            const dDay = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
             const startDay = ['일','월','화','수','목','금','토'][start.getDay()];
             challengeValue = `D-${dDay}`;
             challengeSub = `${start.getMonth()+1}/${start.getDate()}(${startDay}) 시작 예정`;
-        } else if (todayReal > end) {
+        } else if (today > end) {
+            // 종료
             challengeValue = '종료';
             challengeSub = `${end.getMonth()+1}/${end.getDate()} 종료됨`;
         } else {
+            // 진행 중: D+N / 총일수 (잔여 N일)
+            let elapsed = 0;
             let remaining = 0;
-            const checkDate = new Date(todayReal);
-            checkDate.setDate(checkDate.getDate() + 1);
-            while (checkDate <= end) {
-                if (checkDate.getDay() !== 6) remaining++;
-                checkDate.setDate(checkDate.getDate() + 1);
+            const d1 = new Date(start);
+            while (d1 <= today) {
+                if (d1.getDay() !== 6) elapsed++;
+                d1.setDate(d1.getDate() + 1);
             }
-            challengeValue = `${currentWeek}/${totalWeeks}주차`;
+            const d2 = new Date(today);
+            d2.setDate(d2.getDate() + 1);
+            while (d2 <= end) {
+                if (d2.getDay() !== 6) remaining++;
+                d2.setDate(d2.getDate() + 1);
+            }
+            challengeValue = `D+${elapsed} / ${totalDays}일`;
             challengeSub = `잔여 ${remaining}일`;
         }
     }
