@@ -206,135 +206,139 @@ function renderProfileHeader() {
     }
 }
 
-// ===== 요약 카드 5개 =====
+// ===== 요약 카드 4개 (테스트룸 마이페이지와 동일) =====
 function renderSummaryCards() {
     const { app, stats } = studentData;
     const today = getEffectiveToday();
     const totalWeeks = getTotalWeeks(app);
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
+    const end = getScheduleEnd(app);
 
-    // ── ★ tr_student_stats에서 읽기 (테스트룸 계산 결과) ──
-    const avgAuthRate = stats.calc_auth_rate || 0;
+    // ── ★ tr_student_stats에서 읽기 (계산 없이 그대로) ──
+    const authRate = stats.calc_auth_rate || 0;
     const grade = stats.calc_grade || '-';
     const submitRate = stats.calc_submit_rate || 0;
     const refundAmount = stats.calc_refund_amount || 0;
-    const totalDeadlinedTasks = stats.calc_tasks_due || 0;
-    const submittedTasks = stats.calc_tasks_submitted || 0;
+    const tasksDue = stats.calc_tasks_due || 0;
+    const tasksSubmitted = stats.calc_tasks_submitted || 0;
     const authSum = stats.calc_auth_sum || 0;
 
-    // 시작 전 여부
-    const isBeforeStart = start ? today < start : true;
-    const isBeforeGrading = isBeforeStart || totalDeadlinedTasks <= 0;
-
-    // ── 인증률 표시 (숫자는 테스트룸 것, 텍스트만 조합) ──
-    let authDisplay = '-';
-    let authSubText = '마감된 과제 없음';
-    if (totalDeadlinedTasks > 0) {
-        authDisplay = `${avgAuthRate}%`;
-        authSubText = `인증 합계 ${authSum} / 마감 ${totalDeadlinedTasks}건`;
-    } else if (isBeforeStart && submittedTasks > 0) {
-        authDisplay = `${submittedTasks}건 선제출`;
-        authSubText = '시작 전 선제출';
-    }
-
-    // ── 등급 표시 ──
-    const displayGrade = isBeforeGrading ? '-' : grade;
-    const gradeColor = isBeforeGrading ? '#94a3b8' : getGradeColor(grade);
-
-    // ── 환급 예상 ──
-    const expectedRefund = isBeforeGrading ? '-' : refundAmount;
-    // 보증금/환급률 역산 (표시용)
-    let refundSubText = '시작 후 산정';
-    if (!isBeforeGrading && refundAmount > 0 && totalDeadlinedTasks > 0) {
-        refundSubText = `환급 예상 ${refundAmount.toLocaleString()}원`;
-    } else if (!isBeforeGrading) {
-        refundSubText = '환급 조건 미충족';
-    }
-
-    // ── 잔여일 (토요일 제외, effectiveToday 기준) ──
-    const end = getScheduleEnd(app);
-    let remainingDays = '-';
-    if (end && start) {
-        let count = 0;
-        const checkDate = new Date(today);
-        checkDate.setDate(checkDate.getDate() + 1);
-        while (checkDate <= end) {
-            if (checkDate.getDay() !== 6) count++;
+    // ── 카드1: 챌린지 현황 (applications 기반) ──
+    let challengeValue = '-';
+    let challengeSub = '';
+    if (start && end) {
+        if (today < start) {
+            const dDay = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+            const startDay = ['일','월','화','수','목','금','토'][start.getDay()];
+            challengeValue = `D-${dDay}`;
+            challengeSub = `${start.getMonth()+1}/${start.getDate()}(${startDay}) 시작 예정`;
+        } else if (today > end) {
+            challengeValue = '종료';
+            challengeSub = `${end.getMonth()+1}/${end.getDate()} 종료됨`;
+        } else {
+            let remaining = 0;
+            const checkDate = new Date(today);
             checkDate.setDate(checkDate.getDate() + 1);
+            while (checkDate <= end) {
+                if (checkDate.getDay() !== 6) remaining++;
+                checkDate.setDate(checkDate.getDate() + 1);
+            }
+            challengeValue = `${currentWeek}/${totalWeeks}주차`;
+            challengeSub = `잔여 ${remaining}일`;
         }
-        remainingDays = count;
     }
 
-    // ── 제출률 표시 ──
-    let submitDisplay = '-';
-    let submitSubText = '마감된 과제 없음';
-    if (totalDeadlinedTasks > 0) {
+    // ── 카드2: 제출률 (calc_tasks_due 기준 3분기) ──
+    let submitDisplay, submitSub;
+    if (tasksDue > 0) {
+        // 시작 후: 정상 표시
         submitDisplay = `${submitRate}%`;
-        submitSubText = `제출 ${submittedTasks} / 마감 ${totalDeadlinedTasks}건`;
-    } else if (isBeforeStart && submittedTasks > 0) {
-        submitDisplay = `${submittedTasks}건 미리 완료 🎉`;
-        submitSubText = '시작 전 선제출';
+        submitSub = `${tasksSubmitted}/${tasksDue}개 완료`;
+    } else if (tasksDue === 0 && tasksSubmitted > 0) {
+        // 시작 전 + 선제출 있음
+        submitDisplay = `${tasksSubmitted}건 미리 완료 🎉`;
+        submitSub = '시작 전 선제출';
+    } else {
+        // 시작 전 + 제출 없음
+        submitDisplay = '0%';
+        submitSub = '아직 제출된 과제가 없어요';
     }
 
-    // ── 등급 기준 텍스트 ──
-    const gradeRuleText = 'A≥95 B≥90 C≥80 D≥70 F&lt;70';
+    // ── 카드3: 인증률 (calc_tasks_due 기준 3분기) ──
+    let authDisplay, authSub;
+    if (tasksDue > 0) {
+        // 시작 후: 정상 표시
+        authDisplay = `${authRate}%`;
+        authSub = `인증 합계 ${authSum} / 마감 ${tasksDue}건`;
+    } else if (tasksDue === 0 && tasksSubmitted > 0) {
+        // 시작 전 + 선제출 있음
+        authDisplay = `${authRate}%`;
+        authSub = `인증 합계 ${authSum} / 제출 ${tasksSubmitted}건 (시작 전)`;
+    } else {
+        // 시작 전 + 제출 없음
+        authDisplay = '데이터 없음';
+        authSub = '';
+    }
+
+    // ── 카드4: 등급 & 환급 (calc_tasks_due 기준 3분기) ──
+    let gradeDisplay, gradeSub;
+    if (tasksDue > 0) {
+        // 시작 후: 테스트룸 등급 그대로
+        gradeDisplay = grade;
+        gradeSub = `${grade}등급 · 환급 ${refundAmount > 0 ? refundAmount.toLocaleString() : '0'}원`;
+    } else {
+        // 시작 전: tasks_due = 0
+        gradeDisplay = '-';
+        gradeSub = '시작 후 산정';
+    }
+    const gradeColor = (gradeDisplay !== '-') ? getGradeColor(grade) : '#94a3b8';
 
     // ── 인증률 색상 ──
-    const authColor = totalDeadlinedTasks > 0
-        ? (avgAuthRate >= 95 ? '#22c55e' : avgAuthRate >= 90 ? '#3b82f6' : avgAuthRate >= 80 ? '#f59e0b' : avgAuthRate >= 70 ? '#f97316' : '#ef4444')
+    const authColor = (authDisplay !== '데이터 없음' && authDisplay !== '-')
+        ? (authRate >= 95 ? '#22c55e' : authRate >= 90 ? '#3b82f6' : authRate >= 80 ? '#f59e0b' : authRate >= 70 ? '#f97316' : '#ef4444')
         : '#64748b';
 
     const container = document.getElementById('summaryCards');
     container.innerHTML = `
-        <!-- 인증률 -->
-        <div class="detail-stat-card">
-            <div class="stat-icon" style="background:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 80 ? '#dcfce7' : avgAuthRate >= 70 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${authColor};">
-                <i class="fas fa-shield-alt"></i>
-            </div>
-            <div class="stat-value" style="color:${authColor};">${authDisplay}</div>
-            <div class="stat-label">인증률</div>
-            <div class="stat-sub">${authSubText}</div>
-        </div>
-
-        <!-- 등급 -->
-        <div class="detail-stat-card">
-            <div class="stat-icon" style="background:${isBeforeGrading ? '#f1f5f9' : gradeColor + '20'}; color:${gradeColor};">
-                <i class="fas fa-award"></i>
-            </div>
-            <div class="stat-value" style="color:${gradeColor};">${displayGrade}</div>
-            <div class="stat-label">현재 등급</div>
-            <div class="stat-sub">${isBeforeGrading ? '시작 후 산정' : gradeRuleText}</div>
-        </div>
-
-        <!-- 환급 예상 -->
-        <div class="detail-stat-card">
-            <div class="stat-icon" style="background:#dbeafe; color:#3b82f6;">
-                <i class="fas fa-coins"></i>
-            </div>
-            <div class="stat-value">${isBeforeGrading ? '-' : (expectedRefund > 0 ? expectedRefund.toLocaleString() : '0')}</div>
-            <div class="stat-label">환급 예상 (원)</div>
-            <div class="stat-sub">${refundSubText}</div>
-        </div>
-
-        <!-- 잔여일 -->
+        <!-- 카드1: 챌린지 현황 -->
         <div class="detail-stat-card">
             <div class="stat-icon" style="background:#faf5ff; color:#7c3aed;">
-                <i class="fas fa-hourglass-half"></i>
+                <i class="fas fa-calendar-check"></i>
             </div>
-            <div class="stat-value">${remainingDays}</div>
-            <div class="stat-label">잔여일</div>
-            <div class="stat-sub">${currentWeek}/${totalWeeks}주차 진행 중</div>
+            <div class="stat-value">${challengeValue}</div>
+            <div class="stat-label">챌린지 현황</div>
+            <div class="stat-sub">${challengeSub}</div>
         </div>
 
-        <!-- 제출률 -->
+        <!-- 카드2: 제출률 -->
         <div class="detail-stat-card">
             <div class="stat-icon" style="background:#ecfdf5; color:#10b981;">
                 <i class="fas fa-clipboard-check"></i>
             </div>
             <div class="stat-value">${submitDisplay}</div>
             <div class="stat-label">제출률</div>
-            <div class="stat-sub">${submitSubText}</div>
+            <div class="stat-sub">${submitSub}</div>
+        </div>
+
+        <!-- 카드3: 인증률 -->
+        <div class="detail-stat-card">
+            <div class="stat-icon" style="background:${(authDisplay !== '데이터 없음' && authDisplay !== '-') ? (authRate >= 80 ? '#dcfce7' : authRate >= 70 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${authColor};">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <div class="stat-value" style="color:${authColor};">${authDisplay}</div>
+            <div class="stat-label">인증률</div>
+            <div class="stat-sub">${authSub}</div>
+        </div>
+
+        <!-- 카드4: 등급 & 환급 -->
+        <div class="detail-stat-card">
+            <div class="stat-icon" style="background:${gradeDisplay !== '-' ? gradeColor + '20' : '#f1f5f9'}; color:${gradeColor};">
+                <i class="fas fa-award"></i>
+            </div>
+            <div class="stat-value" style="color:${gradeColor};">${gradeDisplay}</div>
+            <div class="stat-label">등급 & 환급</div>
+            <div class="stat-sub">${gradeSub}</div>
         </div>
     `;
 }
