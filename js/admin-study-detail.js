@@ -260,17 +260,18 @@ function renderSummaryCards() {
     // ── 카드3: 인증률 (직접 계산) ──
     // auth_records → study_record_id → study_records 경유 매칭
     const authResult = calcAuthRate(dueTasks, records || [], authRecords || []);
+    const authCompleted = Math.round(authResult.authSum / 100); // 0 or 100이므로 100으로 나눠서 건수로
     let authDisplay, authSub;
     if (dueTasks.length > 0) {
         authDisplay = `${authResult.authRate}%`;
-        authSub = `인증 합계 ${authResult.authSum} / 마감 ${dueTasks.length}건`;
+        authSub = `인증 ${authCompleted} / ${dueTasks.length}건`;
     } else if (totalSubmitted > 0) {
-        // 시작 전 선제출: auth_records에서 합산
         let preAuthSum = 0;
         (authRecords || []).forEach(r => { preAuthSum += (r.auth_rate || 0); });
+        const preAuthCompleted = Math.round(preAuthSum / 100);
         const preAuthRate = totalSubmitted > 0 ? Math.round(preAuthSum / totalSubmitted) : 0;
         authDisplay = `${preAuthRate}%`;
-        authSub = `인증 합계 ${preAuthSum} / 제출 ${totalSubmitted}건 (시작 전)`;
+        authSub = `인증 ${preAuthCompleted} / ${totalSubmitted}건 (시작 전)`;
     } else {
         authDisplay = '데이터 없음';
         authSub = '';
