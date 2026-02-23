@@ -383,28 +383,39 @@ function calcSubmitRate(dueTasks, studyRecords) {
 }
 
 // ===== 공통 유틸: 인증률 계산 =====
-function calcAuthRate(dueTasks, authRecords) {
+// auth_records는 study_record_id로 study_records와 연결됨
+// 도래 과제 → 매칭 study_record 찾기 → 해당 auth_record의 auth_rate 합산
+function calcAuthRate(dueTasks, studyRecords, authRecords) {
     if (dueTasks.length === 0) return { authSum: 0, authRate: 0 };
+
+    // auth_records를 study_record_id로 빠르게 조회할 수 있게 맵 생성
+    const authMap = {};
+    (authRecords || []).forEach(ar => {
+        if (ar.study_record_id) authMap[ar.study_record_id] = ar;
+    });
 
     let authSum = 0;
     for (const task of dueTasks) {
-        // auth_records에서 해당 과제의 인증률 찾기
-        let authRecord = null;
+        // 1. 도래 과제에 매칭되는 study_record 찾기
+        let studyRecord = null;
         if (task.taskType === 'vocab' || task.taskType === 'intro-book') {
-            authRecord = authRecords.find(r =>
+            studyRecord = studyRecords.find(r =>
                 r.task_type === task.taskType &&
                 r.week === task.week &&
                 r.day === task.dayKr
             );
         } else {
-            authRecord = authRecords.find(r =>
+            studyRecord = studyRecords.find(r =>
                 r.task_type === task.taskType &&
                 r.module_number === task.moduleNumber
             );
         }
-        if (authRecord) {
-            authSum += (authRecord.auth_rate || 0);
+
+        // 2. study_record가 있으면 auth_record 찾기
+        if (studyRecord && authMap[studyRecord.id]) {
+            authSum += (authMap[studyRecord.id].auth_rate || 0);
         }
+        // 매칭 안 되면 auth_rate = 0 (미제출 or 인증 미완료)
     }
 
     return {

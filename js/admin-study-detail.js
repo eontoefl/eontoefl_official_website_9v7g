@@ -258,7 +258,8 @@ function renderSummaryCards() {
     }
 
     // ── 카드3: 인증률 (직접 계산) ──
-    const authResult = calcAuthRate(dueTasks, authRecords || []);
+    // auth_records → study_record_id → study_records 경유 매칭
+    const authResult = calcAuthRate(dueTasks, records || [], authRecords || []);
     let authDisplay, authSub;
     if (dueTasks.length > 0) {
         authDisplay = `${authResult.authRate}%`;
