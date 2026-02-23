@@ -233,71 +233,7 @@ function getEffectiveToday() {
     return effective;
 }
 
-// ===== 공통 유틸: 오늘까지 할당된 과제 수 (분모) =====
-// getTaskCountFn: (programType, week, dayIndex) => number
-// 시작일~effectiveToday까지, 토요일(6) 제외, 각 날짜의 실제 요일 기반으로 스케줄 조회
-function countTasksDueToday(startDate, programType, totalWeeks, getTaskCountFn) {
-    const effectiveToday = getEffectiveToday();
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-
-    // 시작 전이면 0
-    if (effectiveToday < start) return 0;
-
-    let total = 0;
-
-    for (let w = 1; w <= totalWeeks; w++) {
-        for (let d = 0; d < 6; d++) { // 주당 6일 (일~금)
-            const taskDate = new Date(start);
-            taskDate.setDate(taskDate.getDate() + (w - 1) * 7 + d);
-            if (taskDate > effectiveToday) return total; // 미도래일이면 중단
-            // 실제 날짜의 요일(getDay())을 사용하여 스케줄 조회
-            const actualDayIndex = taskDate.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
-            if (actualDayIndex === 6) continue; // 토요일은 스킵
-            total += getTaskCountFn(programType, w, actualDayIndex);
-        }
-    }
-    return total;
-}
-
-// ===== 공통 유틸: 등급/환급 판정 (tr_grade_rules 기반) =====
-let gradeRulesCache = null;
-
-async function loadGradeRules() {
-    if (gradeRulesCache) return gradeRulesCache;
-    try {
-        const rules = await supabaseAPI.query('tr_grade_rules', { 'order': 'min_rate.desc' });
-        gradeRulesCache = rules || [];
-        return gradeRulesCache;
-    } catch (e) {
-        console.error('Failed to load grade rules:', e);
-        // 폴백: 하드코딩 기본값
-        return [
-            { grade: 'A', min_rate: 95, refund_rate: 1.0, deposit: 100000 },
-            { grade: 'B', min_rate: 90, refund_rate: 0.9, deposit: 100000 },
-            { grade: 'C', min_rate: 80, refund_rate: 0.8, deposit: 100000 },
-            { grade: 'D', min_rate: 70, refund_rate: 0.7, deposit: 100000 },
-            { grade: 'F', min_rate: 0, refund_rate: 0, deposit: 100000 }
-        ];
-    }
-}
-
-function getGradeFromRules(authRate, gradeRules) {
-    for (const rule of gradeRules) {
-        if (authRate >= rule.min_rate) {
-            return {
-                grade: rule.grade,
-                refundRate: rule.refund_rate,
-                deposit: rule.deposit,
-                refundAmount: Math.round(rule.deposit * rule.refund_rate)
-            };
-        }
-    }
-    // 폴백: F등급
-    return { grade: 'F', refundRate: 0, deposit: 100000, refundAmount: 0 };
-}
-
-// 등급별 색상
+// ===== 공통 유틸: 등급별 색상 =====
 function getGradeColor(grade) {
     const colors = {
         'A': '#22c55e',

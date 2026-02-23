@@ -3,11 +3,11 @@
 let allStudentData = [];
 let filteredStudentData = [];
 
-// 스케줄 전역 변수
+// 스케줄 전역 변수 (잔디/알림용)
 let scheduleLookup = {};
 const dayNameToEng = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
 
-// 헬퍼: 특정 주차/요일의 과제 수 반환 (전역)
+// 헬퍼: 특정 주차/요일의 과제 수 반환 (잔디/알림에서 사용)
 function getTaskCount(programType, week, dayIndex) {
     const prog = programType.toLowerCase();
     const dayEng = dayNameToEng[dayIndex];
@@ -41,20 +41,19 @@ async function loadStudyData() {
     const emptyState = document.getElementById('emptyState');
 
     try {
-        // 1. 진행 중인 학생 조회: 입금 확인 완료 + 프로그램 기간 내
+        // 새벽 4시 컷오프 적용
+        const today = getEffectiveToday();
+
+        // 1. 진행 중인 학생 조회: 입금 확인 완료
         const apps = await supabaseAPI.query('applications', {
             'deposit_confirmed_by_admin': 'eq.true',
             'limit': '500'
         });
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        // 진행 중인 학생 필터링 (입금확인 + 시작일 설정됨 + 종료일+7일 안 지남)
+        // 진행 중인 학생 필터링 (시작일 설정됨 + 종료일+7일 안 지남)
         const activeApps = (apps || []).filter(app => {
             if (!app.schedule_start) return false;
             const end = app.schedule_end ? new Date(app.schedule_end) : null;
-            // 종료일 + 7일 여유 (마지막 주 데이터 확인용)
             if (end) {
                 const endPlus7 = new Date(end);
                 endPlus7.setDate(endPlus7.getDate() + 7);
@@ -70,27 +69,25 @@ async function loadStudyData() {
             return;
         }
 
-        // 2. 해당 학생들의 user_id 수집
-        const userEmails = activeApps.map(a => a.email).filter(Boolean);
+        // 2. 유저 매핑
         const users = await supabaseAPI.query('users', { 'limit': '500' });
         const userMap = {};
         (users || []).forEach(u => { userMap[u.email] = u; });
 
-        // user_id 목록
         const userIds = activeApps.map(app => {
             const user = userMap[app.email];
             return user ? user.id : null;
         }).filter(Boolean);
 
-        // 3. tr_study_records 전체 조회
+        // 3. tr_study_records (잔디/알림/추세용 — 여전히 필요)
         const studyRecords = await supabaseAPI.query('tr_study_records', { 'limit': '10000' });
         const allRecords = (studyRecords || []).filter(r => userIds.includes(r.user_id));
 
-        // 4. tr_auth_records 전체 조회
+        // 4. tr_auth_records (fraud/알림용 — 여전히 필요)
         const authRecords = await supabaseAPI.query('tr_auth_records', { 'limit': '10000' });
         const allAuthRecords = (authRecords || []).filter(r => userIds.includes(r.user_id));
 
-        // 4.5. 스케줄 데이터 로드 (일별 과제 수 참조용)
+        // 5. 스케줄 데이터 (잔디/알림용)
         const scheduleData = await supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' });
         scheduleLookup = {};
         (scheduleData || []).forEach(s => {
@@ -100,7 +97,12 @@ async function loadStudyData() {
             scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
         });
 
-        // 5. 학생별 데이터 조합
+        // 6. ★ tr_student_stats (테스트룸이 계산한 인증률/등급/제출률/환급)
+        const allStats = await supabaseAPI.query('tr_student_stats', { 'limit': '500' });
+        const statsMap = {};
+        (allStats || []).forEach(st => { statsMap[st.user_id] = st; });
+
+        // 7. 학생별 데이터 조합
         allStudentData = activeApps.map(app => {
             const user = userMap[app.email];
             if (!user) return null;
@@ -113,62 +115,42 @@ async function loadStudyData() {
             const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
             const currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
 
-            // 프로그램 타입
             const programType = (app.assigned_program || app.preferred_program || '').includes('Fast') ? 'Fast' : 'Standard';
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
-            // ── 마감 과제 수 계산 (스케줄 기반 일별 과제 수 동적 적용) ──
-            const daysPerWeek = 6;
-            const elapsedWeeks = Math.min(currentWeek, totalWeeks);
-            const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
+            // ── ★ tr_student_stats에서 읽기 (테스트룸 계산 결과) ──
+            const stats = statsMap[userId] || {};
+            const avgAuthRate = stats.calc_auth_rate || 0;
+            const grade = stats.calc_grade || '-';
+            const totalDeadlinedTasks = stats.calc_tasks_due || 0;
+            const submittedTasksCount = stats.calc_tasks_submitted || 0;
 
-            // 어제까지 마감된 과제 수 (일별 과제 수를 스케줄에서 참조)
-            let baseDeadlinedTasks = 0;
-            // 지난 주차 (1주차 ~ elapsedWeeks-1주차) 전체
-            for (let w = 1; w < elapsedWeeks; w++) {
-                for (let d = 0; d < 6; d++) { // 일~금
-                    baseDeadlinedTasks += getTaskCount(programType, w, d);
-                }
-            }
-            // 이번 주 어제까지 (오늘 제외)
-            const daysDeadlinedThisWeek = currentWeek <= totalWeeks
-                ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
-                : 0;
-            for (let d = 0; d < Math.min(daysDeadlinedThisWeek, daysPerWeek); d++) {
-                baseDeadlinedTasks += getTaskCount(programType, elapsedWeeks, d);
+            // 시작 전 여부
+            const isBeforeStart = today < startDate;
+
+            // ── 인증률 표시 (숫자는 테스트룸 것, 텍스트만 공홈에서 조합) ──
+            let authDisplay = '-';
+            if (totalDeadlinedTasks > 0) {
+                authDisplay = `${avgAuthRate}%`;
+            } else if (isBeforeStart && submittedTasksCount > 0) {
+                authDisplay = `${submittedTasksCount}건 선제출`;
             }
 
-            // 선제 완료: 오늘/미래 날짜 중 해당일 과제를 모두 완료한 날의 과제 수 추가
-            let earlyCompletedTasks = 0;
-            const todayStr = today.toISOString().split('T')[0];
-            const endDate = app.schedule_end ? new Date(app.schedule_end) : null;
-            if (endDate) endDate.setHours(0, 0, 0, 0);
-            const scanEnd = endDate || new Date(startDate.getTime() + totalWeeks * 7 * 86400000);
-            for (let scanDate = new Date(today); scanDate <= scanEnd; scanDate.setDate(scanDate.getDate() + 1)) {
-                if (scanDate < startDate) continue;
-                const scanDay = scanDate.getDay();
-                if (scanDay === 6) continue;
-                const scanStr = scanDate.toISOString().split('T')[0];
-                if (scanStr < todayStr) continue;
-                // 해당 날짜의 주차/요일 계산
-                const diffFromStart = Math.floor((scanDate - startDate) / 86400000);
-                const scanWeek = Math.floor(diffFromStart / 7) + 1;
-                const requiredTasks = getTaskCount(programType, scanWeek, scanDay);
-                if (requiredTasks <= 0) continue;
-                const dayRecs = myRecords.filter(r => new Date(r.completed_at).toISOString().split('T')[0] === scanStr);
-                const uniqueTypes = new Set(dayRecs.map(r => r.task_type));
-                if (uniqueTypes.size >= requiredTasks) earlyCompletedTasks += requiredTasks;
+            // ── 등급 표시 ──
+            const isBeforeGrading = isBeforeStart || totalDeadlinedTasks <= 0;
+            const gradeColor = isBeforeGrading ? '#94a3b8' : getGradeColor(grade);
+            const displayGrade = isBeforeGrading ? '-' : grade;
+
+            // ── 제출률 표시 ──
+            const submitRate = stats.calc_submit_rate || 0;
+            let submitDisplay = '-';
+            if (totalDeadlinedTasks > 0) {
+                submitDisplay = `${submitRate}%`;
+            } else if (isBeforeStart && submittedTasksCount > 0) {
+                submitDisplay = `${submittedTasksCount}건 미리 완료 🎉`;
             }
 
-            const totalDeadlinedTasks = baseDeadlinedTasks + earlyCompletedTasks;
-
-            // 인증률 계산
-            const totalAuthRate = myAuthRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
-            const avgAuthRate = totalDeadlinedTasks > 0 ? Math.round(totalAuthRate / totalDeadlinedTasks) : 0;
-            const submittedTasksCount = myRecords.length;
-            const authDisplay = totalDeadlinedTasks > 0 ? `${avgAuthRate}%` : (submittedTasksCount > 0 ? '진행 중' : '-');
-
-            // 이번 주 / 저번 주 인증률 (추세 계산용)
+            // ── 추세 (이번 주 vs 저번 주 — 여전히 auth_records 기반) ──
             const thisWeekStart = new Date(startDate);
             thisWeekStart.setDate(thisWeekStart.getDate() + (currentWeek - 1) * 7);
             const lastWeekStart = new Date(thisWeekStart);
@@ -183,34 +165,19 @@ async function loadStudyData() {
                 return d >= lastWeekStart && d < thisWeekStart;
             });
 
-            const thisWeekAvg = thisWeekAuth.length > 0 
-                ? Math.round(thisWeekAuth.reduce((s, r) => s + (r.auth_rate || 0), 0) / thisWeekAuth.length) 
+            const thisWeekAvg = thisWeekAuth.length > 0
+                ? Math.round(thisWeekAuth.reduce((s, r) => s + (r.auth_rate || 0), 0) / thisWeekAuth.length)
                 : 0;
-            const lastWeekAvg = lastWeekAuth.length > 0 
-                ? Math.round(lastWeekAuth.reduce((s, r) => s + (r.auth_rate || 0), 0) / lastWeekAuth.length) 
+            const lastWeekAvg = lastWeekAuth.length > 0
+                ? Math.round(lastWeekAuth.reduce((s, r) => s + (r.auth_rate || 0), 0) / lastWeekAuth.length)
                 : 0;
 
-            // 추세
             let trend = '→';
             let trendColor = '#94a3b8';
             if (thisWeekAvg > lastWeekAvg + 5) { trend = '↑'; trendColor = '#22c55e'; }
             else if (thisWeekAvg < lastWeekAvg - 5) { trend = '↓'; trendColor = '#ef4444'; }
 
-            // 등급/환급 산정 여부 (마감 과제가 있으면 산정)
-            const isBeforeGrading = totalDeadlinedTasks <= 0;
-
-            // 등급
-            let grade = '-';
-            if (!isBeforeGrading) {
-                grade = 'D';
-                if (avgAuthRate >= 90) grade = 'A';
-                else if (avgAuthRate >= 75) grade = 'B';
-                else if (avgAuthRate >= 60) grade = 'C';
-            }
-
-            const gradeColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444', '-': '#94a3b8' };
-
-            // 이번 주 잔디 (일~금)
+            // ── 이번 주 잔디 (여전히 study_records + 스케줄 기반) ──
             const weekGrass = [];
             const cw = Math.min(currentWeek, totalWeeks);
             for (let d = 0; d < 6; d++) {
@@ -221,10 +188,8 @@ async function loadStudyData() {
                 const isToday = dateStr === todayStr;
                 const isFuture = checkDate > today;
 
-                // 해당 날짜의 스케줄 과제 수
                 const requiredTasks = getTaskCount(programType, cw, checkDate.getDay());
 
-                // 해당 날짜 제출 기록 확인 (미래/오늘 포함)
                 const dayRecords = myRecords.filter(r => {
                     const rDate = new Date(r.completed_at).toISOString().split('T')[0];
                     return rDate === dateStr;
@@ -232,44 +197,39 @@ async function loadStudyData() {
                 const uniqueTypes = new Set(dayRecords.map(r => r.task_type));
 
                 if (requiredTasks > 0 && uniqueTypes.size >= requiredTasks) {
-                    weekGrass.push('🟩'); // 해당일 과제 전부 완료
+                    weekGrass.push('🟩');
                 } else if (uniqueTypes.size > 0) {
-                    weekGrass.push('🟨'); // 일부 제출
+                    weekGrass.push('🟨');
                 } else if (isFuture || isToday) {
-                    weekGrass.push('⬜'); // 미도래 또는 오늘 (제출 없음)
+                    weekGrass.push('⬜');
                 } else {
-                    weekGrass.push('🟥'); // 과거 미제출
+                    weekGrass.push('🟥');
                 }
             }
 
-            // 제출률
-            const submittedTasks = myRecords.length;
-            const submitRate = totalDeadlinedTasks > 0 ? Math.round((submittedTasks / totalDeadlinedTasks) * 100) : 0;
-            const submitDisplay = totalDeadlinedTasks > 0 ? `${submitRate}%` : (submittedTasks > 0 ? '진행 중' : '-');
-
-            // 최근 활동
-            const lastActivity = myRecords.length > 0 
+            // ── 최근 활동 ──
+            const lastActivity = myRecords.length > 0
                 ? Math.max(...myRecords.map(r => new Date(r.completed_at).getTime()))
                 : null;
-            const daysSinceActivity = lastActivity 
+            const daysSinceActivity = lastActivity
                 ? Math.floor((today - lastActivity) / (1000 * 60 * 60 * 24))
                 : 999;
 
-            // 연속 미제출 일수
+            // ── 연속 미제출 일수 ──
             let consecutiveMissing = 0;
             for (let d = 1; d <= 7; d++) {
                 const checkDate = new Date(today);
                 checkDate.setDate(checkDate.getDate() - d);
                 if (checkDate < startDate) break;
                 const checkDay = checkDate.getDay();
-                if (checkDay === 6) continue; // 토요일 스킵
+                if (checkDay === 6) continue;
                 const dateStr = checkDate.toISOString().split('T')[0];
                 const hasRecord = myRecords.some(r => new Date(r.completed_at).toISOString().split('T')[0] === dateStr);
                 if (!hasRecord) consecutiveMissing++;
                 else break;
             }
 
-            // fraud 여부
+            // ── fraud 여부 ──
             const hasFraud = myAuthRecords.some(r => r.no_selection_flag || r.no_text_flag || r.focus_lost_count > 3);
 
             return {
@@ -284,8 +244,8 @@ async function loadStudyData() {
                 authDisplay,
                 trend,
                 trendColor,
-                grade,
-                gradeColor: gradeColors[grade],
+                grade: displayGrade,
+                gradeColor,
                 weekGrass,
                 submitRate,
                 submitDisplay,
@@ -326,9 +286,10 @@ function updateStatCards(students, authRecords) {
     }).length;
     document.getElementById('yesterdayMissing').textContent = yesterdayMissing;
 
-    // 평균 인증률
-    const totalAuth = students.reduce((sum, s) => sum + s.avgAuthRate, 0);
-    const avgAuth = students.length > 0 ? Math.round(totalAuth / students.length) : 0;
+    // 평균 인증률 (tr_student_stats 기반)
+    const studentsWithTasks = students.filter(s => s.totalDeadlinedTasks > 0);
+    const totalAuth = studentsWithTasks.reduce((sum, s) => sum + s.avgAuthRate, 0);
+    const avgAuth = studentsWithTasks.length > 0 ? Math.round(totalAuth / studentsWithTasks.length) : 0;
     document.getElementById('avgAuthRate').textContent = avgAuth + '%';
 
     // 알림 (fraud + 연속미제출 2일+)
@@ -381,20 +342,20 @@ function renderTable() {
     emptyState.style.display = 'none';
 
     tbody.innerHTML = filteredStudentData.map(s => {
-        // 행 스타일 (마감 과제가 있는 학생만 경고 표시)
+        // 행 스타일
         let rowStyle = '';
         if (s.totalDeadlinedTasks > 0 && s.avgAuthRate < 50) rowStyle += 'background: #fef2f2;';
         if (s.totalDeadlinedTasks > 0 && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
 
-        // 이름 경고 (마감 과제가 있는 학생만)
         const nameWarning = (s.totalDeadlinedTasks > 0 && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
 
-        // 인증률 색상
+        // 인증률 색상 (등급 기준 연동)
         let authColor = '#22c55e';
         if (s.totalDeadlinedTasks === 0) authColor = '#64748b';
-        else if (s.avgAuthRate < 60) authColor = '#ef4444';
-        else if (s.avgAuthRate < 75) authColor = '#f59e0b';
-        else if (s.avgAuthRate < 90) authColor = '#3b82f6';
+        else if (s.avgAuthRate < 70) authColor = '#ef4444';
+        else if (s.avgAuthRate < 80) authColor = '#f97316';
+        else if (s.avgAuthRate < 90) authColor = '#f59e0b';
+        else if (s.avgAuthRate < 95) authColor = '#3b82f6';
 
         // 최근 활동 텍스트
         let lastActivityText = '-';
@@ -457,9 +418,7 @@ function escapeHtml(text) {
 // ===== KST 기준 어제 날짜 =====
 function getYesterdayDateKST() {
     const now = new Date();
-    // KST = UTC + 9
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    // 새벽 4시 기준: 4시 이전이면 이틀 전이 "어제"
     if (kst.getUTCHours() < 4) {
         kst.setUTCDate(kst.getUTCDate() - 2);
     } else {
@@ -481,9 +440,8 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
     const alerts = [];
 
     const yesterday = getYesterdayDateKST();
-    const yesterdayDay = new Date(yesterday).getDay(); // 0=일, 6=토
+    const yesterdayDay = new Date(yesterday).getDay();
 
-    // 어제가 토요일(6)이면 미제출 알림 스킵 (일~금이 과제일)
     const isWeekday = yesterdayDay !== 6;
 
     const now = new Date();
@@ -493,7 +451,7 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
     const TEST_ACCOUNTS = ['홍길동', '김철수'];
 
     students.forEach(s => {
-        if (TEST_ACCOUNTS.includes(s.name)) return; // 테스트 계정 스킵
+        if (TEST_ACCOUNTS.includes(s.name)) return;
 
         const myRecords = allRecords.filter(r => r.user_id === s.userId);
         const myAuthRecords = allAuthRecords.filter(r => r.user_id === s.userId);
@@ -521,7 +479,6 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
 
         // --- 🟠 연속 미제출 2일+ (이탈 위험) ---
         if (s.consecutiveMissing >= 2) {
-            // 연속 미제출 날짜들
             const missedDays = [];
             const startDate = new Date(s.scheduleStart);
             for (let d = 1; d <= s.consecutiveMissing + 3; d++) {
@@ -529,7 +486,7 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
                 checkDate.setDate(checkDate.getDate() - d);
                 if (checkDate < startDate) break;
                 const checkDay = checkDate.getDay();
-                if (checkDay === 6 || checkDay === 0) continue; // 토/일 스킵
+                if (checkDay === 6 || checkDay === 0) continue;
                 const dateStr = checkDate.toISOString().split('T')[0];
                 const hasRecord = myRecords.some(r => new Date(r.completed_at).toISOString().split('T')[0] === dateStr);
                 if (!hasRecord) missedDays.push(getDayName(dateStr).replace('요일', ''));
@@ -550,14 +507,12 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
 
         // --- 🔴 어제 미제출 ---
         if (isWeekday) {
-            // 어제의 주차/요일에 해당하는 스케줄 과제 수 동적 조회
             const yesterdayDate = new Date(yesterday);
             const startDate = new Date(s.scheduleStart);
             const diffFromStart = Math.floor((yesterdayDate - startDate) / 86400000);
             const yesterdayWeek = Math.max(1, Math.floor(diffFromStart / 7) + 1);
             const yesterdayRequired = getTaskCount(s.programType, yesterdayWeek, yesterdayDay);
 
-            // 어제 스케줄에 과제가 있는 경우에만 체크
             if (yesterdayRequired > 0) {
                 const yesterdayRecords = myRecords.filter(r => {
                     return new Date(r.completed_at).toISOString().split('T')[0] === yesterday;
@@ -565,7 +520,6 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
                 const uniqueTypes = new Set(yesterdayRecords.map(r => r.task_type));
 
                 if (uniqueTypes.size === 0) {
-                    // 연속 미제출 알림에 이미 포함된 경우 스킵
                     if (s.consecutiveMissing < 2) {
                         alerts.push({
                             priority: 3,
@@ -596,7 +550,6 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
             const completedDate = new Date(r.completed_at).toISOString().split('T')[0];
             if (completedDate !== yesterday) return false;
             const completedTime = new Date(r.completed_at);
-            // KST로 변환
             const kstHour = (completedTime.getUTCHours() + 9) % 24;
             return kstHour >= 0 && kstHour < 4;
         });
