@@ -209,8 +209,9 @@ function renderProfileHeader() {
 // ===== 요약 카드 4개 (테스트룸 마이페이지와 동일) =====
 function renderSummaryCards() {
     const { app, stats } = studentData;
-    // D-day는 실제 오늘 날짜 기준 (effectiveToday가 아님, 테스트룸과 동일)
-    const todayReal = new Date(); todayReal.setHours(0,0,0,0);
+    // D-day는 KST 기준 오늘 날짜 (테스트룸과 동일, 새벽4시 컷오프 아님)
+    const kstNow = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+    const todayReal = new Date(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate());
     const totalWeeks = getTotalWeeks(app);
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
