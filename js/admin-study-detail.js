@@ -98,6 +98,9 @@ async function loadStudentDetail() {
             scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
         });
 
+        // 6. 등급 기준 로드 (tr_grade_rules)
+        await loadGradeRules();
+
         // 렌더링
         loading.style.display = 'none';
         detailContent.style.display = 'block';
@@ -205,77 +208,56 @@ function renderProfileHeader() {
 // ===== 요약 카드 5개 =====
 function renderSummaryCards() {
     const { app, records, authRecords } = studentData;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = getEffectiveToday();
     const totalWeeks = getTotalWeeks(app);
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
+    const programType = getProgram(app);
 
-    // ── 마감 과제 수 계산 (스케줄 기반 일별 과제 수 동적 적용) ──
-    const programType = getProgram(app); // 'Fast' or 'Standard'
-    const daysPerWeek = 6; // 일~금
-    const elapsedWeeks = Math.min(currentWeek, totalWeeks);
-    const dayOfWeek = today.getDay(); // 0=일, 1=월, ..., 5=금, 6=토
+    // ── 분모: 오늘까지 할당된 과제 수 (effectiveToday 이하) ──
+    const totalDeadlinedTasks = start ? countTasksDueToday(start, programType, totalWeeks, getTaskCountForDay) : 0;
 
-    // 어제까지 마감된 과제 수 (일별 과제 수를 스케줄에서 참조)
-    let baseDeadlinedTasks = 0;
-    // 지난 주차 전체
-    for (let w = 1; w < elapsedWeeks; w++) {
-        for (let d = 0; d < 6; d++) { // 일~금
-            baseDeadlinedTasks += getTaskCountForDay(programType, w, d);
-        }
-    }
-    // 이번 주 어제까지 (오늘 제외)
-    const daysDeadlinedThisWeek = currentWeek <= totalWeeks
-        ? (dayOfWeek === 6 ? daysPerWeek : dayOfWeek)
-        : 0;
-    for (let d = 0; d < Math.min(daysDeadlinedThisWeek, daysPerWeek); d++) {
-        baseDeadlinedTasks += getTaskCountForDay(programType, elapsedWeeks, d);
-    }
+    // ── 분자: 제출/인증 (미도래일 선제출 포함) ──
+    const submittedTasks = records.length;
+    const totalAuthSum = authRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
 
-    // 선제 완료: 오늘/미래 날짜 중 해당일 과제를 모두 완료한 날의 과제 수 추가
-    let earlyCompletedTasks = 0;
-    const todayStr = toDateStr(today);
-    const scheduleEnd = getScheduleEnd(app);
-    const scanEnd = scheduleEnd || new Date(start.getTime() + totalWeeks * 7 * 86400000);
-    for (let scanDate = new Date(today); scanDate <= scanEnd; scanDate.setDate(scanDate.getDate() + 1)) {
-        if (scanDate < start) continue;
-        const scanDay = scanDate.getDay();
-        if (scanDay === 6) continue;
-        const scanStr = toDateStr(scanDate);
-        if (scanStr < todayStr) continue;
-        const diffFromStart = Math.floor((scanDate - start) / 86400000);
-        const scanWeek = Math.floor(diffFromStart / 7) + 1;
-        const requiredTasks = getTaskCountForDay(programType, scanWeek, scanDay);
-        if (requiredTasks <= 0) continue;
-        const dayRecs = records.filter(r => toDateStr(new Date(r.completed_at)) === scanStr);
-        const uniqueTypes = new Set(dayRecs.map(r => r.task_type));
-        if (uniqueTypes.size >= requiredTasks) earlyCompletedTasks += requiredTasks;
+    // 시작 전 여부
+    const isBeforeStart = start ? today < start : true;
+
+    // ── 인증률 계산 ──
+    let avgAuthRate = 0;
+    let authDisplay = '-';
+    let authSubText = '마감된 과제 없음';
+    if (totalDeadlinedTasks > 0) {
+        avgAuthRate = Math.round(totalAuthSum / totalDeadlinedTasks);
+        authDisplay = `${avgAuthRate}%`;
+        authSubText = `인증 합계 ${totalAuthSum} / 마감 ${totalDeadlinedTasks}건`;
+    } else if (isBeforeStart && submittedTasks > 0) {
+        avgAuthRate = Math.round(totalAuthSum / submittedTasks);
+        authDisplay = `${avgAuthRate}%`;
+        authSubText = `인증 합계 ${totalAuthSum} / 제출 ${submittedTasks}건, 시작 전`;
+    } else if (submittedTasks > 0) {
+        authDisplay = '진행 중';
+        authSubText = `${submittedTasks}건 제출 (마감 전)`;
     }
 
-    const totalDeadlinedTasks = baseDeadlinedTasks + earlyCompletedTasks;
-
-    // ── 인증률 ──
-    const totalAuthRate = authRecords.reduce((sum, r) => sum + (r.auth_rate || 0), 0);
-    const avgAuthRate = totalDeadlinedTasks > 0 ? Math.round(totalAuthRate / totalDeadlinedTasks) : 0;
-
-    // ── 등급/환급 산정 여부 (마감 과제가 있으면 산정) ──
-    const isBeforeGrading = totalDeadlinedTasks <= 0;
-
-    // ── 등급 ──
+    // ── 등급 판정 (tr_grade_rules 기반) ──
+    const isBeforeGrading = isBeforeStart || totalDeadlinedTasks <= 0;
     let grade = '-', gradeColor = '#94a3b8';
+    let gradeResult = { grade: '-', refundRate: 0, deposit: 100000, refundAmount: 0 };
     if (!isBeforeGrading) {
-        grade = 'D'; gradeColor = '#ef4444';
-        if (avgAuthRate >= 90) { grade = 'A'; gradeColor = '#22c55e'; }
-        else if (avgAuthRate >= 75) { grade = 'B'; gradeColor = '#3b82f6'; }
-        else if (avgAuthRate >= 60) { grade = 'C'; gradeColor = '#f59e0b'; }
+        const rules = gradeRulesCache || [];
+        gradeResult = getGradeFromRules(avgAuthRate, rules);
+        grade = gradeResult.grade;
+        gradeColor = getGradeColor(grade);
     }
 
     // ── 환급 예상 ──
-    const deposit = 100000; // 보증금 고정 10만원
-    const refundRates = { A: 1.0, B: 0.8, C: 0.5, D: 0 };
-    const expectedRefund = isBeforeGrading ? '-' : Math.round(deposit * (refundRates[grade] || 0));
+    const expectedRefund = isBeforeGrading ? '-' : gradeResult.refundAmount;
+    const deposit = gradeResult.deposit;
+    const refundPct = Math.round(gradeResult.refundRate * 100);
 
-    // ── 잔여일 (학습일 기준: 토요일 제외, 주 6일) ──
+    // ── 잔여일 (토요일 제외, effectiveToday 기준) ──
     const end = getScheduleEnd(app);
     let remainingDays = '-';
     if (end && start) {
@@ -290,29 +272,37 @@ function renderSummaryCards() {
     }
 
     // ── 제출률 ──
-    const submittedTasks = records.length;
-    const submitRate = totalDeadlinedTasks > 0 
-        ? Math.round((submittedTasks / totalDeadlinedTasks) * 100) 
-        : 0;
+    let submitRate = 0;
+    let submitDisplay = '-';
+    let submitSubText = '마감된 과제 없음';
+    if (totalDeadlinedTasks > 0) {
+        submitRate = Math.round((submittedTasks / totalDeadlinedTasks) * 100);
+        submitDisplay = `${submitRate}%`;
+        submitSubText = `제출 ${submittedTasks} / 마감 ${totalDeadlinedTasks}건`;
+    } else if (isBeforeStart && submittedTasks > 0) {
+        submitDisplay = `${submittedTasks}건 미리 완료 🎉`;
+        submitSubText = '시작 전 선제출';
+    } else if (submittedTasks > 0) {
+        submitDisplay = '진행 중';
+        submitSubText = `${submittedTasks}건 제출 (마감 전)`;
+    }
 
-    // ── 인증률/제출률 표시값 ──
-    const authDisplay = totalDeadlinedTasks > 0 ? `${avgAuthRate}%` : (submittedTasks > 0 ? '진행 중' : '-');
-    const submitDisplay = totalDeadlinedTasks > 0 ? `${submitRate}%` : (submittedTasks > 0 ? '진행 중' : '-');
-    const authSubText = totalDeadlinedTasks > 0 
-        ? `인증 합계 ${totalAuthRate} / 마감 ${totalDeadlinedTasks}건`
-        : (submittedTasks > 0 ? `오늘 ${submittedTasks}건 제출 (마감 전)` : '마감된 과제 없음');
-    const submitSubText = totalDeadlinedTasks > 0
-        ? `제출 ${submittedTasks} / 마감 ${totalDeadlinedTasks}건`
-        : (submittedTasks > 0 ? `오늘 ${submittedTasks}건 제출 (마감 전)` : '마감된 과제 없음');
+    // ── 등급 기준 텍스트 ──
+    const gradeRuleText = 'A≥95 B≥90 C≥80 D≥70 F&lt;70';
+
+    // ── 인증률/제출률 색상 ──
+    const authColor = totalDeadlinedTasks > 0 
+        ? (avgAuthRate >= 95 ? '#22c55e' : avgAuthRate >= 90 ? '#3b82f6' : avgAuthRate >= 80 ? '#f59e0b' : avgAuthRate >= 70 ? '#f97316' : '#ef4444')
+        : '#64748b';
 
     const container = document.getElementById('summaryCards');
     container.innerHTML = `
         <!-- 인증률 -->
         <div class="detail-stat-card">
-            <div class="stat-icon" style="background:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 75 ? '#dcfce7' : avgAuthRate >= 60 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 75 ? '#22c55e' : avgAuthRate >= 60 ? '#f59e0b' : '#ef4444') : '#94a3b8'};">
+            <div class="stat-icon" style="background:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 80 ? '#dcfce7' : avgAuthRate >= 70 ? '#fef3c7' : '#fef2f2') : '#f1f5f9'}; color:${authColor};">
                 <i class="fas fa-shield-alt"></i>
             </div>
-            <div class="stat-value" style="color:${totalDeadlinedTasks > 0 ? (avgAuthRate >= 75 ? '#22c55e' : avgAuthRate >= 60 ? '#f59e0b' : '#ef4444') : '#64748b'};">${authDisplay}</div>
+            <div class="stat-value" style="color:${authColor};">${authDisplay}</div>
             <div class="stat-label">인증률</div>
             <div class="stat-sub">${authSubText}</div>
         </div>
@@ -322,9 +312,9 @@ function renderSummaryCards() {
             <div class="stat-icon" style="background:${isBeforeGrading ? '#f1f5f9' : gradeColor + '20'}; color:${gradeColor};">
                 <i class="fas fa-award"></i>
             </div>
-            <div class="stat-value" style="color:${gradeColor};">${isBeforeGrading ? '산정 전' : grade}</div>
+            <div class="stat-value" style="color:${gradeColor};">${isBeforeGrading ? '-' : grade}</div>
             <div class="stat-label">현재 등급</div>
-            <div class="stat-sub">${isBeforeGrading ? '과제 완료 시 산정' : 'A≥90 B≥75 C≥60 D&lt;60'}</div>
+            <div class="stat-sub">${isBeforeGrading ? '시작 후 산정' : gradeRuleText}</div>
         </div>
 
         <!-- 환급 예상 -->
@@ -332,9 +322,9 @@ function renderSummaryCards() {
             <div class="stat-icon" style="background:#dbeafe; color:#3b82f6;">
                 <i class="fas fa-coins"></i>
             </div>
-            <div class="stat-value">${isBeforeGrading ? '산정 전' : (expectedRefund > 0 ? expectedRefund.toLocaleString() : '0')}</div>
+            <div class="stat-value">${isBeforeGrading ? '-' : (expectedRefund > 0 ? expectedRefund.toLocaleString() : '0')}</div>
             <div class="stat-label">환급 예상 (원)</div>
-            <div class="stat-sub">${isBeforeGrading ? '과제 완료 시 산정' : '보증금 ' + deposit.toLocaleString() + '원 × ' + Math.round((refundRates[grade] || 0) * 100) + '%'}</div>
+            <div class="stat-sub">${isBeforeGrading ? '시작 후 산정' : '보증금 ' + deposit.toLocaleString() + '원 × ' + refundPct + '%'}</div>
         </div>
 
         <!-- 잔여일 -->
@@ -369,7 +359,7 @@ function renderGrassGrid() {
     }
 
     const totalWeeks = getTotalWeeks(app);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = getEffectiveToday();
 
     // 요일 라벨
     let html = `<div class="grass-day-labels">`;
@@ -674,7 +664,7 @@ function generateWeeklyCheckData() {
     const name = user.name || app.name || '-';
     const program = getProgram(app);
     const totalWeeks = getTotalWeeks(app);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = getEffectiveToday();
 
     // 주차 시작일/종료일
     const weekStart = new Date(start);
