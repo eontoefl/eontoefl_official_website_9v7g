@@ -481,13 +481,18 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
     const yesterday = getYesterdayDateKST();
     const yesterdayDay = new Date(yesterday).getDay(); // 0=일, 6=토
 
-    // 어제가 토요일(6) 또는 일요일(0)이면 미제출 알림 스킵
-    const isWeekday = yesterdayDay >= 1 && yesterdayDay <= 5;
+    // 어제가 토요일(6)이면 미제출 알림 스킵 (일~금이 과제일)
+    const isWeekday = yesterdayDay !== 6;
 
     const now = new Date();
     const oneDayAgoMs = now.getTime() - 24 * 60 * 60 * 1000;
 
+    // 테스트 계정 제외
+    const TEST_ACCOUNTS = ['홍길동', '김철수'];
+
     students.forEach(s => {
+        if (TEST_ACCOUNTS.includes(s.name)) return; // 테스트 계정 스킵
+
         const myRecords = allRecords.filter(r => r.user_id === s.userId);
         const myAuthRecords = allAuthRecords.filter(r => r.user_id === s.userId);
 
@@ -541,35 +546,46 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
             }
         }
 
-        // --- 🔴 어제 미제출 (평일만) ---
+        // --- 🔴 어제 미제출 ---
         if (isWeekday) {
-            const yesterdayRecords = myRecords.filter(r => {
-                return new Date(r.completed_at).toISOString().split('T')[0] === yesterday;
-            });
-            const uniqueTypes = new Set(yesterdayRecords.map(r => r.task_type));
-            if (uniqueTypes.size === 0) {
-                // 연속 미제출 알림에 이미 포함된 경우 스킵
-                if (s.consecutiveMissing < 2) {
+            // 어제의 주차/요일에 해당하는 스케줄 과제 수 동적 조회
+            const yesterdayDate = new Date(yesterday);
+            const startDate = new Date(s.scheduleStart);
+            const diffFromStart = Math.floor((yesterdayDate - startDate) / 86400000);
+            const yesterdayWeek = Math.max(1, Math.floor(diffFromStart / 7) + 1);
+            const yesterdayRequired = getTaskCount(s.programType, yesterdayWeek, yesterdayDay);
+
+            // 어제 스케줄에 과제가 있는 경우에만 체크
+            if (yesterdayRequired > 0) {
+                const yesterdayRecords = myRecords.filter(r => {
+                    return new Date(r.completed_at).toISOString().split('T')[0] === yesterday;
+                });
+                const uniqueTypes = new Set(yesterdayRecords.map(r => r.task_type));
+
+                if (uniqueTypes.size === 0) {
+                    // 연속 미제출 알림에 이미 포함된 경우 스킵
+                    if (s.consecutiveMissing < 2) {
+                        alerts.push({
+                            priority: 3,
+                            type: 'missing',
+                            color: '#ef4444',
+                            icon: '🔴',
+                            title: `${s.name} - ${getDayName(yesterday)} 과제 전체 미제출`,
+                            subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 현재 인증률 ${s.avgAuthRate}%`,
+                            userId: s.userId
+                        });
+                    }
+                } else if (uniqueTypes.size < yesterdayRequired) {
                     alerts.push({
                         priority: 3,
                         type: 'missing',
                         color: '#ef4444',
                         icon: '🔴',
-                        title: `${s.name} - ${getDayName(yesterday)} 과제 전체 미제출`,
+                        title: `${s.name} - ${getDayName(yesterday)} 과제 ${uniqueTypes.size}/${yesterdayRequired}개만 제출`,
                         subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 현재 인증률 ${s.avgAuthRate}%`,
                         userId: s.userId
                     });
                 }
-            } else if (uniqueTypes.size < 4) {
-                alerts.push({
-                    priority: 3,
-                    type: 'missing',
-                    color: '#ef4444',
-                    icon: '🔴',
-                    title: `${s.name} - ${getDayName(yesterday)} 과제 ${uniqueTypes.size}/4개만 제출`,
-                    subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 현재 인증률 ${s.avgAuthRate}%`,
-                    userId: s.userId
-                });
             }
         }
 

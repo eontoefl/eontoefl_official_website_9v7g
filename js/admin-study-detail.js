@@ -108,6 +108,7 @@ async function loadStudentDetail() {
         buildTaskRows();
         renderTaskTable();
         renderNotes();
+        loadProgressSaves();
         setupWeeklyCheckDropdown();
 
     } catch (error) {
@@ -816,4 +817,289 @@ function copyWeeklyCheck() {
         document.body.removeChild(ta);
         alert('클립보드에 복사되었습니다.');
     });
+}
+
+// ===== 과제 진행상태 관리 (tr_progress_save) =====
+
+let progressSaves = [];
+
+async function loadProgressSaves() {
+    const loadingEl = document.getElementById('progressLoading');
+    const tableWrap = document.getElementById('progressTableWrap');
+    const emptyEl = document.getElementById('progressEmpty');
+    const countEl = document.getElementById('progressCount');
+
+    loadingEl.style.display = 'block';
+    tableWrap.style.display = 'none';
+    emptyEl.style.display = 'none';
+
+    try {
+        const userId = studentData.user.id;
+        const res = await supabaseAPI.query('tr_progress_save', {
+            'user_id': `eq.${userId}`,
+            'order': 'updated_at.desc',
+            'limit': '100'
+        });
+        progressSaves = res || [];
+
+        loadingEl.style.display = 'none';
+
+        if (progressSaves.length === 0) {
+            emptyEl.style.display = 'block';
+            countEl.textContent = '';
+            return;
+        }
+
+        countEl.textContent = `(${progressSaves.length}건)`;
+        tableWrap.style.display = 'block';
+        renderProgressTable();
+
+    } catch (err) {
+        console.error('Failed to load progress saves:', err);
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        emptyEl.querySelector('p').textContent = '불러오기 실패';
+    }
+}
+
+function renderProgressTable() {
+    const tbody = document.getElementById('progressTableBody');
+    tbody.innerHTML = '';
+
+    progressSaves.forEach((save, idx) => {
+        const components = save.completed_components || [];
+        const totalComponents = getTotalComponentCount(save);
+        const completedCount = components.length;
+        const progressPct = totalComponents > 0 ? Math.round((completedCount / totalComponents) * 100) : 0;
+
+        const statusLabel = {
+            'in_progress': '진행중',
+            'completed': '완료',
+            'abandoned': '중단'
+        }[save.status] || save.status;
+
+        const statusClass = `status-${save.status || 'in_progress'}`;
+
+        const taskTypeLabel = {
+            'reading': '리딩',
+            'listening': '리스닝',
+            'vocab': '어휘',
+            'speaking': '스피킹',
+            'writing': '라이팅'
+        }[save.task_type] || save.task_type || '-';
+
+        const updatedAt = save.updated_at ? formatProgressDate(save.updated_at) : '-';
+        const attempt = save.attempt || 1;
+
+        // 메인 행
+        const tr = document.createElement('tr');
+        tr.className = 'clickable';
+        tr.innerHTML = `
+            <td style="width:30px; text-align:center;">
+                <i class="fas fa-chevron-right" id="progressArrow_${idx}" style="color:#94a3b8; font-size:11px; transition:transform 0.2s;"></i>
+            </td>
+            <td><strong>${taskTypeLabel}</strong></td>
+            <td>Module ${save.module_number || '-'}</td>
+            <td>${attempt}차</td>
+            <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="flex:1; background:#e2e8f0; border-radius:4px; height:6px; min-width:60px;">
+                        <div style="background:${progressPct === 100 ? '#16a34a' : '#6366f1'}; height:100%; border-radius:4px; width:${progressPct}%;"></div>
+                    </div>
+                    <span style="font-size:12px; color:#64748b; white-space:nowrap;">${completedCount}/${totalComponents}</span>
+                </div>
+            </td>
+            <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+            <td style="font-size:12px; color:#64748b;">${updatedAt}</td>
+            <td style="white-space:nowrap;" onclick="event.stopPropagation();">
+                ${save.status === 'abandoned' ? `<button class="btn-restore" onclick="restoreProgress('${save.id}', ${idx})"><i class="fas fa-undo"></i> 복원</button> ` : ''}
+                <button class="btn-delete-progress" onclick="deleteProgress('${save.id}', ${idx})"><i class="fas fa-trash-alt"></i> 삭제</button>
+            </td>
+        `;
+
+        tr.addEventListener('click', () => toggleProgressDetail(idx));
+        tbody.appendChild(tr);
+
+        // 상세 패널 행 (숨김 상태)
+        const detailTr = document.createElement('tr');
+        detailTr.id = `progressDetail_${idx}`;
+        detailTr.style.display = 'none';
+        detailTr.innerHTML = `
+            <td colspan="8" style="padding:0 12px 12px 12px;">
+                <div class="progress-detail-panel">
+                    ${renderProgressDetailContent(save, idx)}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(detailTr);
+    });
+}
+
+function getTotalComponentCount(save) {
+    // completed_components 길이 + 남은 컴포넌트
+    const completed = (save.completed_components || []).length;
+    const currentIdx = save.current_component_index || 0;
+    // total = max(completed, currentIdx) + 남은 것 추정
+    // 정확한 total은 알 수 없으므로 current_component_index 기반 추정
+    // completed가 currentIdx와 같거나 크면, 아직 풀지 않은 것이 있을 수 있음
+    // total_components 필드가 있으면 사용
+    if (save.total_components) return save.total_components;
+    // 없으면 currentIdx 기반: completed + (status가 completed가 아니면 최소 1개 이상 남음)
+    if (save.status === 'completed') return completed;
+    // 진행중/중단이면 최소 completed + 1
+    return Math.max(completed + 1, currentIdx + 1);
+}
+
+function renderProgressDetailContent(save, idx) {
+    const components = save.completed_components || [];
+    const currentIdx = save.current_component_index || 0;
+    const totalComponents = getTotalComponentCount(save);
+    const timerRemaining = save.timer_remaining || 0;
+    const taskTypeLabel = {
+        'reading': '리딩',
+        'listening': '리스닝',
+        'vocab': '어휘',
+        'speaking': '스피킹',
+        'writing': '라이팅'
+    }[save.task_type] || save.task_type || '-';
+
+    let html = '';
+    html += `<div style="font-weight:600; margin-bottom:12px; color:#1e293b;">📋 상세 진행 정보</div>`;
+    html += `<div style="color:#64748b; font-size:12px; margin-bottom:12px;">`;
+    html += `과제: ${taskTypeLabel} Module ${save.module_number || '-'} / ${save.attempt || 1}차 풀이`;
+    html += `<br>총 컴포넌트: ${totalComponents}개`;
+    html += `</div>`;
+
+    // 컴포넌트 목록 렌더링
+    for (let i = 0; i < totalComponents; i++) {
+        const comp = components[i];
+        let icon, name, scoreText = '', extraClass = '';
+
+        if (comp) {
+            // 완료된 컴포넌트
+            icon = '✅';
+            name = formatComponentName(comp);
+            const answers = comp.answers || [];
+            if (answers.length > 0) {
+                const correct = answers.filter(a => a.isCorrect).length;
+                scoreText = `— ${correct}/${answers.length} 정답`;
+            }
+        } else if (i === currentIdx && save.status !== 'completed') {
+            // 현재 진행중인 컴포넌트
+            icon = '⏸️';
+            name = `컴포넌트 ${i + 1}`;
+            extraClass = '<span class="component-current">← 여기서 끊김</span>';
+        } else {
+            // 아직 안 한 컴포넌트
+            icon = '⬜';
+            name = `컴포넌트 ${i + 1}`;
+        }
+
+        html += `<div class="component-item">`;
+        html += `<span class="component-icon">${icon}</span>`;
+        html += `<span class="component-name">${i + 1}. ${name}</span>`;
+        if (scoreText) html += `<span class="component-score">${scoreText}</span>`;
+        if (extraClass) html += ` ${extraClass}`;
+        html += `</div>`;
+    }
+
+    // 남은 타이머
+    if (timerRemaining > 0) {
+        const minutes = Math.floor(timerRemaining / 60);
+        const seconds = timerRemaining % 60;
+        html += `<div style="margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0; color:#64748b; font-size:12px;">`;
+        html += `⏱ 남은 타이머: ${minutes}분 ${seconds}초`;
+        html += `</div>`;
+    }
+
+    // 마지막 저장 시간
+    if (save.updated_at) {
+        html += `<div style="color:#94a3b8; font-size:11px; margin-top:8px;">`;
+        html += `마지막 저장: ${new Date(save.updated_at).toLocaleString('ko-KR')}`;
+        html += `</div>`;
+    }
+
+    return html;
+}
+
+function formatComponentName(comp) {
+    if (!comp) return '알 수 없음';
+    const type = comp.componentType || comp.component_type || '';
+    const setId = comp.setId || comp.set_id || '';
+
+    const typeLabels = {
+        'fill_blank': '빈칸채우기',
+        'fill-blank': '빈칸채우기',
+        'fillBlank': '빈칸채우기',
+        'casual_reading': '일상리딩',
+        'casual-reading': '일상리딩',
+        'casualReading': '일상리딩',
+        'academic_reading': '아카데믹 리딩',
+        'academic-reading': '아카데믹 리딩',
+        'academicReading': '아카데믹 리딩',
+        'casual_listening': '일상리스닝',
+        'academic_listening': '아카데믹 리스닝',
+        'vocab': '어휘',
+        'speaking': '스피킹',
+        'writing': '라이팅'
+    };
+
+    let label = typeLabels[type] || type || '컴포넌트';
+    if (setId) label += ` (${setId})`;
+    return label;
+}
+
+function formatProgressDate(dateStr) {
+    try {
+        const d = new Date(dateStr);
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        return `${month}/${day} ${hours}:${mins}`;
+    } catch {
+        return dateStr;
+    }
+}
+
+function toggleProgressDetail(idx) {
+    const detailRow = document.getElementById(`progressDetail_${idx}`);
+    const arrow = document.getElementById(`progressArrow_${idx}`);
+
+    if (detailRow.style.display === 'none') {
+        detailRow.style.display = 'table-row';
+        arrow.style.transform = 'rotate(90deg)';
+    } else {
+        detailRow.style.display = 'none';
+        arrow.style.transform = 'rotate(0deg)';
+    }
+}
+
+async function restoreProgress(id, idx) {
+    if (!confirm('이어하기 상태(in_progress)로 복원할까요?\n학생이 다시 이어서 풀 수 있게 됩니다.')) return;
+
+    try {
+        await supabaseAPI.patch('tr_progress_save', id, {
+            status: 'in_progress',
+            updated_at: new Date().toISOString()
+        });
+        alert('✅ 복원 완료! 학생이 이어하기 할 수 있습니다.');
+        await loadProgressSaves();
+    } catch (err) {
+        console.error('Restore failed:', err);
+        alert('❌ 복원 실패: ' + err.message);
+    }
+}
+
+async function deleteProgress(id, idx) {
+    if (!confirm('⚠️ 완전 삭제하면 학생이 처음부터 다시 풀어야 합니다.\n\n정말 삭제할까요?')) return;
+
+    try {
+        await supabaseAPI.hardDelete('tr_progress_save', id);
+        alert('✅ 삭제 완료! 학생이 처음부터 새로 풀 수 있습니다.');
+        await loadProgressSaves();
+    } catch (err) {
+        console.error('Delete failed:', err);
+        alert('❌ 삭제 실패: ' + err.message);
+    }
 }

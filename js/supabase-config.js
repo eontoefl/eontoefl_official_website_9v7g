@@ -138,6 +138,26 @@ const supabaseAPI = {
         
         return true;
     },
+
+    // HARD DELETE: 데이터 완전 삭제
+    async hardDelete(table, id) {
+        const url = `${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`;
+        
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+        
+        return true;
+    },
     
     // 커스텀 쿼리
     async query(table, filters = {}) {
