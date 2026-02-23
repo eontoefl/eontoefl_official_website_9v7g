@@ -210,8 +210,9 @@ function renderProfileHeader() {
 function renderSummaryCards() {
     const { app, stats } = studentData;
     // D-day는 KST 기준 오늘 날짜 (테스트룸과 동일, 새벽4시 컷오프 아님)
+    // UTC 자정으로 통일해서 시간대 오프셋 제거
     const kstNow = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
-    const todayReal = new Date(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate());
+    const todayReal = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
     const totalWeeks = getTotalWeeks(app);
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
