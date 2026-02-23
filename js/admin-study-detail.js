@@ -209,7 +209,8 @@ function renderProfileHeader() {
 // ===== 요약 카드 4개 (테스트룸 마이페이지와 동일) =====
 function renderSummaryCards() {
     const { app, stats } = studentData;
-    const today = getEffectiveToday();
+    // D-day는 실제 오늘 날짜 기준 (effectiveToday가 아님, 테스트룸과 동일)
+    const todayReal = new Date(); todayReal.setHours(0,0,0,0);
     const totalWeeks = getTotalWeeks(app);
     const currentWeek = getCurrentWeek(app);
     const start = getScheduleStart(app);
@@ -228,17 +229,17 @@ function renderSummaryCards() {
     let challengeValue = '-';
     let challengeSub = '';
     if (start && end) {
-        if (today < start) {
-            const dDay = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+        if (todayReal < start) {
+            const dDay = Math.ceil((start - todayReal) / (1000 * 60 * 60 * 24));
             const startDay = ['일','월','화','수','목','금','토'][start.getDay()];
             challengeValue = `D-${dDay}`;
             challengeSub = `${start.getMonth()+1}/${start.getDate()}(${startDay}) 시작 예정`;
-        } else if (today > end) {
+        } else if (todayReal > end) {
             challengeValue = '종료';
             challengeSub = `${end.getMonth()+1}/${end.getDate()} 종료됨`;
         } else {
             let remaining = 0;
-            const checkDate = new Date(today);
+            const checkDate = new Date(todayReal);
             checkDate.setDate(checkDate.getDate() + 1);
             while (checkDate <= end) {
                 if (checkDate.getDay() !== 6) remaining++;
