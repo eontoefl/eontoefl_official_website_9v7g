@@ -3,6 +3,20 @@
 let allStudentData = [];
 let filteredStudentData = [];
 
+// 스케줄 전역 변수
+let scheduleLookup = {};
+const dayNameToEng = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
+
+// 헬퍼: 특정 주차/요일의 과제 수 반환 (전역)
+function getTaskCount(programType, week, dayIndex) {
+    const prog = programType.toLowerCase();
+    const dayEng = dayNameToEng[dayIndex];
+    if (!dayEng) return 0;
+    const lookup = scheduleLookup[prog];
+    if (!lookup) return 0;
+    return lookup[`${week}_${dayEng}`] || 0;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     checkAdminAuth();
     loadStudyData();
@@ -78,25 +92,13 @@ async function loadStudyData() {
 
         // 4.5. 스케줄 데이터 로드 (일별 과제 수 참조용)
         const scheduleData = await supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' });
-        // 룩업: { 'standard': { '1_sunday': 3, '1_monday': 3, ... }, 'fast': { ... } }
-        const scheduleLookup = {};
-        const dayNameToEng = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
+        scheduleLookup = {};
         (scheduleData || []).forEach(s => {
             const prog = (s.program || '').toLowerCase();
             if (!scheduleLookup[prog]) scheduleLookup[prog] = {};
             const taskCount = [s.section1, s.section2, s.section3, s.section4].filter(v => v && v.trim() !== '').length;
             scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
         });
-
-        // 헬퍼: 특정 주차/요일의 과제 수 반환
-        function getTaskCount(programType, week, dayIndex) {
-            const prog = programType.toLowerCase();
-            const dayEng = dayNameToEng[dayIndex];
-            if (!dayEng) return 0;
-            const lookup = scheduleLookup[prog];
-            if (!lookup) return 0;
-            return lookup[`${week}_${dayEng}`] || 0;
-        }
 
         // 5. 학생별 데이터 조합
         allStudentData = activeApps.map(app => {
