@@ -27,6 +27,8 @@ function switchTab(tabName, event) {
         loadPlatformInfo();
     } else if (tabName === 'usage-guide') {
         loadUsageGuideTab();
+    } else if (tabName === 'notices') {
+        if (typeof loadNotices === 'function') loadNotices();
     }
     
     // Update URL hash
