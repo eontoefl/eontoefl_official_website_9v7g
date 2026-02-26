@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문제 관리 - 이온토플 관리자</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+
+    <style>
+        .q-layout {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        .q-header {
+            margin-bottom: 32px;
+        }
+        .q-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 8px;
+        }
+        .q-header p {
+            font-size: 15px;
+            color: #64748b;
+            margin: 0;
+        }
+        .q-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .q-card-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Section selector */
+        .q-section-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: 'Pretendard', sans-serif;
+            color: #334155;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .q-section-select:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        /* Set ID */
+        .q-set-id {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+            font-family: monospace;
+        }
+        .q-set-id .label {
+            color: #94a3b8;
+            font-family: 'Pretendard', sans-serif;
+            font-weight: 500;
+        }
+
+        /* Textarea */
+        .q-textarea {
+            width: 100%;
+            min-height: 250px;
+            padding: 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Pretendard', 'Georgia', serif;
+            line-height: 1.8;
+            resize: vertical;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .q-textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+
+        /* Blanks table */
+        .q-blanks-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .q-blanks-summary .count {
+            background: #6366f1;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .q-blanks-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .q-blanks-table th {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 2px solid #e2e8f0;
+            color: #64748b;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .q-blanks-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+        .q-blanks-table tr:hover {
+            background: #f8fafc;
+        }
+        .q-blanks-table tr.active-row {
+            background: #eef2ff;
+        }
+        .q-blank-status {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .q-blank-status.done {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        .q-blank-status.pending {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        .q-blank-status.error {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        /* Blank detail form */
+        .q-detail-form {
+            border: 2px solid #6366f1;
+            border-radius: 12px;
+            padding: 20px;
+            background: #fafafe;
+        }
+        .q-detail-form .q-detail-header {
+            font-size: 15px;
+            font-weight: 700;
+            color: #4f46e5;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .q-detail-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+        .q-detail-full {
+            margin-bottom: 14px;
+        }
+        .q-detail-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .q-detail-label .optional {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 400;
+        }
+        .q-detail-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            box-sizing: border-box;
+        }
+        .q-detail-input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        .q-detail-input[readonly] {
+            background: #f1f5f9;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+        .q-detail-textarea {
+            width: 100%;
+            min-height: 70px;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .q-detail-textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        .q-validation {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .q-validation.ok { color: #16a34a; }
+        .q-validation.err { color: #dc2626; }
+
+        /* Preview */
+        .q-preview-passage {
+            font-family: 'Georgia', 'Pretendard', serif;
+            font-size: 15px;
+            line-height: 2;
+            color: #1e293b;
+            word-break: break-word;
+        }
+        .q-preview-blank {
+            display: inline-block;
+            border-bottom: 2px solid #6366f1;
+            min-width: 20px;
+            text-align: center;
+            color: #6366f1;
+            font-weight: 700;
+            font-family: monospace;
+            letter-spacing: 2px;
+            margin: 0 1px;
+        }
+        .q-preview-prefix {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        /* Existing sets list */
+        .q-sets-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .q-sets-table th {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 2px solid #e2e8f0;
+            color: #64748b;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .q-sets-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .q-sets-table tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Buttons */
+        .q-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Pretendard', sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .q-btn-primary {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        }
+        .q-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.4); }
+        .q-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .q-btn-secondary {
+            background: white;
+            color: #475569;
+            border: 1px solid #d1d5db;
+        }
+        .q-btn-secondary:hover { background: #f8fafc; border-color: #6366f1; color: #6366f1; }
+        .q-btn-danger {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fca5a5;
+        }
+        .q-btn-danger:hover { background: #fee2e2; }
+        .q-btn-sm {
+            padding: 5px 12px;
+            font-size: 12px;
+        }
+
+        /* Empty state */
+        .q-empty {
+            text-align: center;
+            padding: 48px 20px;
+            color: #94a3b8;
+        }
+        .q-empty i { font-size: 36px; margin-bottom: 12px; display: block; }
+
+        /* Hidden */
+        .q-hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-study.html" class="admin-nav-link">
+                    <i class="fas fa-book-reader"></i> 학습 관리
+                </a>
+                <a href="admin-questions.html" class="admin-nav-link active">
+                    <i class="fas fa-puzzle-piece"></i> 문제 관리
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="q-layout">
+        <div class="q-header">
+            <h1>🧩 문제 관리</h1>
+            <p>테스트룸에 출제되는 문제를 등록하고 관리하세요</p>
+        </div>
+
+        <!-- Section Selector -->
+        <div class="q-card">
+            <select id="sectionSelect" class="q-section-select" onchange="onSectionChange()">
+                <option value="" disabled>── 섹션을 선택하세요 ──</option>
+                <option value="reading-fillblanks" selected>📝 Reading - Fill in the Blanks</option>
+                <option value="reading-daily1" disabled>📖 Reading - Daily1 (준비중)</option>
+                <option value="reading-daily2" disabled>📖 Reading - Daily2 (준비중)</option>
+                <option value="reading-academic" disabled>📖 Reading - Academic (준비중)</option>
+                <option value="listening-response" disabled>🎧 Listening - 응답고르기 (준비중)</option>
+                <option value="listening-conversation" disabled>🎧 Listening - 대화 (준비중)</option>
+                <option value="listening-announcement" disabled>🎧 Listening - 공지사항 (준비중)</option>
+                <option value="listening-lecture" disabled>🎧 Listening - 렉처 (준비중)</option>
+                <option value="writing-arrange" disabled>✍️ Writing - 배열 (준비중)</option>
+                <option value="writing-email" disabled>✍️ Writing - 이메일 (준비중)</option>
+                <option value="writing-discussion" disabled>✍️ Writing - 토론 (준비중)</option>
+                <option value="speaking-repeat" disabled>🎙️ Speaking - 따라말하기 (준비중)</option>
+                <option value="speaking-interview" disabled>🎙️ Speaking - 인터뷰 (준비중)</option>
+            </select>
+        </div>
+
+        <!-- Fill in the Blanks Section -->
+        <div id="section-reading-fillblanks">
+            <!-- Set ID -->
+            <div class="q-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="q-set-id">
+                        <span class="label">세트 ID:</span>
+                        <span id="setId">로딩중...</span>
+                    </div>
+                    <div id="editModeLabel" class="q-hidden" style="background:#fef3c7; color:#d97706; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600;">
+                        <i class="fas fa-edit"></i> 수정 모드
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passage Input -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 입력</div>
+                <textarea id="passageInput" class="q-textarea" placeholder="빈칸이 포함된 영어 지문을 붙여넣으세요.&#10;&#10;예: Social conformity is different fr_ _ simple imita_ _ _ _ , wh_ _ _ involves copying others' ac_ _ _ _ _ without deeper motivation." oninput="onPassageInput()"></textarea>
+            </div>
+
+            <!-- Detected Blanks -->
+            <div id="blanksSection" class="q-card q-hidden">
+                <div class="q-card-title">
+                    <i class="fas fa-search" style="color:#6366f1;"></i> 감지된 빈칸
+                    <span id="blanksSummary" class="q-blanks-summary"></span>
+                </div>
+                <div id="blanksTableWrap"></div>
+            </div>
+
+            <!-- Blank Detail Form -->
+            <div id="detailSection" class="q-card q-hidden">
+                <div class="q-detail-form">
+                    <div class="q-detail-header">
+                        <i class="fas fa-pencil-alt"></i>
+                        빈칸 #<span id="detailIndex">1</span> 상세 입력
+                    </div>
+
+                    <div class="q-detail-row">
+                        <div>
+                            <div class="q-detail-label">앞글자 (prefix)</div>
+                            <input type="text" id="detailPrefix" class="q-detail-input" readonly>
+                        </div>
+                        <div>
+                            <div class="q-detail-label">빈칸 수</div>
+                            <input type="text" id="detailBlankCount" class="q-detail-input" readonly>
+                        </div>
+                    </div>
+
+                    <div class="q-detail-full">
+                        <div class="q-detail-label">정답 (answer) <span style="color:#dc2626;">*</span></div>
+                        <input type="text" id="detailAnswer" class="q-detail-input" placeholder="빈칸에 들어갈 글자" oninput="onAnswerInput()">
+                        <div id="answerValidation" class="q-validation"></div>
+                    </div>
+
+                    <div class="q-detail-full">
+                        <div class="q-detail-label">해설 (explanation) <span class="optional">선택</span></div>
+                        <textarea id="detailExplanation" class="q-detail-textarea" placeholder="문제 풀이 후 보여줄 설명"></textarea>
+                    </div>
+
+                    <div class="q-detail-row">
+                        <div>
+                            <div class="q-detail-label">자주 틀리는 답 <span class="optional">선택</span></div>
+                            <input type="text" id="detailMistakes" class="q-detail-input" placeholder="예: imitating">
+                        </div>
+                        <div>
+                            <div class="q-detail-label">오답 설명 <span class="optional">선택</span></div>
+                            <input type="text" id="detailMistakesExp" class="q-detail-input" placeholder="오답에 대한 설명">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+                        <button class="q-btn q-btn-secondary" onclick="saveBlankDetail()"><i class="fas fa-check"></i> 저장</button>
+                        <button class="q-btn q-btn-secondary" onclick="closeDetail()"><i class="fas fa-times"></i> 닫기</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview -->
+            <div id="previewSection" class="q-card q-hidden">
+                <div class="q-card-title"><i class="fas fa-eye" style="color:#6366f1;"></i> 미리보기 (학생 화면)</div>
+                <div id="previewContent" class="q-preview-passage"></div>
+            </div>
+
+            <!-- Register Button -->
+            <div id="registerSection" class="q-hidden" style="display:flex; gap:12px; justify-content:flex-end; margin-bottom:32px;">
+                <button id="cancelEditBtn" class="q-btn q-btn-secondary q-hidden" onclick="cancelEdit()"><i class="fas fa-times"></i> 수정 취소</button>
+                <button id="registerBtn" class="q-btn q-btn-primary" onclick="registerSet()" disabled><i class="fas fa-upload"></i> 등록하기</button>
+            </div>
+
+            <!-- Existing Sets -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-list" style="color:#6366f1;"></i> 등록된 세트 목록</span>
+                    <span id="setsCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div id="setsListWrap">
+                    <div class="q-empty">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        로딩 중...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin-utils.js"></script>
+    <script src="js/admin-questions.js"></script>
+</body>
+</html>
