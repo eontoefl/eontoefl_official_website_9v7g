@@ -606,6 +606,35 @@ async function bulkSendGuide() {
     }
 }
 
+// ===== 일괄 알림톡 발송완료 =====
+async function bulkSendKakao() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    if (!confirm(`${selectedIds.size}명의 알림톡 발송완료 처리를 하시겠습니까?`)) return;
+
+    try {
+        const updateData = {
+            kakaotalk_notification_sent: true,
+            kakaotalk_notification_sent_at: Date.now()
+        };
+
+        const promises = Array.from(selectedIds).map(id =>
+            supabaseAPI.patch('applications', id, updateData)
+        );
+
+        await Promise.all(promises);
+        alert(`✅ ${selectedIds.size}명의 알림톡 발송완료 처리되었습니다!`);
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk kakao send error:', error);
+        alert('일부 알림톡 발송완료 처리에 실패했습니다.');
+    }
+}
+
 // ===== 택배송장출력 (선택된 학생) =====
 async function bulkExportShipping() {
     if (selectedIds.size === 0) {
@@ -825,6 +854,12 @@ function matchTrackingData(rows) {
         return;
     }
 
+    console.log('=== 운송장 매칭 디버그 ===');
+    console.log('엑셀 컬럼:', keys);
+    console.log('받는분 키:', recipientKey, '/ 전화번호 키:', recipientPhoneKey, '/ 운송장 키:', trackingKey);
+    console.log('첫 행 샘플:', JSON.stringify(rows[0]));
+    console.log('DB 신청서 수:', allApplications.length);
+
     // 각 행 매칭
     rows.forEach(row => {
         const name = String(row[recipientKey] || '').trim();
@@ -956,7 +991,7 @@ async function submitTrackingBulk() {
     for (const item of toUpdate) {
         try {
             await supabaseAPI.patch('applications', item.appId, {
-                shipping_tracking_number: item.tracking.replace(/-/g, ''),
+                shipping_tracking_number: item.tracking,
                 shipping_courier: 'CJ대한통운',
                 shipping_completed: true,
                 shipping_completed_at: Date.now()
