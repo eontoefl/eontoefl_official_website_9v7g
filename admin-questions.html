@@ -651,7 +651,7 @@
                 <option value="" disabled>── 섹션을 선택하세요 ──</option>
                 <option value="reading-fillblanks" selected>📝 Reading - Fill in the Blanks</option>
                 <option value="reading-daily1">📖 Reading - Daily1</option>
-                <option value="reading-daily2" disabled>📖 Reading - Daily2 (준비중)</option>
+                <option value="reading-daily2">📖 Reading - Daily2</option>
                 <option value="reading-academic" disabled>📖 Reading - Academic (준비중)</option>
                 <option value="listening-response" disabled>🎧 Listening - 응답고르기 (준비중)</option>
                 <option value="listening-conversation" disabled>🎧 Listening - 대화 (준비중)</option>
@@ -892,6 +892,135 @@
                 </div>
             </div>
         </div>
+
+        <!-- Daily2 Section -->
+        <div id="section-reading-daily2" class="q-hidden">
+            <!-- Set ID -->
+            <div class="q-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="q-set-id">
+                        <span class="label">세트 ID:</span>
+                        <span id="d2SetId">로딩중...</span>
+                    </div>
+                    <div id="d2EditModeLabel" class="q-hidden" style="background:#fef3c7; color:#d97706; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600;">
+                        <i class="fas fa-edit"></i> 수정 모드
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Title -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-heading" style="color:#6366f1;"></i> 기본 정보</div>
+                <div class="d1-form-row">
+                    <div class="d1-form-group">
+                        <label class="d1-label">상단 제목 <span class="d1-required">*</span></label>
+                        <select id="d2MainTitleSelect" class="d1-select" onchange="onD2MainTitleChange()">
+                            <option value="" disabled selected>상단 제목을 선택하세요</option>
+                            <option value="Read a notice.">Read a notice.</option>
+                            <option value="Read an email.">Read an email.</option>
+                            <option value="Read an advertisement.">Read an advertisement.</option>
+                            <option value="Read an article.">Read an article.</option>
+                            <option value="__custom__">✏️ 직접 입력</option>
+                        </select>
+                        <input type="text" id="d2MainTitleCustom" class="d1-input q-hidden" placeholder="상단 제목을 직접 입력하세요" oninput="updateD2RegisterBtn()">
+                    </div>
+                    <div class="d1-form-group">
+                        <label class="d1-label">지문 제목 <span class="d1-required">*</span></label>
+                        <input type="text" id="d2PassageTitle" class="d1-input" placeholder="지문 제목을 입력하세요 (예: Parking Lot Resurfacing)" oninput="updateD2RegisterBtn()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passage Content -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 본문 <span class="d1-required">*</span></div>
+                <textarea id="d2PassageContent" class="q-textarea" placeholder="영어 지문 본문을 붙여넣으세요. 문단은 엔터로 구분합니다." oninput="updateD2RegisterBtn()"></textarea>
+            </div>
+
+            <!-- Sentence Translations -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-language" style="color:#6366f1;"></i> 문장별 번역 <span class="d1-required">*</span></span>
+                    <span id="d2SentenceCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div id="d2SentenceList"></div>
+                <button class="q-btn q-btn-secondary" onclick="addD2Sentence()" style="margin-top:10px;">
+                    <i class="fas fa-plus"></i> 문장 추가
+                </button>
+            </div>
+
+            <!-- Interactive Words -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-spell-check" style="color:#6366f1;"></i> 핵심 단어 <span class="d1-required">*</span></span>
+                    <span id="d2WordCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div class="d1-words-header">
+                    <span style="flex:2;">단어 *</span>
+                    <span style="flex:2;">뜻 *</span>
+                    <span style="flex:3;">설명 (선택)</span>
+                    <span style="width:36px;"></span>
+                </div>
+                <div id="d2WordList"></div>
+                <button class="q-btn q-btn-secondary" onclick="addD2Word()" style="margin-top:10px;">
+                    <i class="fas fa-plus"></i> 단어 추가
+                </button>
+            </div>
+
+            <!-- Question 1 (필수) -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-question-circle" style="color:#6366f1;"></i> 문제 1 <span class="d1-required">*</span></div>
+                <div id="d2Question1"></div>
+            </div>
+
+            <!-- Question 2 (필수) -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-question-circle" style="color:#6366f1;"></i> 문제 2 <span class="d1-required">*</span></div>
+                <div id="d2Question2"></div>
+            </div>
+
+            <!-- Question 3 (선택) -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-question-circle" style="color:#94a3b8;"></i> 문제 3 <span style="font-size:12px; color:#94a3b8; font-weight:400;">(선택)</span></span>
+                    <button id="d2Q3ToggleBtn" class="q-btn q-btn-secondary q-btn-sm" onclick="toggleD2Question3()">
+                        <i class="fas fa-plus"></i> 문제 3 추가
+                    </button>
+                </div>
+                <div id="d2Question3" class="q-hidden"></div>
+            </div>
+
+            <!-- Preview -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-eye" style="color:#6366f1;"></i> 미리보기</span>
+                    <button class="q-btn q-btn-secondary q-btn-sm" onclick="renderD2Preview()">
+                        <i class="fas fa-sync-alt"></i> 갱신
+                    </button>
+                </div>
+                <div id="d2PreviewContent" style="padding:16px 0; color:#94a3b8; font-size:14px;">입력값을 채우면 미리보기가 표시됩니다.</div>
+            </div>
+
+            <!-- Register Button -->
+            <div style="display:flex; gap:12px; justify-content:flex-end; margin-bottom:32px;">
+                <button id="d2CancelEditBtn" class="q-btn q-btn-secondary q-hidden" onclick="cancelD2Edit()"><i class="fas fa-times"></i> 수정 취소</button>
+                <button id="d2RegisterBtn" class="q-btn q-btn-primary" onclick="registerD2Set()" disabled><i class="fas fa-upload"></i> 등록하기</button>
+            </div>
+
+            <!-- Existing Sets -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-list" style="color:#6366f1;"></i> 등록된 세트 목록</span>
+                    <span id="d2SetsCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div id="d2SetsListWrap">
+                    <div class="q-empty">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        로딩 중...
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
@@ -899,5 +1028,6 @@
     <script src="js/admin-utils.js"></script>
     <script src="js/admin-questions.js"></script>
     <script src="js/admin-questions-daily1.js"></script>
+    <script src="js/admin-questions-daily2.js"></script>
 </body>
 </html>
