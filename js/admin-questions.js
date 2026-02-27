@@ -25,9 +25,21 @@ document.addEventListener('DOMContentLoaded', () => {
     loadExistingSets();
 });
 
-// ===== 섹션 전환 (향후 확장) =====
+// ===== 섹션 전환 =====
 function onSectionChange() {
-    // 현재 Fill in the Blanks만 활성화
+    const val = document.getElementById('sectionSelect').value;
+    // 모든 섹션 숨기기
+    const sections = document.querySelectorAll('[id^="section-"]');
+    sections.forEach(s => s.classList.add('q-hidden'));
+    // 선택된 섹션 표시
+    const target = document.getElementById('section-' + val);
+    if (target) target.classList.remove('q-hidden');
+    // 섹션별 초기 로드
+    if (val === 'reading-fillblanks') {
+        loadExistingSets();
+    } else if (val === 'reading-daily1') {
+        if (typeof loadD1ExistingSets === 'function') loadD1ExistingSets();
+    }
 }
 
 // ===== 기존 세트 목록 로드 =====
