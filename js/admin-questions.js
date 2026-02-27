@@ -39,6 +39,8 @@ function onSectionChange() {
         loadExistingSets();
     } else if (val === 'reading-daily1') {
         if (typeof loadD1ExistingSets === 'function') loadD1ExistingSets();
+    } else if (val === 'reading-daily2') {
+        if (typeof loadD2ExistingSets === 'function') loadD2ExistingSets();
     }
 }
 
