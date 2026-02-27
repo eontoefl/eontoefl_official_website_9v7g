@@ -342,6 +342,262 @@
 
         /* Hidden */
         .q-hidden { display: none !important; }
+
+        /* ===== Daily1 Styles ===== */
+        .d1-form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .d1-form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .d1-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .d1-required { color: #dc2626; }
+        .d1-input, .d1-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .d1-input:focus, .d1-select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+
+        /* Sentence rows */
+        .d1-sentence-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .d1-sentence-num {
+            min-width: 28px;
+            height: 28px;
+            background: #6366f1;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .d1-sentence-row input {
+            flex: 1;
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            box-sizing: border-box;
+        }
+        .d1-sentence-row input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        .d1-del-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #fca5a5;
+            background: #fef2f2;
+            color: #dc2626;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .d1-del-btn:hover { background: #fee2e2; }
+
+        /* Words table */
+        .d1-words-header {
+            display: flex;
+            gap: 8px;
+            padding: 8px 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 8px;
+        }
+        .d1-word-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .d1-word-row input {
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            box-sizing: border-box;
+        }
+        .d1-word-row input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        .d1-word-row input:nth-child(1) { flex: 2; }
+        .d1-word-row input:nth-child(2) { flex: 2; }
+        .d1-word-row input:nth-child(3) { flex: 3; }
+
+        /* Question section */
+        .d1-q-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 12px;
+        }
+        .d1-q-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .d1-q-full {
+            margin-bottom: 14px;
+        }
+        .d1-q-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 5px;
+        }
+        .d1-radio-group {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .d1-radio-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .d1-radio-label:hover { border-color: #6366f1; }
+        .d1-radio-label.selected {
+            border-color: #22c55e;
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+        .d1-radio-label input[type="radio"] {
+            margin: 0;
+            accent-color: #22c55e;
+        }
+
+        /* Option card */
+        .d1-option-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .d1-option-card.correct {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+        .d1-option-card-header {
+            font-size: 14px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .d1-option-card.correct .d1-option-card-header {
+            color: #16a34a;
+        }
+        .d1-option-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            background: #6366f1;
+            color: white;
+            border-radius: 50%;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .d1-option-card.correct .d1-option-label {
+            background: #22c55e;
+        }
+
+        /* Preview */
+        .d1-preview {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #1e293b;
+        }
+        .d1-preview-section {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .d1-preview-section:last-child { border-bottom: none; }
+        .d1-preview-main-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #6366f1;
+            margin-bottom: 4px;
+        }
+        .d1-preview-passage-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 12px;
+        }
+        .d1-preview-passage {
+            font-family: 'Georgia', serif;
+            font-size: 14px;
+            line-height: 1.9;
+            color: #374151;
+            white-space: pre-wrap;
+        }
+        .d1-preview-tag {
+            display: inline-block;
+            background: #eef2ff;
+            color: #6366f1;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 10px;
+            border-radius: 10px;
+            margin-right: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .d1-form-row, .d1-q-row { grid-template-columns: 1fr; }
+            .d1-radio-group { flex-wrap: wrap; }
+            .d1-words-header { display: none; }
+            .d1-word-row { flex-wrap: wrap; }
+            .d1-word-row input { flex: 1 1 100% !important; }
+        }
     </style>
 </head>
 <body>
@@ -394,7 +650,7 @@
             <select id="sectionSelect" class="q-section-select" onchange="onSectionChange()">
                 <option value="" disabled>── 섹션을 선택하세요 ──</option>
                 <option value="reading-fillblanks" selected>📝 Reading - Fill in the Blanks</option>
-                <option value="reading-daily1" disabled>📖 Reading - Daily1 (준비중)</option>
+                <option value="reading-daily1">📖 Reading - Daily1</option>
                 <option value="reading-daily2" disabled>📖 Reading - Daily2 (준비중)</option>
                 <option value="reading-academic" disabled>📖 Reading - Academic (준비중)</option>
                 <option value="listening-response" disabled>🎧 Listening - 응답고르기 (준비중)</option>
@@ -513,11 +769,135 @@
                 </div>
             </div>
         </div>
+
+        <!-- Daily1 Section -->
+        <div id="section-reading-daily1" class="q-hidden">
+            <!-- Set ID -->
+            <div class="q-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="q-set-id">
+                        <span class="label">세트 ID:</span>
+                        <span id="d1SetId">로딩중...</span>
+                    </div>
+                    <div id="d1EditModeLabel" class="q-hidden" style="background:#fef3c7; color:#d97706; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600;">
+                        <i class="fas fa-edit"></i> 수정 모드
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Title -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-heading" style="color:#6366f1;"></i> 기본 정보</div>
+                <div class="d1-form-row">
+                    <div class="d1-form-group">
+                        <label class="d1-label">상단 제목 <span class="d1-required">*</span></label>
+                        <select id="d1MainTitleSelect" class="d1-select" onchange="onD1MainTitleChange()">
+                            <option value="" disabled selected>상단 제목을 선택하세요</option>
+                            <option value="Read a notice.">Read a notice.</option>
+                            <option value="Read an email.">Read an email.</option>
+                            <option value="Read an advertisement.">Read an advertisement.</option>
+                            <option value="Read an article.">Read an article.</option>
+                            <option value="__custom__">✏️ 직접 입력</option>
+                        </select>
+                        <input type="text" id="d1MainTitleCustom" class="d1-input q-hidden" placeholder="상단 제목을 직접 입력하세요" oninput="updateD1RegisterBtn()">
+                    </div>
+                    <div class="d1-form-group">
+                        <label class="d1-label">지문 제목 <span class="d1-required">*</span></label>
+                        <input type="text" id="d1PassageTitle" class="d1-input" placeholder="지문 제목을 입력하세요 (예: Library Renovation Notice)" oninput="updateD1RegisterBtn()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passage Content -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 본문 <span class="d1-required">*</span></div>
+                <textarea id="d1PassageContent" class="q-textarea" placeholder="영어 지문 본문을 붙여넣으세요. 문단은 엔터로 구분합니다." oninput="updateD1RegisterBtn()"></textarea>
+            </div>
+
+            <!-- Sentence Translations -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-language" style="color:#6366f1;"></i> 문장별 번역 <span class="d1-required">*</span></span>
+                    <span id="d1SentenceCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div id="d1SentenceList"></div>
+                <button class="q-btn q-btn-secondary" onclick="addD1Sentence()" style="margin-top:10px;">
+                    <i class="fas fa-plus"></i> 문장 추가
+                </button>
+            </div>
+
+            <!-- Interactive Words -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-spell-check" style="color:#6366f1;"></i> 핵심 단어 <span class="d1-required">*</span></span>
+                    <span id="d1WordCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div class="d1-words-header">
+                    <span style="flex:2;">단어 *</span>
+                    <span style="flex:2;">뜻 *</span>
+                    <span style="flex:3;">설명 (선택)</span>
+                    <span style="width:36px;"></span>
+                </div>
+                <div id="d1WordList"></div>
+                <button class="q-btn q-btn-secondary" onclick="addD1Word()" style="margin-top:10px;">
+                    <i class="fas fa-plus"></i> 단어 추가
+                </button>
+            </div>
+
+            <!-- Question 1 -->
+            <div class="q-card">
+                <div class="q-card-title"><i class="fas fa-question-circle" style="color:#6366f1;"></i> 문제 1 <span class="d1-required">*</span></div>
+                <div id="d1Question1"></div>
+            </div>
+
+            <!-- Question 2 -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-question-circle" style="color:#94a3b8;"></i> 문제 2 <span style="font-size:12px; color:#94a3b8; font-weight:400;">(선택)</span></span>
+                    <button id="d1Q2ToggleBtn" class="q-btn q-btn-secondary q-btn-sm" onclick="toggleD1Question2()">
+                        <i class="fas fa-plus"></i> 문제 2 추가
+                    </button>
+                </div>
+                <div id="d1Question2" class="q-hidden"></div>
+            </div>
+
+            <!-- Preview -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-eye" style="color:#6366f1;"></i> 미리보기</span>
+                    <button class="q-btn q-btn-secondary q-btn-sm" onclick="renderD1Preview()">
+                        <i class="fas fa-sync-alt"></i> 갱신
+                    </button>
+                </div>
+                <div id="d1PreviewContent" style="padding:16px 0; color:#94a3b8; font-size:14px;">입력값을 채우면 미리보기가 표시됩니다.</div>
+            </div>
+
+            <!-- Register Button -->
+            <div style="display:flex; gap:12px; justify-content:flex-end; margin-bottom:32px;">
+                <button id="d1CancelEditBtn" class="q-btn q-btn-secondary q-hidden" onclick="cancelD1Edit()"><i class="fas fa-times"></i> 수정 취소</button>
+                <button id="d1RegisterBtn" class="q-btn q-btn-primary" onclick="registerD1Set()" disabled><i class="fas fa-upload"></i> 등록하기</button>
+            </div>
+
+            <!-- Existing Sets -->
+            <div class="q-card">
+                <div class="q-card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-list" style="color:#6366f1;"></i> 등록된 세트 목록</span>
+                    <span id="d1SetsCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                </div>
+                <div id="d1SetsListWrap">
+                    <div class="q-empty">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        로딩 중...
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-utils.js"></script>
     <script src="js/admin-questions.js"></script>
+    <script src="js/admin-questions-daily1.js"></script>
 </body>
 </html>
