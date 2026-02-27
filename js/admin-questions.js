@@ -131,7 +131,7 @@ function onPassageInput() {
 
 // ===== 빈칸 감지 =====
 function detectBlanks(text) {
-    const pattern = /([a-zA-Z]+)((?:\s*_\s*)+)/g;
+    const pattern = /([a-zA-Z]+)((?:\s*_)+)(?!\s*_)/g;
     const newBlanks = [];
     let match;
 
