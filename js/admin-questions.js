@@ -166,7 +166,11 @@ function renderBlanksTable() {
     const summary = document.getElementById('blanksSummary');
 
     const completedCount = blanksData.filter(b => b.answer).length;
-    summary.innerHTML = `<span class="count">${blanksData.length}개 감지</span> <span style="color:#64748b; font-weight:400;">(입력 완료: ${completedCount}/${blanksData.length})</span>`;
+    const isCorrectCount = blanksData.length === 10;
+    summary.innerHTML = `<span class="count" style="${isCorrectCount ? '' : 'background:#dc2626;'}">${blanksData.length}개 감지</span> `
+        + (isCorrectCount
+            ? `<span style="color:#64748b; font-weight:400;">(입력 완료: ${completedCount}/${blanksData.length})</span>`
+            : `<span style="color:#dc2626; font-weight:600;">❌ 빈칸은 정확히 10개여야 합니다 (현재 ${blanksData.length}개)</span>`);
 
     let html = `<table class="q-blanks-table">
         <thead><tr>
@@ -346,7 +350,8 @@ function renderPreview() {
 // ===== 등록 버튼 상태 업데이트 =====
 function updateRegisterButton() {
     const btn = document.getElementById('registerBtn');
-    const allFilled = blanksData.length > 0 && blanksData.every(b => {
+    const isCorrectCount = blanksData.length === 10;
+    const allFilled = isCorrectCount && blanksData.every(b => {
         return b.answer && b.answer.length === b.blankCount && /^[a-zA-Z]+$/.test(b.answer);
     });
 
