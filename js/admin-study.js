@@ -410,6 +410,12 @@ function renderTable() {
                         ${s.programType}
                     </span>
                 </td>
+                <td style="font-size:13px; white-space:nowrap;">
+                    ${s.scheduleStart ? formatDateWithDay(s.scheduleStart) : '<span style="color:#94a3b8;">미정</span>'}
+                    <div style="font-size:11px; margin-top:2px;">
+                        ${s.scheduleStart ? getDday(s.scheduleStart) : ''}
+                    </div>
+                </td>
                 <td>${isBeforeStart ? '<span style="color:#94a3b8; font-size:12px;">미시작</span>' : s.currentWeek + '/' + s.totalWeeks + '주'}</td>
                 <td>
                     <span style="color:${authColor}; font-weight:700;">${s.authDisplay}</span>
