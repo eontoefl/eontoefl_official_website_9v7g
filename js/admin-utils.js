@@ -354,7 +354,11 @@ function getScoreDisplay(app) {
     const target = app.target_cutoff_old || app.target_cutoff_new || null;
     
     const currentText = current ? current : '없음';
-    const targetText = target ? target : '없음';
+    // new 점수는 소수점 포함 가능 (예: 4.0)
+    let targetText = '없음';
+    if (target !== null && target !== undefined) {
+        targetText = Number.isInteger(Number(target)) && !app.target_cutoff_new ? String(target) : String(target);
+    }
     
     const currentColor = current ? '#1e293b' : '#94a3b8';
     const targetColor = target ? '#7c3aed' : '#94a3b8';

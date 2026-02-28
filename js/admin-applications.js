@@ -160,6 +160,18 @@ function applyFilters() {
             const nameB = (b.name || '').toLowerCase();
             return nameA.localeCompare(nameB);
         });
+    } else if (sortBy === 'startDate_asc') {
+        filteredApplications.sort((a, b) => {
+            const dateA = a.schedule_start ? new Date(a.schedule_start) : new Date('9999-12-31');
+            const dateB = b.schedule_start ? new Date(b.schedule_start) : new Date('9999-12-31');
+            return dateA - dateB;
+        });
+    } else if (sortBy === 'startDate_desc') {
+        filteredApplications.sort((a, b) => {
+            const dateA = a.schedule_start ? new Date(a.schedule_start) : new Date('0000-01-01');
+            const dateB = b.schedule_start ? new Date(b.schedule_start) : new Date('0000-01-01');
+            return dateB - dateA;
+        });
     }
     
     // 페이지 초기화
@@ -209,7 +221,7 @@ function displayApplications() {
                 </td>
                 <td>
                     <span style="color: #9480c5; font-weight: 500; font-size: 13px;">
-                        ${escapeHtml(app.preferred_program || '-')}
+                        ${escapeHtml(app.assigned_program || app.preferred_program || '-')}
                     </span>
                 </td>
                 <td style="font-size: 13px; color: #64748b;">
