@@ -125,40 +125,40 @@ async function loadStudyData() {
             const totalDeadlinedTasks = stats.calc_tasks_due || 0;
             const submittedTasksCount = stats.calc_tasks_submitted || 0;
 
-            // ── calc_tasks_due 기준 분기 (테스트룸 개발자와 합의) ──
-            // calc_tasks_due > 0 → 시작됨
-            // calc_tasks_due = 0 → 시작 전
+            // 시작 전 여부
+            const isBeforeStart = today < startDate;
+
+            // ── calc_tasks_due 기준 3분기 (테스트룸 개발자 포맷) ──
             const submitRate = stats.calc_submit_rate || 0;
-            const authSum = stats.calc_auth_sum || 0;
 
-            // ── 제출률 표시 ──
-            let submitDisplay;
-            if (totalDeadlinedTasks > 0) {
-                submitDisplay = `${submitRate}%`;
-            } else if (submittedTasksCount > 0) {
-                submitDisplay = `${submittedTasksCount}건 미리 완료 🎉`;
-            } else {
-                submitDisplay = '0%';
-            }
-
-            // ── 인증률 표시 ──
-            let authDisplay;
+            // 인증률 표시
+            let authDisplay = '-';
             if (totalDeadlinedTasks > 0) {
                 authDisplay = `${avgAuthRate}%`;
-            } else if (submittedTasksCount > 0) {
+            } else if (totalDeadlinedTasks === 0 && submittedTasksCount > 0) {
                 authDisplay = `${avgAuthRate}%`;
             } else {
                 authDisplay = '-';
             }
 
-            // ── 등급 표시 ──
-            let displayGrade = '-';
-            let gradeColor = '#94a3b8';
+            // 등급 표시
+            let displayGrade;
             if (totalDeadlinedTasks > 0) {
                 displayGrade = grade;
-                gradeColor = getGradeColor(grade);
+            } else {
+                displayGrade = '-';
             }
-            // calc_tasks_due = 0 → 무조건 "-" / 시작 후 산정
+            const gradeColor = (displayGrade !== '-') ? getGradeColor(grade) : '#94a3b8';
+
+            // 제출률 표시
+            let submitDisplay = '-';
+            if (totalDeadlinedTasks > 0) {
+                submitDisplay = `${submitRate}%`;
+            } else if (totalDeadlinedTasks === 0 && submittedTasksCount > 0) {
+                submitDisplay = `${submittedTasksCount}건 미리 완료 🎉`;
+            } else {
+                submitDisplay = '0%';
+            }
 
             // ── 추세 (이번 주 vs 저번 주 — 여전히 auth_records 기반) ──
             const thisWeekStart = new Date(startDate);
@@ -322,11 +322,28 @@ function applyFilters() {
         return true;
     });
 
-    // 정렬
+    // 정렬 (미시작자는 항상 하단)
     filteredStudentData.sort((a, b) => {
+        const aStarted = a.totalDeadlinedTasks > 0 || a.avgAuthRate > 0 ? 1 : (new Date(a.scheduleStart) <= new Date() ? 1 : 0);
+        const bStarted = b.totalDeadlinedTasks > 0 || b.avgAuthRate > 0 ? 1 : (new Date(b.scheduleStart) <= new Date() ? 1 : 0);
+        const aBeforeStart = new Date(a.scheduleStart) > new Date();
+        const bBeforeStart = new Date(b.scheduleStart) > new Date();
+
+        // 미시작자 하단
+        if (aBeforeStart !== bBeforeStart) return aBeforeStart ? 1 : -1;
+
         switch (sortBy) {
+            case 'manage':
+                // 관리 필요순: 인증률 낮은순 (과제 있는 학생 우선)
+                if ((a.totalDeadlinedTasks > 0) !== (b.totalDeadlinedTasks > 0)) {
+                    return a.totalDeadlinedTasks > 0 ? -1 : 1;
+                }
+                return a.avgAuthRate - b.avgAuthRate;
             case 'authRate_asc': return a.avgAuthRate - b.avgAuthRate;
             case 'authRate_desc': return b.avgAuthRate - a.avgAuthRate;
+            case 'startDate_asc': return new Date(a.scheduleStart) - new Date(b.scheduleStart);
+            case 'startDate_desc': return new Date(b.scheduleStart) - new Date(a.scheduleStart);
+            case 'submitRate_asc': return a.submitRate - b.submitRate;
             case 'lastActivity_asc': return (b.daysSinceActivity || 999) - (a.daysSinceActivity || 999);
             case 'name_asc': return a.name.localeCompare(b.name, 'ko');
             default: return a.avgAuthRate - b.avgAuthRate;
@@ -354,7 +371,12 @@ function renderTable() {
     tbody.innerHTML = filteredStudentData.map(s => {
         // 행 스타일
         let rowStyle = '';
-        if (s.grade !== '-' && s.avgAuthRate < 50) rowStyle += 'background: #fef2f2;';
+        const isBeforeStart = new Date(s.scheduleStart) > new Date();
+        if (isBeforeStart) {
+            rowStyle += 'background: #f8fafc; opacity: 0.7;';
+        } else if (s.grade !== '-' && s.avgAuthRate < 50) {
+            rowStyle += 'background: #fef2f2;';
+        }
         if (s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
 
         const nameWarning = (s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
@@ -388,7 +410,7 @@ function renderTable() {
                         ${s.programType}
                     </span>
                 </td>
-                <td>${s.currentWeek}/${s.totalWeeks}주</td>
+                <td>${isBeforeStart ? '<span style="color:#94a3b8; font-size:12px;">미시작</span>' : s.currentWeek + '/' + s.totalWeeks + '주'}</td>
                 <td>
                     <span style="color:${authColor}; font-weight:700;">${s.authDisplay}</span>
                 </td>

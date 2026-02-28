@@ -210,9 +210,9 @@ function displayApplications() {
                     </span>
                 </td>
                 <td style="font-size: 13px; color: #64748b;">
-                    ${app.schedule_start ? formatDateOnly(app.schedule_start) : '<span style="color:#94a3b8;">미정</span>'}
-                    <div style="font-size: 11px; color: #94a3b8;">
-                        ${app.schedule_start ? getRelativeTime(app.schedule_start) : ''}
+                    ${app.schedule_start ? formatDateWithDay(app.schedule_start) : '<span style="color:#94a3b8;">미정</span>'}
+                    <div style="font-size: 11px; margin-top:2px;">
+                        ${app.schedule_start ? getDday(app.schedule_start) : ''}
                     </div>
                 </td>
                 <td>
@@ -871,8 +871,9 @@ function matchTrackingData(rows) {
         // 전화번호에서 중간 4자리 추출 (010-XXXX-****)
         const phoneMid = extractPhoneMid(phone);
 
-        // DB에서 매칭 (allApplications 사용)
+        // DB에서 매칭 (allApplications 사용, 삭제된 신청서 제외)
         const matched = allApplications.filter(app => {
+            if (app.deleted) return false;
             if (app.name !== name) return false;
             if (phoneMid && app.phone) {
                 const appPhoneMid = extractPhoneMid(app.phone);
