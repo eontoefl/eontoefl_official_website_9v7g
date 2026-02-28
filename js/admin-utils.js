@@ -193,6 +193,47 @@ function formatPhone(phone) {
 }
 
 /**
+ * 날짜 + 요일 포맷팅 (예: 2026-03-01 (일))
+ * @param {string|number} dateInput - 날짜 문자열 또는 타임스탬프
+ * @returns {string} 포맷된 날짜 + 요일
+ */
+function formatDateWithDay(dateInput) {
+    if (!dateInput) return '-';
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '-';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayName = days[date.getDay()];
+    return `${year}-${month}-${day} (${dayName})`;
+}
+
+/**
+ * D-Day 계산 (예: D-3, D-DAY, D+2)
+ * @param {string|number} dateInput - 시작일 문자열 또는 타임스탬프
+ * @returns {string} D-Day HTML 문자열
+ */
+function getDday(dateInput) {
+    if (!dateInput) return '';
+    const target = new Date(dateInput);
+    if (isNaN(target.getTime())) return '';
+    const today = new Date();
+    // 날짜만 비교 (시간 제거)
+    const targetDate = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diff = Math.round((targetDate - todayDate) / (1000 * 60 * 60 * 24));
+    
+    if (diff === 0) {
+        return '<span style="color:#ef4444; font-weight:700;">D-DAY</span>';
+    } else if (diff > 0) {
+        return `<span style="color:#7c3aed; font-weight:600;">D-${diff}</span>`;
+    } else {
+        return `<span style="color:#94a3b8; font-weight:500;">D+${Math.abs(diff)}</span>`;
+    }
+}
+
+/**
  * 사이트 설정 조회 함수
  * @returns {Promise<Object|null>} 사이트 설정 객체 또는 null
  */
