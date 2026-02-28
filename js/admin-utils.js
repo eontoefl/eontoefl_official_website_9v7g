@@ -249,3 +249,117 @@ async function getSiteSettings() {
         return null;
     }
 }
+
+/**
+ * 남은 기간을 "X달 X주 남음" 형태로 반환
+ * @param {string} dateStr - 날짜 문자열 (예: "2026-10", "2026-05-10")
+ * @returns {string} 남은 기간 HTML 문자열
+ */
+function getRemainingPeriod(dateStr) {
+    if (!dateStr) return '';
+    
+    // "2026-10" 같은 월만 있는 경우 → 해당 월 말일로 처리
+    let targetDate;
+    if (/^\d{4}-\d{2}$/.test(dateStr)) {
+        const [year, month] = dateStr.split('-').map(Number);
+        targetDate = new Date(year, month, 0); // 해당 월의 마지막 날
+    } else {
+        targetDate = new Date(dateStr);
+    }
+    
+    if (isNaN(targetDate.getTime())) return '';
+    
+    const today = new Date();
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    
+    const diffDays = Math.round((target - todayDate) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return '<span style="color:#ef4444; font-weight:600;">마감</span>';
+    if (diffDays === 0) return '<span style="color:#ef4444; font-weight:700;">오늘 마감</span>';
+    
+    const months = Math.floor(diffDays / 30);
+    const weeks = Math.floor((diffDays % 30) / 7);
+    
+    let text = '';
+    if (months > 0) text += `${months}달 `;
+    if (weeks > 0) text += `${weeks}주 `;
+    if (months === 0 && weeks === 0) text = `${diffDays}일 `;
+    text += '남음';
+    
+    // 색상: 1달 이내 빨강, 2달 이내 주황, 그 외 초록
+    let color = '#22c55e';
+    if (diffDays <= 30) color = '#ef4444';
+    else if (diffDays <= 60) color = '#f59e0b';
+    
+    return `<span style="color:${color}; font-weight:600; font-size:11px;">${text}</span>`;
+}
+
+/**
+ * 목표기한 표시 (submission_deadline 우선, 지났으면 preferred_completion)
+ * @param {Object} app - 신청서 객체
+ * @returns {string} HTML 문자열
+ */
+function getDeadlineDisplay(app) {
+    const now = new Date();
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // submission_deadline 파싱
+    let sdDate = null;
+    if (app.submission_deadline) {
+        if (/^\d{4}-\d{2}$/.test(app.submission_deadline)) {
+            const [y, m] = app.submission_deadline.split('-').map(Number);
+            sdDate = new Date(y, m, 0);
+        } else {
+            sdDate = new Date(app.submission_deadline);
+        }
+    }
+    
+    // submission_deadline이 아직 안 지났으면
+    if (sdDate && sdDate >= todayDate) {
+        return `<div style="font-size:13px; color:#1e293b;">${escapeHtml(app.submission_deadline)}</div>
+                <div style="margin-top:2px;">${getRemainingPeriod(app.submission_deadline)}</div>`;
+    }
+    
+    // 지났으면 preferred_completion으로 전환
+    if (app.preferred_completion) {
+        let pcDate = null;
+        if (/^\d{4}-\d{2}$/.test(app.preferred_completion)) {
+            const [y, m] = app.preferred_completion.split('-').map(Number);
+            pcDate = new Date(y, m, 0);
+        } else {
+            pcDate = new Date(app.preferred_completion);
+        }
+        
+        return `<div style="font-size:13px; color:#1e293b;">${escapeHtml(app.preferred_completion)}</div>
+                <div style="margin-top:2px;">${getRemainingPeriod(app.preferred_completion)}</div>`;
+    }
+    
+    // 둘 다 없거나 둘 다 지남
+    if (sdDate) {
+        return `<div style="font-size:13px; color:#94a3b8;">${escapeHtml(app.submission_deadline)}</div>
+                <div style="margin-top:2px;">${getRemainingPeriod(app.submission_deadline)}</div>`;
+    }
+    
+    return '<span style="color:#94a3b8;">-</span>';
+}
+
+/**
+ * 점수 표시 (현재 → 목표)
+ * @param {Object} app - 신청서 객체
+ * @returns {string} HTML 문자열
+ */
+function getScoreDisplay(app) {
+    const current = app.score_total_old || app.score_total_new || null;
+    const target = app.target_cutoff_old || app.target_cutoff_new || null;
+    
+    const currentText = current ? current : '없음';
+    const targetText = target ? target : '없음';
+    
+    const currentColor = current ? '#1e293b' : '#94a3b8';
+    const targetColor = target ? '#7c3aed' : '#94a3b8';
+    
+    return `<span style="color:${currentColor}; font-weight:600;">${currentText}</span>
+            <span style="color:#94a3b8; margin:0 2px;">→</span>
+            <span style="color:${targetColor}; font-weight:600;">${targetText}</span>`;
+}

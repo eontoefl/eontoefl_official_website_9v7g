@@ -201,8 +201,11 @@ function displayApplications() {
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
                 </td>
+                <td style="font-size: 13px; white-space:nowrap;">
+                    ${getScoreDisplay(app)}
+                </td>
                 <td style="font-size: 13px;">
-                    ${formatPhone(app.phone)}
+                    ${getDeadlineDisplay(app)}
                 </td>
                 <td>
                     <span style="color: #9480c5; font-weight: 500; font-size: 13px;">
