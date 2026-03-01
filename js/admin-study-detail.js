@@ -1213,8 +1213,9 @@ async function addDeadlineExtension() {
             });
             alert(`✅ ${originalDate} 연장이 +${extraDays}일로 수정되었습니다.`);
         } else {
-            // INSERT
+            // INSERT (id를 클라이언트에서 생성)
             await supabaseAPI.post('tr_deadline_extensions', {
+                id: crypto.randomUUID(),
                 user_id: userId,
                 original_date: originalDate,
                 extra_days: extraDays,
