@@ -260,6 +260,80 @@
         .btn-copy:hover { background: #6d28d9; }
         .btn-copy.copied { background: #22c55e; }
 
+        /* ===== 데드라인 연장 관리 ===== */
+        .deadline-container {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        .deadline-toggle-btn {
+            background: none; border: none; cursor: pointer;
+            font-size: 13px; color: #7c3aed; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 0;
+        }
+        .deadline-toggle-btn:hover { color: #6d28d9; }
+        .deadline-body { display: none; margin-top: 16px; }
+        .deadline-body.open { display: block; }
+        .deadline-form {
+            display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+            padding: 16px; background: #f8fafc; border-radius: 10px;
+            border: 1px solid #e2e8f0; margin-bottom: 16px;
+        }
+        .deadline-form .field {
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .deadline-form .field label {
+            font-size: 12px; font-weight: 600; color: #64748b;
+        }
+        .deadline-form .field input,
+        .deadline-form .field select {
+            padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 13px; font-family: 'Pretendard', sans-serif;
+        }
+        .deadline-form .field input:focus,
+        .deadline-form .field select:focus {
+            outline: none; border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+        }
+        .deadline-form .field-reason { flex: 1; min-width: 150px; }
+        .deadline-form .field-reason input { width: 100%; }
+        .btn-deadline-add {
+            background: #7c3aed; color: white; border: none;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; white-space: nowrap;
+            display: inline-flex; align-items: center; gap: 6px;
+            align-self: flex-end;
+        }
+        .btn-deadline-add:hover { background: #6d28d9; }
+        .btn-deadline-add:disabled { background: #c4b5fd; cursor: not-allowed; }
+        .deadline-list-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .deadline-list-table th {
+            text-align: left; padding: 8px 12px; background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0; color: #64748b; font-weight: 600;
+            font-size: 12px;
+        }
+        .deadline-list-table td {
+            padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #334155;
+        }
+        .deadline-list-table tr:hover { background: #faf5ff; }
+        .btn-deadline-del {
+            background: #fef2f2; color: #ef4444; border: 1px solid #fca5a5;
+            padding: 4px 10px; border-radius: 6px; cursor: pointer;
+            font-size: 11px; font-weight: 600;
+        }
+        .btn-deadline-del:hover { background: #fee2e2; }
+        .deadline-empty {
+            text-align: center; padding: 24px; color: #94a3b8; font-size: 13px;
+        }
+        .deadline-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #fef3c7; color: #d97706; padding: 2px 8px;
+            border-radius: 6px; font-size: 11px; font-weight: 600;
+        }
+
         /* ===== 오답노트 모달 ===== */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -381,6 +455,50 @@
             <!-- 요약 카드 4개 (테스트룸 마이페이지와 동일) -->
             <div class="detail-stats-grid" id="summaryCards">
                 <!-- JS에서 렌더링 -->
+            </div>
+
+            <!-- 📅 데드라인 연장 관리 -->
+            <div class="deadline-container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="section-title" style="margin-bottom:0;">
+                        <i class="fas fa-calendar-plus" style="color:#7c3aed;"></i>
+                        데드라인 연장 관리
+                        <span id="deadlineCount" class="deadline-badge" style="display:none;"></span>
+                    </div>
+                    <button class="deadline-toggle-btn" id="deadlineToggleBtn" onclick="toggleDeadlineSection()">
+                        <i class="fas fa-chevron-down" id="deadlineToggleIcon"></i> 펼치기
+                    </button>
+                </div>
+                <div class="deadline-body" id="deadlineBody">
+                    <!-- 연장 추가 폼 -->
+                    <div class="deadline-form">
+                        <div class="field">
+                            <label>과제 날짜 *</label>
+                            <input type="date" id="dlDate">
+                        </div>
+                        <div class="field">
+                            <label>연장 일수 *</label>
+                            <select id="dlDays">
+                                <option value="1">+1일</option>
+                                <option value="2">+2일</option>
+                                <option value="3">+3일</option>
+                                <option value="5">+5일</option>
+                                <option value="7">+7일</option>
+                            </select>
+                        </div>
+                        <div class="field field-reason">
+                            <label>사유 (선택)</label>
+                            <input type="text" id="dlReason" placeholder="예: 영국 거주 - 시차">
+                        </div>
+                        <button class="btn-deadline-add" id="dlAddBtn" onclick="addDeadlineExtension()">
+                            <i class="fas fa-plus"></i> 연장 등록
+                        </button>
+                    </div>
+                    <!-- 연장 목록 -->
+                    <div id="deadlineListWrap">
+                        <div class="deadline-empty"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</div>
+                    </div>
+                </div>
             </div>
 
             <!-- 주차별 잔디심기 -->
