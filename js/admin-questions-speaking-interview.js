@@ -62,17 +62,17 @@ function initSiQuestions() {
                 <div class="sr-q-field">
                     <label>핵심 표현</label>
                     <table class="si-hl-table" id="siV${i}HlTable">
-                        <thead><tr><th style="width:30%">표현 (phrase)</th><th style="width:35%">뜻 (meaning)</th><th style="width:35%">용법 (usage)</th></tr></thead>
+                        <thead><tr><th style="width:30%">키워드 (key)</th><th style="width:35%">제목 (title)</th><th style="width:35%">설명 (description)</th></tr></thead>
                         <tbody id="siV${i}HlBody">
                             <tr>
                                 <td><input type="text" placeholder="I believe"></td>
-                                <td><input type="text" placeholder="~라고 생각합니다"></td>
-                                <td><input type="text" placeholder="의견을 말할 때"></td>
+                                <td><input type="text" placeholder="피드백 제목"></td>
+                                <td><input type="text" placeholder="피드백 상세 설명"></td>
                             </tr>
                         </tbody>
                     </table>
                     <div style="margin-top: 6px; display: flex; gap: 6px;">
-                        <button class="si-hl-add-btn" onclick="addSiHighlightRow(${i})">+ 표현 추가</button>
+                        <button class="si-hl-add-btn" onclick="addSiHighlightRow(${i})">+ 키워드 추가</button>
                         <button class="si-hl-del-btn" onclick="removeSiHighlightRow(${i})">- 마지막 삭제</button>
                     </div>
                 </div>
@@ -88,9 +88,9 @@ function addSiHighlightRow(vNum) {
     if (!tbody) return;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" placeholder="표현"></td>
-        <td><input type="text" placeholder="뜻"></td>
-        <td><input type="text" placeholder="용법"></td>`;
+        <td><input type="text" placeholder="키워드"></td>
+        <td><input type="text" placeholder="제목"></td>
+        <td><input type="text" placeholder="설명"></td>`;
     tbody.appendChild(tr);
 }
 
@@ -104,17 +104,17 @@ function removeSiHighlightRow(vNum) {
 function buildSiHighlightsJSON(vNum) {
     const tbody = document.getElementById(`siV${vNum}HlBody`);
     if (!tbody) return '{}';
-    const expressions = [];
+    const result = {};
     for (const row of tbody.rows) {
         const inputs = row.querySelectorAll('input');
-        const phrase = inputs[0]?.value?.trim() || '';
-        const meaning = inputs[1]?.value?.trim() || '';
-        const usage = inputs[2]?.value?.trim() || '';
-        if (phrase || meaning || usage) {
-            expressions.push({ phrase, meaning, usage });
+        const key = inputs[0]?.value?.trim() || '';
+        const title = inputs[1]?.value?.trim() || '';
+        const description = inputs[2]?.value?.trim() || '';
+        if (key) {
+            result[key] = { title, description };
         }
     }
-    return expressions.length > 0 ? JSON.stringify({ expressions }) : '{}';
+    return Object.keys(result).length > 0 ? JSON.stringify(result) : '{}';
 }
 
 // ===== JSON → 핵심 표현 테이블 로드 =====
@@ -124,17 +124,25 @@ function loadSiHighlights(vNum, jsonStr) {
     tbody.innerHTML = '';
     let data;
     try { data = JSON.parse(jsonStr || '{}'); } catch { data = {}; }
-    const expressions = data.expressions || [];
-    if (expressions.length === 0) {
+    // 새 형식: { "키워드": { "title": ..., "description": ... } }
+    // 레거시 형식: { "expressions": [{ "phrase", "meaning", "usage" }] }
+    let entries = [];
+    if (data.expressions && Array.isArray(data.expressions)) {
+        // 레거시 형식 호환
+        entries = data.expressions.map(e => ({ key: e.phrase || '', title: e.meaning || '', description: e.usage || '' }));
+    } else {
+        entries = Object.entries(data).map(([k, v]) => ({ key: k, title: v?.title || '', description: v?.description || '' }));
+    }
+    if (entries.length === 0) {
         addSiHighlightRow(vNum);
         return;
     }
-    for (const expr of expressions) {
+    for (const e of entries) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><input type="text" value="${escapeHtml(expr.phrase || '')}"></td>
-            <td><input type="text" value="${escapeHtml(expr.meaning || '')}"></td>
-            <td><input type="text" value="${escapeHtml(expr.usage || '')}"></td>`;
+            <td><input type="text" value="${escapeHtml(e.key || '')}"></td>
+            <td><input type="text" value="${escapeHtml(e.title || '')}"></td>
+            <td><input type="text" value="${escapeHtml(e.description || '')}"></td>`;
         tbody.appendChild(tr);
     }
 }
@@ -362,8 +370,9 @@ function renderSiPreview() {
         let hlText = '';
         try {
             const hl = JSON.parse(hlJson);
-            if (hl.expressions && hl.expressions.length > 0) {
-                hlText = hl.expressions.map(e => e.phrase).filter(Boolean).join(', ');
+            const keys = Object.keys(hl);
+            if (keys.length > 0) {
+                hlText = keys.join(', ');
             }
         } catch {}
 
@@ -455,9 +464,9 @@ function buildSiPayload() {
     const data = {
         id: getSiSetId(),
         context_text: document.getElementById('siContextText').value.trim(),
-        translation: document.getElementById('siContextTrans')?.value?.trim() || '',
-        audio: `${SI_BASE_URL}/narration/${SI_PREFIX}${setNum}_nr.mp3`,
-        image: `${SI_BASE_URL}/contextimage/interview_baseimage_${g}.png`,
+        context_translation: document.getElementById('siContextTrans')?.value?.trim() || '',
+        context_audio: `${SI_BASE_URL}/narration/${SI_PREFIX}${setNum}_nr.mp3`,
+        context_image: `${SI_BASE_URL}/contextimage/interview_baseimage_${g}.png`,
         nodding_video: `${SI_BASE_URL}/video/nodding_video_${g === 'female' ? 'f' : 'm'}.mp4`,
     };
 
@@ -519,7 +528,7 @@ async function editSiSet(setId) {
 
     // 폼 채우기
     document.getElementById('siContextText').value = set.context_text || '';
-    document.getElementById('siContextTrans').value = set.translation || '';
+    document.getElementById('siContextTrans').value = set.context_translation || '';
 
     for (let i = 1; i <= SI_Q_COUNT; i++) {
         const sEl = document.getElementById(`siV${i}Script`);
