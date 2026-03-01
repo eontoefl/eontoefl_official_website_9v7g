@@ -1,4 +1,4 @@
-// ===== 문제 관리: Reading - Daily1 =====
+// ===== 문제 관리: Reading - Daily1 (v2 블록 입력) =====
 
 const D1_TABLE = 'tr_reading_daily1';
 const D1_PREFIX = 'daily1_set_';
@@ -112,39 +112,84 @@ function getD1MainTitle() {
     return sel.value;
 }
 
-// ===== 문장별 번역: 동적 행 =====
-function addD1Sentence(value) {
-    const list = document.getElementById('d1SentenceList');
-    const idx = list.children.length + 1;
-    const row = document.createElement('div');
-    row.className = 'd1-sentence-row';
-    row.innerHTML = `
-        <div class="d1-sentence-num">${idx}</div>
-        <input type="text" value="${d1EscapeAttr(value || '')}" placeholder="문장의 한글 해석을 입력하세요" oninput="updateD1RegisterBtn()">
-        <button class="d1-del-btn" onclick="removeD1Sentence(this)" title="삭제"><i class="fas fa-times"></i></button>
+// ===== 블록 입력: CRUD (v2) =====
+function addD1Block(text = '', needsTranslation = true, translation = '') {
+    const list = document.getElementById('d1BlockList');
+    const idx = list.children.length;
+
+    const block = document.createElement('div');
+    block.className = 'passage-block';
+    block.dataset.blockIdx = idx;
+
+    const transHiddenClass = needsTranslation ? '' : ' hidden';
+    const checkedAttr = needsTranslation ? ' checked' : '';
+
+    block.innerHTML = `
+        <div class="passage-block-header">
+            <span class="passage-block-num">블록 ${idx + 1}</span>
+            <button class="d1-del-btn" onclick="removeD1Block(this)" title="삭제">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="passage-block-body">
+            <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+            <textarea class="passage-block-text" placeholder="영어 원문을 입력하세요 (엔터 = 같은 블록 안의 줄바꿈)" rows="3" oninput="updateD1RegisterBtn()">${d1EscapeHtml(text)}</textarea>
+            
+            <label class="passage-block-check">
+                <input type="checkbox" class="block-needs-trans"${checkedAttr} onchange="toggleD1BlockTranslation(this)">
+                해석 필요
+            </label>
+            
+            <div class="passage-block-trans-wrap${transHiddenClass}">
+                <div class="d1-q-label">해석</div>
+                <input type="text" class="passage-block-trans" placeholder="한글 해석을 입력하세요" value="${d1EscapeAttr(translation)}" oninput="updateD1RegisterBtn()">
+            </div>
+        </div>
     `;
-    list.appendChild(row);
-    updateD1SentenceNumbers();
+
+    list.appendChild(block);
+    updateD1BlockNumbers();
     updateD1RegisterBtn();
 }
 
-function removeD1Sentence(btn) {
-    btn.closest('.d1-sentence-row').remove();
-    updateD1SentenceNumbers();
+function removeD1Block(btn) {
+    const list = document.getElementById('d1BlockList');
+    if (list.children.length <= 1) {
+        alert('블록은 최소 1개 이상이어야 합니다.');
+        return;
+    }
+    btn.closest('.passage-block').remove();
+    updateD1BlockNumbers();
     updateD1RegisterBtn();
 }
 
-function updateD1SentenceNumbers() {
-    const rows = document.querySelectorAll('#d1SentenceList .d1-sentence-row');
-    rows.forEach((row, i) => {
-        row.querySelector('.d1-sentence-num').textContent = i + 1;
+function updateD1BlockNumbers() {
+    const blocks = document.querySelectorAll('#d1BlockList .passage-block');
+    blocks.forEach((block, i) => {
+        block.dataset.blockIdx = i;
+        block.querySelector('.passage-block-num').textContent = `블록 ${i + 1}`;
     });
-    document.getElementById('d1SentenceCount').textContent = `(${rows.length}개)`;
+    document.getElementById('d1BlockCount').textContent = `(${blocks.length}개)`;
 }
 
-function getD1Sentences() {
-    const rows = document.querySelectorAll('#d1SentenceList .d1-sentence-row');
-    return Array.from(rows).map(r => r.querySelector('input').value.trim());
+function toggleD1BlockTranslation(checkbox) {
+    const wrap = checkbox.closest('.passage-block-body').querySelector('.passage-block-trans-wrap');
+    if (checkbox.checked) {
+        wrap.classList.remove('hidden');
+    } else {
+        wrap.classList.add('hidden');
+    }
+    updateD1RegisterBtn();
+}
+
+function getD1Blocks() {
+    const blocks = document.querySelectorAll('#d1BlockList .passage-block');
+    return Array.from(blocks).map(block => {
+        const text = block.querySelector('.passage-block-text').value;
+        const needsTranslation = block.querySelector('.block-needs-trans').checked;
+        const translation = block.querySelector('.passage-block-trans').value;
+        return { text: text.trim(), needsTranslation, translation: translation.trim() };
+    });
 }
 
 // ===== 핵심 단어: 동적 행 =====
@@ -250,7 +295,6 @@ function initD1QuestionBlock(containerId, qNum) {
 
 function selectD1Answer(prefix, num) {
     const labels = ['A', 'B', 'C', 'D'];
-    // 라디오 UI 업데이트
     labels.forEach((l, i) => {
         const radioLabel = document.getElementById(`${prefix}Radio${l}`);
         const optionCard = document.getElementById(`${prefix}Option${l}`);
@@ -262,7 +306,6 @@ function selectD1Answer(prefix, num) {
             optionCard.classList.remove('correct');
         }
     });
-    // 실제 라디오 체크
     const radio = document.querySelector(`input[name="${prefix}Answer"][value="${num}"]`);
     if (radio) radio.checked = true;
     updateD1RegisterBtn();
@@ -316,15 +359,22 @@ function d1SanitizeDelimiters(str) {
     return str.replace(/::/g, ': :').replace(/##/g, '# #');
 }
 
-// ===== 데이터 조합 (폼 → DB) =====
+// ===== 데이터 조합 (폼 → DB) — v2 블록 방식 =====
 function buildD1Data() {
     const mainTitle = d1SanitizeDelimiters(getD1MainTitle());
     const passageTitle = d1SanitizeDelimiters(document.getElementById('d1PassageTitle').value.trim());
-    const passageContent = document.getElementById('d1PassageContent').value.trim();
-    const sentences = getD1Sentences().map(s => d1SanitizeDelimiters(s));
+    const blocks = getD1Blocks();
     const words = getD1Words();
 
-    const sentenceTranslations = sentences.join('##');
+    // 블록 원문을 ##로 연결 (각 블록 내 ##는 sanitize 완료)
+    const passageContent = blocks.map(b => d1SanitizeDelimiters(b.text)).join('##');
+
+    // 해석을 ##로 연결 (해석 없는 블록은 빈 문자열)
+    const sentenceTranslations = blocks.map(b => {
+        if (b.needsTranslation && b.translation) return d1SanitizeDelimiters(b.translation);
+        return '';
+    }).join('##');
+
     const interactiveWords = words.map(w => {
         const word = d1SanitizeDelimiters(w.word);
         const translation = d1SanitizeDelimiters(w.translation);
@@ -364,7 +414,7 @@ function buildD1Data() {
     };
 }
 
-// ===== 유효성 검사 =====
+// ===== 유효성 검사 — v2 블록 방식 =====
 function validateD1Form() {
     const errors = [];
 
@@ -372,17 +422,22 @@ function validateD1Form() {
     if (!getD1MainTitle()) errors.push('상단 제목을 선택해주세요');
     // 지문 제목
     if (!document.getElementById('d1PassageTitle').value.trim()) errors.push('지문 제목을 입력해주세요');
-    // 지문 본문
-    if (!document.getElementById('d1PassageContent').value.trim()) errors.push('지문 본문을 입력해주세요');
 
-    // 문장별 번역
-    const sentences = getD1Sentences();
-    if (sentences.length === 0) {
-        errors.push('문장별 번역을 최소 1개 입력해주세요');
+    // 블록 검사
+    const blocks = getD1Blocks();
+    if (blocks.length === 0) {
+        errors.push('지문 블록을 최소 1개 입력해주세요');
     } else {
-        sentences.forEach((s, i) => {
-            if (!s) errors.push(`문장별 번역 #${i + 1}이 비어있습니다`);
+        blocks.forEach((b, i) => {
+            if (!b.text) errors.push(`블록 #${i + 1}의 원문을 입력해주세요`);
+            if (b.needsTranslation && !b.translation) errors.push(`블록 #${i + 1}의 해석을 입력해주세요`);
         });
+
+        // 해석 있는 블록이 최소 1개 필요
+        const hasTranslation = blocks.some(b => b.needsTranslation);
+        if (!hasTranslation) {
+            errors.push('해석이 있는 블록이 최소 1개 필요합니다');
+        }
     }
 
     // 핵심 단어
@@ -475,7 +530,7 @@ async function registerD1Set() {
     }
 }
 
-// ===== 수정 모드 =====
+// ===== 수정 모드 — v2 블록 역파싱 =====
 async function editD1Set(id) {
     const set = d1ExistingSets.find(s => s.id === id);
     if (!set) return;
@@ -498,12 +553,28 @@ async function editD1Set(id) {
     }
 
     document.getElementById('d1PassageTitle').value = set.passage_title || '';
-    document.getElementById('d1PassageContent').value = set.passage_content || '';
 
-    // 문장별 번역 로드
-    document.getElementById('d1SentenceList').innerHTML = '';
-    if (set.sentence_translations) {
-        set.sentence_translations.split('##').forEach(s => addD1Sentence(s));
+    // ===== 블록 로드 (하위 호환 포함) =====
+    document.getElementById('d1BlockList').innerHTML = '';
+
+    if (set.passage_content && set.passage_content.includes('##')) {
+        // 새 방식: ##로 split → 블록 생성
+        const passageBlocks = set.passage_content.split('##');
+        const translationBlocks = (set.sentence_translations || '').split('##');
+
+        passageBlocks.forEach((text, i) => {
+            const trans = translationBlocks[i] || '';
+            const needsTrans = trans.trim() !== '';
+            addD1Block(text, needsTrans, trans);
+        });
+    } else {
+        // 기존 방식 (B): 전체 원문을 블록 1개에 넣기
+        const fullText = set.passage_content || '';
+        // 기존 sentence_translations를 줄바꿈으로 합쳐서 해석란에 넣기
+        const allTrans = set.sentence_translations
+            ? set.sentence_translations.split('##').join('\n')
+            : '';
+        addD1Block(fullText, true, allTrans);
     }
 
     // 핵심 단어 로드
@@ -523,7 +594,6 @@ async function editD1Set(id) {
     // 문제 2 로드
     if (set.question2 && set.question2.trim()) {
         if (!d1Q2Visible) toggleD1Question2();
-        // initD1QuestionBlock이 toggleD1Question2 안에서 호출되므로 약간의 지연 필요
         setTimeout(() => {
             loadD1QuestionToForm(set.question2, 2);
             updateD1RegisterBtn();
@@ -551,29 +621,21 @@ async function editD1Set(id) {
 function loadD1QuestionToForm(questionStr, qNum) {
     const prefix = `d1Q${qNum}`;
 
-    // 먼저 :: 로 4개 파트를 추출 (Qn, text, trans, answer)
-    // 나머지는 보기 파트
     const allParts = questionStr.split('::');
-    // allParts[0] = "Q1", allParts[1] = 문제원문, allParts[2] = 문제해석, allParts[3] = 정답번호
-    // allParts[4~] = 보기 데이터 (##로 구분된 보기들이 ::로 쪼개진 상태)
-
     const qText = allParts[1] || '';
     const qTrans = allParts[2] || '';
     const correctAnswer = parseInt(allParts[3]) || 0;
 
-    // 나머지를 다시 합치고 ##로 분리
     const optionsRaw = allParts.slice(4).join('::');
     const optionParts = optionsRaw.split('##');
 
     document.getElementById(`${prefix}Text`).value = qText;
     document.getElementById(`${prefix}Trans`).value = qTrans;
 
-    // 정답 선택
     if (correctAnswer >= 1 && correctAnswer <= 4) {
         selectD1Answer(prefix, correctAnswer);
     }
 
-    // 보기 로드
     const labels = ['A', 'B', 'C', 'D'];
     optionParts.forEach((optStr, i) => {
         if (i >= 4) return;
@@ -581,7 +643,7 @@ function loadD1QuestionToForm(questionStr, qNum) {
         const match = optParts[0].match(/^([A-D])\)(.*)/);
         const text = match ? match[2] : optParts[0];
         const trans = optParts[1] || '';
-        const exp = optParts.slice(2).join('::'); // 해설에 :: 포함 가능
+        const exp = optParts.slice(2).join('::');
 
         const l = labels[i];
         const textEl = document.getElementById(`${prefix}Opt${l}Text`);
@@ -598,7 +660,7 @@ function cancelD1Edit() {
     resetD1Form();
 }
 
-// ===== 폼 초기화 =====
+// ===== 폼 초기화 — v2 블록 방식 =====
 function resetD1Form() {
     d1EditingSetId = null;
     d1Q2Visible = false;
@@ -611,11 +673,10 @@ function resetD1Form() {
     document.getElementById('d1MainTitleCustom').classList.add('q-hidden');
     document.getElementById('d1MainTitleCustom').value = '';
     document.getElementById('d1PassageTitle').value = '';
-    document.getElementById('d1PassageContent').value = '';
 
-    // 문장별 번역
-    document.getElementById('d1SentenceList').innerHTML = '';
-    updateD1SentenceNumbers();
+    // 블록 초기화 (기존 d1SentenceList, d1PassageContent 대체)
+    document.getElementById('d1BlockList').innerHTML = '';
+    updateD1BlockNumbers();
 
     // 핵심 단어
     document.getElementById('d1WordList').innerHTML = '';
@@ -655,18 +716,17 @@ async function deleteD1Set(id) {
     }
 }
 
-// ===== 미리보기 =====
+// ===== 미리보기 — v2 블록 방식 =====
 function renderD1Preview() {
     const container = document.getElementById('d1PreviewContent');
     const mainTitle = getD1MainTitle();
     const passageTitle = document.getElementById('d1PassageTitle').value.trim();
-    const passageContent = document.getElementById('d1PassageContent').value.trim();
-    const sentences = getD1Sentences();
+    const blocks = getD1Blocks();
     const words = getD1Words();
     const q1 = getD1QuestionData(1);
     const q2 = d1Q2Visible ? getD1QuestionData(2) : null;
 
-    if (!mainTitle && !passageTitle && !passageContent) {
+    if (!mainTitle && !passageTitle && blocks.length === 0) {
         container.innerHTML = '입력값을 채우면 미리보기가 표시됩니다.';
         container.style.color = '#94a3b8';
         return;
@@ -679,16 +739,25 @@ function renderD1Preview() {
     html += '<div class="d1-preview-section">';
     if (mainTitle) html += `<div class="d1-preview-main-title">📖 ${d1EscapeHtml(mainTitle)}</div>`;
     if (passageTitle) html += `<div class="d1-preview-passage-title">📄 ${d1EscapeHtml(passageTitle)}</div>`;
-    if (passageContent) html += `<div class="d1-preview-passage">${d1EscapeHtml(passageContent)}</div>`;
     html += '</div>';
 
-    // 문장별 번역
-    const validSentences = sentences.filter(s => s);
-    if (validSentences.length > 0) {
+    // 블록별 원문 + 해석 표시
+    const validBlocks = blocks.filter(b => b.text);
+    if (validBlocks.length > 0) {
+        const transCount = validBlocks.filter(b => b.needsTranslation && b.translation).length;
+        const noTransCount = validBlocks.length - transCount;
         html += '<div class="d1-preview-section">';
-        html += `<div style="font-weight:600; margin-bottom:8px;">📝 문장별 번역 <span class="d1-preview-tag">${validSentences.length}개</span></div>`;
-        validSentences.forEach((s, i) => {
-            html += `<div style="margin-bottom:4px; padding-left:8px; color:#475569;">${i + 1}. ${d1EscapeHtml(s)}</div>`;
+        html += `<div style="font-weight:600; margin-bottom:8px;">📝 지문 블록 <span class="d1-preview-tag">총 ${validBlocks.length}블록 (해석 있음: ${transCount} / 해석 없음: ${noTransCount})</span></div>`;
+        validBlocks.forEach((b, i) => {
+            html += `<div style="margin-bottom:10px; padding:10px; background:#f8fafc; border-radius:8px; border-left:3px solid #6366f1;">`;
+            html += `<div style="font-weight:600; color:#475569; font-size:12px; margin-bottom:4px;">블록 ${i + 1}</div>`;
+            html += `<div style="color:#1e293b; white-space:pre-wrap;">${d1EscapeHtml(b.text)}</div>`;
+            if (b.needsTranslation && b.translation) {
+                html += `<div style="margin-top:6px; color:#6366f1; font-size:13px;">→ ${d1EscapeHtml(b.translation)}</div>`;
+            } else if (!b.needsTranslation) {
+                html += `<div style="margin-top:4px; color:#94a3b8; font-size:12px;">(해석 없음)</div>`;
+            }
+            html += '</div>';
         });
         html += '</div>';
     }

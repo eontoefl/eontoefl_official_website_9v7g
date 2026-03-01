@@ -1,5 +1,5 @@
-// ===== 문제 관리: Reading - Daily2 =====
-// Daily1과 동일하되: Q2 필수, Q3 선택(토글)
+// ===== 문제 관리: Reading - Daily2 (v2 블록 입력) =====
+// Daily1과 동일하되: Q2 필수, Q3 선택(토글), 프리셋 7개
 
 const D2_TABLE = 'tr_reading_daily2';
 const D2_PREFIX = 'daily2_set_';
@@ -114,39 +114,84 @@ function getD2MainTitle() {
     return sel.value;
 }
 
-// ===== 문장별 번역: 동적 행 =====
-function addD2Sentence(value) {
-    const list = document.getElementById('d2SentenceList');
-    const idx = list.children.length + 1;
-    const row = document.createElement('div');
-    row.className = 'd1-sentence-row';
-    row.innerHTML = `
-        <div class="d1-sentence-num">${idx}</div>
-        <input type="text" value="${d2EscapeAttr(value || '')}" placeholder="문장의 한글 해석을 입력하세요" oninput="updateD2RegisterBtn()">
-        <button class="d1-del-btn" onclick="removeD2Sentence(this)" title="삭제"><i class="fas fa-times"></i></button>
+// ===== 블록 입력: CRUD (v2) =====
+function addD2Block(text = '', needsTranslation = true, translation = '') {
+    const list = document.getElementById('d2BlockList');
+    const idx = list.children.length;
+
+    const block = document.createElement('div');
+    block.className = 'passage-block';
+    block.dataset.blockIdx = idx;
+
+    const transHiddenClass = needsTranslation ? '' : ' hidden';
+    const checkedAttr = needsTranslation ? ' checked' : '';
+
+    block.innerHTML = `
+        <div class="passage-block-header">
+            <span class="passage-block-num">블록 ${idx + 1}</span>
+            <button class="d1-del-btn" onclick="removeD2Block(this)" title="삭제">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="passage-block-body">
+            <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+            <textarea class="passage-block-text" placeholder="영어 원문을 입력하세요 (엔터 = 같은 블록 안의 줄바꿈)" rows="3" oninput="updateD2RegisterBtn()">${d2EscapeHtml(text)}</textarea>
+            
+            <label class="passage-block-check">
+                <input type="checkbox" class="block-needs-trans"${checkedAttr} onchange="toggleD2BlockTranslation(this)">
+                해석 필요
+            </label>
+            
+            <div class="passage-block-trans-wrap${transHiddenClass}">
+                <div class="d1-q-label">해석</div>
+                <input type="text" class="passage-block-trans" placeholder="한글 해석을 입력하세요" value="${d2EscapeAttr(translation)}" oninput="updateD2RegisterBtn()">
+            </div>
+        </div>
     `;
-    list.appendChild(row);
-    updateD2SentenceNumbers();
+
+    list.appendChild(block);
+    updateD2BlockNumbers();
     updateD2RegisterBtn();
 }
 
-function removeD2Sentence(btn) {
-    btn.closest('.d1-sentence-row').remove();
-    updateD2SentenceNumbers();
+function removeD2Block(btn) {
+    const list = document.getElementById('d2BlockList');
+    if (list.children.length <= 1) {
+        alert('블록은 최소 1개 이상이어야 합니다.');
+        return;
+    }
+    btn.closest('.passage-block').remove();
+    updateD2BlockNumbers();
     updateD2RegisterBtn();
 }
 
-function updateD2SentenceNumbers() {
-    const rows = document.querySelectorAll('#d2SentenceList .d1-sentence-row');
-    rows.forEach((row, i) => {
-        row.querySelector('.d1-sentence-num').textContent = i + 1;
+function updateD2BlockNumbers() {
+    const blocks = document.querySelectorAll('#d2BlockList .passage-block');
+    blocks.forEach((block, i) => {
+        block.dataset.blockIdx = i;
+        block.querySelector('.passage-block-num').textContent = `블록 ${i + 1}`;
     });
-    document.getElementById('d2SentenceCount').textContent = `(${rows.length}개)`;
+    document.getElementById('d2BlockCount').textContent = `(${blocks.length}개)`;
 }
 
-function getD2Sentences() {
-    const rows = document.querySelectorAll('#d2SentenceList .d1-sentence-row');
-    return Array.from(rows).map(r => r.querySelector('input').value.trim());
+function toggleD2BlockTranslation(checkbox) {
+    const wrap = checkbox.closest('.passage-block-body').querySelector('.passage-block-trans-wrap');
+    if (checkbox.checked) {
+        wrap.classList.remove('hidden');
+    } else {
+        wrap.classList.add('hidden');
+    }
+    updateD2RegisterBtn();
+}
+
+function getD2Blocks() {
+    const blocks = document.querySelectorAll('#d2BlockList .passage-block');
+    return Array.from(blocks).map(block => {
+        const text = block.querySelector('.passage-block-text').value;
+        const needsTranslation = block.querySelector('.block-needs-trans').checked;
+        const translation = block.querySelector('.passage-block-trans').value;
+        return { text: text.trim(), needsTranslation, translation: translation.trim() };
+    });
 }
 
 // ===== 핵심 단어: 동적 행 =====
@@ -315,15 +360,22 @@ function d2SanitizeDelimiters(str) {
     return str.replace(/::/g, ': :').replace(/##/g, '# #');
 }
 
-// ===== 데이터 조합 (폼 → DB) =====
+// ===== 데이터 조합 (폼 → DB) — v2 블록 방식 =====
 function buildD2Data() {
     const mainTitle = d2SanitizeDelimiters(getD2MainTitle());
     const passageTitle = d2SanitizeDelimiters(document.getElementById('d2PassageTitle').value.trim());
-    const passageContent = document.getElementById('d2PassageContent').value.trim();
-    const sentences = getD2Sentences().map(s => d2SanitizeDelimiters(s));
+    const blocks = getD2Blocks();
     const words = getD2Words();
 
-    const sentenceTranslations = sentences.join('##');
+    // 블록 원문을 ##로 연결
+    const passageContent = blocks.map(b => d2SanitizeDelimiters(b.text)).join('##');
+
+    // 해석을 ##로 연결 (해석 없는 블록은 빈 문자열)
+    const sentenceTranslations = blocks.map(b => {
+        if (b.needsTranslation && b.translation) return d2SanitizeDelimiters(b.translation);
+        return '';
+    }).join('##');
+
     const interactiveWords = words.map(w => {
         const word = d2SanitizeDelimiters(w.word);
         const translation = d2SanitizeDelimiters(w.translation);
@@ -347,7 +399,7 @@ function buildD2Data() {
     }
 
     const q1 = getD2QuestionData(1);
-    const q2 = getD2QuestionData(2);
+    const q2 = getD2QuestionData(2); // Q2는 필수
     const q3 = d2Q3Visible ? getD2QuestionData(3) : null;
 
     const setId = d2EditingSetId || `${D2_PREFIX}${String(d2NextSetNumber).padStart(4, '0')}`;
@@ -365,21 +417,27 @@ function buildD2Data() {
     };
 }
 
-// ===== 유효성 검사 =====
+// ===== 유효성 검사 — v2 블록 방식 =====
 function validateD2Form() {
     const errors = [];
 
     if (!getD2MainTitle()) errors.push('상단 제목을 선택해주세요');
     if (!document.getElementById('d2PassageTitle').value.trim()) errors.push('지문 제목을 입력해주세요');
-    if (!document.getElementById('d2PassageContent').value.trim()) errors.push('지문 본문을 입력해주세요');
 
-    const sentences = getD2Sentences();
-    if (sentences.length === 0) {
-        errors.push('문장별 번역을 최소 1개 입력해주세요');
+    // 블록 검사
+    const blocks = getD2Blocks();
+    if (blocks.length === 0) {
+        errors.push('지문 블록을 최소 1개 입력해주세요');
     } else {
-        sentences.forEach((s, i) => {
-            if (!s) errors.push(`문장별 번역 #${i + 1}이 비어있습니다`);
+        blocks.forEach((b, i) => {
+            if (!b.text) errors.push(`블록 #${i + 1}의 원문을 입력해주세요`);
+            if (b.needsTranslation && !b.translation) errors.push(`블록 #${i + 1}의 해석을 입력해주세요`);
         });
+
+        const hasTranslation = blocks.some(b => b.needsTranslation);
+        if (!hasTranslation) {
+            errors.push('해석이 있는 블록이 최소 1개 필요합니다');
+        }
     }
 
     const words = getD2Words();
@@ -468,7 +526,7 @@ async function registerD2Set() {
     }
 }
 
-// ===== 수정 모드 =====
+// ===== 수정 모드 — v2 블록 역파싱 =====
 async function editD2Set(id) {
     const set = d2ExistingSets.find(s => s.id === id);
     if (!set) return;
@@ -480,7 +538,7 @@ async function editD2Set(id) {
 
     // 기본 정보
     const mainTitleSel = document.getElementById('d2MainTitleSelect');
-    const presetValues = ['Read a notice.', 'Read an email.', 'Read an advertisement.', 'Read an article.'];
+    const presetValues = ['Read a notice.', 'Read an email.', 'Read an advertisement.', 'Read an article.', 'Read a text chain.', 'Read a post.', 'Read a memo.'];
     if (presetValues.includes(set.main_title)) {
         mainTitleSel.value = set.main_title;
         document.getElementById('d2MainTitleCustom').classList.add('q-hidden');
@@ -491,12 +549,27 @@ async function editD2Set(id) {
     }
 
     document.getElementById('d2PassageTitle').value = set.passage_title || '';
-    document.getElementById('d2PassageContent').value = set.passage_content || '';
 
-    // 문장별 번역
-    document.getElementById('d2SentenceList').innerHTML = '';
-    if (set.sentence_translations) {
-        set.sentence_translations.split('##').forEach(s => addD2Sentence(s));
+    // ===== 블록 로드 (하위 호환 포함) =====
+    document.getElementById('d2BlockList').innerHTML = '';
+
+    if (set.passage_content && set.passage_content.includes('##')) {
+        // 새 방식: ##로 split → 블록 생성
+        const passageBlocks = set.passage_content.split('##');
+        const translationBlocks = (set.sentence_translations || '').split('##');
+
+        passageBlocks.forEach((text, i) => {
+            const trans = translationBlocks[i] || '';
+            const needsTrans = trans.trim() !== '';
+            addD2Block(text, needsTrans, trans);
+        });
+    } else {
+        // 기존 방식 (B): 전체 원문을 블록 1개에 넣기
+        const fullText = set.passage_content || '';
+        const allTrans = set.sentence_translations
+            ? set.sentence_translations.split('##').join('\n')
+            : '';
+        addD2Block(fullText, true, allTrans);
     }
 
     // 핵심 단어
@@ -586,7 +659,7 @@ function cancelD2Edit() {
     resetD2Form();
 }
 
-// ===== 폼 초기화 =====
+// ===== 폼 초기화 — v2 블록 방식 =====
 function resetD2Form() {
     d2EditingSetId = null;
     d2Q3Visible = false;
@@ -598,10 +671,10 @@ function resetD2Form() {
     document.getElementById('d2MainTitleCustom').classList.add('q-hidden');
     document.getElementById('d2MainTitleCustom').value = '';
     document.getElementById('d2PassageTitle').value = '';
-    document.getElementById('d2PassageContent').value = '';
 
-    document.getElementById('d2SentenceList').innerHTML = '';
-    updateD2SentenceNumbers();
+    // 블록 초기화
+    document.getElementById('d2BlockList').innerHTML = '';
+    updateD2BlockNumbers();
 
     document.getElementById('d2WordList').innerHTML = '';
     updateD2WordCount();
@@ -640,19 +713,18 @@ async function deleteD2Set(id) {
     }
 }
 
-// ===== 미리보기 =====
+// ===== 미리보기 — v2 블록 방식 =====
 function renderD2Preview() {
     const container = document.getElementById('d2PreviewContent');
     const mainTitle = getD2MainTitle();
     const passageTitle = document.getElementById('d2PassageTitle').value.trim();
-    const passageContent = document.getElementById('d2PassageContent').value.trim();
-    const sentences = getD2Sentences();
+    const blocks = getD2Blocks();
     const words = getD2Words();
     const q1 = getD2QuestionData(1);
     const q2 = getD2QuestionData(2);
     const q3 = d2Q3Visible ? getD2QuestionData(3) : null;
 
-    if (!mainTitle && !passageTitle && !passageContent) {
+    if (!mainTitle && !passageTitle && blocks.length === 0) {
         container.innerHTML = '입력값을 채우면 미리보기가 표시됩니다.';
         container.style.color = '#94a3b8';
         return;
@@ -664,15 +736,25 @@ function renderD2Preview() {
     html += '<div class="d1-preview-section">';
     if (mainTitle) html += `<div class="d1-preview-main-title">📖 ${d2EscapeHtml(mainTitle)}</div>`;
     if (passageTitle) html += `<div class="d1-preview-passage-title">📄 ${d2EscapeHtml(passageTitle)}</div>`;
-    if (passageContent) html += `<div class="d1-preview-passage">${d2EscapeHtml(passageContent)}</div>`;
     html += '</div>';
 
-    const validSentences = sentences.filter(s => s);
-    if (validSentences.length > 0) {
+    // 블록별 원문 + 해석 표시
+    const validBlocks = blocks.filter(b => b.text);
+    if (validBlocks.length > 0) {
+        const transCount = validBlocks.filter(b => b.needsTranslation && b.translation).length;
+        const noTransCount = validBlocks.length - transCount;
         html += '<div class="d1-preview-section">';
-        html += `<div style="font-weight:600; margin-bottom:8px;">📝 문장별 번역 <span class="d1-preview-tag">${validSentences.length}개</span></div>`;
-        validSentences.forEach((s, i) => {
-            html += `<div style="margin-bottom:4px; padding-left:8px; color:#475569;">${i + 1}. ${d2EscapeHtml(s)}</div>`;
+        html += `<div style="font-weight:600; margin-bottom:8px;">📝 지문 블록 <span class="d1-preview-tag">총 ${validBlocks.length}블록 (해석 있음: ${transCount} / 해석 없음: ${noTransCount})</span></div>`;
+        validBlocks.forEach((b, i) => {
+            html += `<div style="margin-bottom:10px; padding:10px; background:#f8fafc; border-radius:8px; border-left:3px solid #6366f1;">`;
+            html += `<div style="font-weight:600; color:#475569; font-size:12px; margin-bottom:4px;">블록 ${i + 1}</div>`;
+            html += `<div style="color:#1e293b; white-space:pre-wrap;">${d2EscapeHtml(b.text)}</div>`;
+            if (b.needsTranslation && b.translation) {
+                html += `<div style="margin-top:6px; color:#6366f1; font-size:13px;">→ ${d2EscapeHtml(b.translation)}</div>`;
+            } else if (!b.needsTranslation) {
+                html += `<div style="margin-top:4px; color:#94a3b8; font-size:12px;">(해석 없음)</div>`;
+            }
+            html += '</div>';
         });
         html += '</div>';
     }
