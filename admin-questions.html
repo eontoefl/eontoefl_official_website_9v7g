@@ -598,6 +598,86 @@
             .d1-word-row { flex-wrap: wrap; }
             .d1-word-row input { flex: 1 1 100% !important; }
         }
+
+        /* ===== Block Input Styles (v2) ===== */
+        .passage-block {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: #fafbfc;
+            transition: border-color 0.2s;
+        }
+        .passage-block:hover {
+            border-color: #cbd5e1;
+        }
+        .passage-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .passage-block-num {
+            font-weight: 700;
+            font-size: 14px;
+            color: #475569;
+        }
+        .passage-block-body {}
+        .passage-block-text {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', 'Georgia', serif;
+            line-height: 1.7;
+            resize: vertical;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .passage-block-text:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+        .passage-block-check {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #475569;
+            cursor: pointer;
+            user-select: none;
+        }
+        .passage-block-check input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #6366f1;
+        }
+        .passage-block-trans-wrap {
+            margin-top: 8px;
+        }
+        .passage-block-trans-wrap.hidden {
+            display: none;
+        }
+        .passage-block-trans {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .passage-block-trans:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
     </style>
 </head>
 <body>
@@ -808,21 +888,17 @@
                 </div>
             </div>
 
-            <!-- Passage Content -->
-            <div class="q-card">
-                <div class="q-card-title"><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 본문 <span class="d1-required">*</span></div>
-                <textarea id="d1PassageContent" class="q-textarea" placeholder="영어 지문 본문을 붙여넣으세요. 문단은 엔터로 구분합니다." oninput="updateD1RegisterBtn()"></textarea>
-            </div>
-
-            <!-- Sentence Translations -->
+            <!-- ④+⑤ 지문 블록 입력 (v2) -->
             <div class="q-card">
                 <div class="q-card-title" style="justify-content:space-between;">
-                    <span><i class="fas fa-language" style="color:#6366f1;"></i> 문장별 번역 <span class="d1-required">*</span></span>
-                    <span id="d1SentenceCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                    <span><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 블록 입력 <span class="d1-required">*</span></span>
+                    <span id="d1BlockCount" style="font-size:13px; color:#94a3b8; font-weight:400;">(0개)</span>
                 </div>
-                <div id="d1SentenceList"></div>
-                <button class="q-btn q-btn-secondary" onclick="addD1Sentence()" style="margin-top:10px;">
-                    <i class="fas fa-plus"></i> 문장 추가
+                <div id="d1BlockList">
+                    <!-- 동적 블록들이 여기에 추가됨 -->
+                </div>
+                <button type="button" class="q-btn q-btn-secondary" onclick="addD1Block()" style="margin-top:10px;">
+                    <i class="fas fa-plus"></i> 블록 추가
                 </button>
             </div>
 
@@ -920,6 +996,9 @@
                             <option value="Read an email.">Read an email.</option>
                             <option value="Read an advertisement.">Read an advertisement.</option>
                             <option value="Read an article.">Read an article.</option>
+                            <option value="Read a text chain.">Read a text chain.</option>
+                            <option value="Read a post.">Read a post.</option>
+                            <option value="Read a memo.">Read a memo.</option>
                             <option value="__custom__">✏️ 직접 입력</option>
                         </select>
                         <input type="text" id="d2MainTitleCustom" class="d1-input q-hidden" placeholder="상단 제목을 직접 입력하세요" oninput="updateD2RegisterBtn()">
@@ -931,21 +1010,17 @@
                 </div>
             </div>
 
-            <!-- Passage Content -->
-            <div class="q-card">
-                <div class="q-card-title"><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 본문 <span class="d1-required">*</span></div>
-                <textarea id="d2PassageContent" class="q-textarea" placeholder="영어 지문 본문을 붙여넣으세요. 문단은 엔터로 구분합니다." oninput="updateD2RegisterBtn()"></textarea>
-            </div>
-
-            <!-- Sentence Translations -->
+            <!-- ④+⑤ 지문 블록 입력 (v2) -->
             <div class="q-card">
                 <div class="q-card-title" style="justify-content:space-between;">
-                    <span><i class="fas fa-language" style="color:#6366f1;"></i> 문장별 번역 <span class="d1-required">*</span></span>
-                    <span id="d2SentenceCount" style="font-size:13px; color:#94a3b8; font-weight:400;"></span>
+                    <span><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 블록 입력 <span class="d1-required">*</span></span>
+                    <span id="d2BlockCount" style="font-size:13px; color:#94a3b8; font-weight:400;">(0개)</span>
                 </div>
-                <div id="d2SentenceList"></div>
-                <button class="q-btn q-btn-secondary" onclick="addD2Sentence()" style="margin-top:10px;">
-                    <i class="fas fa-plus"></i> 문장 추가
+                <div id="d2BlockList">
+                    <!-- 동적 블록들이 여기에 추가됨 -->
+                </div>
+                <button type="button" class="q-btn q-btn-secondary" onclick="addD2Block()" style="margin-top:10px;">
+                    <i class="fas fa-plus"></i> 블록 추가
                 </button>
             </div>
 
