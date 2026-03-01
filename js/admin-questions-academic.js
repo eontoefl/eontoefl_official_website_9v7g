@@ -1,0 +1,1008 @@
+// ===== 문제 관리: Reading - Academic (v2 블록 + 문제 유형) =====
+
+const AC_TABLE = 'tr_reading_academic';
+const AC_PREFIX = 'academic_set_';
+
+// State
+let acExistingSets = [];
+let acEditingSetId = null;
+let acNextSetNumber = 1;
+
+// ===== 초기화 =====
+document.addEventListener('DOMContentLoaded', () => {
+    for (let i = 1; i <= 5; i++) {
+        initAcQuestionBlock(`acQuestion${i}`, i);
+    }
+});
+
+// ===== 기존 세트 목록 로드 =====
+async function loadAcExistingSets() {
+    try {
+        const res = await supabaseAPI.query(AC_TABLE, { order: 'id.asc', limit: '500' });
+        acExistingSets = res || [];
+
+        if (acExistingSets.length > 0) {
+            const lastId = acExistingSets[acExistingSets.length - 1].id;
+            const lastNum = parseInt(lastId.replace(AC_PREFIX, '')) || 0;
+            acNextSetNumber = lastNum + 1;
+        } else {
+            acNextSetNumber = 1;
+        }
+
+        updateAcSetId();
+        renderAcSetsList();
+    } catch (error) {
+        console.error('Academic 세트 목록 로드 실패:', error);
+        document.getElementById('acSetsListWrap').innerHTML = '<div class="q-empty"><i class="fas fa-exclamation-triangle"></i> 로드 실패</div>';
+    }
+}
+
+function updateAcSetId() {
+    const idStr = acEditingSetId || `${AC_PREFIX}${String(acNextSetNumber).padStart(4, '0')}`;
+    document.getElementById('acSetId').textContent = idStr;
+}
+
+// ===== 세트 목록 렌더링 =====
+function renderAcSetsList() {
+    const wrap = document.getElementById('acSetsListWrap');
+    const countEl = document.getElementById('acSetsCount');
+    countEl.textContent = `(${acExistingSets.length}건)`;
+
+    if (acExistingSets.length === 0) {
+        wrap.innerHTML = '<div class="q-empty"><i class="fas fa-inbox"></i> 등록된 세트가 없습니다.</div>';
+        return;
+    }
+
+    let html = `<table class="q-sets-table">
+        <thead><tr>
+            <th>세트 ID</th>
+            <th>상단 제목</th>
+            <th>지문 제목</th>
+            <th>문제 수</th>
+            <th>등록일</th>
+            <th style="width:120px; text-align:center;">액션</th>
+        </tr></thead><tbody>`;
+
+    acExistingSets.forEach(s => {
+        const date = s.created_at ? new Date(s.created_at).toLocaleDateString('ko-KR') : '-';
+        const titleShort = (s.passage_title || '').length > 25
+            ? acEscapeHtml(s.passage_title.substring(0, 25)) + '...'
+            : acEscapeHtml(s.passage_title || '');
+        html += `<tr>
+            <td style="font-family:monospace; font-weight:600;">${acEscapeHtml(s.id)}</td>
+            <td>${acEscapeHtml(s.main_title || '')}</td>
+            <td title="${acEscapeHtml(s.passage_title || '')}">${titleShort}</td>
+            <td>5개</td>
+            <td style="color:#64748b;">${date}</td>
+            <td style="text-align:center;">
+                <button class="q-btn q-btn-secondary q-btn-sm" onclick="editAcSet('${acEscapeHtml(s.id)}')" title="수정">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="q-btn q-btn-danger q-btn-sm" onclick="deleteAcSet('${acEscapeHtml(s.id)}')" title="삭제">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+// ===== 상단 제목 =====
+function onAcMainTitleChange() {
+    const sel = document.getElementById('acMainTitleSelect');
+    const custom = document.getElementById('acMainTitleCustom');
+    if (sel.value === '__custom__') {
+        custom.classList.remove('q-hidden');
+        custom.focus();
+    } else {
+        custom.classList.add('q-hidden');
+        custom.value = '';
+    }
+    updateAcRegisterBtn();
+}
+
+function getAcMainTitle() {
+    const sel = document.getElementById('acMainTitleSelect');
+    if (sel.value === '__custom__') {
+        return document.getElementById('acMainTitleCustom').value.trim();
+    }
+    return sel.value;
+}
+
+// ===== 블록 입력: CRUD =====
+function addAcBlock(text = '', needsTranslation = true, translation = '', separator = '##') {
+    const list = document.getElementById('acBlockList');
+    const idx = list.children.length;
+
+    const block = document.createElement('div');
+    block.className = 'passage-block';
+    block.dataset.blockIdx = idx;
+
+    const transHiddenClass = needsTranslation ? '' : ' hidden';
+    const checkedAttr = needsTranslation ? ' checked' : '';
+
+    const selJoin = separator === '#|#' ? ' selected' : '';
+    const selBreak = separator === '#||#' ? ' selected' : '';
+    const selPara = separator === '##' ? ' selected' : '';
+
+    block.innerHTML = `
+        <div class="passage-block-header">
+            <span class="passage-block-num">블록 ${idx + 1}</span>
+            <button class="d1-del-btn" onclick="removeAcBlock(this)" title="삭제">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="passage-block-body">
+            <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+            <textarea class="passage-block-text" placeholder="영어 원문을 입력하세요 (엔터 = 같은 블록 안의 줄바꿈)" rows="3" oninput="updateAcRegisterBtn()">${acEscapeHtml(text)}</textarea>
+            
+            <label class="passage-block-check">
+                <input type="checkbox" class="block-needs-trans"${checkedAttr} onchange="toggleAcBlockTranslation(this)">
+                해석 필요
+            </label>
+            
+            <div class="passage-block-trans-wrap${transHiddenClass}">
+                <div class="d1-q-label">해석</div>
+                <input type="text" class="passage-block-trans" placeholder="한글 해석을 입력하세요" value="${acEscapeAttr(translation)}" oninput="updateAcRegisterBtn()">
+            </div>
+
+            <div class="passage-block-separator-wrap">
+                <span class="passage-block-separator-label">다음 블록 연결:</span>
+                <select class="passage-block-separator-select">
+                    <option value="#|#"${selJoin}>이어붙이기 (공백)</option>
+                    <option value="#||#"${selBreak}>줄바꿈</option>
+                    <option value="##"${selPara}>단락구분</option>
+                </select>
+            </div>
+        </div>
+    `;
+
+    list.appendChild(block);
+    updateAcBlockNumbers();
+    updateAcRegisterBtn();
+}
+
+function removeAcBlock(btn) {
+    const list = document.getElementById('acBlockList');
+    if (list.children.length <= 1) {
+        alert('블록은 최소 1개 이상이어야 합니다.');
+        return;
+    }
+    btn.closest('.passage-block').remove();
+    updateAcBlockNumbers();
+    updateAcRegisterBtn();
+}
+
+function updateAcBlockNumbers() {
+    const blocks = document.querySelectorAll('#acBlockList .passage-block');
+    blocks.forEach((block, i) => {
+        block.dataset.blockIdx = i;
+        block.querySelector('.passage-block-num').textContent = `블록 ${i + 1}`;
+        const sepWrap = block.querySelector('.passage-block-separator-wrap');
+        if (sepWrap) {
+            if (i === blocks.length - 1) {
+                sepWrap.classList.add('hidden');
+            } else {
+                sepWrap.classList.remove('hidden');
+            }
+        }
+    });
+    document.getElementById('acBlockCount').textContent = `(${blocks.length}개)`;
+}
+
+function toggleAcBlockTranslation(checkbox) {
+    const wrap = checkbox.closest('.passage-block-body').querySelector('.passage-block-trans-wrap');
+    if (checkbox.checked) {
+        wrap.classList.remove('hidden');
+    } else {
+        wrap.classList.add('hidden');
+    }
+    updateAcRegisterBtn();
+}
+
+function getAcBlocks() {
+    const blocks = document.querySelectorAll('#acBlockList .passage-block');
+    return Array.from(blocks).map((block) => {
+        const text = block.querySelector('.passage-block-text').value;
+        const needsTranslation = block.querySelector('.block-needs-trans').checked;
+        const translation = block.querySelector('.passage-block-trans').value;
+        const sepSelect = block.querySelector('.passage-block-separator-select');
+        const separator = sepSelect ? sepSelect.value : '##';
+        return { text: text.trim(), needsTranslation, translation: translation.trim(), separator };
+    });
+}
+
+// ===== 핵심 단어 =====
+function addAcWord(word, translation, explanation) {
+    const list = document.getElementById('acWordList');
+    const row = document.createElement('div');
+    row.className = 'd1-word-row';
+    row.innerHTML = `
+        <input type="text" value="${acEscapeAttr(word || '')}" placeholder="영어 단어" oninput="updateAcRegisterBtn()">
+        <input type="text" value="${acEscapeAttr(translation || '')}" placeholder="한글 뜻" oninput="updateAcRegisterBtn()">
+        <input type="text" value="${acEscapeAttr(explanation || '')}" placeholder="설명 (선택)">
+        <button class="d1-del-btn" onclick="removeAcWord(this)" title="삭제"><i class="fas fa-times"></i></button>
+    `;
+    list.appendChild(row);
+    updateAcWordCount();
+    updateAcRegisterBtn();
+}
+
+function removeAcWord(btn) {
+    btn.closest('.d1-word-row').remove();
+    updateAcWordCount();
+    updateAcRegisterBtn();
+}
+
+function updateAcWordCount() {
+    const rows = document.querySelectorAll('#acWordList .d1-word-row');
+    document.getElementById('acWordCount').textContent = `(${rows.length}개)`;
+}
+
+function getAcWords() {
+    const rows = document.querySelectorAll('#acWordList .d1-word-row');
+    return Array.from(rows).map(r => {
+        const inputs = r.querySelectorAll('input');
+        return {
+            word: inputs[0].value.trim(),
+            translation: inputs[1].value.trim(),
+            explanation: inputs[2].value.trim()
+        };
+    });
+}
+
+// ===== 🆕 문제 유형 시스템 =====
+function onAcQuestionTypeChange(qNum) {
+    const type = getAcQuestionType(qNum);
+    const hintEl = document.getElementById(`acQ${qNum}TypeHint`);
+
+    // 안내 메시지 업데이트
+    hintEl.className = 'ac-qtype-hint';
+    if (type === 'highlight') {
+        hintEl.classList.add('highlight-hint', 'visible');
+        hintEl.innerHTML = '💡 지문 원문에서 하이라이트할 단어를 &lt;&lt;단어&gt;&gt; 로 감싸주세요.';
+    } else if (type === 'insertion') {
+        hintEl.classList.add('insertion-hint', 'visible');
+        hintEl.textContent = '💡 지문 원문에 (A)(B)(C)(D) 삽입 위치 마커가 포함되어 있어야 합니다.';
+    } else {
+        // normal — 숨김
+    }
+
+    updateAcHighlightBanner();
+    updateAcRegisterBtn();
+}
+
+function getAcQuestionType(qNum) {
+    const sel = document.getElementById(`acQ${qNum}Type`);
+    return sel ? sel.value : 'normal';
+}
+
+function setAcQuestionType(qNum, type) {
+    const sel = document.getElementById(`acQ${qNum}Type`);
+    if (sel) {
+        sel.value = type || 'normal';
+        onAcQuestionTypeChange(qNum);
+    }
+}
+
+function updateAcHighlightBanner() {
+    const banner = document.getElementById('acHighlightBanner');
+    let hasHighlight = false;
+    for (let i = 1; i <= 5; i++) {
+        if (getAcQuestionType(i) === 'highlight') {
+            hasHighlight = true;
+            break;
+        }
+    }
+    if (hasHighlight) {
+        banner.classList.add('visible');
+    } else {
+        banner.classList.remove('visible');
+    }
+}
+
+// ===== 문제 블록 생성 =====
+function initAcQuestionBlock(containerId, qNum) {
+    const container = document.getElementById(containerId);
+    const prefix = `acQ${qNum}`;
+    const labels = ['A', 'B', 'C', 'D'];
+
+    let html = `<div class="d1-q-section">
+        <div class="d1-q-row">
+            <div>
+                <div class="d1-q-label">문제 원문 <span class="d1-required">*</span></div>
+                <input type="text" id="${prefix}Text" class="d1-input" placeholder="영어 질문 (예: The word &quot;validity&quot; in the passage is closest in meaning to...)" oninput="updateAcRegisterBtn()">
+            </div>
+            <div>
+                <div class="d1-q-label">문제 해석 <span class="d1-required">*</span></div>
+                <input type="text" id="${prefix}Trans" class="d1-input" placeholder="한글 해석" oninput="updateAcRegisterBtn()">
+            </div>
+        </div>
+
+        <div class="d1-q-full">
+            <div class="d1-q-label">정답 선택 <span class="d1-required">*</span></div>
+            <div class="d1-radio-group" id="${prefix}RadioGroup">`;
+
+    labels.forEach((l, i) => {
+        html += `
+                <label class="d1-radio-label" id="${prefix}Radio${l}" onclick="selectAcAnswer('${prefix}', ${i + 1})">
+                    <input type="radio" name="${prefix}Answer" value="${i + 1}"> ${l}
+                </label>`;
+    });
+
+    html += `
+            </div>
+        </div>`;
+
+    labels.forEach((l) => {
+        html += `
+        <div class="d1-option-card" id="${prefix}Option${l}">
+            <div class="d1-option-card-header">
+                <span class="d1-option-label">${l}</span>
+                보기 ${l}
+            </div>
+            <div class="d1-q-row">
+                <div>
+                    <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+                    <input type="text" id="${prefix}Opt${l}Text" class="d1-input" placeholder="보기 원문" oninput="updateAcRegisterBtn()">
+                </div>
+                <div>
+                    <div class="d1-q-label">해석 <span class="d1-required">*</span></div>
+                    <input type="text" id="${prefix}Opt${l}Trans" class="d1-input" placeholder="보기 해석" oninput="updateAcRegisterBtn()">
+                </div>
+            </div>
+            <div class="d1-q-full">
+                <div class="d1-q-label">해설 <span class="d1-required">*</span></div>
+                <textarea id="${prefix}Opt${l}Exp" class="d1-input" style="min-height:60px; resize:vertical;" placeholder="정답/오답 이유 설명" oninput="updateAcRegisterBtn()"></textarea>
+            </div>
+        </div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function selectAcAnswer(prefix, num) {
+    const labels = ['A', 'B', 'C', 'D'];
+    labels.forEach((l, i) => {
+        const radioLabel = document.getElementById(`${prefix}Radio${l}`);
+        const optionCard = document.getElementById(`${prefix}Option${l}`);
+        if (i + 1 === num) {
+            radioLabel.classList.add('selected');
+            optionCard.classList.add('correct');
+        } else {
+            radioLabel.classList.remove('selected');
+            optionCard.classList.remove('correct');
+        }
+    });
+    const radio = document.querySelector(`input[name="${prefix}Answer"][value="${num}"]`);
+    if (radio) radio.checked = true;
+    updateAcRegisterBtn();
+}
+
+function getAcQuestionData(qNum) {
+    const prefix = `acQ${qNum}`;
+    const text = document.getElementById(`${prefix}Text`)?.value.trim();
+    const trans = document.getElementById(`${prefix}Trans`)?.value.trim();
+    const answerEl = document.querySelector(`input[name="${prefix}Answer"]:checked`);
+    const correctAnswer = answerEl ? parseInt(answerEl.value) : 0;
+
+    const labels = ['A', 'B', 'C', 'D'];
+    const options = labels.map(l => ({
+        label: l,
+        text: document.getElementById(`${prefix}Opt${l}Text`)?.value.trim() || '',
+        translation: document.getElementById(`${prefix}Opt${l}Trans`)?.value.trim() || '',
+        explanation: document.getElementById(`${prefix}Opt${l}Exp`)?.value.trim() || ''
+    }));
+
+    return {
+        num: `Q${qNum}`,
+        type: getAcQuestionType(qNum),
+        text,
+        translation: trans,
+        correctAnswer,
+        options
+    };
+}
+
+// ===== 🆕 구분자 치환 (<<>> 보호 포함) =====
+function acSanitizeDelimiters(str) {
+    if (!str) return '';
+
+    // 1단계: <<...>> 내부를 임시 보호
+    const preserved = [];
+    let safeText = str.replace(/<<([^>]+)>>/g, (match) => {
+        preserved.push(match);
+        return `__HIGHLIGHT_${preserved.length - 1}__`;
+    });
+
+    // 2단계: 기존 sanitize 실행 (순서 중요: 긴 패턴 먼저)
+    safeText = safeText
+        .replace(/::/g, ': :')
+        .replace(/#\|\|#/g, '# ||#')
+        .replace(/#\|#/g, '# |#')
+        .replace(/##/g, '# #');
+
+    // 3단계: <<...>> 복원
+    safeText = safeText.replace(/__HIGHLIGHT_(\d+)__/g, (match, idx) => {
+        return preserved[parseInt(idx)];
+    });
+
+    return safeText;
+}
+
+// ===== 데이터 조합 (폼 → DB) =====
+function buildAcData() {
+    const mainTitle = acSanitizeDelimiters(getAcMainTitle());
+    const passageTitle = acSanitizeDelimiters(document.getElementById('acPassageTitle').value.trim());
+    const blocks = getAcBlocks();
+    const words = getAcWords();
+
+    // 블록 원문을 각 블록의 separator로 연결
+    let passageContent = '';
+    blocks.forEach((b, i) => {
+        passageContent += acSanitizeDelimiters(b.text);
+        if (i < blocks.length - 1) {
+            passageContent += b.separator;
+        }
+    });
+
+    // 해석을 ##로 연결
+    const sentenceTranslations = blocks.map(b => {
+        if (b.needsTranslation && b.translation) return acSanitizeDelimiters(b.translation);
+        return '';
+    }).join('##');
+
+    const interactiveWords = words.map(w => {
+        const word = acSanitizeDelimiters(w.word);
+        const translation = acSanitizeDelimiters(w.translation);
+        const explanation = acSanitizeDelimiters(w.explanation);
+        if (explanation) return `${word}::${translation}::${explanation}`;
+        return `${word}::${translation}`;
+    }).join('##');
+
+    // 🆕 question 빌드 (유형 태그 포함)
+    function buildQuestion(qData) {
+        if (!qData || !qData.text) return '';
+        const labels = ['A', 'B', 'C', 'D'];
+        const optionsStr = qData.options.map((opt, i) => {
+            const text = acSanitizeDelimiters(opt.text);
+            const trans = acSanitizeDelimiters(opt.translation);
+            const exp = acSanitizeDelimiters(opt.explanation);
+            return `${labels[i]})${text}::${trans}::${exp}`;
+        }).join('##');
+
+        const qText = acSanitizeDelimiters(qData.text);
+        const qTrans = acSanitizeDelimiters(qData.translation);
+
+        // 유형 태그 생성
+        let qPrefix = qData.num;
+        if (qData.type === 'highlight') {
+            qPrefix += '[highlight]';
+        } else if (qData.type === 'insertion') {
+            qPrefix += '[insertion]';
+        }
+        // normal이면 태그 없음 (하위 호환)
+
+        return `${qPrefix}::${qText}::${qTrans}::${qData.correctAnswer}::${optionsStr}`;
+    }
+
+    const setId = acEditingSetId || `${AC_PREFIX}${String(acNextSetNumber).padStart(4, '0')}`;
+
+    const data = {
+        id: setId,
+        main_title: mainTitle,
+        passage_title: passageTitle,
+        passage_content: passageContent,
+        sentence_translations: sentenceTranslations,
+        interactive_words: interactiveWords
+    };
+
+    for (let i = 1; i <= 5; i++) {
+        const q = getAcQuestionData(i);
+        data[`question${i}`] = buildQuestion(q);
+    }
+
+    return data;
+}
+
+// ===== 🆕 유효성 검사 =====
+function validateAcForm() {
+    const errors = [];
+
+    // 상단 제목
+    if (!getAcMainTitle()) errors.push('상단 제목을 선택해주세요');
+    // 지문 제목
+    if (!document.getElementById('acPassageTitle').value.trim()) errors.push('지문 제목을 입력해주세요');
+
+    // 블록 검사
+    const blocks = getAcBlocks();
+    if (blocks.length === 0) {
+        errors.push('지문 블록을 최소 1개 입력해주세요');
+    } else {
+        blocks.forEach((b, i) => {
+            if (!b.text) errors.push(`블록 #${i + 1}의 원문을 입력해주세요`);
+            if (b.needsTranslation && !b.translation) errors.push(`블록 #${i + 1}의 해석을 입력해주세요`);
+        });
+        const hasTranslation = blocks.some(b => b.needsTranslation);
+        if (!hasTranslation) {
+            errors.push('해석이 있는 블록이 최소 1개 필요합니다');
+        }
+    }
+
+    // 핵심 단어
+    const words = getAcWords();
+    if (words.length === 0) {
+        errors.push('핵심 단어를 최소 1개 입력해주세요');
+    } else {
+        words.forEach((w, i) => {
+            if (!w.word) errors.push(`핵심 단어 #${i + 1}의 단어를 입력해주세요`);
+            if (!w.translation) errors.push(`핵심 단어 #${i + 1}의 뜻을 입력해주세요`);
+        });
+    }
+
+    // 문제 1~5 필수 검사
+    for (let i = 1; i <= 5; i++) {
+        const qErrors = validateAcQuestion(i);
+        errors.push(...qErrors);
+    }
+
+    // 🆕 문제 유형 관련 검사
+    const questionTypes = [];
+    for (let i = 1; i <= 5; i++) {
+        questionTypes.push({ qNum: i, type: getAcQuestionType(i) });
+    }
+
+    const highlightQuestions = questionTypes.filter(q => q.type === 'highlight');
+    const insertionQuestions = questionTypes.filter(q => q.type === 'insertion');
+
+    // highlight 중복 검사
+    if (highlightQuestions.length > 1) {
+        errors.push('highlight 유형 문제는 1개만 설정할 수 있습니다');
+    }
+
+    // insertion 중복 검사
+    if (insertionQuestions.length > 1) {
+        errors.push('insertion 유형 문제는 1개만 설정할 수 있습니다');
+    }
+
+    // <<>> 마크업 검사
+    const fullPassage = blocks.map(b => b.text).join('');
+    const highlightMarkers = fullPassage.match(/<<[^>]+>>/g) || [];
+
+    if (highlightQuestions.length > 0 && highlightMarkers.length === 0) {
+        errors.push('highlight 유형 문제가 있으면 지문에 <<단어>> 마크업이 필요합니다');
+    }
+
+    if (highlightMarkers.length > 1) {
+        errors.push('<<>> 마크업은 지문에 1개만 사용할 수 있습니다');
+    }
+
+    if (highlightMarkers.length > 0 && highlightQuestions.length === 0) {
+        errors.push('지문에 <<>> 마크업이 있으면 highlight 유형 문제를 설정해주세요');
+    }
+
+    // <<>> 열기/닫기 검사
+    const openCount = (fullPassage.match(/<</g) || []).length;
+    const closeCount = (fullPassage.match(/>>/g) || []).length;
+    if (openCount !== closeCount) {
+        errors.push('<<>> 마크업이 올바르게 열고 닫혔는지 확인해주세요');
+    }
+
+    // (A)(B)(C)(D) 마커 검사 (순서 무관)
+    if (insertionQuestions.length > 0) {
+        const hasAllMarkers =
+            fullPassage.includes('(A)') &&
+            fullPassage.includes('(B)') &&
+            fullPassage.includes('(C)') &&
+            fullPassage.includes('(D)');
+        if (!hasAllMarkers) {
+            errors.push('insertion 유형 문제가 있으면 지문에 (A)(B)(C)(D) 마커가 필요합니다');
+        }
+    }
+
+    return errors;
+}
+
+function validateAcQuestion(qNum) {
+    const errors = [];
+    const prefix = `acQ${qNum}`;
+    const label = `문제 ${qNum}`;
+
+    const text = document.getElementById(`${prefix}Text`)?.value.trim();
+    const trans = document.getElementById(`${prefix}Trans`)?.value.trim();
+    if (!text) errors.push(`${label}의 문제 원문을 입력해주세요`);
+    if (!trans) errors.push(`${label}의 문제 해석을 입력해주세요`);
+
+    const answerEl = document.querySelector(`input[name="${prefix}Answer"]:checked`);
+    if (!answerEl) errors.push(`${label}의 정답을 선택해주세요`);
+
+    const labels = ['A', 'B', 'C', 'D'];
+    labels.forEach(l => {
+        const optText = document.getElementById(`${prefix}Opt${l}Text`)?.value.trim();
+        const optTrans = document.getElementById(`${prefix}Opt${l}Trans`)?.value.trim();
+        const optExp = document.getElementById(`${prefix}Opt${l}Exp`)?.value.trim();
+        if (!optText) errors.push(`${label} 보기 ${l}의 원문을 입력해주세요`);
+        if (!optTrans) errors.push(`${label} 보기 ${l}의 해석을 입력해주세요`);
+        if (!optExp) errors.push(`${label} 보기 ${l}의 해설을 입력해주세요`);
+    });
+
+    return errors;
+}
+
+// ===== 등록 버튼 상태 =====
+function updateAcRegisterBtn() {
+    const btn = document.getElementById('acRegisterBtn');
+    const errors = validateAcForm();
+    btn.disabled = errors.length > 0;
+    btn.innerHTML = acEditingSetId
+        ? '<i class="fas fa-save"></i> 수정 저장'
+        : '<i class="fas fa-upload"></i> 등록하기';
+}
+
+// ===== 등록 / 수정 =====
+async function registerAcSet() {
+    const errors = validateAcForm();
+    if (errors.length > 0) {
+        alert('⚠️ 입력을 확인해주세요:\n\n' + errors.map(e => '• ' + e).join('\n'));
+        return;
+    }
+
+    const data = buildAcData();
+
+    try {
+        if (acEditingSetId) {
+            const { id, ...updateData } = data;
+            await supabaseAPI.patch(AC_TABLE, acEditingSetId, updateData);
+            alert(`✅ ${acEditingSetId} 수정 완료!`);
+        } else {
+            await supabaseAPI.post(AC_TABLE, data);
+            alert(`✅ ${data.id} 등록 완료!`);
+        }
+
+        resetAcForm();
+        await loadAcExistingSets();
+    } catch (error) {
+        console.error('저장 실패:', error);
+        alert('❌ 저장에 실패했습니다: ' + error.message);
+    }
+}
+
+// ===== 🆕 문제 유형 태그 파싱 =====
+function parseAcQuestionType(questionStr) {
+    const match = questionStr.match(/^(Q\d+)(?:\[(\w+)\])?::(.*)$/s);
+    if (!match) return { qNum: '', type: 'normal', rest: questionStr };
+
+    return {
+        qNum: match[1],
+        type: match[2] || 'normal',
+        rest: match[3]
+    };
+}
+
+// ===== 수정 모드 =====
+async function editAcSet(id) {
+    const set = acExistingSets.find(s => s.id === id);
+    if (!set) return;
+
+    acEditingSetId = id;
+    updateAcSetId();
+    document.getElementById('acEditModeLabel').classList.remove('q-hidden');
+    document.getElementById('acCancelEditBtn').classList.remove('q-hidden');
+
+    // 기본 정보
+    const mainTitleSel = document.getElementById('acMainTitleSelect');
+    const presetValues = [
+        'Read a passage about social psychology.',
+        'Read a passage about marine biology.',
+        'Read a passage about astrophysics.',
+        'Read a passage from a biology textbook.'
+    ];
+    if (presetValues.includes(set.main_title)) {
+        mainTitleSel.value = set.main_title;
+        document.getElementById('acMainTitleCustom').classList.add('q-hidden');
+    } else {
+        mainTitleSel.value = '__custom__';
+        document.getElementById('acMainTitleCustom').classList.remove('q-hidden');
+        document.getElementById('acMainTitleCustom').value = set.main_title || '';
+    }
+
+    document.getElementById('acPassageTitle').value = set.passage_title || '';
+
+    // ===== 블록 로드 (하위 호환 포함) =====
+    document.getElementById('acBlockList').innerHTML = '';
+
+    if (set.passage_content && (set.passage_content.includes('##') || set.passage_content.includes('#|#') || set.passage_content.includes('#||#'))) {
+        // 새 방식: 3종 구분자로 split
+        const parts = set.passage_content.split(/(##|#\|\|#|#\|#)/);
+        const passageBlocks = [];
+        const separators = [];
+        for (let i = 0; i < parts.length; i++) {
+            if (i % 2 === 0) {
+                passageBlocks.push(parts[i]);
+            } else {
+                separators.push(parts[i]);
+            }
+        }
+        const translationBlocks = (set.sentence_translations || '').split('##');
+
+        passageBlocks.forEach((text, i) => {
+            const trans = translationBlocks[i] || '';
+            const needsTrans = trans.trim() !== '';
+            const sep = separators[i] || '##';
+            addAcBlock(text, needsTrans, trans, sep);
+        });
+    } else {
+        // 기존 방식 (B): 전체 원문을 블록 1개에 넣기
+        const fullText = set.passage_content || '';
+        const allTrans = set.sentence_translations
+            ? set.sentence_translations.split('##').join('\n')
+            : '';
+        addAcBlock(fullText, true, allTrans);
+    }
+
+    // 핵심 단어 로드
+    document.getElementById('acWordList').innerHTML = '';
+    if (set.interactive_words) {
+        set.interactive_words.split('##').forEach(wStr => {
+            const parts = wStr.split('::');
+            addAcWord(parts[0] || '', parts[1] || '', parts[2] || '');
+        });
+    }
+
+    // 🆕 문제 1~5 로드 (유형 태그 포함)
+    for (let i = 1; i <= 5; i++) {
+        const questionStr = set[`question${i}`];
+        if (questionStr && questionStr.trim()) {
+            loadAcQuestionToForm(questionStr, i);
+        }
+    }
+
+    updateAcRegisterBtn();
+    renderAcPreview();
+
+    // 스크롤 위로
+    document.getElementById('acMainTitleSelect').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ===== 문제 역파싱 → 폼 로드 =====
+function loadAcQuestionToForm(questionStr, qNum) {
+    const prefix = `acQ${qNum}`;
+
+    // 1단계: 유형 태그 추출
+    const parsed = parseAcQuestionType(questionStr);
+
+    // 2단계: 유형 드롭다운 복원
+    setAcQuestionType(qNum, parsed.type);
+
+    // 3단계: 기존 파싱 (rest를 :: 로 split)
+    const allParts = parsed.rest.split('::');
+    const qText = allParts[0] || '';
+    const qTrans = allParts[1] || '';
+    const correctAnswer = parseInt(allParts[2]) || 0;
+
+    const optionsRaw = allParts.slice(3).join('::');
+    const optionParts = optionsRaw.split('##');
+
+    document.getElementById(`${prefix}Text`).value = qText;
+    document.getElementById(`${prefix}Trans`).value = qTrans;
+
+    if (correctAnswer >= 1 && correctAnswer <= 4) {
+        selectAcAnswer(prefix, correctAnswer);
+    }
+
+    const labels = ['A', 'B', 'C', 'D'];
+    optionParts.forEach((optStr, i) => {
+        if (i >= 4) return;
+        const optParts = optStr.split('::');
+        const match = optParts[0].match(/^([A-D])\)(.*)/);
+        const text = match ? match[2] : optParts[0];
+        const trans = optParts[1] || '';
+        const exp = optParts.slice(2).join('::');
+
+        const l = labels[i];
+        const textEl = document.getElementById(`${prefix}Opt${l}Text`);
+        const transEl = document.getElementById(`${prefix}Opt${l}Trans`);
+        const expEl = document.getElementById(`${prefix}Opt${l}Exp`);
+        if (textEl) textEl.value = text;
+        if (transEl) transEl.value = trans;
+        if (expEl) expEl.value = exp;
+    });
+}
+
+// ===== 수정 취소 =====
+function cancelAcEdit() {
+    resetAcForm();
+}
+
+// ===== 폼 초기화 =====
+function resetAcForm() {
+    acEditingSetId = null;
+
+    document.getElementById('acEditModeLabel').classList.add('q-hidden');
+    document.getElementById('acCancelEditBtn').classList.add('q-hidden');
+
+    // 기본 정보
+    document.getElementById('acMainTitleSelect').value = '';
+    document.getElementById('acMainTitleCustom').classList.add('q-hidden');
+    document.getElementById('acMainTitleCustom').value = '';
+    document.getElementById('acPassageTitle').value = '';
+
+    // 블록 초기화
+    document.getElementById('acBlockList').innerHTML = '';
+    updateAcBlockNumbers();
+
+    // 핵심 단어
+    document.getElementById('acWordList').innerHTML = '';
+    updateAcWordCount();
+
+    // 문제 1~5 초기화
+    for (let i = 1; i <= 5; i++) {
+        initAcQuestionBlock(`acQuestion${i}`, i);
+        // 유형 드롭다운 리셋
+        const typeEl = document.getElementById(`acQ${i}Type`);
+        if (typeEl) typeEl.value = 'normal';
+        // 안내 메시지 숨김
+        const hintEl = document.getElementById(`acQ${i}TypeHint`);
+        if (hintEl) {
+            hintEl.className = 'ac-qtype-hint';
+        }
+    }
+
+    // highlight 배너 숨김
+    document.getElementById('acHighlightBanner').classList.remove('visible');
+
+    // 미리보기
+    document.getElementById('acPreviewContent').innerHTML = '입력값을 채우면 미리보기가 표시됩니다.';
+    document.getElementById('acPreviewContent').style.color = '#94a3b8';
+
+    updateAcSetId();
+    updateAcRegisterBtn();
+}
+
+// ===== 삭제 =====
+async function deleteAcSet(id) {
+    if (!confirm(`"${id}" 세트를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+    try {
+        await supabaseAPI.hardDelete(AC_TABLE, id);
+        alert(`✅ ${id} 삭제 완료!`);
+        await loadAcExistingSets();
+    } catch (error) {
+        console.error('삭제 실패:', error);
+        alert('❌ 삭제에 실패했습니다: ' + error.message);
+    }
+}
+
+// ===== 🆕 미리보기 =====
+function renderAcPreview() {
+    const container = document.getElementById('acPreviewContent');
+    const mainTitle = getAcMainTitle();
+    const passageTitle = document.getElementById('acPassageTitle').value.trim();
+    const blocks = getAcBlocks();
+    const words = getAcWords();
+
+    if (!mainTitle && !passageTitle && blocks.length === 0) {
+        container.innerHTML = '입력값을 채우면 미리보기가 표시됩니다.';
+        container.style.color = '#94a3b8';
+        return;
+    }
+
+    container.style.color = '';
+
+    // insertion 문제가 있는지 확인
+    let hasInsertionType = false;
+    for (let i = 1; i <= 5; i++) {
+        if (getAcQuestionType(i) === 'insertion') {
+            hasInsertionType = true;
+            break;
+        }
+    }
+
+    let html = '<div class="d1-preview">';
+
+    // 상단 제목 + 지문 제목
+    html += '<div class="d1-preview-section">';
+    if (mainTitle) html += `<div class="d1-preview-main-title">📖 ${acEscapeHtml(mainTitle)}</div>`;
+    if (passageTitle) html += `<div class="d1-preview-passage-title">📄 ${acEscapeHtml(passageTitle)}</div>`;
+    html += '</div>';
+
+    // 블록별 원문 + 해석
+    const validBlocks = blocks.filter(b => b.text);
+    if (validBlocks.length > 0) {
+        const transCount = validBlocks.filter(b => b.needsTranslation && b.translation).length;
+        const noTransCount = validBlocks.length - transCount;
+        html += '<div class="d1-preview-section">';
+        html += `<div style="font-weight:600; margin-bottom:8px;">📝 지문 블록 <span class="d1-preview-tag">총 ${validBlocks.length}블록 (해석 있음: ${transCount} / 해석 없음: ${noTransCount})</span></div>`;
+        validBlocks.forEach((b, i) => {
+            html += `<div style="margin-bottom:10px; padding:10px; background:#f8fafc; border-radius:8px; border-left:3px solid #6366f1;">`;
+            html += `<div style="font-weight:600; color:#475569; font-size:12px; margin-bottom:4px;">블록 ${i + 1}</div>`;
+
+            // 원문 렌더링: <<단어>> 하이라이트 + (A)~(D) insertion 마커
+            let blockHtml = acEscapeHtml(b.text);
+            // <<>> → 하이라이트 (escape 후 &lt;&lt;...&gt;&gt; 를 변환)
+            blockHtml = blockHtml.replace(/&lt;&lt;([^&]+?)&gt;&gt;/g, '<span class="ac-preview-highlight">$1</span>');
+            // (A)~(D) → insertion 마커 (insertion 유형이 있을 때만)
+            if (hasInsertionType) {
+                blockHtml = blockHtml.replace(/\(([A-D])\)/g, '<span class="ac-preview-insertion-marker">($1)</span>');
+            }
+
+            html += `<div style="color:#1e293b; white-space:pre-wrap;">${blockHtml}</div>`;
+            if (b.needsTranslation && b.translation) {
+                html += `<div style="margin-top:6px; color:#6366f1; font-size:13px;">→ ${acEscapeHtml(b.translation)}</div>`;
+            } else if (!b.needsTranslation) {
+                html += `<div style="margin-top:4px; color:#94a3b8; font-size:12px;">(해석 없음)</div>`;
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    // 핵심 단어
+    const validWords = words.filter(w => w.word && w.translation);
+    if (validWords.length > 0) {
+        html += '<div class="d1-preview-section">';
+        html += `<div style="font-weight:600; margin-bottom:8px;">🔤 핵심 단어 <span class="d1-preview-tag">${validWords.length}개</span></div>`;
+        validWords.forEach(w => {
+            let wordHtml = `<strong>${acEscapeHtml(w.word)}</strong> — ${acEscapeHtml(w.translation)}`;
+            if (w.explanation) wordHtml += ` <span style="color:#94a3b8;">(${acEscapeHtml(w.explanation)})</span>`;
+            html += `<div style="margin-bottom:4px; padding-left:8px;">${wordHtml}</div>`;
+        });
+        html += '</div>';
+    }
+
+    // 문제 1~5 미리보기
+    for (let i = 1; i <= 5; i++) {
+        const q = getAcQuestionData(i);
+        if (q && q.text) {
+            html += '<div class="d1-preview-section">';
+            html += renderAcQuestionPreview(q);
+            html += '</div>';
+        }
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderAcQuestionPreview(q) {
+    if (!q || !q.text) return '';
+    const labels = ['A', 'B', 'C', 'D'];
+
+    // 유형 태그 표시
+    let typeTag = '';
+    if (q.type === 'highlight') {
+        typeTag = ' <span style="background:#fefce8; color:#854d0e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #fde047;">[highlight]</span>';
+    } else if (q.type === 'insertion') {
+        typeTag = ' <span style="background:#fff7ed; color:#9a3412; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #fdba74;">[insertion]</span>';
+    } else {
+        typeTag = ' <span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">[일반]</span>';
+    }
+
+    let qHtml = `<div style="font-weight:600; margin-bottom:6px;">❓ ${acEscapeHtml(q.num)}${typeTag}: ${acEscapeHtml(q.text)}</div>`;
+    if (q.translation) qHtml += `<div style="color:#64748b; margin-bottom:8px; padding-left:20px;">(${acEscapeHtml(q.translation)})</div>`;
+
+    q.options.forEach((opt, i) => {
+        const isCorrect = q.correctAnswer === (i + 1);
+        const mark = isCorrect ? ' ← ✅ 정답' : '';
+        const color = isCorrect ? 'color:#16a34a; font-weight:600;' : '';
+        qHtml += `<div style="padding-left:20px; margin-bottom:3px; ${color}">${labels[i]}) ${acEscapeHtml(opt.text)}`;
+        if (opt.translation) qHtml += ` <span style="color:#94a3b8;">(${acEscapeHtml(opt.translation)})</span>`;
+        qHtml += `${mark}</div>`;
+    });
+
+    return qHtml;
+}
+
+// ===== 유틸리티 =====
+function acEscapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function acEscapeAttr(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
