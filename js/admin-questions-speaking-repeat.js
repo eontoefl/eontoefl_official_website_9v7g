@@ -118,7 +118,7 @@ function updateSrSetDisplay() {
 // ===== URL 자동 생성 =====
 function updateSrUrls(setNum) {
     // 나레이션
-    const nrAudio = `${SR_BASE_URL}/audio/${SR_PREFIX}${setNum}_nr.mp3`;
+    const nrAudio = `${SR_BASE_URL}/narration/${SR_PREFIX}${setNum}_nr.mp3`;
     const nrImage = `${SR_BASE_URL}/baseimage/${SR_PREFIX}${setNum}_baseimage.png`;
     setTextSafe('srNarrationAudioUrl', nrAudio);
     setTextSafe('srNarrationImageUrl', nrImage);
@@ -220,7 +220,7 @@ async function verifySrAllFiles() {
     statusIds.forEach(id => setTextSafe(id, '⏳'));
 
     // 나레이션
-    const nrAudioOk = await checkAudio(`${SR_BASE_URL}/audio/${SR_PREFIX}${setNum}_nr.mp3`);
+    const nrAudioOk = await checkAudio(`${SR_BASE_URL}/narration/${SR_PREFIX}${setNum}_nr.mp3`);
     setTextSafe('srNarrationAudioStatus', nrAudioOk ? '✅' : '❌');
 
     const nrImageOk = await checkImage(`${SR_BASE_URL}/baseimage/${SR_PREFIX}${setNum}_baseimage.png`);
@@ -254,7 +254,7 @@ function renderSrPreview() {
     </div>`;
 
     // 나레이션 오디오
-    const nrUrl = `${SR_BASE_URL}/audio/${SR_PREFIX}${setNum}_nr.mp3`;
+    const nrUrl = `${SR_BASE_URL}/narration/${SR_PREFIX}${setNum}_nr.mp3`;
     html += `<div class="sr-preview-card">
         <h4><i class="fas fa-volume-up" style="color:#8b5cf6;"></i> 나레이션</h4>
         <button class="sr-preview-play" onclick="playSrAudio('${nrUrl}', this)">▶️ 재생</button>
@@ -355,7 +355,7 @@ function buildSrPayload() {
     const data = {
         id: getSrSetId(),
         context_text: document.getElementById('srContextText').value.trim(),
-        narration_audio: `${SR_BASE_URL}/audio/${SR_PREFIX}${setNum}_nr.mp3`,
+        narration_audio: `${SR_BASE_URL}/narration/${SR_PREFIX}${setNum}_nr.mp3`,
         narration_image: `${SR_BASE_URL}/baseimage/${SR_PREFIX}${setNum}_baseimage.png`
     };
 
