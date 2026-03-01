@@ -583,30 +583,7 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
             }
         }
 
-        // --- 🟡 마감 직전 제출 (어제 새벽 0~4시 KST) ---
-        const lateRecords = myRecords.filter(r => {
-            const completedDate = new Date(r.completed_at).toISOString().split('T')[0];
-            if (completedDate !== yesterday) return false;
-            const completedTime = new Date(r.completed_at);
-            const kstHour = (completedTime.getUTCHours() + 9) % 24;
-            return kstHour >= 0 && kstHour < 4;
-        });
-        if (lateRecords.length > 0) {
-            const latestTime = new Date(Math.max(...lateRecords.map(r => new Date(r.completed_at).getTime())));
-            const kstHour = (latestTime.getUTCHours() + 9) % 24;
-            const kstMin = latestTime.getUTCMinutes();
-            const ampm = kstHour < 12 ? 'AM' : 'PM';
-            const displayHour = kstHour === 0 ? 12 : kstHour > 12 ? kstHour - 12 : kstHour;
-            alerts.push({
-                priority: 4,
-                type: 'late',
-                color: '#eab308',
-                icon: '🟡',
-                title: `${s.name} - ${getDayName(yesterday)} 과제 새벽 ${displayHour}:${String(kstMin).padStart(2, '0')} ${ampm} 제출`,
-                subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 습관 주의`,
-                userId: s.userId
-            });
-        }
+
     });
 
     // 우선순위 정렬
