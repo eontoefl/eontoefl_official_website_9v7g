@@ -790,6 +790,77 @@
             border-radius: 4px;
             color: #E65100;
         }
+
+        /* Academic 단락 입력 UI */
+        .ac-passage-guide {
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #0369a1;
+            line-height: 1.6;
+        }
+        .ac-legacy-banner {
+            display: none;
+            padding: 10px 16px;
+            margin-bottom: 16px;
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #92400e;
+            line-height: 1.5;
+        }
+        .ac-legacy-banner.visible {
+            display: block;
+        }
+        .ac-paragraph-section {
+            padding: 16px;
+            margin-bottom: 16px;
+            background: #fafbfc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+        .ac-paragraph-section:last-of-type {
+            margin-bottom: 0;
+        }
+        .ac-paragraph-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 10px;
+        }
+        .ac-paragraph-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Pretendard', sans-serif;
+            line-height: 1.7;
+            box-sizing: border-box;
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+        .ac-paragraph-textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+        .ac-paragraph-status {
+            margin-top: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            min-height: 20px;
+        }
+        .ac-paragraph-status.match {
+            color: #16a34a;
+        }
+        .ac-paragraph-status.mismatch {
+            color: #dc2626;
+        }
     </style>
 </head>
 <body>
@@ -1252,16 +1323,48 @@
                 ⚠️ highlight 유형 문제가 있습니다. 지문에서 하이라이트할 단어를 &lt;&lt;단어&gt;&gt; 형태로 감싸주세요. (예: &lt;&lt;validity&gt;&gt;)
             </div>
 
-            <!-- 지문 블록 입력 -->
+            <!-- 지문 입력 (단락 3개 고정) -->
             <div class="q-card">
-                <div class="q-card-title" style="justify-content:space-between;">
-                    <span><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 블록 입력 <span class="d1-required">*</span></span>
-                    <span id="acBlockCount" style="font-size:13px; color:#94a3b8; font-weight:400;">(0개)</span>
+                <div class="q-card-title"><i class="fas fa-file-alt" style="color:#6366f1;"></i> 지문 입력 <span class="d1-required">*</span></div>
+                <div class="ac-passage-guide">
+                    ⚠️ 한 줄 = 한 문장입니다. 문장 중간에 엔터를 치지 마세요.<br>
+                    <span style="color:#94a3b8;">(화면에서 자동으로 줄바꿈되어 보이더라도, 엔터를 치지 않았으면 같은 문장입니다.)</span>
                 </div>
-                <div id="acBlockList"></div>
-                <button type="button" class="q-btn q-btn-secondary" onclick="addAcBlock()" style="margin-top:10px;">
-                    <i class="fas fa-plus"></i> 블록 추가
-                </button>
+
+                <!-- 레거시 데이터 안내 배너 -->
+                <div id="acLegacyBanner" class="ac-legacy-banner">
+                    ⚠️ 이 세트는 구 형식으로 저장되어 있어 자동 단락 분리가 불가능합니다. 원문과 해석을 3개 단락으로 나눠서 재배치해주세요. 재배치 후 저장하면 새 형식으로 자동 전환됩니다.
+                </div>
+
+                <!-- 단락 1 -->
+                <div class="ac-paragraph-section">
+                    <div class="ac-paragraph-title">── 단락 1 ──</div>
+                    <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+                    <textarea id="acPara1Original" class="ac-paragraph-textarea" placeholder="단락 1의 영어 문장을 한 줄에 하나씩 입력하세요" rows="5" oninput="onAcParagraphInput(1)"></textarea>
+                    <div class="d1-q-label" style="margin-top:8px;">해석 <span class="d1-required">*</span></div>
+                    <textarea id="acPara1Translation" class="ac-paragraph-textarea" placeholder="단락 1의 한글 해석을 원문과 같은 순서로 한 줄에 하나씩 입력하세요" rows="5" oninput="onAcParagraphInput(1)"></textarea>
+                    <div id="acPara1Status" class="ac-paragraph-status"></div>
+                </div>
+
+                <!-- 단락 2 -->
+                <div class="ac-paragraph-section">
+                    <div class="ac-paragraph-title">── 단락 2 ──</div>
+                    <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+                    <textarea id="acPara2Original" class="ac-paragraph-textarea" placeholder="단락 2의 영어 문장을 한 줄에 하나씩 입력하세요" rows="5" oninput="onAcParagraphInput(2)"></textarea>
+                    <div class="d1-q-label" style="margin-top:8px;">해석 <span class="d1-required">*</span></div>
+                    <textarea id="acPara2Translation" class="ac-paragraph-textarea" placeholder="단락 2의 한글 해석을 원문과 같은 순서로 한 줄에 하나씩 입력하세요" rows="5" oninput="onAcParagraphInput(2)"></textarea>
+                    <div id="acPara2Status" class="ac-paragraph-status"></div>
+                </div>
+
+                <!-- 단락 3 -->
+                <div class="ac-paragraph-section">
+                    <div class="ac-paragraph-title">── 단락 3 ──</div>
+                    <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
+                    <textarea id="acPara3Original" class="ac-paragraph-textarea" placeholder="단락 3의 영어 문장을 한 줄에 하나씩 입력하세요" rows="5" oninput="onAcParagraphInput(3)"></textarea>
+                    <div class="d1-q-label" style="margin-top:8px;">해석 <span class="d1-required">*</span></div>
+                    <textarea id="acPara3Translation" class="ac-paragraph-textarea" placeholder="단락 3의 한글 해석을 원문과 같은 순서로 한 줄에 하나씩 입력하세요" rows="5" oninput="onAcParagraphInput(3)"></textarea>
+                    <div id="acPara3Status" class="ac-paragraph-status"></div>
+                </div>
             </div>
 
             <!-- 핵심 단어 -->
