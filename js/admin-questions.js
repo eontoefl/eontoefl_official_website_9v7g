@@ -45,6 +45,8 @@ function onSectionChange() {
         if (typeof loadAcExistingSets === 'function') loadAcExistingSets();
     } else if (val === 'speaking-repeat') {
         if (typeof loadSrExistingSets === 'function') loadSrExistingSets();
+    } else if (val === 'speaking-interview') {
+        if (typeof loadSiExistingSets === 'function') loadSiExistingSets();
     }
 }
 
