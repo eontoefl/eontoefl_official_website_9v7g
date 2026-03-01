@@ -445,6 +445,7 @@ function buildTaskRows() {
             score: r.score || 0,
             total: r.total || 0,
             authRate: auth ? (auth.auth_rate || 0) : '-',
+            authRecordId: auth ? auth.id : null,
             submittedTime: formatKSTTime(r.completed_at),
             hasNote: !!noteContent,
             noteText: noteContent,
@@ -537,6 +538,16 @@ function renderTaskTable() {
 
         const rowBg = r.isFraud ? 'background:#fef2f2;' : '';
 
+        // 인증 부여 버튼: authRate가 100이 아니면 표시
+        let actionBtn = '';
+        if (r.authRate === '-' || (typeof r.authRate === 'number' && r.authRate < 100)) {
+            actionBtn = `<button onclick="forceAuth('${r.recordId}')" style="background:#faf5ff; border:1px solid #c4b5fd; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:11px; color:#7c3aed; font-weight:600; white-space:nowrap;">
+                <i class="fas fa-check-circle"></i> 인증
+            </button>`;
+        } else {
+            actionBtn = '<span style="color:#22c55e; font-size:12px;">✅</span>';
+        }
+
         return `
             <tr style="${rowBg}">
                 <td style="white-space:nowrap;">${r.dateStr}</td>
@@ -547,6 +558,7 @@ function renderTaskTable() {
                 <td style="white-space:nowrap;">${r.submittedTime}</td>
                 <td>${noteBtn}</td>
                 <td>${statusIcon}</td>
+                <td style="text-align:center;">${actionBtn}</td>
             </tr>
         `;
     }).join('');
@@ -1159,9 +1171,9 @@ function renderDeadlineList() {
             : '-';
 
         html += `<tr>
-            <td style="font-family:monospace; font-weight:600;">${escapeH(date)}</td>
+            <td style="font-family:monospace; font-weight:600;">${escapeHtml(date)}</td>
             <td><span style="color:#7c3aed; font-weight:700;">+${days}일</span></td>
-            <td style="color:#64748b;">${escapeH(reason)}</td>
+            <td style="color:#64748b;">${escapeHtml(reason)}</td>
             <td style="color:#94a3b8; font-size:12px;">${created}</td>
             <td style="text-align:center;">
                 <button class="btn-deadline-del" onclick="deleteDeadlineExtension('${ext.id}')">
@@ -1252,8 +1264,75 @@ async function deleteDeadlineExtension(id) {
     }
 }
 
-// HTML escape 헬퍼
-function escapeH(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// ===== 🆕 인증 강제 부여 =====
+async function forceAuth(studyRecordId) {
+    if (!studentData || !studentData.user) return;
+    const userId = studentData.user.id;
+
+    // 해당 row 찾기
+    const row = allTaskRows.find(r => r.recordId === studyRecordId);
+    if (!row) {
+        alert('해당 과제를 찾을 수 없습니다.');
+        return;
+    }
+
+    const taskLabel = `${row.taskName} (${row.dateStr})`;
+    if (!confirm(`"${taskLabel}"의 인증률을 100%로 부여하시겠습니까?`)) return;
+
+    try {
+        if (row.authRecordId) {
+            // 케이스 A: auth_record 있음 → UPDATE (fraud_flag 건드리지 않음)
+            await supabaseAPI.patch('tr_auth_records', row.authRecordId, {
+                auth_rate: 100
+            });
+        } else {
+            // 케이스 B: auth_record 없음 → INSERT
+            await supabaseAPI.post('tr_auth_records', {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                study_record_id: studyRecordId,
+                auth_rate: 100,
+                step1_completed: true,
+                step2_completed: true,
+                explanation_completed: true,
+                fraud_flag: false
+            });
+        }
+
+        alert(`✅ ${taskLabel} 인증 100% 부여 완료!`);
+
+        // 데이터 새로고침
+        const authRecords = await supabaseAPI.query('tr_auth_records', {
+            'user_id': `eq.${userId}`,
+            'limit': '10000',
+            'order': 'created_at.desc'
+        });
+        studentData.authRecords = authRecords || [];
+
+        // 테이블 재빌드
+        const weekFilter = document.getElementById('taskWeekFilter');
+        const savedWeek = weekFilter.value;
+        const typeFilter = document.getElementById('taskTypeFilter');
+        const savedType = typeFilter.value;
+        const statusFilter = document.getElementById('taskStatusFilter');
+        const savedStatus = statusFilter.value;
+
+        // 주차 필터 옵션 초기화 (buildTaskRows가 다시 추가함)
+        weekFilter.innerHTML = '<option value="">전체 주차</option>';
+
+        buildTaskRows();
+
+        // 필터 복원
+        weekFilter.value = savedWeek;
+        typeFilter.value = savedType;
+        statusFilter.value = savedStatus;
+        applyTaskFilters();
+
+        // 요약 카드도 갱신
+        renderSummaryCards();
+
+    } catch (err) {
+        console.error('인증 부여 실패:', err);
+        alert('❌ 인증 부여 실패: ' + err.message);
+    }
 }
