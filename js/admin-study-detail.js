@@ -453,7 +453,9 @@ function buildTaskRows() {
             noteType,
             isFraud,
             rawDate: new Date(r.completed_at),
-            recordId: r.id
+            recordId: r.id,
+            speakingFile1: r.speaking_file_1 || null,
+            speakingFile2: r.speaking_file_2 || null
         };
     });
 
@@ -539,13 +541,25 @@ function renderTaskTable() {
         const rowBg = r.isFraud ? 'background:#fef2f2;' : '';
 
         // 인증 부여 버튼: authRate가 100이 아니면 표시
-        let actionBtn = '';
+        let actionBtns = '';
         if (r.authRate === '-' || (typeof r.authRate === 'number' && r.authRate < 100)) {
-            actionBtn = `<button onclick="forceAuth('${r.recordId}')" style="background:#faf5ff; border:1px solid #c4b5fd; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:11px; color:#7c3aed; font-weight:600; white-space:nowrap;">
-                <i class="fas fa-check-circle"></i> 인증
+            actionBtns += `<button onclick="forceAuth('${r.recordId}')" style="background:#faf5ff; border:1px solid #c4b5fd; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:11px; color:#7c3aed; font-weight:600; white-space:nowrap;" title="인증 100% 부여">
+                <i class="fas fa-check-circle"></i>
             </button>`;
         } else {
-            actionBtn = '<span style="color:#22c55e; font-size:12px;">✅</span>';
+            actionBtns += '<span style="color:#22c55e; font-size:12px;" title="인증 완료">✅</span>';
+        }
+
+        // 스피킹 녹음 재생 버튼
+        if (r.speakingFile1) {
+            actionBtns += ` <button onclick="playSpeaking('${escapeHtml(r.speakingFile1)}', '${escapeHtml(r.taskName)} - 녹음1')" style="background:#f0fdf4; border:1px solid #86efac; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:11px; color:#16a34a; font-weight:600;" title="녹음1 재생">
+                <i class="fas fa-volume-up"></i>₁
+            </button>`;
+        }
+        if (r.speakingFile2) {
+            actionBtns += ` <button onclick="playSpeaking('${escapeHtml(r.speakingFile2)}', '${escapeHtml(r.taskName)} - 녹음2')" style="background:#f0fdf4; border:1px solid #86efac; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:11px; color:#16a34a; font-weight:600;" title="녹음2 재생">
+                <i class="fas fa-volume-up"></i>₂
+            </button>`;
         }
 
         return `
@@ -558,7 +572,7 @@ function renderTaskTable() {
                 <td style="white-space:nowrap;">${r.submittedTime}</td>
                 <td>${noteBtn}</td>
                 <td>${statusIcon}</td>
-                <td style="text-align:center;">${actionBtn}</td>
+                <td style="text-align:center; white-space:nowrap;">${actionBtns}</td>
             </tr>
         `;
     }).join('');
@@ -1334,5 +1348,54 @@ async function forceAuth(studyRecordId) {
     } catch (err) {
         console.error('인증 부여 실패:', err);
         alert('❌ 인증 부여 실패: ' + err.message);
+    }
+}
+
+// ===== 🔊 스피킹 녹음 재생 =====
+function playSpeaking(filePath, label) {
+    const audioUrl = `${SUPABASE_URL}/storage/v1/object/public/speaking-files/${filePath}`;
+
+    // 기존 모달이 있으면 제거
+    let modal = document.getElementById('speakingAudioModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'speakingAudioModal';
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1100; display:flex; align-items:center; justify-content:center;';
+    modal.innerHTML = `
+        <div style="background:white; border-radius:16px; padding:24px; min-width:340px; max-width:480px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div style="font-weight:700; font-size:15px; color:#1e293b;">
+                    <i class="fas fa-volume-up" style="color:#16a34a;"></i> ${escapeHtml(label)}
+                </div>
+                <button onclick="closeSpeakingModal()" style="background:none; border:none; cursor:pointer; font-size:18px; color:#94a3b8; padding:4px;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <audio controls autoplay style="width:100%;" controlsList="nodownload">
+                <source src="${escapeHtml(audioUrl)}" type="audio/webm">
+                <source src="${escapeHtml(audioUrl)}" type="audio/mp4">
+                <source src="${escapeHtml(audioUrl)}" type="audio/mpeg">
+                브라우저가 오디오 재생을 지원하지 않습니다.
+            </audio>
+            <div style="margin-top:10px; font-size:11px; color:#94a3b8; word-break:break-all;">${escapeHtml(filePath)}</div>
+        </div>
+    `;
+
+    // 배경 클릭 시 닫기
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeSpeakingModal();
+    });
+
+    document.body.appendChild(modal);
+}
+
+function closeSpeakingModal() {
+    const modal = document.getElementById('speakingAudioModal');
+    if (modal) {
+        // 오디오 정지
+        const audio = modal.querySelector('audio');
+        if (audio) { audio.pause(); audio.src = ''; }
+        modal.remove();
     }
 }
