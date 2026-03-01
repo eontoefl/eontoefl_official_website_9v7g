@@ -108,6 +108,7 @@ async function loadStudentDetail() {
 
         renderProfileHeader();
         renderSummaryCards();
+        loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
         renderGrassGrid();
         buildTaskRows();
         renderTaskTable();
@@ -1083,4 +1084,175 @@ async function deleteProgress(id, idx) {
         console.error('Delete failed:', err);
         alert('❌ 삭제 실패: ' + err.message);
     }
+}
+
+// ===== 📅 데드라인 연장 관리 =====
+let deadlineExtensions = [];
+
+function toggleDeadlineSection() {
+    const body = document.getElementById('deadlineBody');
+    const icon = document.getElementById('deadlineToggleIcon');
+    const btn = document.getElementById('deadlineToggleBtn');
+    const isOpen = body.classList.toggle('open');
+    icon.className = isOpen ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    btn.innerHTML = `<i class="${icon.className}"></i> ${isOpen ? '접기' : '펼치기'}`;
+
+    // 처음 펼칠 때 데이터 로드
+    if (isOpen && deadlineExtensions.length === 0) {
+        loadDeadlineExtensions();
+    }
+}
+
+async function loadDeadlineExtensions() {
+    if (!studentData || !studentData.user) return;
+    const userId = studentData.user.id;
+
+    try {
+        const result = await supabaseAPI.query('tr_deadline_extensions', {
+            'user_id': `eq.${userId}`,
+            'order': 'original_date.desc',
+            'limit': '200'
+        });
+        deadlineExtensions = result || [];
+        renderDeadlineList();
+        updateDeadlineCount();
+    } catch (err) {
+        console.error('데드라인 연장 로드 실패:', err);
+        document.getElementById('deadlineListWrap').innerHTML =
+            '<div class="deadline-empty"><i class="fas fa-exclamation-triangle"></i> 로드 실패</div>';
+    }
+}
+
+function updateDeadlineCount() {
+    const badge = document.getElementById('deadlineCount');
+    if (deadlineExtensions.length > 0) {
+        badge.textContent = `${deadlineExtensions.length}건`;
+        badge.style.display = 'inline-flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function renderDeadlineList() {
+    const wrap = document.getElementById('deadlineListWrap');
+
+    if (deadlineExtensions.length === 0) {
+        wrap.innerHTML = '<div class="deadline-empty"><i class="fas fa-check-circle" style="color:#22c55e;"></i> 등록된 연장이 없습니다.</div>';
+        return;
+    }
+
+    let html = `<table class="deadline-list-table">
+        <thead><tr>
+            <th>과제 날짜</th>
+            <th>연장 일수</th>
+            <th>사유</th>
+            <th>등록일</th>
+            <th style="width:60px; text-align:center;">삭제</th>
+        </tr></thead><tbody>`;
+
+    deadlineExtensions.forEach(ext => {
+        const date = ext.original_date || '-';
+        const days = ext.extra_days || 1;
+        const reason = ext.reason || '-';
+        const created = ext.created_at
+            ? new Date(ext.created_at).toLocaleDateString('ko-KR')
+            : '-';
+
+        html += `<tr>
+            <td style="font-family:monospace; font-weight:600;">${escapeH(date)}</td>
+            <td><span style="color:#7c3aed; font-weight:700;">+${days}일</span></td>
+            <td style="color:#64748b;">${escapeH(reason)}</td>
+            <td style="color:#94a3b8; font-size:12px;">${created}</td>
+            <td style="text-align:center;">
+                <button class="btn-deadline-del" onclick="deleteDeadlineExtension('${ext.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+async function addDeadlineExtension() {
+    if (!studentData || !studentData.user) return;
+    const userId = studentData.user.id;
+
+    const dateEl = document.getElementById('dlDate');
+    const daysEl = document.getElementById('dlDays');
+    const reasonEl = document.getElementById('dlReason');
+    const btn = document.getElementById('dlAddBtn');
+
+    const originalDate = dateEl.value;
+    const extraDays = parseInt(daysEl.value) || 1;
+    const reason = reasonEl.value.trim();
+
+    if (!originalDate) {
+        alert('과제 날짜를 선택해주세요.');
+        dateEl.focus();
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 등록 중...';
+
+    try {
+        // 같은 user_id + original_date가 이미 있는지 확인
+        const existing = await supabaseAPI.query('tr_deadline_extensions', {
+            'user_id': `eq.${userId}`,
+            'original_date': `eq.${originalDate}`,
+            'limit': '1'
+        });
+
+        if (existing && existing.length > 0) {
+            // UPDATE (UPSERT)
+            await supabaseAPI.patch('tr_deadline_extensions', existing[0].id, {
+                extra_days: extraDays,
+                reason: reason || null
+            });
+            alert(`✅ ${originalDate} 연장이 +${extraDays}일로 수정되었습니다.`);
+        } else {
+            // INSERT
+            await supabaseAPI.post('tr_deadline_extensions', {
+                user_id: userId,
+                original_date: originalDate,
+                extra_days: extraDays,
+                reason: reason || null
+            });
+            alert(`✅ ${originalDate} +${extraDays}일 연장 등록 완료!`);
+        }
+
+        // 폼 초기화
+        dateEl.value = '';
+        reasonEl.value = '';
+        daysEl.value = '1';
+
+        await loadDeadlineExtensions();
+    } catch (err) {
+        console.error('연장 등록 실패:', err);
+        alert('❌ 등록 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus"></i> 연장 등록';
+    }
+}
+
+async function deleteDeadlineExtension(id) {
+    if (!confirm('이 연장을 삭제하시겠습니까?\n삭제하면 학생의 마감이 원래대로 돌아갑니다.')) return;
+
+    try {
+        await supabaseAPI.hardDelete('tr_deadline_extensions', id);
+        alert('✅ 연장 삭제 완료!');
+        await loadDeadlineExtensions();
+    } catch (err) {
+        console.error('연장 삭제 실패:', err);
+        alert('❌ 삭제 실패: ' + err.message);
+    }
+}
+
+// HTML escape 헬퍼
+function escapeH(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
