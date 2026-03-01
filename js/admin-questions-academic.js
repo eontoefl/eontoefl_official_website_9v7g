@@ -111,107 +111,41 @@ function getAcMainTitle() {
     return sel.value;
 }
 
-// ===== 블록 입력: CRUD =====
-function addAcBlock(text = '', needsTranslation = true, translation = '', separator = '##') {
-    const list = document.getElementById('acBlockList');
-    const idx = list.children.length;
-
-    const block = document.createElement('div');
-    block.className = 'passage-block';
-    block.dataset.blockIdx = idx;
-
-    const transHiddenClass = needsTranslation ? '' : ' hidden';
-    const checkedAttr = needsTranslation ? ' checked' : '';
-
-    const selJoin = separator === '#|#' ? ' selected' : '';
-    const selBreak = separator === '#||#' ? ' selected' : '';
-    const selPara = separator === '##' ? ' selected' : '';
-
-    block.innerHTML = `
-        <div class="passage-block-header">
-            <span class="passage-block-num">블록 ${idx + 1}</span>
-            <button class="d1-del-btn" onclick="removeAcBlock(this)" title="삭제">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="passage-block-body">
-            <div class="d1-q-label">원문 <span class="d1-required">*</span></div>
-            <textarea class="passage-block-text" placeholder="영어 원문을 입력하세요 (엔터 = 같은 블록 안의 줄바꿈)" rows="3" oninput="updateAcRegisterBtn()">${acEscapeHtml(text)}</textarea>
-            
-            <label class="passage-block-check">
-                <input type="checkbox" class="block-needs-trans"${checkedAttr} onchange="toggleAcBlockTranslation(this)">
-                해석 필요
-            </label>
-            
-            <div class="passage-block-trans-wrap${transHiddenClass}">
-                <div class="d1-q-label">해석</div>
-                <input type="text" class="passage-block-trans" placeholder="한글 해석을 입력하세요" value="${acEscapeAttr(translation)}" oninput="updateAcRegisterBtn()">
-            </div>
-
-            <div class="passage-block-separator-wrap">
-                <span class="passage-block-separator-label">다음 블록 연결:</span>
-                <select class="passage-block-separator-select">
-                    <option value="#|#"${selJoin}>이어붙이기 (공백)</option>
-                    <option value="#||#"${selBreak}>줄바꿈</option>
-                    <option value="##"${selPara}>단락구분</option>
-                </select>
-            </div>
-        </div>
-    `;
-
-    list.appendChild(block);
-    updateAcBlockNumbers();
-    updateAcRegisterBtn();
+// ===== 단락 입력 (3개 고정) =====
+function countAcLines(text) {
+    return text.split('\n').filter(line => line.trim() !== '').length;
 }
 
-function removeAcBlock(btn) {
-    const list = document.getElementById('acBlockList');
-    if (list.children.length <= 1) {
-        alert('블록은 최소 1개 이상이어야 합니다.');
-        return;
-    }
-    btn.closest('.passage-block').remove();
-    updateAcBlockNumbers();
-    updateAcRegisterBtn();
-}
+function onAcParagraphInput(paraNum) {
+    const origEl = document.getElementById(`acPara${paraNum}Original`);
+    const transEl = document.getElementById(`acPara${paraNum}Translation`);
+    const statusEl = document.getElementById(`acPara${paraNum}Status`);
 
-function updateAcBlockNumbers() {
-    const blocks = document.querySelectorAll('#acBlockList .passage-block');
-    blocks.forEach((block, i) => {
-        block.dataset.blockIdx = i;
-        block.querySelector('.passage-block-num').textContent = `블록 ${i + 1}`;
-        const sepWrap = block.querySelector('.passage-block-separator-wrap');
-        if (sepWrap) {
-            if (i === blocks.length - 1) {
-                sepWrap.classList.add('hidden');
-            } else {
-                sepWrap.classList.remove('hidden');
-            }
-        }
-    });
-    document.getElementById('acBlockCount').textContent = `(${blocks.length}개)`;
-}
+    const origLines = countAcLines(origEl.value);
+    const transLines = countAcLines(transEl.value);
 
-function toggleAcBlockTranslation(checkbox) {
-    const wrap = checkbox.closest('.passage-block-body').querySelector('.passage-block-trans-wrap');
-    if (checkbox.checked) {
-        wrap.classList.remove('hidden');
+    if (origLines === 0 && transLines === 0) {
+        statusEl.textContent = '';
+        statusEl.className = 'ac-paragraph-status';
+    } else if (origLines === transLines) {
+        statusEl.textContent = `✅ 원문 ${origLines}줄 / 해석 ${transLines}줄 — 일치`;
+        statusEl.className = 'ac-paragraph-status match';
     } else {
-        wrap.classList.add('hidden');
+        statusEl.textContent = `❌ 원문 ${origLines}줄 / 해석 ${transLines}줄 — 불일치!`;
+        statusEl.className = 'ac-paragraph-status mismatch';
     }
+
     updateAcRegisterBtn();
 }
 
-function getAcBlocks() {
-    const blocks = document.querySelectorAll('#acBlockList .passage-block');
-    return Array.from(blocks).map((block) => {
-        const text = block.querySelector('.passage-block-text').value;
-        const needsTranslation = block.querySelector('.block-needs-trans').checked;
-        const translation = block.querySelector('.passage-block-trans').value;
-        const sepSelect = block.querySelector('.passage-block-separator-select');
-        const separator = sepSelect ? sepSelect.value : '##';
-        return { text: text.trim(), needsTranslation, translation: translation.trim(), separator };
-    });
+function getAcParagraphs() {
+    const paragraphs = [];
+    for (let i = 1; i <= 3; i++) {
+        const original = document.getElementById(`acPara${i}Original`)?.value || '';
+        const translation = document.getElementById(`acPara${i}Translation`)?.value || '';
+        paragraphs.push({ original: original.trim(), translation: translation.trim() });
+    }
+    return paragraphs;
 }
 
 // ===== 핵심 단어 =====
@@ -437,23 +371,20 @@ function acSanitizeDelimiters(str) {
 function buildAcData() {
     const mainTitle = acSanitizeDelimiters(getAcMainTitle());
     const passageTitle = acSanitizeDelimiters(document.getElementById('acPassageTitle').value.trim());
-    const blocks = getAcBlocks();
+    const paragraphs = getAcParagraphs();
     const words = getAcWords();
 
-    // 블록 원문을 각 블록의 separator로 연결
-    let passageContent = '';
-    blocks.forEach((b, i) => {
-        passageContent += acSanitizeDelimiters(b.text);
-        if (i < blocks.length - 1) {
-            passageContent += b.separator;
-        }
-    });
-
-    // 해석을 ##로 연결
-    const sentenceTranslations = blocks.map(b => {
-        if (b.needsTranslation && b.translation) return acSanitizeDelimiters(b.translation);
-        return '';
+    // passage_content: 단락 내 문장은 #|#, 단락 간은 ##
+    const passageContent = paragraphs.map(p => {
+        const sentences = p.original.split('\n').filter(s => s.trim() !== '');
+        return sentences.map(s => acSanitizeDelimiters(s.trim())).join('#|#');
     }).join('##');
+
+    // sentence_translations: 전체 해석을 ##로 연결
+    const allTranslations = paragraphs.flatMap(p => {
+        return p.translation.split('\n').filter(s => s.trim() !== '');
+    });
+    const sentenceTranslations = allTranslations.map(t => acSanitizeDelimiters(t.trim())).join('##');
 
     const interactiveWords = words.map(w => {
         const word = acSanitizeDelimiters(w.word);
@@ -517,18 +448,18 @@ function validateAcForm() {
     // 지문 제목
     if (!document.getElementById('acPassageTitle').value.trim()) errors.push('지문 제목을 입력해주세요');
 
-    // 블록 검사
-    const blocks = getAcBlocks();
-    if (blocks.length === 0) {
-        errors.push('지문 블록을 최소 1개 입력해주세요');
-    } else {
-        blocks.forEach((b, i) => {
-            if (!b.text) errors.push(`블록 #${i + 1}의 원문을 입력해주세요`);
-            if (b.needsTranslation && !b.translation) errors.push(`블록 #${i + 1}의 해석을 입력해주세요`);
-        });
-        const hasTranslation = blocks.some(b => b.needsTranslation);
-        if (!hasTranslation) {
-            errors.push('해석이 있는 블록이 최소 1개 필요합니다');
+    // 단락 검사 (3개 고정)
+    const paragraphs = getAcParagraphs();
+    for (let i = 0; i < 3; i++) {
+        const p = paragraphs[i];
+        if (!p.original) errors.push(`단락 ${i + 1}의 원문을 입력해주세요`);
+        if (!p.translation) errors.push(`단락 ${i + 1}의 해석을 입력해주세요`);
+        if (p.original && p.translation) {
+            const origLines = countAcLines(p.original);
+            const transLines = countAcLines(p.translation);
+            if (origLines !== transLines) {
+                errors.push(`단락 ${i + 1}의 원문(${origLines}줄)과 해석(${transLines}줄)의 문장 수가 일치하지 않습니다`);
+            }
         }
     }
 
@@ -569,7 +500,7 @@ function validateAcForm() {
     }
 
     // <<>> 마크업 검사
-    const fullPassage = blocks.map(b => b.text).join('');
+    const fullPassage = paragraphs.map(p => p.original).join('');
     const highlightMarkers = fullPassage.match(/<<[^>]+>>/g) || [];
 
     if (highlightQuestions.length > 0 && highlightMarkers.length === 0) {
@@ -711,36 +642,45 @@ async function editAcSet(id) {
 
     document.getElementById('acPassageTitle').value = set.passage_title || '';
 
-    // ===== 블록 로드 (하위 호환 포함) =====
-    document.getElementById('acBlockList').innerHTML = '';
+    // ===== 단락 로드 (하위 호환 포함) =====
+    // 레거시 배너 숨김 (기본)
+    document.getElementById('acLegacyBanner').classList.remove('visible');
 
-    if (set.passage_content && (set.passage_content.includes('##') || set.passage_content.includes('#|#') || set.passage_content.includes('#||#'))) {
-        // 새 방식: 3종 구분자로 split
-        const parts = set.passage_content.split(/(##|#\|\|#|#\|#)/);
-        const passageBlocks = [];
-        const separators = [];
-        for (let i = 0; i < parts.length; i++) {
-            if (i % 2 === 0) {
-                passageBlocks.push(parts[i]);
+    if (set.passage_content && (set.passage_content.includes('##') || set.passage_content.includes('#|#'))) {
+        // 새 방식: ## 로 단락 분리, #|# 로 문장 분리
+        const rawParagraphs = set.passage_content.split('##');
+        const allTranslations = (set.sentence_translations || '').split('##');
+
+        let transIndex = 0;
+        for (let i = 0; i < 3; i++) {
+            const origEl = document.getElementById(`acPara${i + 1}Original`);
+            const transEl = document.getElementById(`acPara${i + 1}Translation`);
+
+            if (rawParagraphs[i]) {
+                const sentences = rawParagraphs[i].split('#|#');
+                origEl.value = sentences.join('\n');
+                const translations = sentences.map(() => allTranslations[transIndex++] || '');
+                transEl.value = translations.join('\n');
             } else {
-                separators.push(parts[i]);
+                origEl.value = '';
+                transEl.value = '';
             }
+            onAcParagraphInput(i + 1);
         }
-        const translationBlocks = (set.sentence_translations || '').split('##');
-
-        passageBlocks.forEach((text, i) => {
-            const trans = translationBlocks[i] || '';
-            const needsTrans = trans.trim() !== '';
-            const sep = separators[i] || '##';
-            addAcBlock(text, needsTrans, trans, sep);
-        });
     } else {
-        // 기존 방식 (B): 전체 원문을 블록 1개에 넣기
+        // 기존 방식 (레거시): 전체 원문을 단락 1에 넣기
+        document.getElementById('acLegacyBanner').classList.add('visible');
         const fullText = set.passage_content || '';
         const allTrans = set.sentence_translations
             ? set.sentence_translations.split('##').join('\n')
             : '';
-        addAcBlock(fullText, true, allTrans);
+        document.getElementById('acPara1Original').value = fullText;
+        document.getElementById('acPara1Translation').value = allTrans;
+        document.getElementById('acPara2Original').value = '';
+        document.getElementById('acPara2Translation').value = '';
+        document.getElementById('acPara3Original').value = '';
+        document.getElementById('acPara3Translation').value = '';
+        for (let i = 1; i <= 3; i++) onAcParagraphInput(i);
     }
 
     // 핵심 단어 로드
@@ -830,9 +770,15 @@ function resetAcForm() {
     document.getElementById('acMainTitleCustom').value = '';
     document.getElementById('acPassageTitle').value = '';
 
-    // 블록 초기화
-    document.getElementById('acBlockList').innerHTML = '';
-    updateAcBlockNumbers();
+    // 단락 초기화
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById(`acPara${i}Original`).value = '';
+        document.getElementById(`acPara${i}Translation`).value = '';
+        document.getElementById(`acPara${i}Status`).textContent = '';
+        document.getElementById(`acPara${i}Status`).className = 'ac-paragraph-status';
+    }
+    // 레거시 배너 숨김
+    document.getElementById('acLegacyBanner').classList.remove('visible');
 
     // 핵심 단어
     document.getElementById('acWordList').innerHTML = '';
@@ -876,15 +822,16 @@ async function deleteAcSet(id) {
     }
 }
 
-// ===== 🆕 미리보기 =====
+// ===== 🆕 미리보기 (단락 3개 기반) =====
 function renderAcPreview() {
     const container = document.getElementById('acPreviewContent');
     const mainTitle = getAcMainTitle();
     const passageTitle = document.getElementById('acPassageTitle').value.trim();
-    const blocks = getAcBlocks();
+    const paragraphs = getAcParagraphs();
     const words = getAcWords();
 
-    if (!mainTitle && !passageTitle && blocks.length === 0) {
+    const hasParagraphContent = paragraphs.some(p => p.original);
+    if (!mainTitle && !passageTitle && !hasParagraphContent) {
         container.innerHTML = '입력값을 채우면 미리보기가 표시됩니다.';
         container.style.color = '#94a3b8';
         return;
@@ -909,34 +856,51 @@ function renderAcPreview() {
     if (passageTitle) html += `<div class="d1-preview-passage-title">📄 ${acEscapeHtml(passageTitle)}</div>`;
     html += '</div>';
 
-    // 블록별 원문 + 해석
-    const validBlocks = blocks.filter(b => b.text);
-    if (validBlocks.length > 0) {
-        const transCount = validBlocks.filter(b => b.needsTranslation && b.translation).length;
-        const noTransCount = validBlocks.length - transCount;
+    // 단락별 원문 + 해석 (문장 단위)
+    let totalSentences = 0;
+    const paraCounts = [];
+    const validParas = paragraphs.filter(p => p.original);
+    if (validParas.length > 0) {
         html += '<div class="d1-preview-section">';
-        html += `<div style="font-weight:600; margin-bottom:8px;">📝 지문 블록 <span class="d1-preview-tag">총 ${validBlocks.length}블록 (해석 있음: ${transCount} / 해석 없음: ${noTransCount})</span></div>`;
-        validBlocks.forEach((b, i) => {
-            html += `<div style="margin-bottom:10px; padding:10px; background:#f8fafc; border-radius:8px; border-left:3px solid #6366f1;">`;
-            html += `<div style="font-weight:600; color:#475569; font-size:12px; margin-bottom:4px;">블록 ${i + 1}</div>`;
 
-            // 원문 렌더링: <<단어>> 하이라이트 + (A)~(D) insertion 마커
-            let blockHtml = acEscapeHtml(b.text);
-            // <<>> → 하이라이트 (escape 후 &lt;&lt;...&gt;&gt; 를 변환)
-            blockHtml = blockHtml.replace(/&lt;&lt;([^&]+?)&gt;&gt;/g, '<span class="ac-preview-highlight">$1</span>');
-            // (A)~(D) → insertion 마커 (insertion 유형이 있을 때만)
-            if (hasInsertionType) {
-                blockHtml = blockHtml.replace(/\(([A-D])\)/g, '<span class="ac-preview-insertion-marker">($1)</span>');
+        paragraphs.forEach((para, pIdx) => {
+            if (!para.original) {
+                paraCounts.push(0);
+                return;
             }
 
-            html += `<div style="color:#1e293b; white-space:pre-wrap;">${blockHtml}</div>`;
-            if (b.needsTranslation && b.translation) {
-                html += `<div style="margin-top:6px; color:#6366f1; font-size:13px;">→ ${acEscapeHtml(b.translation)}</div>`;
-            } else if (!b.needsTranslation) {
-                html += `<div style="margin-top:4px; color:#94a3b8; font-size:12px;">(해석 없음)</div>`;
-            }
+            const origLines = para.original.split('\n').filter(l => l.trim() !== '');
+            const transLines = para.translation ? para.translation.split('\n').filter(l => l.trim() !== '') : [];
+            paraCounts.push(origLines.length);
+            totalSentences += origLines.length;
+
+            html += `<div style="margin-bottom:14px; padding:12px; background:#f8fafc; border-radius:8px; border-left:3px solid #6366f1;">`;
+            html += `<div style="font-weight:700; color:#475569; font-size:13px; margin-bottom:8px;">[단락 ${pIdx + 1}]</div>`;
+
+            origLines.forEach((sentence, sIdx) => {
+                // 원문 렌더링: <<단어>> 하이라이트 + (A)~(D) insertion 마커
+                let sentHtml = acEscapeHtml(sentence.trim());
+                // <<>> → 하이라이트 (escape 후 &lt;&lt;...&gt;&gt; 를 변환)
+                sentHtml = sentHtml.replace(/&lt;&lt;([^&]+?)&gt;&gt;/g, '<span class="ac-preview-highlight">$1</span>');
+                // (A)~(D) → insertion 마커
+                if (hasInsertionType) {
+                    sentHtml = sentHtml.replace(/\(([A-D])\)/g, '<span class="ac-preview-insertion-marker">($1)</span>');
+                }
+
+                html += `<div style="margin-bottom:4px; color:#1e293b;">${sentHtml}</div>`;
+                // 해석이 있으면 바로 아래 표시
+                if (transLines[sIdx]) {
+                    html += `<div style="margin-bottom:8px; color:#6366f1; font-size:13px; padding-left:12px;">→ ${acEscapeHtml(transLines[sIdx].trim())}</div>`;
+                }
+            });
+
             html += '</div>';
         });
+
+        // 총 문장 수 요약
+        const paraCountStr = paraCounts.map((c, i) => `단락${i + 1}: ${c}`).join(' / ');
+        html += `<div style="font-weight:600; margin-top:4px; font-size:13px; color:#475569;">📝 총 ${totalSentences}문장 (${paraCountStr})</div>`;
+
         html += '</div>';
     }
 
