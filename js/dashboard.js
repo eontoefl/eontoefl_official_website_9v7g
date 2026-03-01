@@ -35,11 +35,19 @@ async function loadDashboard() {
     try {
         const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
         
-        // 사용자의 신청서 로드 (Supabase API 사용)
-        const result = await supabaseAPI.query('applications', { 'email': `eq.${currentUser.email}`, 'limit': '100' });
+        // 사용자의 신청서 로드 (Supabase API 사용) — 삭제되지 않은 것만, 최신순
+        const result = await supabaseAPI.query('applications', { 
+            'email': `eq.${currentUser.email}`, 
+            'deleted': 'neq.true',
+            'order': 'created_at.desc',
+            'limit': '100' 
+        });
         
-        // 정확한 이메일 매칭 필터링
-        const matchedApplications = result?.filter(app => app.email === currentUser.email || app.user_email === currentUser.email);
+        // 정확한 이메일 매칭 필터링 + 삭제되지 않은 것만
+        const matchedApplications = result?.filter(app => 
+            (app.email === currentUser.email || app.user_email === currentUser.email) &&
+            app.deleted !== true && app.deleted !== 'true'
+        );
         
         if (!matchedApplications || matchedApplications.length === 0) {
             showEmptyState();
