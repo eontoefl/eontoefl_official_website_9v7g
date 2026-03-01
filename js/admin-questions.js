@@ -43,6 +43,8 @@ function onSectionChange() {
         if (typeof loadD2ExistingSets === 'function') loadD2ExistingSets();
     } else if (val === 'reading-academic') {
         if (typeof loadAcExistingSets === 'function') loadAcExistingSets();
+    } else if (val === 'speaking-repeat') {
+        if (typeof loadSrExistingSets === 'function') loadSrExistingSets();
     }
 }
 
