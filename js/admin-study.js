@@ -543,46 +543,6 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
             }
         }
 
-        // --- 🔴 어제 미제출 ---
-        if (isWeekday) {
-            const yesterdayDate = new Date(yesterday);
-            const startDate = new Date(s.scheduleStart);
-            const diffFromStart = Math.floor((yesterdayDate - startDate) / 86400000);
-            const yesterdayWeek = Math.max(1, Math.floor(diffFromStart / 7) + 1);
-            const yesterdayRequired = getTaskCount(s.programType, yesterdayWeek, yesterdayDay);
-
-            if (yesterdayRequired > 0) {
-                const yesterdayRecords = myRecords.filter(r => {
-                    return new Date(r.completed_at).toISOString().split('T')[0] === yesterday;
-                });
-                const uniqueTypes = new Set(yesterdayRecords.map(r => r.task_type));
-
-                if (uniqueTypes.size === 0) {
-                    if (s.consecutiveMissing < 2) {
-                        alerts.push({
-                            priority: 3,
-                            type: 'missing',
-                            color: '#ef4444',
-                            icon: '🔴',
-                            title: `${s.name} - ${getDayName(yesterday)} 과제 전체 미제출`,
-                            subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 현재 인증률 ${s.avgAuthRate}%`,
-                            userId: s.userId
-                        });
-                    }
-                } else if (uniqueTypes.size < yesterdayRequired) {
-                    alerts.push({
-                        priority: 3,
-                        type: 'missing',
-                        color: '#ef4444',
-                        icon: '🔴',
-                        title: `${s.name} - ${getDayName(yesterday)} 과제 ${uniqueTypes.size}/${yesterdayRequired}개만 제출`,
-                        subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 현재 인증률 ${s.avgAuthRate}%`,
-                        userId: s.userId
-                    });
-                }
-            }
-        }
-
 
     });
 
