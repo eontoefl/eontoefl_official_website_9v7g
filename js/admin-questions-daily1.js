@@ -113,7 +113,7 @@ function getD1MainTitle() {
 }
 
 // ===== 블록 입력: CRUD (v2) =====
-function addD1Block(text = '', needsTranslation = true, translation = '') {
+function addD1Block(text = '', needsTranslation = true, translation = '', separator = '##') {
     const list = document.getElementById('d1BlockList');
     const idx = list.children.length;
 
@@ -123,6 +123,11 @@ function addD1Block(text = '', needsTranslation = true, translation = '') {
 
     const transHiddenClass = needsTranslation ? '' : ' hidden';
     const checkedAttr = needsTranslation ? ' checked' : '';
+
+    // separator 드롭다운 선택값
+    const selJoin = separator === '#|#' ? ' selected' : '';
+    const selBreak = separator === '#||#' ? ' selected' : '';
+    const selPara = separator === '##' ? ' selected' : '';
 
     block.innerHTML = `
         <div class="passage-block-header">
@@ -143,6 +148,15 @@ function addD1Block(text = '', needsTranslation = true, translation = '') {
             <div class="passage-block-trans-wrap${transHiddenClass}">
                 <div class="d1-q-label">해석</div>
                 <input type="text" class="passage-block-trans" placeholder="한글 해석을 입력하세요" value="${d1EscapeAttr(translation)}" oninput="updateD1RegisterBtn()">
+            </div>
+
+            <div class="passage-block-separator-wrap">
+                <span class="passage-block-separator-label">다음 블록 연결:</span>
+                <select class="passage-block-separator-select">
+                    <option value="#|#"${selJoin}>이어붙이기 (공백)</option>
+                    <option value="#||#"${selBreak}>줄바꿈</option>
+                    <option value="##"${selPara}>단락구분</option>
+                </select>
             </div>
         </div>
     `;
@@ -168,6 +182,15 @@ function updateD1BlockNumbers() {
     blocks.forEach((block, i) => {
         block.dataset.blockIdx = i;
         block.querySelector('.passage-block-num').textContent = `블록 ${i + 1}`;
+        // 마지막 블록은 separator 숨김
+        const sepWrap = block.querySelector('.passage-block-separator-wrap');
+        if (sepWrap) {
+            if (i === blocks.length - 1) {
+                sepWrap.classList.add('hidden');
+            } else {
+                sepWrap.classList.remove('hidden');
+            }
+        }
     });
     document.getElementById('d1BlockCount').textContent = `(${blocks.length}개)`;
 }
@@ -184,11 +207,13 @@ function toggleD1BlockTranslation(checkbox) {
 
 function getD1Blocks() {
     const blocks = document.querySelectorAll('#d1BlockList .passage-block');
-    return Array.from(blocks).map(block => {
+    return Array.from(blocks).map((block, i) => {
         const text = block.querySelector('.passage-block-text').value;
         const needsTranslation = block.querySelector('.block-needs-trans').checked;
         const translation = block.querySelector('.passage-block-trans').value;
-        return { text: text.trim(), needsTranslation, translation: translation.trim() };
+        const sepSelect = block.querySelector('.passage-block-separator-select');
+        const separator = sepSelect ? sepSelect.value : '##';
+        return { text: text.trim(), needsTranslation, translation: translation.trim(), separator };
     });
 }
 
@@ -356,7 +381,11 @@ function toggleD1Question2() {
 // ===== 구분자 치환 =====
 function d1SanitizeDelimiters(str) {
     if (!str) return '';
-    return str.replace(/::/g, ': :').replace(/##/g, '# #');
+    return str
+        .replace(/::/g, ': :')
+        .replace(/#\|\|#/g, '# ||#')
+        .replace(/#\|#/g, '# |#')
+        .replace(/##/g, '# #');
 }
 
 // ===== 데이터 조합 (폼 → DB) — v2 블록 방식 =====
@@ -366,8 +395,14 @@ function buildD1Data() {
     const blocks = getD1Blocks();
     const words = getD1Words();
 
-    // 블록 원문을 ##로 연결 (각 블록 내 ##는 sanitize 완료)
-    const passageContent = blocks.map(b => d1SanitizeDelimiters(b.text)).join('##');
+    // 블록 원문을 각 블록의 separator로 연결
+    let passageContent = '';
+    blocks.forEach((b, i) => {
+        passageContent += d1SanitizeDelimiters(b.text);
+        if (i < blocks.length - 1) {
+            passageContent += b.separator; // '#|#' or '#||#' or '##'
+        }
+    });
 
     // 해석을 ##로 연결 (해석 없는 블록은 빈 문자열)
     const sentenceTranslations = blocks.map(b => {
@@ -557,15 +592,26 @@ async function editD1Set(id) {
     // ===== 블록 로드 (하위 호환 포함) =====
     document.getElementById('d1BlockList').innerHTML = '';
 
-    if (set.passage_content && set.passage_content.includes('##')) {
-        // 새 방식: ##로 split → 블록 생성
-        const passageBlocks = set.passage_content.split('##');
+    if (set.passage_content && (set.passage_content.includes('##') || set.passage_content.includes('#|#') || set.passage_content.includes('#||#'))) {
+        // 새 방식: 3종 구분자로 split → 블록 생성
+        const parts = set.passage_content.split(/(##|#\|\|#|#\|#)/);
+        // parts = [텍스트, 구분자, 텍스트, 구분자, ...텍스트]
+        const passageBlocks = [];
+        const separators = [];
+        for (let i = 0; i < parts.length; i++) {
+            if (i % 2 === 0) {
+                passageBlocks.push(parts[i]);
+            } else {
+                separators.push(parts[i]);
+            }
+        }
         const translationBlocks = (set.sentence_translations || '').split('##');
 
         passageBlocks.forEach((text, i) => {
             const trans = translationBlocks[i] || '';
             const needsTrans = trans.trim() !== '';
-            addD1Block(text, needsTrans, trans);
+            const sep = separators[i] || '##'; // 마지막 블록은 기본값
+            addD1Block(text, needsTrans, trans, sep);
         });
     } else {
         // 기존 방식 (B): 전체 원문을 블록 1개에 넣기
