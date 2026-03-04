@@ -336,35 +336,53 @@
 
         /* ===== 학생 알림 발송 ===== */
         .notif-container {
-            background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-            padding: 20px 24px; margin-bottom: 20px;
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+            margin-bottom: 24px;
         }
         .notif-toggle-btn {
-            background: none; border: 1px solid #dbeafe; color: #2563eb; border-radius: 8px;
-            padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .2s;
+            background: none; border: none; cursor: pointer;
+            font-size: 13px; color: #3b82f6; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 0;
         }
-        .notif-toggle-btn:hover { background: #eff6ff; }
+        .notif-toggle-btn:hover { color: #2563eb; }
         .notif-body { display: none; margin-top: 16px; }
         .notif-body.open { display: block; }
         .notif-form {
-            display: flex; flex-direction: column; gap: 12px;
-            background: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0;
+            display: flex; flex-direction: column; gap: 10px;
+            padding: 16px; background: #f8fafc; border-radius: 10px;
+            border: 1px solid #e2e8f0; margin-bottom: 16px;
         }
-        .notif-form label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 2px; }
-        .notif-form input, .notif-form textarea {
-            width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
-            font-size: 13px; font-family: 'Pretendard', sans-serif; box-sizing: border-box;
+        .notif-form .field {
+            display: flex; flex-direction: column; gap: 4px;
         }
-        .notif-form input:focus, .notif-form textarea:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+        .notif-form .field label {
+            font-size: 12px; font-weight: 600; color: #64748b;
+        }
+        .notif-form .field input,
+        .notif-form .field textarea {
+            padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 13px; font-family: 'Pretendard', sans-serif;
+            width: 100%; box-sizing: border-box;
+        }
+        .notif-form .field input:focus,
+        .notif-form .field textarea:focus {
+            outline: none; border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+        .notif-form .field-message { flex: 1; }
         .btn-notif-send {
-            background: #3b82f6; color: white; border: none; border-radius: 8px;
-            padding: 10px 24px; font-size: 13px; font-weight: 700; cursor: pointer;
-            align-self: flex-start; transition: background .2s;
+            background: #3b82f6; color: white; border: none;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; white-space: nowrap;
+            display: inline-flex; align-items: center; gap: 6px;
+            align-self: flex-start;
         }
         .btn-notif-send:hover { background: #2563eb; }
         .btn-notif-send:disabled { background: #93c5fd; cursor: not-allowed; }
         .notif-list-table {
-            width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px;
+            width: 100%; border-collapse: collapse; font-size: 13px;
         }
         .notif-list-table th {
             text-align: left; padding: 8px 12px; background: #f8fafc;
@@ -374,14 +392,14 @@
             padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #334155;
         }
         .notif-list-table tr:hover { background: #eff6ff; }
-        .notif-badge-read { color: #22c55e; font-size: 11px; font-weight: 600; }
-        .notif-badge-unread { color: #f59e0b; font-size: 11px; font-weight: 600; }
         .btn-notif-del {
             background: #fef2f2; color: #ef4444; border: 1px solid #fca5a5;
             padding: 4px 10px; border-radius: 6px; cursor: pointer;
             font-size: 11px; font-weight: 600;
         }
         .btn-notif-del:hover { background: #fee2e2; }
+        .notif-badge-read { color: #22c55e; font-size: 11px; font-weight: 600; }
+        .notif-badge-unread { color: #f59e0b; font-size: 11px; font-weight: 600; }
         .notif-empty {
             text-align: center; padding: 24px; color: #94a3b8; font-size: 13px;
         }
@@ -389,6 +407,10 @@
             display: inline-flex; align-items: center; gap: 4px;
             background: #dbeafe; color: #2563eb; padding: 2px 8px;
             border-radius: 6px; font-size: 11px; font-weight: 600;
+        }
+        .notif-form-bottom {
+            display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+            margin-top: 4px;
         }
 
         /* ===== 오답노트 모달 ===== */
@@ -573,21 +595,23 @@
                 <div class="notif-body" id="notifBody">
                     <!-- 발송 폼 -->
                     <div class="notif-form">
-                        <div>
+                        <div class="field" style="flex:1; min-width:200px;">
                             <label>제목 *</label>
                             <input type="text" id="notifTitle" placeholder="예: 1주차 주간체크 피드백 도착!">
                         </div>
-                        <div>
-                            <label>본문 * <span style="font-weight:400; color:#94a3b8;">(줄바꿈 가능, 이모지 사용 가능)</span></label>
+                        <div class="field field-message">
+                            <label>본문 * <span style="font-weight:400; color:#94a3b8;">(줄바꿈·이모지 가능)</span></label>
                             <textarea id="notifMessage" rows="4" placeholder="정숙님! 1주차 정말 수고 많으셨어요 🎉&#10;&#10;리딩 점수가 많이 올랐어요!"></textarea>
                         </div>
-                        <div>
-                            <label>발송자</label>
-                            <input type="text" id="notifCreatedBy" value="이온쌤" style="max-width:200px;">
+                        <div class="notif-form-bottom">
+                            <div class="field">
+                                <label>발송자</label>
+                                <input type="text" id="notifCreatedBy" value="이온쌤" style="max-width:200px;">
+                            </div>
+                            <button class="btn-notif-send" id="notifSendBtn" onclick="sendNotification()">
+                                <i class="fas fa-paper-plane"></i> 발송
+                            </button>
                         </div>
-                        <button class="btn-notif-send" id="notifSendBtn" onclick="sendNotification()">
-                            <i class="fas fa-paper-plane"></i> 발송
-                        </button>
                     </div>
                     <!-- 발송 이력 -->
                     <div id="notifListWrap">
