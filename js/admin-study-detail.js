@@ -1399,3 +1399,175 @@ function closeSpeakingModal() {
         modal.remove();
     }
 }
+
+// ===== 🔔 학생 알림 발송 =====
+let notifList = [];
+let notifLoaded = false;
+
+function toggleNotifSection() {
+    const body = document.getElementById('notifBody');
+    const icon = document.getElementById('notifToggleIcon');
+    const btn = document.getElementById('notifToggleBtn');
+    const isOpen = body.classList.toggle('open');
+    icon.className = isOpen ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    btn.innerHTML = `<i class="${icon.className}"></i> ${isOpen ? '접기' : '펼치기'}`;
+
+    // 처음 펼칠 때 데이터 로드
+    if (isOpen && !notifLoaded) {
+        loadNotifications();
+    }
+}
+
+async function loadNotifications() {
+    if (!studentData || !studentData.user) return;
+    const userId = studentData.user.id;
+
+    try {
+        const result = await supabaseAPI.query('tr_notifications', {
+            'user_id': `eq.${userId}`,
+            'order': 'created_at.desc',
+            'limit': '100'
+        });
+        notifList = result || [];
+        notifLoaded = true;
+        renderNotifList();
+        updateNotifCount();
+    } catch (err) {
+        console.error('알림 목록 로드 실패:', err);
+        document.getElementById('notifListWrap').innerHTML =
+            '<div class="notif-empty"><i class="fas fa-exclamation-triangle"></i> 로드 실패</div>';
+    }
+}
+
+function updateNotifCount() {
+    const badge = document.getElementById('notifCount');
+    if (notifList.length > 0) {
+        badge.textContent = `${notifList.length}건`;
+        badge.style.display = 'inline-flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function renderNotifList() {
+    const wrap = document.getElementById('notifListWrap');
+
+    if (notifList.length === 0) {
+        wrap.innerHTML = '<div class="notif-empty"><i class="fas fa-bell-slash" style="color:#cbd5e1;"></i> 발송된 알림이 없습니다.</div>';
+        return;
+    }
+
+    let html = `<table class="notif-list-table">
+        <thead><tr>
+            <th>발송일</th>
+            <th>제목</th>
+            <th>본문 미리보기</th>
+            <th>읽음</th>
+            <th>발송자</th>
+            <th style="width:60px; text-align:center;">삭제</th>
+        </tr></thead><tbody>`;
+
+    notifList.forEach(n => {
+        const created = n.created_at
+            ? new Date(n.created_at).toLocaleString('ko-KR', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+              })
+            : '-';
+        const title = n.title || '-';
+        const msgPreview = (n.message || '').replace(/\n/g, ' ').substring(0, 50);
+        const readBadge = n.is_read
+            ? '<span class="notif-badge-read"><i class="fas fa-check-circle"></i> 읽음</span>'
+            : '<span class="notif-badge-unread"><i class="fas fa-clock"></i> 안읽음</span>';
+        const createdBy = n.created_by || '-';
+
+        html += `<tr>
+            <td style="font-size:12px; color:#94a3b8; white-space:nowrap;">${created}</td>
+            <td style="font-weight:600;">${escapeHtml(title)}</td>
+            <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(msgPreview)}${(n.message || '').length > 50 ? '…' : ''}</td>
+            <td>${readBadge}</td>
+            <td style="font-size:12px; color:#94a3b8;">${escapeHtml(createdBy)}</td>
+            <td style="text-align:center;">
+                <button class="btn-notif-del" onclick="deleteNotification('${n.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+async function sendNotification() {
+    if (!studentData || !studentData.user) {
+        alert('학생 데이터가 로드되지 않았습니다.');
+        return;
+    }
+    const userId = studentData.user.id;
+
+    const titleEl = document.getElementById('notifTitle');
+    const messageEl = document.getElementById('notifMessage');
+    const createdByEl = document.getElementById('notifCreatedBy');
+    const btn = document.getElementById('notifSendBtn');
+
+    const title = titleEl.value.trim();
+    const message = messageEl.value.trim();
+    const createdBy = createdByEl.value.trim() || '이온쌤';
+
+    // 유효성 검사
+    if (!title) {
+        alert('제목을 입력해주세요.');
+        titleEl.focus();
+        return;
+    }
+    if (!message) {
+        alert('본문을 입력해주세요.');
+        messageEl.focus();
+        return;
+    }
+
+    const studentName = studentData.user.name || '학생';
+    if (!confirm(`"${studentName}"에게 알림을 발송합니다.\n\n제목: ${title}\n\n계속하시겠습니까?`)) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 발송 중...';
+
+    try {
+        await supabaseAPI.post('tr_notifications', {
+            user_id: userId,
+            title: title,
+            message: message,
+            created_by: createdBy
+        });
+
+        alert(`✅ "${studentName}"에게 알림 발송 완료!`);
+
+        // 폼 초기화
+        titleEl.value = '';
+        messageEl.value = '';
+        // createdBy는 유지
+
+        // 목록 새로고침
+        await loadNotifications();
+    } catch (err) {
+        console.error('알림 발송 실패:', err);
+        alert('❌ 발송 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> 발송';
+    }
+}
+
+async function deleteNotification(id) {
+    if (!confirm('이 알림을 삭제하시겠습니까?\n삭제하면 학생 화면에서도 사라집니다.')) return;
+
+    try {
+        await supabaseAPI.hardDelete('tr_notifications', id);
+        alert('✅ 알림 삭제 완료!');
+        await loadNotifications();
+    } catch (err) {
+        console.error('알림 삭제 실패:', err);
+        alert('❌ 삭제 실패: ' + err.message);
+    }
+}
