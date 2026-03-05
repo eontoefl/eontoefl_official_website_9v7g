@@ -985,6 +985,108 @@
             font-size: 20px; cursor: pointer; color: #94a3b8;
         }
         .si-modal-close:hover { color: #ef4444; }
+
+        /* ===== Writing Arrange ===== */
+        .wa-set-id-display {
+            font-family: monospace; font-size: 15px; font-weight: 700; color: #1e293b;
+        }
+        .wa-set-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .wa-set-item {
+            padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0;
+            background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #475569;
+            transition: all .15s;
+        }
+        .wa-set-item:hover { border-color: #f59e0b; color: #d97706; }
+        .wa-set-item.active { background: #fef3c7; border-color: #f59e0b; color: #d97706; }
+        .wa-set-item-new {
+            background: #f0fdf4; border-color: #86efac; color: #16a34a;
+        }
+        .wa-set-item-new:hover { background: #dcfce7; }
+        .wa-accordion-header {
+            display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+            cursor: pointer; transition: all .15s; margin-bottom: 4px;
+        }
+        .wa-accordion-header:hover { background: #f1f5f9; }
+        .wa-accordion-header.open { border-radius: 8px 8px 0 0; margin-bottom: 0; border-bottom: none; }
+        .wa-accordion-header .wa-q-label {
+            font-size: 13px; font-weight: 700; color: #1e293b; min-width: 32px;
+        }
+        .wa-accordion-header .wa-q-preview {
+            font-size: 12px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+        }
+        .wa-accordion-header .wa-q-chevron {
+            font-size: 11px; color: #94a3b8; transition: transform .2s;
+        }
+        .wa-accordion-header.open .wa-q-chevron { transform: rotate(90deg); }
+        .wa-accordion-body {
+            display: none; padding: 16px; border: 1px solid #e2e8f0;
+            border-top: none; border-radius: 0 0 8px 8px; margin-bottom: 8px;
+        }
+        .wa-accordion-body.open { display: block; }
+        .wa-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .wa-field label {
+            font-size: 12px; font-weight: 600; color: #64748b;
+        }
+        .wa-field label .wa-hint { font-weight: 400; color: #94a3b8; }
+        .wa-field input, .wa-field textarea {
+            padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-size: 13px; font-family: 'Pretendard', sans-serif; width: 100%; box-sizing: border-box;
+        }
+        .wa-field input:focus, .wa-field textarea:focus {
+            outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+        }
+        .wa-field .wa-pipe-input { font-family: monospace; }
+        .wa-punct-row { display: flex; gap: 16px; align-items: center; }
+        .wa-punct-row label { font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .wa-preview-box {
+            background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+            padding: 14px 16px; margin-top: 8px;
+        }
+        .wa-preview-box .wa-pv-label { font-size: 11px; font-weight: 700; color: #d97706; margin-bottom: 8px; }
+        .wa-pv-hint { font-size: 13px; color: #1e293b; font-weight: 600; }
+        .wa-pv-hint-trans { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+        .wa-pv-sentence { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .wa-pv-word {
+            padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 600;
+        }
+        .wa-pv-word.given { background: #e2e8f0; color: #475569; }
+        .wa-pv-word.blank { background: white; border: 1.5px dashed #d1d5db; color: #94a3b8; min-width: 40px; text-align: center; }
+        .wa-pv-word.punct { background: none; color: #1e293b; padding: 4px 2px; }
+        .wa-pv-options { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .wa-pv-chip {
+            padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+        }
+        .wa-pv-answer { font-size: 13px; color: #16a34a; font-weight: 600; margin-top: 6px; }
+        .wa-pv-answer-trans { font-size: 12px; color: #64748b; }
+        .wa-pv-warn {
+            color: #ef4444; font-size: 12px; font-weight: 600; margin-top: 6px;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .wa-toggle-all-btn {
+            background: none; border: 1px solid #e2e8f0; border-radius: 8px;
+            padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+            color: #64748b; margin-bottom: 12px;
+        }
+        .wa-toggle-all-btn:hover { background: #f8fafc; }
+        .wa-action-btn {
+            padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .wa-btn-preview { background: #fef3c7; color: #d97706; }
+        .wa-btn-preview:hover { background: #fde68a; }
+        .wa-btn-register { background: #f59e0b; color: white; }
+        .wa-btn-register:hover { background: #d97706; }
+        .wa-btn-register:disabled { background: #fcd34d; cursor: not-allowed; }
+        .wa-btn-cancel { background: #f1f5f9; color: #64748b; }
+        .wa-btn-cancel:hover { background: #e2e8f0; }
+        .wa-btn-delete {
+            background: #fef2f2; color: #ef4444; border: 1px solid #fca5a5;
+            padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+        }
+        .wa-btn-delete:hover { background: #fee2e2; }
+        .wa-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
     </style>
 </head>
 <body>
@@ -1044,7 +1146,7 @@
                 <option value="listening-conversation" disabled>🎧 Listening - 대화 (준비중)</option>
                 <option value="listening-announcement" disabled>🎧 Listening - 공지사항 (준비중)</option>
                 <option value="listening-lecture" disabled>🎧 Listening - 렉처 (준비중)</option>
-                <option value="writing-arrange" disabled>✍️ Writing - 배열 (준비중)</option>
+                <option value="writing-arrange">✍️ Writing - 단어배열</option>
                 <option value="writing-email" disabled>✍️ Writing - 이메일 (준비중)</option>
                 <option value="writing-discussion" disabled>✍️ Writing - 토론 (준비중)</option>
                 <option value="speaking-repeat">🎙️ Speaking - 따라말하기</option>
@@ -1799,6 +1901,40 @@
             </div>
         </div>
 
+        <!-- Writing Arrange Section -->
+        <div id="section-writing-arrange" class="q-hidden">
+            <div class="q-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                        <span class="wa-set-id-display" id="waSetId">로드중...</span>
+                        <span id="waEditBadge" style="display:none; background:#fef3c7; color:#d97706; padding:2px 10px; border-radius:6px; font-size:11px; font-weight:700; margin-left:8px;">수정 모드</span>
+                    </div>
+                </div>
+                <div class="wa-set-list" id="waSetList"></div>
+            </div>
+
+            <div class="q-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <span style="font-size:14px; font-weight:700; color:#1e293b;">Q1 ~ Q10 문제 입력</span>
+                    <button class="wa-toggle-all-btn" onclick="toggleAllWaQuestions()">
+                        <i class="fas fa-expand-arrows-alt"></i> 전체 펼치기
+                    </button>
+                </div>
+                <div id="waAccordionWrap"></div>
+            </div>
+
+            <div class="q-card">
+                <div class="wa-actions">
+                    <button class="wa-action-btn wa-btn-register" id="waRegisterBtn" onclick="registerWaSet()" disabled>
+                        <i class="fas fa-save"></i> 등록
+                    </button>
+                    <button class="wa-action-btn wa-btn-cancel" id="waCancelEditBtn" onclick="cancelWaEdit()" style="display:none;">
+                        <i class="fas fa-times"></i> 취소
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Scripts -->
@@ -1810,5 +1946,6 @@
     <script src="js/admin-questions-academic.js"></script>
 <script src="js/admin-questions-speaking-repeat.js"></script>
 <script src="js/admin-questions-speaking-interview.js"></script>
+<script src="js/admin-questions-writing-arrange.js"></script>
 </body>
 </html>
