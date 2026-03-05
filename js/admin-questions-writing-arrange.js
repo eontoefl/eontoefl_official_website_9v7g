@@ -209,7 +209,7 @@ function updateWaPreview(num) {
     if (answer && options) {
         answerParts.forEach(aw => {
             const trimmed = aw.trim();
-            if (trimmed && !optionParts.some(o => o.trim() === trimmed)) {
+            if (trimmed && !optionParts.some(o => o.trim().toLowerCase() === trimmed.toLowerCase())) {
                 warnings.push(`⚠️ 정답 단어 '${trimmed}'가 보기에 없습니다`);
             }
         });
@@ -294,10 +294,10 @@ function validateWaForm() {
         }
         if (answer && options) {
             const answerParts = answer.split('|');
-            const optionParts = options.split('|').map(o => o.trim());
+            const optionParts = options.split('|').map(o => o.trim().toLowerCase());
             answerParts.forEach(aw => {
                 const t = aw.trim();
-                if (t && !optionParts.includes(t)) {
+                if (t && !optionParts.includes(t.toLowerCase())) {
                     errors.push(`Q${i}: 정답 단어 '${t}'가 보기에 없습니다`);
                 }
             });
