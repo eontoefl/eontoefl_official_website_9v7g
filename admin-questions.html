@@ -998,9 +998,7 @@
         }
         .wa-set-item:hover { border-color: #f59e0b; color: #d97706; }
         .wa-set-item.active { background: #fef3c7; border-color: #f59e0b; color: #d97706; }
-        .wa-set-item-new {
-            background: #f0fdf4; border-color: #86efac; color: #16a34a;
-        }
+        .wa-set-item-new { background: #f0fdf4; border-color: #86efac; color: #16a34a; }
         .wa-set-item-new:hover { background: #dcfce7; }
         .wa-accordion-header {
             display: flex; align-items: center; gap: 10px; padding: 12px 16px;
@@ -1009,15 +1007,9 @@
         }
         .wa-accordion-header:hover { background: #f1f5f9; }
         .wa-accordion-header.open { border-radius: 8px 8px 0 0; margin-bottom: 0; border-bottom: none; }
-        .wa-accordion-header .wa-q-label {
-            font-size: 13px; font-weight: 700; color: #1e293b; min-width: 32px;
-        }
-        .wa-accordion-header .wa-q-preview {
-            font-size: 12px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
-        }
-        .wa-accordion-header .wa-q-chevron {
-            font-size: 11px; color: #94a3b8; transition: transform .2s;
-        }
+        .wa-accordion-header .wa-q-label { font-size: 13px; font-weight: 700; color: #1e293b; min-width: 32px; }
+        .wa-accordion-header .wa-q-preview { font-size: 12px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        .wa-accordion-header .wa-q-chevron { font-size: 11px; color: #94a3b8; transition: transform .2s; }
         .wa-accordion-header.open .wa-q-chevron { transform: rotate(90deg); }
         .wa-accordion-body {
             display: none; padding: 16px; border: 1px solid #e2e8f0;
@@ -1025,9 +1017,7 @@
         }
         .wa-accordion-body.open { display: block; }
         .wa-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-        .wa-field label {
-            font-size: 12px; font-weight: 600; color: #64748b;
-        }
+        .wa-field label { font-size: 12px; font-weight: 600; color: #64748b; }
         .wa-field label .wa-hint { font-weight: 400; color: #94a3b8; }
         .wa-field input, .wa-field textarea {
             padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
@@ -1036,9 +1026,46 @@
         .wa-field input:focus, .wa-field textarea:focus {
             outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
         }
-        .wa-field .wa-pipe-input { font-family: monospace; }
-        .wa-punct-row { display: flex; gap: 16px; align-items: center; }
-        .wa-punct-row label { font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        /* 단어 칩 — 클릭 토글 */
+        .wa-word-select-area, .wa-dummy-area { margin-bottom: 14px; }
+        .wa-word-chips, .wa-dummy-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .wa-chip {
+            padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; border: 2px solid transparent; transition: all .15s;
+            display: inline-flex; align-items: center; gap: 6px; user-select: none;
+        }
+        .wa-chip-blank {
+            background: white; border-color: #f59e0b; color: #d97706;
+        }
+        .wa-chip-blank:hover { background: #fffbeb; }
+        .wa-chip-given {
+            background: #e2e8f0; border-color: #94a3b8; color: #475569;
+        }
+        .wa-chip-given:hover { background: #cbd5e1; }
+        .wa-chip-badge {
+            font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .wa-chip-blank .wa-chip-badge { background: #fef3c7; color: #d97706; }
+        .wa-chip-given .wa-chip-badge { background: #cbd5e1; color: #64748b; }
+        .wa-chip-dummy {
+            background: #fef2f2; border-color: #fca5a5; color: #ef4444; cursor: default;
+        }
+        .wa-chip-remove {
+            background: none; border: none; color: #ef4444; font-size: 16px; font-weight: 700;
+            cursor: pointer; padding: 0 0 0 4px; line-height: 1;
+        }
+        .wa-chip-remove:hover { color: #b91c1c; }
+        /* 분석 버튼 */
+        .wa-btn-parse {
+            background: #f59e0b; color: white; white-space: nowrap;
+        }
+        .wa-btn-parse:hover { background: #d97706; }
+        .wa-btn-dummy-add {
+            background: #f1f5f9; color: #64748b; white-space: nowrap;
+        }
+        .wa-btn-dummy-add:hover { background: #e2e8f0; }
+        /* 미리보기 */
         .wa-preview-box {
             background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
             padding: 14px 16px; margin-top: 8px;
@@ -1047,13 +1074,11 @@
         .wa-pv-hint { font-size: 13px; color: #1e293b; font-weight: 600; }
         .wa-pv-hint-trans { font-size: 12px; color: #64748b; margin-bottom: 8px; }
         .wa-pv-sentence { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-        .wa-pv-word {
-            padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 600;
-        }
+        .wa-pv-word { padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; }
         .wa-pv-word.given { background: #e2e8f0; color: #475569; }
         .wa-pv-word.blank { background: white; border: 1.5px dashed #d1d5db; color: #94a3b8; min-width: 40px; text-align: center; }
         .wa-pv-word.punct { background: none; color: #1e293b; padding: 4px 2px; }
-        .wa-pv-options { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .wa-pv-options { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
         .wa-pv-chip {
             padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
             background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
@@ -1074,8 +1099,6 @@
             padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
             cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
         }
-        .wa-btn-preview { background: #fef3c7; color: #d97706; }
-        .wa-btn-preview:hover { background: #fde68a; }
         .wa-btn-register { background: #f59e0b; color: white; }
         .wa-btn-register:hover { background: #d97706; }
         .wa-btn-register:disabled { background: #fcd34d; cursor: not-allowed; }
