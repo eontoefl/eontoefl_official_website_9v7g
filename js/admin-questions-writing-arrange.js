@@ -32,20 +32,20 @@ function initWaQuestions() {
                     <input type="text" id="waGivenTrans${i}" placeholder="레베카가 회의에 대해 뭐라고 물었니?" oninput="onWaInput(${i})">
                 </div>
                 <div class="wa-field">
-                    <label>정답 단어 배열 * <span class="wa-hint">파이프(|) 구분, 순서대로</span></label>
-                    <input type="text" class="wa-pipe-input" id="waAnswer${i}" placeholder="wanted|to know|if|I|prepared|the|agenda" oninput="onWaInput(${i})">
-                </div>
-                <div class="wa-field">
-                    <label>정답 번역 (한글) *</label>
-                    <input type="text" id="waAnswerTrans${i}" placeholder="그녀는 내가 안건을 준비했는지 알고 싶어 했어요." oninput="onWaInput(${i})">
-                </div>
-                <div class="wa-field">
                     <label>화면 표시 * <span class="wa-hint">주어진 단어 + 빈칸(_)을 파이프로 구분</span></label>
                     <input type="text" class="wa-pipe-input" id="waPresented${i}" placeholder="She|_|_|_|_|_|_|_" oninput="onWaInput(${i})">
                 </div>
                 <div class="wa-field">
                     <label>보기 단어 * <span class="wa-hint">정답+오답 섞어서 파이프 구분</span></label>
                     <input type="text" class="wa-pipe-input" id="waOptions${i}" placeholder="the|was|prepared|to know|agenda|I|if|wanted" oninput="onWaInput(${i})">
+                </div>
+                <div class="wa-field">
+                    <label>정답 단어 배열 * <span class="wa-hint">파이프(|) 구분, 순서대로</span></label>
+                    <input type="text" class="wa-pipe-input" id="waAnswer${i}" placeholder="wanted|to know|if|I|prepared|the|agenda" oninput="onWaInput(${i})">
+                </div>
+                <div class="wa-field">
+                    <label>정답 번역 (한글) *</label>
+                    <input type="text" id="waAnswerTrans${i}" placeholder="그녀는 내가 안건을 준비했는지 알고 싶어 했어요." oninput="onWaInput(${i})">
                 </div>
                 <div class="wa-field">
                     <label>문장 끝 부호</label>
