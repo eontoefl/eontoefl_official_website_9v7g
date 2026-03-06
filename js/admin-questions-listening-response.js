@@ -406,9 +406,14 @@ async function registerLrSet() {
             const delUrl = `${SUPABASE_URL}/rest/v1/${LR_TABLE}?set_id=eq.${setId}`;
             const delRes = await fetch(delUrl, {
                 method: 'DELETE',
-                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' }
+                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }
             });
             if (!delRes.ok) throw new Error(`삭제 실패: ${delRes.status}`);
+            const deletedRows = await delRes.json();
+            console.log(`LR DELETE 결과: ${deletedRows.length}행 삭제됨`);
+            if (deletedRows.length === 0) {
+                throw new Error(`삭제된 행이 없습니다. Supabase RLS 정책 또는 set_id를 확인해주세요.`);
+            }
 
             // 2. INSERT batch
             const postUrl = `${SUPABASE_URL}/rest/v1/${LR_TABLE}`;
@@ -593,11 +598,13 @@ async function deleteLrSet(setId) {
         const delUrl = `${SUPABASE_URL}/rest/v1/${LR_TABLE}?set_id=eq.${setId}`;
         const delRes = await fetch(delUrl, {
             method: 'DELETE',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' }
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }
         });
         if (!delRes.ok) throw new Error(`삭제 실패: ${delRes.status}`);
+        const deleted = await delRes.json();
+        if (deleted.length === 0) throw new Error(`삭제된 행이 없습니다.`);
 
-        alert('세트가 삭제되었습니다.');
+        alert(`세트가 삭제되었습니다. (${deleted.length}행)`);
         if (lrEditMode && lrEditSetId === setId) cancelLrEdit();
         await loadLrExistingSets();
     } catch (e) {

@@ -469,10 +469,17 @@ async function registerWaSet() {
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 수정 중...';
         try {
+            // 1) DELETE by set_id
             const delUrl = `${SUPABASE_URL}/rest/v1/tr_writing_arrange?set_id=eq.${setId}`;
-            const delRes = await fetch(delUrl, { method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } });
+            const delRes = await fetch(delUrl, { method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' } });
             if (!delRes.ok) throw new Error(`삭제 실패: ${delRes.status}`);
+            const deletedRows = await delRes.json();
+            console.log(`Arrange DELETE 결과: ${deletedRows.length}행 삭제됨`);
+            if (deletedRows.length === 0) {
+                throw new Error(`삭제된 행이 없습니다. Supabase RLS 정책 또는 set_id를 확인해주세요.`);
+            }
 
+            // 2) INSERT batch
             const postUrl = `${SUPABASE_URL}/rest/v1/tr_writing_arrange`;
             const postRes = await fetch(postUrl, { method: 'POST', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(rows) });
             if (!postRes.ok) { const err = await postRes.json(); throw new Error(err.message || `저장 실패: ${postRes.status}`); }
@@ -647,9 +654,11 @@ async function deleteWaSet(setId) {
     if (!confirm(`"${setId}" 세트를 삭제합니다.\n10문제가 모두 삭제되며 복구할 수 없습니다.\n\n계속하시겠습니까?`)) return;
     try {
         const delUrl = `${SUPABASE_URL}/rest/v1/tr_writing_arrange?set_id=eq.${setId}`;
-        const delRes = await fetch(delUrl, { method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } });
+        const delRes = await fetch(delUrl, { method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' } });
         if (!delRes.ok) throw new Error(`삭제 실패: ${delRes.status}`);
-        alert(`✅ "${setId}" 삭제 완료!`);
+        const deleted = await delRes.json();
+        if (deleted.length === 0) throw new Error(`삭제된 행이 없습니다.`);
+        alert(`✅ "${setId}" 삭제 완료! (${deleted.length}행)`);
         cancelWaEdit();
         await loadWaExistingSets();
     } catch (err) {
