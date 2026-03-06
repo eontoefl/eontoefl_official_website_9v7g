@@ -1140,6 +1140,30 @@
         }
         .lr-answer-radio label:has(input:checked) { background: #dcfce7; border-color: #86efac; color: #166534; }
         .lr-answer-radio input[type=radio] { accent-color: #22c55e; }
+
+        /* ===== Listening Conversation ===== */
+        .lc-highlight-card {
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 14px 16px; margin-bottom: 10px; position: relative;
+        }
+        .lc-highlight-card-num {
+            font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 8px;
+        }
+        .lc-highlight-card .sr-q-field { margin-bottom: 8px; }
+        .lc-highlight-card .sr-q-field:last-child { margin-bottom: 0; }
+        .lc-hl-del-btn {
+            position: absolute; top: 10px; right: 12px;
+            background: none; border: none; font-size: 16px; cursor: pointer; color: #94a3b8;
+            transition: color .2s;
+        }
+        .lc-hl-del-btn:hover { color: #ef4444; }
+        .lc-hl-add-btn {
+            background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0;
+            border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .lc-hl-add-btn:hover { background: #dcfce7; }
+        .lc-hl-hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -1196,7 +1220,7 @@
                 <option value="reading-daily2">📖 Reading - Daily2</option>
                 <option value="reading-academic">📖 Reading - Academic</option>
                 <option value="listening-response">🎧 Listening - 응답고르기</option>
-                <option value="listening-conversation" disabled>🎧 Listening - 대화 (준비중)</option>
+                <option value="listening-conversation">🎧 Listening - 대화</option>
                 <option value="listening-announcement" disabled>🎧 Listening - 공지사항 (준비중)</option>
                 <option value="listening-lecture" disabled>🎧 Listening - 렉처 (준비중)</option>
                 <option value="writing-arrange">✍️ Writing - 단어배열</option>
@@ -2023,6 +2047,103 @@
             </div>
         </div>
 
+        <!-- Listening Conversation Section -->
+        <div id="section-listening-conversation" class="q-hidden">
+
+            <!-- 세트 ID + 오디오 -->
+            <div class="q-card">
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div style="font-size: 14px; color: #64748b;">세트 ID:</div>
+                    <div id="lcSetId" style="font-size: 18px; font-weight: 700; color: #1e293b;">-</div>
+                    <span id="lcEditModeLabel" style="display:none; background:#f59e0b; color:white; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600;">수정 모드</span>
+                </div>
+                <div style="margin-top: 12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:12px; font-weight:600; color:#475569;">🔊 오디오:</span>
+                    <span id="lcAudioUrl" style="font-family:monospace; font-size:11px; color:#64748b; word-break:break-all;"></span>
+                    <button class="sr-url-btn" id="lcAudioLinkBtn" onclick="window.open(document.getElementById('lcAudioUrl').textContent,'_blank')" title="새 탭에서 열기">🔗</button>
+                    <button class="sr-url-btn" onclick="openLcModal()" title="미리듣기">▶️</button>
+                    <span id="lcAudioStatus" class="sr-check-icon">⬜</span>
+                </div>
+                <div style="margin-top: 8px;">
+                    <button onclick="verifyLcAudioFile()" class="sr-action-btn sr-verify-btn" style="font-size:12px; padding:4px 12px;">
+                        <i class="fas fa-check-double"></i> 파일 검증
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 1: 스크립트 -->
+            <div class="q-card">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
+                    <i class="fas fa-file-alt" style="color: #3b82f6;"></i> STEP 1. 스크립트
+                </h3>
+                <div class="sr-q-field">
+                    <label>📝 영어 스크립트 *</label>
+                    <textarea id="lcScript" rows="8" placeholder="Woman: Did you pick up your prescription...&#10;Man: I tried yesterday, but they said..." oninput="updateLcRegisterBtn()"></textarea>
+                </div>
+                <div class="sr-q-field" style="margin-top:10px;">
+                    <label>🇰🇷 한국어 번역 *</label>
+                    <textarea id="lcScriptTrans" rows="8" placeholder="여자: 약국에서 처방약 찾아갔어요?&#10;남자: 어제 가봤는데, 아직 준비 안 됐대요..."></textarea>
+                </div>
+            </div>
+
+            <!-- STEP 2: 핵심표현 -->
+            <div class="q-card">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
+                    <i class="fas fa-key" style="color: #f59e0b;"></i> STEP 2. 핵심표현
+                </h3>
+                <div id="lcHighlightCards"></div>
+                <div style="margin-top: 10px; display:flex; align-items:center; gap:12px;">
+                    <button class="lc-hl-add-btn" onclick="addLcHighlightCard()">
+                        <i class="fas fa-plus"></i> 표현 추가
+                    </button>
+                    <span class="lc-hl-hint">💡 보통 7~9개 정도 입력합니다</span>
+                </div>
+            </div>
+
+            <!-- STEP 3: 문제 Q1/Q2 -->
+            <div class="q-card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0;">
+                        <i class="fas fa-question-circle" style="color: #8b5cf6;"></i> STEP 3. 문제 (Q1 · Q2)
+                    </h3>
+                    <button onclick="toggleAllLcQuestions()" class="sr-toggle-all-btn" id="lcToggleAllBtn">전체 펼치기</button>
+                </div>
+                <div id="lcQuestionsWrap"></div>
+            </div>
+
+            <!-- 등록/취소 버튼 -->
+            <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+                <button id="lcCancelEditBtn" style="display:none; background:#64748b; color:white;" onclick="cancelLcEdit()" class="sr-action-btn">
+                    <i class="fas fa-times"></i> 취소
+                </button>
+                <button id="lcRegisterBtn" onclick="registerLcSet()" disabled class="sr-action-btn sr-register-btn">
+                    <i class="fas fa-save"></i> 등록
+                </button>
+            </div>
+
+            <!-- 등록된 세트 목록 -->
+            <div class="q-card">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
+                    <i class="fas fa-list" style="color: #6366f1;"></i> 등록된 세트 목록
+                    <span id="lcSetsCount" style="font-size: 12px; color: #94a3b8; margin-left: 8px;">0개</span>
+                </h3>
+                <div id="lcSetsListWrap">
+                    <div style="padding: 20px; text-align: center; color: #94a3b8;">
+                        <i class="fas fa-spinner fa-spin"></i> 로딩 중...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 오디오 모달 (Listening Conversation) -->
+        <div id="lcAudioModal" class="si-modal-overlay" onclick="if(event.target===this)closeLcModal()">
+            <div class="si-modal-box">
+                <button class="si-modal-close" onclick="closeLcModal()">&times;</button>
+                <div id="lcModalBody"></div>
+            </div>
+        </div>
+
         <!-- Writing Arrange Section -->
         <div id="section-writing-arrange" class="q-hidden">
             <div class="q-card">
@@ -2070,5 +2191,6 @@
 <script src="js/admin-questions-speaking-interview.js"></script>
 <script src="js/admin-questions-writing-arrange.js"></script>
 <script src="js/admin-questions-listening-response.js"></script>
+<script src="js/admin-questions-listening-conversation.js"></script>
 </body>
 </html>
