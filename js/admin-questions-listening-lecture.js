@@ -681,20 +681,20 @@ function setLlVal(id, val) {
     if (el) el.value = val;
 }
 
-// ===== 스크립트 줄 수 체크 =====
+// ===== 스크립트 덩어리 수 체크 =====
 function checkLlScriptLines() {
     const statusEl = document.getElementById('llScriptLineStatus');
     if (!statusEl) return;
     const script = document.getElementById('llScript')?.value || '';
     const trans = document.getElementById('llScriptTrans')?.value || '';
-    const scriptLines = script.trim() ? script.trim().split('\n').length : 0;
-    const transLines = trans.trim() ? trans.trim().split('\n').length : 0;
-    if (scriptLines === 0 && transLines === 0) {
+    const scriptChunks = script.trim() ? script.trim().split(/\n\n+/).filter(s => s.trim()).length : 0;
+    const transChunks = trans.trim() ? trans.trim().split(/\n\n+/).filter(s => s.trim()).length : 0;
+    if (scriptChunks === 0 && transChunks === 0) {
         statusEl.innerHTML = '';
-    } else if (scriptLines === transLines) {
-        statusEl.innerHTML = `<span style="color:#16a34a;">✅ 원문 ${scriptLines}줄 / 해석 ${transLines}줄 — 일치</span>`;
+    } else if (scriptChunks === transChunks) {
+        statusEl.innerHTML = `<span style="color:#16a34a;">✅ 원문 ${scriptChunks}덩어리 / 해석 ${transChunks}덩어리 — 일치</span>`;
     } else {
-        statusEl.innerHTML = `<span style="color:#dc2626;">❌ 원문 ${scriptLines}줄 / 해석 ${transLines}줄 — 불일치!</span>`;
+        statusEl.innerHTML = `<span style="color:#dc2626;">❌ 원문 ${scriptChunks}덩어리 / 해석 ${transChunks}덩어리 — 불일치!</span>`;
     }
 }
 
