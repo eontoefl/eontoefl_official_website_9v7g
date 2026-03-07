@@ -53,6 +53,8 @@ function onSectionChange() {
         if (typeof loadLrExistingSets === 'function') loadLrExistingSets();
     } else if (val === 'listening-conversation') {
         if (typeof loadLcExistingSets === 'function') loadLcExistingSets();
+    } else if (val === 'listening-announcement') {
+        if (typeof loadLaExistingSets === 'function') loadLaExistingSets();
     }
 }
 
