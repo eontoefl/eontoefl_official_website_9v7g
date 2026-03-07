@@ -425,7 +425,7 @@ function buildLlPayload() {
     for (let q = 1; q <= LL_Q_COUNT; q++) {
         // Lecture 컬럼명 매핑 (Announcement와 동일 패턴)
         data[`q${q}_question_text`] = document.getElementById(`llQ${q}Question`)?.value?.trim() || '';
-        data[`q${q}_question_text_trans`] = document.getElementById(`llQ${q}QuestionTrans`)?.value?.trim() || '';
+        data[`q${q}_question_trans`] = document.getElementById(`llQ${q}QuestionTrans`)?.value?.trim() || '';
         data[`q${q}_correct_answer`] = parseInt(document.querySelector(`input[name="llAnswer${q}"]:checked`)?.value || '0');
         for (let j = 1; j <= 4; j++) {
             data[`q${q}_opt${j}`] = document.getElementById(`llQ${q}Opt${j}`)?.value?.trim() || '';
@@ -540,7 +540,7 @@ async function editLlSet(setId) {
         // STEP 3 Q1~Q4 (Lecture 컬럼명 매핑)
         for (let q = 1; q <= LL_Q_COUNT; q++) {
             setLlVal(`llQ${q}Question`, row[`q${q}_question_text`] || '');
-            setLlVal(`llQ${q}QuestionTrans`, row[`q${q}_question_text_trans`] || '');
+            setLlVal(`llQ${q}QuestionTrans`, row[`q${q}_question_trans`] || '');
 
             const answerRadio = document.querySelector(`input[name="llAnswer${q}"][value="${row[`q${q}_correct_answer`]}"]`);
             if (answerRadio) answerRadio.checked = true;
