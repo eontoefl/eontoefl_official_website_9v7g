@@ -54,7 +54,7 @@ function buildLrQAccordion(i) {
             </div>
             <div class="sr-q-field">
                 <label>대본 번역 (한글) *</label>
-                <textarea id="lrQ${i}ScriptTrans" rows="2" placeholder="가장 가까운 ATM이 어디에 있나요?"></textarea>
+                <textarea id="lrQ${i}ScriptTrans" rows="2" placeholder="가장 가까운 ATM이 어디에 있나요?" oninput="updateLrRegisterBtn()"></textarea>
             </div>
 
             <!-- 정답 선택 -->
@@ -82,11 +82,11 @@ function buildLrQAccordion(i) {
                     </div>
                     <div class="sr-q-field">
                         <label>번역 (한글) *</label>
-                        <input type="text" id="lrQ${i}OptTrans${j}" placeholder="보기 ${j} 번역">
+                        <input type="text" id="lrQ${i}OptTrans${j}" placeholder="보기 ${j} 번역" oninput="updateLrRegisterBtn()">
                     </div>
                     <div class="sr-q-field">
                         <label>해설 (한글) *</label>
-                        <textarea id="lrQ${i}OptExp${j}" rows="2" placeholder="보기 ${j} 해설"></textarea>
+                        <textarea id="lrQ${i}OptExp${j}" rows="2" placeholder="보기 ${j} 해설" oninput="updateLrRegisterBtn()"></textarea>
                     </div>
                 </div>`).join('')}
             </div>
