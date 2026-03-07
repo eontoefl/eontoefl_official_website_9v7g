@@ -2,7 +2,7 @@
 const LA_TABLE = 'tr_listening_announcement';
 const LA_PREFIX = 'announcement_set_';
 const LA_NARRATION_BASE = 'https://eontoefl.github.io/toefl-audio/listening/announcement/narration';
-const LA_AUDIO_BASE = 'https://eontoefl.github.io/toefl-audio/listening/announcement';
+const LA_AUDIO_BASE = 'https://eontoefl.github.io/toefl-audio/listening/announcement/audio';
 const LA_Q_COUNT = 2;
 
 let laExistingSets = [];
@@ -14,20 +14,20 @@ let laAllExpanded = false;
 // ===== 핵심표현 카드 데이터 =====
 let laHighlightCards = [];
 
-// ===== URL 생성 헬퍼 (앞 0 제거) =====
-function getLaSetNumRaw() {
+// ===== URL 생성 헬퍼 (4자리 0패딩) =====
+function getLaSetNumPadded() {
     const setId = getLaSetId();
-    return parseInt(setId.replace(LA_PREFIX, ''));
+    return setId.replace(LA_PREFIX, ''); // '0019' 그대로 반환
 }
 
 function getLaNarrationUrl() {
-    const n = getLaSetNumRaw();
-    return `${LA_NARRATION_BASE}/listening_announcement_${n}_narration.mp3`;
+    const num = getLaSetNumPadded();
+    return `${LA_NARRATION_BASE}/announcement_nr_${num}.mp3`;
 }
 
 function getLaAudioUrl() {
-    const n = getLaSetNumRaw();
-    return `${LA_AUDIO_BASE}/set_${n}/announcement_sample.mp3`;
+    const num = getLaSetNumPadded();
+    return `${LA_AUDIO_BASE}/announcement_set_${num}.mp3`;
 }
 
 // ===== 초기화 =====
@@ -404,12 +404,12 @@ function updateLaRegisterBtn() {
 // ===== 페이로드 빌드 (컬럼명 매핑: Announcement 전용) =====
 function buildLaPayload() {
     const setId = laEditMode ? laEditSetId : getLaSetId();
-    const setNum = parseInt(setId.replace(LA_PREFIX, ''));
+    const setNum = setId.replace(LA_PREFIX, ''); // '0019' 패딩 유지
     const data = {
         id: setId,
         gender: document.getElementById('laGender')?.value || '',
-        narration_url: `${LA_NARRATION_BASE}/listening_announcement_${setNum}_narration.mp3`,
-        audio_url: `${LA_AUDIO_BASE}/set_${setNum}/announcement_sample.mp3`,
+        narration_url: `${LA_NARRATION_BASE}/announcement_nr_${setNum}.mp3`,
+        audio_url: `${LA_AUDIO_BASE}/announcement_set_${setNum}.mp3`,
         script: document.getElementById('laScript')?.value?.trim() || '',
         script_trans: document.getElementById('laScriptTrans')?.value?.trim() || '',
         script_highlights: laCardsToHighlights()
