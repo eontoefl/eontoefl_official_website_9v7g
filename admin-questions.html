@@ -2076,14 +2076,19 @@
                 <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
                     <i class="fas fa-file-alt" style="color: #3b82f6;"></i> STEP 1. 스크립트
                 </h3>
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#92400e;">
+                    ⚠️ <b>한 줄 = 한 문장</b>입니다. 문장 중간에 엔터를 치지 마세요.<br>
+                    <span style="color:#a16207;">(화면에서 자동으로 줄바꿈되어 보이더라도, 엔터를 치지 않았으면 같은 문장입니다.)</span>
+                </div>
                 <div class="sr-q-field">
                     <label>📝 영어 스크립트 *</label>
-                    <textarea id="lcScript" rows="8" placeholder="Woman: Did you pick up your prescription...&#10;Man: I tried yesterday, but they said..." oninput="updateLcRegisterBtn()"></textarea>
+                    <textarea id="lcScript" rows="8" placeholder="Woman: Did you pick up your prescription...&#10;Man: I tried yesterday, but they said..." oninput="updateLcRegisterBtn(); checkLcScriptLines()"></textarea>
                 </div>
                 <div class="sr-q-field" style="margin-top:10px;">
                     <label>🇰🇷 한국어 번역 *</label>
-                    <textarea id="lcScriptTrans" rows="8" placeholder="여자: 약국에서 처방약 찾아갔어요?&#10;남자: 어제 가봤는데, 아직 준비 안 됐대요..." oninput="updateLcRegisterBtn()"></textarea>
+                    <textarea id="lcScriptTrans" rows="8" placeholder="여자: 약국에서 처방약 찾아갔어요?&#10;남자: 어제 가봤는데, 아직 준비 안 됐대요..." oninput="updateLcRegisterBtn(); checkLcScriptLines()"></textarea>
                 </div>
+                <div id="lcScriptLineStatus" style="margin-top:6px; font-size:12px; font-weight:600;"></div>
             </div>
 
             <!-- STEP 2: 핵심표현 -->
@@ -2195,14 +2200,19 @@
                 <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
                     <i class="fas fa-file-alt" style="color: #3b82f6;"></i> STEP 1. 스크립트
                 </h3>
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#92400e;">
+                    ⚠️ <b>한 줄 = 한 문장</b>입니다. 문장 중간에 엔터를 치지 마세요.<br>
+                    <span style="color:#a16207;">(화면에서 자동으로 줄바꿈되어 보이더라도, 엔터를 치지 않았으면 같은 문장입니다.)</span>
+                </div>
                 <div class="sr-q-field">
                     <label>📝 영어 스크립트 *</label>
-                    <textarea id="laScript" rows="8" placeholder="Good afternoon, everyone. Based on your recent survey responses..." oninput="updateLaRegisterBtn()"></textarea>
+                    <textarea id="laScript" rows="8" placeholder="Good afternoon, everyone. Based on your recent survey responses..." oninput="updateLaRegisterBtn(); checkLaScriptLines()"></textarea>
                 </div>
                 <div class="sr-q-field" style="margin-top:10px;">
                     <label>🇰🇷 한국어 번역 *</label>
-                    <textarea id="laScriptTrans" rows="8" placeholder="좋은 오후입니다, 여러분. 최근 설문조사 응답을 바탕으로..." oninput="updateLaRegisterBtn()"></textarea>
+                    <textarea id="laScriptTrans" rows="8" placeholder="좋은 오후입니다, 여러분. 최근 설문조사 응답을 바탕으로..." oninput="updateLaRegisterBtn(); checkLaScriptLines()"></textarea>
                 </div>
+                <div id="laScriptLineStatus" style="margin-top:6px; font-size:12px; font-weight:600;"></div>
             </div>
 
             <!-- STEP 2: 핵심표현 -->
@@ -2320,14 +2330,19 @@
                 <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
                     <i class="fas fa-file-alt" style="color: #3b82f6;"></i> STEP 1. 스크립트
                 </h3>
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px; color:#92400e;">
+                    ⚠️ <b>한 줄 = 한 문장</b>입니다. 문장 중간에 엔터를 치지 마세요.<br>
+                    <span style="color:#a16207;">(화면에서 자동으로 줄바꿈되어 보이더라도, 엔터를 치지 않았으면 같은 문장입니다.)</span>
+                </div>
                 <div class="sr-q-field">
                     <label>📝 영어 스크립트 *</label>
-                    <textarea id="llScript" rows="10" placeholder="Dark matter. It makes up roughly 85 percent of all matter in the universe, yet we can't see it directly..." oninput="updateLlRegisterBtn()"></textarea>
+                    <textarea id="llScript" rows="10" placeholder="Dark matter. It makes up roughly 85 percent of all matter in the universe, yet we can't see it directly..." oninput="updateLlRegisterBtn(); checkLlScriptLines()"></textarea>
                 </div>
                 <div class="sr-q-field" style="margin-top:10px;">
                     <label>🇰🇷 한국어 번역 *</label>
-                    <textarea id="llScriptTrans" rows="10" placeholder="암흑 물질이에요. 우주 전체 물질의 약 85퍼센트를 차지하는데, 우리는 그걸 직접 볼 수가 없어요..." oninput="updateLlRegisterBtn()"></textarea>
+                    <textarea id="llScriptTrans" rows="10" placeholder="암흑 물질이에요. 우주 전체 물질의 약 85퍼센트를 차지하는데, 우리는 그걸 직접 볼 수가 없어요..." oninput="updateLlRegisterBtn(); checkLlScriptLines()"></textarea>
                 </div>
+                <div id="llScriptLineStatus" style="margin-top:6px; font-size:12px; font-weight:600;"></div>
             </div>
 
             <!-- STEP 2: 핵심표현 -->
