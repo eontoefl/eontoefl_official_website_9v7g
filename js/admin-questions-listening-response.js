@@ -22,6 +22,12 @@ function initLrQuestions() {
 }
 
 function buildLrQAccordion(i) {
+    // Q1: 성별 변경 시 Q2~Q12 자동 교대 적용
+    // Q2~Q12: 개별 변경만 (자동 교대 안 함)
+    const genderOnchange = i === 1
+        ? `onLrGenderChange(${i})`
+        : `onLrQInput(${i})`;
+
     return `
     <div class="sr-q-item" id="lrQ${i}Item">
         <div class="sr-q-header" onclick="toggleLrQuestion(${i})">
@@ -32,22 +38,12 @@ function buildLrQAccordion(i) {
             <span class="sr-q-header-arrow" id="lrQ${i}Arrow"><i class="fas fa-chevron-down"></i></span>
         </div>
         <div class="sr-q-body" id="lrQ${i}Body">
-            <!-- 오디오 미리듣기 -->
-            <div class="sr-q-field" style="margin-bottom:14px;">
-                <label>🔊 오디오</label>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span id="lrQ${i}AudioUrl" style="font-family:monospace; font-size:11px; color:#64748b; flex:1; word-break:break-all;"></span>
-                    <button class="sr-url-btn" onclick="openLrModal(lrGetAudioUrl(${i}))" title="미리듣기">▶️</button>
-                    <span id="lrQ${i}AudioStatus" class="sr-check-icon">⬜</span>
-                </div>
-            </div>
-
             <!-- 화자 성별 -->
             <div class="sr-q-field">
-                <label>화자 성별 *</label>
+                <label>화자 성별 *${i === 1 ? ' <span style="font-size:11px; color:#3b82f6;">(Q1 선택 시 Q2~Q12 자동 교대 적용)</span>' : ''}</label>
                 <div class="lr-gender-radio">
-                    <label><input type="radio" name="lrGender${i}" value="F" onchange="onLrQInput(${i})"> 👩 여성 (F)</label>
-                    <label><input type="radio" name="lrGender${i}" value="M" onchange="onLrQInput(${i})"> 👨 남성 (M)</label>
+                    <label><input type="radio" name="lrGender${i}" value="F" onchange="${genderOnchange}"> 👩 여성 (F)</label>
+                    <label><input type="radio" name="lrGender${i}" value="M" onchange="${genderOnchange}"> 👨 남성 (M)</label>
                 </div>
             </div>
 
@@ -120,6 +116,25 @@ function toggleAllLrQuestions() {
     if (btn) btn.textContent = lrAllExpanded ? '전체 접기' : '전체 펼치기';
 }
 
+// ===== Q1 성별 자동 교대 배치 =====
+function onLrGenderChange(num) {
+    // Q1 성별 변경 → Q2~Q12 자동 교대 적용
+    const q1Gender = document.querySelector(`input[name="lrGender${num}"]:checked`)?.value;
+    if (!q1Gender) return;
+
+    for (let i = 2; i <= LR_Q_COUNT; i++) {
+        // 홀수 번째(Q1, Q3, Q5...) = Q1과 같은 성별, 짝수 번째(Q2, Q4, Q6...) = 반대 성별
+        const targetGender = (i % 2 === 1) ? q1Gender : (q1Gender === 'F' ? 'M' : 'F');
+        const radio = document.querySelector(`input[name="lrGender${i}"][value="${targetGender}"]`);
+        if (radio) radio.checked = true;
+        updateLrQHeader(i);
+    }
+
+    // Q1 자신의 헤더도 갱신
+    updateLrQHeader(num);
+    updateLrRegisterBtn();
+}
+
 // ===== 입력 이벤트 =====
 function onLrQInput(num) {
     updateLrQHeader(num);
@@ -188,12 +203,6 @@ function updateLrFileGrid() {
             <span id="lrFile${i}Status" class="sr-check-icon">⬜</span>`;
     }
     grid.innerHTML = html;
-
-    // 아코디언 내부 오디오 URL도 갱신
-    for (let i = 1; i <= LR_Q_COUNT; i++) {
-        const urlEl = document.getElementById(`lrQ${i}AudioUrl`);
-        if (urlEl) urlEl.textContent = lrGetAudioUrl(i);
-    }
 }
 
 // ===== 파일 검증 =====
@@ -214,12 +223,10 @@ async function verifyLrAllFiles() {
         checks.push({ idx: i, url: `${LR_BASE_URL}/${setId}_q${qi}.mp3` });
     }
 
-    // 모두 ⏳
+    // 상단 그리드만 ⏳ 표시
     checks.forEach(c => {
         const el = document.getElementById(`lrFile${c.idx}Status`);
-        const el2 = document.getElementById(`lrQ${c.idx}AudioStatus`);
         if (el) el.textContent = '⏳';
-        if (el2) el2.textContent = '⏳';
     });
 
     const results = await Promise.all(checks.map(async c => {
@@ -227,12 +234,11 @@ async function verifyLrAllFiles() {
         return { idx: c.idx, ok };
     }));
 
+    // 상단 그리드만 결과 표시
     results.forEach(r => {
         const icon = r.ok ? '✅' : '❌';
         const el = document.getElementById(`lrFile${r.idx}Status`);
-        const el2 = document.getElementById(`lrQ${r.idx}AudioStatus`);
         if (el) el.textContent = icon;
-        if (el2) el2.textContent = icon;
     });
 
     const passed = results.filter(r => r.ok).length;
@@ -566,10 +572,6 @@ function resetLrForm() {
         // 헤더 초기화
         const sub = document.getElementById(`lrQ${i}Sub`);
         if (sub) sub.textContent = '';
-
-        // 검증 상태 초기화
-        const audioStatus = document.getElementById(`lrQ${i}AudioStatus`);
-        if (audioStatus) audioStatus.textContent = '⬜';
     }
 
     // 파일 검증 그리드 초기화
