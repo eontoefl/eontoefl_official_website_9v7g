@@ -668,6 +668,23 @@ function setLaVal(id, val) {
     if (el) el.value = val;
 }
 
+// ===== 스크립트 줄 수 체크 =====
+function checkLaScriptLines() {
+    const statusEl = document.getElementById('laScriptLineStatus');
+    if (!statusEl) return;
+    const script = document.getElementById('laScript')?.value || '';
+    const trans = document.getElementById('laScriptTrans')?.value || '';
+    const scriptLines = script.trim() ? script.trim().split('\n').length : 0;
+    const transLines = trans.trim() ? trans.trim().split('\n').length : 0;
+    if (scriptLines === 0 && transLines === 0) {
+        statusEl.innerHTML = '';
+    } else if (scriptLines === transLines) {
+        statusEl.innerHTML = `<span style="color:#16a34a;">✅ 원문 ${scriptLines}줄 / 해석 ${transLines}줄 — 일치</span>`;
+    } else {
+        statusEl.innerHTML = `<span style="color:#dc2626;">❌ 원문 ${scriptLines}줄 / 해석 ${transLines}줄 — 불일치!</span>`;
+    }
+}
+
 // ===== DOMContentLoaded =====
 document.addEventListener('DOMContentLoaded', () => {
     initLaQuestions();
