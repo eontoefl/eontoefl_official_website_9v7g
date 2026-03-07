@@ -1221,7 +1221,7 @@
                 <option value="reading-academic">📖 Reading - Academic</option>
                 <option value="listening-response">🎧 Listening - 응답고르기</option>
                 <option value="listening-conversation">🎧 Listening - 대화</option>
-                <option value="listening-announcement" disabled>🎧 Listening - 공지사항 (준비중)</option>
+                <option value="listening-announcement">🎧 Listening - 공지사항</option>
                 <option value="listening-lecture" disabled>🎧 Listening - 렉처 (준비중)</option>
                 <option value="writing-arrange">✍️ Writing - 단어배열</option>
                 <option value="writing-email" disabled>✍️ Writing - 이메일 (준비중)</option>
@@ -2082,7 +2082,7 @@
                 </div>
                 <div class="sr-q-field" style="margin-top:10px;">
                     <label>🇰🇷 한국어 번역 *</label>
-                    <textarea id="lcScriptTrans" rows="8" placeholder="여자: 약국에서 처방약 찾아갔어요?&#10;남자: 어제 가봤는데, 아직 준비 안 됐대요..."></textarea>
+                    <textarea id="lcScriptTrans" rows="8" placeholder="여자: 약국에서 처방약 찾아갔어요?&#10;남자: 어제 가봤는데, 아직 준비 안 됐대요..." oninput="updateLcRegisterBtn()"></textarea>
                 </div>
             </div>
 
@@ -2144,6 +2144,125 @@
             </div>
         </div>
 
+        <!-- Listening Announcement Section -->
+        <div id="section-listening-announcement" class="q-hidden">
+
+            <!-- 세트 ID + 성별 + 오디오 2개 -->
+            <div class="q-card">
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div style="font-size: 14px; color: #64748b;">세트 ID:</div>
+                    <div id="laSetId" style="font-size: 18px; font-weight: 700; color: #1e293b;">-</div>
+                    <span id="laEditModeLabel" style="display:none; background:#f59e0b; color:white; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600;">수정 모드</span>
+                </div>
+
+                <!-- 성별 -->
+                <div style="margin-top: 12px; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:12px; font-weight:600; color:#475569;">👤 성별:</span>
+                    <select id="laGender" onchange="updateLaRegisterBtn()" style="padding:4px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;">
+                        <option value="">-- 선택 --</option>
+                        <option value="F">👩 여성 (F)</option>
+                        <option value="M">👨 남성 (M)</option>
+                    </select>
+                </div>
+
+                <!-- 나레이션 URL -->
+                <div style="margin-top: 12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:12px; font-weight:600; color:#475569;">🎙️ 나레이션:</span>
+                    <span id="laNarrationUrl" style="font-family:monospace; font-size:11px; color:#64748b; word-break:break-all;"></span>
+                    <button class="sr-url-btn" onclick="window.open(document.getElementById('laNarrationUrl').textContent,'_blank')" title="새 탭에서 열기">🔗</button>
+                    <button class="sr-url-btn" onclick="openLaModal('narration')" title="미리듣기">▶️</button>
+                    <span id="laNarrationStatus" class="sr-check-icon">⬜</span>
+                </div>
+
+                <!-- 오디오 URL -->
+                <div style="margin-top: 8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:12px; font-weight:600; color:#475569;">🔊 오디오:</span>
+                    <span id="laAudioUrl" style="font-family:monospace; font-size:11px; color:#64748b; word-break:break-all;"></span>
+                    <button class="sr-url-btn" onclick="window.open(document.getElementById('laAudioUrl').textContent,'_blank')" title="새 탭에서 열기">🔗</button>
+                    <button class="sr-url-btn" onclick="openLaModal('audio')" title="미리듣기">▶️</button>
+                    <span id="laAudioStatus" class="sr-check-icon">⬜</span>
+                </div>
+
+                <div style="margin-top: 8px;">
+                    <button onclick="verifyLaAllFiles()" class="sr-action-btn sr-verify-btn" style="font-size:12px; padding:4px 12px;">
+                        <i class="fas fa-check-double"></i> 전체 파일 검증
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 1: 스크립트 -->
+            <div class="q-card">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
+                    <i class="fas fa-file-alt" style="color: #3b82f6;"></i> STEP 1. 스크립트
+                </h3>
+                <div class="sr-q-field">
+                    <label>📝 영어 스크립트 *</label>
+                    <textarea id="laScript" rows="8" placeholder="Good afternoon, everyone. Based on your recent survey responses..." oninput="updateLaRegisterBtn()"></textarea>
+                </div>
+                <div class="sr-q-field" style="margin-top:10px;">
+                    <label>🇰🇷 한국어 번역 *</label>
+                    <textarea id="laScriptTrans" rows="8" placeholder="좋은 오후입니다, 여러분. 최근 설문조사 응답을 바탕으로..." oninput="updateLaRegisterBtn()"></textarea>
+                </div>
+            </div>
+
+            <!-- STEP 2: 핵심표현 -->
+            <div class="q-card">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
+                    <i class="fas fa-key" style="color: #f59e0b;"></i> STEP 2. 핵심표현
+                </h3>
+                <div id="laHighlightCards"></div>
+                <div style="margin-top: 10px; display:flex; align-items:center; gap:12px;">
+                    <button class="lc-hl-add-btn" onclick="addLaHighlightCard()">
+                        <i class="fas fa-plus"></i> 표현 추가
+                    </button>
+                    <span class="lc-hl-hint">💡 보통 5~8개 정도 입력합니다</span>
+                </div>
+            </div>
+
+            <!-- STEP 3: 문제 Q1/Q2 -->
+            <div class="q-card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0;">
+                        <i class="fas fa-question-circle" style="color: #8b5cf6;"></i> STEP 3. 문제 (Q1 · Q2)
+                    </h3>
+                    <button onclick="toggleAllLaQuestions()" class="sr-toggle-all-btn" id="laToggleAllBtn">전체 펼치기</button>
+                </div>
+                <div id="laQuestionsWrap"></div>
+            </div>
+
+            <!-- 등록/취소 버튼 -->
+            <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+                <button id="laCancelEditBtn" style="display:none; background:#64748b; color:white;" onclick="cancelLaEdit()" class="sr-action-btn">
+                    <i class="fas fa-times"></i> 취소
+                </button>
+                <button id="laRegisterBtn" onclick="registerLaSet()" disabled class="sr-action-btn sr-register-btn">
+                    <i class="fas fa-save"></i> 등록
+                </button>
+            </div>
+
+            <!-- 등록된 세트 목록 -->
+            <div class="q-card">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px;">
+                    <i class="fas fa-list" style="color: #6366f1;"></i> 등록된 세트 목록
+                    <span id="laSetsCount" style="font-size: 12px; color: #94a3b8; margin-left: 8px;">0개</span>
+                </h3>
+                <div id="laSetsListWrap">
+                    <div style="padding: 20px; text-align: center; color: #94a3b8;">
+                        <i class="fas fa-spinner fa-spin"></i> 로딩 중...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 오디오 모달 (Listening Announcement) -->
+        <div id="laAudioModal" class="si-modal-overlay" onclick="if(event.target===this)closeLaModal()">
+            <div class="si-modal-box">
+                <button class="si-modal-close" onclick="closeLaModal()">&times;</button>
+                <div id="laModalBody"></div>
+            </div>
+        </div>
+
         <!-- Writing Arrange Section -->
         <div id="section-writing-arrange" class="q-hidden">
             <div class="q-card">
@@ -2192,5 +2311,6 @@
 <script src="js/admin-questions-writing-arrange.js"></script>
 <script src="js/admin-questions-listening-response.js"></script>
 <script src="js/admin-questions-listening-conversation.js"></script>
+<script src="js/admin-questions-listening-announcement.js"></script>
 </body>
 </html>
