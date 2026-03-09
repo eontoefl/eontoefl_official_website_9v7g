@@ -698,6 +698,141 @@ function checkLlScriptLines() {
     }
 }
 
+// ===== JSON 붙여넣기 기능 =====
+function openLlJsonModal() {
+    document.getElementById('llJsonModal').style.display = 'flex';
+    document.getElementById('llJsonInput').value = '';
+    document.getElementById('llJsonError').style.display = 'none';
+}
+
+function closeLlJsonModal() {
+    document.getElementById('llJsonModal').style.display = 'none';
+    document.getElementById('llJsonInput').value = '';
+    document.getElementById('llJsonError').style.display = 'none';
+}
+
+function applyLlJson() {
+    const raw = document.getElementById('llJsonInput').value.trim();
+    const errEl = document.getElementById('llJsonError');
+    errEl.style.display = 'none';
+
+    if (!raw) {
+        errEl.textContent = '❌ JSON을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // ```json ... ``` 코드블록 자동 제거
+    let cleaned = raw;
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+    let data;
+    try {
+        data = JSON.parse(cleaned);
+    } catch (e) {
+        errEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // 배열인 경우 첫 번째 객체 사용
+    if (Array.isArray(data)) {
+        if (data.length === 0) {
+            errEl.textContent = '❌ 빈 배열입니다.';
+            errEl.style.display = 'block';
+            return;
+        }
+        data = data[0];
+    }
+
+    if (typeof data !== 'object' || data === null) {
+        errEl.textContent = '❌ JSON은 객체 { } 형식이어야 합니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // questions 검증 (4개)
+    if (!data.questions || !Array.isArray(data.questions)) {
+        errEl.textContent = '❌ "questions" 배열이 필요합니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (data.questions.length !== LL_Q_COUNT) {
+        errEl.textContent = `❌ questions는 ${LL_Q_COUNT}개여야 합니다. (현재 ${data.questions.length}개)`;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // === 강의 제목 채우기 ===
+    if (data.lecture_title) {
+        setLlVal('llLectureTitle', data.lecture_title);
+    }
+
+    // === 스크립트 채우기 ===
+    if (data.script) {
+        setLlVal('llScript', data.script);
+    }
+    if (data.script_trans) {
+        setLlVal('llScriptTrans', data.script_trans);
+    }
+
+    // === 핵심표현 채우기 ===
+    if (data.script_highlights && data.script_highlights.trim()) {
+        const items = data.script_highlights.split('##');
+        llHighlightCards = items.map(item => {
+            const parts = item.split('::');
+            return {
+                word: (parts[0] || '').trim(),
+                translation: (parts[1] || '').trim(),
+                explanation: (parts[2] || '').trim()
+            };
+        });
+        renderLlHighlightCards();
+    }
+
+    // === Q1~Q4 채우기 ===
+    let filledCount = 0;
+    data.questions.forEach((q, idx) => {
+        const num = idx + 1;
+
+        // 질문
+        if (q.question) setLlVal(`llQ${num}Question`, q.question);
+        if (q.question_trans) setLlVal(`llQ${num}QuestionTrans`, q.question_trans);
+
+        // 보기 1~4
+        for (let j = 1; j <= 4; j++) {
+            if (q[`option${j}`]) setLlVal(`llQ${num}Opt${j}`, q[`option${j}`]);
+            if (q[`option_trans${j}`]) setLlVal(`llQ${num}OptTrans${j}`, q[`option_trans${j}`]);
+            if (q[`option_exp${j}`]) setLlVal(`llQ${num}OptExp${j}`, q[`option_exp${j}`]);
+        }
+
+        // 정답 라디오
+        if (q.answer && q.answer >= 1 && q.answer <= 4) {
+            const radio = document.querySelector(`input[name="llAnswer${num}"][value="${q.answer}"]`);
+            if (radio) {
+                radio.checked = true;
+                onLlAnswerChange(num);
+            }
+        }
+
+        updateLlQHeader(num);
+        filledCount++;
+    });
+
+    // 줄 수 체크 및 등록 버튼 갱신
+    checkLlScriptLines();
+    updateLlRegisterBtn();
+
+    closeLlJsonModal();
+    alert(`✅ 자동 채움 완료!\n\n` +
+        `📚 강의제목: ${data.lecture_title ? '채움' : '없음'}\n` +
+        `📝 스크립트: ${data.script ? '채움' : '없음'}\n` +
+        `🔑 핵심표현: ${llHighlightCards.filter(c => c.word.trim()).length}개\n` +
+        `📋 문제: ${filledCount}문제\n\n` +
+        `⚠️ 성별(Gender)은 직접 선택해주세요.`);
+}
+
 // ===== DOMContentLoaded =====
 document.addEventListener('DOMContentLoaded', () => {
     initLlQuestions();
