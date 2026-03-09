@@ -628,6 +628,117 @@ function checkLcScriptLines() {
     }
 }
 
+// ===== JSON 붙여넣기 기능 =====
+function openLcJsonModal() {
+    document.getElementById('lcJsonModal').style.display = 'flex';
+    document.getElementById('lcJsonInput').value = '';
+    document.getElementById('lcJsonError').style.display = 'none';
+}
+
+function closeLcJsonModal() {
+    document.getElementById('lcJsonModal').style.display = 'none';
+    document.getElementById('lcJsonInput').value = '';
+    document.getElementById('lcJsonError').style.display = 'none';
+}
+
+function applyLcJson() {
+    const input = document.getElementById('lcJsonInput').value.trim();
+    const errorEl = document.getElementById('lcJsonError');
+    errorEl.style.display = 'none';
+
+    if (!input) {
+        errorEl.textContent = '❌ JSON을 붙여넣어주세요.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    let data;
+    try {
+        // ```json ... ``` 코드블록 자동 제거
+        let cleaned = input;
+        if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+        }
+        data = JSON.parse(cleaned);
+    } catch (e) {
+        errorEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    // 객체 형식 확인
+    if (typeof data !== 'object' || Array.isArray(data)) {
+        errorEl.textContent = '❌ JSON 객체 형식이어야 합니다. { "script": "...", "questions": [...] }';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    // questions 배열 확인
+    if (!data.questions || !Array.isArray(data.questions) || data.questions.length !== 2) {
+        errorEl.textContent = `❌ questions 배열에 2문제가 있어야 합니다. 현재 ${data.questions ? data.questions.length : 0}문제`;
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    // 1) 스크립트 채우기
+    setLcVal('lcScript', data.script || '');
+    setLcVal('lcScriptTrans', data.script_trans || '');
+
+    // 2) 핵심표현 채우기
+    if (data.script_highlights && typeof data.script_highlights === 'string') {
+        const items = data.script_highlights.split('##').filter(s => s.trim());
+        lcHighlightCards = items.map(item => {
+            const parts = item.split('::');
+            return {
+                word: (parts[0] || '').trim(),
+                translation: (parts[1] || '').trim(),
+                explanation: (parts[2] || '').trim()  // 3번째 파트 없으면 빈 문자열
+            };
+        });
+        if (lcHighlightCards.length === 0) {
+            lcHighlightCards = [{ word: '', translation: '', explanation: '' }];
+        }
+        renderLcHighlightCards();
+    }
+
+    // 3) Q1, Q2 문제 채우기
+    let filledCount = 0;
+    data.questions.forEach(item => {
+        const q = item.num;
+        if (q < 1 || q > 2) return;
+
+        // 질문
+        setLcVal(`lcQ${q}Question`, item.question || '');
+        setLcVal(`lcQ${q}QuestionTrans`, item.question_trans || '');
+
+        // 보기 4개
+        for (let j = 1; j <= 4; j++) {
+            setLcVal(`lcQ${q}Opt${j}`, item[`option${j}`] || '');
+            setLcVal(`lcQ${q}OptTrans${j}`, item[`option_trans${j}`] || '');
+            setLcVal(`lcQ${q}OptExp${j}`, item[`option_exp${j}`] || '');
+        }
+
+        // 정답 라디오
+        const answer = item.answer;
+        if (answer >= 1 && answer <= 4) {
+            const radio = document.querySelector(`input[name="lcAnswer${q}"][value="${answer}"]`);
+            if (radio) {
+                radio.checked = true;
+                onLcAnswerChange(q);
+            }
+        }
+
+        updateLcQHeader(q);
+        filledCount++;
+    });
+
+    // 줄 수 체크 + 등록 버튼 갱신
+    checkLcScriptLines();
+    updateLcRegisterBtn();
+    closeLcJsonModal();
+    alert(`✅ 스크립트 + 핵심표현 + ${filledCount}문제가 자동으로 채워졌습니다!`);
+}
+
 // ===== DOMContentLoaded =====
 document.addEventListener('DOMContentLoaded', () => {
     initLcQuestions();
