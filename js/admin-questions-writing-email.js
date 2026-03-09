@@ -85,19 +85,13 @@ function buildWeBulletAccordion(b) {
             <span class="sr-q-header-arrow" id="weBullet${b}Arrow"><i class="fas fa-chevron-down"></i></span>
         </div>
         <div class="sr-q-body" id="weBullet${b}Body">
-            <!-- 지시사항 미리보기 (읽기전용) -->
-            <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:8px 12px; margin-bottom:10px;">
-                <div style="font-size:11px; font-weight:600; color:#0369a1; margin-bottom:4px;">📌 지시사항 ${b} (STEP 1에서 입력)</div>
-                <div id="weBullet${b}InstructionPreview" style="font-size:12px; color:#334155; font-style:italic;">-</div>
-            </div>
-
             <div class="sr-q-field">
-                <label>📋 채점 기준 (한국어) — must *</label>
-                <textarea id="weBullet${b}Must" rows="2" placeholder="고객들한테서 구체적으로 어떤 문제를 관찰했는지 말해야 해요..." oninput="updateWeRegisterBtn()"></textarea>
-            </div>
-            <div class="sr-q-field">
-                <label>📝 예시 문장 (영어) — sample *</label>
+                <label>📝 모범답안 해당 부분 (영어) — sample *</label>
                 <textarea id="weBullet${b}Sample" rows="2" placeholder="I've noticed that students often have trouble finding their textbooks..." oninput="updateWeRegisterBtn()"></textarea>
+            </div>
+            <div class="sr-q-field">
+                <label>📌 꼭 말해야하는 부분 (한국어) — must *</label>
+                <textarea id="weBullet${b}Must" rows="2" placeholder="고객들한테서 구체적으로 어떤 문제를 관찰했는지 말해야 해요..." oninput="updateWeRegisterBtn()"></textarea>
             </div>
             <div class="sr-q-field">
                 <label>⭐ 만점 포인트 (한국어, 장문) — points *</label>
@@ -135,14 +129,9 @@ function toggleAllWeBullets() {
         : '<i class="fas fa-expand-arrows-alt"></i> 전체 펼치기';
 }
 
-// ===== 지시사항 → 불릿 미리보기 동기화 =====
+// ===== 지시사항 → 불릿 접힌 상태 서브텍스트 업데이트 =====
 function syncWeInstructionPreview(num) {
     const input = document.getElementById(`weInstruction${num}`);
-    const preview = document.getElementById(`weBullet${num}InstructionPreview`);
-    if (input && preview) {
-        preview.textContent = input.value.trim() || '-';
-    }
-    // 불릿 접힌 상태 서브텍스트 업데이트
     const sub = document.getElementById(`weBullet${num}Sub`);
     if (sub) {
         const val = input?.value?.trim() || '';
