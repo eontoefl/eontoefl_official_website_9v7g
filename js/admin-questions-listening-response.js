@@ -621,6 +621,88 @@ function setLrVal(id, val) {
     if (el) el.value = val;
 }
 
+// ===== JSON 붙여넣기 기능 =====
+function openLrJsonModal() {
+    document.getElementById('lrJsonModal').style.display = 'flex';
+    document.getElementById('lrJsonInput').value = '';
+    document.getElementById('lrJsonError').style.display = 'none';
+}
+
+function closeLrJsonModal() {
+    document.getElementById('lrJsonModal').style.display = 'none';
+    document.getElementById('lrJsonInput').value = '';
+    document.getElementById('lrJsonError').style.display = 'none';
+}
+
+function applyLrJson() {
+    const input = document.getElementById('lrJsonInput').value.trim();
+    const errorEl = document.getElementById('lrJsonError');
+    errorEl.style.display = 'none';
+
+    if (!input) {
+        errorEl.textContent = '❌ JSON을 붙여넣어주세요.';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    let data;
+    try {
+        data = JSON.parse(input);
+    } catch (e) {
+        errorEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    if (!Array.isArray(data)) {
+        errorEl.textContent = '❌ JSON 배열 형식이어야 합니다. [ { ... }, { ... } ]';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    if (data.length !== 12) {
+        errorEl.textContent = `❌ 12문제여야 합니다. 현재 ${data.length}문제가 입력되었습니다.`;
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    // 필드 채우기
+    let filledCount = 0;
+    data.forEach(item => {
+        const q = item.num;
+        if (q < 1 || q > 12) return;
+
+        // 스크립트
+        setLrVal(`lrQ${q}Script`, item.script || '');
+        setLrVal(`lrQ${q}ScriptTrans`, item.script_trans || '');
+
+        // 보기
+        for (let j = 1; j <= 4; j++) {
+            setLrVal(`lrQ${q}Opt${j}`, item[`option${j}`] || '');
+            setLrVal(`lrQ${q}OptTrans${j}`, item[`option_trans${j}`] || '');
+            setLrVal(`lrQ${q}OptExp${j}`, item[`option_exp${j}`] || '');
+        }
+
+        // 정답 라디오
+        const answer = item.answer;
+        if (answer >= 1 && answer <= 4) {
+            const radio = document.querySelector(`input[name="lrAnswer${q}"][value="${answer}"]`);
+            if (radio) {
+                radio.checked = true;
+                onLrAnswerChange(q);
+            }
+        }
+
+        updateLrQHeader(q);
+        filledCount++;
+    });
+
+    // Q1 성별 자동 교대 트리거 (gender는 JSON에 없으므로 수동 선택 필요)
+    updateLrRegisterBtn();
+    closeLrJsonModal();
+    alert(`✅ ${filledCount}문제가 자동으로 채워졌습니다!\n\n⚠️ 성별(Gender)은 Q1에서 직접 선택해주세요.`);
+}
+
 // ===== DOMContentLoaded에서 아코디언 생성 =====
 document.addEventListener('DOMContentLoaded', () => {
     initLrQuestions();
