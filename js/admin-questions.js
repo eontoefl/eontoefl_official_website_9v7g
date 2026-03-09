@@ -57,6 +57,8 @@ function onSectionChange() {
         if (typeof loadLaExistingSets === 'function') loadLaExistingSets();
     } else if (val === 'listening-lecture') {
         if (typeof loadLlExistingSets === 'function') loadLlExistingSets();
+    } else if (val === 'writing-email') {
+        if (typeof loadWeExistingSets === 'function') loadWeExistingSets();
     }
 }
 
