@@ -1225,7 +1225,7 @@
                 <option value="listening-lecture">🎧 Listening - 렉처</option>
                 <option value="writing-arrange">✍️ Writing - 단어배열</option>
                 <option value="writing-email">✍️ Writing - 이메일</option>
-                <option value="writing-discussion" disabled>✍️ Writing - 토론 (준비중)</option>
+                <option value="writing-discussion">✍️ Writing - 토론</option>
                 <option value="speaking-repeat">🎙️ Speaking - 따라말하기</option>
                 <option value="speaking-interview">🎙️ Speaking - 인터뷰</option>
             </select>
@@ -2752,6 +2752,140 @@
             </div>
         </div>
 
+        <!-- ==================== Writing Discussion Section ==================== -->
+        <div id="section-writing-discussion" class="q-hidden">
+
+            <!-- 세트 ID + 기존 세트 목록 -->
+            <div class="q-card">
+                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <div style="font-size:14px; color:#64748b;">세트 ID:</div>
+                    <div id="wdSetId" style="font-size:18px; font-weight:700; color:#1e293b;">-</div>
+                    <span id="wdEditModeLabel" style="display:none; background:#f59e0b; color:white; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600;">수정 모드</span>
+                </div>
+                <div style="margin-top:12px;">
+                    <div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:6px;">📋 기존 세트:</div>
+                    <div id="wdSetList" style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <span style="font-size:12px; color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JSON 일괄 입력 -->
+            <div class="q-card" style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0;">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span style="font-size:14px; font-weight:700; color:#166534;">📋 JSON 일괄 입력</span>
+                    <span style="font-size:11px; color:#15803d;">해설프롬프트의 JSON 출력을 붙여넣으면 모범답안 + 문장 해설이 자동 채워집니다.</span>
+                </div>
+                <div style="margin-top:10px;">
+                    <button onclick="openWdJsonModal()" class="sr-action-btn" style="background:#16a34a; color:white; border:none; padding:6px 16px; border-radius:6px; font-size:13px; cursor:pointer;">
+                        <i class="fas fa-paste"></i> JSON 붙여넣기
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 1: 문제 기본 정보 -->
+            <div class="q-card">
+                <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin-bottom:12px;">
+                    <i class="fas fa-chalkboard-teacher" style="color:#3b82f6;"></i> STEP 1. 문제 기본 정보
+                </h3>
+                <div class="sr-q-field">
+                    <label>📋 수업 맥락 + 교수 질문 (영어, 장문) *</label>
+                    <textarea id="wdClassContext" rows="6" placeholder="Your professor is teaching a class on sociology. Write a post responding to the professor's question.&#10;&#10;Dr. Williams:&#10;This week we examined community engagement programs in urban neighborhoods..." oninput="updateWdRegisterBtn()"></textarea>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">ℹ️ 교수 이름, 수업 맥락, 질문 전체를 포함하세요</div>
+                </div>
+                <div class="sr-q-field">
+                    <label>📝 토론 주제 (영어, 1문장) *</label>
+                    <input type="text" id="wdTopic" placeholder="Should neighborhood associations require residents to participate?" oninput="updateWdRegisterBtn()">
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">ℹ️ class_context 내 핵심 질문을 짧게 요약</div>
+                </div>
+            </div>
+
+            <!-- STEP 2: 학생 의견 -->
+            <div class="q-card">
+                <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin-bottom:12px;">
+                    <i class="fas fa-users" style="color:#f59e0b;"></i> STEP 2. 학생 의견
+                </h3>
+                <div class="sr-q-field">
+                    <label>🗣️ 학생1 의견 (영어) *</label>
+                    <textarea id="wdStudent1Opinion" rows="4" placeholder="I believe participation should remain completely voluntary in all communities. Forcing people to attend meetings..." oninput="updateWdRegisterBtn()"></textarea>
+                </div>
+                <div class="sr-q-field">
+                    <label>🗣️ 학생2 의견 (영어) *</label>
+                    <textarea id="wdStudent2Opinion" rows="4" placeholder="While {name1} makes a good point about freedom, I think some level of required participation benefits everyone..." oninput="updateWdRegisterBtn()"></textarea>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">ℹ️ 학생 이름은 {name1}, {name2}로 입력해주세요. 학생 앱에서 자동으로 실제 이름으로 치환됩니다.</div>
+                </div>
+            </div>
+
+            <!-- STEP 3: 문장별 해설 (아코디언, 1~5 가변) -->
+            <div class="q-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin:0;">
+                        <i class="fas fa-list-ol" style="color:#8b5cf6;"></i> STEP 3. 문장별 해설
+                    </h3>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="wdBulletInfo" style="font-size:11px; color:#64748b;">현재 1개 / 최대 5개</span>
+                        <button onclick="toggleAllWdBullets()" id="wdToggleAllBtn" style="padding:4px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:12px; cursor:pointer; background:white;">
+                            <i class="fas fa-expand-arrows-alt"></i> 전체 펼치기
+                        </button>
+                    </div>
+                </div>
+                <div id="wdBulletAccordion"></div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:12px;">
+                    <button id="wdAddBulletBtn" onclick="addWdBullet()" style="padding:6px 16px; border:1px dashed #8b5cf6; border-radius:6px; font-size:13px; cursor:pointer; background:white; color:#8b5cf6; font-weight:600;">
+                        <i class="fas fa-plus"></i> 문장 추가
+                    </button>
+                    <span style="font-size:11px; color:#94a3b8;">문장 1은 필수, 2~5는 선택입니다. 빈 문장은 저장 시 자동 무시됩니다.</span>
+                </div>
+            </div>
+
+            <!-- STEP 4: 모범답안 -->
+            <div class="q-card">
+                <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin-bottom:12px;">
+                    <i class="fas fa-pen-fancy" style="color:#059669;"></i> STEP 4. 모범답안
+                </h3>
+                <div class="sr-q-field">
+                    <label>📄 모범답안 (영어, 장문) *</label>
+                    <textarea id="wdSampleAnswer" rows="8" placeholder="I believe participation should remain voluntary, and I agree with {name1} that forcing people to attend meetings creates resentment instead of genuine interest..." oninput="updateWdRegisterBtn()"></textarea>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">ℹ️ {name1}, {name2} 사용 가능</div>
+                </div>
+            </div>
+
+            <!-- 등록 / 취소 / 삭제 -->
+            <div class="q-card">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button id="wdRegisterBtn" onclick="registerWdSet()" disabled style="padding:8px 24px; background:#3b82f6; color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; opacity:0.5;">
+                        <i class="fas fa-save"></i> 등록
+                    </button>
+                    <button id="wdCancelEditBtn" onclick="cancelWdEdit()" style="display:none; padding:8px 24px; background:#6b7280; color:white; border:none; border-radius:8px; font-size:14px; cursor:pointer;">
+                        <i class="fas fa-times"></i> 취소
+                    </button>
+                    <button id="wdDeleteBtn" onclick="deleteWdSet()" style="display:none; padding:8px 24px; background:#ef4444; color:white; border:none; border-radius:8px; font-size:14px; cursor:pointer;">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- JSON 붙여넣기 모달 (Writing Discussion) -->
+        <div id="wdJsonModal" class="si-modal-overlay" onclick="if(event.target===this)closeWdJsonModal()" style="display:none;">
+            <div class="si-modal-box" style="max-width:700px;">
+                <button class="si-modal-close" onclick="closeWdJsonModal()">&times;</button>
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:12px;">📋 JSON 붙여넣기 (Discussion)</h3>
+                <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px; font-size:12px; color:#92400e; margin-bottom:12px;">
+                    ⚠️ 해설프롬프트에서 출력된 JSON을 그대로 붙여넣으세요.<br>
+                    <code style="font-size:11px;">{ "sample_answer": "...", "bullets": [ { "sentence": "...", "ets": "...", "strategy": "..." }, ... ] }</code><br>
+                    <span style="font-size:11px;">STEP 1~2 필드(class_context, topic 등)를 포함하면 같이 채워집니다.</span>
+                </div>
+                <textarea id="wdJsonInput" rows="14" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #d1d5db; border-radius:8px; padding:10px;" placeholder='{ "sample_answer": "I believe...", "bullets": [ { "sentence": "I believe...", "ets": "ETS는...", "strategy": "이 문장은..." } ] }'></textarea>
+                <div id="wdJsonError" style="display:none; margin-top:8px; padding:8px 12px; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:13px;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                    <button onclick="closeWdJsonModal()" style="padding:6px 16px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; cursor:pointer; background:white;">취소</button>
+                    <button onclick="applyWdJson()" style="padding:6px 16px; background:#16a34a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600;">적용</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Scripts -->
@@ -2769,5 +2903,6 @@
 <script src="js/admin-questions-listening-announcement.js"></script>
 <script src="js/admin-questions-listening-lecture.js"></script>
 <script src="js/admin-questions-writing-email.js"></script>
+<script src="js/admin-questions-writing-discussion.js"></script>
 </body>
 </html>
