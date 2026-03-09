@@ -667,5 +667,121 @@ async function deleteWaSet(setId) {
     }
 }
 
+// ===== JSON 붙여넣기 기능 =====
+function openWaJsonModal() {
+    document.getElementById('waJsonModal').style.display = 'flex';
+    document.getElementById('waJsonInput').value = '';
+    document.getElementById('waJsonError').style.display = 'none';
+}
+
+function closeWaJsonModal() {
+    document.getElementById('waJsonModal').style.display = 'none';
+    document.getElementById('waJsonInput').value = '';
+    document.getElementById('waJsonError').style.display = 'none';
+}
+
+function applyWaJson() {
+    const raw = document.getElementById('waJsonInput').value.trim();
+    const errEl = document.getElementById('waJsonError');
+    errEl.style.display = 'none';
+
+    if (!raw) {
+        errEl.textContent = '❌ JSON을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // ```json ... ``` 코드블록 자동 제거
+    let cleaned = raw;
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+    let data;
+    try {
+        data = JSON.parse(cleaned);
+    } catch (e) {
+        errEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (!Array.isArray(data)) {
+        errEl.textContent = '❌ JSON은 배열 [ { ... }, { ... } ] 형식이어야 합니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (data.length !== WA_Q_COUNT) {
+        errEl.textContent = `❌ 배열은 ${WA_Q_COUNT}개여야 합니다. (현재 ${data.length}개)`;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // === Q1~Q10 채우기 ===
+    let filledCount = 0;
+    data.forEach((item, idx) => {
+        const i = idx + 1;
+
+        // 힌트 문장
+        if (item.given_sentence) setVal(`waHint${i}`, item.given_sentence);
+        if (item.given_translation) setVal(`waHintTrans${i}`, item.given_translation);
+
+        // 정답 번역
+        if (item.correct_translation) setVal(`waAnswerTrans${i}`, item.correct_translation);
+
+        // 해설
+        if (item.explanation) setVal(`waExplain${i}`, item.explanation);
+
+        // === waQData 복원 (핵심) ===
+        const presentedParts = (item.presented_words || '').split('|');
+        const correctParts = (item.correct_answer || '').split('|');
+        const punct = item.end_punctuation || '.';
+
+        // words 복원: presented에서 주어진/빈칸 판별
+        const words = [];
+        let ci = 0;
+        presentedParts.forEach(p => {
+            const t = p.trim();
+            if (t === '_') {
+                const ansWord = correctParts[ci] || '';
+                words.push({ text: ansWord, raw: ansWord.replace(/ /g, '_'), isGiven: false });
+                ci++;
+            } else {
+                words.push({ text: t, raw: t.replace(/ /g, '_'), isGiven: true });
+            }
+        });
+
+        // 더미(오답) 복원: option_words에서 correct_answer에 없는 것
+        const correctLower = correctParts.map(c => c.trim().toLowerCase());
+        const givenTextsLower = words.filter(w => w.isGiven).map(w => w.text.toLowerCase());
+        const optionParts = (item.option_words || '').split('|').map(o => o.trim()).filter(o => o);
+        const dummies = optionParts.filter(o => {
+            const lower = o.toLowerCase();
+            return !correctLower.includes(lower) && !givenTextsLower.includes(lower);
+        });
+
+        waQData[i] = { words, dummies, punct };
+
+        // 정답 문장 복원 (입력 필드에)
+        const fullSentence = words.map(w => w.raw).join(' ') + punct;
+        setVal(`waSentence${i}`, fullSentence);
+
+        // UI 업데이트
+        showWaSubAreas(i);
+        renderWaWordChips(i);
+        renderWaDummyChips(i);
+        updateWaPreview(i);
+        updateWaQHeader(i);
+
+        filledCount++;
+    });
+
+    updateWaRegisterBtn();
+    closeWaJsonModal();
+
+    alert(`✅ 자동 채움 완료!\n\n` +
+        `📋 ${filledCount}문제 채움\n\n` +
+        `각 문제의 미리보기를 확인한 후 등록 버튼을 눌러주세요.`);
+}
+
 // ===== 페이지 로드 시 초기화 =====
 initWaQuestions();
