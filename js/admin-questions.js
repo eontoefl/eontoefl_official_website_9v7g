@@ -598,3 +598,162 @@ function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ===== Fill in the Blanks JSON 붙여넣기 =====
+function openFbJsonModal() {
+    document.getElementById('fbJsonModal').style.display = 'flex';
+    document.getElementById('fbJsonInput').value = '';
+    document.getElementById('fbJsonError').style.display = 'none';
+}
+
+function closeFbJsonModal() {
+    document.getElementById('fbJsonModal').style.display = 'none';
+    document.getElementById('fbJsonInput').value = '';
+    document.getElementById('fbJsonError').style.display = 'none';
+}
+
+function applyFbJson() {
+    const raw = document.getElementById('fbJsonInput').value.trim();
+    const errEl = document.getElementById('fbJsonError');
+    errEl.style.display = 'none';
+
+    if (!raw) {
+        errEl.textContent = '❌ JSON을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // ```json ... ``` 코드블록 자동 제거
+    let cleaned = raw;
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+    let data;
+    try {
+        data = JSON.parse(cleaned);
+    } catch (e) {
+        errEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (typeof data !== 'object' || data === null) {
+        errEl.textContent = '❌ JSON은 객체 { } 형식이어야 합니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (!data.passage || typeof data.passage !== 'string') {
+        errEl.textContent = '❌ "passage" 필드가 필요합니다 (완성된 원문 지문).';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (!data.blanks || !Array.isArray(data.blanks) || data.blanks.length === 0) {
+        errEl.textContent = '❌ "blanks" 배열이 필요합니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // 각 blank 검증
+    for (let i = 0; i < data.blanks.length; i++) {
+        const b = data.blanks[i];
+        if (!b.prefix || !b.answer) {
+            errEl.textContent = `❌ blanks[${i}]: prefix와 answer는 필수입니다.`;
+            errEl.style.display = 'block';
+            return;
+        }
+        // prefix + answer = 완성 단어가 passage에 존재하는지 체크
+        const fullWord = b.prefix + b.answer;
+        if (!data.passage.includes(fullWord)) {
+            errEl.textContent = `❌ blanks[${i}]: "${fullWord}"이 passage에서 찾을 수 없습니다.`;
+            errEl.style.display = 'block';
+            return;
+        }
+    }
+
+    // === passage에서 빈칸 지문 생성 + blanksData 복원 ===
+    // 완성된 passage에서 각 blank 위치를 찾아서 언더스코어로 교체
+    let passageText = data.passage;
+    const blankPositions = []; // { start, end, blankObj }
+
+    // 각 blank의 전체 단어 위치를 passage에서 순서대로 찾기
+    let searchFrom = 0;
+    for (let i = 0; i < data.blanks.length; i++) {
+        const b = data.blanks[i];
+        const fullWord = b.prefix + b.answer;
+        const pos = passageText.indexOf(fullWord, searchFrom);
+        if (pos === -1) {
+            errEl.textContent = `❌ blanks[${i}]: "${fullWord}"을 passage 위치 ${searchFrom}부터 찾을 수 없습니다.`;
+            errEl.style.display = 'block';
+            return;
+        }
+        blankPositions.push({
+            start: pos,
+            end: pos + fullWord.length,
+            prefixLen: b.prefix.length,
+            answerLen: b.answer.length,
+            blank: b
+        });
+        searchFrom = pos + fullWord.length;
+    }
+
+    // 뒤에서부터 교체 (인덱스 안 꼬이게)
+    let underscorePassage = passageText;
+    for (let i = blankPositions.length - 1; i >= 0; i--) {
+        const bp = blankPositions[i];
+        const before = underscorePassage.substring(0, bp.start + bp.prefixLen);
+        const underscores = ' ' + bp.blank.answer.split('').map(() => '_').join(' ');
+        const after = underscorePassage.substring(bp.end);
+        underscorePassage = before + underscores + after;
+    }
+
+    // passageInput에 언더스코어 지문 넣기
+    document.getElementById('passageInput').value = underscorePassage;
+
+    // detectBlanks 호출하여 blanksData 생성
+    detectBlanks(underscorePassage);
+
+    // blanksData에 JSON 데이터 채우기
+    if (blanksData.length === data.blanks.length) {
+        for (let i = 0; i < blanksData.length; i++) {
+            const src = data.blanks[i];
+            blanksData[i].answer = src.answer;
+            blanksData[i].explanation = sanitizePipe(src.explanation || '');
+            blanksData[i].commonMistakes = src.mistake || '';
+            blanksData[i].mistakesExplanation = sanitizePipe(src.mistake_exp || '');
+        }
+    } else {
+        // 개수 불일치 시 가능한 만큼 채우기
+        const minLen = Math.min(blanksData.length, data.blanks.length);
+        for (let i = 0; i < minLen; i++) {
+            const src = data.blanks[i];
+            blanksData[i].answer = src.answer;
+            blanksData[i].explanation = sanitizePipe(src.explanation || '');
+            blanksData[i].commonMistakes = src.mistake || '';
+            blanksData[i].mistakesExplanation = sanitizePipe(src.mistake_exp || '');
+        }
+    }
+
+    // UI 갱신
+    renderBlanksTable();
+    renderPreview();
+    updateRegisterButton();
+    show('blanksSection');
+    show('previewSection');
+    show('registerSection');
+
+    closeFbJsonModal();
+
+    const filledCount = blanksData.filter(b => b.answer).length;
+    const mismatch = blanksData.length !== data.blanks.length
+        ? `\n\n⚠️ 빈칸 수 불일치: JSON ${data.blanks.length}개 vs 감지 ${blanksData.length}개`
+        : '';
+
+    alert(`✅ 자동 채움 완료!\n\n` +
+        `📄 지문: 채움\n` +
+        `📝 빈칸: ${filledCount}/${blanksData.length}개 정답 입력됨\n` +
+        `📋 해설: ${data.blanks.filter(b => b.explanation).length}개\n` +
+        `❌ 오답: ${data.blanks.filter(b => b.mistake).length}개` +
+        mismatch +
+        `\n\n내용을 확인한 후 등록 버튼을 눌러주세요.`);
+}
