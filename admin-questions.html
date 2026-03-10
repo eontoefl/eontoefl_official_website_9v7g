@@ -1519,6 +1519,19 @@
 
         <!-- Daily2 Section -->
         <div id="section-reading-daily2" class="q-hidden">
+            <!-- JSON 일괄 입력 카드 -->
+            <div class="q-card" style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0;">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span style="font-size:14px; font-weight:700; color:#166534;">📋 JSON 일괄 입력</span>
+                    <span style="font-size:11px; color:#15803d;">해설프롬프트의 JSON 출력을 붙여넣으면 전체 폼이 자동 채워집니다.</span>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:8px;">
+                    <button onclick="openD2JsonModal()" class="sr-action-btn" style="background:#16a34a; color:white; border:none; padding:6px 16px; border-radius:6px; font-size:13px; cursor:pointer;">
+                        <i class="fas fa-paste"></i> JSON 붙여넣기
+                    </button>
+                </div>
+            </div>
+
             <!-- Set ID -->
             <div class="q-card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1641,6 +1654,24 @@
                         <i class="fas fa-spinner fa-spin"></i>
                         로딩 중...
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON 붙여넣기 모달 (Daily2) -->
+        <div id="d2JsonModal" class="si-modal-overlay" onclick="if(event.target===this)closeD2JsonModal()" style="display:none;">
+            <div class="si-modal-box" style="max-width:750px;">
+                <button class="si-modal-close" onclick="closeD2JsonModal()">&times;</button>
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:12px;">📋 JSON 붙여넣기 (Daily2)</h3>
+                <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px; font-size:12px; color:#92400e; margin-bottom:12px;">
+                    ⚠️ 해설프롬프트에서 출력된 JSON을 그대로 붙여넣으세요.<br>
+                    <code style="font-size:11px;">{ "main_title": "...", "passage_title": "...", "passage_content": "...", "sentence_translations": "...", "interactive_words": "...", "question1": "...", "question2": "...", "question3": "..." }</code>
+                </div>
+                <textarea id="d2JsonInput" rows="16" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #d1d5db; border-radius:8px; padding:10px;" placeholder='{ "main_title": "Read a post.", "passage_title": "Food Drive Volunteers", "passage_content": "Thomas Bennett##Our community is organizing...#|#The event will run...", "sentence_translations": "토마스 베넷##우리 커뮤니티가...#|#행사는...", "interactive_words": "food drive::푸드 드라이브::설명...##in need::도움이 필요한::설명...", "question1": "Q1::What is the purpose?::목적은?::B::A)opt::해석::해설##B)opt::해석::해설##C)opt::해석::해설##D)opt::해석::해설", "question2": "Q2::What is indicated?::무엇이 나타나 있나?::C::A)opt::해석::해설##B)opt::해석::해설##C)opt::해석::해설##D)opt::해석::해설", "question3": "" }'></textarea>
+                <div id="d2JsonError" style="display:none; margin-top:8px; padding:8px 12px; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:13px;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                    <button onclick="closeD2JsonModal()" style="padding:6px 16px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; cursor:pointer; background:white;">취소</button>
+                    <button onclick="applyD2Json()" style="padding:6px 16px; background:#16a34a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600;">적용</button>
                 </div>
             </div>
         </div>
