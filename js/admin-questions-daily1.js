@@ -930,14 +930,14 @@ function parseD1TagFormat(text) {
 function parseD1PassageToBlocks(passageContent) {
     if (!passageContent) return [];
 
-    // ## 와 #|# 만 블록 구분자로 사용 (#||# 는 블록 내부 줄바꿈이므로 분리하지 않음)
+    // ## 와 #|# 만 블록 구분자로 사용
     const parts = passageContent.split(/(##|#\|#)/);
     const blocks = [];
     const separators = [];
 
     for (let i = 0; i < parts.length; i++) {
         if (i % 2 === 0) {
-            // 텍스트 부분 (#||# 는 그대로 유지)
+            // 텍스트 부분
             blocks.push(parts[i]);
         } else {
             // 구분자 부분 (## 또는 #|#)
