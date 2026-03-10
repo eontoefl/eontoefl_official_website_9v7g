@@ -1136,7 +1136,7 @@ function applyD1Json() {
 
         const blocks = parseD1PassageToBlocks(data.passage_content);
         const translations = data.sentence_translations
-            ? data.sentence_translations.split('##')
+            ? data.sentence_translations.split(/##|#\|#/)
             : [];
 
         blocks.forEach((block, i) => {
