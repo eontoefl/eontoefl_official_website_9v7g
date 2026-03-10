@@ -863,3 +863,348 @@ function d1EscapeAttr(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// ============================================================
+// ===== Daily1 JSON / ===TAG=== 붙여넣기 기능 =====
+// ============================================================
+
+function openD1JsonModal() {
+    document.getElementById('d1JsonModal').style.display = 'flex';
+    document.getElementById('d1JsonInput').value = '';
+    document.getElementById('d1JsonError').style.display = 'none';
+}
+
+function closeD1JsonModal() {
+    document.getElementById('d1JsonModal').style.display = 'none';
+    document.getElementById('d1JsonInput').value = '';
+    document.getElementById('d1JsonError').style.display = 'none';
+}
+
+/**
+ * ===TAG=== 구분자 형식 파싱
+ * 입력: "===MAIN_TITLE===\nRead a notice.\n===PASSAGE_TITLE===\n..."
+ * 출력: { main_title: "Read a notice.", passage_title: "...", ... }
+ */
+function parseD1TagFormat(text) {
+    const tags = ['MAIN_TITLE', 'PASSAGE_TITLE', 'PASSAGE_CONTENT', 'SENTENCE_TRANSLATIONS', 'INTERACTIVE_WORDS', 'QUESTION1', 'QUESTION2'];
+    const result = {};
+    const fieldMap = {
+        'MAIN_TITLE': 'main_title',
+        'PASSAGE_TITLE': 'passage_title',
+        'PASSAGE_CONTENT': 'passage_content',
+        'SENTENCE_TRANSLATIONS': 'sentence_translations',
+        'INTERACTIVE_WORDS': 'interactive_words',
+        'QUESTION1': 'question1',
+        'QUESTION2': 'question2'
+    };
+
+    // 각 태그의 위치를 찾기
+    const positions = [];
+    for (const tag of tags) {
+        const marker = `===${tag}===`;
+        const idx = text.indexOf(marker);
+        if (idx !== -1) {
+            positions.push({ tag, field: fieldMap[tag], start: idx, contentStart: idx + marker.length });
+        }
+    }
+
+    // 위치 순으로 정렬
+    positions.sort((a, b) => a.start - b.start);
+
+    // 각 태그의 내용 추출
+    for (let i = 0; i < positions.length; i++) {
+        const current = positions[i];
+        const nextStart = (i + 1 < positions.length) ? positions[i + 1].start : text.length;
+        let content = text.substring(current.contentStart, nextStart).trim();
+        result[current.field] = content;
+    }
+
+    return result;
+}
+
+/**
+ * PASSAGE_CONTENT를 블록 배열로 분해
+ * "Hello world.##This is a test.#|#Second sentence." 
+ * → [{text: "Hello world.", separator: "##"}, {text: "This is a test.", separator: "#|#"}, {text: "Second sentence.", separator: "##"}]
+ */
+function parseD1PassageToBlocks(passageContent) {
+    if (!passageContent) return [];
+
+    // ##, #||#, #|# 구분자로 split (구분자 유지)
+    const parts = passageContent.split(/(##|#\|\|#|#\|#)/);
+    const blocks = [];
+    const separators = [];
+
+    for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) {
+            // 텍스트 부분
+            blocks.push(parts[i]);
+        } else {
+            // 구분자 부분
+            separators.push(parts[i]);
+        }
+    }
+
+    return blocks.map((text, i) => ({
+        text: text.trim(),
+        separator: separators[i] || '##'
+    }));
+}
+
+/**
+ * INTERACTIVE_WORDS를 단어 배열로 분해
+ * "word1::뜻1::설명1##word2::뜻2::설명2" → [{word, translation, explanation}, ...]
+ */
+function parseD1InteractiveWords(wordsStr) {
+    if (!wordsStr) return [];
+    return wordsStr.split('##').map(item => {
+        const parts = item.split('::');
+        return {
+            word: (parts[0] || '').trim(),
+            translation: (parts[1] || '').trim(),
+            explanation: (parts[2] || '').trim()
+        };
+    }).filter(w => w.word);
+}
+
+/**
+ * QUESTION 문자열을 파싱
+ * "Q1::What is...::뭐가...::2::A)opt::해석::해설##B)opt::해석::해설##C)opt::해석::해설##D)opt::해석::해설"
+ */
+function parseD1Question(questionStr) {
+    if (!questionStr || !questionStr.trim()) return null;
+
+    const str = questionStr.trim();
+    // Q번호::문제원문::문제해석::정답번호::보기들...
+    // 보기들은 ##로 구분되고 각 보기는 알파벳)텍스트::해석::해설 형식
+    // 첫 4개 필드: Q번호, 문제원문, 문제해석, 정답번호
+    // 이후: 보기A~D (##로 구분)
+
+    const allParts = str.split('::');
+    if (allParts.length < 5) return null;
+
+    const qNum = allParts[0]; // "Q1" or "Q2"
+    const text = allParts[1] || '';
+    const trans = allParts[2] || '';
+    const correctAnswer = parseInt(allParts[3]) || 0;
+
+    // 보기 부분: allParts[4:]을 ::로 다시 합친 후 ##로 분리
+    const optionsRaw = allParts.slice(4).join('::');
+    const optionParts = optionsRaw.split('##');
+
+    const options = [];
+    for (let i = 0; i < optionParts.length && i < 4; i++) {
+        const optParts = optionParts[i].split('::');
+        const match = optParts[0].match(/^([A-D])\)(.*)/);
+        const optText = match ? match[2].trim() : optParts[0].trim();
+        const optTrans = (optParts[1] || '').trim();
+        // 해설은 ^로 분리된 헷갈리는 답 포함 가능 — 통째로 가져오기
+        const optExp = optParts.slice(2).join('::').trim();
+        options.push({
+            label: ['A', 'B', 'C', 'D'][i],
+            text: optText,
+            translation: optTrans,
+            explanation: optExp
+        });
+    }
+
+    return { qNum, text, translation: trans, correctAnswer, options };
+}
+
+/**
+ * 파싱된 문제 데이터를 폼에 채우기
+ */
+function fillD1QuestionToForm(qData, qNum) {
+    if (!qData) return;
+    const prefix = `d1Q${qNum}`;
+
+    const textEl = document.getElementById(`${prefix}Text`);
+    const transEl = document.getElementById(`${prefix}Trans`);
+    if (textEl) textEl.value = qData.text;
+    if (transEl) transEl.value = qData.translation;
+
+    if (qData.correctAnswer >= 1 && qData.correctAnswer <= 4) {
+        selectD1Answer(prefix, qData.correctAnswer);
+    }
+
+    const labels = ['A', 'B', 'C', 'D'];
+    qData.options.forEach((opt, i) => {
+        if (i >= 4) return;
+        const l = labels[i];
+        const t = document.getElementById(`${prefix}Opt${l}Text`);
+        const tr = document.getElementById(`${prefix}Opt${l}Trans`);
+        const ex = document.getElementById(`${prefix}Opt${l}Exp`);
+        if (t) t.value = opt.text;
+        if (tr) tr.value = opt.translation;
+        if (ex) ex.value = opt.explanation;
+    });
+}
+
+/**
+ * 메인: 붙여넣기 적용
+ * ===TAG=== 형식과 JSON 형식 모두 자동 감지
+ */
+function applyD1Json() {
+    const raw = document.getElementById('d1JsonInput').value.trim();
+    const errEl = document.getElementById('d1JsonError');
+    errEl.style.display = 'none';
+
+    if (!raw) {
+        errEl.textContent = '❌ 내용을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    let data = null;
+
+    // 1) ===TAG=== 형식 감지
+    if (raw.includes('===MAIN_TITLE===') || raw.includes('===PASSAGE_TITLE===') || raw.includes('===PASSAGE_CONTENT===')) {
+        data = parseD1TagFormat(raw);
+    } else {
+        // 2) JSON 형식 시도
+        let cleaned = raw;
+        cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+        try {
+            data = JSON.parse(cleaned);
+            if (Array.isArray(data)) data = data[0];
+        } catch (e) {
+            errEl.textContent = '❌ ===TAG=== 형식도 아니고 JSON 형식도 아닙니다.\n===MAIN_TITLE=== 태그 또는 { } JSON 형식을 확인해주세요.\n\n상세: ' + e.message;
+            errEl.style.display = 'block';
+            return;
+        }
+    }
+
+    if (!data || typeof data !== 'object') {
+        errEl.textContent = '❌ 파싱 결과가 비어있습니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // 최소 필수 필드 체크
+    if (!data.passage_content && !data.question1) {
+        errEl.textContent = '❌ passage_content 또는 question1 중 하나는 필수입니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // === 폼 채우기 시작 ===
+    const summary = {
+        main_title: false,
+        passage_title: false,
+        blocks: 0,
+        translations: 0,
+        words: 0,
+        question1: false,
+        question2: false
+    };
+
+    // 1) MAIN_TITLE
+    if (data.main_title) {
+        const mainTitleSel = document.getElementById('d1MainTitleSelect');
+        const presetValues = ['Read a notice.', 'Read an email.', 'Read an advertisement.', 'Read an article.'];
+        const titleVal = data.main_title.trim();
+
+        // 정확히 일치하거나 마침표 없는 버전도 시도
+        const matchedPreset = presetValues.find(p => 
+            p === titleVal || 
+            p.toLowerCase() === titleVal.toLowerCase() ||
+            p.replace('.', '') === titleVal ||
+            p.replace('.', '').toLowerCase() === titleVal.toLowerCase()
+        );
+
+        if (matchedPreset) {
+            mainTitleSel.value = matchedPreset;
+            document.getElementById('d1MainTitleCustom').classList.add('q-hidden');
+        } else {
+            mainTitleSel.value = '__custom__';
+            document.getElementById('d1MainTitleCustom').classList.remove('q-hidden');
+            document.getElementById('d1MainTitleCustom').value = titleVal;
+        }
+        summary.main_title = true;
+    }
+
+    // 2) PASSAGE_TITLE
+    if (data.passage_title) {
+        document.getElementById('d1PassageTitle').value = data.passage_title.trim();
+        summary.passage_title = true;
+    }
+
+    // 3) PASSAGE_CONTENT → 블록으로 분해 후 추가
+    if (data.passage_content) {
+        // 기존 블록 초기화
+        document.getElementById('d1BlockList').innerHTML = '';
+
+        const blocks = parseD1PassageToBlocks(data.passage_content);
+        const translations = data.sentence_translations
+            ? data.sentence_translations.split('##')
+            : [];
+
+        blocks.forEach((block, i) => {
+            const trans = (translations[i] || '').trim();
+            const needsTrans = trans !== '';
+            addD1Block(block.text, needsTrans, trans, block.separator);
+            summary.blocks++;
+            if (needsTrans) summary.translations++;
+        });
+    }
+
+    // 4) INTERACTIVE_WORDS → 단어 행 추가
+    if (data.interactive_words) {
+        // 기존 단어 초기화
+        document.getElementById('d1WordList').innerHTML = '';
+
+        const words = parseD1InteractiveWords(data.interactive_words);
+        words.forEach(w => {
+            addD1Word(w.word, w.translation, w.explanation);
+            summary.words++;
+        });
+    }
+
+    // 5) QUESTION1
+    if (data.question1) {
+        const q1Data = parseD1Question(data.question1);
+        if (q1Data) {
+            initD1QuestionBlock('d1Question1', 1);
+            fillD1QuestionToForm(q1Data, 1);
+            summary.question1 = true;
+        }
+    }
+
+    // 6) QUESTION2
+    if (data.question2 && data.question2.trim()) {
+        const q2Data = parseD1Question(data.question2);
+        if (q2Data) {
+            // 문제 2 활성화
+            if (!d1Q2Visible) {
+                d1Q2Visible = true;
+                const container = document.getElementById('d1Question2');
+                container.classList.remove('q-hidden');
+                initD1QuestionBlock('d1Question2', 2);
+                const btn = document.getElementById('d1Q2ToggleBtn');
+                btn.innerHTML = '<i class="fas fa-minus"></i> 문제 2 제거';
+                btn.classList.remove('q-btn-secondary');
+                btn.classList.add('q-btn-danger');
+            }
+            fillD1QuestionToForm(q2Data, 2);
+            summary.question2 = true;
+        }
+    }
+
+    // UI 갱신
+    updateD1BlockNumbers();
+    updateD1WordCount();
+    updateD1RegisterBtn();
+    renderD1Preview();
+
+    closeD1JsonModal();
+
+    // 결과 알림
+    alert(`✅ 자동 채움 완료!\n\n` +
+        `📖 상단 제목: ${summary.main_title ? '채움' : '없음 (수동 입력 필요)'}\n` +
+        `📄 지문 제목: ${summary.passage_title ? '채움' : '없음 (수동 입력 필요)'}\n` +
+        `📝 지문 블록: ${summary.blocks}개 (해석: ${summary.translations}개)\n` +
+        `🔤 핵심 단어: ${summary.words}개\n` +
+        `❓ 문제 1: ${summary.question1 ? '채움' : '없음'}\n` +
+        `❓ 문제 2: ${summary.question2 ? '채움' : '없음'}\n\n` +
+        `내용을 확인한 후 등록 버튼을 눌러주세요.`);
+}
