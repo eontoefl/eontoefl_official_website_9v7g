@@ -753,7 +753,7 @@ function applyFbJson() {
         `📄 지문: 채움\n` +
         `📝 빈칸: ${filledCount}/${blanksData.length}개 정답 입력됨\n` +
         `📋 해설: ${data.blanks.filter(b => b.explanation).length}개\n` +
-        `❌ 오답: ${data.blanks.filter(b => b.mistake).length}개` +
+        `🔄 헷갈리는 오답: ${data.blanks.filter(b => b.mistake).length}개` +
         mismatch +
         `\n\n내용을 확인한 후 등록 버튼을 눌러주세요.`);
 }
