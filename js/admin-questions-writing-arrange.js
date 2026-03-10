@@ -236,7 +236,7 @@ function getWaGenerated(num) {
     const correctAnswer = correctParts.join('|');
 
     // option_words: 정답 + 더미 섞기
-    const allOptions = [...correctParts, ...dummies];
+    const allOptions = [...correctParts, ...dummies].map(w => w.toLowerCase());
     const shuffled = shuffleArray([...allOptions]);
     const optionWords = shuffled.join('|');
 
