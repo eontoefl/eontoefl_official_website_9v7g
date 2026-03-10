@@ -1142,7 +1142,15 @@ function applyD1Json() {
         blocks.forEach((block, i) => {
             const trans = (translations[i] || '').trim();
             const needsTrans = trans !== '';
-            addD1Block(block.text, needsTrans, trans, block.separator);
+            // To/From/Date/Subject 줄은 단락구분(##) 대신 줄바꿈(#||#)으로 자동 변환
+            let sep = block.separator;
+            if (/^(To:|From:|Date:|Subject:)/i.test(block.text.trim())) {
+                const nextBlock = blocks[i + 1];
+                if (nextBlock && /^(To:|From:|Date:|Subject:)/i.test(nextBlock.text.trim())) {
+                    sep = '#||#';
+                }
+            }
+            addD1Block(block.text, needsTrans, trans, sep);
             summary.blocks++;
             if (needsTrans) summary.translations++;
         });
