@@ -970,3 +970,277 @@ function acEscapeAttr(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// ===== Academic JSON 붙여넣기 기능 =====
+
+function openAcJsonModal() {
+    document.getElementById('acJsonModal').style.display = 'flex';
+    document.getElementById('acJsonInput').value = '';
+    document.getElementById('acJsonError').style.display = 'none';
+}
+
+function closeAcJsonModal() {
+    document.getElementById('acJsonModal').style.display = 'none';
+    document.getElementById('acJsonInput').value = '';
+    document.getElementById('acJsonError').style.display = 'none';
+}
+
+/**
+ * Academic 문제 문자열 파싱
+ * "Q1[highlight]::What...::뭐...::B::A)opt::해석::해설##B)opt::해석::해설##C)...##D)..."
+ */
+function parseAcJsonQuestion(questionStr) {
+    if (!questionStr || !questionStr.trim()) return null;
+
+    const str = questionStr.trim();
+
+    // 유형 태그 추출: Q1[highlight]::... 또는 Q1[normal]::... 또는 Q1::...
+    const typeMatch = str.match(/^(Q\d+)(?:\[(\w+)\])?\s*::\s*(.*)/s);
+    if (!typeMatch) return null;
+
+    const qNum = typeMatch[1];
+    const type = typeMatch[2] || 'normal';
+    const rest = typeMatch[3];
+
+    const allParts = rest.split('::');
+    if (allParts.length < 4) return null;
+
+    const text = allParts[0] || '';
+    const trans = allParts[1] || '';
+
+    // 정답: 알파벳(A/B/C/D) 또는 숫자(1/2/3/4) 둘 다 지원
+    const answerRaw = (allParts[2] || '').trim();
+    let correctAnswer = 0;
+    const letterMap = { 'A': 1, 'B': 2, 'C': 3, 'D': 4 };
+    if (letterMap[answerRaw.toUpperCase()]) {
+        correctAnswer = letterMap[answerRaw.toUpperCase()];
+    } else {
+        correctAnswer = parseInt(answerRaw) || 0;
+    }
+
+    // 보기 부분
+    const optionsRaw = allParts.slice(3).join('::');
+    const optionParts = optionsRaw.split('##');
+
+    const options = [];
+    for (let i = 0; i < optionParts.length && i < 4; i++) {
+        const optParts = optionParts[i].split('::');
+        const match = optParts[0].match(/^([A-D])\)(.*)/);
+        const optText = match ? match[2].trim() : optParts[0].trim();
+        const optTrans = (optParts[1] || '').trim();
+        const optExp = optParts.slice(2).join('::').trim();
+        options.push({
+            label: ['A', 'B', 'C', 'D'][i],
+            text: optText,
+            translation: optTrans,
+            explanation: optExp
+        });
+    }
+
+    return { qNum, type, text, translation: trans, correctAnswer, options };
+}
+
+/**
+ * 파싱된 문제 데이터를 Academic 폼에 채우기
+ */
+function fillAcQuestionFromJson(qData, qNum) {
+    if (!qData) return;
+    const prefix = `acQ${qNum}`;
+
+    // 유형 설정
+    setAcQuestionType(qNum, qData.type);
+
+    const textEl = document.getElementById(`${prefix}Text`);
+    const transEl = document.getElementById(`${prefix}Trans`);
+    if (textEl) textEl.value = qData.text;
+    if (transEl) transEl.value = qData.translation;
+
+    if (qData.correctAnswer >= 1 && qData.correctAnswer <= 4) {
+        selectAcAnswer(prefix, qData.correctAnswer);
+    }
+
+    const labels = ['A', 'B', 'C', 'D'];
+    qData.options.forEach((opt, i) => {
+        if (i >= 4) return;
+        const l = labels[i];
+        const t = document.getElementById(`${prefix}Opt${l}Text`);
+        const tr = document.getElementById(`${prefix}Opt${l}Trans`);
+        const ex = document.getElementById(`${prefix}Opt${l}Exp`);
+        if (t) t.value = opt.text;
+        if (tr) tr.value = opt.translation;
+        if (ex) ex.value = opt.explanation;
+    });
+}
+
+/**
+ * 메인: Academic JSON 붙여넣기 적용
+ * Academic은 paragraphs 배열 구조 (Daily1/2의 구분자 방식과 다름)
+ */
+function applyAcJson() {
+    const raw = document.getElementById('acJsonInput').value.trim();
+    const errEl = document.getElementById('acJsonError');
+    errEl.style.display = 'none';
+
+    if (!raw) {
+        errEl.textContent = '❌ JSON을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    let data = null;
+
+    // ```json ... ``` 코드블록 자동 제거
+    let cleaned = raw;
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+    try {
+        data = JSON.parse(cleaned);
+        if (Array.isArray(data)) data = data[0];
+    } catch (e) {
+        errEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (!data || typeof data !== 'object') {
+        errEl.textContent = '❌ 파싱 결과가 비어있습니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (!data.paragraphs && !data.question1) {
+        errEl.textContent = '❌ paragraphs 또는 question1 중 하나는 필수입니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // === 폼 채우기 시작 ===
+    const summary = {
+        main_title: false,
+        passage_title: false,
+        paragraphs: 0,
+        sentences: 0,
+        words: 0,
+        questions: 0
+    };
+
+    // 1) MAIN_TITLE
+    if (data.main_title) {
+        const mainTitleSel = document.getElementById('acMainTitleSelect');
+        const presetValues = [
+            'Read a passage about social psychology.',
+            'Read a passage about marine biology.',
+            'Read a passage about astrophysics.',
+            'Read a passage from a biology textbook.'
+        ];
+        const titleVal = data.main_title.trim();
+
+        const matchedPreset = presetValues.find(p =>
+            p === titleVal ||
+            p.toLowerCase() === titleVal.toLowerCase() ||
+            p.replace('.', '') === titleVal ||
+            p.replace('.', '').toLowerCase() === titleVal.toLowerCase()
+        );
+
+        if (matchedPreset) {
+            mainTitleSel.value = matchedPreset;
+            document.getElementById('acMainTitleCustom').classList.add('q-hidden');
+        } else {
+            mainTitleSel.value = '__custom__';
+            document.getElementById('acMainTitleCustom').classList.remove('q-hidden');
+            document.getElementById('acMainTitleCustom').value = titleVal;
+        }
+        summary.main_title = true;
+    }
+
+    // 2) PASSAGE_TITLE
+    if (data.passage_title) {
+        document.getElementById('acPassageTitle').value = data.passage_title.trim();
+        summary.passage_title = true;
+    }
+
+    // 3) PARAGRAPHS → 단락 3개 textarea에 채우기
+    if (data.paragraphs && Array.isArray(data.paragraphs)) {
+        // 핵심 단어 초기화
+        document.getElementById('acWordList').innerHTML = '';
+
+        for (let i = 0; i < 3; i++) {
+            const para = data.paragraphs[i];
+            const origEl = document.getElementById(`acPara${i + 1}Original`);
+            const transEl = document.getElementById(`acPara${i + 1}Translation`);
+
+            if (para) {
+                // original: 문장 배열 → 줄바꿈으로 연결
+                if (Array.isArray(para.original)) {
+                    origEl.value = para.original.join('\n');
+                    summary.sentences += para.original.length;
+                } else if (typeof para.original === 'string') {
+                    origEl.value = para.original;
+                } else {
+                    origEl.value = '';
+                }
+
+                // translation: 해석 배열 → 줄바꿈으로 연결
+                if (Array.isArray(para.translation)) {
+                    transEl.value = para.translation.join('\n');
+                } else if (typeof para.translation === 'string') {
+                    transEl.value = para.translation;
+                } else {
+                    transEl.value = '';
+                }
+
+                // words: 단락별 핵심 단어 → 통합 단어 목록에 추가
+                if (Array.isArray(para.words)) {
+                    para.words.forEach(wStr => {
+                        const parts = wStr.split('::');
+                        if (parts[0] && parts[0].trim()) {
+                            addAcWord(
+                                (parts[0] || '').trim(),
+                                (parts[1] || '').trim(),
+                                (parts[2] || '').trim()
+                            );
+                            summary.words++;
+                        }
+                    });
+                }
+
+                summary.paragraphs++;
+            } else {
+                origEl.value = '';
+                transEl.value = '';
+            }
+
+            onAcParagraphInput(i + 1);
+        }
+    }
+
+    // 4) QUESTION 1~5
+    for (let i = 1; i <= 5; i++) {
+        const qStr = data[`question${i}`];
+        if (qStr && qStr.trim()) {
+            const qData = parseAcJsonQuestion(qStr);
+            if (qData) {
+                initAcQuestionBlock(`acQuestion${i}`, i);
+                fillAcQuestionFromJson(qData, i);
+                summary.questions++;
+            }
+        }
+    }
+
+    // UI 갱신
+    updateAcWordCount();
+    updateAcHighlightBanner();
+    updateAcRegisterBtn();
+    renderAcPreview();
+
+    closeAcJsonModal();
+
+    // 결과 알림
+    alert(`✅ 자동 채움 완료!\n\n` +
+        `📖 상단 제목: ${summary.main_title ? '채움' : '없음 (수동 입력 필요)'}\n` +
+        `📄 지문 제목: ${summary.passage_title ? '채움' : '없음 (수동 입력 필요)'}\n` +
+        `📝 단락: ${summary.paragraphs}개 (문장: ${summary.sentences}개)\n` +
+        `🔤 핵심 단어: ${summary.words}개\n` +
+        `❓ 문제: ${summary.questions}개 채움\n\n` +
+        `내용을 확인한 후 등록 버튼을 눌러주세요.`);
+}
