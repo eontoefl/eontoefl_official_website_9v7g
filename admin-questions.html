@@ -1369,6 +1369,19 @@
 
         <!-- Daily1 Section -->
         <div id="section-reading-daily1" class="q-hidden">
+            <!-- JSON 일괄 입력 카드 -->
+            <div class="q-card" style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0;">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span style="font-size:14px; font-weight:700; color:#166534;">📋 해설프롬프트 출력 붙여넣기</span>
+                    <span style="font-size:11px; color:#15803d;">===TAG=== 구분자 형식 또는 JSON 형식 모두 지원합니다.</span>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:8px;">
+                    <button onclick="openD1JsonModal()" class="sr-action-btn" style="background:#16a34a; color:white; border:none; padding:6px 16px; border-radius:6px; font-size:13px; cursor:pointer;">
+                        <i class="fas fa-paste"></i> 붙여넣기
+                    </button>
+                </div>
+            </div>
+
             <!-- Set ID -->
             <div class="q-card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1482,6 +1495,41 @@
                         <i class="fas fa-spinner fa-spin"></i>
                         로딩 중...
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON/태그 붙여넣기 모달 (Daily1) -->
+        <div id="d1JsonModal" class="si-modal-overlay" onclick="if(event.target===this)closeD1JsonModal()" style="display:none;">
+            <div class="si-modal-box" style="max-width:750px;">
+                <button class="si-modal-close" onclick="closeD1JsonModal()">&times;</button>
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:12px;">📋 해설프롬프트 출력 붙여넣기 (Daily1)</h3>
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px; font-size:12px; color:#166534; margin-bottom:8px;">
+                    ✅ <strong>===TAG=== 구분자 형식</strong> (프롬프트 출력 그대로 붙여넣기)<br>
+                    <code style="font-size:11px;">===MAIN_TITLE===<br>Read a notice.<br>===PASSAGE_TITLE===<br>Road Closure<br>===PASSAGE_CONTENT===<br>...</code>
+                </div>
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px; font-size:12px; color:#1e40af; margin-bottom:12px;">
+                    ✅ <strong>JSON 형식</strong>도 지원됩니다.<br>
+                    <code style="font-size:11px;">{ "main_title": "...", "passage_title": "...", "passage_content": "...", ... }</code>
+                </div>
+                <textarea id="d1JsonInput" rows="16" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #d1d5db; border-radius:8px; padding:10px; white-space:pre;" placeholder="===MAIN_TITLE===
+Read a notice.
+===PASSAGE_TITLE===
+Road Closure
+===PASSAGE_CONTENT===
+Pine Avenue between 3rd Street...##Your registration has been confirmed.#|#The event will...
+===SENTENCE_TRANSLATIONS===
+Pine Avenue가...##등록이 확인되었어요.##행사는...
+===INTERACTIVE_WORDS===
+has been confirmed::확인되었어요::승인 의미...##take place::열리다::개최 의미...
+===QUESTION1===
+Q1::What is the purpose?::목적이 뭔가요?::2::A)option::해석::해설##B)option::해석::해설##C)option::해석::해설##D)option::해석::해설
+===QUESTION2===
+Q2::What will remain?::뭐가 유지되나요?::3::A)option::해석::해설##B)option::해석::해설##C)option::해석::해설##D)option::해석::해설"></textarea>
+                <div id="d1JsonError" style="display:none; margin-top:8px; padding:8px 12px; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:13px;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                    <button onclick="closeD1JsonModal()" style="padding:6px 16px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; cursor:pointer; background:white;">취소</button>
+                    <button onclick="applyD1Json()" style="padding:6px 16px; background:#16a34a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600;">적용</button>
                 </div>
             </div>
         </div>
