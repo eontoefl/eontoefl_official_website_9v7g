@@ -1041,8 +1041,7 @@ function fillD1QuestionToForm(qData, qNum) {
 }
 
 /**
- * 메인: 붙여넣기 적용
- * ===TAG=== 형식과 JSON 형식 모두 자동 감지
+ * 메인: JSON 붙여넣기 적용
  */
 function applyD1Json() {
     const raw = document.getElementById('d1JsonInput').value.trim();
@@ -1050,25 +1049,26 @@ function applyD1Json() {
     errEl.style.display = 'none';
 
     if (!raw) {
-        errEl.textContent = '❌ 내용을 입력해주세요.';
+        errEl.textContent = '❌ JSON을 입력해주세요.';
         errEl.style.display = 'block';
         return;
     }
 
     let data = null;
 
-    // 1) ===TAG=== 형식 감지
-    if (raw.includes('===MAIN_TITLE===') || raw.includes('===PASSAGE_TITLE===') || raw.includes('===PASSAGE_CONTENT===')) {
-        data = parseD1TagFormat(raw);
+    // ```json ... ``` 코드블록 자동 제거
+    let cleaned = raw;
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+    // ===TAG=== 형식 하위호환 (혹시 이전 형식이 들어올 경우)
+    if (cleaned.includes('===MAIN_TITLE===') || cleaned.includes('===PASSAGE_CONTENT===')) {
+        data = parseD1TagFormat(cleaned);
     } else {
-        // 2) JSON 형식 시도
-        let cleaned = raw;
-        cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
         try {
             data = JSON.parse(cleaned);
             if (Array.isArray(data)) data = data[0];
         } catch (e) {
-            errEl.textContent = '❌ ===TAG=== 형식도 아니고 JSON 형식도 아닙니다.\n===MAIN_TITLE=== 태그 또는 { } JSON 형식을 확인해주세요.\n\n상세: ' + e.message;
+            errEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
             errEl.style.display = 'block';
             return;
         }
