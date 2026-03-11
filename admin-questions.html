@@ -2010,6 +2010,21 @@
         <!-- Speaking - Interview Section -->
         <div id="section-speaking-interview" class="q-hidden">
 
+            <!-- JSON 일괄 입력 카드 -->
+            <div class="q-card" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <h3 style="font-size: 15px; font-weight: 700; color: #166534; margin: 0 0 4px 0;">
+                            <i class="fas fa-paste" style="color: #16a34a;"></i> JSON 붙여넣기로 자동 채우기
+                        </h3>
+                        <p style="font-size: 12px; color: #15803d; margin: 0;">해설프롬프트에서 출력된 JSON을 붙여넣으면 모든 필드가 자동으로 채워집니다.</p>
+                    </div>
+                    <button onclick="openSiJsonModal()" class="sr-action-btn" style="background:#16a34a; color:white; border:none; padding:8px 20px; border-radius:8px; font-size:13px; cursor:pointer; font-weight:600;">
+                        <i class="fas fa-paste"></i> JSON 입력하기
+                    </button>
+                </div>
+            </div>
+
             <!-- 세트 ID + 성별 -->
             <div class="q-card">
                 <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
@@ -2099,6 +2114,24 @@
             <div class="si-modal-box">
                 <button class="si-modal-close" onclick="closeSiModal()">&times;</button>
                 <div id="siModalBody"></div>
+            </div>
+        </div>
+
+        <!-- JSON 입력 모달 (Interview) -->
+        <div id="siJsonModal" class="si-modal-overlay" onclick="if(event.target===this)closeSiJsonModal()" style="display:none;">
+            <div class="si-modal-box" style="max-width:700px;">
+                <button class="si-modal-close" onclick="closeSiJsonModal()">&times;</button>
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:12px;">📋 JSON 붙여넣기 (Speaking Interview)</h3>
+                <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px; font-size:12px; color:#92400e; margin-bottom:12px;">
+                    ⚠️ 해설프롬프트에서 출력된 JSON을 그대로 붙여넣으세요.<br>
+                    <code style="font-size:11px;">{ "context_text": "...", "context_translation": "...", "questions": [ { "script": "...", "model_answer": "...", "highlights": {...} } ] }</code>
+                </div>
+                <textarea id="siJsonInput" rows="14" style="width:100%; font-family:monospace; font-size:12px; border:1px solid #d1d5db; border-radius:8px; padding:10px;" placeholder='{ "context_text": "You are participating in a research study about...", "context_translation": "당신은 ...에 관한 연구에 참여하고 있습니다.", "questions": [ { "question_number": 1, "script": "...", "translation": "...", "model_answer": "...", "model_answer_trans": "...", "highlights": { "key expression": { "title": "...", "description": "..." } } } ] }'></textarea>
+                <div id="siJsonError" style="display:none; margin-top:8px; padding:8px 12px; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:13px;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                    <button onclick="closeSiJsonModal()" style="padding:6px 16px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; cursor:pointer; background:white;">취소</button>
+                    <button onclick="applySiJson()" style="padding:6px 16px; background:#16a34a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600;">적용</button>
+                </div>
             </div>
         </div>
 

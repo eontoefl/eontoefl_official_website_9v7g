@@ -636,3 +636,141 @@ if (typeof setTextSafe === 'undefined') {
 document.addEventListener('DOMContentLoaded', () => {
     initSiQuestions();
 });
+
+// ===== Speaking Interview JSON 붙여넣기 기능 =====
+
+function openSiJsonModal() {
+    document.getElementById('siJsonModal').style.display = 'flex';
+    document.getElementById('siJsonInput').value = '';
+    document.getElementById('siJsonError').style.display = 'none';
+}
+
+function closeSiJsonModal() {
+    document.getElementById('siJsonModal').style.display = 'none';
+    document.getElementById('siJsonInput').value = '';
+    document.getElementById('siJsonError').style.display = 'none';
+}
+
+/**
+ * Speaking Interview JSON 붙여넣기 적용
+ * 
+ * 예상 JSON 구조:
+ * {
+ *   "context_text": "...",
+ *   "context_translation": "...",
+ *   "questions": [
+ *     {
+ *       "question_number": 1,
+ *       "script": "...",
+ *       "translation": "...",
+ *       "model_answer": "...",
+ *       "model_answer_trans": "...",
+ *       "highlights": {
+ *         "key expression": { "title": "...", "description": "..." }
+ *       }
+ *     }
+ *   ]
+ * }
+ */
+function applySiJson() {
+    const raw = document.getElementById('siJsonInput').value.trim();
+    const errEl = document.getElementById('siJsonError');
+    errEl.style.display = 'none';
+
+    if (!raw) {
+        errEl.textContent = '❌ JSON을 입력해주세요.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    let data = null;
+
+    // ```json ... ``` 코드블록 자동 제거
+    let cleaned = raw;
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+
+    try {
+        data = JSON.parse(cleaned);
+        if (Array.isArray(data)) data = data[0];
+    } catch (e) {
+        errEl.textContent = '❌ JSON 형식이 올바르지 않습니다: ' + e.message;
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (!data || typeof data !== 'object') {
+        errEl.textContent = '❌ 파싱 결과가 비어있습니다.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // questions 배열 확인
+    if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+        errEl.textContent = '❌ "questions" 배열이 필요합니다. (V1~V4)';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // === 폼 채우기 시작 ===
+    const summary = {
+        context: false,
+        questions: 0,
+        highlights: 0
+    };
+
+    // 1) Context (상황 설명)
+    if (data.context_text) {
+        const ctxEl = document.getElementById('siContextText');
+        if (ctxEl) ctxEl.value = data.context_text.trim();
+        summary.context = true;
+    }
+    if (data.context_translation) {
+        const ctxTransEl = document.getElementById('siContextTrans');
+        if (ctxTransEl) ctxTransEl.value = data.context_translation.trim();
+    }
+
+    // 2) Questions (V1~V4)
+    const questions = data.questions;
+    for (let i = 0; i < Math.min(questions.length, SI_Q_COUNT); i++) {
+        const q = questions[i];
+        const vNum = i + 1;
+
+        // 질문 스크립트
+        const scriptEl = document.getElementById(`siV${vNum}Script`);
+        if (scriptEl && q.script) scriptEl.value = q.script.trim();
+
+        // 질문 번역
+        const transEl = document.getElementById(`siV${vNum}Translation`);
+        if (transEl && q.translation) transEl.value = q.translation.trim();
+
+        // 모범 답변
+        const maEl = document.getElementById(`siV${vNum}ModelAnswer`);
+        if (maEl && q.model_answer) maEl.value = q.model_answer.trim();
+
+        // 모범 답변 번역
+        const matEl = document.getElementById(`siV${vNum}ModelAnswerTrans`);
+        if (matEl && q.model_answer_trans) matEl.value = q.model_answer_trans.trim();
+
+        // 핵심 표현 (highlights)
+        if (q.highlights && typeof q.highlights === 'object') {
+            loadSiHighlights(vNum, JSON.stringify(q.highlights));
+            summary.highlights += Object.keys(q.highlights).length;
+        }
+
+        // 헤더 서브타이틀 업데이트
+        onSiVInput(vNum);
+        summary.questions++;
+    }
+
+    // UI 갱신
+    updateSiRegisterBtn();
+
+    closeSiJsonModal();
+
+    // 결과 알림
+    alert(`✅ JSON 자동 채움 완료!\n\n` +
+        `📝 상황 설명: ${summary.context ? '채움' : '없음 (수동 입력 필요)'}\n` +
+        `🎤 질문: ${summary.questions}개 채움\n` +
+        `💡 핵심 표현: 총 ${summary.highlights}개 채움\n\n` +
+        `⚠️ 파일 URL은 세트 번호 기반 자동 생성입니다.\n전체 파일 검증을 실행해주세요.`);
+}
