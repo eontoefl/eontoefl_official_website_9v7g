@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제작 진행률 - 이온토플 관리자</title>
+    
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+
+    <!-- ===== 진행률 대시보드 전용 스타일 (progress-wrap 스코핑) ===== -->
+    <style>
+        .progress-wrap {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background: #f0edf5;
+            color: #1e1e2f;
+            min-height: calc(100vh - 60px);
+        }
+
+        .progress-wrap .dashboard-header {
+            background: linear-gradient(135deg, #9480c5, #7a66b0);
+            padding: 24px;
+            text-align: center;
+            color: #fff;
+            position: sticky;
+            top: 60px;
+            z-index: 90;
+        }
+        .progress-wrap .dashboard-header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .progress-wrap .dashboard-header p { font-size: 13px; opacity: 0.85; }
+
+        .progress-wrap .controls {
+            max-width: 1200px;
+            margin: 16px auto;
+            padding: 0 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .progress-wrap .controls select, .progress-wrap .controls button {
+            font-family: 'Pretendard', sans-serif;
+            font-size: 14px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1.5px solid #d8d0eb;
+            background: #fff;
+            color: #1e1e2f;
+            cursor: pointer;
+        }
+        .progress-wrap .controls button {
+            background: #9480c5;
+            color: #fff;
+            border-color: #9480c5;
+            font-weight: 600;
+        }
+        .progress-wrap .controls button:hover { background: #7a66b0; }
+        .progress-wrap .controls button.loading { opacity: 0.6; pointer-events: none; }
+
+        .progress-wrap .summary-bar {
+            max-width: 1200px;
+            margin: 0 auto 16px;
+            padding: 0 16px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        .progress-wrap .summary-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+        .progress-wrap .summary-card .label { font-size: 11px; color: #999; font-weight: 600; margin-bottom: 4px; }
+        .progress-wrap .summary-card .value { font-size: 24px; font-weight: 800; }
+        .progress-wrap .summary-card .value.total { color: #9480c5; }
+        .progress-wrap .summary-card .value.done { color: #5ea065; }
+        .progress-wrap .summary-card .value.missing { color: #d94452; }
+        .progress-wrap .summary-card .value.urgent { color: #e67e22; }
+
+        .progress-wrap .timeline {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+        }
+
+        .progress-wrap .week-section {
+            margin-bottom: 24px;
+        }
+        .progress-wrap .week-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #9480c5;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-wrap .day-card {
+            background: #fff;
+            border-radius: 14px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+            border: 1px solid #eeeaf5;
+        }
+        .progress-wrap .day-card.today { border: 2px solid #9480c5; }
+        .progress-wrap .day-card.past { opacity: 0.6; }
+        .progress-wrap .day-card.past.all-done { opacity: 0.45; }
+        .progress-wrap .day-card.future.all-done { opacity: 1; }
+        .progress-wrap .day-card.has-missing { background: #fff; border: 2px solid #e74c5e; }
+        .progress-wrap .day-card.has-missing .day-header { background: #fff; }
+
+        .progress-wrap .day-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            background: #faf9fd;
+            border-bottom: 1px solid #f0edf5;
+            cursor: pointer;
+        }
+        .progress-wrap .day-header:hover { background: #f5f3fa; }
+        .progress-wrap .day-header .day-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .progress-wrap .day-header .day-date {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1e1e2f;
+        }
+        .progress-wrap .day-header .day-label {
+            font-size: 12px;
+            color: #999;
+            font-weight: 500;
+        }
+        .progress-wrap .day-header .day-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+        .progress-wrap .day-badge.today-badge { background: #9480c5; color: #fff; }
+        .progress-wrap .day-badge.past-badge { background: #e8e4f0; color: #999; }
+        .progress-wrap .day-badge.future-badge { background: #f0faf1; color: #5ea065; }
+        .progress-wrap .day-badge.urgent-badge { background: #fef3e8; color: #e67e22; }
+
+        .progress-wrap .day-header .day-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .progress-wrap .day-stats .done { color: #5ea065; }
+        .progress-wrap .day-stats .missing { color: #d94452; }
+
+        .progress-wrap .day-body {
+            padding: 16px 20px;
+            display: none;
+        }
+        .progress-wrap .day-body.open { display: block; }
+
+        .progress-wrap .task-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f3fa;
+        }
+        .progress-wrap .task-row:last-child { border-bottom: none; }
+
+        .progress-wrap .task-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .progress-wrap .set-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .progress-wrap .set-chip {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .progress-wrap .set-chip.exists { background: #d4f5d6; color: #3a9142; }
+        .progress-wrap .set-chip.missing { background: #fde8ea; color: #d94452; }
+        .progress-wrap .set-chip.loading { background: #e8e4f0; color: #999; }
+
+        .progress-wrap .legend {
+            max-width: 1200px;
+            margin: 0 auto 16px;
+            padding: 0 16px;
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #999;
+        }
+        .progress-wrap .legend span { display: flex; align-items: center; gap: 4px; }
+        .progress-wrap .legend .dot {
+            width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+        }
+        .progress-wrap .dot.green { background: #5ea065; }
+        .progress-wrap .dot.red { background: #d94452; }
+        .progress-wrap .dot.gray { background: #ccc; }
+
+        @media (max-width: 640px) {
+            .progress-wrap .summary-bar { grid-template-columns: repeat(2, 1fr); }
+            .progress-wrap .controls { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Admin Navigation (다른 admin 페이지와 동일) -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-study.html" class="admin-nav-link">
+                    <i class="fas fa-book-reader"></i> 학습 관리
+                </a>
+                <a href="admin-questions.html" class="admin-nav-link">
+                    <i class="fas fa-puzzle-piece"></i> 문제 관리
+                </a>
+                <a href="admin-progress.html" class="admin-nav-link active">
+                    <i class="fas fa-chart-bar"></i> 제작 진행률
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 진행률 대시보드 본문 (progress-wrap 스코핑) -->
+    <div class="progress-wrap">
+
+        <div class="dashboard-header">
+            <h1><i class="fas fa-chart-bar"></i> 문제 제작 진행률 대시보드</h1>
+            <p id="headerSubtitle">로딩 중...</p>
+        </div>
+
+        <div class="controls">
+            <select id="programSelect">
+                <option value="fast">Fast (4주)</option>
+                <option value="standard">Standard (8주)</option>
+            </select>
+            <select id="startDateSelect">
+                <option value="2025-02-22">2025/2/22 시작</option>
+                <option value="2025-02-23">2025/2/23 시작</option>
+                <option value="2025-03-01">2025/3/1 시작</option>
+                <option value="2025-06-01">2025/6/1 시작</option>
+                <option value="2025-09-01">2025/9/1 시작</option>
+                <option value="2026-01-01">2026/1/1 시작</option>
+                <option value="2026-02-22" selected>2026/2/22 시작</option>
+                <option value="2026-03-01">2026/3/1 시작</option>
+            </select>
+            <button id="refreshBtn" onclick="loadDashboard()">
+                <i class="fas fa-sync-alt"></i> 새로고침
+            </button>
+        </div>
+
+        <div class="summary-bar">
+            <div class="summary-card">
+                <div class="label">전체 세트</div>
+                <div class="value total" id="summaryTotal">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">제작 완료</div>
+                <div class="value done" id="summaryDone">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">미제작</div>
+                <div class="value missing" id="summaryMissing">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">긴급 (3일 이내)</div>
+                <div class="value urgent" id="summaryUrgent">-</div>
+            </div>
+        </div>
+
+        <div class="legend">
+            <span><span class="dot green"></span> 제작 완료</span>
+            <span><span class="dot red"></span> 미제작</span>
+            <span><span class="dot gray"></span> 확인 중</span>
+        </div>
+
+        <div class="timeline" id="timeline">
+            <p style="text-align:center; color:#999; padding:40px;">로딩 중...</p>
+        </div>
+
+    </div>
+
+    <!-- Supabase 설정 (공홈과 동일한 config 사용) -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin-utils.js"></script>
+
+    <script>
+    // ============================================
+    // Supabase fetch (supabase-config.js의 SUPABASE_URL, SUPABASE_ANON_KEY 사용)
+    // ============================================
+    async function supabaseFetch(table, query = '') {
+        const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
+        const res = await fetch(url, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            }
+        });
+        if (!res.ok) throw new Error(`Supabase error: ${res.status}`);
+        return await res.json();
+    }
+
+    // ============================================
+    // 스케줄 데이터 (하드코딩 - schedule-data.js와 동일)
+    // ============================================
+    const SCHEDULE = {
+        fast: {
+            week1: {
+                sunday: ["내벨업보카 5, 6, 7pg", "입문서 정독 1/3", "리딩 Module 1", "리스닝 Module 1"],
+                monday: ["내벨업보카 8, 9pg", "입문서 정독 2/3", "리딩 Module 2", "스피킹 1"],
+                tuesday: ["내벨업보카 10, 11, 12pg", "입문서 정독 3/3", "리스닝 Module 2", "라이팅 1"],
+                wednesday: ["내벨업보카 13, 14pg", "리딩 Module 3", "라이팅 2"],
+                thursday: ["내벨업보카 15, 16, 17pg", "리스닝 Module 3", "스피킹 2"],
+                friday: ["내벨업보카 18, 19pg", "스피킹 3", "라이팅 3"],
+                saturday: []
+            },
+            week2: {
+                sunday: ["내벨업보카 20, 21, 22pg", "리딩 Module 4", "리스닝 Module 4"],
+                monday: ["내벨업보카 23, 24pg", "리딩 Module 5", "스피킹 4"],
+                tuesday: ["내벨업보카 25, 26, 27pg", "리스닝 Module 5", "라이팅 4"],
+                wednesday: ["내벨업보카 28, 29pg", "리딩 Module 6", "라이팅 5"],
+                thursday: ["내벨업보카 30, 31, 32pg", "리스닝 Module 6", "스피킹 5"],
+                friday: ["내벨업보카 33, 34pg", "스피킹 6", "라이팅 6"],
+                saturday: []
+            },
+            week3: {
+                sunday: ["내벨업보카 35, 36, 37pg", "리딩 Module 7", "리스닝 Module 7"],
+                monday: ["내벨업보카 38, 39pg", "리딩 Module 8", "스피킹 7"],
+                tuesday: ["내벨업보카 40, 41, 42pg", "리스닝 Module 8", "라이팅 7"],
+                wednesday: ["내벨업보카 43, 44pg", "리딩 Module 9", "라이팅 8"],
+                thursday: ["내벨업보카 45, 46, 47pg", "리스닝 Module 9", "스피킹 8"],
+                friday: ["내벨업보카 48, 49pg", "스피킹 9", "라이팅 9"],
+                saturday: []
+            },
+            week4: {
+                sunday: ["내벨업보카 50, 51, 52pg", "리딩 Module 10", "리스닝 Module 10"],
+                monday: ["내벨업보카 53, 54pg", "리딩 Module 11", "스피킹 10"],
+                tuesday: ["내벨업보카 55, 56, 57pg", "리스닝 Module 11", "라이팅 10"],
+                wednesday: ["내벨업보카 58, 59pg", "리딩 Module 12", "라이팅 11"],
+                thursday: ["내벨업보카 60, 61pg", "리스닝 Module 12", "스피킹 11"],
+                friday: ["스피킹 12", "라이팅 12"],
+                saturday: []
+            }
+        }
+    };
+
+    // ============================================
+    // 모듈 → 세트 매핑 (module-definitions.js 기반)
+    // ============================================
+    function getRequiredSets(taskName) {
+        const sets = [];
+
+        // 리딩 Module
+        const readingMatch = taskName.match(/리딩 Module\s+(\d+)/);
+        if (readingMatch) {
+            const m = parseInt(readingMatch[1]);
+            const fb1 = (m - 1) * 2 + 1, fb2 = fb1 + 1;
+            const d1_1 = (m - 1) * 2 + 1, d1_2 = d1_1 + 1;
+            const d2_1 = (m - 1) * 2 + 1, d2_2 = d2_1 + 1;
+            const acad = m;
+            sets.push(
+                { table: 'tr_reading_fillblanks', setId: `fillblank_set_${String(fb1).padStart(4,'0')}`, label: `FB ${fb1}`, field: 'id' },
+                { table: 'tr_reading_fillblanks', setId: `fillblank_set_${String(fb2).padStart(4,'0')}`, label: `FB ${fb2}`, field: 'id' },
+                { table: 'tr_reading_daily1', setId: `daily1_set_${String(d1_1).padStart(4,'0')}`, label: `D1 ${d1_1}`, field: 'id' },
+                { table: 'tr_reading_daily1', setId: `daily1_set_${String(d1_2).padStart(4,'0')}`, label: `D1 ${d1_2}`, field: 'id' },
+                { table: 'tr_reading_daily2', setId: `daily2_set_${String(d2_1).padStart(4,'0')}`, label: `D2 ${d2_1}`, field: 'id' },
+                { table: 'tr_reading_daily2', setId: `daily2_set_${String(d2_2).padStart(4,'0')}`, label: `D2 ${d2_2}`, field: 'id' },
+                { table: 'tr_reading_academic', setId: `academic_set_${String(acad).padStart(4,'0')}`, label: `Acad ${acad}`, field: 'id' }
+            );
+        }
+
+        // 리스닝 Module
+        const listeningMatch = taskName.match(/리스닝 Module\s+(\d+)/);
+        if (listeningMatch) {
+            const m = parseInt(listeningMatch[1]);
+            const resp = m;
+            const conv1 = (m - 1) * 3 + 1;
+            const ann1 = (m - 1) * 3 + 1;
+            const lec1 = (m - 1) * 2 + 1;
+            
+            sets.push({ table: 'tr_listening_response', setId: `response_set_${String(resp).padStart(4,'0')}`, label: `Resp ${resp}`, field: 'set_id' });
+            for (let i = 0; i < 3; i++) {
+                sets.push({ table: 'tr_listening_conversation', setId: `conversation_set_${String(conv1+i).padStart(4,'0')}`, label: `Conv ${conv1+i}`, field: 'id' });
+            }
+            for (let i = 0; i < 3; i++) {
+                sets.push({ table: 'tr_listening_announcement', setId: `announcement_set_${String(ann1+i).padStart(4,'0')}`, label: `Ann ${ann1+i}`, field: 'id' });
+            }
+            for (let i = 0; i < 2; i++) {
+                sets.push({ table: 'tr_listening_lecture', setId: `lecture_set_${String(lec1+i).padStart(4,'0')}`, label: `Lec ${lec1+i}`, field: 'id' });
+            }
+        }
+
+        // 라이팅
+        const writingMatch = taskName.match(/라이팅\s+(\d+)/);
+        if (writingMatch) {
+            const n = parseInt(writingMatch[1]);
+            sets.push(
+                { table: 'tr_writing_arrange', setId: `arrange_set_${String(n).padStart(4,'0')}`, label: `Arr ${n}`, field: 'set_id' },
+                { table: 'tr_writing_email', setId: `email_set_${String(n).padStart(4,'0')}`, label: `Email ${n}`, field: 'id' },
+                { table: 'tr_writing_discussion', setId: `discussion_set_${String(n).padStart(4,'0')}`, label: `Disc ${n}`, field: 'id' }
+            );
+        }
+
+        // 스피킹 (각 유형 독립 번호: 스피킹 1 = repeat 1 + interview 1)
+        const speakingMatch = taskName.match(/스피킹\s+(\d+)/);
+        if (speakingMatch) {
+            const n = parseInt(speakingMatch[1]);
+            sets.push(
+                { table: 'tr_speaking_repeat', setId: `repeat_set_${String(n).padStart(4,'0')}`, label: `Repeat ${n}`, field: 'id' },
+                { table: 'tr_speaking_interview', setId: `interview_set_${String(n).padStart(4,'0')}`, label: `Intv ${n}`, field: 'id' }
+            );
+        }
+
+        return sets;
+    }
+
+    // ============================================
+    // Supabase에서 존재하는 세트 ID 일괄 조회
+    // ============================================
+    async function loadExistingSets() {
+        const results = {};
+
+        const tables = [
+            { name: 'tr_reading_fillblanks', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_reading_daily1', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_reading_daily2', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_reading_academic', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_listening_response', query: 'select=set_id&order=set_id.asc', field: 'set_id' },
+            { name: 'tr_listening_conversation', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_listening_announcement', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_listening_lecture', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_writing_arrange', query: 'select=set_id&order=set_id.asc', field: 'set_id' },
+            { name: 'tr_writing_email', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_writing_discussion', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_speaking_repeat', query: 'select=id&order=id.asc', field: 'id' },
+            { name: 'tr_speaking_interview', query: 'select=id&order=id.asc', field: 'id' }
+        ];
+
+        await Promise.all(tables.map(async (t) => {
+            try {
+                const rows = await supabaseFetch(t.name, t.query);
+                const ids = new Set();
+                rows.forEach(row => {
+                    const val = row[t.field];
+                    if (val !== null && val !== undefined) {
+                        ids.add(String(val));
+                    }
+                });
+                results[t.name] = ids;
+                console.log(`📦 ${t.name} (${t.field}):`, [...ids].slice(0, 10));
+            } catch (e) {
+                console.error(`❌ ${t.name} 조회 실패:`, e);
+                results[t.name] = new Set();
+            }
+        }));
+
+        return results;
+    }
+
+    // ============================================
+    // 날짜 계산
+    // ============================================
+    const DAY_ORDER = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const DAY_KR = { sunday: '일', monday: '월', tuesday: '화', wednesday: '수', thursday: '목', friday: '금', saturday: '토' };
+
+    function getScheduleDates(startDateStr, program) {
+        const scheduleData = SCHEDULE[program];
+        if (!scheduleData) return [];
+
+        const startDate = new Date(startDateStr + 'T00:00:00');
+        const startDayOfWeek = startDate.getDay();
+
+        const days = [];
+        const weeks = Object.keys(scheduleData).sort();
+
+        weeks.forEach((weekKey, weekIdx) => {
+            const weekData = scheduleData[weekKey];
+            DAY_ORDER.forEach((dayName, dayIdx) => {
+                const tasks = weekData[dayName] || [];
+                if (tasks.length === 0) return;
+
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + (weekIdx * 7) + dayIdx);
+
+                days.push({
+                    date: date,
+                    dateStr: `${date.getMonth()+1}/${date.getDate()}`,
+                    dayName: dayName,
+                    dayKr: DAY_KR[dayName],
+                    weekKey: weekKey,
+                    weekNum: weekIdx + 1,
+                    tasks: tasks
+                });
+            });
+        });
+
+        return days;
+    }
+
+    // ============================================
+    // 대시보드 렌더링
+    // ============================================
+    async function loadDashboard() {
+        const btn = document.getElementById('refreshBtn');
+        btn.classList.add('loading');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 조회 중...';
+
+        const program = document.getElementById('programSelect').value;
+        const startDate = document.getElementById('startDateSelect').value;
+
+        try {
+            const existingSets = await loadExistingSets();
+            console.log('✅ 기존 세트 조회 완료:', existingSets);
+
+            const days = getScheduleDates(startDate, program);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let totalSets = 0, doneSets = 0, missingSets = 0, urgentSets = 0;
+
+            const timelineHtml = [];
+            let currentWeek = 0;
+
+            days.forEach(day => {
+                if (day.weekNum !== currentWeek) {
+                    currentWeek = day.weekNum;
+                    timelineHtml.push(`<div class="week-section"><div class="week-title"><i class="fas fa-calendar-week"></i> Week ${currentWeek}</div>`);
+                }
+
+                const dayDate = new Date(day.date);
+                dayDate.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((dayDate - today) / (1000 * 60 * 60 * 24));
+                const isToday = diffDays === 0;
+                const isPast = diffDays < 0;
+                const isUrgent = diffDays > 0 && diffDays <= 3;
+
+                let dayClass = '';
+                let badgeClass = 'future-badge';
+                let badgeText = `D-${diffDays}`;
+
+                if (isToday) { dayClass = 'today'; badgeClass = 'today-badge'; badgeText = '오늘'; }
+                else if (isPast) { dayClass = 'past'; badgeClass = 'past-badge'; badgeText = `D+${Math.abs(diffDays)}`; }
+                else if (isUrgent) { badgeClass = 'urgent-badge'; badgeText = `D-${diffDays}`; }
+
+                let dayDone = 0, dayTotal = 0;
+                const taskRows = [];
+
+                day.tasks.forEach(taskName => {
+                    const requiredSets = getRequiredSets(taskName);
+                    if (requiredSets.length === 0) {
+                        taskRows.push(`
+                            <div class="task-row">
+                                <div class="task-name">${taskName}</div>
+                                <div class="set-chips"><span style="font-size:11px;color:#999;">데이터 체크 불필요</span></div>
+                            </div>
+                        `);
+                        return;
+                    }
+
+                    const chips = requiredSets.map(s => {
+                        const tableIds = existingSets[s.table] || new Set();
+                        const exists = tableIds.has(String(s.setId));
+                        totalSets++;
+                        dayTotal++;
+
+                        if (exists) {
+                            doneSets++;
+                            dayDone++;
+                            return `<span class="set-chip exists"><i class="fas fa-check"></i> ${s.label}</span>`;
+                        } else {
+                            missingSets++;
+                            if (isPast || isToday || isUrgent) urgentSets++;
+                            return `<span class="set-chip missing"><i class="fas fa-times"></i> ${s.label}</span>`;
+                        }
+                    }).join('');
+
+                    taskRows.push(`
+                        <div class="task-row">
+                            <div class="task-name">${taskName}</div>
+                            <div class="set-chips">${chips}</div>
+                        </div>
+                    `);
+                });
+
+                const statsHtml = dayTotal > 0 
+                    ? `<span class="done">${dayDone}✓</span> / <span class="missing">${dayTotal - dayDone}✗</span>`
+                    : '';
+
+                const hasMissing = dayTotal > 0 && dayDone < dayTotal;
+                const allDone = dayTotal > 0 && dayDone === dayTotal;
+
+                if (isPast) {
+                    if (allDone) dayClass += ' all-done';
+                } else {
+                    dayClass += ' future';
+                    if (hasMissing) dayClass += ' has-missing';
+                    else if (allDone) dayClass += ' all-done';
+                }
+
+                const isOpen = isToday || isUrgent || (hasMissing && !isPast) ? 'open' : '';
+
+                timelineHtml.push(`
+                    <div class="day-card ${dayClass}">
+                        <div class="day-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                            <div class="day-info">
+                                <span class="day-date">${day.dateStr} (${day.dayKr})</span>
+                                <span class="day-label">Week${day.weekNum}</span>
+                                <span class="day-badge ${badgeClass}">${badgeText}</span>
+                            </div>
+                            <div class="day-stats">${statsHtml}</div>
+                        </div>
+                        <div class="day-body ${isOpen}">
+                            ${taskRows.join('')}
+                        </div>
+                    </div>
+                `);
+            });
+
+            timelineHtml.push('</div>');
+
+            document.getElementById('timeline').innerHTML = timelineHtml.join('');
+            document.getElementById('summaryTotal').textContent = totalSets;
+            document.getElementById('summaryDone').textContent = doneSets;
+            document.getElementById('summaryMissing').textContent = missingSets;
+            document.getElementById('summaryUrgent').textContent = urgentSets;
+            document.getElementById('headerSubtitle').textContent = 
+                `${program.toUpperCase()} | 시작일: ${startDate} | 마지막 조회: ${new Date().toLocaleTimeString('ko-KR')}`;
+
+        } catch (e) {
+            console.error('❌ 대시보드 로드 실패:', e);
+            document.getElementById('timeline').innerHTML = `<p style="color:red;text-align:center;">로드 실패: ${e.message}</p>`;
+        }
+
+        btn.classList.remove('loading');
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> 새로고침';
+    }
+
+    // 페이지 로드 시 자동 실행
+    window.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>
