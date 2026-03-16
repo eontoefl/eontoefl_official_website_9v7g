@@ -1164,6 +1164,216 @@
         }
         .lc-hl-add-btn:hover { background: #dcfce7; }
         .lc-hl-hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+        /* ===== Quick Viewer Panel ===== */
+        .qv-panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+            border: 2px solid #e0e7ff;
+            overflow: hidden;
+        }
+        .qv-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+            cursor: pointer;
+            user-select: none;
+        }
+        .qv-panel-header:hover {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+        }
+        .qv-panel-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #3730a3;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .qv-panel-arrow {
+            color: #6366f1;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        .qv-panel-body {
+            padding: 16px 20px 20px;
+        }
+        .qv-chips-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .qv-chip {
+            padding: 6px 14px;
+            border: 1.5px solid #c7d2fe;
+            border-radius: 20px;
+            background: white;
+            color: #4338ca;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Pretendard', sans-serif;
+        }
+        .qv-chip:hover {
+            background: #eef2ff;
+            border-color: #818cf8;
+        }
+        .qv-chip.active {
+            background: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+        .qv-range-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+            font-size: 13px;
+            color: #475569;
+        }
+        .qv-range-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .qv-range-label input[type="radio"] {
+            accent-color: #6366f1;
+        }
+        .qv-range-inputs {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .qv-range-input {
+            width: 72px;
+            padding: 4px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+            font-family: monospace;
+        }
+        .qv-range-input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        .qv-range-tilde {
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .qv-result-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .qv-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            border-radius: 10px 10px 0 0;
+        }
+        .qv-result-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #334155;
+        }
+        .qv-copy-btn {
+            padding: 4px 12px;
+            border: 1px solid #c7d2fe;
+            border-radius: 6px;
+            background: white;
+            color: #4f46e5;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Pretendard', sans-serif;
+        }
+        .qv-copy-btn:hover {
+            background: #eef2ff;
+        }
+        .qv-copy-btn.copied {
+            background: #dcfce7;
+            border-color: #86efac;
+            color: #16a34a;
+        }
+        .qv-result-list {
+            padding: 4px 0;
+        }
+        .qv-result-item {
+            display: flex;
+            gap: 12px;
+            padding: 10px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            align-items: flex-start;
+        }
+        .qv-result-item:last-child {
+            border-bottom: none;
+        }
+        .qv-result-item:hover {
+            background: #f1f5f9;
+        }
+        .qv-result-num {
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: #6366f1;
+            background: #eef2ff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .qv-result-content {
+            font-size: 13px;
+            line-height: 1.7;
+            color: #334155;
+            word-break: break-word;
+            white-space: pre-wrap;
+            flex: 1;
+            min-width: 0;
+        }
+        .qv-bullet-line {
+            margin-bottom: 4px;
+        }
+        .qv-bullet-label {
+            font-weight: 700;
+            color: #6366f1;
+            margin-right: 4px;
+        }
+        .qv-na {
+            color: #cbd5e1;
+            font-style: italic;
+        }
+        .qv-empty {
+            padding: 24px;
+            text-align: center;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .qv-loading {
+            padding: 24px;
+            text-align: center;
+            font-size: 13px;
+            color: #6366f1;
+        }
     </style>
 </head>
 <body>
@@ -3052,6 +3262,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="js/admin-questions-viewer.js"></script>
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-utils.js"></script>
     <script src="js/admin-questions.js"></script>
