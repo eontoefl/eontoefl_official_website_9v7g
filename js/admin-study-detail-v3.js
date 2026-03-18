@@ -454,6 +454,7 @@ function renderNotifList() {
             <th>본문 미리보기</th>
             <th>읽음</th>
             <th>발송자</th>
+            <th style="width:60px; text-align:center;">수정</th>
             <th style="width:60px; text-align:center;">삭제</th>
         </tr></thead><tbody>`;
 
@@ -477,6 +478,11 @@ function renderNotifList() {
             <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(msgPreview)}${(n.message || '').length > 50 ? '…' : ''}</td>
             <td>${readBadge}</td>
             <td style="font-size:12px; color:#94a3b8;">${escapeHtml(createdBy)}</td>
+            <td style="text-align:center;">
+                <button class="btn-notif-edit" onclick="editNotification('${n.id}')">
+                    <i class="fas fa-pen"></i>
+                </button>
+            </td>
             <td style="text-align:center;">
                 <button class="btn-notif-del" onclick="deleteNotification('${n.id}')">
                     <i class="fas fa-trash"></i>
@@ -542,6 +548,75 @@ async function sendNotification() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-paper-plane"></i> 발송';
+    }
+}
+
+function editNotification(id) {
+    const n = notifList.find(x => x.id === id);
+    if (!n) return alert('알림을 찾을 수 없습니다.');
+
+    const existing = document.getElementById('notifEditModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'notifEditModal';
+    modal.className = 'notif-edit-overlay';
+    modal.innerHTML = `
+        <div class="notif-edit-modal">
+            <div class="notif-edit-header">
+                <h3><i class="fas fa-pen"></i> 알림 수정</h3>
+                <button class="notif-edit-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="notif-edit-body">
+                <div class="field">
+                    <label>제목</label>
+                    <input type="text" id="editNotifTitle" value="${escapeHtml(n.title || '')}">
+                </div>
+                <div class="field">
+                    <label>본문</label>
+                    <textarea id="editNotifMessage" rows="6">${escapeHtml(n.message || '')}</textarea>
+                </div>
+            </div>
+            <div class="notif-edit-footer">
+                <button class="btn-notif-cancel" onclick="closeEditModal()">취소</button>
+                <button class="btn-notif-save" id="editNotifSaveBtn" onclick="saveNotification('${n.id}')">
+                    <i class="fas fa-check"></i> 저장
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeEditModal(); });
+    document.getElementById('editNotifTitle').focus();
+}
+
+function closeEditModal() {
+    const modal = document.getElementById('notifEditModal');
+    if (modal) modal.remove();
+}
+
+async function saveNotification(id) {
+    const title = document.getElementById('editNotifTitle').value.trim();
+    const message = document.getElementById('editNotifMessage').value.trim();
+    const btn = document.getElementById('editNotifSaveBtn');
+
+    if (!title) return alert('제목을 입력해주세요.');
+    if (!message) return alert('본문을 입력해주세요.');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+
+    try {
+        await supabaseAPI.patch('tr_notifications', id, { title, message });
+        alert('✅ 알림이 수정되었습니다!');
+        closeEditModal();
+        await loadNotifications();
+    } catch (err) {
+        console.error('알림 수정 실패:', err);
+        alert('❌ 수정 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> 저장';
     }
 }
 
