@@ -80,7 +80,11 @@ async function loadStudyData() {
         }).filter(Boolean);
 
         // 3. tr_study_records (잔디/알림/추세용 — 여전히 필요)
-        const studyRecords = await supabaseAPI.query('tr_study_records', { 'limit': '10000' });
+        // 목록에서는 가벼운 필드만 조회 (result_json, detail 등 무거운 필드 제외)
+        const studyRecords = await supabaseAPI.query('tr_study_records', {
+            'select': 'id,user_id,week,day,task_type,module_number,completed_at',
+            'limit': '10000'
+        });
         const allRecords = (studyRecords || []).filter(r => userIds.includes(r.user_id));
 
         // 4. tr_auth_records (fraud/알림용 — 여전히 필요)
