@@ -449,11 +449,138 @@
             border-top: 1px solid #e2e8f0;
         }
 
+        /* ===== 전체 학습 기록 테이블 ===== */
+        .record-table-container {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        .record-filters {
+            display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+            padding: 12px 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;
+        }
+        .record-filters .filter-group {
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .record-filters .filter-group label {
+            font-size: 11px; font-weight: 600; color: #64748b;
+        }
+        .record-filters .filter-group select {
+            padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+            font-size: 12px; font-family: 'Pretendard', sans-serif; min-width: 100px;
+        }
+        .record-filters .filter-group select:focus {
+            outline: none; border-color: #3b82f6;
+        }
+        .record-table-wrap { overflow-x: auto; }
+        .record-table-loading {
+            text-align: center; padding: 40px; color: #94a3b8; font-size: 13px;
+        }
+        .record-table {
+            width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;
+        }
+        .record-table th {
+            text-align: left; padding: 8px 10px; background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0; color: #64748b; font-weight: 700;
+            font-size: 11px; cursor: pointer; user-select: none; position: sticky; top: 0;
+        }
+        .record-table th:hover { background: #f1f5f9; }
+        .record-table th .sort-icon { margin-left: 4px; font-size: 9px; color: #94a3b8; }
+        .record-table th .sort-icon.active { color: #3b82f6; }
+        .record-table td {
+            padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #334155;
+        }
+        .record-table tr:hover { background: #faf5ff; }
+        .record-table tr.row-undone { background: #fefce8; }
+        .record-table tr.row-undone:hover { background: #fef9c3; }
+
+        .record-week-badge {
+            display: inline-block; background: #ede9fe; color: #7c3aed;
+            padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px;
+        }
+        .record-day-badge { font-weight: 600; color: #475569; }
+        .record-task-name { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+        .record-status-done { color: #22c55e; font-weight: 700; }
+        .record-status-undone { color: #ef4444; font-weight: 700; }
+        .record-score { font-weight: 600; }
+        .record-level { color: #8b5cf6; font-weight: 700; }
+        .record-auth-100 { color: #22c55e; font-weight: 700; }
+        .record-auth-50 { color: #f59e0b; font-weight: 700; }
+        .record-auth-0 { color: #ef4444; font-weight: 700; }
+        .btn-record-view {
+            background: #eff6ff; color: #3b82f6; border: 1px solid #93c5fd;
+            border-radius: 6px; padding: 3px 10px; cursor: pointer;
+            font-size: 11px; font-weight: 600; white-space: nowrap;
+        }
+        .btn-record-view:hover { background: #dbeafe; }
+        .record-empty {
+            text-align: center; padding: 40px; color: #94a3b8; font-size: 13px;
+        }
+
+        /* ===== 상세 보기 모달 ===== */
+        .detail-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.55); z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .detail-modal {
+            background: white; border-radius: 16px; width: 700px; max-width: 100%;
+            max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+        }
+        .detail-modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 24px; border-bottom: 1px solid #e2e8f0;
+            position: sticky; top: 0; background: white; z-index: 1;
+            border-radius: 16px 16px 0 0;
+        }
+        .detail-modal-header h3 {
+            margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .detail-modal-close {
+            background: none; border: none; font-size: 22px; color: #94a3b8;
+            cursor: pointer; padding: 0; line-height: 1;
+        }
+        .detail-modal-close:hover { color: #ef4444; }
+        .detail-modal-body { padding: 20px 24px; }
+        .detail-section {
+            margin-bottom: 20px; padding: 16px; background: #f8fafc;
+            border-radius: 10px; border: 1px solid #e2e8f0;
+        }
+        .detail-section-title {
+            font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .detail-qa-table {
+            width: 100%; border-collapse: collapse; font-size: 12px;
+        }
+        .detail-qa-table th {
+            text-align: left; padding: 6px 8px; background: #f1f5f9;
+            border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600;
+        }
+        .detail-qa-table td {
+            padding: 6px 8px; border-bottom: 1px solid #f1f5f9; color: #334155;
+        }
+        .detail-qa-table .correct { color: #22c55e; font-weight: 700; }
+        .detail-qa-table .wrong { color: #ef4444; font-weight: 700; }
+        .detail-text-block {
+            background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+            padding: 12px; font-size: 13px; color: #334155; line-height: 1.7;
+            white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto;
+        }
+        .detail-summary {
+            display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: #475569;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;
+        }
+        .detail-summary strong { color: #1e293b; }
+
         @media (max-width: 768px) {
             .student-profile-header { flex-direction: column; text-align: center; }
             .student-profile-header .info .meta { justify-content: center; }
             .student-profile-header .actions { justify-content: center; }
-
+            .record-filters { flex-direction: column; }
         }
     </style>
 </head>
@@ -676,10 +803,48 @@
                 <p>V3 잔디심기 (study_results_v3 기반 0%/50%/100%) - 구현 예정</p>
             </div>
 
-            <!-- [V3 구현 예정] 과제별 상세 기록 -->
-            <div class="v3-placeholder">
-                <i class="fas fa-tasks"></i>
-                <p>V3 과제별 상세 기록 (study_results_v3 기반) - 구현 예정</p>
+            <!-- 전체 학습 기록 테이블 -->
+            <div class="record-table-container">
+                <div class="section-title" style="margin-bottom:12px;">
+                    <i class="fas fa-table" style="color:#3b82f6;"></i>
+                    전체 학습 기록
+                    <span id="recordTableCount" class="notif-count-badge" style="display:none;"></span>
+                </div>
+
+                <!-- 필터 바 -->
+                <div class="record-filters">
+                    <div class="filter-group">
+                        <label>주차</label>
+                        <select id="filterWeek" onchange="applyRecordFilters()">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>영역</label>
+                        <select id="filterType" onchange="applyRecordFilters()">
+                            <option value="">전체</option>
+                            <option value="reading">Reading</option>
+                            <option value="listening">Listening</option>
+                            <option value="writing">Writing</option>
+                            <option value="speaking">Speaking</option>
+                            <option value="vocab">보카</option>
+                            <option value="intro-book">입문서</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>상태</label>
+                        <select id="filterStatus" onchange="applyRecordFilters()">
+                            <option value="">전체</option>
+                            <option value="done">완료만</option>
+                            <option value="undone">미완료만</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 테이블 -->
+                <div class="record-table-wrap" id="recordTableWrap">
+                    <div class="record-table-loading"><i class="fas fa-spinner fa-spin"></i> 테이블 생성 중...</div>
+                </div>
             </div>
 
             <!-- [V3 구현 예정] 오답노트 모아보기 -->

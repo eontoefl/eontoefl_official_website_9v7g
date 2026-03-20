@@ -296,8 +296,10 @@ function getGradeFromRules(authRate, rules, deposit) {
 function parseScheduleSection(sectionText) {
     if (!sectionText || !sectionText.trim()) return null;
     const text = sectionText.trim();
-    if (text.startsWith('내벨업보카')) return { taskType: 'vocab', moduleNumber: null };
-    if (text.startsWith('입문서 정독')) return { taskType: 'intro-book', moduleNumber: null };
+    if (text.startsWith('내벨업보카')) return { taskType: 'vocab', moduleNumber: 1 };
+    const introMatch = text.match(/입문서 정독\s*(\d+)/);
+    if (introMatch) return { taskType: 'intro-book', moduleNumber: parseInt(introMatch[1]) };
+    if (text.startsWith('입문서 정독')) return { taskType: 'intro-book', moduleNumber: 1 };
     const readingMatch = text.match(/리딩 Module\s*(\d+)/);
     if (readingMatch) return { taskType: 'reading', moduleNumber: parseInt(readingMatch[1]) };
     const listeningMatch = text.match(/리스닝 Module\s*(\d+)/);

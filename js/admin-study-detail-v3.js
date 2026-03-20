@@ -80,7 +80,7 @@ async function loadStudentDetail() {
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
-                'select': 'id,user_id,section_type,module_number,week,day,locked_auth_rate,error_note_submitted,initial_record,created_at',
+                'select': 'id,user_id,section_type,module_number,week,day,initial_record,initial_level,locked_auth_rate,error_note_submitted,error_note_text,completed_at,speaking_file_1,writing_email_text,writing_discussion_text',
                 'limit': '1000'
             }),
             supabaseAPI.query('tr_deadline_extensions', {
@@ -101,6 +101,7 @@ async function loadStudentDetail() {
 
         renderProfileHeader();
         renderV3SummaryCards();
+        renderStudyRecordTable();
         loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
 
     } catch (error) {
@@ -481,6 +482,573 @@ function formatCardDate(date) {
     const dayNames = ['\uc77c', '\uc6d4', '\ud654', '\uc218', '\ubaa9', '\uae08', '\ud1a0'];
     const dayName = dayNames[date.getUTCDay()];
     return `${m}/${d} (${dayName})`;
+}
+
+// ===== 전체 학습 기록 테이블 =====
+const DAY_ORDER = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+const DAY_KR_MAP = { 'sunday': '일', 'monday': '월', 'tuesday': '화', 'wednesday': '수', 'thursday': '목', 'friday': '금' };
+
+let allRecordRows = [];     // 전체 행 데이터
+let filteredRows = [];      // 필터 적용된 행
+let currentSort = { col: null, dir: 'asc' };
+
+function renderStudyRecordTable() {
+    const { app } = studentData;
+    const programType = getProgram(app);
+    const totalWeeks = getTotalWeeks(app);
+    const prog = programType.toLowerCase();
+
+    // study_results_v3를 빠르게 조회할 수 있는 맵 생성
+    // 키: "section_type|module_number|week|day"
+    const v3Map = {};
+    studyResultsV3.forEach(r => {
+        const key = `${r.section_type}|${r.module_number}|${r.week}|${r.day}`;
+        v3Map[key] = r;
+    });
+
+    // 스케줄 기반 행 생성
+    allRecordRows = [];
+    for (let week = 1; week <= totalWeeks; week++) {
+        for (const dayEn of DAY_ORDER) {
+            const sched = scheduleData.find(s =>
+                (s.program || '').toLowerCase() === prog &&
+                s.week === week &&
+                s.day === dayEn
+            );
+            if (!sched) continue;
+
+            for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
+                const parsed = parseScheduleSection(sec);
+                if (!parsed || parsed.taskType === 'unknown') continue;
+
+                const dayKr = DAY_KR_MAP[dayEn];
+                const moduleNum = parsed.moduleNumber;
+
+                // DB 매칭
+                const key = `${parsed.taskType}|${moduleNum}|${week}|${dayKr}`;
+                const record = v3Map[key] || null;
+
+                allRecordRows.push({
+                    week, dayEn, dayKr, taskType: parsed.taskType,
+                    moduleNumber: moduleNum,
+                    rawSection: sec,
+                    record: record,
+                    // 파싱된 데이터
+                    isDone: !!(record && record.initial_record),
+                    score: getScoreText(parsed.taskType, record),
+                    level: getLevelText(parsed.taskType, record),
+                    authRate: getAuthRateValue(record),
+                    errorNote: record ? !!record.error_note_submitted : false,
+                    completedAt: record ? record.completed_at : null
+                });
+            }
+        }
+    }
+
+    // 주차 필터 옵션 동적 생성
+    const weekSelect = document.getElementById('filterWeek');
+    for (let w = 1; w <= totalWeeks; w++) {
+        const opt = document.createElement('option');
+        opt.value = w;
+        opt.textContent = `W${w}`;
+        weekSelect.appendChild(opt);
+    }
+
+    // 배지 업데이트
+    const badge = document.getElementById('recordTableCount');
+    if (badge) { badge.textContent = `${allRecordRows.length}건`; badge.style.display = 'inline-flex'; }
+
+    filteredRows = [...allRecordRows];
+    renderRecordTableHTML();
+}
+
+// ===== 영역별 점수 파싱 =====
+function getScoreText(taskType, record) {
+    if (!record || !record.initial_record) return '-';
+    const ir = record.initial_record;
+    switch (taskType) {
+        case 'reading':
+        case 'listening': {
+            const correct = ir.totalCorrect ?? 0;
+            const total = ir.totalQuestions ?? 0;
+            const pct = total > 0 ? Math.round(correct / total * 100) : 0;
+            return `${correct}/${total} (${pct}%)`;
+        }
+        case 'writing': {
+            if (ir.arrange) {
+                const c = ir.arrange.correct ?? 0;
+                const t = ir.arrange.total ?? 0;
+                const pct = t > 0 ? Math.round(c / t * 100) : 0;
+                return `${c}/${t} (${pct}%)`;
+            }
+            return '완료';
+        }
+        case 'speaking':
+            return ir.completed ? '완료' : '미완료';
+        case 'vocab': {
+            const s = ir.score ?? 0;
+            const t = ir.total ?? 0;
+            const pct = t > 0 ? Math.round(s / t * 100) : 0;
+            return `${s}/${t} (${pct}%)`;
+        }
+        case 'intro-book':
+            return `메모 ${ir.memo_count ?? 0}개`;
+        default:
+            return '-';
+    }
+}
+
+function getLevelText(taskType, record) {
+    if (!record) return '-';
+    if (taskType === 'reading' || taskType === 'listening') {
+        return record.initial_level != null ? record.initial_level : '-';
+    }
+    return '-';
+}
+
+function getAuthRateValue(record) {
+    if (!record) return 0;
+    if (record.locked_auth_rate != null) return record.locked_auth_rate;
+    if (record.initial_record) return record.error_note_submitted ? 100 : 50;
+    return 0;
+}
+
+// ===== 필터/정렬 =====
+function applyRecordFilters() {
+    const weekVal = document.getElementById('filterWeek').value;
+    const typeVal = document.getElementById('filterType').value;
+    const statusVal = document.getElementById('filterStatus').value;
+
+    filteredRows = allRecordRows.filter(r => {
+        if (weekVal && r.week !== parseInt(weekVal)) return false;
+        if (typeVal && r.taskType !== typeVal) return false;
+        if (statusVal === 'done' && !r.isDone) return false;
+        if (statusVal === 'undone' && r.isDone) return false;
+        return true;
+    });
+
+    if (currentSort.col) {
+        sortRows(currentSort.col, currentSort.dir, true);
+    } else {
+        renderRecordTableHTML();
+    }
+}
+
+function sortRows(col, dir, skipToggle) {
+    if (!skipToggle) {
+        if (currentSort.col === col) {
+            dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            dir = 'asc';
+        }
+    }
+    currentSort = { col, dir };
+
+    filteredRows.sort((a, b) => {
+        let va, vb;
+        switch (col) {
+            case 'week': va = a.week; vb = b.week; break;
+            case 'day': va = DAY_ORDER.indexOf(a.dayEn); vb = DAY_ORDER.indexOf(b.dayEn); break;
+            case 'task': va = a.taskType; vb = b.taskType; break;
+            case 'status': va = a.isDone ? 1 : 0; vb = b.isDone ? 1 : 0; break;
+            case 'auth': va = a.authRate; vb = b.authRate; break;
+            case 'note': va = a.errorNote ? 1 : 0; vb = b.errorNote ? 1 : 0; break;
+            case 'time': va = a.completedAt || ''; vb = b.completedAt || ''; break;
+            default: va = 0; vb = 0;
+        }
+        if (va < vb) return dir === 'asc' ? -1 : 1;
+        if (va > vb) return dir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    renderRecordTableHTML();
+}
+
+// ===== 테이블 HTML 렌더 =====
+function renderRecordTableHTML() {
+    const wrap = document.getElementById('recordTableWrap');
+
+    if (filteredRows.length === 0) {
+        wrap.innerHTML = '<div class="record-empty"><i class="fas fa-inbox" style="font-size:24px; margin-bottom:8px; display:block;"></i>표시할 기록이 없습니다.</div>';
+        return;
+    }
+
+    function sortIcon(col) {
+        const active = currentSort.col === col;
+        const arrow = active ? (currentSort.dir === 'asc' ? '\u25b2' : '\u25bc') : '\u25b4';
+        return `<span class="sort-icon${active ? ' active' : ''}">${arrow}</span>`;
+    }
+
+    let html = `<table class="record-table">
+        <thead><tr>
+            <th onclick="sortRows('week')">\uc8fc\ucc28${sortIcon('week')}</th>
+            <th onclick="sortRows('day')">\uc694\uc77c${sortIcon('day')}</th>
+            <th onclick="sortRows('task')">\uacfc\uc81c${sortIcon('task')}</th>
+            <th onclick="sortRows('status')">\uc0c1\ud0dc${sortIcon('status')}</th>
+            <th>\uc810\uc218</th>
+            <th>\ub808\ubca8</th>
+            <th onclick="sortRows('auth')">\uc778\uc99d\ub960${sortIcon('auth')}</th>
+            <th onclick="sortRows('note')">\uc624\ub2f5\ub178\ud2b8${sortIcon('note')}</th>
+            <th onclick="sortRows('time')">\ud480\uc774 \uc2dc\uac01${sortIcon('time')}</th>
+            <th>\uc0c1\uc138</th>
+        </tr></thead><tbody>`;
+
+    filteredRows.forEach(r => {
+        const rowClass = r.isDone ? '' : ' class="row-undone"';
+        const info = TASK_EMOJI_MAP[r.taskType] || { emoji: '\ud83d\udccc', label: r.taskType };
+        const moduleStr = r.moduleNumber ? ` M${r.moduleNumber}` : '';
+        const taskLabel = `${info.emoji} ${info.label}${moduleStr}`;
+
+        const statusHtml = r.isDone
+            ? '<span class="record-status-done">\u2705 \uc644\ub8cc</span>'
+            : '<span class="record-status-undone">\u274c \ubbf8\uc644\ub8cc</span>';
+
+        const levelHtml = r.level !== '-' ? `<span class="record-level">${r.level}</span>` : '<span style="color:#cbd5e1;">-</span>';
+
+        let authClass = 'record-auth-0';
+        if (r.authRate >= 100) authClass = 'record-auth-100';
+        else if (r.authRate >= 50) authClass = 'record-auth-50';
+        const authHtml = `<span class="${authClass}">${r.authRate}%</span>`;
+
+        const noteHtml = r.isDone
+            ? (r.errorNote ? '<span style="color:#22c55e;">\u2705</span>' : '<span style="color:#ef4444;">\u274c</span>')
+            : '<span style="color:#cbd5e1;">-</span>';
+
+        const timeHtml = r.completedAt ? formatCompletedAt(r.completedAt) : '<span style="color:#cbd5e1;">-</span>';
+
+        const viewBtn = r.record
+            ? `<button class="btn-record-view" onclick="openRecordDetailModal('${r.record.id}')">\ubcf4\uae30</button>`
+            : '<span style="color:#cbd5e1;">-</span>';
+
+        html += `<tr${rowClass}>
+            <td><span class="record-week-badge">W${r.week}</span></td>
+            <td><span class="record-day-badge">${r.dayKr}</span></td>
+            <td><span class="record-task-name">${taskLabel}</span></td>
+            <td>${statusHtml}</td>
+            <td class="record-score">${r.isDone ? r.score : '<span style="color:#cbd5e1;">-</span>'}</td>
+            <td>${levelHtml}</td>
+            <td>${authHtml}</td>
+            <td style="text-align:center;">${noteHtml}</td>
+            <td style="font-size:11px; color:#94a3b8;">${timeHtml}</td>
+            <td style="text-align:center;">${viewBtn}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+function formatCompletedAt(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    const m = kst.getUTCMonth() + 1;
+    const day = kst.getUTCDate();
+    const h = kst.getUTCHours();
+    const min = String(kst.getUTCMinutes()).padStart(2, '0');
+    return `${m}/${day} ${h}:${min}`;
+}
+
+// ===== [보기] 상세 모달 =====
+async function openRecordDetailModal(recordId) {
+    const record = studyResultsV3.find(r => r.id === recordId);
+    if (!record) return alert('기록을 찾을 수 없습니다.');
+
+    // current_record는 별도 조회
+    let currentRecord = null;
+    let currentErrorNote = null;
+    try {
+        const detail = await supabaseAPI.query('study_results_v3', {
+            'id': `eq.${recordId}`,
+            'select': 'current_record,current_error_note_text',
+            'limit': '1'
+        });
+        if (detail && detail.length > 0) {
+            currentRecord = detail[0].current_record;
+            currentErrorNote = detail[0].current_error_note_text;
+        }
+    } catch (e) {
+        console.warn('다시풀기 데이터 로드 실패:', e);
+    }
+
+    // 기존 모달 제거
+    const existing = document.getElementById('recordDetailModal');
+    if (existing) existing.remove();
+
+    const info = TASK_EMOJI_MAP[record.section_type] || { emoji: '\ud83d\udccc', label: record.section_type };
+    const moduleStr = record.module_number ? ` M${record.module_number}` : '';
+    const title = `${info.emoji} ${info.label}${moduleStr} (W${record.week} ${record.day})`;
+
+    let bodyHtml = '';
+    switch (record.section_type) {
+        case 'reading':
+        case 'listening':
+            bodyHtml = buildReadingListeningModal(record, currentRecord, currentErrorNote);
+            break;
+        case 'writing':
+            bodyHtml = buildWritingModal(record, currentRecord);
+            break;
+        case 'speaking':
+            bodyHtml = buildSpeakingModal(record);
+            break;
+        case 'vocab':
+            bodyHtml = buildVocabModal(record);
+            break;
+        case 'intro-book':
+            bodyHtml = buildIntroBookModal(record);
+            break;
+        default:
+            bodyHtml = '<p>상세 데이터가 없습니다.</p>';
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'recordDetailModal';
+    modal.className = 'detail-modal-overlay';
+    modal.innerHTML = `
+        <div class="detail-modal">
+            <div class="detail-modal-header">
+                <h3>${title}</h3>
+                <button class="detail-modal-close" onclick="closeRecordDetailModal()">&times;</button>
+            </div>
+            <div class="detail-modal-body">${bodyHtml}</div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeRecordDetailModal(); });
+}
+
+function closeRecordDetailModal() {
+    const m = document.getElementById('recordDetailModal');
+    if (m) m.remove();
+}
+
+// ===== Reading / Listening 모달 =====
+function buildReadingListeningModal(record, currentRecord, currentErrorNote) {
+    const ir = record.initial_record;
+    let html = '';
+
+    // 실전풀이
+    if (ir) {
+        const completedStr = ir.completedAt ? formatCompletedAt(ir.completedAt) : (record.completed_at ? formatCompletedAt(record.completed_at) : '-');
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-pen-fancy" style="color:#3b82f6;"></i> \uc2e4\uc804\ud480\uc774 (${completedStr})</div>`;
+
+        // 문항별 테이블
+        const answers = extractAnswers(ir);
+        if (answers.length > 0) {
+            html += '<table class="detail-qa-table"><thead><tr><th>\ubc88\ud638</th><th>\uc815\ub2f5</th><th>\ud559\uc0dd \uc120\ud0dd</th><th>\uacb0\uacfc</th></tr></thead><tbody>';
+            answers.forEach(a => {
+                const cls = a.isCorrect ? 'correct' : 'wrong';
+                const icon = a.isCorrect ? '\u2705' : '\u274c';
+                html += `<tr><td>Q${a.questionNumber}</td><td>${escapeHtml(a.correctAnswer)}</td><td class="${cls}">${escapeHtml(a.userAnswer)}</td><td>${icon}</td></tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        const correct = ir.totalCorrect ?? 0;
+        const total = ir.totalQuestions ?? 0;
+        const pct = total > 0 ? Math.round(correct / total * 100) : 0;
+        const level = record.initial_level != null ? record.initial_level : '-';
+        html += `<div class="detail-summary">
+            <span>\ucd1d\uc810: <strong>${correct}/${total} (${pct}%)</strong></span>
+            <span>\ub808\ubca8: <strong>${level}</strong></span>
+        </div></div>`;
+    }
+
+    // 다시풀기
+    if (currentRecord) {
+        const crCompletedStr = currentRecord.completedAt ? formatCompletedAt(currentRecord.completedAt) : '-';
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-redo" style="color:#8b5cf6;"></i> \ub2e4\uc2dc\ud480\uae30 (${crCompletedStr})</div>`;
+
+        const answers2 = extractAnswers(currentRecord);
+        if (answers2.length > 0) {
+            html += '<table class="detail-qa-table"><thead><tr><th>\ubc88\ud638</th><th>\uc815\ub2f5</th><th>\ud559\uc0dd \uc120\ud0dd</th><th>\uacb0\uacfc</th></tr></thead><tbody>';
+            answers2.forEach(a => {
+                const cls = a.isCorrect ? 'correct' : 'wrong';
+                const icon = a.isCorrect ? '\u2705' : '\u274c';
+                html += `<tr><td>Q${a.questionNumber}</td><td>${escapeHtml(a.correctAnswer)}</td><td class="${cls}">${escapeHtml(a.userAnswer)}</td><td>${icon}</td></tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        const c2 = currentRecord.totalCorrect ?? 0;
+        const t2 = currentRecord.totalQuestions ?? 0;
+        const p2 = t2 > 0 ? Math.round(c2 / t2 * 100) : 0;
+        html += `<div class="detail-summary"><span>\ucd1d\uc810: <strong>${c2}/${t2} (${p2}%)</strong></span></div></div>`;
+    }
+
+    // 오답노트
+    const noteText = record.error_note_text || currentErrorNote;
+    if (noteText) {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-sticky-note" style="color:#f59e0b;"></i> \uc624\ub2f5\ub178\ud2b8</div>
+            <div class="detail-text-block">${escapeHtml(noteText)}</div>
+        </div>`;
+    }
+
+    return html || '<p style="color:#94a3b8; text-align:center;">데이터가 없습니다.</p>';
+}
+
+function extractAnswers(recordObj) {
+    if (!recordObj || !recordObj.sets) return [];
+    const answers = [];
+    const sets = recordObj.sets;
+
+    // sets가 배열이면 그대로, 객체면 values로 변환
+    const setList = Array.isArray(sets) ? sets : Object.values(sets);
+
+    setList.forEach(set => {
+        if (set && set.answers && Array.isArray(set.answers)) {
+            set.answers.forEach(a => {
+                // 정답/유저답을 라벨로 변환 (숫자면 A/B/C/D, 문자열이면 그대로)
+                const correctRaw = a.correctAnswer ?? a.correct ?? '-';
+                const userRaw = a.userAnswer ?? a.selected ?? '-';
+                const options = a.options || [];
+
+                const correctLabel = typeof correctRaw === 'number' && options[correctRaw]
+                    ? (options[correctRaw].label || String.fromCharCode(65 + correctRaw))
+                    : String(correctRaw);
+                const userLabel = typeof userRaw === 'number' && options[userRaw]
+                    ? (options[userRaw].label || String.fromCharCode(65 + userRaw))
+                    : String(userRaw);
+
+                answers.push({
+                    questionNumber: a.questionNum || a.questionNumber || answers.length + 1,
+                    correctAnswer: correctLabel,
+                    userAnswer: userLabel,
+                    isCorrect: a.isCorrect != null ? !!a.isCorrect : (correctRaw === userRaw)
+                });
+            });
+        }
+    });
+    return answers;
+}
+
+// ===== Writing 모달 =====
+function buildWritingModal(record, currentRecord) {
+    let html = '';
+
+    function buildWritingSection(label, icon, color, wr) {
+        if (!wr) return '';
+        let s = `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-${icon}" style="color:${color};"></i> ${label}</div>`;
+
+        // 배열 정리
+        if (wr.arrange) {
+            const c = wr.arrange.correct ?? 0, t = wr.arrange.total ?? 0;
+            const pct = t > 0 ? Math.round(c / t * 100) : 0;
+            s += `<div style="margin-bottom:12px;"><strong>[\ubc30\uc5f4 \uc815\ub9ac]</strong> ${c}/${t} (${pct}%)</div>`;
+        }
+
+        // Email
+        const emailText = record.writing_email_text || (wr.email ? wr.email.userAnswer : null);
+        if (emailText || (wr.email && wr.email.wordCount)) {
+            const wc = wr.email ? (wr.email.wordCount || 0) : 0;
+            s += `<div style="margin-bottom:12px;"><strong>[Email]</strong> ${wc}\ub2e8\uc5b4</div>`;
+            if (emailText) s += `<div class="detail-text-block">${escapeHtml(emailText)}</div>`;
+        }
+
+        // Discussion
+        const discText = record.writing_discussion_text || (wr.discussion ? wr.discussion.userAnswer : null);
+        if (discText || (wr.discussion && wr.discussion.wordCount)) {
+            const wc = wr.discussion ? (wr.discussion.wordCount || 0) : 0;
+            s += `<div style="margin-top:12px; margin-bottom:8px;"><strong>[Discussion]</strong> ${wc}\ub2e8\uc5b4</div>`;
+            if (discText) s += `<div class="detail-text-block">${escapeHtml(discText)}</div>`;
+        }
+
+        s += '</div>';
+        return s;
+    }
+
+    html += buildWritingSection('\uc2e4\uc804\ud480\uc774', 'pen-fancy', '#3b82f6', record.initial_record);
+    if (currentRecord) html += buildWritingSection('\ub2e4\uc2dc\ud480\uae30', 'redo', '#8b5cf6', currentRecord);
+
+    // 오답노트
+    if (record.error_note_text) {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-sticky-note" style="color:#f59e0b;"></i> \uc624\ub2f5\ub178\ud2b8</div>
+            <div class="detail-text-block">${escapeHtml(record.error_note_text)}</div>
+        </div>`;
+    }
+
+    return html || '<p style="color:#94a3b8; text-align:center;">데이터가 없습니다.</p>';
+}
+
+// ===== Speaking 모달 =====
+function buildSpeakingModal(record) {
+    const ir = record.initial_record;
+    let html = '';
+
+    if (ir) {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-microphone" style="color:#3b82f6;"></i> \uc2e4\uc804\ud480\uc774</div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <span>Repeat: ${ir.repeat && ir.repeat.completed ? '\u2705 \uc644\ub8cc' : '\u274c \ubbf8\uc644\ub8cc'}</span>
+                <span>Interview: ${ir.interview && ir.interview.completed ? '\u2705 \uc644\ub8cc' : '\u274c \ubbf8\uc644\ub8cc'}</span>
+            </div>
+        </div>`;
+    }
+
+    // 오답노트
+    if (record.error_note_text) {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-sticky-note" style="color:#f59e0b;"></i> \uc624\ub2f5\ub178\ud2b8</div>
+            <div class="detail-text-block">${escapeHtml(record.error_note_text)}</div>
+        </div>`;
+    }
+
+    // 녹음 파일
+    if (record.speaking_file_1) {
+        const audioUrl = `${SUPABASE_URL}/storage/v1/object/public/speaking-files/${record.speaking_file_1}`;
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-headphones" style="color:#10b981;"></i> \ub179\uc74c \ud30c\uc77c</div>
+            <audio controls style="width:100%;" controlsList="nodownload">
+                <source src="${escapeHtml(audioUrl)}" type="audio/webm">
+                <source src="${escapeHtml(audioUrl)}" type="audio/mp4">
+                <source src="${escapeHtml(audioUrl)}" type="audio/mpeg">
+                \ube0c\ub77c\uc6b0\uc800\uac00 \uc624\ub514\uc624\ub97c \uc9c0\uc6d0\ud558\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4.
+            </audio>
+            <div style="font-size:11px; color:#94a3b8; margin-top:4px; word-break:break-all;">${escapeHtml(record.speaking_file_1)}</div>
+        </div>`;
+    }
+
+    return html || '<p style="color:#94a3b8; text-align:center;">데이터가 없습니다.</p>';
+}
+
+// ===== Vocab 모달 =====
+function buildVocabModal(record) {
+    const ir = record.initial_record;
+    if (!ir) return '<p style="color:#94a3b8; text-align:center;">데이터가 없습니다.</p>';
+
+    const s = ir.score ?? 0, t = ir.total ?? 0;
+    const pct = t > 0 ? Math.round(s / t * 100) : 0;
+    const pages = ir.pages ? ir.pages.join(', ') + 'pg' : '-';
+    const authOk = pct >= 30;
+
+    return `<div class="detail-section">
+        <div class="detail-section-title"><i class="fas fa-spell-check" style="color:#3b82f6;"></i> \uacb0\uacfc</div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:14px;">
+            <span>\uc810\uc218: <strong>${s}/${t} (${pct}%)</strong></span>
+            <span>\ubc94\uc704: <strong>${pages}</strong></span>
+            <span>\uc778\uc99d: ${authOk ? '<span style="color:#22c55e; font-weight:700;">\u2705 30% \uc774\uc0c1</span>' : '<span style="color:#ef4444; font-weight:700;">\u274c 30% \ubbf8\ub9cc (\ubbf8\uc778\uc815)</span>'}</span>
+        </div>
+    </div>`;
+}
+
+// ===== Intro-book 모달 =====
+function buildIntroBookModal(record) {
+    const ir = record.initial_record;
+    if (!ir) return '<p style="color:#94a3b8; text-align:center;">데이터가 없습니다.</p>';
+
+    const memoCount = ir.memo_count ?? 0;
+
+    return `<div class="detail-section">
+        <div class="detail-section-title"><i class="fas fa-book-reader" style="color:#3b82f6;"></i> \uacb0\uacfc</div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:14px;">
+            <span>\uba54\ubaa8 \uc791\uc131: <strong>${memoCount}\uac1c</strong></span>
+            <span>\uc778\uc99d: <span style="color:#22c55e; font-weight:700;">\u2705</span></span>
+        </div>
+    </div>`;
 }
 
 // ===== 오답노트 모달 =====
