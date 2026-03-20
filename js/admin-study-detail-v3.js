@@ -1,9 +1,21 @@
 // ===== 학생 학습 상세 V3 (admin-study-detail-v3.js) =====
-// V2 테이블(tr_study_records, tr_auth_records, tr_schedule_assignment) 로직 제거
-// V3 테이블(study_results_v3) 기반으로 추후 구현 예정
+// V3 테이블(study_results_v3, tr_schedule_assignment, tr_deadline_extensions) 기반
 
 // ===== 전역 변수 =====
 let studentData = null;      // { user, app }
+let scheduleData = [];       // tr_schedule_assignment 전체
+let studyResultsV3 = [];     // study_results_v3 해당 학생
+let deadlineExtensionsData = []; // tr_deadline_extensions 해당 학생
+
+// ===== 과제 타입 → 이모지/라벨 매핑 =====
+const TASK_EMOJI_MAP = {
+    'reading': { emoji: '\ud83d\udcd6', label: 'Reading' },
+    'listening': { emoji: '\ud83c\udfa7', label: 'Listening' },
+    'writing': { emoji: '\u270d\ufe0f', label: 'Writing' },
+    'speaking': { emoji: '\ud83c\udfa4', label: 'Speaking' },
+    'vocab': { emoji: '\ud83d\udcdd', label: '\ub0b4\ubca8\uc5c5\ubcf4\uce74' },
+    'intro-book': { emoji: '\ud83d\udcd5', label: '\uc785\ubb38\uc11c \uc815\ub3c5' }
+};
 
 // ===== 초기화 =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -60,22 +72,36 @@ async function loadStudentDetail() {
             studentData = { user, app };
         }
 
-        // ── V2 테이블 로드 제거됨 ──
-        // tr_study_records, tr_auth_records, tr_schedule_assignment, grade rules
-        // → V3 구현 시 study_results_v3 테이블 로드로 대체 예정
+        // ── V3 데이터 로드 ──
+        const studentUserId = studentData.user.id;
+
+        // 병렬로 필요한 데이터 모두 로드
+        const [scheduleResult, studyV3Result, deadlineResult, gradeRules] = await Promise.all([
+            supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
+            supabaseAPI.query('study_results_v3', {
+                'user_id': `eq.${studentUserId}`,
+                'select': 'id,user_id,section_type,module_number,week,day,locked_auth_rate,error_note_submitted,initial_record,created_at',
+                'limit': '1000'
+            }),
+            supabaseAPI.query('tr_deadline_extensions', {
+                'user_id': `eq.${studentUserId}`,
+                'order': 'original_date.desc',
+                'limit': '200'
+            }),
+            loadGradeRules()
+        ]);
+
+        scheduleData = scheduleResult || [];
+        studyResultsV3 = studyV3Result || [];
+        deadlineExtensionsData = deadlineResult || [];
 
         // 렌더링
         loading.style.display = 'none';
         detailContent.style.display = 'block';
 
         renderProfileHeader();
+        renderV3SummaryCards();
         loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
-
-        // ── V2 렌더링 함수 호출 제거됨 ──
-        // renderSummaryCards(), renderGrassGrid(), buildTaskRows(),
-        // renderTaskTable(), renderNotes(), loadProgressSaves(),
-        // setupWeeklyCheckDropdown()
-        // → V3 구현 시 새로운 함수로 대체 예정
 
     } catch (error) {
         console.error('Failed to load student detail:', error);
@@ -165,6 +191,296 @@ function renderProfileHeader() {
         btn.style.display = 'inline-flex';
         btn.onclick = () => { window.location.href = `admin-applications.html?manage=${app.id}`; };
     }
+}
+
+// ===== 오답노트 모달 =====
+
+// ===== V3 요약 카드 렌더링 (메인 함수) =====
+function renderV3SummaryCards() {
+    const { app } = studentData;
+    const effectiveToday = getEffectiveToday();
+    const programType = getProgram(app);
+    const totalWeeks = getTotalWeeks(app);
+    const totalDays = programType === 'Fast' ? 28 : 56;
+    const startDate = getScheduleStart(app);
+    const depositAmount = app.deposit_amount || 100000;
+
+    renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks);
+    renderCardChallenge(effectiveToday, startDate, totalDays);
+    renderCardAuthRate(effectiveToday, programType, startDate, totalWeeks);
+    renderCardGrade(effectiveToday, programType, startDate, totalWeeks, depositAmount);
+}
+
+// ===== 카드1: 오늘의 과제 =====
+function renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks) {
+    const el = document.getElementById('cardTodayTasks');
+
+    // 시작 전
+    if (!startDate || effectiveToday < startDate) {
+        const startStr = startDate ? formatCardDate(startDate) : '-';
+        el.innerHTML = `
+            <div class="card-prestart-msg">
+                <i class="fas fa-hourglass-start" style="color:#3b82f6;"></i><br>
+                <span style="font-size:14px; font-weight:700; color:#3b82f6;">${startStr} 시작</span>
+            </div>`;
+        return;
+    }
+
+    // 주차/요일 계산
+    const diffDays = Math.floor((effectiveToday - startDate) / (1000 * 60 * 60 * 24));
+    const weekNum = Math.floor(diffDays / 7) + 1;
+    const dayIndex = effectiveToday.getUTCDay(); // 0=일, 1=월...
+
+    // 챌린지 종료 후
+    if (weekNum > totalWeeks) {
+        el.innerHTML = `<div class="card-prestart-msg"><i class="fas fa-check-circle" style="color:#22c55e;"></i><br>챌린지 완료!</div>`;
+        return;
+    }
+
+    // 토요일(6)은 휴무
+    if (dayIndex === 6) {
+        el.innerHTML = `<div class="task-rest-msg"><i class="fas fa-couch"></i> 오늘은 휴무일</div>`;
+        return;
+    }
+
+    const dayEngNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayEn = dayEngNames[dayIndex];
+
+    // tr_schedule_assignment에서 오늘 과제 가져오기
+    const prog = programType.toLowerCase();
+    const todaySchedule = scheduleData.find(s =>
+        (s.program || '').toLowerCase() === prog &&
+        s.week === weekNum &&
+        s.day === dayEn
+    );
+
+    if (!todaySchedule) {
+        el.innerHTML = `<div class="task-rest-msg"><i class="fas fa-couch"></i> 오늘은 휴무일</div>`;
+        return;
+    }
+
+    // section1~4 파싱
+    const tasks = [];
+    for (const sec of [todaySchedule.section1, todaySchedule.section2, todaySchedule.section3, todaySchedule.section4]) {
+        const parsed = parseScheduleSection(sec);
+        if (parsed && parsed.taskType !== 'unknown') {
+            const info = TASK_EMOJI_MAP[parsed.taskType] || { emoji: '\ud83d\udccc', label: parsed.taskType };
+            const moduleStr = parsed.moduleNumber ? ` M${parsed.moduleNumber}` : '';
+            tasks.push({ emoji: info.emoji, label: `${info.label}${moduleStr}` });
+        }
+    }
+
+    if (tasks.length === 0) {
+        el.innerHTML = `<div class="task-rest-msg"><i class="fas fa-couch"></i> 오늘은 휴무일</div>`;
+        return;
+    }
+
+    let html = '<div class="task-list-items">';
+    tasks.forEach(t => {
+        html += `<div class="task-item"><span class="task-emoji">${t.emoji}</span> ${escapeHtml(t.label)}</div>`;
+    });
+    html += '</div>';
+    html += `<div class="task-count-badge"><i class="fas fa-tasks"></i> 총 ${tasks.length}개 과제</div>`;
+
+    el.innerHTML = html;
+}
+
+// ===== 카드2: 챌린지 현황 =====
+function renderCardChallenge(effectiveToday, startDate, totalDays) {
+    const el = document.getElementById('cardChallenge');
+
+    // 시작 전
+    if (!startDate || effectiveToday < startDate) {
+        const daysUntil = startDate ? Math.ceil((startDate - effectiveToday) / (1000 * 60 * 60 * 24)) : '?';
+        const startStr = startDate ? formatCardDate(startDate) : '-';
+        el.innerHTML = `
+            <div style="text-align:center;">
+                <div class="challenge-dplus">D-${daysUntil}</div>
+                <div style="font-size:12px; color:#a78bfa; margin-top:6px; font-weight:600;">${startStr} 시작</div>
+                <div class="challenge-bar-wrap"><div class="challenge-bar" style="width:0%;"></div></div>
+                <div class="challenge-sub"><span>대기 중</span><span>총 ${totalDays}일</span></div>
+            </div>`;
+        return;
+    }
+
+    const dplus = Math.floor((effectiveToday - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    const elapsed = Math.min(dplus, totalDays);
+    const remainingDays = Math.max(0, totalDays - elapsed);
+    const elapsedPct = Math.min(100, Math.round((elapsed / totalDays) * 100));
+    const startStr = formatCardDate(startDate);
+
+    // 완료 후
+    const isComplete = dplus > totalDays;
+
+    el.innerHTML = `
+        <div style="text-align:center;">
+            <div class="challenge-dplus">
+                D+${isComplete ? totalDays : dplus}
+                <small>/ ${totalDays}일</small>
+            </div>
+            <div class="challenge-bar-wrap">
+                <div class="challenge-bar" style="width:${elapsedPct}%;${isComplete ? ' background:linear-gradient(90deg,#22c55e,#4ade80);' : ''}"></div>
+            </div>
+            <div class="challenge-sub">
+                <span>${isComplete ? '\u2705 \ucc4c\ub9b0\uc9c0 \uc644\ub8cc' : `\ub0a8\uc740 ${remainingDays}\uc77c`}</span>
+                <span>${startStr} ~</span>
+            </div>
+        </div>`;
+}
+
+// ===== 카드3: 인증률 =====
+function renderCardAuthRate(effectiveToday, programType, startDate, totalWeeks) {
+    const el = document.getElementById('cardAuthRate');
+
+    // 시작 전
+    if (!startDate || effectiveToday < startDate) {
+        el.innerHTML = `
+            <div style="text-align:center;">
+                <div class="auth-rate-value" style="color:#94a3b8;">-<span>%</span></div>
+                <div class="auth-bar-wrap"><div class="auth-bar" style="width:0%; background:#e2e8f0;"></div></div>
+                <div class="auth-sub">시작 전</div>
+            </div>`;
+        return;
+    }
+
+    // study_results_v3에서 인증률 분자 계산
+    // locked_auth_rate가 있으면 사용, 없으면 initial_record 존재시 50 (error_note_submitted이면 100), 아니면 0
+    let authRateSum = 0;
+    for (const r of studyResultsV3) {
+        if (r.locked_auth_rate != null) {
+            authRateSum += r.locked_auth_rate;
+        } else if (r.initial_record) {
+            // 초기 기록이 있으면 50, 오답노트 제출했으면 100
+            authRateSum += r.error_note_submitted ? 100 : 50;
+        }
+        // initial_record 없으면 0 (미제출)
+    }
+
+    // 인증률 분모 계산: 도래한 과제 수 (tr_deadline_extensions 적용)
+    const tasksDueToday = countDueTasks(effectiveToday, programType, startDate, totalWeeks);
+
+    const authRate = tasksDueToday > 0 ? Math.round(authRateSum / tasksDueToday) : 0;
+    const barColor = authRate >= 90 ? '#10b981' : authRate >= 70 ? '#f59e0b' : '#ef4444';
+
+    el.innerHTML = `
+        <div style="text-align:center;">
+            <div class="auth-rate-value" style="color:${barColor};">${authRate}<span>%</span></div>
+            <div class="auth-bar-wrap"><div class="auth-bar" style="width:${Math.min(100, authRate)}%; background:${barColor};"></div></div>
+            <div class="auth-sub">인증 ${authRateSum.toLocaleString()} / 과제 ${tasksDueToday}개</div>
+        </div>`;
+}
+
+// ===== 카드4: 등급 & 환급 =====
+function renderCardGrade(effectiveToday, programType, startDate, totalWeeks, depositAmount) {
+    const el = document.getElementById('cardGrade');
+
+    // 시작 전
+    if (!startDate || effectiveToday < startDate) {
+        el.innerHTML = `
+            <div style="text-align:center;">
+                <div class="grade-badge-lg" style="background:#cbd5e1;">-</div>
+                <div class="grade-sub">시작 후 산정</div>
+            </div>`;
+        return;
+    }
+
+    // 인증률 재계산 (카드3과 동일 로직)
+    let authRateSum = 0;
+    for (const r of studyResultsV3) {
+        if (r.locked_auth_rate != null) {
+            authRateSum += r.locked_auth_rate;
+        } else if (r.initial_record) {
+            authRateSum += r.error_note_submitted ? 100 : 50;
+        }
+    }
+    const tasksDueToday = countDueTasks(effectiveToday, programType, startDate, totalWeeks);
+    const authRate = tasksDueToday > 0 ? Math.round(authRateSum / tasksDueToday) : 0;
+
+    // 등급 판정
+    const rules = gradeRulesCache || [];
+    let grade = '-', refundRate = 0, refundAmount = 0;
+
+    if (rules.length > 0) {
+        for (const rule of rules) {
+            if (authRate >= rule.min_rate) {
+                grade = rule.grade;
+                refundRate = rule.refund_rate || 0;
+                // refund_rate가 1 이하면 비율(0.9 = 90%), 100 초과면 퍼센트로 처리
+                if (refundRate > 1) {
+                    refundAmount = Math.round(depositAmount * refundRate / 100);
+                } else {
+                    refundAmount = Math.round(depositAmount * refundRate);
+                }
+                break;
+            }
+        }
+        if (grade === '-') {
+            grade = 'F'; refundRate = 0; refundAmount = 0;
+        }
+    }
+
+    const gradeColor = getGradeColor(grade);
+
+    el.innerHTML = `
+        <div style="text-align:center;">
+            <div class="grade-badge-lg" style="background:${gradeColor};">${grade}</div>
+            <div class="grade-refund">
+                환급 <span class="grade-refund-amount">${refundAmount.toLocaleString()}원</span>
+            </div>
+            <div class="grade-sub">보증금 ${depositAmount.toLocaleString()}원 / ${Math.round((refundRate > 1 ? refundRate : refundRate * 100))}% 환급</div>
+        </div>`;
+}
+
+// ===== 도래 과제 수 계산 (tr_deadline_extensions 적용) =====
+function countDueTasks(effectiveToday, programType, startDate, totalWeeks) {
+    const prog = programType.toLowerCase();
+    const progSchedule = (scheduleData || []).filter(s => (s.program || '').toLowerCase() === prog);
+
+    // deadline extensions를 날짜 키로 매핑
+    const extMap = {};
+    (deadlineExtensionsData || []).forEach(ext => {
+        if (ext.original_date) extMap[ext.original_date] = ext.extra_days || 0;
+    });
+
+    let count = 0;
+    const dayEngNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    for (const s of progSchedule) {
+        if (s.week > totalWeeks) continue;
+        const dayIndex = DAY_ENG_TO_INDEX[s.day];
+        if (dayIndex === undefined) continue;
+
+        // 해당 과제의 날짜 계산
+        const taskDate = new Date(startDate);
+        taskDate.setUTCDate(taskDate.getUTCDate() + (s.week - 1) * 7 + dayIndex);
+
+        // effectiveToday 이후면 아직 도래하지 않음
+        if (taskDate > effectiveToday) continue;
+
+        // deadline extension 체크: 연장된 날짜의 과제는 분모에서 제외하지 않음
+        // (인증률 분모는 모든 도래 과제를 포함, 연장은 마감만 늦춤)
+        const dateStr = toDateStr(taskDate);
+
+        // section1~4 중 유효한 과제 수 세기
+        for (const sec of [s.section1, s.section2, s.section3, s.section4]) {
+            const parsed = parseScheduleSection(sec);
+            if (parsed && parsed.taskType !== 'unknown') {
+                count++;
+            }
+        }
+    }
+
+    return count;
+}
+
+// ===== 카드용 날짜 포맷 =====
+function formatCardDate(date) {
+    if (!date) return '-';
+    const m = date.getUTCMonth() + 1;
+    const d = date.getUTCDate();
+    const dayNames = ['\uc77c', '\uc6d4', '\ud654', '\uc218', '\ubaa9', '\uae08', '\ud1a0'];
+    const dayName = dayNames[date.getUTCDay()];
+    return `${m}/${d} (${dayName})`;
 }
 
 // ===== 오답노트 모달 =====
