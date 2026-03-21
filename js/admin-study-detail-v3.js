@@ -83,7 +83,7 @@ async function loadStudentDetail() {
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
-                'select': 'id,user_id,section_type,module_number,week,day,initial_record,initial_level,locked_auth_rate,error_note_submitted,error_note_text,completed_at,speaking_file_1,writing_email_text,writing_discussion_text',
+                'select': 'id,user_id,section_type,module_number,week,day,initial_record,initial_level,locked_auth_rate,error_note_submitted,error_note_text,completed_at,speaking_file_1,writing_email_text,writing_discussion_text,rewrite_record',
                 'limit': '1000'
             }),
             supabaseAPI.query('tr_deadline_extensions', {
@@ -1118,6 +1118,26 @@ function buildWritingModal(record, currentRecord) {
 
     html += buildWritingSection('\uc2e4\uc804\ud480\uc774', 'pen-fancy', '#3b82f6', record.initial_record);
     if (currentRecord) html += buildWritingSection('\ub2e4\uc2dc\ud480\uae30', 'redo', '#8b5cf6', currentRecord);
+
+    // Rewrite
+    const rw = record.rewrite_record;
+    if (rw) {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-pencil-alt" style="color:#10b981;"></i> Rewrite</div>`;
+        if (rw.email && rw.email.text) {
+            const wc = rw.email.wordCount || 0;
+            const savedAt = rw.email.savedAt ? formatCompletedAt(rw.email.savedAt) : '';
+            html += `<div style="margin-bottom:12px;"><strong>[Email]</strong> ${wc}단어${savedAt ? ` <span style="color:#94a3b8; font-size:11px;">(${savedAt})</span>` : ''}</div>`;
+            html += `<div class="detail-text-block">${escapeHtml(rw.email.text)}</div>`;
+        }
+        if (rw.discussion && rw.discussion.text) {
+            const wc = rw.discussion.wordCount || 0;
+            const savedAt = rw.discussion.savedAt ? formatCompletedAt(rw.discussion.savedAt) : '';
+            html += `<div style="margin-top:12px; margin-bottom:8px;"><strong>[Discussion]</strong> ${wc}단어${savedAt ? ` <span style="color:#94a3b8; font-size:11px;">(${savedAt})</span>` : ''}</div>`;
+            html += `<div class="detail-text-block">${escapeHtml(rw.discussion.text)}</div>`;
+        }
+        html += '</div>';
+    }
 
     // 오답노트
     if (record.error_note_text) {
