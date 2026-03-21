@@ -104,7 +104,7 @@ async function loadStudentDetail() {
 
         renderProfileHeader();
         renderV3SummaryCards();
-        renderStudyRecordTable();
+        await renderStudyRecordTable();
         loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
 
     } catch (error) {
@@ -494,6 +494,7 @@ const DAY_KR_MAP = { 'sunday': '일', 'monday': '월', 'tuesday': '화', 'wednes
 let allRecordRows = [];     // 전체 행 데이터
 let filteredRows = [];      // 필터 적용된 행
 let currentSort = { col: null, dir: 'asc' };
+let introMemoMapGlobal = {};  // 입문서 과제별 구간 메모 매핑 (모달에서 참조)
 
 // 과제 날짜 계산: scheduleStart + (week-1)*7 + dayIndex
 function getTaskDate(scheduleStart, week, dayEng) {
@@ -502,14 +503,13 @@ function getTaskDate(scheduleStart, week, dayEng) {
     return d;
 }
 
-function renderStudyRecordTable() {
+async function renderStudyRecordTable() {
     const { app } = studentData;
     const programType = getProgram(app);
     const totalWeeks = getTotalWeeks(app);
     const prog = programType.toLowerCase();
 
     // study_results_v3를 빠르게 조회할 수 있는 맵 생성
-    // 키: "section_type|module_number|week|day"
     const v3Map = {};
     studyResultsV3.forEach(r => {
         const key = `${r.section_type}|${r.module_number}|${r.week}|${r.day}`;
@@ -520,7 +520,64 @@ function renderStudyRecordTable() {
     const effectiveToday = getEffectiveToday();
     const scheduleStart = getScheduleStart(app);
 
-    // 스케줄 기반 행 생성
+    // ── 입문서 과제별 마감 구간 메모 수 계산 ──
+    // 1) 스케줄에서 입문서 과제 목록 추출 + 마감 시각 계산
+    const introDeadlines = [];
+    for (let week = 1; week <= totalWeeks; week++) {
+        for (const dayEn of DAY_ORDER) {
+            const sched = scheduleData.find(s =>
+                (s.program || '').toLowerCase() === prog && s.week === week && s.day === dayEn
+            );
+            if (!sched) continue;
+            for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
+                const parsed = parseScheduleSection(sec);
+                if (parsed && parsed.taskType === 'intro-book' && scheduleStart) {
+                    const taskDate = getTaskDate(scheduleStart, week, dayEn);
+                    // 마감 = 익일 04:00 KST = 과제일 19:00 UTC
+                    const deadline = new Date(taskDate);
+                    deadline.setUTCDate(deadline.getUTCDate() + 1);
+                    deadline.setUTCHours(19, 0, 0, 0);
+                    introDeadlines.push({ week, dayEn, moduleNumber: parsed.moduleNumber, deadline });
+                }
+            }
+        }
+    }
+    introDeadlines.sort((a, b) => a.deadline - b.deadline);
+
+    // 2) tr_book_memos 조회 (학생당 1회)
+    let allBookMemos = [];
+    if (introDeadlines.length > 0) {
+        try {
+            allBookMemos = await supabaseAPI.query('tr_book_memos', {
+                'user_id': `eq.${studentData.user.id}`,
+                'select': 'page_number,content,created_at',
+                'order': 'page_number.asc',
+                'limit': '500'
+            }) || [];
+        } catch (e) {
+            console.warn('입문서 메모 조회 실패:', e);
+        }
+    }
+
+    // 3) 과제별 마감 구간에 해당하는 메모 매핑
+    introMemoMapGlobal = {};
+    introDeadlines.forEach((d, idx) => {
+        const prevDeadline = idx > 0 ? introDeadlines[idx - 1].deadline : null;
+        const isLast = idx === introDeadlines.length - 1;
+        const matched = allBookMemos.filter(m => {
+            const t = new Date(m.created_at);
+            return prevDeadline ? (t > prevDeadline && t <= d.deadline) : (t <= d.deadline);
+        });
+        const afterDeadline = isLast ? allBookMemos.filter(m => new Date(m.created_at) > d.deadline) : [];
+        introMemoMapGlobal[`${d.week}|${d.dayEn}`] = {
+            count: matched.length,
+            memos: matched,
+            afterDeadlineMemos: afterDeadline,
+            isLast
+        };
+    });
+
+    // ── 스케줄 기반 행 생성 ──
     allRecordRows = [];
     for (let week = 1; week <= totalWeeks; week++) {
         for (const dayEn of DAY_ORDER) {
@@ -540,19 +597,28 @@ function renderStudyRecordTable() {
 
                 const dayKr = DAY_KR_MAP[dayEn];
                 const moduleNum = parsed.moduleNumber;
-
-                // DB 매칭
                 const key = `${parsed.taskType}|${moduleNum}|${week}|${dayKr}`;
                 const record = v3Map[key] || null;
+
+                // 입문서 점수: tr_book_memos 기반 과제별 메모 수
+                let score;
+                if (isUpcoming) {
+                    score = '-';
+                } else if (parsed.taskType === 'intro-book') {
+                    const introInfo = introMemoMapGlobal[`${week}|${dayEn}`];
+                    score = `메모 ${introInfo ? introInfo.count : 0}개`;
+                } else {
+                    score = getScoreText(parsed.taskType, record);
+                }
 
                 allRecordRows.push({
                     week, dayEn, dayKr, taskType: parsed.taskType,
                     moduleNumber: moduleNum,
                     rawSection: sec,
-                    record: record,
+                    record,
                     isUpcoming,
                     isDone: !isUpcoming && !!(record && record.initial_record),
-                    score: isUpcoming ? '-' : getScoreText(parsed.taskType, record),
+                    score,
                     level: isUpcoming ? '-' : getLevelText(parsed.taskType, record),
                     authRate: isUpcoming ? -1 : getAuthRateValue(record),
                     errorNote: isUpcoming ? false : (record ? !!record.error_note_submitted : false),
@@ -609,7 +675,7 @@ function getScoreText(taskType, record) {
             return `${s}/${t} (${pct}%)`;
         }
         case 'intro-book':
-            return `메모 ${ir.memo_count ?? 0}개`;
+            return `메모 ${ir.memo_count ?? 0}개`;  // fallback (테이블에서는 tr_book_memos 기반 값 사용)
         default:
             return '-';
     }
@@ -734,7 +800,15 @@ function renderRecordTableHTML() {
         }
 
         // 예정 과제는 점수/레벨/인증률/오답노트 모두 '-'
-        const scoreHtml = r.isUpcoming ? '<span style="color:#cbd5e1;">-</span>' : (r.isDone ? r.score : '<span style="color:#cbd5e1;">-</span>');
+        // 입문서는 미완료여도 메모 수 표시
+        let scoreHtml;
+        if (r.isUpcoming) {
+            scoreHtml = '<span style="color:#cbd5e1;">-</span>';
+        } else if (r.taskType === 'intro-book') {
+            scoreHtml = r.score;
+        } else {
+            scoreHtml = r.isDone ? r.score : '<span style="color:#cbd5e1;">-</span>';
+        }
 
         const levelHtml = (!r.isUpcoming && r.level !== '-')
             ? `<span class="record-level">${r.level}</span>`
@@ -761,9 +835,17 @@ function renderRecordTableHTML() {
 
         const timeHtml = r.completedAt ? formatCompletedAt(r.completedAt) : '<span style="color:#cbd5e1;">-</span>';
 
-        const viewBtn = (!r.isUpcoming && r.record)
-            ? `<button class="btn-record-view" onclick="openRecordDetailModal('${r.record.id}')">\ubcf4\uae30</button>`
-            : '<span style="color:#cbd5e1;">-</span>';
+        // 입문서는 record 없어도 도래했으면 [보기] 표시
+        let viewBtn;
+        if (r.isUpcoming) {
+            viewBtn = '<span style="color:#cbd5e1;">-</span>';
+        } else if (r.record) {
+            viewBtn = `<button class="btn-record-view" onclick="openRecordDetailModal('${r.record.id}')">보기</button>`;
+        } else if (r.taskType === 'intro-book') {
+            viewBtn = `<button class="btn-record-view" onclick="openIntroBookModal(${r.week}, '${r.dayEn}')">보기</button>`;
+        } else {
+            viewBtn = '<span style="color:#cbd5e1;">-</span>';
+        }
 
         html += `<tr${rowClass}>
             <td><span class="record-week-badge">W${r.week}</span></td>
@@ -792,6 +874,34 @@ function formatCompletedAt(dateStr) {
     const h = kst.getUTCHours();
     const min = String(kst.getUTCMinutes()).padStart(2, '0');
     return `${m}/${day} ${h}:${min}`;
+}
+
+// ===== 입문서 전용 모달 (record 없이 열기) =====
+async function openIntroBookModal(week, dayEn) {
+    const dayKr = DAY_KR_MAP[dayEn];
+    const row = allRecordRows.find(r => r.taskType === 'intro-book' && r.week === week && r.dayEn === dayEn);
+    const moduleNum = row ? row.moduleNumber : '';
+    const record = row ? row.record : null;
+
+    const existing = document.getElementById('recordDetailModal');
+    if (existing) existing.remove();
+
+    const title = `📕 입문서 정독${moduleNum ? ` M${moduleNum}` : ''} (W${week} ${dayKr})`;
+    const bodyHtml = await buildIntroBookModal(record, week, dayEn);
+
+    const modal = document.createElement('div');
+    modal.id = 'recordDetailModal';
+    modal.className = 'detail-modal-overlay';
+    modal.innerHTML = `
+        <div class="detail-modal">
+            <div class="detail-modal-header">
+                <h3>${title}</h3>
+                <button class="detail-modal-close" onclick="closeRecordDetailModal()">&times;</button>
+            </div>
+            <div class="detail-modal-body">${bodyHtml}</div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeRecordDetailModal(); });
 }
 
 // ===== [보기] 상세 모달 =====
@@ -839,9 +949,12 @@ async function openRecordDetailModal(recordId) {
         case 'vocab':
             bodyHtml = buildVocabModal(record);
             break;
-        case 'intro-book':
-            bodyHtml = await buildIntroBookModal(record);
+        case 'intro-book': {
+            // record.day(한글)에서 영문 요일 역산
+            const dayEnFromRecord = Object.keys(DAY_KR_MAP).find(k => DAY_KR_MAP[k] === record.day);
+            bodyHtml = await buildIntroBookModal(record, record.week, dayEnFromRecord);
             break;
+        }
         default:
             bodyHtml = '<p>상세 데이터가 없습니다.</p>';
     }
@@ -1081,33 +1194,29 @@ function buildVocabModal(record) {
 }
 
 // ===== Intro-book 모달 =====
-async function buildIntroBookModal(record) {
-    const ir = record.initial_record;
+async function buildIntroBookModal(record, week, dayEn) {
+    const ir = record ? record.initial_record : null;
     const userId = studentData.user.id;
-    const memoCount = ir ? (ir.memo_count ?? 0) : 0;
-    const authRate = record.locked_auth_rate;
+    const authRate = record ? record.locked_auth_rate : null;
 
-    // tr_book_progress + tr_book_memos 병렬 조회
+    // 과제별 구간 메모 정보 (renderStudyRecordTable에서 이미 계산됨)
+    const introInfo = dayEn ? introMemoMapGlobal[`${week}|${dayEn}`] : null;
+    const segmentMemos = introInfo ? introInfo.memos : [];
+    const afterDeadlineMemos = introInfo ? introInfo.afterDeadlineMemos : [];
+    const isLast = introInfo ? introInfo.isLast : false;
+    const segmentCount = segmentMemos.length;
+
+    // 읽기 진도 조회 (모달 열 때 1회)
     let progress = null;
-    let memos = [];
     try {
-        const [progResult, memoResult] = await Promise.all([
-            supabaseAPI.query('tr_book_progress', {
-                'user_id': `eq.${userId}`,
-                'select': 'last_page,max_page_reached,is_completed,completed_at,updated_at',
-                'limit': '1'
-            }),
-            supabaseAPI.query('tr_book_memos', {
-                'user_id': `eq.${userId}`,
-                'select': 'page_number,content,created_at',
-                'order': 'page_number.asc',
-                'limit': '500'
-            })
-        ]);
+        const progResult = await supabaseAPI.query('tr_book_progress', {
+            'user_id': `eq.${userId}`,
+            'select': 'last_page,max_page_reached,is_completed,completed_at,updated_at',
+            'limit': '1'
+        });
         progress = progResult && progResult.length > 0 ? progResult[0] : null;
-        memos = memoResult || [];
     } catch (e) {
-        console.warn('입문서 데이터 로드 실패:', e);
+        console.warn('입문서 진도 로드 실패:', e);
     }
 
     let html = '';
@@ -1115,21 +1224,21 @@ async function buildIntroBookModal(record) {
     // 1. 이 과제 인증 시점 정보
     let authIcon;
     if (authRate != null && authRate >= 100) {
-        authIcon = '<span style="color:#22c55e; font-weight:700;">\u2705 인증</span>';
+        authIcon = '<span style="color:#22c55e; font-weight:700;">✅ 인증</span>';
     } else if (authRate != null && authRate >= 50) {
-        authIcon = '<span style="color:#f59e0b; font-weight:700;">\ud83d\udfe1 초기 제출</span>';
+        authIcon = '<span style="color:#f59e0b; font-weight:700;">🟡 초기 제출</span>';
     } else if (ir) {
         authIcon = record.error_note_submitted
-            ? '<span style="color:#22c55e; font-weight:700;">\u2705 인증</span>'
-            : '<span style="color:#f59e0b; font-weight:700;">\ud83d\udfe1 초기 제출</span>';
+            ? '<span style="color:#22c55e; font-weight:700;">✅ 인증</span>'
+            : '<span style="color:#f59e0b; font-weight:700;">🟡 초기 제출</span>';
     } else {
-        authIcon = '<span style="color:#ef4444; font-weight:700;">\u274c 미인증</span>';
+        authIcon = '<span style="color:#ef4444; font-weight:700;">❌ 미인증</span>';
     }
 
     html += `<div class="detail-section">
         <div class="detail-section-title"><i class="fas fa-check-circle" style="color:#3b82f6;"></i> 이 과제 인증 시점</div>
         <div style="display:flex; flex-direction:column; gap:6px; font-size:14px;">
-            <span>메모 수: <strong>${memoCount}개</strong></span>
+            <span>메모 수: <strong>${segmentCount}개</strong></span>
             <span>인증: ${authIcon}</span>
         </div>
     </div>`;
@@ -1140,7 +1249,7 @@ async function buildIntroBookModal(record) {
         const lastPage = progress.last_page || 0;
         const pct = INTRO_BOOK_TOTAL_PAGES > 0 ? Math.round(maxPage / INTRO_BOOK_TOTAL_PAGES * 100) : 0;
         const completedStr = progress.is_completed
-            ? '<span style="color:#22c55e; font-weight:700;">\u2705 완독</span>'
+            ? '<span style="color:#22c55e; font-weight:700;">✅ 완독</span>'
             : '<span style="color:#f59e0b;">진행 중</span>';
         const updatedStr = progress.updated_at ? formatCompletedAt(progress.updated_at) : '-';
 
@@ -1163,15 +1272,21 @@ async function buildIntroBookModal(record) {
         </div>`;
     }
 
-    // 3. 전체 메모 목록 (접기/펼치기)
-    if (memos.length > 0) {
+    // 3. 이 과제 구간 메모 목록 (접기/펼치기)
+    const totalDisplay = segmentMemos.length + afterDeadlineMemos.length;
+    if (totalDisplay > 0) {
+        const titleSuffix = isLast && afterDeadlineMemos.length > 0
+            ? ` (구간 ${segmentMemos.length}개 + 마감 후 ${afterDeadlineMemos.length}개)`
+            : ` (${segmentMemos.length}개)`;
+
         html += `<div class="detail-section">
-            <div class="detail-section-title" style="cursor:pointer;" onclick="var w=this.parentElement.querySelector('.memo-list-wrap');var t=this.querySelector('.memo-toggle');if(w.style.display==='none'){w.style.display='block';t.textContent='\u25b2 접기';}else{w.style.display='none';t.textContent='\u25bc 펼치기';}">
-                <i class="fas fa-sticky-note" style="color:#f59e0b;"></i> 전체 메모 목록 (${memos.length}개)
-                <span class="memo-toggle" style="font-size:11px; color:#94a3b8; margin-left:auto;">\u25bc 펼치기</span>
+            <div class="detail-section-title" style="cursor:pointer;" onclick="var w=this.parentElement.querySelector('.memo-list-wrap');var t=this.querySelector('.memo-toggle');if(w.style.display==='none'){w.style.display='block';t.textContent='▲ 접기';}else{w.style.display='none';t.textContent='▼ 펼치기';}">
+                <i class="fas fa-sticky-note" style="color:#f59e0b;"></i> 이 과제 메모${titleSuffix}
+                <span class="memo-toggle" style="font-size:11px; color:#94a3b8; margin-left:auto;">▼ 펼치기</span>
             </div>
             <div class="memo-list-wrap" style="display:none; max-height:300px; overflow-y:auto;">`;
-        memos.forEach(m => {
+
+        segmentMemos.forEach(m => {
             const timeStr = m.created_at ? formatCompletedAt(m.created_at) : '';
             html += `<div style="padding:8px 10px; border-bottom:1px solid #e2e8f0; font-size:13px;">
                 <span style="color:#8b5cf6; font-weight:700; margin-right:8px;">p.${m.page_number}</span>
@@ -1179,11 +1294,27 @@ async function buildIntroBookModal(record) {
                 ${timeStr ? `<span style="color:#94a3b8; font-size:11px; margin-left:8px;">${timeStr}</span>` : ''}
             </div>`;
         });
+
+        // 마지막 과제이고 마감 이후 메모가 있으면 구분선
+        if (isLast && afterDeadlineMemos.length > 0) {
+            html += `<div style="padding:10px; text-align:center; color:#94a3b8; font-size:12px; border-bottom:1px solid #e2e8f0; background:#f8fafc;">
+                ─────── 마감 이후 작성 (${afterDeadlineMemos.length}개) ───────
+            </div>`;
+            afterDeadlineMemos.forEach(m => {
+                const timeStr = m.created_at ? formatCompletedAt(m.created_at) : '';
+                html += `<div style="padding:8px 10px; border-bottom:1px solid #e2e8f0; font-size:13px; background:#fffbeb;">
+                    <span style="color:#8b5cf6; font-weight:700; margin-right:8px;">p.${m.page_number}</span>
+                    <span style="color:#334155;">${escapeHtml(m.content)}</span>
+                    ${timeStr ? `<span style="color:#94a3b8; font-size:11px; margin-left:8px;">${timeStr}</span>` : ''}
+                </div>`;
+            });
+        }
+
         html += '</div></div>';
     } else {
         html += `<div class="detail-section">
-            <div class="detail-section-title"><i class="fas fa-sticky-note" style="color:#f59e0b;"></i> 전체 메모 목록</div>
-            <p style="color:#94a3b8; font-size:13px;">작성된 메모가 없습니다.</p>
+            <div class="detail-section-title"><i class="fas fa-sticky-note" style="color:#f59e0b;"></i> 이 과제 메모</div>
+            <p style="color:#94a3b8; font-size:13px;">이 구간에 작성된 메모가 없습니다.</p>
         </div>`;
     }
 
