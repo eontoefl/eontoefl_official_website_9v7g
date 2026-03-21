@@ -7,6 +7,9 @@ let scheduleData = [];       // tr_schedule_assignment 전체
 let studyResultsV3 = [];     // study_results_v3 해당 학생
 let deadlineExtensionsData = []; // tr_deadline_extensions 해당 학생
 
+// ===== 입문서 총 페이지 수 (추후 DB에서 자동 조회로 교체 예정) =====
+const INTRO_BOOK_TOTAL_PAGES = 300;
+
 // ===== 과제 타입 → 이모지/라벨 매핑 =====
 const TASK_EMOJI_MAP = {
     'reading': { emoji: '\ud83d\udcd6', label: 'Reading' },
@@ -837,7 +840,7 @@ async function openRecordDetailModal(recordId) {
             bodyHtml = buildVocabModal(record);
             break;
         case 'intro-book':
-            bodyHtml = buildIntroBookModal(record);
+            bodyHtml = await buildIntroBookModal(record);
             break;
         default:
             bodyHtml = '<p>상세 데이터가 없습니다.</p>';
@@ -1078,19 +1081,113 @@ function buildVocabModal(record) {
 }
 
 // ===== Intro-book 모달 =====
-function buildIntroBookModal(record) {
+async function buildIntroBookModal(record) {
     const ir = record.initial_record;
-    if (!ir) return '<p style="color:#94a3b8; text-align:center;">데이터가 없습니다.</p>';
+    const userId = studentData.user.id;
+    const memoCount = ir ? (ir.memo_count ?? 0) : 0;
+    const authRate = record.locked_auth_rate;
 
-    const memoCount = ir.memo_count ?? 0;
+    // tr_book_progress + tr_book_memos 병렬 조회
+    let progress = null;
+    let memos = [];
+    try {
+        const [progResult, memoResult] = await Promise.all([
+            supabaseAPI.query('tr_book_progress', {
+                'user_id': `eq.${userId}`,
+                'select': 'last_page,max_page_reached,is_completed,completed_at,updated_at',
+                'limit': '1'
+            }),
+            supabaseAPI.query('tr_book_memos', {
+                'user_id': `eq.${userId}`,
+                'select': 'page_number,content,created_at',
+                'order': 'page_number.asc',
+                'limit': '500'
+            })
+        ]);
+        progress = progResult && progResult.length > 0 ? progResult[0] : null;
+        memos = memoResult || [];
+    } catch (e) {
+        console.warn('입문서 데이터 로드 실패:', e);
+    }
 
-    return `<div class="detail-section">
-        <div class="detail-section-title"><i class="fas fa-book-reader" style="color:#3b82f6;"></i> \uacb0\uacfc</div>
-        <div style="display:flex; flex-direction:column; gap:8px; font-size:14px;">
-            <span>\uba54\ubaa8 \uc791\uc131: <strong>${memoCount}\uac1c</strong></span>
-            <span>\uc778\uc99d: <span style="color:#22c55e; font-weight:700;">\u2705</span></span>
+    let html = '';
+
+    // 1. 이 과제 인증 시점 정보
+    let authIcon;
+    if (authRate != null && authRate >= 100) {
+        authIcon = '<span style="color:#22c55e; font-weight:700;">\u2705 인증</span>';
+    } else if (authRate != null && authRate >= 50) {
+        authIcon = '<span style="color:#f59e0b; font-weight:700;">\ud83d\udfe1 초기 제출</span>';
+    } else if (ir) {
+        authIcon = record.error_note_submitted
+            ? '<span style="color:#22c55e; font-weight:700;">\u2705 인증</span>'
+            : '<span style="color:#f59e0b; font-weight:700;">\ud83d\udfe1 초기 제출</span>';
+    } else {
+        authIcon = '<span style="color:#ef4444; font-weight:700;">\u274c 미인증</span>';
+    }
+
+    html += `<div class="detail-section">
+        <div class="detail-section-title"><i class="fas fa-check-circle" style="color:#3b82f6;"></i> 이 과제 인증 시점</div>
+        <div style="display:flex; flex-direction:column; gap:6px; font-size:14px;">
+            <span>메모 수: <strong>${memoCount}개</strong></span>
+            <span>인증: ${authIcon}</span>
         </div>
     </div>`;
+
+    // 2. 읽기 진도
+    if (progress) {
+        const maxPage = progress.max_page_reached || 0;
+        const lastPage = progress.last_page || 0;
+        const pct = INTRO_BOOK_TOTAL_PAGES > 0 ? Math.round(maxPage / INTRO_BOOK_TOTAL_PAGES * 100) : 0;
+        const completedStr = progress.is_completed
+            ? '<span style="color:#22c55e; font-weight:700;">\u2705 완독</span>'
+            : '<span style="color:#f59e0b;">진행 중</span>';
+        const updatedStr = progress.updated_at ? formatCompletedAt(progress.updated_at) : '-';
+
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-book-open" style="color:#8b5cf6;"></i> 읽기 진도</div>
+            <div style="display:flex; flex-direction:column; gap:6px; font-size:14px;">
+                <span>현재 위치: <strong>${lastPage}p</strong> / ${INTRO_BOOK_TOTAL_PAGES}p</span>
+                <span>최대 도달: <strong>${maxPage}p</strong> (${pct}%)</span>
+                <div style="background:#f1f5f9; border-radius:6px; height:8px; overflow:hidden; margin:2px 0;">
+                    <div style="height:100%; width:${Math.min(100, pct)}%; background:linear-gradient(90deg,#8b5cf6,#a78bfa); border-radius:6px;"></div>
+                </div>
+                <span>완독: ${completedStr}</span>
+                <span>마지막 읽은 시각: ${updatedStr}</span>
+            </div>
+        </div>`;
+    } else {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-book-open" style="color:#8b5cf6;"></i> 읽기 진도</div>
+            <p style="color:#94a3b8; font-size:13px;">읽기 진도 데이터가 없습니다.</p>
+        </div>`;
+    }
+
+    // 3. 전체 메모 목록 (접기/펼치기)
+    if (memos.length > 0) {
+        html += `<div class="detail-section">
+            <div class="detail-section-title" style="cursor:pointer;" onclick="var w=this.parentElement.querySelector('.memo-list-wrap');var t=this.querySelector('.memo-toggle');if(w.style.display==='none'){w.style.display='block';t.textContent='\u25b2 접기';}else{w.style.display='none';t.textContent='\u25bc 펼치기';}">
+                <i class="fas fa-sticky-note" style="color:#f59e0b;"></i> 전체 메모 목록 (${memos.length}개)
+                <span class="memo-toggle" style="font-size:11px; color:#94a3b8; margin-left:auto;">\u25bc 펼치기</span>
+            </div>
+            <div class="memo-list-wrap" style="display:none; max-height:300px; overflow-y:auto;">`;
+        memos.forEach(m => {
+            const timeStr = m.created_at ? formatCompletedAt(m.created_at) : '';
+            html += `<div style="padding:8px 10px; border-bottom:1px solid #e2e8f0; font-size:13px;">
+                <span style="color:#8b5cf6; font-weight:700; margin-right:8px;">p.${m.page_number}</span>
+                <span style="color:#334155;">${escapeHtml(m.content)}</span>
+                ${timeStr ? `<span style="color:#94a3b8; font-size:11px; margin-left:8px;">${timeStr}</span>` : ''}
+            </div>`;
+        });
+        html += '</div></div>';
+    } else {
+        html += `<div class="detail-section">
+            <div class="detail-section-title"><i class="fas fa-sticky-note" style="color:#f59e0b;"></i> 전체 메모 목록</div>
+            <p style="color:#94a3b8; font-size:13px;">작성된 메모가 없습니다.</p>
+        </div>`;
+    }
+
+    return html;
 }
 
 // ===== 오답노트 모달 =====
