@@ -632,12 +632,15 @@ function applyRecordFilters() {
     const weekVal = document.getElementById('filterWeek').value;
     const typeVal = document.getElementById('filterType').value;
     const statusVal = document.getElementById('filterStatus').value;
+    const arrivalVal = document.getElementById('filterArrival').value;
 
     filteredRows = allRecordRows.filter(r => {
         if (weekVal && r.week !== parseInt(weekVal)) return false;
         if (typeVal && r.taskType !== typeVal) return false;
-        if (statusVal === 'done' && !r.isDone) return false;
-        if (statusVal === 'undone' && r.isDone) return false;
+        if (arrivalVal === 'arrived' && r.isUpcoming) return false;
+        if (arrivalVal === 'upcoming' && !r.isUpcoming) return false;
+        if (statusVal === 'done' && (!r.isDone || r.isUpcoming)) return false;
+        if (statusVal === 'undone' && (r.isDone || r.isUpcoming)) return false;
         return true;
     });
 
