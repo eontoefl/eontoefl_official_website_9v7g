@@ -493,6 +493,10 @@
         .record-table tr:hover { background: #faf5ff; }
         .record-table tr.row-undone { background: #fefce8; }
         .record-table tr.row-undone:hover { background: #fef9c3; }
+        .record-table tr.row-upcoming { background: #f8fafc; color: #9ca3af; }
+        .record-table tr.row-upcoming:hover { background: #f1f5f9; }
+        .record-table tr.row-upcoming td { color: #9ca3af; }
+        .record-status-upcoming { color: #94a3b8; font-weight: 600; font-size: 11px; }
 
         .record-week-badge {
             display: inline-block; background: #ede9fe; color: #7c3aed;
@@ -837,6 +841,14 @@
                             <option value="">전체</option>
                             <option value="done">완료만</option>
                             <option value="undone">미완료만</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>도래 상태</label>
+                        <select id="filterArrival" onchange="applyRecordFilters()">
+                            <option value="">전체</option>
+                            <option value="arrived">도래만</option>
+                            <option value="upcoming">예정만</option>
                         </select>
                     </div>
                 </div>
