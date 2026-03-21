@@ -492,6 +492,13 @@ let allRecordRows = [];     // 전체 행 데이터
 let filteredRows = [];      // 필터 적용된 행
 let currentSort = { col: null, dir: 'asc' };
 
+// 과제 날짜 계산: scheduleStart + (week-1)*7 + dayIndex
+function getTaskDate(scheduleStart, week, dayEng) {
+    const d = new Date(scheduleStart);
+    d.setUTCDate(d.getUTCDate() + (week - 1) * 7 + (DAY_ENG_TO_INDEX[dayEng] || 0));
+    return d;
+}
+
 function renderStudyRecordTable() {
     const { app } = studentData;
     const programType = getProgram(app);
