@@ -1177,7 +1177,7 @@ function buildVocabModal(record) {
 
     const s = ir.score ?? 0, t = ir.total ?? 0;
     const pct = t > 0 ? Math.round(s / t * 100) : 0;
-    const pages = ir.pages ? ir.pages.join(', ') + 'pg' : '-';
+    const pages = ir.pages ? (Array.isArray(ir.pages) ? ir.pages.join(', ') + 'pg' : ir.pages + 'pg') : '-';
     const authOk = pct >= 30;
 
     return `<div class="detail-section">
