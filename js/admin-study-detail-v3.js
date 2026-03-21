@@ -506,6 +506,10 @@ function renderStudyRecordTable() {
         v3Map[key] = r;
     });
 
+    // 도래 판별용
+    const effectiveToday = getEffectiveToday();
+    const scheduleStart = getScheduleStart(app);
+
     // 스케줄 기반 행 생성
     allRecordRows = [];
     for (let week = 1; week <= totalWeeks; week++) {
@@ -516,6 +520,9 @@ function renderStudyRecordTable() {
                 s.day === dayEn
             );
             if (!sched) continue;
+
+            const taskDate = scheduleStart ? getTaskDate(scheduleStart, week, dayEn) : null;
+            const isUpcoming = !taskDate || taskDate > effectiveToday;
 
             for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
                 const parsed = parseScheduleSection(sec);
@@ -533,12 +540,12 @@ function renderStudyRecordTable() {
                     moduleNumber: moduleNum,
                     rawSection: sec,
                     record: record,
-                    // 파싱된 데이터
-                    isDone: !!(record && record.initial_record),
-                    score: getScoreText(parsed.taskType, record),
-                    level: getLevelText(parsed.taskType, record),
-                    authRate: getAuthRateValue(record),
-                    errorNote: record ? !!record.error_note_submitted : false,
+                    isUpcoming,
+                    isDone: !isUpcoming && !!(record && record.initial_record),
+                    score: isUpcoming ? '-' : getScoreText(parsed.taskType, record),
+                    level: isUpcoming ? '-' : getLevelText(parsed.taskType, record),
+                    authRate: isUpcoming ? -1 : getAuthRateValue(record),
+                    errorNote: isUpcoming ? false : (record ? !!record.error_note_submitted : false),
                     completedAt: record ? record.completed_at : null
                 });
             }
@@ -694,29 +701,54 @@ function renderRecordTableHTML() {
         </tr></thead><tbody>`;
 
     filteredRows.forEach(r => {
-        const rowClass = r.isDone ? '' : ' class="row-undone"';
+        // 행 스타일: 예정(회색) > 미완료(노랑) > 완료(기본)
+        let rowClass = '';
+        if (r.isUpcoming) rowClass = ' class="row-upcoming"';
+        else if (!r.isDone) rowClass = ' class="row-undone"';
+
         const info = TASK_EMOJI_MAP[r.taskType] || { emoji: '\ud83d\udccc', label: r.taskType };
         const moduleStr = r.moduleNumber ? ` M${r.moduleNumber}` : '';
         const taskLabel = `${info.emoji} ${info.label}${moduleStr}`;
 
-        const statusHtml = r.isDone
-            ? '<span class="record-status-done">\u2705 \uc644\ub8cc</span>'
-            : '<span class="record-status-undone">\u274c \ubbf8\uc644\ub8cc</span>';
+        // 상태 표시
+        let statusHtml;
+        if (r.isUpcoming) {
+            statusHtml = '<span class="record-status-upcoming">\u23f3 \uc608\uc815</span>';
+        } else if (r.isDone) {
+            statusHtml = '<span class="record-status-done">\u2705 \uc644\ub8cc</span>';
+        } else {
+            statusHtml = '<span class="record-status-undone">\u274c \ubbf8\uc644\ub8cc</span>';
+        }
 
-        const levelHtml = r.level !== '-' ? `<span class="record-level">${r.level}</span>` : '<span style="color:#cbd5e1;">-</span>';
+        // 예정 과제는 점수/레벨/인증률/오답노트 모두 '-'
+        const scoreHtml = r.isUpcoming ? '<span style="color:#cbd5e1;">-</span>' : (r.isDone ? r.score : '<span style="color:#cbd5e1;">-</span>');
 
-        let authClass = 'record-auth-0';
-        if (r.authRate >= 100) authClass = 'record-auth-100';
-        else if (r.authRate >= 50) authClass = 'record-auth-50';
-        const authHtml = `<span class="${authClass}">${r.authRate}%</span>`;
-
-        const noteHtml = r.isDone
-            ? (r.errorNote ? '<span style="color:#22c55e;">\u2705</span>' : '<span style="color:#ef4444;">\u274c</span>')
+        const levelHtml = (!r.isUpcoming && r.level !== '-')
+            ? `<span class="record-level">${r.level}</span>`
             : '<span style="color:#cbd5e1;">-</span>';
+
+        let authHtml;
+        if (r.isUpcoming) {
+            authHtml = '<span style="color:#cbd5e1;">-</span>';
+        } else {
+            let authClass = 'record-auth-0';
+            if (r.authRate >= 100) authClass = 'record-auth-100';
+            else if (r.authRate >= 50) authClass = 'record-auth-50';
+            authHtml = `<span class="${authClass}">${r.authRate}%</span>`;
+        }
+
+        let noteHtml;
+        if (r.isUpcoming) {
+            noteHtml = '<span style="color:#cbd5e1;">-</span>';
+        } else if (r.isDone) {
+            noteHtml = r.errorNote ? '<span style="color:#22c55e;">\u2705</span>' : '<span style="color:#ef4444;">\u274c</span>';
+        } else {
+            noteHtml = '<span style="color:#cbd5e1;">-</span>';
+        }
 
         const timeHtml = r.completedAt ? formatCompletedAt(r.completedAt) : '<span style="color:#cbd5e1;">-</span>';
 
-        const viewBtn = r.record
+        const viewBtn = (!r.isUpcoming && r.record)
             ? `<button class="btn-record-view" onclick="openRecordDetailModal('${r.record.id}')">\ubcf4\uae30</button>`
             : '<span style="color:#cbd5e1;">-</span>';
 
@@ -725,7 +757,7 @@ function renderRecordTableHTML() {
             <td><span class="record-day-badge">${r.dayKr}</span></td>
             <td><span class="record-task-name">${taskLabel}</span></td>
             <td>${statusHtml}</td>
-            <td class="record-score">${r.isDone ? r.score : '<span style="color:#cbd5e1;">-</span>'}</td>
+            <td class="record-score">${scoreHtml}</td>
             <td>${levelHtml}</td>
             <td>${authHtml}</td>
             <td style="text-align:center;">${noteHtml}</td>
