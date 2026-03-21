@@ -495,6 +495,7 @@ let allRecordRows = [];     // 전체 행 데이터
 let filteredRows = [];      // 필터 적용된 행
 let currentSort = { col: null, dir: 'asc' };
 let introMemoMapGlobal = {};  // 입문서 과제별 구간 메모 매핑 (모달에서 참조)
+const NO_ERROR_NOTE_TYPES = ['vocab', 'intro-book'];  // 오답노트 해당 없는 과제 유형
 
 // 과제 날짜 계산: scheduleStart + (week-1)*7 + dayIndex
 function getTaskDate(scheduleStart, week, dayEng) {
@@ -626,7 +627,7 @@ async function renderStudyRecordTable() {
                     score,
                     level: isUpcoming ? '-' : getLevelText(parsed.taskType, record),
                     authRate: isUpcoming ? -1 : getAuthRateValue(record),
-                    errorNote: isUpcoming ? false : (record ? !!record.error_note_submitted : false),
+                    errorNote: isUpcoming ? false : NO_ERROR_NOTE_TYPES.includes(parsed.taskType) ? null : (record ? !!record.error_note_submitted : false),
                     completedAt: record ? record.completed_at : null
                 });
             }
@@ -743,7 +744,7 @@ function sortRows(col, dir, skipToggle) {
             case 'task': va = a.taskType; vb = b.taskType; break;
             case 'status': va = a.isDone ? 1 : 0; vb = b.isDone ? 1 : 0; break;
             case 'auth': va = a.authRate; vb = b.authRate; break;
-            case 'note': va = a.errorNote ? 1 : 0; vb = b.errorNote ? 1 : 0; break;
+            case 'note': va = a.errorNote === null ? -1 : a.errorNote ? 1 : 0; vb = b.errorNote === null ? -1 : b.errorNote ? 1 : 0; break;
             case 'time': va = a.completedAt || ''; vb = b.completedAt || ''; break;
             default: va = 0; vb = 0;
         }
@@ -822,7 +823,7 @@ function renderRecordTableHTML() {
         }
 
         let noteHtml;
-        if (r.isUpcoming) {
+        if (r.isUpcoming || r.errorNote === null) {
             noteHtml = '<span style="color:#cbd5e1;">-</span>';
         } else if (r.isDone) {
             noteHtml = r.errorNote ? '<span style="color:#22c55e;">\u2705</span>' : '<span style="color:#ef4444;">\u274c</span>';
