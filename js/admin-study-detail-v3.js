@@ -506,6 +506,10 @@ function renderStudyRecordTable() {
         v3Map[key] = r;
     });
 
+    // 도래 판별용
+    const effectiveToday = getEffectiveToday();
+    const scheduleStart = getScheduleStart(app);
+
     // 스케줄 기반 행 생성
     allRecordRows = [];
     for (let week = 1; week <= totalWeeks; week++) {
@@ -516,6 +520,9 @@ function renderStudyRecordTable() {
                 s.day === dayEn
             );
             if (!sched) continue;
+
+            const taskDate = scheduleStart ? getTaskDate(scheduleStart, week, dayEn) : null;
+            const isUpcoming = !taskDate || taskDate > effectiveToday;
 
             for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
                 const parsed = parseScheduleSection(sec);
@@ -533,12 +540,12 @@ function renderStudyRecordTable() {
                     moduleNumber: moduleNum,
                     rawSection: sec,
                     record: record,
-                    // 파싱된 데이터
-                    isDone: !!(record && record.initial_record),
-                    score: getScoreText(parsed.taskType, record),
-                    level: getLevelText(parsed.taskType, record),
-                    authRate: getAuthRateValue(record),
-                    errorNote: record ? !!record.error_note_submitted : false,
+                    isUpcoming,
+                    isDone: !isUpcoming && !!(record && record.initial_record),
+                    score: isUpcoming ? '-' : getScoreText(parsed.taskType, record),
+                    level: isUpcoming ? '-' : getLevelText(parsed.taskType, record),
+                    authRate: isUpcoming ? -1 : getAuthRateValue(record),
+                    errorNote: isUpcoming ? false : (record ? !!record.error_note_submitted : false),
                     completedAt: record ? record.completed_at : null
                 });
             }
