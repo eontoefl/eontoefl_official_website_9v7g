@@ -589,7 +589,7 @@ async function renderStudyRecordTable() {
             if (!sched) continue;
 
             const taskDate = scheduleStart ? getTaskDate(scheduleStart, week, dayEn) : null;
-            const isUpcoming = !taskDate || taskDate > effectiveToday;
+            const isDateUpcoming = !taskDate || taskDate > effectiveToday;
 
             for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
                 const parsed = parseScheduleSection(sec);
@@ -599,6 +599,11 @@ async function renderStudyRecordTable() {
                 const moduleNum = parsed.moduleNumber;
                 const key = `${parsed.taskType}|${moduleNum}|${week}|${dayKr}`;
                 const record = v3Map[key] || null;
+                const hasRecord = !!(record && record.initial_record);
+
+                // 우선순위: record 있으면 도래 여부와 무관하게 완료
+                const isUpcoming = isDateUpcoming && !hasRecord;
+                const isDone = hasRecord;
 
                 // 입문서 점수: tr_book_memos 기반 과제별 메모 수
                 let score;
@@ -617,7 +622,7 @@ async function renderStudyRecordTable() {
                     rawSection: sec,
                     record,
                     isUpcoming,
-                    isDone: !isUpcoming && !!(record && record.initial_record),
+                    isDone,
                     score,
                     level: isUpcoming ? '-' : getLevelText(parsed.taskType, record),
                     authRate: isUpcoming ? -1 : getAuthRateValue(record),
@@ -708,7 +713,7 @@ function applyRecordFilters() {
         if (typeVal && r.taskType !== typeVal) return false;
         if (arrivalVal === 'arrived' && r.isUpcoming) return false;
         if (arrivalVal === 'upcoming' && !r.isUpcoming) return false;
-        if (statusVal === 'done' && (!r.isDone || r.isUpcoming)) return false;
+        if (statusVal === 'done' && !r.isDone) return false;
         if (statusVal === 'undone' && (r.isDone || r.isUpcoming)) return false;
         return true;
     });
@@ -799,16 +804,8 @@ function renderRecordTableHTML() {
             statusHtml = '<span class="record-status-undone">\u274c \ubbf8\uc644\ub8cc</span>';
         }
 
-        // 예정 과제는 점수/레벨/인증률/오답노트 모두 '-'
-        // 입문서는 미완료여도 메모 수 표시
-        let scoreHtml;
-        if (r.isUpcoming) {
-            scoreHtml = '<span style="color:#cbd5e1;">-</span>';
-        } else if (r.taskType === 'intro-book') {
-            scoreHtml = r.score;
-        } else {
-            scoreHtml = r.isDone ? r.score : '<span style="color:#cbd5e1;">-</span>';
-        }
+        // 예정이면 '-', 그 외에는 score 표시
+        const scoreHtml = r.isUpcoming ? '<span style="color:#cbd5e1;">-</span>' : r.score;
 
         const levelHtml = (!r.isUpcoming && r.level !== '-')
             ? `<span class="record-level">${r.level}</span>`
