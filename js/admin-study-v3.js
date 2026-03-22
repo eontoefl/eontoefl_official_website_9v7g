@@ -91,7 +91,7 @@ async function loadStudyData() {
         const authRecords = await supabaseAPI.query('tr_auth_records', { 'limit': '10000' });
         const allAuthRecords = (authRecords || []).filter(r => userIds.includes(r.user_id));
 
-        // 5. 스케줄 데이터 (잔디/알림용)
+        // 5. 스케줄 데이터 (잔디/알림/인증률 계산용)
         const scheduleData = await supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' });
         scheduleLookup = {};
         (scheduleData || []).forEach(s => {
@@ -101,10 +101,19 @@ async function loadStudyData() {
             scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
         });
 
-        // 6. ★ tr_student_stats (테스트룸이 계산한 인증률/등급/제출률/환급)
-        const allStats = await supabaseAPI.query('tr_student_stats', { 'limit': '500' });
-        const statsMap = {};
-        (allStats || []).forEach(st => { statsMap[st.user_id] = st; });
+        // 6. study_results_v3 (V3 인증률 계산용)
+        const v3Records = await supabaseAPI.query('study_results_v3', {
+            'select': 'user_id,locked_auth_rate,initial_record,error_note_submitted',
+            'limit': '10000'
+        });
+        const v3Map = {};
+        (v3Records || []).forEach(r => {
+            if (!v3Map[r.user_id]) v3Map[r.user_id] = [];
+            v3Map[r.user_id].push(r);
+        });
+
+        // 7. 등급 규칙 로드
+        const gradeRules = await loadGradeRules();
 
         // 7. 학생별 데이터 조합
         allStudentData = activeApps.map(app => {
@@ -122,47 +131,57 @@ async function loadStudyData() {
             const programType = (app.assigned_program || app.preferred_program || '').includes('Fast') ? 'Fast' : 'Standard';
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
-            // ── ★ tr_student_stats에서 읽기 (테스트룸 계산 결과) ──
-            const stats = statsMap[userId] || {};
-            const avgAuthRate = stats.calc_auth_rate || 0;
-            const grade = stats.calc_grade || '-';
-            const totalDeadlinedTasks = stats.calc_tasks_due || 0;
-            const submittedTasksCount = stats.calc_tasks_submitted || 0;
-
             // 시작 전 여부
             const isBeforeStart = today < startDate;
 
-            // ── calc_tasks_due 기준 3분기 (테스트룸 개발자 포맷) ──
-            const submitRate = stats.calc_submit_rate || 0;
+            // ── study_results_v3 기반 인증률 계산 ──
+            const myV3 = v3Map[userId] || [];
+            let authRateSum = 0;
+            for (const r of myV3) {
+                if (r.locked_auth_rate != null) {
+                    authRateSum += r.locked_auth_rate;
+                } else if (r.initial_record) {
+                    authRateSum += r.error_note_submitted ? 100 : 50;
+                }
+            }
+
+            // 도래 과제 수 계산 (스케줄 기반)
+            const prog = programType.toLowerCase();
+            const dayEngNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            let totalDeadlinedTasks = 0;
+            for (const s of (scheduleData || [])) {
+                if ((s.program || '').toLowerCase() !== prog) continue;
+                if (s.week > totalWeeks) continue;
+                const dayIndex = dayEngNames.indexOf(s.day);
+                if (dayIndex < 0) continue;
+                const taskDate = new Date(startDate);
+                taskDate.setDate(taskDate.getDate() + (s.week - 1) * 7 + dayIndex);
+                if (taskDate > today) continue;
+                for (const sec of [s.section1, s.section2, s.section3, s.section4]) {
+                    const parsed = parseScheduleSection(sec);
+                    if (parsed && parsed.taskType !== 'unknown') totalDeadlinedTasks++;
+                }
+            }
+
+            const avgAuthRate = totalDeadlinedTasks > 0 ? Math.round(authRateSum / totalDeadlinedTasks) : 0;
 
             // 인증률 표시
             let authDisplay = '-';
-            if (totalDeadlinedTasks > 0) {
-                authDisplay = `${avgAuthRate}%`;
-            } else if (totalDeadlinedTasks === 0 && submittedTasksCount > 0) {
-                authDisplay = `${avgAuthRate}%`;
-            } else {
+            if (isBeforeStart) {
                 authDisplay = '-';
+            } else if (totalDeadlinedTasks > 0) {
+                authDisplay = `${avgAuthRate}%`;
+            } else if (myV3.length > 0) {
+                authDisplay = `${avgAuthRate}%`;
             }
 
-            // 등급 표시
-            let displayGrade;
+            // 등급 계산 (인증률 기반)
+            let displayGrade = '-';
             if (totalDeadlinedTasks > 0) {
-                displayGrade = grade;
-            } else {
-                displayGrade = '-';
+                const gradeResult = getGradeFromRules(avgAuthRate, gradeRules, 100000);
+                displayGrade = gradeResult ? gradeResult.grade : '-';
             }
-            const gradeColor = (displayGrade !== '-') ? getGradeColor(grade) : '#94a3b8';
-
-            // 제출률 표시
-            let submitDisplay = '-';
-            if (totalDeadlinedTasks > 0) {
-                submitDisplay = `${submitRate}%`;
-            } else if (totalDeadlinedTasks === 0 && submittedTasksCount > 0) {
-                submitDisplay = `${submittedTasksCount}건 미리 완료 🎉`;
-            } else {
-                submitDisplay = '0%';
-            }
+            const gradeColor = (displayGrade !== '-') ? getGradeColor(displayGrade) : '#94a3b8';
 
             // ── 추세 (이번 주 vs 저번 주 — 여전히 auth_records 기반) ──
             const thisWeekStart = new Date(startDate);
@@ -261,8 +280,6 @@ async function loadStudyData() {
                 grade: displayGrade,
                 gradeColor,
                 weekGrass,
-                submitRate,
-                submitDisplay,
                 totalDeadlinedTasks,
                 lastActivity,
                 daysSinceActivity,
@@ -300,7 +317,7 @@ function updateStatCards(students, authRecords) {
     }).length;
     document.getElementById('yesterdayMissing').textContent = yesterdayMissing;
 
-    // 평균 인증률 (tr_student_stats 기반)
+    // 평균 인증률 (study_results_v3 기반)
     const studentsWithTasks = students.filter(s => s.totalDeadlinedTasks > 0);
     const totalAuth = studentsWithTasks.reduce((sum, s) => sum + s.avgAuthRate, 0);
     const avgAuth = studentsWithTasks.length > 0 ? Math.round(totalAuth / studentsWithTasks.length) : 0;
@@ -347,7 +364,6 @@ function applyFilters() {
             case 'authRate_desc': return b.avgAuthRate - a.avgAuthRate;
             case 'startDate_asc': return new Date(a.scheduleStart) - new Date(b.scheduleStart);
             case 'startDate_desc': return new Date(b.scheduleStart) - new Date(a.scheduleStart);
-            case 'submitRate_asc': return a.submitRate - b.submitRate;
             case 'lastActivity_asc': return (b.daysSinceActivity || 999) - (a.daysSinceActivity || 999);
             case 'name_asc': return a.name.localeCompare(b.name, 'ko');
             default: return a.avgAuthRate - b.avgAuthRate;
@@ -437,7 +453,6 @@ function renderTable() {
                         ${s.weekGrass.map(g => `<span>${g}</span>`).join('')}
                     </div>
                 </td>
-                <td>${s.submitDisplay}</td>
                 <td>${lastActivityText}</td>
                 <td>
                     <button onclick="window.location.href='admin-study-detail-v3.html?id=${s.userId}'" 
