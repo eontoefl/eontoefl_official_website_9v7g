@@ -810,53 +810,58 @@
 
             <!-- 전체 학습 기록 테이블 -->
             <div class="record-table-container">
-                <div class="section-title" style="margin-bottom:12px;">
-                    <i class="fas fa-table" style="color:#3b82f6;"></i>
-                    전체 학습 기록
-                    <span id="recordTableCount" class="notif-count-badge" style="display:none;"></span>
+                <div class="section-title" style="margin-bottom:12px; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between;" onclick="toggleRecordTable()">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-table" style="color:#3b82f6;"></i>
+                        전체 학습 기록
+                        <span id="recordTableCount" class="notif-count-badge" style="display:none;"></span>
+                    </div>
+                    <i id="recordTableToggleIcon" class="fas fa-chevron-up" style="font-size:14px; color:#94a3b8; transition:transform 0.3s;"></i>
                 </div>
 
-                <!-- 필터 바 -->
-                <div class="record-filters">
-                    <div class="filter-group">
-                        <label>주차</label>
-                        <select id="filterWeek" onchange="applyRecordFilters()">
-                            <option value="">전체</option>
-                        </select>
+                <div id="recordTableBody" style="overflow:hidden; transition:max-height 0.3s ease;">
+                    <!-- 필터 바 -->
+                    <div class="record-filters">
+                        <div class="filter-group">
+                            <label>주차</label>
+                            <select id="filterWeek" onchange="applyRecordFilters()">
+                                <option value="">전체</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>영역</label>
+                            <select id="filterType" onchange="applyRecordFilters()">
+                                <option value="">전체</option>
+                                <option value="reading">Reading</option>
+                                <option value="listening">Listening</option>
+                                <option value="writing">Writing</option>
+                                <option value="speaking">Speaking</option>
+                                <option value="vocab">보카</option>
+                                <option value="intro-book">입문서</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>상태</label>
+                            <select id="filterStatus" onchange="applyRecordFilters()">
+                                <option value="">전체</option>
+                                <option value="done">완료만</option>
+                                <option value="undone">미완료만</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>도래 상태</label>
+                            <select id="filterArrival" onchange="applyRecordFilters()">
+                                <option value="">전체</option>
+                                <option value="arrived">도래만</option>
+                                <option value="upcoming">예정만</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="filter-group">
-                        <label>영역</label>
-                        <select id="filterType" onchange="applyRecordFilters()">
-                            <option value="">전체</option>
-                            <option value="reading">Reading</option>
-                            <option value="listening">Listening</option>
-                            <option value="writing">Writing</option>
-                            <option value="speaking">Speaking</option>
-                            <option value="vocab">보카</option>
-                            <option value="intro-book">입문서</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>상태</label>
-                        <select id="filterStatus" onchange="applyRecordFilters()">
-                            <option value="">전체</option>
-                            <option value="done">완료만</option>
-                            <option value="undone">미완료만</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>도래 상태</label>
-                        <select id="filterArrival" onchange="applyRecordFilters()">
-                            <option value="">전체</option>
-                            <option value="arrived">도래만</option>
-                            <option value="upcoming">예정만</option>
-                        </select>
-                    </div>
-                </div>
 
-                <!-- 테이블 -->
-                <div class="record-table-wrap" id="recordTableWrap">
-                    <div class="record-table-loading"><i class="fas fa-spinner fa-spin"></i> 테이블 생성 중...</div>
+                    <!-- 테이블 -->
+                    <div class="record-table-wrap" id="recordTableWrap">
+                        <div class="record-table-loading"><i class="fas fa-spinner fa-spin"></i> 테이블 생성 중...</div>
+                    </div>
                 </div>
             </div>
 

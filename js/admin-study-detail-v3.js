@@ -495,6 +495,25 @@ function formatCardDate(date) {
 }
 
 // ===== 전체 학습 기록 테이블 =====
+let recordTableCollapsed = false;
+
+function toggleRecordTable() {
+    const body = document.getElementById('recordTableBody');
+    const icon = document.getElementById('recordTableToggleIcon');
+    if (!body || !icon) return;
+
+    recordTableCollapsed = !recordTableCollapsed;
+    if (recordTableCollapsed) {
+        body.style.maxHeight = '0';
+        body.style.overflow = 'hidden';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        body.style.maxHeight = '';
+        body.style.overflow = '';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
 const DAY_ORDER = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAY_KR_MAP = { 'sunday': '일', 'monday': '월', 'tuesday': '화', 'wednesday': '수', 'thursday': '목', 'friday': '금' };
 
