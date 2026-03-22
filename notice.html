@@ -3,15 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>신청하기 - 이온토플</title>
+    <title>공지사항 - 이온토플</title>
     <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
-    <!-- Pretendard Font -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-    
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
-    
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
 </head>
@@ -26,9 +21,7 @@
                     </a>
                 </div>
                 <ul class="nav-menu" id="navMenu">
-                    <li class="nav-item">
-                        <a href="index.html">홈</a>
-                    </li>
+                    <li class="nav-item"><a href="index.html">홈</a></li>
                     <li class="nav-item has-dropdown">
                         <a href="about.html">소개</a>
                         <div class="dropdown-menu">
@@ -56,14 +49,14 @@
                         </div>
                     </li>
                     <li class="nav-item has-dropdown">
-                        <a href="application.html" class="active">신청하기</a>
+                        <a href="application.html">신청하기</a>
                         <div class="dropdown-menu">
                             <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
                             <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
                         </div>
                     </li>
                     <li class="nav-item has-dropdown">
-                        <a href="notice.html">커뮤니티</a>
+                        <a href="notice.html" class="active">커뮤니티</a>
                         <div class="dropdown-menu">
                             <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
                             <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
@@ -72,7 +65,6 @@
                         </div>
                     </li>
                 </ul>
-                <!-- Dynamic Login/User Menu -->
                 <div id="authMenu" style="margin-left: 120px;">
                     <a href="login.html">LOGIN</a>
                 </div>
@@ -88,101 +80,34 @@
     <!-- Page Header -->
     <section class="page-header">
         <div class="container">
-            <h1>신청하기</h1>
-            <p style="margin-bottom: 48px;">TOEFL 프로그램 신청 및 현황을 확인하세요</p>
-            
-            <!-- Application Process Steps -->
-            <div class="process-steps" style="max-width: 1000px; margin: 0 auto;">
-                <div class="process-step">
-                    <div class="step-icon" style="background: rgba(255, 255, 255, 0.2); color: white;">
-                        <i class="fas fa-edit"></i>
-                    </div>
-                    <div class="step-title" style="color: white;">STEP 1</div>
-                    <div class="step-desc" style="color: white; font-weight: 600;">신청서 작성</div>
-                    <div class="step-detail" style="color: rgba(255, 255, 255, 0.9);">이름, 연락처, 희망 프로그램 작성</div>
-                </div>
-                <div class="process-arrow" style="color: rgba(255, 255, 255, 0.6);">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-                <div class="process-step">
-                    <div class="step-icon" style="background: rgba(255, 255, 255, 0.2); color: white;">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="step-title" style="color: white;">STEP 2</div>
-                    <div class="step-desc" style="color: white; font-weight: 600;">승인 여부 검토</div>
-                    <div class="step-detail" style="color: rgba(255, 255, 255, 0.9);">프로그램 수강 가능 여부 확인</div>
-                </div>
-                <div class="process-arrow" style="color: rgba(255, 255, 255, 0.6);">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-                <div class="process-step">
-                    <div class="step-icon" style="background: rgba(255, 255, 255, 0.2); color: white;">
-                        <i class="fas fa-clipboard-check"></i>
-                    </div>
-                    <div class="step-title" style="color: white;">STEP 3</div>
-                    <div class="step-desc" style="color: white; font-weight: 600;">개별 분석 & 플랜 제작</div>
-                    <div class="step-detail" style="color: rgba(255, 255, 255, 0.9);">이온쌤이 맞춤 학습 플랜 직접 작성</div>
-                </div>
-                <div class="process-arrow" style="color: rgba(255, 255, 255, 0.6);">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-                <div class="process-step">
-                    <div class="step-icon" style="background: rgba(255, 255, 255, 0.2); color: white;">
-                        <i class="fas fa-credit-card"></i>
-                    </div>
-                    <div class="step-title" style="color: white;">STEP 4</div>
-                    <div class="step-desc" style="color: white; font-weight: 600;">프로그램 확정 & 결제</div>
-                    <div class="step-detail" style="color: rgba(255, 255, 255, 0.9);">수강료 결제 후 프로그램 확정</div>
-                </div>
-                <div class="process-arrow" style="color: rgba(255, 255, 255, 0.6);">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-                <div class="process-step">
-                    <div class="step-icon" style="background: rgba(255, 255, 255, 0.2); color: white;">
-                        <i class="fas fa-rocket"></i>
-                    </div>
-                    <div class="step-title" style="color: white;">STEP 5</div>
-                    <div class="step-desc" style="color: white; font-weight: 600;">프로그램 시작</div>
-                    <div class="step-detail" style="color: rgba(255, 255, 255, 0.9);">전화/이메일로 일정 안내 후 수업 시작</div>
-                </div>
-            </div>
+            <h1>공지사항</h1>
+            <p>이온토플의 최신 소식과 공지사항을 확인하세요</p>
         </div>
     </section>
 
-    <!-- Page Layout (Sidebar + Content) -->
+    <!-- Page Layout -->
     <div class="page-layout">
         <div class="container">
             <div class="layout-wrapper">
-                <!-- Sidebar -->
                 <aside class="sidebar">
                     <nav class="sidebar-nav">
-                        <div class="sidebar-title">신청하기</div>
-                        <a href="application.html" class="active"><i class="fas fa-list"></i> 신청 현황</a>
-                        <a href="application-form.html"><i class="fas fa-pen"></i> 신청서 작성하기</a>
+                        <div class="sidebar-title">커뮤니티</div>
+                        <a href="notice.html" class="active"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                        <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                        <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
+                        <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
                     </nav>
                 </aside>
 
-                <!-- Main Content -->
                 <main class="main-content">
-    <!-- Applications List -->
     <section>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
             <div>
-                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">프로그램 신청 현황</h2>
-                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 신청이 있습니다</p>
+                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">공지사항</h2>
+                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">1</span>건의 공지사항이 있습니다</p>
             </div>
-            <a href="application-form.html" class="btn-primary" style="white-space: nowrap; padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px;">
-                <i class="fas fa-pen"></i> 신청서 작성하기
-            </a>
         </div>
 
-        <!-- Loading -->
-        <div class="loading" id="listLoading">
-            <div class="spinner"></div>
-            <p style="margin-top: 12px; font-size: 13px; color: #64748b;">로딩 중...</p>
-        </div>
-
-        <!-- Applications Table -->
         <div class="applications-table">
             <div class="table-wrapper">
                 <table>
@@ -190,36 +115,46 @@
                         <tr>
                             <th style="width: 60px;">NO</th>
                             <th>제목</th>
-                            <th style="width: 120px;">작성자</th>
-                            <th style="width: 100px;">상태</th>
+                            <th style="width: 100px;">작성자</th>
                             <th style="width: 120px;">작성일시</th>
+                            <th style="width: 70px;">조회</th>
                         </tr>
                     </thead>
-                    <tbody id="applicationsBody">
-                        <!-- Applications will be loaded here -->
+                    <tbody id="noticeBody">
+                        <tr onclick="openNoticeDetail(1)" style="cursor:pointer;">
+                            <td style="text-align:center; color:#64748b;">1</td>
+                            <td style="font-weight:600; color:#1e293b;">
+                                <span style="background:#9480c5; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">공지</span>
+                                이온토플 홈페이지가 새롭게 오픈했습니다
+                            </td>
+                            <td style="text-align:center; color:#64748b;">관리자</td>
+                            <td style="text-align:center; color:#94a3b8; font-size:13px;">2025. 03. 22.</td>
+                            <td style="text-align:center; color:#94a3b8; font-size:13px;">0</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Pagination -->
         <div id="pagination" style="text-align: center; margin-top: 24px; display: none;"></div>
     </section>
-
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; animation: fadeIn 0.2s ease;">
-        <div style="background:white; max-width:420px; margin:15% auto; border-radius:12px; padding:2rem; text-align:center;">
-            <div style="font-size:3rem; color:#ef4444; margin-bottom:1rem;"><i class="fas fa-exclamation-triangle"></i></div>
-            <h3 style="font-size:1.2rem; color:#1e293b; margin-bottom:0.75rem;">신청서를 삭제하시겠습니까?</h3>
-            <p style="font-size:0.9rem; color:#64748b; line-height:1.6; margin-bottom:1.5rem;">삭제된 신청서는 <strong style="color:#ef4444;">되돌릴 수 없습니다.</strong><br>정말 삭제하시겠습니까?</p>
-            <div style="display:flex; gap:0.75rem; justify-content:center;">
-                <button onclick="closeDeleteModal()" style="padding:10px 24px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; font-size:0.9rem; font-family:inherit;">취소</button>
-                <button id="confirmDeleteBtn" style="padding:10px 24px; border:none; background:#ef4444; color:white; border-radius:8px; cursor:pointer; font-size:0.9rem; font-weight:600; font-family:inherit;">삭제하기</button>
+                </main>
             </div>
         </div>
     </div>
-                </main>
+
+    <!-- Notice Detail Modal -->
+    <div id="noticeModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000;">
+        <div style="background:white; max-width:720px; width:90%; margin:5vh auto; border-radius:16px; max-height:90vh; overflow-y:auto; padding:32px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+                <div style="flex:1; min-width:0;">
+                    <h3 id="modalSubject" style="margin:0 0 8px; font-size:20px; color:#1e293b;"></h3>
+                    <div id="modalMeta" style="font-size:13px; color:#94a3b8;"></div>
+                </div>
+                <button onclick="closeNoticeModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#94a3b8; padding:0 0 0 16px;">&times;</button>
             </div>
+            <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 0 20px;">
+            <div id="modalContent" style="font-size:15px; line-height:1.8; color:#334155;"></div>
         </div>
     </div>
 
@@ -237,7 +172,7 @@
                         <li><a href="index.html#about">소개</a></li>
                         <li><a href="index.html#programs">프로그램</a></li>
                         <li><a href="index.html#pricing">가격</a></li>
-                        <li><a href="index.html#reviews">후기</a></li>
+                        <li><a href="reviews.html">후기</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">
@@ -246,7 +181,6 @@
                         <li><a href="register.html">회원가입</a></li>
                         <li><a href="application.html">신청하기</a></li>
                         <li><a href="my-application.html">신청서 조회</a></li>
-                        <li><a href="admin.html">관리자</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">
@@ -264,15 +198,49 @@
         </div>
     </footer>
 
-    <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
         <i class="fas fa-comment"></i>
     </a>
 
-    <!-- JavaScript -->
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
-    <script src="js/application.js"></script>
+    <script>
+        const sampleNotices = [
+            {
+                id: 1,
+                subject: '이온토플 홈페이지가 새롭게 오픈했습니다',
+                author: '관리자',
+                date: '2025. 03. 22.',
+                hit: 0,
+                content: `<p>안녕하세요, 이온토플입니다.</p>
+                <p>이온토플 홈페이지가 새롭게 리뉴얼되어 오픈했습니다.</p>
+                <p>앞으로 프로그램 신청, 학습 관리, 수강 후기 등 다양한 기능을 편리하게 이용하실 수 있습니다.</p>
+                <p>많은 관심 부탁드립니다. 감사합니다.</p>`
+            }
+        ];
+
+        function openNoticeDetail(id) {
+            const notice = sampleNotices.find(n => n.id === id);
+            if (!notice) return;
+            document.getElementById('modalSubject').textContent = notice.subject;
+            document.getElementById('modalMeta').textContent = notice.author + '  |  ' + notice.date + '  |  조회 ' + notice.hit;
+            document.getElementById('modalContent').innerHTML = notice.content;
+            document.getElementById('noticeModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeNoticeModal() {
+            document.getElementById('noticeModal').style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('noticeModal').addEventListener('click', function(e) {
+            if (e.target === this) closeNoticeModal();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeNoticeModal();
+        });
+    </script>
 </body>
 </html>
