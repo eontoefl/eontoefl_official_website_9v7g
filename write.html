@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>글쓰기 - 이온토플</title>
+    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+    <style>
+        .write-form-group {
+            margin-bottom: 24px;
+        }
+        .write-form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .write-form-group input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: 'Pretendard', sans-serif;
+            color: #1e293b;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .write-form-group input[type="text"]:focus {
+            outline: none;
+            border-color: #9480c5;
+            box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.1);
+        }
+        .quill-container {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .quill-container .ql-toolbar {
+            border: none;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8f9fa;
+        }
+        .quill-container .ql-container {
+            border: none;
+            font-family: 'Pretendard', sans-serif;
+            font-size: 15px;
+            min-height: 400px;
+        }
+        .quill-container .ql-editor {
+            min-height: 400px;
+            line-height: 1.8;
+            color: #334155;
+        }
+        .quill-container .ql-editor.ql-blank::before {
+            color: #94a3b8;
+            font-style: normal;
+        }
+        .write-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .btn-cancel {
+            padding: 12px 32px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Pretendard', sans-serif;
+            transition: all 0.2s;
+        }
+        .btn-cancel:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        .btn-submit {
+            padding: 12px 32px;
+            border: none;
+            background: linear-gradient(135deg, #9480c5 0%, #7d6aad 100%);
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Pretendard', sans-serif;
+            transition: all 0.2s;
+        }
+        .btn-submit:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(148, 128, 197, 0.4);
+        }
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .write-notice {
+            background: #f8f4ff;
+            border-left: 4px solid #9480c5;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        .write-notice p {
+            color: #5b21b6;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/black_logo.png" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item"><a href="index.html">홈</a></li>
+                    <li class="nav-item has-dropdown">
+                        <a href="about.html">소개</a>
+                        <div class="dropdown-menu">
+                            <a href="about.html#intro"><i class="fas fa-building"></i> 이온토플 소개</a>
+                            <a href="about.html#instructors"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                            <a href="about.html#facilities"><i class="fas fa-door-open"></i> 수강 시설</a>
+                            <a href="about.html#location"><i class="fas fa-map-marker-alt"></i> 오시는 길</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 기초반</a>
+                            <a href="programs.html#intermediate"><i class="fas fa-chart-line"></i> 중급반</a>
+                            <a href="programs.html#advanced"><i class="fas fa-crown"></i> 고급반</a>
+                            <a href="programs.html#intensive"><i class="fas fa-bolt"></i> 단기 집중반</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="notice.html" class="active">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <div id="authMenu" style="margin-left: 120px;">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header">
+        <div class="container">
+            <h1 id="pageTitle">글쓰기</h1>
+            <p id="pageDesc">새 글을 작성합니다</p>
+        </div>
+    </section>
+
+    <!-- Page Layout -->
+    <div class="page-layout">
+        <div class="container">
+            <div class="layout-wrapper">
+                <aside class="sidebar">
+                    <nav class="sidebar-nav">
+                        <div class="sidebar-title">커뮤니티</div>
+                        <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                        <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                        <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
+                        <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                    </nav>
+                </aside>
+
+                <main class="main-content">
+                    <div style="margin-bottom: 24px;">
+                        <a id="backLink" href="reviews.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                            <i class="fas fa-arrow-left"></i> 목록으로
+                        </a>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                        <h2 id="formTitle" style="font-size:24px; font-weight:700; color:#1e293b; margin:0;">글쓰기</h2>
+                    </div>
+
+                    <div class="write-notice" id="writeNotice" style="display:none;">
+                        <p id="writeNoticeText"></p>
+                    </div>
+
+                    <!-- 글쓰기 폼 -->
+                    <form id="writeForm" onsubmit="return false;">
+                        <div class="write-form-group">
+                            <label for="writeSubject">제목</label>
+                            <input type="text" id="writeSubject" placeholder="제목을 입력하세요" required>
+                        </div>
+
+                        <div class="write-form-group">
+                            <label>내용</label>
+                            <div class="quill-container">
+                                <div id="quillEditor"></div>
+                            </div>
+                        </div>
+
+                        <div class="write-actions">
+                            <button type="button" class="btn-cancel" id="btnCancel" onclick="goBack()">취소</button>
+                            <button type="button" class="btn-submit" id="btnSubmit" onclick="submitPost()">
+                                <i class="fas fa-check"></i> 등록하기
+                            </button>
+                        </div>
+                    </form>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">TOEFL 전문 교육기관으로<br>여러분의 목표 달성을 돕습니다</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="index.html#about">소개</a></li>
+                        <li><a href="index.html#programs">프로그램</a></li>
+                        <li><a href="index.html#pricing">가격</a></li>
+                        <li><a href="reviews.html">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">학생 서비스</h4>
+                    <ul class="footer-links">
+                        <li><a href="register.html">회원가입</a></li>
+                        <li><a href="application.html">신청하기</a></li>
+                        <li><a href="my-application.html">신청서 조회</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><i class="fas fa-envelope"></i> info@iontoefl.com</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 이온토플. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+    <script>
+        // ==================== 설정 ====================
+        const BOARD_CONFIG = {
+            reviews: {
+                table: 'reviews',
+                title: '수강 후기 작성',
+                headerTitle: '수강 후기',
+                headerDesc: '이온토플과 함께 목표를 달성한 경험을 공유해주세요',
+                listUrl: 'reviews.html',
+                formTitle: '수강 후기 작성',
+                notice: '수강 후기는 이온토플을 수강한 경험을 바탕으로 작성해주세요.',
+                requireLogin: true,
+                requireAdmin: false,
+                sidebarActive: 'reviews'
+            },
+            notice: {
+                table: 'notices',
+                title: '공지사항 작성',
+                headerTitle: '공지사항',
+                headerDesc: '이온토플의 최신 소식과 공지사항',
+                listUrl: 'notice.html',
+                formTitle: '공지사항 작성',
+                notice: '공지사항은 관리자만 작성할 수 있습니다.',
+                requireLogin: true,
+                requireAdmin: true,
+                sidebarActive: 'notice'
+            },
+            materials: {
+                table: 'materials',
+                title: '학습 자료 등록',
+                headerTitle: '학습 자료',
+                headerDesc: '수강생들을 위한 학습 자료를 등록합니다',
+                listUrl: 'materials.html',
+                formTitle: '학습 자료 등록',
+                notice: '학습 자료는 관리자만 등록할 수 있습니다.',
+                requireLogin: true,
+                requireAdmin: true,
+                sidebarActive: 'materials'
+            }
+        };
+
+        let quill = null;
+        let currentBoard = 'reviews';
+        let boardConfig = null;
+
+        // ==================== 초기화 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // board 파라미터 읽기
+            const params = new URLSearchParams(window.location.search);
+            currentBoard = params.get('board') || 'reviews';
+            boardConfig = BOARD_CONFIG[currentBoard];
+
+            if (!boardConfig) {
+                alert('잘못된 게시판입니다.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // 권한 체크
+            if (!checkPermission()) return;
+
+            // 페이지 세팅
+            setupPage();
+
+            // Quill 에디터 초기화
+            initQuillEditor();
+        });
+
+        // ==================== 권한 체크 ====================
+        function checkPermission() {
+            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+
+            if (boardConfig.requireLogin && !userData) {
+                alert('로그인 후 이용해주세요.');
+                window.location.href = 'login.html';
+                return false;
+            }
+
+            if (boardConfig.requireAdmin && (!userData || userData.role !== 'admin')) {
+                alert('관리자만 작성할 수 있습니다.');
+                window.location.href = boardConfig.listUrl;
+                return false;
+            }
+
+            return true;
+        }
+
+        // ==================== 페이지 세팅 ====================
+        function setupPage() {
+            // 페이지 타이틀
+            document.title = boardConfig.title + ' - 이온토플';
+            document.getElementById('pageTitle').textContent = boardConfig.headerTitle;
+            document.getElementById('pageDesc').textContent = boardConfig.headerDesc;
+            document.getElementById('formTitle').textContent = boardConfig.formTitle;
+            document.getElementById('backLink').href = boardConfig.listUrl;
+
+            // 사이드바 활성화
+            const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
+            sidebarLinks.forEach(link => {
+                link.classList.remove('active');
+                const href = link.getAttribute('href');
+                if (boardConfig.sidebarActive === 'reviews' && href === 'reviews.html') link.classList.add('active');
+                if (boardConfig.sidebarActive === 'notice' && href === 'notice.html') link.classList.add('active');
+                if (boardConfig.sidebarActive === 'materials' && href === 'materials.html') link.classList.add('active');
+            });
+
+            // 안내 문구
+            if (boardConfig.notice) {
+                document.getElementById('writeNotice').style.display = 'block';
+                document.getElementById('writeNoticeText').textContent = boardConfig.notice;
+            }
+        }
+
+        // ==================== Quill 에디터 ====================
+        function initQuillEditor() {
+            quill = new Quill('#quillEditor', {
+                theme: 'snow',
+                placeholder: '내용을 입력하세요...',
+                modules: {
+                    toolbar: {
+                        container: [
+                            [{ header: [1, 2, 3, false] }],
+                            ['bold', 'italic', 'underline', 'strike'],
+                            [{ color: [] }, { background: [] }],
+                            [{ list: 'ordered' }, { list: 'bullet' }],
+                            [{ align: [] }],
+                            [{ indent: '-1' }, { indent: '+1' }],
+                            ['link', 'image'],
+                            ['blockquote', 'code-block'],
+                            ['clean']
+                        ],
+                        handlers: {
+                            image: imageHandler
+                        }
+                    }
+                }
+            });
+        }
+
+        // ==================== 이미지 핸들러 ====================
+        function imageHandler() {
+            const input = document.createElement('input');
+            input.setAttribute('type', 'file');
+            input.setAttribute('accept', 'image/*');
+            input.click();
+
+            input.onchange = async () => {
+                const file = input.files[0];
+                if (!file) return;
+
+                // 파일 크기 체크 (5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('이미지 파일은 5MB 이하만 업로드 가능합니다.');
+                    return;
+                }
+
+                try {
+                    const imageUrl = await uploadImage(file);
+                    const range = quill.getSelection(true);
+                    quill.insertEmbed(range.index, 'image', imageUrl);
+                    quill.setSelection(range.index + 1);
+                } catch (error) {
+                    console.error('이미지 업로드 실패:', error);
+                    alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+                }
+            };
+        }
+
+        // ==================== Supabase Storage 이미지 업로드 ====================
+        async function uploadImage(file) {
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            const ext = file.name.split('.').pop();
+            const filePath = `${currentBoard}/${timestamp}_${randomStr}.${ext}`;
+
+            const url = `${SUPABASE_URL}/storage/v1/object/board-images/${filePath}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                },
+                body: file
+            });
+
+            if (!response.ok) {
+                // storage bucket이 없으면 base64 fallback
+                console.warn('Storage 업로드 실패, base64로 대체합니다.');
+                return await fileToBase64(file);
+            }
+
+            // public URL 반환
+            return `${SUPABASE_URL}/storage/v1/object/public/board-images/${filePath}`;
+        }
+
+        // base64 fallback
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ==================== 글 등록 ====================
+        async function submitPost() {
+            const subject = document.getElementById('writeSubject').value.trim();
+            const content = quill.root.innerHTML;
+
+            // 유효성 검사
+            if (!subject) {
+                alert('제목을 입력해주세요.');
+                document.getElementById('writeSubject').focus();
+                return;
+            }
+
+            if (!content || content === '<p><br></p>') {
+                alert('내용을 입력해주세요.');
+                quill.focus();
+                return;
+            }
+
+            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            if (!userData) {
+                alert('로그인이 필요합니다.');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const btn = document.getElementById('btnSubmit');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 등록 중...';
+
+            try {
+                // 게시판별 데이터 구성
+                const postData = buildPostData(subject, content, userData);
+
+                await supabaseAPI.post(boardConfig.table, postData);
+
+                alert('글이 등록되었습니다.');
+                window.location.href = boardConfig.listUrl;
+
+            } catch (error) {
+                console.error('글 등록 실패:', error);
+                alert('글 등록에 실패했습니다.\n' + (error.message || ''));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> 등록하기';
+            }
+        }
+
+        // ==================== 게시판별 데이터 빌드 ====================
+        function buildPostData(subject, content, userData) {
+            const now = new Date().toISOString();
+
+            if (currentBoard === 'reviews') {
+                return {
+                    subject: subject,
+                    content: content,
+                    author_name: userData.name || userData.nickname || '익명',
+                    author_email: userData.email || '',
+                    published_at: now,
+                    hit_count: 0
+                };
+            }
+
+            if (currentBoard === 'notice') {
+                return {
+                    subject: subject,
+                    content: content,
+                    author: userData.name || '관리자',
+                    date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\./g, '. ').trim(),
+                    hit: 0,
+                    published_at: now
+                };
+            }
+
+            if (currentBoard === 'materials') {
+                return {
+                    subject: subject,
+                    content: content,
+                    author: userData.name || '관리자',
+                    date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\./g, '. ').trim(),
+                    hit: 0,
+                    published_at: now
+                };
+            }
+
+            return { subject, content, published_at: now };
+        }
+
+        // ==================== 뒤로가기 ====================
+        function goBack() {
+            const content = quill.root.innerHTML;
+            const subject = document.getElementById('writeSubject').value.trim();
+
+            if (subject || (content && content !== '<p><br></p>')) {
+                if (!confirm('작성 중인 내용이 있습니다. 정말 나가시겠습니까?')) {
+                    return;
+                }
+            }
+
+            window.location.href = boardConfig.listUrl;
+        }
+    </script>
+</body>
+</html>
