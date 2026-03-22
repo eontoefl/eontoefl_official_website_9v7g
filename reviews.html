@@ -21,9 +21,7 @@
                     </a>
                 </div>
                 <ul class="nav-menu" id="navMenu">
-                    <li class="nav-item">
-                        <a href="index.html">홈</a>
-                    </li>
+                    <li class="nav-item"><a href="index.html">홈</a></li>
                     <li class="nav-item has-dropdown">
                         <a href="about.html">소개</a>
                         <div class="dropdown-menu">
@@ -67,7 +65,6 @@
                         </div>
                     </li>
                 </ul>
-                <!-- Dynamic Login/User Menu -->
                 <div id="authMenu" style="margin-left: 120px;">
                     <a href="login.html">LOGIN</a>
                 </div>
@@ -105,59 +102,80 @@
 
                 <!-- Main Content -->
                 <main class="main-content">
-    <section>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-            <div>
-                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">수강 후기</h2>
-                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 후기가 있습니다</p>
-            </div>
-        </div>
 
-        <!-- Loading -->
-        <div class="loading" id="listLoading">
-            <div class="spinner"></div>
-            <p style="margin-top: 12px; font-size: 13px; color: #64748b;">로딩 중...</p>
-        </div>
+                    <!-- 목록 뷰 -->
+                    <section id="listView">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                            <div>
+                                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">수강 후기</h2>
+                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 후기가 있습니다</p>
+                            </div>
+                        </div>
 
-        <!-- Reviews Table -->
-        <div class="applications-table">
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">NO</th>
-                            <th>제목</th>
-                            <th style="width: 100px;">작성자</th>
-                            <th style="width: 120px;">작성일시</th>
-                            <th style="width: 70px;">조회</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reviewsBody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                        <div class="loading" id="listLoading">
+                            <div class="spinner"></div>
+                            <p style="margin-top: 12px; font-size: 13px; color: #64748b;">로딩 중...</p>
+                        </div>
 
-        <!-- Pagination -->
-        <div id="pagination" style="text-align: center; margin-top: 24px; display: none;"></div>
-    </section>
+                        <div class="applications-table">
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 60px;">NO</th>
+                                            <th>제목</th>
+                                            <th style="width: 100px;">작성자</th>
+                                            <th style="width: 120px;">작성일시</th>
+                                            <th style="width: 70px;">조회</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reviewsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="pagination" style="text-align: center; margin-top: 24px; display: none;"></div>
+                    </section>
+
+                    <!-- 상세 뷰 -->
+                    <section id="detailView" style="display:none;">
+                        <div style="margin-bottom: 24px;">
+                            <a href="reviews.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                <i class="fas fa-arrow-left"></i> 목록으로
+                            </a>
+                        </div>
+
+                        <div id="detailLoading" style="text-align:center; padding:60px 20px;">
+                            <div class="spinner"></div>
+                            <p style="margin-top:12px; font-size:13px; color:#64748b;">로딩 중...</p>
+                        </div>
+
+                        <article id="detailArticle" style="display:none;">
+                            <h2 id="detailSubject" style="font-size:22px; font-weight:700; color:#1e293b; margin-bottom:16px; line-height:1.4;"></h2>
+                            <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid #e2e8f0; margin-bottom:32px;">
+                                <span id="detailAuthor" style="font-size:14px; color:#64748b;"></span>
+                                <span style="color:#e2e8f0;">|</span>
+                                <span id="detailDate" style="font-size:14px; color:#94a3b8;"></span>
+                                <span style="color:#e2e8f0;">|</span>
+                                <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
+                            </div>
+                            <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
+                        </article>
+
+                        <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; display:none;" id="detailNav">
+                            <div style="display:flex; justify-content:space-between;">
+                                <a id="prevPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                    <i class="fas fa-chevron-left"></i> <span>이전 글</span>
+                                </a>
+                                <a id="nextPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px; margin-left:auto;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                    <span>다음 글</span> <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
                 </main>
             </div>
-        </div>
-    </div>
-
-    <!-- Review Detail Modal -->
-    <div id="reviewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; animation: fadeIn 0.2s ease;">
-        <div style="background:white; max-width:720px; width:90%; margin:5vh auto; border-radius:16px; max-height:90vh; overflow-y:auto; padding:32px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
-                <div style="flex:1; min-width:0;">
-                    <h3 id="modalSubject" style="margin:0 0 8px; font-size:20px; color:#1e293b; word-break:break-word;"></h3>
-                    <div id="modalMeta" style="font-size:13px; color:#94a3b8;"></div>
-                </div>
-                <button onclick="closeReviewModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#94a3b8; padding:0 0 0 16px; flex-shrink:0;">&times;</button>
-            </div>
-            <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 0 20px;">
-            <div id="modalContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
         </div>
     </div>
 
@@ -201,12 +219,10 @@
         </div>
     </footer>
 
-    <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
         <i class="fas fa-comment"></i>
     </a>
 
-    <!-- JavaScript -->
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
@@ -215,7 +231,18 @@
         let currentPage = 1;
         const itemsPerPage = 15;
 
-        document.addEventListener('DOMContentLoaded', loadReviews);
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const reviewId = params.get('id');
+
+            if (reviewId) {
+                showDetailView(reviewId);
+            } else {
+                loadReviews();
+            }
+        });
+
+        // ==================== 목록 ====================
 
         async function loadReviews() {
             try {
@@ -262,7 +289,7 @@
                     ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
                     : '';
                 return `
-                    <tr onclick="openReviewDetail(${review.id})" style="cursor:pointer;">
+                    <tr onclick="location.href='reviews.html?id=${review.id}'" style="cursor:pointer;">
                         <td style="text-align:center; color:#64748b;">${no}</td>
                         <td style="font-weight:600; color:#1e293b;">${review.subject || ''}</td>
                         <td style="text-align:center; color:#64748b;">${review.author_name || '익명'}</td>
@@ -311,34 +338,98 @@
             paginationEl.style.display = 'block';
         }
 
-        function openReviewDetail(reviewId) {
-            supabaseAPI.getById('reviews', reviewId).then(review => {
-                if (!review) return;
+        // ==================== 상세 ====================
+
+        async function showDetailView(reviewId) {
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = 'block';
+
+            try {
+                // 게시글 로드
+                const review = await supabaseAPI.getById('reviews', reviewId);
+                if (!review) {
+                    document.getElementById('detailLoading').innerHTML = `
+                        <div style="text-align:center; color:#ef4444;">
+                            <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
+                            <p>존재하지 않는 게시글입니다.</p>
+                        </div>`;
+                    return;
+                }
+
+                // 제목 업데이트
+                document.title = review.subject + ' - 수강 후기 - 이온토플';
+
                 const date = review.published_at
                     ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
                     : '';
-                document.getElementById('modalSubject').textContent = review.subject;
-                document.getElementById('modalMeta').textContent = `${review.author_name || '익명'}  |  ${date}  |  조회 ${review.hit_count || 0}`;
-                document.getElementById('modalContent').innerHTML = review.content || '';
-                document.getElementById('reviewModal').style.display = 'block';
-                document.body.style.overflow = 'hidden';
-            });
+
+                document.getElementById('detailSubject').textContent = review.subject;
+                document.getElementById('detailAuthor').textContent = review.author_name || '익명';
+                document.getElementById('detailDate').textContent = date;
+                document.getElementById('detailHit').textContent = '조회 ' + (review.hit_count || 0);
+                document.getElementById('detailContent').innerHTML = review.content || '';
+
+                document.getElementById('detailLoading').style.display = 'none';
+                document.getElementById('detailArticle').style.display = 'block';
+
+                // 이전/다음 글 네비게이션
+                loadPostNavigation(review.wr_id);
+
+            } catch (error) {
+                console.error('게시글 로드 오류:', error);
+                document.getElementById('detailLoading').innerHTML = `
+                    <div style="text-align:center; color:#ef4444;">
+                        <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
+                        <p>게시글을 불러오는데 실패했습니다.</p>
+                    </div>`;
+            }
         }
 
-        function closeReviewModal() {
-            document.getElementById('reviewModal').style.display = 'none';
-            document.body.style.overflow = '';
+        async function loadPostNavigation(currentWrId) {
+            try {
+                // 이전 글 (wr_id가 현재보다 큰 것 중 가장 작은 것)
+                const prevResult = await supabaseAPI.query('reviews', {
+                    'wr_id': 'gt.' + currentWrId,
+                    'order': 'wr_id.asc',
+                    'limit': '1',
+                    'select': 'id,subject'
+                });
+
+                // 다음 글 (wr_id가 현재보다 작은 것 중 가장 큰 것)
+                const nextResult = await supabaseAPI.query('reviews', {
+                    'wr_id': 'lt.' + currentWrId,
+                    'order': 'wr_id.desc',
+                    'limit': '1',
+                    'select': 'id,subject'
+                });
+
+                const nav = document.getElementById('detailNav');
+                let hasNav = false;
+
+                if (prevResult && prevResult.length > 0) {
+                    const prev = prevResult[0];
+                    const prevEl = document.getElementById('prevPost');
+                    prevEl.href = 'reviews.html?id=' + prev.id;
+                    prevEl.querySelector('span').textContent = prev.subject;
+                    prevEl.style.display = 'inline-flex';
+                    hasNav = true;
+                }
+
+                if (nextResult && nextResult.length > 0) {
+                    const next = nextResult[0];
+                    const nextEl = document.getElementById('nextPost');
+                    nextEl.href = 'reviews.html?id=' + next.id;
+                    nextEl.querySelector('span').textContent = next.subject;
+                    nextEl.style.display = 'inline-flex';
+                    hasNav = true;
+                }
+
+                if (hasNav) nav.style.display = 'block';
+
+            } catch (e) {
+                console.error('네비게이션 로드 오류:', e);
+            }
         }
-
-        // 모달 바깥 클릭 시 닫기
-        document.getElementById('reviewModal').addEventListener('click', function(e) {
-            if (e.target === this) closeReviewModal();
-        });
-
-        // ESC 키로 닫기
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeReviewModal();
-        });
     </script>
 </body>
 </html>

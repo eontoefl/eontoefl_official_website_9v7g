@@ -100,68 +100,75 @@
                 </aside>
 
                 <main class="main-content">
-    <section>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-            <div>
-                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">학습 자료</h2>
-                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">1</span>건의 자료가 있습니다</p>
-            </div>
-        </div>
 
-        <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:16px 20px; border-radius:8px; margin-bottom:24px;">
-            <p style="color:#856404; margin:0; font-size:14px;">
-                <i class="fas fa-lock" style="margin-right:8px;"></i>
-                <strong>학습 자료는 수강생 전용입니다.</strong> 로그인 후 이용하실 수 있습니다.
-            </p>
-        </div>
+                    <!-- 목록 뷰 -->
+                    <section id="listView">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                            <div>
+                                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">학습 자료</h2>
+                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">1</span>건의 자료가 있습니다</p>
+                            </div>
+                        </div>
 
-        <div class="applications-table">
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">NO</th>
-                            <th>제목</th>
-                            <th style="width: 100px;">작성자</th>
-                            <th style="width: 120px;">작성일시</th>
-                            <th style="width: 70px;">조회</th>
-                        </tr>
-                    </thead>
-                    <tbody id="materialsBody">
-                        <tr onclick="openMaterialDetail(1)" style="cursor:pointer;">
-                            <td style="text-align:center; color:#64748b;">1</td>
-                            <td style="font-weight:600; color:#1e293b;">
-                                <span style="background:#4facfe; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">자료</span>
-                                TOEFL Reading 핵심 전략 가이드
-                            </td>
-                            <td style="text-align:center; color:#64748b;">관리자</td>
-                            <td style="text-align:center; color:#94a3b8; font-size:13px;">2025. 03. 22.</td>
-                            <td style="text-align:center; color:#94a3b8; font-size:13px;">0</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                        <div style="background:#fff3cd; border-left:4px solid #ffc107; padding:16px 20px; border-radius:8px; margin-bottom:24px;">
+                            <p style="color:#856404; margin:0; font-size:14px;">
+                                <i class="fas fa-lock" style="margin-right:8px;"></i>
+                                <strong>학습 자료는 수강생 전용입니다.</strong> 로그인 후 이용하실 수 있습니다.
+                            </p>
+                        </div>
 
-        <div id="pagination" style="text-align: center; margin-top: 24px; display: none;"></div>
-    </section>
+                        <div class="applications-table">
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 60px;">NO</th>
+                                            <th>제목</th>
+                                            <th style="width: 100px;">작성자</th>
+                                            <th style="width: 120px;">작성일시</th>
+                                            <th style="width: 70px;">조회</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="materialsBody">
+                                        <tr onclick="location.href='materials.html?id=1'" style="cursor:pointer;">
+                                            <td style="text-align:center; color:#64748b;">1</td>
+                                            <td style="font-weight:600; color:#1e293b;">
+                                                <span style="background:#4facfe; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">자료</span>
+                                                TOEFL Reading 핵심 전략 가이드
+                                            </td>
+                                            <td style="text-align:center; color:#64748b;">관리자</td>
+                                            <td style="text-align:center; color:#94a3b8; font-size:13px;">2025. 03. 22.</td>
+                                            <td style="text-align:center; color:#94a3b8; font-size:13px;">0</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 상세 뷰 -->
+                    <section id="detailView" style="display:none;">
+                        <div style="margin-bottom: 24px;">
+                            <a href="materials.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                <i class="fas fa-arrow-left"></i> 목록으로
+                            </a>
+                        </div>
+
+                        <article id="detailArticle">
+                            <h2 id="detailSubject" style="font-size:22px; font-weight:700; color:#1e293b; margin-bottom:16px; line-height:1.4;"></h2>
+                            <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid #e2e8f0; margin-bottom:32px;">
+                                <span id="detailAuthor" style="font-size:14px; color:#64748b;"></span>
+                                <span style="color:#e2e8f0;">|</span>
+                                <span id="detailDate" style="font-size:14px; color:#94a3b8;"></span>
+                                <span style="color:#e2e8f0;">|</span>
+                                <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
+                            </div>
+                            <div id="detailContent" style="font-size:15px; line-height:1.8; color:#334155;"></div>
+                        </article>
+                    </section>
+
                 </main>
             </div>
-        </div>
-    </div>
-
-    <!-- Material Detail Modal -->
-    <div id="materialModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000;">
-        <div style="background:white; max-width:720px; width:90%; margin:5vh auto; border-radius:16px; max-height:90vh; overflow-y:auto; padding:32px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
-                <div style="flex:1; min-width:0;">
-                    <h3 id="modalSubject" style="margin:0 0 8px; font-size:20px; color:#1e293b;"></h3>
-                    <div id="modalMeta" style="font-size:13px; color:#94a3b8;"></div>
-                </div>
-                <button onclick="closeMaterialModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#94a3b8; padding:0 0 0 16px;">&times;</button>
-            </div>
-            <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 0 20px;">
-            <div id="modalContent" style="font-size:15px; line-height:1.8; color:#334155;"></div>
         </div>
     </div>
 
@@ -233,27 +240,29 @@
             }
         ];
 
-        function openMaterialDetail(id) {
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const materialId = params.get('id');
+
+            if (materialId) {
+                showDetailView(parseInt(materialId));
+            }
+        });
+
+        function showDetailView(id) {
             const material = sampleMaterials.find(m => m.id === id);
             if (!material) return;
-            document.getElementById('modalSubject').textContent = material.subject;
-            document.getElementById('modalMeta').textContent = material.author + '  |  ' + material.date + '  |  조회 ' + material.hit;
-            document.getElementById('modalContent').innerHTML = material.content;
-            document.getElementById('materialModal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
 
-        function closeMaterialModal() {
-            document.getElementById('materialModal').style.display = 'none';
-            document.body.style.overflow = '';
-        }
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = 'block';
 
-        document.getElementById('materialModal').addEventListener('click', function(e) {
-            if (e.target === this) closeMaterialModal();
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeMaterialModal();
-        });
+            document.title = material.subject + ' - 학습 자료 - 이온토플';
+            document.getElementById('detailSubject').textContent = material.subject;
+            document.getElementById('detailAuthor').textContent = material.author;
+            document.getElementById('detailDate').textContent = material.date;
+            document.getElementById('detailHit').textContent = '조회 ' + material.hit;
+            document.getElementById('detailContent').innerHTML = material.content;
+        }
     </script>
 </body>
 </html>
