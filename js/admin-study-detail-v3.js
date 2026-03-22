@@ -189,6 +189,13 @@ function renderProfileHeader() {
         : '-';
     document.getElementById('studentEmail').textContent = user.email || '-';
 
+    // 수강 상태 뱃지
+    const liveStatus = getAppLiveStatus(app);
+    const badgeEl = document.getElementById('studentStatusBadge');
+    if (badgeEl && liveStatus) {
+        badgeEl.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:600; background:${liveStatus.bg}; color:${liveStatus.color};"><i class="fas ${liveStatus.icon}"></i> ${liveStatus.label}</span>`;
+    }
+
     // 신청서 관리 버튼
     if (app.id) {
         const btn = document.getElementById('btnManageApp');
