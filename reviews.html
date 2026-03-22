@@ -378,67 +378,32 @@
         });
 
         // 수강 후기 로드 함수
+        let currentPage = 1;
+        const pageSize = 10;
+        let totalReviews = 0;
+        let isLoading = false;
+
         async function loadReviews() {
             try {
-                // 임시 샘플 데이터 (실제로는 DB에서 가져옴)
-                const sampleReviews = [
-                    {
-                        name: "김○○",
-                        program: "고급반",
-                        score_before: 85,
-                        score_after: 108,
-                        rating: 5,
-                        content: "체계적인 커리큘럼과 꼼꼼한 피드백 덕분에 목표 점수를 달성할 수 있었습니다. 특히 Writing과 Speaking 파트에서 많은 도움을 받았습니다.",
-                        date: "2024.01.20"
-                    },
-                    {
-                        name: "이○○",
-                        program: "중급반",
-                        score_before: 72,
-                        score_after: 95,
-                        rating: 5,
-                        content: "강사님의 열정적인 수업과 1:1 맞춤 관리가 정말 인상적이었습니다. 23점이나 올릴 수 있었어요!",
-                        date: "2024.01.15"
-                    },
-                    {
-                        name: "박○○",
-                        program: "단기 집중반",
-                        score_before: 88,
-                        score_after: 105,
-                        rating: 5,
-                        content: "단기간에 점수를 올려야 해서 고민이 많았는데, 집중 관리 덕분에 17점 상승했습니다. 감사합니다!",
-                        date: "2024.01.10"
-                    },
-                    {
-                        name: "최○○",
-                        program: "기초반",
-                        score_before: 55,
-                        score_after: 78,
-                        rating: 5,
-                        content: "영어 기초가 부족했는데 차근차근 실력을 쌓을 수 있었습니다. 선생님들이 정말 친절하세요.",
-                        date: "2024.01.05"
-                    },
-                    {
-                        name: "정○○",
-                        program: "고급반",
-                        score_before: 92,
-                        score_after: 112,
-                        rating: 5,
-                        content: "고득점을 위한 세밀한 전략과 노하우를 배울 수 있었습니다. 특히 실전 모의고사가 큰 도움이 되었어요.",
-                        date: "2023.12.28"
-                    },
-                    {
-                        name: "강○○",
-                        program: "중급반",
-                        score_before: 68,
-                        score_after: 89,
-                        rating: 5,
-                        content: "처음에는 80점도 어려울 것 같았는데 선생님들의 도움으로 89점까지 올릴 수 있었습니다!",
-                        date: "2023.12.20"
-                    }
-                ];
+                // Supabase에서 후기 데이터 로드
+                const result = await supabaseAPI.query('reviews', {
+                    'order': 'wr_id.desc',
+                    'limit': String(pageSize),
+                    'offset': String((currentPage - 1) * pageSize)
+                });
 
-                displayReviews(sampleReviews);
+                if (!result || result.length === 0) {
+                    if (currentPage === 1) {
+                        document.getElementById('reviewsContainer').innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px;">
+                                <i class="fas fa-inbox" style="font-size: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
+                                <p style="color: #64748b;">등록된 후기가 없습니다.</p>
+                            </div>`;
+                    }
+                    return;
+                }
+
+                displayReviews(result, currentPage === 1);
             } catch (error) {
                 console.error('후기 로드 오류:', error);
                 document.getElementById('reviewsLoading').innerHTML = `
@@ -451,57 +416,87 @@
         }
 
         // 후기 표시 함수
-        function displayReviews(reviews) {
+        function displayReviews(reviews, isFirst) {
             const container = document.getElementById('reviewsContainer');
-            
-            if (reviews.length === 0) {
-                container.innerHTML = `
-                    <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px;">
-                        <i class="fas fa-inbox" style="font-size: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
-                        <p style="color: #64748b;">등록된 후기가 없습니다.</p>
-                    </div>
-                `;
-                return;
-            }
 
             const reviewsHTML = reviews.map(review => {
-                const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
-                const scoreIncrease = review.score_after - review.score_before;
+                const date = review.published_at ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '';
                 
+                // 내용 미리보기 (HTML 태그 제거 후 200자)
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = review.content || '';
+                const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                const preview = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent;
+
                 return `
-                    <div class="review-card">
+                    <div class="review-card" onclick="openReviewDetail(${review.id})" style="cursor:pointer;">
                         <div class="review-header">
                             <div>
-                                <div class="review-name">${review.name}</div>
-                                <div class="review-program">${review.program}</div>
+                                <div class="review-name">${review.author_name || '익명'}</div>
+                                <div class="review-date" style="font-size:12px; color:#94a3b8;">${date}</div>
                             </div>
-                            <div class="review-rating" style="color: #fbbf24; font-size: 18px;">${stars}</div>
+                            <div style="font-size:12px; color:#94a3b8;">조회 ${review.hit_count || 0}</div>
                         </div>
-                        <div class="review-score">
-                            <div style="display: flex; align-items: center; gap: 16px;">
-                                <div>
-                                    <div style="font-size: 12px; color: #94a3b8; margin-bottom: 4px;">수강 전</div>
-                                    <div style="font-size: 24px; font-weight: 700; color: #64748b;">${review.score_before}</div>
-                                </div>
-                                <i class="fas fa-arrow-right" style="color: #9480c5; font-size: 20px;"></i>
-                                <div>
-                                    <div style="font-size: 12px; color: #94a3b8; margin-bottom: 4px;">수강 후</div>
-                                    <div style="font-size: 24px; font-weight: 700; color: #667eea;">${review.score_after}</div>
-                                </div>
-                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px;">
-                                    +${scoreIncrease}점 ↑
-                                </div>
-                            </div>
-                        </div>
-                        <div class="review-content">${review.content}</div>
-                        <div class="review-date">${review.date}</div>
+                        <div class="review-subject" style="font-weight:700; font-size:16px; margin:12px 0 8px; color:#1e293b;">${review.subject}</div>
+                        <div class="review-content" style="color:#64748b; font-size:14px; line-height:1.6;">${preview}</div>
                     </div>
                 `;
             }).join('');
 
-            container.innerHTML = reviewsHTML;
+            if (isFirst) {
+                container.innerHTML = reviewsHTML;
+            } else {
+                container.insertAdjacentHTML('beforeend', reviewsHTML);
+            }
+
+            // 더보기 버튼
+            const existingBtn = document.getElementById('loadMoreBtn');
+            if (existingBtn) existingBtn.remove();
+
+            if (reviews.length === pageSize) {
+                container.insertAdjacentHTML('afterend', `
+                    <div id="loadMoreBtn" style="text-align:center; margin:32px 0;">
+                        <button onclick="loadMore()" style="background:#9480c5; color:white; border:none; padding:12px 32px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">
+                            더보기
+                        </button>
+                    </div>
+                `);
+            }
+        }
+
+        function loadMore() {
+            currentPage++;
+            loadReviews();
+        }
+
+        // 후기 상세 모달
+        function openReviewDetail(reviewId) {
+            supabaseAPI.getById('reviews', reviewId).then(review => {
+                if (!review) return;
+                const date = review.published_at ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+                
+                const modal = document.createElement('div');
+                modal.id = 'reviewModal';
+                modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+                modal.innerHTML = `
+                    <div style="background:white; border-radius:16px; max-width:720px; width:100%; max-height:85vh; overflow-y:auto; padding:32px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+                            <div>
+                                <h3 style="margin:0 0 8px; font-size:20px; color:#1e293b;">${review.subject}</h3>
+                                <div style="font-size:13px; color:#94a3b8;">${review.author_name || '익명'} · ${date} · 조회 ${review.hit_count || 0}</div>
+                            </div>
+                            <button onclick="document.getElementById('reviewModal').remove()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#94a3b8; padding:0;">&times;</button>
+                        </div>
+                        <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 0 20px;">
+                        <div class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;">${review.content}</div>
+                    </div>
+                `;
+                modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+                document.body.appendChild(modal);
+            });
         }
     </script>
+    <script src="js/supabase-config.js"></script>
 
     <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
