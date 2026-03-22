@@ -283,6 +283,9 @@ function loadModalInfoTab(app) {
                 <i class="fas fa-pen"></i> 신청서 수정하기
             </button>
         </div>
+
+        <!-- 수강 상태 관리 (입금 확인된 학생만 표시) -->
+        ${renderAppStatusSection(app)}
     `;
 }
 
@@ -1849,3 +1852,155 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+// ===== 수강 상태 관리 섹션 =====
+function renderAppStatusSection(app) {
+    const status = getAppLiveStatus(app);
+    if (!status) return ''; // 입금 미확인이면 표시 안 함
+
+    const statuses = [
+        { key: 'active', label: '진행중', color: '#7c3aed', bg: '#ede9fe', icon: 'fa-running' },
+        { key: 'refunded', label: '환불완료', color: '#ef4444', bg: '#fef2f2', icon: 'fa-undo' },
+        { key: 'dropped', label: '중도포기', color: '#94a3b8', bg: '#f1f5f9', icon: 'fa-user-slash' }
+    ];
+
+    // 수료/시작대기는 자동 판정이므로 버튼 없이 표시만
+    if (status.key === 'completed' || status.key === 'ready') {
+        return `
+        <div class="info-card" style="margin-top: 24px;">
+            <h3 class="info-card-title"><i class="fas fa-flag"></i> 수강 상태</h3>
+            <div style="display:flex; align-items:center; gap:10px; padding:16px 0;">
+                <span style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:20px; font-size:14px; font-weight:600; background:${status.bg}; color:${status.color};">
+                    <i class="fas ${status.icon}"></i> ${status.label}
+                </span>
+                <span style="font-size:12px; color:#94a3b8;">자동 판정</span>
+            </div>
+        </div>`;
+    }
+
+    // 환불 상세 정보 (이미 환불/중도포기 처리된 경우)
+    const refundInfo = (status.key === 'refunded' || status.key === 'dropped') ? `
+        <div style="margin-top:16px; padding:16px; background:#f8fafc; border-radius:8px; font-size:13px;">
+            ${app.refund_reason ? `<div style="margin-bottom:8px;"><span style="color:#64748b;">사유:</span> ${escapeHtml(app.refund_reason)}</div>` : ''}
+            ${app.refund_amount ? `<div style="margin-bottom:8px;"><span style="color:#64748b;">환불 금액:</span> ${Number(app.refund_amount).toLocaleString()}원</div>` : ''}
+            ${app.refund_at ? `<div><span style="color:#64748b;">처리일:</span> ${new Date(app.refund_at).toLocaleDateString('ko-KR')}</div>` : ''}
+        </div>` : '';
+
+    return `
+    <div class="info-card" style="margin-top: 24px;">
+        <h3 class="info-card-title"><i class="fas fa-flag"></i> 수강 상태</h3>
+        <div style="display:flex; gap:10px; padding:16px 0; flex-wrap:wrap;">
+            ${statuses.map(s => `
+                <button onclick="selectAppStatus('${s.key}')"
+                    id="appStatusBtn_${s.key}"
+                    style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border-radius:20px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s;
+                    ${status.key === s.key
+                        ? `background:${s.color}; color:white; border:2px solid ${s.color};`
+                        : `background:white; color:${s.color}; border:2px solid #e2e8f0;`}">
+                    <i class="fas ${s.icon}"></i> ${s.label}
+                </button>
+            `).join('')}
+        </div>
+
+        <!-- 환불/중도포기 입력 폼 (숨김) -->
+        <div id="appStatusForm" style="display:none; margin-top:12px; padding:20px; background:#f8fafc; border-radius:10px;">
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">사유</label>
+                <input type="text" id="appStatusReason" placeholder="사유 입력..."
+                    style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">환불 금액</label>
+                <input type="number" id="appStatusRefundAmount" placeholder="0"
+                    style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="cancelAppStatusChange()" style="padding:8px 20px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:13px;">취소</button>
+                <button onclick="confirmAppStatusChange()" style="padding:8px 20px; background:#7c3aed; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">저장</button>
+            </div>
+        </div>
+
+        ${refundInfo}
+    </div>`;
+}
+
+let pendingAppStatus = null;
+
+function selectAppStatus(key) {
+    const current = getAppLiveStatus(currentManageApp);
+    if (current && current.key === key) return;
+
+    if (key === 'refunded' || key === 'dropped') {
+        pendingAppStatus = key;
+        document.getElementById('appStatusForm').style.display = 'block';
+        document.getElementById('appStatusReason').value = '';
+        document.getElementById('appStatusRefundAmount').value = '';
+        highlightAppStatusBtn(key);
+    } else if (key === 'active') {
+        if (!confirm('수강 상태를 "진행중"으로 되돌리시겠습니까?')) return;
+        changeAppStatus('active', '', 0);
+    }
+}
+
+function highlightAppStatusBtn(activeKey) {
+    const statuses = [
+        { key: 'active', color: '#7c3aed' },
+        { key: 'refunded', color: '#ef4444' },
+        { key: 'dropped', color: '#94a3b8' }
+    ];
+    statuses.forEach(s => {
+        const btn = document.getElementById('appStatusBtn_' + s.key);
+        if (!btn) return;
+        if (s.key === activeKey) {
+            btn.style.background = s.color;
+            btn.style.color = 'white';
+            btn.style.borderColor = s.color;
+        } else {
+            btn.style.background = 'white';
+            btn.style.color = s.color;
+            btn.style.borderColor = '#e2e8f0';
+        }
+    });
+}
+
+function cancelAppStatusChange() {
+    pendingAppStatus = null;
+    document.getElementById('appStatusForm').style.display = 'none';
+    const current = getAppLiveStatus(currentManageApp);
+    if (current) highlightAppStatusBtn(current.key);
+}
+
+async function confirmAppStatusChange() {
+    if (!pendingAppStatus) return;
+    const reason = document.getElementById('appStatusReason').value.trim();
+    const amount = parseInt(document.getElementById('appStatusRefundAmount').value) || 0;
+
+    const label = pendingAppStatus === 'refunded' ? '환불완료' : '중도포기';
+    if (!confirm(`"${label}" 처리하시겠습니까?`)) return;
+
+    await changeAppStatus(pendingAppStatus, reason, amount);
+    pendingAppStatus = null;
+}
+
+async function changeAppStatus(status, reason, amount) {
+    try {
+        const updateData = { app_status: status };
+        if (status === 'refunded' || status === 'dropped') {
+            updateData.refund_reason = reason || '';
+            updateData.refund_amount = amount || 0;
+            updateData.refund_at = Date.now();
+        } else {
+            updateData.refund_reason = null;
+            updateData.refund_amount = null;
+            updateData.refund_at = null;
+        }
+
+        await supabaseAPI.patch('applications', currentManageApp.id, updateData);
+        Object.assign(currentManageApp, updateData);
+        alert('✅ 수강 상태가 변경되었습니다.');
+        loadModalInfoTab(currentManageApp);
+    } catch (error) {
+        console.error('App status change error:', error);
+        alert('❌ 상태 변경에 실패했습니다.');
+    }
+}
