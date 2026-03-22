@@ -247,9 +247,8 @@ function getAppLiveStatus(app) {
     if (app.app_status === 'refunded') return { key: 'refunded', label: '환불완료', color: '#ef4444', bg: '#fef2f2', icon: 'fa-undo' };
     if (app.app_status === 'dropped') return { key: 'dropped', label: '중도포기', color: '#94a3b8', bg: '#f1f5f9', icon: 'fa-user-slash' };
 
-    // 세팅 완료 여부 확인 (알림톡까지 다 끝났는지)
-    const isSetupDone = app.kakaotalk_notification_sent;
-    if (!isSetupDone) return null; // 세팅 미완료 → 기존 프로세스 상태 사용
+    // 세팅 완료 여부 확인 (입금 확인까지 됐는지)
+    if (!app.deposit_confirmed_by_admin) return null; // 입금 미확인 → 기존 프로세스 상태 사용
 
     const today = getEffectiveToday();
     const start = app.schedule_start ? new Date(app.schedule_start) : null;
