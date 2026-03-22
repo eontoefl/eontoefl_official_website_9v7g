@@ -214,7 +214,7 @@ function renderV3SummaryCards() {
     const totalWeeks = getTotalWeeks(app);
     const totalDays = programType === 'Fast' ? 28 : 56;
     const startDate = getScheduleStart(app);
-    const depositAmount = app.deposit_amount || 100000;
+    const depositAmount = 100000; // 보증금 10만원 고정
 
     renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks);
     renderCardChallenge(effectiveToday, startDate, totalDays);
