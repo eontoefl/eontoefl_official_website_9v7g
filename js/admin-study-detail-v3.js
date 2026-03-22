@@ -1076,13 +1076,32 @@ function extractAnswers(recordObj) {
     const answers = [];
     const sets = recordObj.sets;
 
-    // sets가 배열이면 그대로, 객체면 values로 변환
-    const setList = Array.isArray(sets) ? sets : Object.values(sets);
+    // 시험 순서: fillblanks → daily1 → daily2 → academic
+    const SET_ORDER = [
+        'fillblanks_set1', 'fillblanks_set2',
+        'daily1_set1', 'daily1_set2',
+        'daily2_set1', 'daily2_set2',
+        'academic_set1'
+    ];
 
+    // sets가 객체면 시험 순서대로 정렬, 배열이면 그대로
+    let setList;
+    if (Array.isArray(sets)) {
+        setList = sets;
+    } else {
+        const keys = Object.keys(sets);
+        keys.sort((a, b) => {
+            const ai = SET_ORDER.indexOf(a);
+            const bi = SET_ORDER.indexOf(b);
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        });
+        setList = keys.map(k => sets[k]);
+    }
+
+    let qNum = 1;
     setList.forEach(set => {
         if (set && set.answers && Array.isArray(set.answers)) {
             set.answers.forEach(a => {
-                // 정답/유저답을 라벨로 변환 (숫자면 A/B/C/D, 문자열이면 그대로)
                 const correctRaw = a.correctAnswer ?? a.correct ?? '-';
                 const userRaw = a.userAnswer ?? a.selected ?? '-';
                 const options = a.options || [];
@@ -1095,7 +1114,7 @@ function extractAnswers(recordObj) {
                     : String(userRaw);
 
                 answers.push({
-                    questionNumber: a.questionNum || a.questionNumber || answers.length + 1,
+                    questionNumber: qNum++,
                     correctAnswer: correctLabel,
                     userAnswer: userLabel,
                     isCorrect: a.isCorrect != null ? !!a.isCorrect : (correctRaw === userRaw)
