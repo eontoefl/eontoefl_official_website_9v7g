@@ -50,9 +50,10 @@ async function loadStudyData() {
             'limit': '500'
         });
 
-        // 진행 중인 학생 필터링 (시작일 설정됨 + 종료일+7일 안 지남)
+        // 진행 중인 학생 필터링 (시작일 설정됨 + 종료일+7일 안 지남 + 환불/중도포기 아님)
         const activeApps = (apps || []).filter(app => {
             if (!app.schedule_start) return false;
+            if (app.app_status === 'refunded' || app.app_status === 'dropped') return false;
             const end = app.schedule_end ? new Date(app.schedule_end) : null;
             if (end) {
                 const endPlus7 = new Date(end);

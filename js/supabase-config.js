@@ -239,6 +239,35 @@ function getEffectiveToday() {
     return new Date(Date.UTC(y, m, d));
 }
 
+// ===== 공통 유틸: 신청서 진행 상태 판정 =====
+// app_status가 DB에 저장되어 있으면 그 값을 우선 사용하고,
+// 없으면 schedule_start / schedule_end 기준으로 자동 판정한다.
+function getAppLiveStatus(app) {
+    // 수동 설정값 우선 (환불완료, 중도포기)
+    if (app.app_status === 'refunded') return { key: 'refunded', label: '환불완료', color: '#ef4444', bg: '#fef2f2', icon: 'fa-undo' };
+    if (app.app_status === 'dropped') return { key: 'dropped', label: '중도포기', color: '#94a3b8', bg: '#f1f5f9', icon: 'fa-user-slash' };
+
+    // 세팅 완료 여부 확인 (알림톡까지 다 끝났는지)
+    const isSetupDone = app.kakaotalk_notification_sent;
+    if (!isSetupDone) return null; // 세팅 미완료 → 기존 프로세스 상태 사용
+
+    const today = getEffectiveToday();
+    const start = app.schedule_start ? new Date(app.schedule_start) : null;
+    const end = app.schedule_end ? new Date(app.schedule_end) : null;
+
+    if (!start) return null;
+
+    if (today < start) return { key: 'ready', label: '시작 대기', color: '#3b82f6', bg: '#dbeafe', icon: 'fa-clock' };
+
+    if (end) {
+        const endPlus7 = new Date(end);
+        endPlus7.setDate(endPlus7.getDate() + 7);
+        if (today > endPlus7) return { key: 'completed', label: '수료', color: '#22c55e', bg: '#dcfce7', icon: 'fa-graduation-cap' };
+    }
+
+    return { key: 'active', label: '진행중', color: '#7c3aed', bg: '#ede9fe', icon: 'fa-running' };
+}
+
 // ===== 공통 유틸: 등급별 색상 =====
 function getGradeColor(grade) {
     const colors = {

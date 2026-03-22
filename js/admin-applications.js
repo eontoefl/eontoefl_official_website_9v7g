@@ -197,9 +197,11 @@ function displayApplications() {
     const tableHTML = pageApplications.map(app => {
         const actionMessage = getAdminActionMessage(app);
         const isSelected = selectedIds.has(app.id);
+        const liveStatus = getAppLiveStatus(app);
+        const liveStatusBadge = liveStatus ? `<span style="display:inline-block; background:${liveStatus.bg}; color:${liveStatus.color}; font-size:10px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:4px;"><i class="fas ${liveStatus.icon}" style="margin-right:2px;"></i>${liveStatus.label}</span>` : '';
         
         return `
-            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted ? 'opacity: 0.55;' : ''}">
+            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted ? 'opacity: 0.55;' : ''}${liveStatus && (liveStatus.key === 'refunded' || liveStatus.key === 'dropped') ? 'opacity: 0.55;' : ''}">
                 <td>
                     <input type="checkbox" 
                            class="app-checkbox" 
@@ -208,7 +210,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
+                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}${liveStatusBadge}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
