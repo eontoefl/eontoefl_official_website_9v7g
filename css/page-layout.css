@@ -25,9 +25,14 @@
 
 /* 페이지 레이아웃 컨테이너 */
 .page-layout {
-    padding: 60px 0;
-    background: #f8f9fa;
+    padding: 60px 40px;
+    background: #ffffff;
     min-height: calc(100vh - 400px);
+}
+
+.page-layout > .container {
+    max-width: none;
+    padding: 0;
 }
 
 .layout-wrapper {
@@ -44,9 +49,9 @@
 
 .sidebar-nav {
     background: white;
-    border-radius: 12px;
+    border-radius: 0;
     padding: 24px 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
     position: -webkit-sticky;
     position: sticky;
     top: 80px;
@@ -100,9 +105,10 @@
 .main-content {
     flex: 1;
     background: white;
-    border-radius: 16px;
+    border-radius: 0;
     padding: 48px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
+    border-left: 1px solid #e2e8f0;
 }
 
 .content-section {
@@ -156,6 +162,11 @@
 
     .page-layout {
         padding: 40px 20px;
+    }
+
+    .page-layout > .container {
+        max-width: none;
+        padding: 0;
     }
 
     .layout-wrapper {
