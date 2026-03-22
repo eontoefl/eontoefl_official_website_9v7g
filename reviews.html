@@ -110,6 +110,11 @@
                                 <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">수강 후기</h2>
                                 <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 후기가 있습니다</p>
                             </div>
+                            <div id="writeBtn" style="display:none;">
+                                <a href="write.html?board=reviews" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; text-decoration:none; border-radius:8px; font-size:14px; font-weight:600; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(148,128,197,0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                                    <i class="fas fa-pen"></i> 글쓰기
+                                </a>
+                            </div>
                         </div>
 
                         <div class="loading" id="listLoading">
@@ -234,6 +239,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
             const reviewId = params.get('id');
+
+            // 로그인한 사용자에게 글쓰기 버튼 표시
+            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            if (userData) {
+                document.getElementById('writeBtn').style.display = 'block';
+            }
 
             if (reviewId) {
                 showDetailView(reviewId);

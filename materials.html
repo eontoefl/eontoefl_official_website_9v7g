@@ -106,7 +106,12 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
                             <div>
                                 <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">학습 자료</h2>
-                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">1</span>건의 자료가 있습니다</p>
+                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 자료가 있습니다</p>
+                            </div>
+                            <div id="writeBtn" style="display:none;">
+                                <a href="write.html?board=materials" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; text-decoration:none; border-radius:8px; font-size:14px; font-weight:600; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(148,128,197,0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                                    <i class="fas fa-pen"></i> 글쓰기
+                                </a>
                             </div>
                         </div>
 
@@ -115,6 +120,11 @@
                                 <i class="fas fa-lock" style="margin-right:8px;"></i>
                                 <strong>학습 자료는 수강생 전용입니다.</strong> 로그인 후 이용하실 수 있습니다.
                             </p>
+                        </div>
+
+                        <div class="loading" id="listLoading">
+                            <div class="spinner"></div>
+                            <p style="margin-top: 12px; font-size: 13px; color: #64748b;">로딩 중...</p>
                         </div>
 
                         <div class="applications-table">
@@ -129,21 +139,12 @@
                                             <th style="width: 70px;">조회</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="materialsBody">
-                                        <tr onclick="location.href='materials.html?id=1'" style="cursor:pointer;">
-                                            <td style="text-align:center; color:#64748b;">1</td>
-                                            <td style="font-weight:600; color:#1e293b;">
-                                                <span style="background:#4facfe; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">자료</span>
-                                                TOEFL Reading 핵심 전략 가이드
-                                            </td>
-                                            <td style="text-align:center; color:#64748b;">관리자</td>
-                                            <td style="text-align:center; color:#94a3b8; font-size:13px;">2025. 03. 22.</td>
-                                            <td style="text-align:center; color:#94a3b8; font-size:13px;">0</td>
-                                        </tr>
-                                    </tbody>
+                                    <tbody id="materialsBody"></tbody>
                                 </table>
                             </div>
                         </div>
+
+                        <div id="pagination" style="text-align: center; margin-top: 24px; display: none;"></div>
                     </section>
 
                     <!-- 상세 뷰 -->
@@ -154,7 +155,12 @@
                             </a>
                         </div>
 
-                        <article id="detailArticle">
+                        <div id="detailLoading" style="text-align:center; padding:60px 20px;">
+                            <div class="spinner"></div>
+                            <p style="margin-top:12px; font-size:13px; color:#64748b;">로딩 중...</p>
+                        </div>
+
+                        <article id="detailArticle" style="display:none;">
                             <h2 id="detailSubject" style="font-size:22px; font-weight:700; color:#1e293b; margin-bottom:16px; line-height:1.4;"></h2>
                             <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid #e2e8f0; margin-bottom:32px;">
                                 <span id="detailAuthor" style="font-size:14px; color:#64748b;"></span>
@@ -163,8 +169,19 @@
                                 <span style="color:#e2e8f0;">|</span>
                                 <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
                             </div>
-                            <div id="detailContent" style="font-size:15px; line-height:1.8; color:#334155;"></div>
+                            <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
                         </article>
+
+                        <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; display:none;" id="detailNav">
+                            <div style="display:flex; justify-content:space-between;">
+                                <a id="prevPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                    <i class="fas fa-chevron-left"></i> <span>이전 글</span>
+                                </a>
+                                <a id="nextPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px; margin-left:auto;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                    <span>다음 글</span> <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </div>
+                        </div>
                     </section>
 
                 </main>
@@ -220,23 +237,19 @@
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script>
+        let allMaterials = [];
+        let currentPage = 1;
+        const itemsPerPage = 15;
+
+        // 샘플 데이터
         const sampleMaterials = [
             {
-                id: 1,
+                id: 'sample-1',
                 subject: 'TOEFL Reading 핵심 전략 가이드',
                 author: '관리자',
-                date: '2025. 03. 22.',
+                published_at: '2025-03-22T00:00:00',
                 hit: 0,
-                content: `<p>안녕하세요, 이온토플입니다.</p>
-                <p>TOEFL Reading 영역의 핵심 전략을 정리한 가이드입니다.</p>
-                <p><strong>주요 내용:</strong></p>
-                <ul>
-                    <li>지문 유형별 접근 전략</li>
-                    <li>시간 배분 방법</li>
-                    <li>자주 출제되는 문제 패턴 분석</li>
-                    <li>고득점을 위한 실전 팁</li>
-                </ul>
-                <p>자세한 자료는 수업 시간에 제공됩니다.</p>`
+                content: '<p>안녕하세요, 이온토플입니다.</p><p>TOEFL Reading 영역의 핵심 전략을 정리한 가이드입니다.</p><p><strong>주요 내용:</strong></p><ul><li>지문 유형별 접근 전략</li><li>시간 배분 방법</li><li>자주 출제되는 문제 패턴 분석</li><li>고득점을 위한 실전 팁</li></ul><p>자세한 자료는 수업 시간에 제공됩니다.</p>'
             }
         ];
 
@@ -244,24 +257,169 @@
             const params = new URLSearchParams(window.location.search);
             const materialId = params.get('id');
 
+            // 관리자에게만 글쓰기 버튼 표시
+            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            if (userData && userData.role === 'admin') {
+                document.getElementById('writeBtn').style.display = 'block';
+            }
+
             if (materialId) {
-                showDetailView(parseInt(materialId));
+                showDetailView(materialId);
+            } else {
+                loadMaterials();
             }
         });
 
-        function showDetailView(id) {
-            const material = sampleMaterials.find(m => m.id === id);
-            if (!material) return;
+        // ==================== 목록 ====================
 
+        async function loadMaterials() {
+            try {
+                const result = await supabaseAPI.query('materials', {
+                    'order': 'id.desc',
+                    'limit': '1000'
+                });
+
+                if (!result || result.length === 0) {
+                    allMaterials = sampleMaterials;
+                } else {
+                    allMaterials = result;
+                }
+
+                document.getElementById('totalCount').textContent = allMaterials.length;
+                document.getElementById('listLoading').style.display = 'none';
+                renderPage(1);
+            } catch (error) {
+                console.warn('DB 로드 실패, 샘플 데이터 사용:', error);
+                allMaterials = sampleMaterials;
+                document.getElementById('totalCount').textContent = allMaterials.length;
+                document.getElementById('listLoading').style.display = 'none';
+                renderPage(1);
+            }
+        }
+
+        function renderPage(page) {
+            currentPage = page;
+            const start = (page - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageData = allMaterials.slice(start, end);
+            const total = allMaterials.length;
+
+            const tbody = document.getElementById('materialsBody');
+            tbody.innerHTML = pageData.map((material, idx) => {
+                const no = total - start - idx;
+                const date = material.published_at
+                    ? new Date(material.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                    : (material.date || '');
+                return `
+                    <tr onclick="location.href='materials.html?id=${material.id}'" style="cursor:pointer;">
+                        <td style="text-align:center; color:#64748b;">${no}</td>
+                        <td style="font-weight:600; color:#1e293b;">
+                            <span style="background:#4facfe; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">자료</span>
+                            ${material.subject || ''}
+                        </td>
+                        <td style="text-align:center; color:#64748b;">${material.author || material.author_name || '관리자'}</td>
+                        <td style="text-align:center; color:#94a3b8; font-size:13px;">${date}</td>
+                        <td style="text-align:center; color:#94a3b8; font-size:13px;">${material.hit || material.hit_count || 0}</td>
+                    </tr>`;
+            }).join('');
+
+            renderPagination(total, page);
+        }
+
+        function renderPagination(total, page) {
+            const totalPages = Math.ceil(total / itemsPerPage);
+            if (totalPages <= 1) {
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            const maxVisible = 5;
+            let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            if (endPage - startPage + 1 < maxVisible) startPage = Math.max(1, endPage - maxVisible + 1);
+
+            let html = '<div style="display:inline-flex; gap:4px; align-items:center;">';
+            if (page > 1) {
+                html += `<button onclick="renderPage(1)" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-left"></i></button>`;
+                html += `<button onclick="renderPage(${page - 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-left"></i></button>`;
+            }
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === page;
+                html += `<button onclick="renderPage(${i})" style="padding:8px 12px; border:1px solid ${isActive ? '#9480c5' : '#e2e8f0'}; background:${isActive ? '#9480c5' : 'white'}; color:${isActive ? 'white' : '#64748b'}; border-radius:6px; cursor:pointer; font-size:13px; font-weight:${isActive ? '600' : '400'};">${i}</button>`;
+            }
+            if (page < totalPages) {
+                html += `<button onclick="renderPage(${page + 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-right"></i></button>`;
+                html += `<button onclick="renderPage(${totalPages})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-right"></i></button>`;
+            }
+            html += '</div>';
+            const paginationEl = document.getElementById('pagination');
+            paginationEl.innerHTML = html;
+            paginationEl.style.display = 'block';
+        }
+
+        // ==================== 상세 ====================
+
+        async function showDetailView(materialId) {
             document.getElementById('listView').style.display = 'none';
             document.getElementById('detailView').style.display = 'block';
 
-            document.title = material.subject + ' - 학습 자료 - 이온토플';
-            document.getElementById('detailSubject').textContent = material.subject;
-            document.getElementById('detailAuthor').textContent = material.author;
-            document.getElementById('detailDate').textContent = material.date;
-            document.getElementById('detailHit').textContent = '조회 ' + material.hit;
-            document.getElementById('detailContent').innerHTML = material.content;
+            try {
+                let material = null;
+
+                if (String(materialId).startsWith('sample-')) {
+                    material = sampleMaterials.find(m => m.id === materialId);
+                } else {
+                    material = await supabaseAPI.getById('materials', materialId);
+                }
+
+                if (!material) {
+                    material = sampleMaterials.find(m => m.id == materialId);
+                }
+
+                if (!material) {
+                    document.getElementById('detailLoading').innerHTML = `
+                        <div style="text-align:center; color:#ef4444;">
+                            <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
+                            <p>존재하지 않는 게시글입니다.</p>
+                        </div>`;
+                    return;
+                }
+
+                document.title = material.subject + ' - 학습 자료 - 이온토플';
+
+                const date = material.published_at
+                    ? new Date(material.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+                    : (material.date || '');
+
+                document.getElementById('detailSubject').textContent = material.subject;
+                document.getElementById('detailAuthor').textContent = material.author || material.author_name || '관리자';
+                document.getElementById('detailDate').textContent = date;
+                document.getElementById('detailHit').textContent = '조회 ' + (material.hit || material.hit_count || 0);
+                document.getElementById('detailContent').innerHTML = material.content || '';
+
+                document.getElementById('detailLoading').style.display = 'none';
+                document.getElementById('detailArticle').style.display = 'block';
+
+            } catch (error) {
+                console.error('게시글 로드 오류:', error);
+                const sample = sampleMaterials.find(m => m.id == materialId);
+                if (sample) {
+                    document.title = sample.subject + ' - 학습 자료 - 이온토플';
+                    document.getElementById('detailSubject').textContent = sample.subject;
+                    document.getElementById('detailAuthor').textContent = sample.author;
+                    document.getElementById('detailDate').textContent = sample.date || '2025. 03. 22.';
+                    document.getElementById('detailHit').textContent = '조회 ' + (sample.hit || 0);
+                    document.getElementById('detailContent').innerHTML = sample.content;
+                    document.getElementById('detailLoading').style.display = 'none';
+                    document.getElementById('detailArticle').style.display = 'block';
+                } else {
+                    document.getElementById('detailLoading').innerHTML = `
+                        <div style="text-align:center; color:#ef4444;">
+                            <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
+                            <p>게시글을 불러오는데 실패했습니다.</p>
+                        </div>`;
+                }
+            }
         }
     </script>
 </body>
