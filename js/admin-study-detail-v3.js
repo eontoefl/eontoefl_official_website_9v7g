@@ -377,7 +377,7 @@ function renderCardAuthRate(effectiveToday, programType, startDate, totalWeeks) 
         <div style="text-align:center;">
             <div class="auth-rate-value" style="color:${barColor};">${authRate}<span>%</span></div>
             <div class="auth-bar-wrap"><div class="auth-bar" style="width:${Math.min(100, authRate)}%; background:${barColor};"></div></div>
-            <div class="auth-sub">인증 ${authRateSum.toLocaleString()} / 과제 ${tasksDueToday}개</div>
+            <div class="auth-sub" style="color:#94a3b8; font-size:12px; margin-top:6px;">오늘까지 할당된 과제 ${tasksDueToday}건 기준</div>
         </div>`;
 }
 
