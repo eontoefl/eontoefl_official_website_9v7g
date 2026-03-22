@@ -2232,7 +2232,7 @@ async function loadPaymentTab(app) {
                     </div>
                 </div>
                 <p style="font-size: 15px; color: #166534; margin: 0; line-height: 1.6;">
-                    입금액: <strong>${(app.deposit_amount || 0).toLocaleString()}원</strong><br/>
+                    입금액: <strong>${(app.final_price || 0).toLocaleString()}원</strong><br/>
                     곧 이용 방법 안내가 발송됩니다.
                 </p>
             </div>

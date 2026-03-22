@@ -279,7 +279,7 @@ function renderSummaryCards() {
     }
 
     // ── 카드4: 등급 & 환급 (직접 계산) ──
-    const deposit = app.deposit_amount || 0;
+    const deposit = 100000; // 보증금 10만원 고정
     let gradeDisplay, gradeSub;
     if (dueTasks.length > 0) {
         const gradeResult = getGradeFromRules(authResult.authRate, gradeRules || [], deposit);

@@ -574,12 +574,9 @@ async function bulkConfirmDeposit() {
 
     try {
         const promises = Array.from(selectedIds).map(async (id) => {
-            const app = await supabaseAPI.getById('applications', id);
-            const amount = app?.final_price || 0;
             return supabaseAPI.patch('applications', id, {
                 deposit_confirmed_by_admin: true,
                 deposit_confirmed_by_admin_at: Date.now(),
-                deposit_amount: amount,
                 current_step: 5
             });
         });

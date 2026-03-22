@@ -654,7 +654,7 @@ async function loadDepositTab(app) {
                         <table style="width: 100%; font-size: 15px;">
                             <tr>
                                 <td style="padding: 8px 0; color: #64748b;">확인 금액</td>
-                                <td style="padding: 8px 0; font-weight: 600; text-align: right;">${(app.deposit_amount || 0).toLocaleString()}원</td>
+                                <td style="padding: 8px 0; font-weight: 600; text-align: right;">${(app.final_price || 0).toLocaleString()}원</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px 0; color: #64748b;">입금 확인 시각</td>
@@ -702,7 +702,7 @@ async function loadDepositTab(app) {
                         <table style="width: 100%; font-size: 15px;">
                             <tr>
                                 <td style="padding: 8px 0; color: #64748b;">확인 금액</td>
-                                <td style="padding: 8px 0; font-weight: 600; text-align: right;">${(app.deposit_amount || 0).toLocaleString()}원</td>
+                                <td style="padding: 8px 0; font-weight: 600; text-align: right;">${(app.final_price || 0).toLocaleString()}원</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px 0; color: #64748b;">학생 입금 알림</td>
@@ -927,7 +927,6 @@ async function confirmDepositByAdmin(appId) {
         const app = await supabaseAPI.patch('applications', appId, {
                 deposit_confirmed_by_admin: true,
                 deposit_confirmed_by_admin_at: Date.now(),
-                deposit_amount: amount,
                 current_step: 5
         });
 

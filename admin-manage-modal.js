@@ -848,7 +848,7 @@ async function loadModalContractTab(app) {
                             </tr>
                             <tr>
                                 <td style="padding: 8px 0; color: #64748b;">확인 금액</td>
-                                <td style="padding: 8px 0; text-align: right; font-weight: 600;">${(app.deposit_amount || 0).toLocaleString()}원</td>
+                                <td style="padding: 8px 0; text-align: right; font-weight: 600;">${(app.final_price || 0).toLocaleString()}원</td>
                             </tr>
                         </table>
                     </div>
@@ -1208,7 +1208,6 @@ async function confirmDepositFromModal(appId) {
         const updatedApp = await supabaseAPI.patch('applications', appId, {
                 deposit_confirmed_by_admin: true,
                 deposit_confirmed_by_admin_at: Date.now(),
-                deposit_amount: parseInt(amount),
                 current_step: 5
         });
         
