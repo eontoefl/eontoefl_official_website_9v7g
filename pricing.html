@@ -112,7 +112,20 @@
         .pr-price-total .pr-price-label { font-size: 14px; font-weight: 600; color: #1e293b; }
         .pr-price-total .pr-price-value { font-size: 15px; font-weight: 700; color: #1e293b; }
 
-        /* Info boxes */
+        /* Info box - outline style (시험료지원금) */
+        .pr-info-outline { border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-top: 16px; }
+        .pr-info-outline-title { font-size: 13px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; }
+        .pr-info-outline p { font-size: 13px; color: #64748b; line-height: 1.7; margin: 0; }
+
+        /* Info box - muted style (보증금) */
+        .pr-info-muted { background: #f8fafc; border-radius: 10px; padding: 20px 24px; margin-top: 12px; }
+        .pr-info-muted-title { font-size: 13px; font-weight: 700; color: #64748b; margin: 0 0 8px 0; }
+        .pr-info-muted p { font-size: 13px; color: #94a3b8; line-height: 1.7; margin: 0; }
+
+        /* Caption text (과정 비교 설명) */
+        .pr-caption { font-size: 13px; color: #94a3b8; line-height: 1.7; margin-top: 12px; }
+
+        /* Legacy note (포함사항 하단 등) */
         .pr-note { background: #f8f7ff; border-radius: 10px; padding: 18px 22px; margin-top: 16px; }
         .pr-note p { font-size: 13px; color: #64748b; line-height: 1.7; margin: 0; }
         .pr-note strong { color: #475569; }
@@ -189,7 +202,6 @@
                         <div class="pr-program" style="margin-top: 32px;">
                             <div class="pr-program-header">
                                 <h3>내벨업챌린지</h3>
-                                <p class="pr-program-desc">TOEFL 관리형 학습 프로그램</p>
                             </div>
                             <div class="pr-price-table">
                                 <div class="pr-price-row">
@@ -206,20 +218,20 @@
                                 </div>
                             </div>
                             <div class="pr-price-total">
-                                <span class="pr-price-label">실 납부액</span>
+                                <span class="pr-price-label">이용가</span>
                                 <span class="pr-price-value">790,000원</span>
                             </div>
                         </div>
 
                         <!-- 안내 사항 -->
-                        <div class="pr-note">
-                            <p><strong>시험료지원금 수령 조건</strong><br>
-                            시험료지원금은 선택이 아닌 필수 적용 항목입니다. 수령을 위해서는 실제 토플 시험 2회 이상 응시 후 점수 인증, 그리고 점수 후기 1회 작성이 필요합니다.</p>
+                        <div class="pr-info-outline">
+                            <p class="pr-info-outline-title">시험료지원금 수령 조건</p>
+                            <p>시험료지원금은 선택이 아닌 필수 적용 항목입니다. 수령을 위해서는 실제 토플 시험 2회 이상 응시 후 점수 인증, 그리고 점수 후기 1회 작성이 필요합니다.</p>
                         </div>
 
-                        <div class="pr-note">
-                            <p><strong>보증금 안내</strong><br>
-                            보증금은 필수이며, 챌린지 종료 후 인증률에 따라 환급됩니다. 인증률에 따라 전액 환급될 수도, 일부 또는 전혀 환급되지 않을 수도 있습니다.</p>
+                        <div class="pr-info-muted">
+                            <p class="pr-info-muted-title">보증금 안내</p>
+                            <p>보증금은 필수이며, 챌린지 종료 후 인증률에 따라 환급됩니다. 인증률에 따라 전액 환급될 수도, 일부 또는 전혀 환급되지 않을 수도 있습니다.</p>
                         </div>
 
                         <!-- Fast vs Standard -->
@@ -235,18 +247,16 @@
                                 <p>일 학습량을 분산하여 여유 있게 완주</p>
                             </div>
                         </div>
-                        <div class="pr-note">
-                            <p>두 과정의 총 학습량은 완벽하게 동일하며, 가격도 같습니다. 기간에 따라 하루 분량이 달라질 뿐이므로 자신의 스케줄에 맞는 과정을 선택하시면 됩니다.</p>
-                        </div>
+                        <p class="pr-caption">두 과정의 총 학습량은 완벽하게 동일하며, 가격도 같습니다. 기간에 따라 하루 분량이 달라질 뿐이므로 자신의 스케줄에 맞는 과정을 선택하시면 됩니다.</p>
 
                         <!-- 포함 사항 -->
                         <div class="pr-includes">
                             <p class="pr-includes-title">포함 사항</p>
                             <div class="pr-include-list">
-                                <div class="pr-include-item"><i class="fas fa-check"></i> 매일 맞춤 학습 분량 제공</div>
+                                <div class="pr-include-item"><i class="fas fa-check"></i> 매일 학습 분량 제공</div>
                                 <div class="pr-include-item"><i class="fas fa-check"></i> 매일 학습 인증 관리</div>
-                                <div class="pr-include-item"><i class="fas fa-check"></i> R / L / S / W 전 영역 자료</div>
-                                <div class="pr-include-item"><i class="fas fa-check"></i> 개별 분석 리포트</div>
+                                <div class="pr-include-item"><i class="fas fa-check"></i> R / L / W / S 전 영역 자료</div>
+                                <div class="pr-include-item"><i class="fas fa-check"></i> 주 1회 개별 분석 리포트</div>
                                 <div class="pr-include-item"><i class="fas fa-check"></i> 보카 실물책 배송</div>
                                 <div class="pr-include-item"><i class="fas fa-check"></i> 필기구 세트 배송</div>
                                 <div class="pr-include-item"><i class="fas fa-check"></i> 이용방법 가이드 제공</div>
