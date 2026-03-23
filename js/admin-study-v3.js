@@ -50,16 +50,9 @@ async function loadStudyData() {
             'limit': '500'
         });
 
-        // 진행 중인 학생 필터링 (시작일 설정됨 + 종료일+7일 안 지남 + 환불/중도포기 아님)
+        // 학생 필터링 (시작일 설정된 학생만 — 종료/환불/중도포기도 포함)
         const activeApps = (apps || []).filter(app => {
             if (!app.schedule_start) return false;
-            if (app.app_status === 'refunded' || app.app_status === 'dropped') return false;
-            const end = app.schedule_end ? new Date(app.schedule_end) : null;
-            if (end) {
-                const endPlus7 = new Date(end);
-                endPlus7.setDate(endPlus7.getDate() + 7);
-                return today <= endPlus7;
-            }
             return true;
         });
 
@@ -285,7 +278,9 @@ async function loadStudyData() {
                 daysSinceActivity,
                 consecutiveMissing,
                 hasFraud,
-                scheduleStart: app.schedule_start
+                scheduleStart: app.schedule_start,
+                scheduleEnd: app.schedule_end,
+                appStatus: app.app_status || null
             };
         }).filter(Boolean);
 
@@ -309,23 +304,28 @@ async function loadStudyData() {
 
 // ===== 통계 카드 업데이트 =====
 function updateStatCards(students, authRecords) {
-    document.getElementById('activeStudents').textContent = students.length;
+    // 통계는 진행 중인 학생만 (종료/환불/중도포기 제외)
+    const activeOnly = students.filter(s => {
+        const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
+        return !ls || (ls.key !== 'completed' && ls.key !== 'refunded' && ls.key !== 'dropped');
+    });
+    document.getElementById('activeStudents').textContent = activeOnly.length;
 
     // 어제 미제출
-    const yesterdayMissing = students.filter(s => {
+    const yesterdayMissing = activeOnly.filter(s => {
         return s.consecutiveMissing >= 1;
     }).length;
     document.getElementById('yesterdayMissing').textContent = yesterdayMissing;
 
-    // 평균 인증률 (study_results_v3 기반)
-    const studentsWithTasks = students.filter(s => s.totalDeadlinedTasks > 0);
+    // 평균 인증률 (study_results_v3 기반, 진행 중만)
+    const studentsWithTasks = activeOnly.filter(s => s.totalDeadlinedTasks > 0);
     const totalAuth = studentsWithTasks.reduce((sum, s) => sum + s.avgAuthRate, 0);
     const avgAuth = studentsWithTasks.length > 0 ? Math.round(totalAuth / studentsWithTasks.length) : 0;
     document.getElementById('avgAuthRate').textContent = avgAuth + '%';
 
-    // 알림 (fraud + 연속미제출 2일+)
-    const fraudCount = students.filter(s => s.hasFraud).length;
-    const consecutiveCount = students.filter(s => s.consecutiveMissing >= 2).length;
+    // 알림 (fraud + 연속미제출 2일+, 진행 중만)
+    const fraudCount = activeOnly.filter(s => s.hasFraud).length;
+    const consecutiveCount = activeOnly.filter(s => s.consecutiveMissing >= 2).length;
     document.getElementById('alertCount').textContent = fraudCount + consecutiveCount;
 }
 
@@ -343,10 +343,16 @@ function applyFilters() {
         return true;
     });
 
-    // 정렬 (미시작자는 항상 하단)
+    // 정렬 (종료/환불/중도포기 → 하단, 미시작 → 그 위)
     filteredStudentData.sort((a, b) => {
-        const aStarted = a.totalDeadlinedTasks > 0 || a.avgAuthRate > 0 ? 1 : (new Date(a.scheduleStart) <= new Date() ? 1 : 0);
-        const bStarted = b.totalDeadlinedTasks > 0 || b.avgAuthRate > 0 ? 1 : (new Date(b.scheduleStart) <= new Date() ? 1 : 0);
+        const aLive = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: a.scheduleStart, schedule_end: a.scheduleEnd, app_status: a.appStatus });
+        const bLive = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: b.scheduleStart, schedule_end: b.scheduleEnd, app_status: b.appStatus });
+        const aEnded = aLive && (aLive.key === 'completed' || aLive.key === 'refunded' || aLive.key === 'dropped');
+        const bEnded = bLive && (bLive.key === 'completed' || bLive.key === 'refunded' || bLive.key === 'dropped');
+
+        // 종료된 학생 하단
+        if (aEnded !== bEnded) return aEnded ? 1 : -1;
+
         const aBeforeStart = new Date(a.scheduleStart) > new Date();
         const bBeforeStart = new Date(b.scheduleStart) > new Date();
 
@@ -389,17 +395,29 @@ function renderTable() {
     emptyState.style.display = 'none';
 
     tbody.innerHTML = filteredStudentData.map(s => {
+        // 운영 상태 판정
+        const sLiveStatus = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
+        const isEnded = sLiveStatus && (sLiveStatus.key === 'completed' || sLiveStatus.key === 'refunded' || sLiveStatus.key === 'dropped');
+
         // 행 스타일
         let rowStyle = '';
         const isBeforeStart = new Date(s.scheduleStart) > new Date();
         if (isBeforeStart) {
             rowStyle += 'background: #f8fafc; opacity: 0.7;';
+        } else if (isEnded) {
+            rowStyle += 'background: #f8fafc;';
         } else if (s.grade !== '-' && s.avgAuthRate < 50) {
             rowStyle += 'background: #fef2f2;';
         }
-        if (s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
+        if (!isEnded && s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
 
-        const nameWarning = (s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
+        const nameWarning = (!isEnded && s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
+
+        // 이름 옆 뱃지 (종료/환불완료/중도포기)
+        let statusBadge = '';
+        if (sLiveStatus && isEnded) {
+            statusBadge = ` <span style="display:inline-block; background:${sLiveStatus.color}; color:white; font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px; margin-left:4px;"><i class="fas ${sLiveStatus.icon}" style="margin-right:2px;"></i>${sLiveStatus.label}</span>`;
+        }
 
         // 인증률 색상 (등급 기준 연동)
         let authColor = '#22c55e';
@@ -422,7 +440,7 @@ function renderTable() {
         return `
             <tr style="${rowStyle}">
                 <td>
-                    <strong>${escapeHtml(s.name)}</strong>${nameWarning}
+                    <strong>${escapeHtml(s.name)}</strong>${statusBadge}${nameWarning}
                     ${s.hasFraud ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:9px; padding:1px 5px; border-radius:3px; margin-left:4px;">FRAUD</span>' : ''}
                 </td>
                 <td>
