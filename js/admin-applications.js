@@ -52,7 +52,15 @@ function getAdminActionMessage(app) {
         return { text: '알림톡 예약을 진행해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
     
-    // 10. 모든 작업 완료
+    // 10. 모든 세팅 완료 → 운영 상태로 전환
+    const liveStatus = getAppLiveStatus(app);
+    if (liveStatus) {
+        if (liveStatus.key === 'ready') return { text: '시작 대기', color: '#3b82f6', bgColor: '#dbeafe' };
+        if (liveStatus.key === 'active') return { text: '진행중', color: '#7c3aed', bgColor: '#ede9fe' };
+        if (liveStatus.key === 'completed') return { text: '종료', color: '#22c55e', bgColor: '#dcfce7' };
+        if (liveStatus.key === 'refunded') return { text: '환불완료', color: '#ef4444', bgColor: '#fef2f2' };
+        if (liveStatus.key === 'dropped') return { text: '중도포기', color: '#94a3b8', bgColor: '#f1f5f9' };
+    }
     return { text: '세팅 완료', color: '#22c55e', bgColor: '#dcfce7' };
 }
 
@@ -76,7 +84,15 @@ function getAppStageFilter(app) {
     if (!app.shipping_completed) return 'need_shipping';
     // 9. 알림톡 예약 필요
     if (!app.kakaotalk_notification_sent) return 'need_kakao';
-    // 10. 완료
+    // 10. 세팅 완료 → 운영 상태 세분화
+    const liveStatus = getAppLiveStatus(app);
+    if (liveStatus) {
+        if (liveStatus.key === 'ready') return 'live_ready';
+        if (liveStatus.key === 'active') return 'live_active';
+        if (liveStatus.key === 'completed') return 'live_completed';
+        if (liveStatus.key === 'refunded') return 'live_refunded';
+        if (liveStatus.key === 'dropped') return 'live_dropped';
+    }
     return 'completed';
 }
 
@@ -198,10 +214,10 @@ function displayApplications() {
         const actionMessage = getAdminActionMessage(app);
         const isSelected = selectedIds.has(app.id);
         const liveStatus = getAppLiveStatus(app);
-        const liveStatusBadge = liveStatus ? `<span style="display:inline-block; background:${liveStatus.bg}; color:${liveStatus.color}; font-size:10px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:4px;"><i class="fas ${liveStatus.icon}" style="margin-right:2px;"></i>${liveStatus.label}</span>` : '';
+        const isInactive = liveStatus && (liveStatus.key === 'refunded' || liveStatus.key === 'dropped');
         
         return `
-            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted ? 'opacity: 0.55;' : ''}${liveStatus && (liveStatus.key === 'refunded' || liveStatus.key === 'dropped') ? 'opacity: 0.55;' : ''}">
+            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted || isInactive ? 'opacity: 0.55;' : ''}">
                 <td>
                     <input type="checkbox" 
                            class="app-checkbox" 
@@ -210,7 +226,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}${liveStatusBadge}
+                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
