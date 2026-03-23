@@ -1,0 +1,876 @@
+/* ═══════════════════════════════════════════
+   내벨업챌린지 Landing — Scoped under .cl
+   은은한 보라 톤
+   ═══════════════════════════════════════════ */
+
+/* ─── Base (scoped, no global reset) ─── */
+.cl {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #1a1a1a;
+    line-height: 1.85;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    font-size: 16px;
+}
+
+.cl img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.cl a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ─── Typography Scale ─── */
+.cl .section-headline {
+    font-family: 'Noto Serif KR', 'Noto Sans KR', serif;
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #111;
+    margin-bottom: 1rem;
+    letter-spacing: -0.03em;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.cl .section-headline-sm {
+    font-family: 'Noto Serif KR', 'Noto Sans KR', serif;
+    font-size: 1.45rem;
+    font-weight: 600;
+    line-height: 1.45;
+    color: #111;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+}
+
+.cl .section-subhead {
+    font-size: 1.05rem;
+    color: #555;
+    font-weight: 400;
+    margin-bottom: 2.5rem;
+    line-height: 1.7;
+}
+
+/* ─── Layout ─── */
+.cl .cl-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.cl .cl-section {
+    padding: 4.5rem 0;
+}
+
+/* ─── Fade In Animation ─── */
+.cl .cl-fade-in {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
+                transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.cl .cl-fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 1: 오프닝
+   ═══════════════════════════════════════════ */
+.cl .section-opening {
+    padding-top: 3rem;
+    padding-bottom: 4rem;
+    background: #fff;
+}
+
+.cl .opening-headline {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #111;
+    margin-bottom: 1.2rem;
+    letter-spacing: -0.04em;
+}
+
+.cl .opening-greeting {
+    font-size: 1rem;
+    color: #888;
+    margin-bottom: 2.5rem;
+    font-weight: 400;
+}
+
+.cl .opening-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .opening-quote {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 1.15rem;
+    font-style: italic;
+    color: #555;
+    padding-left: 1.2rem;
+    border-left: 2px solid #d4cfe6;
+    margin: 1.8rem 0;
+}
+
+.cl .opening-highlight {
+    font-weight: 500;
+    color: #111;
+    padding: 1.4rem 1.6rem;
+    background: #f7f5fb;
+    border-radius: 6px;
+    margin: 2rem 0;
+    line-height: 1.85;
+    font-size: 1.05rem;
+    border-left: 3px solid #9480c5;
+}
+
+.cl .opening-closing {
+    font-weight: 500;
+    color: #7b6fa6;
+    margin-top: 2rem;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 2: 이온쌤 소개
+   ═══════════════════════════════════════════ */
+.cl .section-instructor {
+    background: #faf9fc;
+}
+
+.cl .instructor-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3rem;
+}
+
+.cl .instructor-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .instructor-body em {
+    font-style: normal;
+    font-weight: 500;
+    color: #111;
+}
+
+.cl .instructor-score {
+    font-weight: 600;
+    color: #111;
+    font-size: 1.1rem;
+}
+
+/* Photo Placeholder */
+.cl .photo-placeholder {
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 3 / 4;
+    background: linear-gradient(145deg, #f0eef5, #e8e5f0);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.cl .photo-placeholder-inner {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cl .photo-score-badge {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #7b6fa6;
+    letter-spacing: -0.02em;
+}
+
+.cl .photo-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.cl .photo-sublabel {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 2.5: 이 사이트를 만든 사람
+   ═══════════════════════════════════════════ */
+.cl .section-builder {
+    background: #fff;
+}
+
+.cl .builder-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .builder-echo {
+    font-weight: 500;
+    color: #111;
+    padding: 1.4rem 1.6rem;
+    background: #f7f5fb;
+    border-radius: 6px;
+    margin: 2rem 0;
+    line-height: 1.85;
+    font-size: 1.05rem;
+    border-left: 3px solid #9480c5;
+}
+
+/* Builder Screenshots */
+.cl .builder-screenshots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.4rem;
+    margin-top: 3rem;
+}
+
+.cl .builder-shot {
+    display: flex;
+    flex-direction: column;
+}
+
+.cl .screenshot-builder {
+    height: 200px;
+}
+
+.cl .builder-caption {
+    font-size: 0.8rem;
+    color: #999;
+    margin-top: 0.6rem;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+}
+
+.cl .builder-footnote {
+    text-align: center;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #888;
+    margin-top: 1.4rem;
+    letter-spacing: -0.01em;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 3: 프로그램 설명
+   ═══════════════════════════════════════════ */
+.cl .section-program {
+    background: #faf9fc;
+}
+
+.cl .program-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .program-note {
+    font-weight: 600;
+    color: #111;
+    padding: 0.8rem 1.2rem;
+    background: #f7f5fb;
+    border-radius: 6px;
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+}
+
+/* Screenshot Placeholders */
+.cl .screenshot-wrapper {
+    margin: 2.5rem 0;
+}
+
+.cl .screenshot-placeholder {
+    background: linear-gradient(145deg, #f3f1f8, #eae7f2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.04);
+    overflow: hidden;
+    position: relative;
+    transition: box-shadow 0.3s ease;
+}
+
+.cl .screenshot-placeholder:hover {
+    box-shadow: 0 4px 28px rgba(0,0,0,0.09);
+}
+
+.cl .screenshot-placeholder::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: rgba(0,0,0,0.03);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.cl .screenshot-placeholder::after {
+    content: '\25CF \25CF \25CF';
+    position: absolute;
+    top: 6px;
+    left: 12px;
+    font-size: 7px;
+    letter-spacing: 4px;
+    color: rgba(0,0,0,0.15);
+}
+
+.cl .screenshot-large { height: 320px; }
+.cl .screenshot-xlarge { height: 420px; }
+.cl .screenshot-medium { height: 240px; }
+.cl .screenshot-small { height: 200px; }
+.cl .screenshot-review { height: 260px; }
+
+.cl .screenshot-placeholder-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    color: #aaa;
+    padding-top: 14px;
+}
+
+.cl .screenshot-placeholder-content i {
+    font-size: 2rem;
+    color: #ccc;
+}
+
+.cl .screenshot-placeholder-content span {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.cl .screenshot-placeholder-content small {
+    font-size: 0.78rem;
+    color: #bbb;
+    max-width: 220px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.cl .screenshot-caption {
+    font-size: 0.85rem;
+    color: #888;
+    margin-top: 0.8rem;
+    line-height: 1.6;
+}
+
+/* Flow Diagram */
+.cl .flow-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 3rem 0 1rem;
+    flex-wrap: wrap;
+}
+
+.cl .flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 0.6rem;
+}
+
+.cl .flow-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #f7f5fb;
+    border: 2px solid #e0dce8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #7b6fa6;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.cl .flow-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #555;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+}
+
+.cl .flow-arrow {
+    color: #ccc;
+    font-size: 0.75rem;
+    padding: 0 0.2rem;
+}
+
+.cl .flow-caption {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 1rem;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 4: 실전 환경
+   ═══════════════════════════════════════════ */
+.cl .section-environment {
+    background: #fff;
+}
+
+.cl .environment-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .env-screenshots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    margin-top: 2.5rem;
+}
+
+.cl .env-screenshot-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.cl .env-caption {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.7rem;
+    line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 5: 해설과 오답노트
+   ═══════════════════════════════════════════ */
+.cl .section-explanation {
+    background: #faf9fc;
+}
+
+.cl .explanation-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .screenshot-hero {
+    position: relative;
+    margin: 3rem 0;
+}
+
+/* Annotations */
+.cl .annotation {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    z-index: 2;
+}
+
+.cl .annotation-number {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #7b6fa6;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cl .annotation-text {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #7b6fa6;
+    white-space: nowrap;
+    background: rgba(255,255,255,0.92);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+}
+
+.cl .annotation-1 { top: 20%; right: -8px; }
+.cl .annotation-2 { top: 48%; right: -8px; }
+.cl .annotation-3 { bottom: 18%; right: -8px; }
+
+.cl .explanation-errornote {
+    margin-top: 3rem;
+}
+
+.cl .explanation-errornote p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 6: 강제성 시스템
+   ═══════════════════════════════════════════ */
+.cl .section-accountability {
+    background: #fff;
+}
+
+.cl .accountability-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.2rem;
+    margin: 2.5rem 0 3rem;
+}
+
+.cl .acc-card {
+    background: #faf9fc;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px;
+    padding: 1.8rem;
+    transition: box-shadow 0.3s ease;
+}
+
+.cl .acc-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+
+.cl .acc-icon {
+    color: #7b6fa6;
+    font-size: 1.3rem;
+    margin-bottom: 0.8rem;
+    opacity: 0.8;
+}
+
+.cl .acc-title {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 0.6rem;
+    letter-spacing: -0.02em;
+}
+
+.cl .acc-desc {
+    font-size: 0.88rem;
+    line-height: 1.75;
+    color: #555;
+}
+
+.cl .accountability-visuals {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.2rem;
+    margin-top: 1rem;
+}
+
+.cl .acc-visual-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.cl .acc-visual-caption {
+    font-size: 0.82rem;
+    color: #888;
+    margin-top: 0.7rem;
+    line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 7: 후기 + 선별 + 진단서
+   ═══════════════════════════════════════════ */
+.cl .section-reviews {
+    background: #faf9fc;
+    padding-bottom: 3rem;
+}
+
+.cl .reviews-area {
+    margin-bottom: 4rem;
+}
+
+.cl .reviews-stat {
+    font-size: 1rem;
+    color: #444;
+    margin-bottom: 2rem;
+    line-height: 1.8;
+}
+
+.cl .reviews-stat-note {
+    font-size: 0.85rem;
+    color: #999;
+}
+
+/* Reviews Carousel */
+.cl .reviews-carousel {
+    position: relative;
+    overflow: hidden;
+    margin: 2rem 0;
+}
+
+.cl .reviews-track {
+    display: flex;
+    gap: 1rem;
+    transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+    cursor: grab;
+}
+
+.cl .reviews-track:active {
+    cursor: grabbing;
+}
+
+.cl .review-card {
+    flex: 0 0 calc(50% - 0.5rem);
+    min-width: 0;
+}
+
+.cl .carousel-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-top: 1.2rem;
+}
+
+.cl .carousel-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    background: #fff;
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+}
+
+.cl .carousel-btn:hover {
+    border-color: #999;
+    color: #333;
+}
+
+.cl .carousel-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.cl .reviews-link {
+    display: inline-block;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #7b6fa6;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+    margin-top: 0.5rem;
+}
+
+.cl .reviews-link:hover {
+    border-bottom-color: #7b6fa6;
+}
+
+/* Selection Area */
+.cl .selection-area {
+    padding: 3.5rem 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 3.5rem;
+}
+
+.cl .selection-body {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 2rem;
+    align-items: start;
+    margin-top: 1.5rem;
+}
+
+.cl .selection-text p {
+    font-size: 1rem;
+    line-height: 1.9;
+    margin-bottom: 1.2rem;
+    color: #333;
+}
+
+.cl .selection-text strong {
+    color: #c0392b;
+    font-weight: 600;
+}
+
+/* Diagnosis Area */
+.cl .diagnosis-area {
+    padding-bottom: 2rem;
+}
+
+.cl .diagnosis-body {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 2rem;
+    align-items: start;
+    margin-top: 1.5rem;
+}
+
+.cl .diagnosis-text p {
+    font-size: 1rem;
+    line-height: 1.9;
+    margin-bottom: 1.2rem;
+    color: #333;
+}
+
+.cl .diagnosis-bonus {
+    font-weight: 500;
+    color: #7b6fa6;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION 8: 클로징
+   ═══════════════════════════════════════════ */
+.cl .section-closing {
+    background: #fff;
+    padding: 4rem 0 3rem;
+}
+
+.cl .closing-body p {
+    font-size: 1.05rem;
+    line-height: 1.95;
+    margin-bottom: 1.4rem;
+    color: #333;
+}
+
+.cl .closing-cta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 3rem;
+}
+
+.cl .cta-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 2rem 1.2rem;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: #faf9fc;
+    transition: all 0.25s ease;
+    text-align: center;
+}
+
+.cl .cta-link:hover {
+    border-color: #9480c5;
+    box-shadow: 0 4px 20px rgba(148,128,197,0.1);
+}
+
+.cl .cta-icon {
+    font-size: 1.3rem;
+    color: #7b6fa6;
+    opacity: 0.7;
+}
+
+.cl .cta-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #222;
+    letter-spacing: -0.01em;
+}
+
+.cl .cta-note {
+    font-size: 0.75rem;
+    color: #999;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.cl .cta-apply {
+    border-color: #d4cfe6;
+    background: #f6f4fa;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — Tablet
+   ═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .cl .cl-section { padding: 3rem 0; }
+    .cl .section-opening { padding-top: 2rem; padding-bottom: 3rem; }
+    .cl .opening-headline { font-size: 1.7rem; }
+    .cl .section-headline { font-size: 1.5rem; border-bottom: none; padding-bottom: 0; }
+    .cl .section-headline-sm { font-size: 1.25rem; }
+    .cl .instructor-layout { grid-template-columns: 1fr; }
+    .cl .instructor-photo { order: -1; }
+    .cl .photo-placeholder { max-width: 200px; margin: 0 auto 1rem; }
+    .cl .env-screenshots { grid-template-columns: 1fr; gap: 1.5rem; }
+    .cl .builder-screenshots { grid-template-columns: 1fr; gap: 1.5rem; }
+    .cl .screenshot-builder { height: 180px; }
+    .cl .screenshot-medium { height: 200px; }
+    .cl .flow-diagram { gap: 0; justify-content: center; }
+    .cl .flow-step { padding: 0.6rem 0.3rem; }
+    .cl .flow-icon { width: 42px; height: 42px; font-size: 0.95rem; }
+    .cl .flow-label { font-size: 0.7rem; }
+    .cl .flow-arrow { font-size: 0.6rem; }
+    .cl .accountability-cards { grid-template-columns: 1fr; }
+    .cl .accountability-visuals { grid-template-columns: 1fr; }
+    .cl .review-card { flex: 0 0 85%; }
+    .cl .selection-body,
+    .cl .diagnosis-body { grid-template-columns: 1fr; }
+    .cl .screenshot-small { height: 180px; }
+    .cl .closing-cta { grid-template-columns: 1fr; }
+    .cl .annotation { position: static; transform: none; margin-top: 0.3rem; }
+    .cl .screenshot-hero { margin-bottom: 0.5rem; }
+    .cl .screenshot-hero .screenshot-placeholder { margin-bottom: 0.8rem; }
+    .cl .screenshot-hero .annotation { display: inline-flex; margin-right: 0.5rem; margin-bottom: 0.5rem; }
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — Mobile Small
+   ═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+    .cl { font-size: 15px; }
+    .cl .cl-section { padding: 2.5rem 0; }
+    .cl .section-opening { padding-top: 1.5rem; padding-bottom: 2rem; }
+    .cl .opening-headline { font-size: 1.45rem; }
+    .cl .section-headline { font-size: 1.35rem; }
+
+    .cl .opening-body p,
+    .cl .instructor-body p,
+    .cl .program-body p,
+    .cl .environment-body p,
+    .cl .explanation-body p,
+    .cl .explanation-errornote p,
+    .cl .closing-body p { font-size: 0.95rem; }
+
+    .cl .opening-highlight { padding: 1rem 1.2rem; font-size: 0.95rem; }
+    .cl .screenshot-large { height: 220px; }
+    .cl .screenshot-xlarge { height: 280px; }
+    .cl .screenshot-medium { height: 180px; }
+    .cl .screenshot-review { height: 220px; }
+    .cl .acc-card { padding: 1.4rem; }
+    .cl .flow-diagram { flex-wrap: wrap; gap: 0; }
+    .cl .photo-placeholder { max-width: 180px; }
+    .cl .reviews-link { font-size: 0.85rem; }
+}
