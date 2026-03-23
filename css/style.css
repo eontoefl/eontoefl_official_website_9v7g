@@ -24,12 +24,21 @@
 }
 
 body {
-    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.6;
     color: var(--text-dark);
     background-color: var(--white);
     overflow-x: hidden;
+}
+
+/* Heading font - Noto Serif KR */
+h1, h2, h3, h4, h5, h6,
+.page-header h1,
+.sidebar-title,
+.section-title,
+.hero-title {
+    font-family: 'Noto Serif KR', Georgia, serif;
 }
 
 .container {
@@ -919,7 +928,7 @@ body {
     font-size: 13px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    font-family: 'Pretendard', sans-serif;
+    font-family: 'Noto Sans KR', sans-serif;
     transition: border-color 0.2s;
 }
 

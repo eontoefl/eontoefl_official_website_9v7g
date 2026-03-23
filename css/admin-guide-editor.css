@@ -106,7 +106,7 @@
     border: none !important;
     flex: 1;
     overflow-y: auto;
-    font-family: 'Pretendard', sans-serif;
+    font-family: 'Noto Sans KR', sans-serif;
     font-size: 15px;
 }
 
@@ -204,7 +204,7 @@
 
 /* 미리보기용 Quill 렌더링 스타일 */
 .preview-rendered {
-    font-family: 'Pretendard', sans-serif;
+    font-family: 'Noto Sans KR', sans-serif;
     font-size: 16px;
     line-height: 1.8;
     color: #334155;
