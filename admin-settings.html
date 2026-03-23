@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>사이트 설정 - 이온토플 관리자</title>
     
-    <!-- Pretendard Font -->
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <!-- Noto Sans KR + Noto Serif KR Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Noto+Serif+KR:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
@@ -205,7 +207,7 @@
                                     </p>
                                 </div>
                                 
-                                <textarea id="newContractContent" rows="20" placeholder="계약서 내용을 입력하세요..." required style="font-family: 'Pretendard', sans-serif; font-size: 14px; line-height: 1.8;"></textarea>
+                                <textarea id="newContractContent" rows="20" placeholder="계약서 내용을 입력하세요..." required style="font-family: 'Noto Sans KR', sans-serif; font-size: 14px; line-height: 1.8;"></textarea>
                             </div>
 
                             <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -349,7 +351,7 @@
                         <label for="platformLoginGuide">
                             <i class="fas fa-clipboard-list" style="color: #6366f1;"></i> 로그인 상세 안내
                         </label>
-                        <textarea id="platformLoginGuide" rows="6" placeholder="로그인 방법에 대한 상세 안내를 입력하세요...&#10;&#10;예:&#10;1. 위 URL에 접속하세요.&#10;2. 이메일 주소로 로그인하세요.&#10;3. 초기 비밀번호는 별도 이메일로 발송됩니다." style="font-family: 'Pretendard', sans-serif; font-size: 14px; line-height: 1.6;"></textarea>
+                        <textarea id="platformLoginGuide" rows="6" placeholder="로그인 방법에 대한 상세 안내를 입력하세요...&#10;&#10;예:&#10;1. 위 URL에 접속하세요.&#10;2. 이메일 주소로 로그인하세요.&#10;3. 초기 비밀번호는 별도 이메일로 발송됩니다." style="font-family: 'Noto Sans KR', sans-serif; font-size: 14px; line-height: 1.6;"></textarea>
                         <small style="color: #64748b;">줄바꿈을 포함한 상세 안내 문구 (승인 메시지에 포함됩니다)</small>
                     </div>
 
@@ -380,7 +382,7 @@
                         
                         <div class="form-group" style="margin-bottom: 16px;">
                             <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">타입</label>
-                            <select id="noticeType" onchange="updateNoticePreview()" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Pretendard', sans-serif;">
+                            <select id="noticeType" onchange="updateNoticePreview()" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif;">
                                 <option value="urgent">🚨 긴급 공지</option>
                                 <option value="notice" selected>📢 일반 공지</option>
                                 <option value="deadline">⏰ 마감 안내</option>
@@ -394,18 +396,18 @@
 
                         <div class="form-group" style="margin-bottom: 16px;">
                             <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">제목</label>
-                            <input type="text" id="noticeTitle" oninput="updateNoticePreview()" placeholder="공지 제목을 입력하세요" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Pretendard', sans-serif; box-sizing: border-box;">
+                            <input type="text" id="noticeTitle" oninput="updateNoticePreview()" placeholder="공지 제목을 입력하세요" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box;">
                         </div>
 
                         <div class="form-group" style="margin-bottom: 16px;">
                             <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">내용</label>
-                            <textarea id="noticeContent" oninput="updateNoticePreview()" rows="4" placeholder="공지 내용을 입력하세요. HTML &lt;b&gt;태그 사용 가능" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Pretendard', sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
+                            <textarea id="noticeContent" oninput="updateNoticePreview()" rows="4" placeholder="공지 내용을 입력하세요. HTML &lt;b&gt;태그 사용 가능" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
                         </div>
 
                         <div style="display: flex; gap: 16px; margin-bottom: 16px;">
                             <div class="form-group" style="flex: 1;">
                                 <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">순서</label>
-                                <input type="number" id="noticeSortOrder" value="0" min="0" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Pretendard', sans-serif; box-sizing: border-box;">
+                                <input type="number" id="noticeSortOrder" value="0" min="0" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box;">
                                 <small style="color: #64748b;">숫자가 작을수록 위에 표시</small>
                             </div>
                             <div class="form-group" style="flex: 1;">
@@ -426,8 +428,8 @@
                         </div>
 
                         <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <button type="button" onclick="cancelNoticeForm()" style="padding: 10px 20px; border: 1px solid #d1d5db; border-radius: 8px; background: white; color: #475569; font-size: 14px; cursor: pointer; font-family: 'Pretendard', sans-serif;">취소</button>
-                            <button type="button" onclick="saveNotice()" style="padding: 10px 20px; border: none; border-radius: 8px; background: #3b82f6; color: white; font-size: 14px; cursor: pointer; font-family: 'Pretendard', sans-serif; font-weight: 600;"><i class="fas fa-save"></i> 저장</button>
+                            <button type="button" onclick="cancelNoticeForm()" style="padding: 10px 20px; border: 1px solid #d1d5db; border-radius: 8px; background: white; color: #475569; font-size: 14px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif;">취소</button>
+                            <button type="button" onclick="saveNotice()" style="padding: 10px 20px; border: none; border-radius: 8px; background: #3b82f6; color: white; font-size: 14px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; font-weight: 600;"><i class="fas fa-save"></i> 저장</button>
                         </div>
                     </div>
                 </div>
@@ -439,7 +441,7 @@
                             <i class="fas fa-list" style="color: #6366f1;"></i> 공지 목록
                             <span id="noticeCount" style="font-size: 13px; color: #94a3b8; font-weight: 400;"></span>
                         </h2>
-                        <button type="button" onclick="showNoticeForm()" style="padding: 8px 16px; border: none; border-radius: 8px; background: #3b82f6; color: white; font-size: 13px; cursor: pointer; font-family: 'Pretendard', sans-serif; font-weight: 600;"><i class="fas fa-plus"></i> 새 공지 등록</button>
+                        <button type="button" onclick="showNoticeForm()" style="padding: 8px 16px; border: none; border-radius: 8px; background: #3b82f6; color: white; font-size: 13px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; font-weight: 600;"><i class="fas fa-plus"></i> 새 공지 등록</button>
                     </div>
                     <div id="noticeList" style="padding: 20px;">
                         <div style="text-align: center; padding: 40px 0; color: #94a3b8;">로딩 중...</div>
