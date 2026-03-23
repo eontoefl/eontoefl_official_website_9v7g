@@ -258,10 +258,8 @@ function getAppLiveStatus(app) {
 
     if (today < start) return { key: 'ready', label: '시작 대기', color: '#3b82f6', bg: '#dbeafe', icon: 'fa-clock' };
 
-    if (end) {
-        const endPlus7 = new Date(end);
-        endPlus7.setDate(endPlus7.getDate() + 7);
-        if (today > endPlus7) return { key: 'completed', label: '수료', color: '#22c55e', bg: '#dcfce7', icon: 'fa-graduation-cap' };
+    if (end && today >= end) {
+        return { key: 'completed', label: '종료', color: '#22c55e', bg: '#dcfce7', icon: 'fa-check-circle' };
     }
 
     return { key: 'active', label: '진행중', color: '#7c3aed', bg: '#ede9fe', icon: 'fa-running' };
