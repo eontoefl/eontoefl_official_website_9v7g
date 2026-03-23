@@ -52,14 +52,14 @@ function getAdminActionMessage(app) {
         return { text: '알림톡 예약을 진행해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
     
-    // 10. 모든 세팅 완료 → 운영 상태로 전환
+    // 10. 모든 세팅 완료 → 운영 상태로 전환 (isLive로 디자인 구분)
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {
-        if (liveStatus.key === 'ready') return { text: '시작 대기', color: '#3b82f6', bgColor: '#dbeafe' };
-        if (liveStatus.key === 'active') return { text: '진행중', color: '#7c3aed', bgColor: '#ede9fe' };
-        if (liveStatus.key === 'completed') return { text: '종료', color: '#22c55e', bgColor: '#dcfce7' };
-        if (liveStatus.key === 'refunded') return { text: '환불완료', color: '#ef4444', bgColor: '#fef2f2' };
-        if (liveStatus.key === 'dropped') return { text: '중도포기', color: '#94a3b8', bgColor: '#f1f5f9' };
+        if (liveStatus.key === 'ready') return { text: '시작 대기', color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
+        if (liveStatus.key === 'active') return { text: '진행중', color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true };
+        if (liveStatus.key === 'completed') return { text: '종료', color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
+        if (liveStatus.key === 'refunded') return { text: '환불완료', color: '#ef4444', bgColor: '#fef2f2', icon: 'fa-undo', isLive: true };
+        if (liveStatus.key === 'dropped') return { text: '중도포기', color: '#94a3b8', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
     }
     return { text: '세팅 완료', color: '#22c55e', bgColor: '#dcfce7' };
 }
@@ -249,9 +249,10 @@ function displayApplications() {
                     </div>
                 </td>
                 <td>
-                    <div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">
-                        ${actionMessage.text}
-                    </div>
+                    ${actionMessage.isLive 
+                        ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; background: ${actionMessage.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.icon}" style="font-size: 11px;"></i>${actionMessage.text}</div>`
+                        : `<div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">${actionMessage.text}</div>`
+                    }
                 </td>
                 <td>
                     <div style="display: flex; gap: 6px;">
