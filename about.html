@@ -81,245 +81,149 @@
         </div>
     </nav>
 
-    <!-- Page Header -->
-    <section class="page-header">
-        <div class="container">
-            <h1>이온토플 소개</h1>
-            <p>검증된 교육 시스템으로 여러분의 목표를 실현합니다</p>
+    <!-- About Content -->
+    <style>
+        .about-container {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 80px 40px 100px;
+        }
+        .about-page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .about-page-subtitle {
+            font-size: 15px;
+            color: #94a3b8;
+            margin-bottom: 64px;
+        }
+        .about-section {
+            display: flex;
+            gap: 60px;
+            padding: 48px 0;
+            border-top: 1px solid #e2e8f0;
+        }
+        .about-section:last-child {
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .about-left {
+            flex: 0 0 280px;
+            min-width: 280px;
+        }
+        .about-left h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.4;
+            margin: 0 0 12px 0;
+        }
+        .about-left .about-label {
+            font-size: 14px;
+            color: #7c3aed;
+            font-weight: 600;
+            line-height: 1.6;
+        }
+        .about-right {
+            flex: 1;
+        }
+        .about-right p {
+            font-size: 15px;
+            color: #475569;
+            line-height: 1.9;
+            margin: 0 0 20px 0;
+        }
+        .about-right p:last-child {
+            margin-bottom: 0;
+        }
+        @media (max-width: 768px) {
+            .about-container {
+                padding: 40px 20px 60px;
+            }
+            .about-section {
+                flex-direction: column;
+                gap: 24px;
+                padding: 32px 0;
+            }
+            .about-left {
+                flex: none;
+                min-width: auto;
+            }
+            .about-page-title {
+                font-size: 26px;
+            }
+            .about-page-subtitle {
+                margin-bottom: 40px;
+            }
+        }
+    </style>
+
+    <div class="about-container">
+        <h1 class="about-page-title">이온토플 소개</h1>
+        <p class="about-page-subtitle">EONTOEFL - 내벨업챌린지를 운영하는 토플 전문 교육 서비스입니다.</p>
+
+        <!-- 섹션 1: 이온토플 소개 -->
+        <div class="about-section">
+            <div class="about-left">
+                <h2>이온토플은<br>어떤 곳인가요?</h2>
+                <span class="about-label">내벨업챌린지 운영</span>
+            </div>
+            <div class="about-right">
+                <p>이온토플은 TOEFL 학습자를 위한 체계적인 관리형 프로그램 '내벨업챌린지'를 운영하고 있습니다. 단순히 강의를 제공하는 것이 아니라, 매일의 학습 루틴을 함께 만들어가는 것을 목표로 합니다.</p>
+                <p>토플 시험은 혼자 준비하기에 막막한 부분이 많습니다. 어디서부터 시작해야 할지, 어떤 자료를 써야 할지, 내 페이스가 맞는 건지 확인하기 어렵습니다. 이온토플은 이런 고민을 함께 해결하기 위해 만들어졌습니다.</p>
+                <p>소수 정예로 운영되며, 각 학생의 현재 실력과 목표 점수에 맞는 맞춤형 학습 플랜을 설계합니다. 매일 정해진 분량의 학습을 완수하고, 인증을 통해 꾸준함을 유지하는 구조입니다.</p>
+            </div>
         </div>
-    </section>
 
-    <!-- Page Layout (Sidebar + Content) -->
-    <div class="page-layout">
-        <div class="container">
-            <div class="layout-wrapper">
-                <!-- Left Sidebar Navigation -->
-                <aside class="sidebar">
-                    <nav class="sidebar-nav">
-                        <div class="sidebar-title">소개</div>
-                        <a href="#intro" class="active">
-                            <i class="fas fa-building"></i>
-                            이온토플 소개
-                        </a>
-                        <a href="#instructors">
-                            <i class="fas fa-user-tie"></i>
-                            강사 소개
-                        </a>
-                        <a href="#facilities">
-                            <i class="fas fa-door-open"></i>
-                            수강 시설
-                        </a>
-                        <a href="#location">
-                            <i class="fas fa-map-marker-alt"></i>
-                            오시는 길
-                        </a>
-                    </nav>
-                </aside>
+        <!-- 섹션 2: 내벨업챌린지란 -->
+        <div class="about-section">
+            <div class="about-left">
+                <h2>내벨업챌린지는<br>어떻게 진행되나요?</h2>
+                <span class="about-label">매일 학습 인증 시스템</span>
+            </div>
+            <div class="about-right">
+                <p>내벨업챌린지는 매일 정해진 학습량을 소화하고, 그 결과를 인증하는 방식으로 운영됩니다. 학습 분량은 학생의 수준에 맞게 조정되며, 무리하지 않으면서도 꾸준히 실력을 쌓을 수 있는 양으로 설계됩니다.</p>
+                <p>학습 자료는 이온토플에서 직접 제공합니다. Reading, Listening, Speaking, Writing 네 가지 영역을 균형 있게 학습할 수 있도록 구성되어 있으며, 매주 새로운 자료가 업데이트됩니다.</p>
+                <p>관리자는 매일 학생들의 인증 현황을 확인하고, 놓친 부분이 있으면 바로 피드백을 제공합니다. 혼자 공부하지만 혼자가 아닌, 그런 환경을 만들어 드립니다.</p>
+            </div>
+        </div>
 
-                <!-- Main Content -->
-                <main class="main-content">
-                    <!-- 이온토플 소개 -->
-                    <section id="intro" class="content-section">
-                        <h2>왜 이온토플인가요?</h2>
-                        <p>이온토플은 TOEFL 전문 교육기관으로, 체계적인 커리큘럼과 검증된 교육 시스템을 통해 수강생들의 목표 달성을 돕습니다.</p>
-                        
-                        <div class="features-grid" style="margin-top: 40px;">
-                            <div class="feature-card">
-                                <div class="feature-icon">
-                                    <i class="fas fa-user-tie"></i>
-                                </div>
-                                <h3 class="feature-title">전문 강사진</h3>
-                                <p class="feature-desc">TOEFL 만점자 출신 강사들의 노하우를 직접 전수받습니다</p>
-                            </div>
-                            <div class="feature-card">
-                                <div class="feature-icon">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <h3 class="feature-title">체계적 커리큘럼</h3>
-                                <p class="feature-desc">레벨별 맞춤 학습으로 효율적인 점수 향상을 이룹니다</p>
-                            </div>
-                            <div class="feature-card">
-                                <div class="feature-icon">
-                                    <i class="fas fa-users"></i>
-                                </div>
-                                <h3 class="feature-title">소수정예 관리</h3>
-                                <p class="feature-desc">1:1 밀착 관리로 학습 효과를 극대화합니다</p>
-                            </div>
-                            <div class="feature-card">
-                                <div class="feature-icon">
-                                    <i class="fas fa-laptop"></i>
-                                </div>
-                                <h3 class="feature-title">최신 학습 자료</h3>
-                                <p class="feature-desc">매달 업데이트되는 최신 기출문제와 예상문제로 학습합니다</p>
-                            </div>
-                        </div>
+        <!-- 섹션 3: 왜 이온토플인가 -->
+        <div class="about-section">
+            <div class="about-left">
+                <h2>왜 이온토플을<br>선택해야 하나요?</h2>
+                <span class="about-label">관리형 학습의 차이</span>
+            </div>
+            <div class="about-right">
+                <p>토플 학원은 많습니다. 인강도 많고, 혼자 공부하는 방법도 넘칩니다. 하지만 대부분의 학생들이 겪는 문제는 '시작은 하지만 끝까지 가지 못하는 것'입니다.</p>
+                <p>이온토플은 그 지속력을 만들어주는 데 집중합니다. 매일 관리받고, 매일 인증하고, 매주 결과를 확인하는 과정 속에서 자연스럽게 학습 습관이 형성됩니다.</p>
+                <p>실제로 챌린지를 완주한 학생들의 평균 점수 상승폭은 15점 이상이며, 목표 점수 달성률은 95%를 넘습니다. 결과가 증명하는 시스템입니다.</p>
+            </div>
+        </div>
 
-                        <div class="highlight-box" style="margin-top: 40px;">
-                            <h3 style="color: #5b21b6; margin-bottom: 12px;">🎯 이온토플의 약속</h3>
-                            <p><strong>95%의 목표 달성률</strong>로 입증된 체계적인 교육 프로그램을 제공합니다.</p>
-                            <p style="margin-top: 8px;">1,200명 이상의 수강생들이 이온토플과 함께 평균 15점 이상의 점수 향상을 이루었습니다.</p>
-                        </div>
-                    </section>
+        <!-- 섹션 4: 누구를 위한 프로그램인가 -->
+        <div class="about-section">
+            <div class="about-left">
+                <h2>어떤 분들에게<br>추천하나요?</h2>
+                <span class="about-label">이런 분들을 위해 만들었습니다</span>
+            </div>
+            <div class="about-right">
+                <p>토플 공부를 시작하고 싶지만 어디서부터 손을 대야 할지 모르겠는 분, 독학으로 몇 번 시도했지만 점수가 오르지 않는 분, 학원을 다녔지만 관리가 부족하다고 느꼈던 분들을 위한 프로그램입니다.</p>
+                <p>또한 유학 준비로 정해진 기간 안에 목표 점수를 반드시 달성해야 하는 분, 직장을 다니면서 효율적으로 토플을 준비해야 하는 분들에게도 적합합니다.</p>
+                <p>현재 Fast(4주)와 Standard(8주) 두 가지 과정을 운영하고 있으며, 상담을 통해 자신에게 맞는 과정을 선택할 수 있습니다.</p>
+            </div>
+        </div>
 
-                    <!-- 강사 소개 -->
-                    <section id="instructors" class="content-section">
-                        <h2>강사 소개</h2>
-                        <p>이온토플의 모든 강사진은 TOEFL 고득점자이며, 수년간의 교육 경험을 보유하고 있습니다.</p>
-
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 32px;">
-                            <div style="background: #f8f9fa; padding: 24px; border-radius: 12px; text-align: center;">
-                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-user" style="font-size: 32px; color: white;"></i>
-                                </div>
-                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">김토플 강사</h3>
-                                <p style="color: #9480c5; font-size: 14px; margin-bottom: 12px;">Reading / Listening 전문</p>
-                                <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                    TOEFL 만점(120점) 보유<br>
-                                    5년 이상 교육 경력<br>
-                                    서울대학교 영문학과 졸업
-                                </p>
-                            </div>
-                            <div style="background: #f8f9fa; padding: 24px; border-radius: 12px; text-align: center;">
-                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-user" style="font-size: 32px; color: white;"></i>
-                                </div>
-                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">이영어 강사</h3>
-                                <p style="color: #9480c5; font-size: 14px; margin-bottom: 12px;">Speaking / Writing 전문</p>
-                                <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                    TOEFL 만점(120점) 보유<br>
-                                    7년 이상 교육 경력<br>
-                                    미국 UCLA 언어학 석사
-                                </p>
-                            </div>
-                            <div style="background: #f8f9fa; padding: 24px; border-radius: 12px; text-align: center;">
-                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-user" style="font-size: 32px; color: white;"></i>
-                                </div>
-                                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">박시험 강사</h3>
-                                <p style="color: #9480c5; font-size: 14px; margin-bottom: 12px;">종합반 전문</p>
-                                <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                    TOEFL 118점 보유<br>
-                                    10년 이상 교육 경력<br>
-                                    연세대학교 교육학과 졸업
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 수강 시설 -->
-                    <section id="facilities" class="content-section">
-                        <h2>수강 시설</h2>
-                        <p>쾌적하고 현대적인 학습 환경에서 최고의 교육을 받으실 수 있습니다.</p>
-
-                        <div style="margin-top: 32px;">
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                                <div style="background: #f8f4ff; padding: 24px; border-radius: 12px;">
-                                    <div style="font-size: 32px; color: #9480c5; margin-bottom: 12px;">
-                                        <i class="fas fa-chalkboard-teacher"></i>
-                                    </div>
-                                    <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">스마트 강의실</h3>
-                                    <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                        최신 멀티미디어 장비를 갖춘 강의실에서 효과적인 학습이 가능합니다.
-                                    </p>
-                                </div>
-                                <div style="background: #f8f4ff; padding: 24px; border-radius: 12px;">
-                                    <div style="font-size: 32px; color: #9480c5; margin-bottom: 12px;">
-                                        <i class="fas fa-headphones"></i>
-                                    </div>
-                                    <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">개인 학습실</h3>
-                                    <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                        집중력 향상을 위한 독립된 개인 학습 공간을 무료로 제공합니다.
-                                    </p>
-                                </div>
-                                <div style="background: #f8f4ff; padding: 24px; border-radius: 12px;">
-                                    <div style="font-size: 32px; color: #9480c5; margin-bottom: 12px;">
-                                        <i class="fas fa-wifi"></i>
-                                    </div>
-                                    <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">무료 WiFi</h3>
-                                    <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                        고속 인터넷을 통해 온라인 학습 자료에 언제든 접근할 수 있습니다.
-                                    </p>
-                                </div>
-                                <div style="background: #f8f4ff; padding: 24px; border-radius: 12px;">
-                                    <div style="font-size: 32px; color: #9480c5; margin-bottom: 12px;">
-                                        <i class="fas fa-coffee"></i>
-                                    </div>
-                                    <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">휴게 공간</h3>
-                                    <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                                        편안한 휴식을 위한 카페테리아와 라운지를 운영합니다.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 오시는 길 -->
-                    <section id="location" class="content-section">
-                        <h2>오시는 길</h2>
-                        <p>편리한 교통으로 쉽게 방문하실 수 있습니다.</p>
-
-                        <div style="background: #f8f9fa; padding: 32px; border-radius: 12px; margin-top: 32px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-                                <div>
-                                    <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #1e293b;">
-                                        <i class="fas fa-map-marker-alt" style="color: #9480c5; margin-right: 8px;"></i>
-                                        주소
-                                    </h3>
-                                    <p style="font-size: 16px; color: #475569; line-height: 1.8; margin-bottom: 24px;">
-                                        서울특별시 강남구 테헤란로 123<br>
-                                        이온빌딩 5층 이온토플
-                                    </p>
-
-                                    <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #1e293b;">
-                                        <i class="fas fa-subway" style="color: #9480c5; margin-right: 8px;"></i>
-                                        지하철
-                                    </h3>
-                                    <p style="font-size: 16px; color: #475569; line-height: 1.8; margin-bottom: 24px;">
-                                        <strong>2호선 강남역</strong> 3번 출구 도보 5분<br>
-                                        <strong>분당선 선릉역</strong> 1번 출구 도보 10분
-                                    </p>
-
-                                    <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #1e293b;">
-                                        <i class="fas fa-bus" style="color: #9480c5; margin-right: 8px;"></i>
-                                        버스
-                                    </h3>
-                                    <p style="font-size: 16px; color: #475569; line-height: 1.8;">
-                                        <strong>간선</strong> 146, 240, 360, 362<br>
-                                        <strong>지선</strong> 3414, 4318, 6411
-                                    </p>
-                                </div>
-                                <div>
-                                    <div style="width: 100%; height: 400px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                                        <div style="text-align: center; color: #94a3b8;">
-                                            <i class="fas fa-map" style="font-size: 48px; margin-bottom: 16px;"></i>
-                                            <p style="font-size: 14px;">지도 영역</p>
-                                            <p style="font-size: 12px; margin-top: 8px;">(실제 지도 API 연동 가능)</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="highlight-box" style="margin-top: 32px;">
-                            <h3 style="color: #5b21b6; margin-bottom: 12px;">
-                                <i class="fas fa-phone-alt"></i> 문의하기
-                            </h3>
-                            <p style="margin-bottom: 8px;"><strong>전화:</strong> 02-1234-5678</p>
-                            <p style="margin-bottom: 8px;"><strong>이메일:</strong> info@iontoefl.com</p>
-                            <p><strong>운영시간:</strong> 평일 09:00 - 21:00, 주말 09:00 - 18:00</p>
-                        </div>
-                    </section>
-
-                    <!-- CTA 버튼 -->
-                    <div style="text-align: center; margin-top: 60px; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
-                        <h3 style="color: white; font-size: 24px; font-weight: 700; margin-bottom: 16px;">지금 바로 시작하세요</h3>
-                        <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin-bottom: 24px;">이온토플과 함께 목표 점수를 달성하세요</p>
-                        <div style="display: flex; gap: 16px; justify-content: center;">
-                            <a href="application-form.html" class="btn-primary" style="background: white; color: #667eea;">지금 신청하기</a>
-                            <a href="programs.html" class="btn-secondary" style="border-color: white; color: white;">프로그램 보기</a>
-                        </div>
-                    </div>
-                </main>
+        <!-- 섹션 5: 문의 안내 -->
+        <div class="about-section">
+            <div class="about-left">
+                <h2>궁금한 점이<br>있으신가요?</h2>
+                <span class="about-label">언제든 편하게 문의하세요</span>
+            </div>
+            <div class="about-right">
+                <p>프로그램에 대해 더 자세히 알고 싶으시다면 카카오톡 채널로 문의해 주세요. 현재 수준과 목표에 맞는 과정을 안내해 드리겠습니다.</p>
+                <p>상담은 무료이며, 부담 없이 편하게 질문해 주시면 됩니다. 신청서를 작성해 주시면 더 구체적인 분석과 함께 맞춤 플랜을 제안드립니다.</p>
             </div>
         </div>
     </div>
@@ -357,47 +261,6 @@
     </footer>
 
     <script src="js/common.js"></script>
-    <script>
-        // 사이드바 활성화 스크립트
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
-            const sections = document.querySelectorAll('.content-section');
-
-            // 스크롤 시 현재 섹션 하이라이트
-            window.addEventListener('scroll', function() {
-                let current = '';
-                sections.forEach(section => {
-                    const sectionTop = section.offsetTop;
-                    const sectionHeight = section.clientHeight;
-                    if (pageYOffset >= sectionTop - 100) {
-                        current = section.getAttribute('id');
-                    }
-                });
-
-                sidebarLinks.forEach(link => {
-                    link.classList.remove('active');
-                    if (link.getAttribute('href').substring(1) === current) {
-                        link.classList.add('active');
-                    }
-                });
-            });
-
-            // 클릭 시 부드러운 스크롤
-            sidebarLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const targetId = this.getAttribute('href').substring(1);
-                    const targetSection = document.getElementById(targetId);
-                    if (targetSection) {
-                        window.scrollTo({
-                            top: targetSection.offsetTop - 100,
-                            behavior: 'smooth'
-                        });
-                    }
-                });
-            });
-        });
-    </script>
 
     <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
