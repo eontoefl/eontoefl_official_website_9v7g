@@ -525,7 +525,13 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
     // 테스트 계정 제외
     const TEST_ACCOUNTS = ['홍길동', '김철수'];
 
-    students.forEach(s => {
+    // 진행 중인 학생만 (종료/환불/중도포기 제외)
+    const activeStudents = students.filter(s => {
+        const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
+        return !ls || (ls.key !== 'completed' && ls.key !== 'refunded' && ls.key !== 'dropped');
+    });
+
+    activeStudents.forEach(s => {
         if (TEST_ACCOUNTS.includes(s.name)) return;
 
         const myRecords = allRecords.filter(r => r.user_id === s.userId);
