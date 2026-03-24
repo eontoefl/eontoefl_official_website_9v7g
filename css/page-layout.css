@@ -31,7 +31,7 @@
 }
 
 .page-layout > .container {
-    max-width: none;
+    max-width: 1440px;
     padding: 0;
 }
 
@@ -165,7 +165,7 @@
     }
 
     .page-layout > .container {
-        max-width: none;
+        max-width: 1440px;
         padding: 0;
     }
 
