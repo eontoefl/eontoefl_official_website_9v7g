@@ -252,6 +252,12 @@
     flex-direction: column;
 }
 
+.cl .builder-shot img {
+    height: 200px;
+    object-fit: cover;
+    object-position: left top;
+}
+
 .cl .screenshot-builder {
     height: 200px;
 }
