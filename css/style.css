@@ -32,13 +32,13 @@ body {
     overflow-x: hidden;
 }
 
-/* Heading font - Noto Serif KR */
+/* Heading font - Noto Sans KR */
 h1, h2, h3, h4, h5, h6,
 .page-header h1,
 .sidebar-title,
 .section-title,
 .hero-title {
-    font-family: 'Noto Serif KR', Georgia, serif;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .container {
