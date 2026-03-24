@@ -547,7 +547,7 @@ async function renderStudyRecordTable() {
     const effectiveToday = getEffectiveToday();
     const scheduleStart = getScheduleStart(app);
 
-    // ── 입문서 과제별 마감 구간 메모 수 계산 ──
+    // ── 입문서 과제별 메모 수 계산 ──
     // 1) 스케줄에서 입문서 과제 목록 추출 + 마감 시각 계산
     const introDeadlines = [];
     for (let week = 1; week <= totalWeeks; week++) {
@@ -571,13 +571,13 @@ async function renderStudyRecordTable() {
     }
     introDeadlines.sort((a, b) => a.deadline - b.deadline);
 
-    // 2) tr_book_memos 조회 (학생당 1회)
+    // 2) tr_book_memos 조회 (학생당 1회) — week, day 컬럼 포함
     let allBookMemos = [];
     if (introDeadlines.length > 0) {
         try {
             allBookMemos = await supabaseAPI.query('tr_book_memos', {
                 'user_id': `eq.${studentData.user.id}`,
-                'select': 'page_number,content,created_at',
+                'select': 'page_number,content,created_at,week,day',
                 'order': 'page_number.asc',
                 'limit': '500'
             }) || [];
@@ -586,16 +586,38 @@ async function renderStudyRecordTable() {
         }
     }
 
-    // 3) 과제별 마감 구간에 해당하는 메모 매핑
+    // 3) 과제별 메모 매핑 — week+day 직접 매칭 (기존 데이터 fallback: 시간 구간)
+    // 한글→영어 역매핑 (메모의 day는 한글, introDeadlines의 dayEn은 영어)
+    const DAY_KR_TO_EN = { '일': 'sunday', '월': 'monday', '화': 'tuesday', '수': 'wednesday', '목': 'thursday', '금': 'friday', '토': 'saturday' };
+
+    // week+day가 있는 메모와 없는 메모(기존 데이터) 분리
+    const taggedMemos = allBookMemos.filter(m => m.week != null && m.day != null);
+    const untaggedMemos = allBookMemos.filter(m => m.week == null || m.day == null);
+
     introMemoMapGlobal = {};
     introDeadlines.forEach((d, idx) => {
-        const prevDeadline = idx > 0 ? introDeadlines[idx - 1].deadline : null;
         const isLast = idx === introDeadlines.length - 1;
-        const matched = allBookMemos.filter(m => {
+
+        // A) week+day 태그된 메모: 직접 매칭
+        const directMatched = taggedMemos.filter(m =>
+            m.week === d.week && DAY_KR_TO_EN[m.day] === d.dayEn
+        );
+
+        // B) 태그 없는 기존 메모: 시간 구간 fallback
+        const prevDeadline = idx > 0 ? introDeadlines[idx - 1].deadline : null;
+        const fallbackMatched = untaggedMemos.filter(m => {
             const t = new Date(m.created_at);
             return prevDeadline ? (t > prevDeadline && t <= d.deadline) : (t <= d.deadline);
         });
-        const afterDeadline = isLast ? allBookMemos.filter(m => new Date(m.created_at) > d.deadline) : [];
+
+        const matched = [...directMatched, ...fallbackMatched];
+
+        // 마감 후 메모 (마지막 과제만)
+        const afterDeadline = isLast ? [
+            ...taggedMemos.filter(m => m.week === d.week && DAY_KR_TO_EN[m.day] === d.dayEn && new Date(m.created_at) > d.deadline),
+            ...untaggedMemos.filter(m => new Date(m.created_at) > d.deadline)
+        ] : [];
+
         introMemoMapGlobal[`${d.week}|${d.dayEn}`] = {
             count: matched.length,
             memos: matched,
