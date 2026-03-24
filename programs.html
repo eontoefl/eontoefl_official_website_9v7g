@@ -87,27 +87,24 @@
         </div>
     </section>
 
-    <!-- Page Layout (Sidebar + Content) -->
+    <!-- Page Layout (Full Width - No Sidebar) -->
     <div class="page-layout">
         <div class="container">
-            <div class="layout-wrapper">
-                <!-- Left Sidebar Navigation -->
-                <aside class="sidebar">
-                    <nav class="sidebar-nav">
-                        <div class="sidebar-title">프로그램</div>
-                        <a href="#basic" class="active">
-                            <i class="fas fa-seedling"></i>
-                            내벨업챌린지
-                        </a>
-                        <a href="#sra">
-                            <i class="fas fa-pen-nib"></i>
-                            스라첨삭
-                        </a>
-                    </nav>
-                </aside>
+            <!-- Tab Navigation -->
+            <div class="program-tabs">
+                <a href="#basic" class="program-tab active" data-target="basic">
+                    <i class="fas fa-seedling"></i>
+                    내벨업챌린지
+                </a>
+                <a href="#sra" class="program-tab" data-target="sra">
+                    <i class="fas fa-pen-nib"></i>
+                    스라첨삭
+                </a>
+            </div>
 
-                <!-- Main Content -->
-                <main class="main-content">
+            <div class="layout-wrapper">
+                <!-- Main Content (Full Width) -->
+                <main class="main-content" style="border-left: none; padding: 48px 0;">
                     <!-- 내벨업챌린지 상세 랜딩 -->
                     <div id="basic" class="content-section">
                         <h2>내벨업챌린지</h2>
@@ -589,6 +586,54 @@
         </div>
     </div>
 
+    <!-- Tab Styles (programs.html only) -->
+    <style>
+        .program-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .program-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #64748b;
+            text-decoration: none;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .program-tab:hover {
+            color: #9480c5;
+            background: #f8f4ff;
+        }
+        .program-tab.active {
+            color: #9480c5;
+            border-bottom-color: #9480c5;
+            background: transparent;
+        }
+        .program-tab i {
+            font-size: 14px;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        @media (max-width: 640px) {
+            .program-tab {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -622,72 +667,60 @@
     <script src="js/common.js"></script>
     <script src="js/program-challenge.js"></script>
     <script>
-        // 사이드바 스크롤 활성화
+        // Tab-based section switching
         document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.querySelectorAll('.program-tab');
             const sections = document.querySelectorAll('.content-section');
-            const navLinks = document.querySelectorAll('.sidebar-nav a');
-            const sidebar = document.querySelector('.sidebar');
-            const sidebarNav = document.querySelector('.sidebar-nav');
 
-            // Sticky 상태 디버깅
-            console.log('=== Sidebar Debug Info ===');
-            console.log('Sidebar element:', sidebar);
-            console.log('SidebarNav element:', sidebarNav);
-            
-            if (sidebarNav) {
-                const computedStyle = window.getComputedStyle(sidebarNav);
-                console.log('Position:', computedStyle.position);
-                console.log('Top:', computedStyle.top);
-                console.log('Display:', computedStyle.display);
-            }
+            function showSection(targetId) {
+                // Hide all sections
+                sections.forEach(s => s.classList.remove('active'));
+                // Deactivate all tabs
+                tabs.forEach(t => t.classList.remove('active'));
 
-            if (sidebar) {
-                const parentStyle = window.getComputedStyle(sidebar.parentElement);
-                console.log('Parent overflow:', parentStyle.overflow);
-                console.log('Parent height:', parentStyle.height);
-            }
-
-            // 스크롤 시 위치 추적
-            let scrollCount = 0;
-            window.addEventListener('scroll', () => {
-                scrollCount++;
-                if (scrollCount % 50 === 0 && sidebarNav) { // 50번마다 한 번씩 로그
-                    const rect = sidebarNav.getBoundingClientRect();
-                    console.log(`Scroll ${scrollCount}: top=${rect.top}px`);
+                // Show target section
+                const targetSection = document.getElementById(targetId);
+                if (targetSection) {
+                    targetSection.classList.add('active');
                 }
 
-                // 활성 링크 업데이트
-                let current = '';
-                sections.forEach(section => {
-                    const sectionTop = section.offsetTop;
-                    if (window.pageYOffset >= sectionTop - 200) {
-                        current = section.getAttribute('id');
-                    }
-                });
+                // Activate matching tab
+                const targetTab = document.querySelector(`.program-tab[data-target="${targetId}"]`);
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                }
 
-                navLinks.forEach(link => {
-                    link.classList.remove('active');
-                    if (link.getAttribute('href') === `#${current}`) {
-                        link.classList.add('active');
-                    }
-                });
-            });
+                // Scroll to top of content area
+                const pageLayout = document.querySelector('.page-layout');
+                if (pageLayout) {
+                    pageLayout.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
 
-            // 부드러운 스크롤
-            navLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
+            // Determine initial section from URL hash
+            function getInitialSection() {
+                const hash = window.location.hash.replace('#', '');
+                if (hash === 'sra') return 'sra';
+                return 'basic'; // default
+            }
+
+            // Tab click handler
+            tabs.forEach(tab => {
+                tab.addEventListener('click', (e) => {
                     e.preventDefault();
-                    const targetId = link.getAttribute('href');
-                    const targetSection = document.querySelector(targetId);
-                    if (targetSection) {
-                        const offsetTop = targetSection.offsetTop - 100;
-                        window.scrollTo({
-                            top: offsetTop,
-                            behavior: 'smooth'
-                        });
-                    }
+                    const target = tab.getAttribute('data-target');
+                    window.location.hash = target;
+                    showSection(target);
                 });
             });
+
+            // Handle hash changes (browser back/forward)
+            window.addEventListener('hashchange', () => {
+                showSection(getInitialSection());
+            });
+
+            // Show initial section
+            showSection(getInitialSection());
         });
     </script>
 
