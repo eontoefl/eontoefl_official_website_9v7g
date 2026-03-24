@@ -90,18 +90,6 @@
     <!-- Page Layout (Full Width - No Sidebar) -->
     <div class="page-layout">
         <div class="container">
-            <!-- Tab Navigation -->
-            <div class="program-tabs">
-                <a href="#basic" class="program-tab active" data-target="basic">
-                    <i class="fas fa-seedling"></i>
-                    내벨업챌린지
-                </a>
-                <a href="#sra" class="program-tab" data-target="sra">
-                    <i class="fas fa-pen-nib"></i>
-                    스라첨삭
-                </a>
-            </div>
-
             <div class="layout-wrapper">
                 <!-- Main Content (Full Width) -->
                 <main class="main-content" style="border-left: none; padding: 48px 0;">
@@ -586,52 +574,9 @@
         </div>
     </div>
 
-    <!-- Tab Styles (programs.html only) -->
     <style>
-        .program-tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 0;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        .program-tab {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 16px 32px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #64748b;
-            text-decoration: none;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        .program-tab:hover {
-            color: #9480c5;
-            background: #f8f4ff;
-        }
-        .program-tab.active {
-            color: #9480c5;
-            border-bottom-color: #9480c5;
-            background: transparent;
-        }
-        .program-tab i {
-            font-size: 14px;
-        }
-        .content-section {
-            display: none;
-        }
-        .content-section.active {
-            display: block;
-        }
-        @media (max-width: 640px) {
-            .program-tab {
-                padding: 12px 20px;
-                font-size: 14px;
-            }
-        }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
     </style>
 
     <!-- Footer -->
@@ -667,60 +612,22 @@
     <script src="js/common.js"></script>
     <script src="js/program-challenge.js"></script>
     <script>
-        // Tab-based section switching
         document.addEventListener('DOMContentLoaded', () => {
-            const tabs = document.querySelectorAll('.program-tab');
             const sections = document.querySelectorAll('.content-section');
 
-            function showSection(targetId) {
-                // Hide all sections
+            function showSection(id) {
                 sections.forEach(s => s.classList.remove('active'));
-                // Deactivate all tabs
-                tabs.forEach(t => t.classList.remove('active'));
-
-                // Show target section
-                const targetSection = document.getElementById(targetId);
-                if (targetSection) {
-                    targetSection.classList.add('active');
-                }
-
-                // Activate matching tab
-                const targetTab = document.querySelector(`.program-tab[data-target="${targetId}"]`);
-                if (targetTab) {
-                    targetTab.classList.add('active');
-                }
-
-                // Scroll to top of content area
-                const pageLayout = document.querySelector('.page-layout');
-                if (pageLayout) {
-                    pageLayout.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+                const el = document.getElementById(id);
+                if (el) el.classList.add('active');
             }
 
-            // Determine initial section from URL hash
-            function getInitialSection() {
-                const hash = window.location.hash.replace('#', '');
-                if (hash === 'sra') return 'sra';
-                return 'basic'; // default
+            function current() {
+                const h = window.location.hash.replace('#', '');
+                return h === 'sra' ? 'sra' : 'basic';
             }
 
-            // Tab click handler
-            tabs.forEach(tab => {
-                tab.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const target = tab.getAttribute('data-target');
-                    window.location.hash = target;
-                    showSection(target);
-                });
-            });
-
-            // Handle hash changes (browser back/forward)
-            window.addEventListener('hashchange', () => {
-                showSection(getInitialSection());
-            });
-
-            // Show initial section
-            showSection(getInitialSection());
+            window.addEventListener('hashchange', () => showSection(current()));
+            showSection(current());
         });
     </script>
 
