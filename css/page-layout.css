@@ -104,6 +104,8 @@
 /* ==================== 메인 콘텐츠 ==================== */
 .main-content {
     flex: 1;
+    min-width: 0;
+    overflow-x: hidden;
     background: white;
     border-radius: 0;
     padding: 48px;
