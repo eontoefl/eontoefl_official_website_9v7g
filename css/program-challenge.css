@@ -123,7 +123,6 @@
     font-style: italic;
     color: #555;
     padding-left: 1.2rem;
-    border-left: 2px solid #d4cfe6;
     margin: 1.8rem 0;
 }
 
@@ -136,7 +135,6 @@
     margin: 2rem 0;
     line-height: 1.85;
     font-size: 1.05rem;
-    border-left: 3px solid #9480c5;
 }
 
 .cl .opening-closing {
@@ -239,7 +237,6 @@
     margin: 2rem 0;
     line-height: 1.85;
     font-size: 1.05rem;
-    border-left: 3px solid #9480c5;
 }
 
 /* Builder Screenshots */
