@@ -382,6 +382,8 @@
     border-radius: 0 !important;
     height: auto !important;
     min-height: 0 !important;
+    width: 100%;
+    padding-top: 26px;
 }
 
 .cl .review-card .screenshot-placeholder::before {
@@ -418,8 +420,8 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 34px 28px 28px;
-    margin-top: 26px;
+    padding: 28px;
+    margin-top: 0;
     box-sizing: border-box;
     text-align: center;
     gap: 0;
