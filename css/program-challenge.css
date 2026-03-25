@@ -357,8 +357,11 @@
 .cl .review-card a {
     text-decoration: none;
     color: inherit;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     height: 100%;
+    min-height: 280px;
     background: #fff;
     border-radius: 10px;
     overflow: hidden;
@@ -415,8 +418,8 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 50px 28px 32px;
-    min-height: 230px;
+    padding: 34px 28px 28px;
+    margin-top: 26px;
     box-sizing: border-box;
     text-align: center;
     gap: 0;
