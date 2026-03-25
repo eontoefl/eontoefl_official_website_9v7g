@@ -358,37 +358,48 @@
     text-decoration: none;
     color: inherit;
     display: block;
+    height: 100%;
 }
 
 .cl .review-card .screenshot-placeholder {
     background: #fff;
-    border: 1px solid rgba(0,0,0,0.07);
+    border: none;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    border-radius: 10px;
 }
 
 .cl .review-card .screenshot-placeholder::before {
-    background: #f5f3f9;
+    background: #f0edf5;
+    height: 26px;
+}
+
+.cl .review-card .screenshot-placeholder::after {
+    top: 5px;
+    left: 10px;
+    color: rgba(0,0,0,0.12);
 }
 
 .cl .review-quote-content {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: flex-start;
-    padding: 44px 24px 24px;
-    height: 100%;
+    align-items: center;
+    padding: 26px 28px 20px;
+    height: calc(100% - 26px);
+    margin-top: 26px;
     box-sizing: border-box;
-    text-align: left;
+    text-align: center;
     gap: 0;
 }
 
 .cl .review-quote-title {
     font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    font-size: 1rem;
+    font-size: 1.08rem;
     font-weight: 700;
-    line-height: 1.55;
+    line-height: 1.6;
     color: #1a1a1a;
     letter-spacing: -0.025em;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     word-break: keep-all;
 }
 
@@ -399,34 +410,33 @@
 }
 
 .cl .review-quote-sub {
-    font-size: 0.82rem;
-    line-height: 1.6;
+    font-size: 0.88rem;
+    line-height: 1.65;
     color: #666;
     font-weight: 400;
     word-break: keep-all;
 }
 
 .cl .review-quote-arrow {
-    margin-top: auto;
-    font-size: 0.78rem;
+    margin-top: 12px;
+    font-size: 0.8rem;
     color: #9480c5;
     font-weight: 500;
     display: flex;
     align-items: center;
     gap: 4px;
     opacity: 0;
-    transform: translateX(-4px);
+    transform: translateY(4px);
     transition: opacity 0.25s, transform 0.25s;
 }
 
 .cl .review-card a:hover .review-quote-arrow {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
 }
 
 .cl .review-card a:hover .screenshot-placeholder {
-    box-shadow: 0 6px 32px rgba(123, 111, 166, 0.13);
-    border-color: rgba(123, 111, 166, 0.18);
+    box-shadow: 0 6px 28px rgba(123, 111, 166, 0.15);
 }
 
 .cl .screenshot-placeholder-content {
@@ -919,9 +929,9 @@
     .cl .accountability-cards { grid-template-columns: 1fr; }
     .cl .accountability-visuals { grid-template-columns: 1fr; }
     .cl .review-card { flex: 0 0 85%; }
-    .cl .review-quote-content { padding: 40px 20px 20px; }
-    .cl .review-quote-title { font-size: 0.93rem; }
-    .cl .review-quote-sub { font-size: 0.78rem; }
+    .cl .review-quote-content { padding: 20px 20px 16px; }
+    .cl .review-quote-title { font-size: 1rem; }
+    .cl .review-quote-sub { font-size: 0.84rem; }
     .cl .selection-body,
     .cl .diagnosis-body { grid-template-columns: 1fr; }
     .cl .screenshot-small { height: 180px; }
@@ -955,9 +965,9 @@
     .cl .screenshot-xlarge { height: 280px; }
     .cl .screenshot-medium { height: 180px; }
     .cl .screenshot-review { height: 220px; }
-    .cl .review-quote-content { padding: 36px 16px 16px; }
-    .cl .review-quote-title { font-size: 0.86rem; }
-    .cl .review-quote-sub { font-size: 0.73rem; }
+    .cl .review-quote-content { padding: 16px 16px 14px; }
+    .cl .review-quote-title { font-size: 0.92rem; }
+    .cl .review-quote-sub { font-size: 0.78rem; }
     .cl .acc-card { padding: 1.4rem; }
     .cl .flow-diagram { flex-wrap: wrap; gap: 0; }
     .cl .photo-placeholder { max-width: 180px; }
