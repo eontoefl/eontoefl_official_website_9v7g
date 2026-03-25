@@ -359,29 +359,34 @@
     color: inherit;
     display: block;
     height: 100%;
-    background: transparent;
+    background: #fff;
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: none;
-    transition: box-shadow 0.25s;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.04);
+    transition: box-shadow 0.3s;
     position: relative;
 }
 
+.cl .review-card a:hover {
+    box-shadow: 0 4px 28px rgba(123, 111, 166, 0.13);
+}
+
 .cl .review-card .screenshot-placeholder {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    height: auto;
-    min-height: 0;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
 }
 
 .cl .review-card .screenshot-placeholder::before {
-    display: none;
+    display: none !important;
 }
 
 .cl .review-card .screenshot-placeholder::after {
-    display: none;
+    display: none !important;
 }
 
 .cl .review-card a::before {
@@ -458,10 +463,6 @@
 .cl .review-card a:hover .review-quote-arrow {
     opacity: 1;
     transform: translateY(0);
-}
-
-.cl .review-card a:hover {
-    box-shadow: none;
 }
 
 .cl .screenshot-placeholder-content {
