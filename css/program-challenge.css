@@ -353,6 +353,74 @@
 .cl .screenshot-small { height: 200px; }
 .cl .screenshot-review { height: 260px; }
 
+/* Review Card — Real Testimonial Content */
+.cl .review-card a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.cl .review-quote-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 44px 24px 24px;
+    height: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    gap: 0;
+}
+
+.cl .review-quote-icon {
+    color: #b8aed4;
+    font-size: 1.2rem;
+    margin-bottom: 12px;
+    opacity: 0.7;
+}
+
+.cl .review-quote-title {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.55;
+    color: #1a1a1a;
+    letter-spacing: -0.025em;
+    margin-bottom: 10px;
+    word-break: keep-all;
+}
+
+.cl .review-quote-sub {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: #666;
+    font-weight: 400;
+    word-break: keep-all;
+}
+
+.cl .review-quote-arrow {
+    margin-top: auto;
+    font-size: 0.78rem;
+    color: #9480c5;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.25s, transform 0.25s;
+}
+
+.cl .review-card a:hover .review-quote-arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.cl .review-card a:hover .screenshot-placeholder {
+    box-shadow: 0 6px 32px rgba(123, 111, 166, 0.13);
+    border-color: rgba(123, 111, 166, 0.15);
+}
+
 .cl .screenshot-placeholder-content {
     display: flex;
     flex-direction: column;
@@ -843,6 +911,9 @@
     .cl .accountability-cards { grid-template-columns: 1fr; }
     .cl .accountability-visuals { grid-template-columns: 1fr; }
     .cl .review-card { flex: 0 0 85%; }
+    .cl .review-quote-content { padding: 40px 20px 20px; }
+    .cl .review-quote-title { font-size: 0.95rem; }
+    .cl .review-quote-sub { font-size: 0.8rem; }
     .cl .selection-body,
     .cl .diagnosis-body { grid-template-columns: 1fr; }
     .cl .screenshot-small { height: 180px; }
@@ -876,6 +947,10 @@
     .cl .screenshot-xlarge { height: 280px; }
     .cl .screenshot-medium { height: 180px; }
     .cl .screenshot-review { height: 220px; }
+    .cl .review-quote-content { padding: 36px 16px 16px; }
+    .cl .review-quote-title { font-size: 0.88rem; }
+    .cl .review-quote-sub { font-size: 0.75rem; }
+    .cl .review-quote-icon { font-size: 1rem; margin-bottom: 8px; }
     .cl .acc-card { padding: 1.4rem; }
     .cl .flow-diagram { flex-wrap: wrap; gap: 0; }
     .cl .photo-placeholder { max-width: 180px; }
