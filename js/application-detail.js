@@ -2609,7 +2609,7 @@ async function loadUsageTab(app) {
     // 입금이 확인되지 않았으면
     if (!app.deposit_confirmed_by_admin) {
         usageContent.innerHTML = `
-            <div style="text-align: center; padding: 80px 40px; color: #94a3b8;">
+            <div class="step5-wrap" style="text-align: center; padding: 80px 40px; color: #94a3b8;">
                 <i class="fas fa-lock" style="font-size: 64px; margin-bottom: 24px; color: #cbd5e1;"></i>
                 <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #64748b;">🔒 이용 방법은 입금 확인 후 제공됩니다</h3>
                 <p style="font-size: 15px; line-height: 1.6;">
@@ -2623,7 +2623,7 @@ async function loadUsageTab(app) {
     // 이용방법이 전달되지 않았으면 (관리자가 아직 안 보냄)
     if (!app.guide_sent) {
         usageContent.innerHTML = `
-            <div style="text-align: center; padding: 80px 40px; color: #94a3b8;">
+            <div class="step5-wrap" style="text-align: center; padding: 80px 40px; color: #94a3b8;">
                 <i class="fas fa-hourglass-half" style="font-size: 64px; margin-bottom: 24px; color: #cbd5e1;"></i>
                 <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #64748b;">⏳ 이용 방법 준비 중</h3>
                 <p style="font-size: 15px; line-height: 1.6;">
@@ -2639,7 +2639,7 @@ async function loadUsageTab(app) {
     // 챌린지 이미 시작했으면
     if (app.challenge_start_date) {
         usageContent.innerHTML = `
-            <div style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0;">
+            <div class="step5-wrap" style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0;">
                 <div style="background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%); padding: 32px; border-radius: 16px; border: 2px solid #22c55e; margin-bottom: 32px; text-align: center;">
                     <i class="fas fa-rocket" style="font-size: 64px; color: #22c55e; margin-bottom: 16px;"></i>
                     <h2 style="font-size: 28px; font-weight: 700; color: #166534; margin: 0 0 16px 0;">🎉 챌린지가 시작되었습니다!</h2>
@@ -2748,7 +2748,7 @@ async function loadUsageTab(app) {
 
     // 챌린지 시작 전 (STEP 9)
     usageContent.innerHTML = `
-        <div style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0;">
+        <div class="step5-wrap" style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0;">
             <!-- 개인화 정보 -->
             <div style="background: linear-gradient(135deg, #f8f4ff 0%, #faf5ff 100%); padding: 24px; border-radius: 12px; border: 2px solid #9480c5; margin-bottom: 32px;">
                 <h2 style="text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; color: #6d28d9;">

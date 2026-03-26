@@ -227,6 +227,72 @@
     .nav-item.has-dropdown.active .dropdown-menu {
         display: block;
     }
+
+    /* STEP 5 모바일 최적화 */
+    .step5-wrap {
+        padding: 16px !important;
+    }
+
+    .step5-wrap h2 {
+        font-size: 18px !important;
+    }
+
+    .step5-wrap h3 {
+        font-size: 15px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .step5-wrap h4 {
+        font-size: 14px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .step5-wrap p {
+        font-size: 13px !important;
+    }
+
+    .step5-wrap pre {
+        font-size: 12px !important;
+    }
+
+    .step5-wrap i.fa-lock,
+    .step5-wrap i.fa-hourglass-half,
+    .step5-wrap i.fa-rocket {
+        font-size: 40px !important;
+    }
+
+    .step5-wrap div[style*="padding: 32px"] {
+        padding: 14px !important;
+    }
+
+    .step5-wrap div[style*="padding: 24px"] {
+        padding: 14px !important;
+    }
+
+    .step5-wrap div[style*="padding: 20px"] {
+        padding: 12px !important;
+    }
+
+    .step5-wrap div[style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    .step5-wrap a[style*="padding: 16px 32px"] {
+        padding: 10px 20px !important;
+        font-size: 13px !important;
+    }
+
+    .step5-wrap a[style*="font-size: 18px"] {
+        font-size: 14px !important;
+    }
+
+    .step5-wrap div[style*="margin-bottom: 32px"] {
+        margin-bottom: 16px !important;
+    }
+
+    .step5-wrap div[style*="margin-bottom: 24px"] {
+        margin-bottom: 14px !important;
+    }
 }
 
 @media (max-width: 640px) {
