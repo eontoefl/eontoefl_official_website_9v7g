@@ -163,7 +163,7 @@
     }
 
     .page-layout {
-        padding: 40px 20px;
+        padding: 40px 10px;
     }
 
     .page-layout > .container {
@@ -206,6 +206,7 @@
 
     .main-content {
         padding: 32px 24px;
+        border-left: none;
     }
 
     .content-section h2 {
