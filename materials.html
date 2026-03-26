@@ -401,7 +401,16 @@
                 document.getElementById('detailSubject').textContent = material.subject;
                 document.getElementById('detailAuthor').textContent = material.author || material.author_name || '관리자';
                 document.getElementById('detailDate').textContent = date;
-                document.getElementById('detailHit').textContent = '조회 ' + (material.hit || material.hit_count || 0);
+
+                // 조회수 +1 업데이트
+                const currentHit = material.hit || material.hit_count || 0;
+                const newHit = currentHit + 1;
+                document.getElementById('detailHit').textContent = '조회 ' + newHit;
+                if (!String(materialId).startsWith('sample-')) {
+                    const hitField = material.hit_count !== undefined ? 'hit_count' : 'hit';
+                    supabaseAPI.patch('materials', materialId, { [hitField]: newHit }).catch(() => {});
+                }
+
                 document.getElementById('detailContent').innerHTML = material.content || '';
 
                 document.getElementById('detailLoading').style.display = 'none';

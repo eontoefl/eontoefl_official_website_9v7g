@@ -397,7 +397,16 @@
                 document.getElementById('detailSubject').textContent = notice.subject;
                 document.getElementById('detailAuthor').textContent = notice.author || notice.author_name || '관리자';
                 document.getElementById('detailDate').textContent = date;
-                document.getElementById('detailHit').textContent = '조회 ' + (notice.hit || notice.hit_count || 0);
+
+                // 조회수 +1 업데이트
+                const currentHit = notice.hit || notice.hit_count || 0;
+                const newHit = currentHit + 1;
+                document.getElementById('detailHit').textContent = '조회 ' + newHit;
+                if (!String(noticeId).startsWith('sample-')) {
+                    const hitField = notice.hit_count !== undefined ? 'hit_count' : 'hit';
+                    supabaseAPI.patch('notices', noticeId, { [hitField]: newHit }).catch(() => {});
+                }
+
                 document.getElementById('detailContent').innerHTML = notice.content || '';
 
                 document.getElementById('detailLoading').style.display = 'none';
