@@ -189,6 +189,9 @@ h1, h2, h3, h4, h5, h6,
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-left: 120px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 #authMenu a {
@@ -269,6 +272,39 @@ h1, h2, h3, h4, h5, h6,
     font-size: 20px;
     cursor: pointer;
     color: var(--text-dark);
+}
+
+/* ==================== Hamburger Menu ==================== */
+.hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    padding: 8px;
+    z-index: 1001;
+    flex-shrink: 0;
+}
+
+.hamburger span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--text-dark);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.hamburger.active span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.hamburger.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.hamburger.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
 }
 
 /* ========================================
@@ -1401,7 +1437,39 @@ td:nth-child(5) {
     .mobile-menu-btn {
         display: block;
     }
-    
+
+    /* 햄버거 버튼 모바일 표시 */
+    .hamburger {
+        display: flex;
+    }
+
+    /* 네비게이션 바 모바일 조정 */
+    .navbar {
+        padding: 10px 0;
+    }
+
+    .logo img {
+        height: 24px !important;
+    }
+
+    /* authMenu 모바일 조정 */
+    #authMenu {
+        margin-left: auto;
+        margin-right: 4px;
+        gap: 4px;
+    }
+
+    #authMenu a {
+        font-size: 12px !important;
+        padding: 4px 6px !important;
+    }
+
+    #authMenu span {
+        font-size: 12px;
+        margin: 0 4px !important;
+    }
+
+    /* 모바일 메뉴 드롭다운 */
     .nav-menu {
         display: none;
         position: absolute;
@@ -1410,14 +1478,64 @@ td:nth-child(5) {
         width: 100%;
         background: var(--white);
         flex-direction: column;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 16px 20px;
+        gap: 0;
+        margin-left: 0;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        border-top: 1px solid var(--border-color);
+        z-index: 999;
     }
     
     .nav-menu.active {
         display: flex;
     }
-    
+
+    .nav-menu .nav-item {
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .nav-menu .nav-item:last-child {
+        border-bottom: none;
+    }
+
+    .nav-menu .nav-item > a {
+        display: block;
+        padding: 12px 8px;
+        font-size: 15px;
+    }
+
+    .nav-menu a.active::before {
+        display: none;
+    }
+
+    /* 드롭다운 메뉴 모바일 */
+    .nav-item.has-dropdown .dropdown-menu {
+        position: static;
+        display: none;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0 0 8px 16px;
+        margin-top: 0;
+        min-width: 0;
+    }
+
+    .nav-item.has-dropdown .dropdown-menu::before {
+        display: none;
+    }
+
+    .nav-item.has-dropdown:hover .dropdown-menu {
+        display: none;
+    }
+
+    .nav-item.has-dropdown.active .dropdown-menu {
+        display: block;
+    }
+
+    .dropdown-menu a {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
     .cta-buttons {
         flex-direction: column;
     }

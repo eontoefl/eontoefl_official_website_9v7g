@@ -40,6 +40,33 @@ function initHamburgerMenu() {
             navMenu.classList.toggle('active');
             hamburger.classList.toggle('active');
         });
+
+        // 모바일: 드롭다운 메뉴 토글 (터치 지원)
+        const dropdownItems = navMenu.querySelectorAll('.nav-item.has-dropdown');
+        dropdownItems.forEach(item => {
+            const mainLink = item.querySelector(':scope > a');
+            if (mainLink) {
+                mainLink.addEventListener('click', (e) => {
+                    // 모바일(768px 이하)에서만 동작
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // 다른 드롭다운 닫기
+                        dropdownItems.forEach(other => {
+                            if (other !== item) other.classList.remove('active');
+                        });
+                        item.classList.toggle('active');
+                    }
+                });
+            }
+        });
+
+        // 메뉴 링크 클릭 시 메뉴 닫기 (서브메뉴 링크)
+        navMenu.querySelectorAll('.dropdown-menu a').forEach(link => {
+            link.addEventListener('click', () => {
+                navMenu.classList.remove('active');
+                hamburger.classList.remove('active');
+            });
+        });
     }
 }
 
