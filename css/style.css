@@ -1564,6 +1564,41 @@ td:nth-child(5) {
     th, td {
         padding: 10px 8px;
     }
+
+    /* 신청 현황 테이블: 모바일에서 NO, 작성일시 숨김 */
+    .applications-table th:first-child,
+    .applications-table td:first-child,
+    .applications-table th:nth-child(5),
+    .applications-table td:nth-child(5) {
+        display: none;
+    }
+
+    /* 신청 현황 헤더: 모바일에서 크기 축소 */
+    .app-list-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px;
+        margin-bottom: 20px !important;
+    }
+
+    .app-list-title {
+        font-size: 18px !important;
+        margin-bottom: 4px !important;
+    }
+
+    .app-list-header p {
+        font-size: 12px !important;
+    }
+
+    .app-write-btn {
+        padding: 8px 14px !important;
+        font-size: 13px !important;
+    }
+
+    .app-list-header .btn-outline {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
 }
 
 @media (max-width: 480px) {
