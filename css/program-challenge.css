@@ -3,6 +3,11 @@
    은은한 보라 톤
    ═══════════════════════════════════════════ */
 
+/* ─── Programs page: full-width main-content (no sidebar) ─── */
+.cl-page-main {
+    padding: 48px 0;
+}
+
 /* ─── Base (scoped, no global reset) ─── */
 .cl {
     font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -940,6 +945,9 @@
    RESPONSIVE — Tablet
    ═══════════════════════════════════════════ */
 @media (max-width: 768px) {
+    .cl-page-main {
+        padding: 24px 0;
+    }
     .cl .cl-section {
         padding: 3rem 0;
         margin-left: 0;
