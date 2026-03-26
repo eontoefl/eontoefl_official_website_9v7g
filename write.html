@@ -335,6 +335,18 @@
                 requireLogin: true,
                 requireAdmin: true,
                 sidebarActive: 'materials'
+            },
+            application_notice: {
+                table: 'application_notices',
+                title: '신청 게시판 공지 작성',
+                headerTitle: '신청하기',
+                headerDesc: '신청 게시판 공지사항을 작성합니다',
+                listUrl: 'application.html',
+                formTitle: '공지사항 작성',
+                notice: '이 공지는 신청 게시판 상단에 고정됩니다.',
+                requireLogin: true,
+                requireAdmin: true,
+                sidebarActive: 'application'
             }
         };
 
@@ -414,14 +426,29 @@
             document.getElementById('backLink').href = boardConfig.listUrl;
 
             // 사이드바 활성화
-            const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
-            sidebarLinks.forEach(link => {
-                link.classList.remove('active');
-                const href = link.getAttribute('href');
-                if (boardConfig.sidebarActive === 'reviews' && href === 'reviews.html') link.classList.add('active');
-                if (boardConfig.sidebarActive === 'notice' && href === 'notice.html') link.classList.add('active');
-                if (boardConfig.sidebarActive === 'materials' && href === 'materials.html') link.classList.add('active');
-            });
+            if (boardConfig.sidebarActive === 'application') {
+                // 신청 게시판 공지 → 사이드바를 신청하기 메뉴로 교체
+                const sidebarNav = document.querySelector('.sidebar-nav');
+                sidebarNav.innerHTML = `
+                    <div class="sidebar-title">신청하기</div>
+                    <a href="application.html" class="active"><i class="fas fa-list"></i> 신청 현황</a>
+                    <a href="application-form.html"><i class="fas fa-pen"></i> 신청서 작성하기</a>
+                `;
+                // 상단 네비게이션 active 변경
+                document.querySelectorAll('.nav-menu .nav-item a').forEach(a => {
+                    a.classList.remove('active');
+                    if (a.getAttribute('href') === 'application.html') a.classList.add('active');
+                });
+            } else {
+                const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
+                sidebarLinks.forEach(link => {
+                    link.classList.remove('active');
+                    const href = link.getAttribute('href');
+                    if (boardConfig.sidebarActive === 'reviews' && href === 'reviews.html') link.classList.add('active');
+                    if (boardConfig.sidebarActive === 'notice' && href === 'notice.html') link.classList.add('active');
+                    if (boardConfig.sidebarActive === 'materials' && href === 'materials.html') link.classList.add('active');
+                });
+            }
 
             // 안내 문구
             if (boardConfig.notice && !editMode) {
@@ -643,6 +670,17 @@
                     date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\./g, '. ').trim(),
                     hit: 0,
                     published_at: now
+                };
+            }
+
+            if (currentBoard === 'application_notice') {
+                return {
+                    subject: subject,
+                    content: content,
+                    author: userData.name || '관리자',
+                    pinned: true,
+                    published_at: now,
+                    hit_count: 0
                 };
             }
 
