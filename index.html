@@ -82,177 +82,222 @@
     </nav>
 
 
+    <!-- Landing Page Styles -->
+    <style>
+        /* ===== Hero Section ===== */
+        .landing-hero {
+            padding: 120px 20px 100px;
+            background: #ffffff;
+            text-align: center;
+        }
+        .landing-hero-inner {
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .landing-hero-title {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 32px;
+            letter-spacing: -0.5px;
+            line-height: 1.3;
+        }
+        .landing-hero-body {
+            font-size: 16px;
+            font-weight: 400;
+            color: #475569;
+            line-height: 1.9;
+            margin-bottom: 0;
+            word-break: keep-all;
+        }
+        .landing-hero-body p {
+            margin-bottom: 20px;
+        }
+        .landing-hero-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ===== Cards Section ===== */
+        .landing-cards {
+            padding: 80px 20px 120px;
+            background: #f8fafc;
+        }
+        .landing-cards-grid {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 28px;
+        }
+        .landing-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 36px 28px 0;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
+            position: relative;
+            cursor: pointer;
+        }
+        .landing-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+            border-color: #cbd5e1;
+        }
+        .landing-card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+            line-height: 1.4;
+            letter-spacing: -0.3px;
+        }
+        .landing-card-body {
+            font-size: 14px;
+            font-weight: 400;
+            color: #64748b;
+            line-height: 1.8;
+            margin-bottom: 8px;
+            word-break: keep-all;
+            flex-grow: 1;
+        }
+        .landing-card-footnote {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        .landing-card-img-wrap {
+            margin: 0 -28px;
+            overflow: hidden;
+            border-radius: 0 0 16px 16px;
+            position: relative;
+            bottom: -20px;
+        }
+        .landing-card-img-wrap img,
+        .landing-card-img-wrap video {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        /* ===== Closing CTA ===== */
+        .landing-cta {
+            padding: 100px 20px;
+            background: #ffffff;
+            text-align: center;
+        }
+        .landing-cta-inner {
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        .landing-cta-text {
+            font-size: 18px;
+            font-weight: 400;
+            color: #475569;
+            line-height: 1.8;
+            margin-bottom: 36px;
+            word-break: keep-all;
+        }
+        .landing-cta-btn {
+            display: inline-block;
+            padding: 14px 36px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #ffffff;
+            background: #9480c5;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .landing-cta-btn:hover {
+            background: #7d6aad;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(148, 128, 197, 0.3);
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .landing-hero {
+                padding: 80px 20px 64px;
+            }
+            .landing-hero-title {
+                font-size: 26px;
+            }
+            .landing-hero-body {
+                font-size: 15px;
+            }
+            .landing-cards {
+                padding: 60px 20px 80px;
+            }
+            .landing-cards-grid {
+                grid-template-columns: 1fr;
+                gap: 32px;
+            }
+            .landing-cta {
+                padding: 72px 20px;
+            }
+            .landing-cta-text {
+                font-size: 16px;
+            }
+        }
+    </style>
+
     <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <div class="hero-content">
-                <h1 class="hero-title">목표 점수 달성의 확실한 파트너</h1>
-                <p class="hero-subtitle">체계적인 커리큘럼과 1:1 맞춤 관리로 TOEFL 고득점을 보장합니다</p>
-                <div class="hero-buttons">
-                    <a href="application-form.html" class="btn-primary">지금 신청하기</a>
-                    <a href="about.html" class="btn-secondary">더 알아보기</a>
-                </div>
-                <div class="hero-stats">
-                    <div class="stat-item">
-                        <div class="stat-number">95%</div>
-                        <div class="stat-label">목표달성률</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">1,200+</div>
-                        <div class="stat-label">수강생</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">15+</div>
-                        <div class="stat-label">평균 점수 상승</div>
-                    </div>
-                </div>
+    <section class="landing-hero">
+        <div class="landing-hero-inner">
+            <h1 class="landing-hero-title">신청하지 마세요.</h1>
+            <div class="landing-hero-body">
+                <p>토플점수가 꼭 필요한게 아니라면, 남들이 하는 학원이나 인강같은것도 생각해보세요. 이온토플은 까다롭고, 공부량이 많아서 따라오기 힘들거에요.</p>
+                <p>블로그 글과 후기를 읽어보는 것만으로도 점수가 올랐다는 분들이 계십니다.</p>
             </div>
         </div>
     </section>
 
-    <!-- About Section -->
-    <section id="about" class="section">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">왜 이온토플인가요?</h2>
-                <p class="section-subtitle">검증된 교육 시스템으로 여러분의 목표를 실현합니다</p>
-            </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-user-tie"></i>
-                    </div>
-                    <h3 class="feature-title">전문 강사진</h3>
-                    <p class="feature-desc">TOEFL 만점자 출신 강사들의 노하우를 직접 전수받습니다</p>
+    <!-- Cards Section -->
+    <section class="landing-cards">
+        <div class="landing-cards-grid">
+            <!-- Card 1: About -->
+            <a href="about.html" class="landing-card">
+                <h3 class="landing-card-title">74점에서 시작했습니다.</h3>
+                <p class="landing-card-body">학교가 포기하고, 학원도 포기하고, 본인도 포기할 뻔한 74점짜리 학생의 119점.</p>
+                <p class="landing-card-footnote">현재 점수체계 기준 3.5레벨 → 6.0레벨(만점)</p>
+                <div class="landing-card-img-wrap">
+                    <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/toefl_119_score.png" alt="토플 119점 성적표" loading="lazy">
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <h3 class="feature-title">체계적 커리큘럼</h3>
-                    <p class="feature-desc">레벨별 맞춤 학습으로 효율적인 점수 향상을 이룹니다</p>
+            </a>
+
+            <!-- Card 2: Programs -->
+            <a href="programs.html" class="landing-card">
+                <h3 class="landing-card-title">스터디노마드.</h3>
+                <p class="landing-card-body">학원에 갈 필요도, 시간을 맞출 필요도 없습니다. 내 자리에서, 내 시간에, 실제 토플과 똑같은 화면에서 풀이부터 해설까지 전부. 매일 스케줄대로.</p>
+                <div class="landing-card-img-wrap">
+                    <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/schedule_screen.gif" alt="매일 스케줄 화면" loading="lazy">
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h3 class="feature-title">소수정예 관리</h3>
-                    <p class="feature-desc">1:1 밀착 관리로 학습 효과를 극대화합니다</p>
+            </a>
+
+            <!-- Card 3: Reviews -->
+            <a href="reviews.html" class="landing-card">
+                <h3 class="landing-card-title">10명 중 8.5명.</h3>
+                <p class="landing-card-body">심사해서 받은 학생 기준, 목표점수를 달성하거나 점수가 올랐습니다.</p>
+                <div class="landing-card-img-wrap">
+                    <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/level_trend_chart.png" alt="레벨 추이 차트" loading="lazy">
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-laptop"></i>
-                    </div>
-                    <h3 class="feature-title">최신 학습 자료</h3>
-                    <p class="feature-desc">매달 업데이트되는 최신 기출문제와 예상문제로 학습합니다</p>
-                </div>
-            </div>
-            <div style="text-align: center; margin-top: 48px;">
-                <a href="about.html" class="btn-outline">자세히 보기</a>
-            </div>
+            </a>
         </div>
     </section>
 
-    <!-- Programs Section -->
-    <section id="programs" class="section section-gray">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">프로그램 안내</h2>
-                <p class="section-subtitle">당신의 레벨과 목표에 맞는 프로그램을 선택하세요</p>
-            </div>
-            <div class="programs-grid">
-                <div class="program-card">
-                    <div class="program-badge">독학</div>
-                    <h3 class="program-title">내벨업챌린지</h3>
-                    <p class="program-desc">매일 스케줄에 따라 직접 풀고 직접 정리하는 독학 프로그램</p>
-                    <ul class="program-features">
-                        <li><i class="fas fa-check"></i> 실제 토플과 동일한 CBT 환경</li>
-                        <li><i class="fas fa-check"></i> 자동 채점 + 상세 해설</li>
-                        <li><i class="fas fa-check"></i> 매일 마감 + 보증금 시스템</li>
-                        <li><i class="fas fa-check"></i> Fast 4주 / Standard 8주</li>
-                    </ul>
-                    <div class="program-target">R·L·S·W 전 영역</div>
-                </div>
-                <div class="program-card" style="opacity: 0.7;">
-                    <div class="program-badge">첨삭</div>
-                    <h3 class="program-title">스라첨삭</h3>
-                    <p class="program-desc">Speaking & Writing 첨삭 프로그램</p>
-                    <ul class="program-features">
-                        <li><i class="fas fa-clock" style="color: var(--primary-color);"></i> 준비중 — 4월중 오픈 예정</li>
-                    </ul>
-                    <div class="program-target">Coming Soon</div>
-                </div>
-            </div>
-            <div style="text-align: center; margin-top: 48px;">
-                <a href="programs.html" class="btn-outline">모든 프로그램 보기</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Pricing Section -->
-    <section id="pricing" class="section">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">수강료 안내</h2>
-                <p class="section-subtitle">합리적인 가격으로 최고의 교육을 제공합니다</p>
-            </div>
-            <div class="pricing-grid">
-                <div class="pricing-card">
-                    <div class="pricing-header">
-                        <h3 class="pricing-title">내벨업챌린지</h3>
-                    </div>
-                    <ul class="pricing-features">
-                        <li><i class="fas fa-check"></i> Fast 4주 / Standard 8주</li>
-                        <li><i class="fas fa-check"></i> R·L·S·W 전 영역</li>
-                        <li><i class="fas fa-check"></i> 자동 채점 + 상세 해설</li>
-                        <li><i class="fas fa-check"></i> 보증금 시스템</li>
-                    </ul>
-                    <a href="pricing.html" class="btn-primary">가격 보기</a>
-                </div>
-                <div class="pricing-card" style="opacity: 0.7;">
-                    <div class="pricing-header">
-                        <h3 class="pricing-title">스라첨삭</h3>
-                        <div class="pricing-period">준비중 — 4월중 오픈 예정</div>
-                    </div>
-                    <ul class="pricing-features">
-                        <li><i class="fas fa-clock" style="color: var(--primary-color);"></i> Coming Soon</li>
-                    </ul>
-                    <span class="btn-outline" style="pointer-events: none; opacity: 0.5;">준비중</span>
-                </div>
-            </div>
-            <div style="text-align: center; margin-top: 48px;">
-                <a href="pricing.html" class="btn-outline">할인 혜택 & 환불 규정 보기</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Reviews Section -->
-    <section id="reviews" class="section section-gray">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">수강생 후기</h2>
-                <p class="section-subtitle">이온토플과 함께 목표를 달성한 학생들의 생생한 이야기</p>
-            </div>
-            <div class="reviews-grid" id="reviewsContainer">
-                <!-- Reviews will be loaded dynamically -->
-            </div>
-            <div style="text-align: center; margin-top: 48px;">
-                <a href="reviews.html" class="btn-outline">모든 후기 보기</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
-        <div class="container">
-            <div class="cta-content">
-                <h2 class="cta-title">지금 바로 시작하세요</h2>
-                <p class="cta-subtitle">10초만에 간편하게 회원가입하고 무료 상담을 받아보세요</p>
-                <div class="cta-buttons">
-                    <a href="register.html" class="btn-primary">10초 회원가입</a>
-                    <a href="application-form.html" class="btn-secondary">지금 신청하기</a>
-                </div>
-            </div>
+    <!-- Closing CTA -->
+    <section class="landing-cta">
+        <div class="landing-cta-inner">
+            <p class="landing-cta-text">다 읽으셨어도, 바로 신청하지 마세요.<br>하루 더 생각해보세요.</p>
+            <a href="#" class="landing-cta-btn">신청 페이지 보기</a>
         </div>
     </section>
 
