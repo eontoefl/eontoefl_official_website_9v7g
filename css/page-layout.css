@@ -270,3 +270,105 @@
     margin: 0;
     color: #5b21b6;
 }
+
+/* ==================== 후기 상세 콘텐츠 스타일 통일 ==================== */
+/* 마이그레이션된 글의 인라인 스타일을 강제로 오버라이드 */
+.review-detail-content,
+.review-detail-content * {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+    line-height: 1.8 !important;
+    color: #334155 !important;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+}
+
+.review-detail-content {
+    font-size: 15px !important;
+    font-weight: 400 !important;
+}
+
+.review-detail-content p,
+.review-detail-content div,
+.review-detail-content span,
+.review-detail-content li,
+.review-detail-content td,
+.review-detail-content th,
+.review-detail-content dd,
+.review-detail-content dt {
+    font-size: 15px !important;
+    font-weight: 400 !important;
+}
+
+.review-detail-content h1,
+.review-detail-content h2,
+.review-detail-content h3,
+.review-detail-content h4,
+.review-detail-content h5,
+.review-detail-content h6 {
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
+
+.review-detail-content h1 { font-size: 22px !important; }
+.review-detail-content h2 { font-size: 20px !important; }
+.review-detail-content h3 { font-size: 18px !important; }
+.review-detail-content h4 { font-size: 16px !important; }
+
+.review-detail-content a {
+    color: #9480c5 !important;
+    text-decoration: underline;
+}
+
+.review-detail-content a:hover {
+    color: #7d6aad !important;
+}
+
+.review-detail-content img {
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 8px;
+    margin: 16px 0;
+}
+
+.review-detail-content table {
+    width: 100% !important;
+    border-collapse: collapse;
+    margin: 16px 0;
+}
+
+.review-detail-content table td,
+.review-detail-content table th {
+    border: 1px solid #e2e8f0;
+    padding: 10px 12px;
+}
+
+.review-detail-content blockquote {
+    border-left: 4px solid #9480c5;
+    padding: 12px 20px;
+    margin: 16px 0;
+    background: #f8f4ff;
+    border-radius: 0 8px 8px 0;
+}
+
+.review-detail-content ul,
+.review-detail-content ol {
+    padding-left: 24px;
+    margin: 12px 0;
+}
+
+.review-detail-content li {
+    margin-bottom: 6px;
+}
+
+/* 불필요한 인라인 배경색 제거 */
+.review-detail-content * {
+    background-color: transparent !important;
+}
+
+/* 이미지/미디어는 배경 투명 예외 처리 불필요 (이미 transparent) */
+/* 테이블 헤더 등 특수 케이스 */
+.review-detail-content table th {
+    background-color: #f8fafc !important;
+}

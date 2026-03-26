@@ -232,6 +232,41 @@
         let currentPage = 1;
         const itemsPerPage = 15;
 
+        // 마이그레이션된 후기 콘텐츠의 인라인 스타일 정리
+        function sanitizeReviewContent(html) {
+            if (!html) return '';
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+
+            // 제거할 인라인 스타일 속성 목록
+            const stylePropsToRemove = [
+                'font-family', 'font-size', 'font-weight', 'line-height',
+                'color', 'background-color', 'background',
+                'letter-spacing', 'word-spacing'
+            ];
+
+            const allElements = temp.querySelectorAll('*');
+            allElements.forEach(el => {
+                if (el.style && el.style.length > 0) {
+                    stylePropsToRemove.forEach(prop => {
+                        el.style.removeProperty(prop);
+                    });
+                    // 스타일 속성이 비었으면 style 자체 제거
+                    if (el.getAttribute('style') && el.getAttribute('style').trim() === '') {
+                        el.removeAttribute('style');
+                    }
+                }
+                // face, size 등 레거시 font 속성 제거
+                if (el.tagName === 'FONT') {
+                    el.removeAttribute('face');
+                    el.removeAttribute('size');
+                    el.removeAttribute('color');
+                }
+            });
+
+            return temp.innerHTML;
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
             const reviewId = params.get('id');
@@ -374,7 +409,7 @@
                 document.getElementById('detailAuthor').textContent = review.author_name || '익명';
                 document.getElementById('detailDate').textContent = date;
                 document.getElementById('detailHit').textContent = '조회 ' + (review.hit_count || 0);
-                document.getElementById('detailContent').innerHTML = review.content || '';
+                document.getElementById('detailContent').innerHTML = sanitizeReviewContent(review.content || '');
 
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';
