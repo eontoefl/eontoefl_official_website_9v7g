@@ -94,18 +94,17 @@ async function goToMyApplication(event) {
         return;
     }
     
-    // 2. 신청서 조회 (모든 신청서를 가져온 후 필터링)
+    // 2. 신청서 조회 (supabaseAPI 사용)
     try {
-        const response = await fetch(`tables/applications?limit=1000&sort=-created_at`);
-        const result = await response.json();
+        const result = await supabaseAPI.query('applications', {
+            'email': `eq.${userData.email}`,
+            'order': 'created_at.desc',
+            'limit': '1'
+        });
         
-        // 본인의 신청서만 필터링
-        const myApplications = result.data ? result.data.filter(app => app.email === userData.email) : [];
-        
-        if (myApplications.length > 0) {
+        if (result && result.length > 0) {
             // 신청서가 있으면 가장 최근 신청서 상세 페이지로 이동
-            const application = myApplications[0];
-            window.location.href = `application-detail.html?id=${application.id}`;
+            window.location.href = `application-detail.html?id=${result[0].id}`;
         } else {
             // 신청서가 없으면 알림
             alert('📋 접수한 신청서가 없습니다.\n\n신청서를 먼저 작성해주세요.');
