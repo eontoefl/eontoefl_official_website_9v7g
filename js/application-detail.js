@@ -242,7 +242,7 @@ function displayApplicationDetail(app) {
                         <div style="font-size: 19px; font-weight: 700; color: #9480c5; margin-bottom: 8px;">
                             Total: ${formatNewScore(app.total_score)} 레벨
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
+                        <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
                             <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
                                 <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Reading</div>
                                 <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${formatNewScore(app.score_reading_new)}</div>
@@ -270,7 +270,7 @@ function displayApplicationDetail(app) {
                         <div style="font-size: 19px; font-weight: 700; color: #9480c5; margin-bottom: 8px;">
                             Total: ${app.total_score}점
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
+                        <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
                             <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
                                 <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Reading</div>
                                 <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${app.score_reading_old || '-'}</div>
@@ -353,8 +353,31 @@ ${escapeHtml(app.score_history)}
                 font-size: 15px;
                 color: #1e293b;
             }
+            @media (max-width: 768px) {
+                .detail-row {
+                    grid-template-columns: 90px 1fr;
+                    gap: 8px;
+                    padding: 12px 0;
+                }
+                .detail-label {
+                    font-size: 13px;
+                }
+                .detail-value {
+                    font-size: 13px;
+                }
+                .step1-container {
+                    padding: 16px !important;
+                }
+                .step1-container h3 {
+                    font-size: 16px !important;
+                    margin-bottom: 16px !important;
+                }
+                .section-score-grid {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                }
+            }
         </style>
-        <div style="background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div class="step1-container" style="background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <h3 style="font-size: 19px; font-weight: 700; color: #1e293b; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid #9480c5;">📋 신청서 정보</h3>
             
             <div class="detail-row">
@@ -416,7 +439,7 @@ ${escapeHtml(app.score_history)}
         <div class="detail-row" style="margin-top: 12px;">
             <div class="detail-label">섹션별 목표</div>
             <div class="detail-value">
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
                     ${app.target_version === 'old' ? `
                         <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
                             <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Reading</div>
