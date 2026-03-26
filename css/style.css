@@ -1573,6 +1573,30 @@ td:nth-child(5) {
         display: none;
     }
 
+    /* 작성자/상태 컬럼: 고정 너비 해제 → 최소 너비만 차지 */
+    .applications-table th:nth-child(3),
+    .applications-table th:nth-child(4) {
+        width: auto !important;
+        white-space: nowrap;
+    }
+
+    .applications-table td:nth-child(3),
+    .applications-table td:nth-child(4) {
+        white-space: nowrap;
+    }
+
+    /* 제목 컬럼: 남는 공간 전부 차지 */
+    .applications-table th:nth-child(2) {
+        width: 100% !important;
+    }
+
+    /* 상태 뱃지 축소 */
+    .applications-table .status-badge {
+        padding: 3px 8px;
+        font-size: 10px;
+        border-radius: 10px;
+    }
+
     /* 신청 현황 헤더: 모바일에서 크기 축소 */
     .app-list-header {
         flex-direction: column !important;
