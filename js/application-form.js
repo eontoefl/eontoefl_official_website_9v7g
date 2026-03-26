@@ -595,6 +595,13 @@ function setupFormSubmission() {
                     throw new Error('신청서 제출에 실패했습니다.');
                 }
 
+                // 텔레그램 알림 발송 (실패해도 신청서 제출에는 영향 없음)
+                try {
+                    await sendTelegramNotification(formData);
+                } catch (notifyErr) {
+                    console.warn('텔레그램 알림 발송 실패:', notifyErr);
+                }
+
                 // Clear auto-saved data
                 localStorage.removeItem(getDraftKey());
 
@@ -1015,6 +1022,32 @@ function setupDateDropdowns() {
             option.textContent = day + '일';
             select.appendChild(option);
         }
+    });
+}
+
+// ==================== 텔레그램 알림 ====================
+
+async function sendTelegramNotification(formData) {
+    const BOT_TOKEN = '8429679066:AAGRxlntlVcu8C8Y2ZEzdiGg0WCFKlSdSis';
+    const CHAT_ID = '1753336274';
+
+    const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    const text = `📋 새 신청서 접수!\n\n` +
+        `👤 이름: ${formData.name || '-'}\n` +
+        `📧 이메일: ${formData.email || '-'}\n` +
+        `📱 전화: ${formData.phone || '-'}\n` +
+        `🎯 목표: ${formData.target_score || '-'}점\n` +
+        `📚 희망 프로그램: ${formData.preferred_program || '-'}\n` +
+        `🕐 접수 시간: ${now}`;
+
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text: text,
+            parse_mode: 'HTML'
+        })
     });
 }
 
