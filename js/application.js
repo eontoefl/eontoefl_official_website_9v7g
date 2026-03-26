@@ -1,5 +1,6 @@
 // Applications List Page
 let allApplications = [];
+let allAppNotices = [];
 let currentPage = 1;
 const itemsPerPage = 15;
 let deleteTargetId = null;
@@ -20,6 +21,14 @@ function maskName(name) {
 function getCurrentUserEmail() {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
     return userData ? userData.email : null;
+}
+
+/**
+ * 현재 사용자가 관리자인지 확인
+ */
+function isAdmin() {
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    return userData && userData.role === 'admin';
 }
 
 /**
@@ -137,9 +146,151 @@ async function confirmDelete() {
     }
 }
 
+// ==================== 공지사항 관련 ====================
+
+/**
+ * 공지사항 상세보기 모달 열기
+ */
+function openNoticeDetail(e, noticeId) {
+    e.stopPropagation();
+    e.preventDefault();
+    const notice = allAppNotices.find(n => n.id === noticeId);
+    if (!notice) return;
+
+    const modal = document.getElementById('noticeDetailModal');
+    document.getElementById('noticeDetailSubject').textContent = notice.subject;
+    document.getElementById('noticeDetailAuthor').textContent = notice.author || '관리자';
+    document.getElementById('noticeDetailDate').textContent = notice.published_at
+        ? new Date(notice.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '';
+    document.getElementById('noticeDetailContent').innerHTML = notice.content || '';
+
+    // 관리자 수정/삭제 버튼
+    const adminBtns = document.getElementById('noticeAdminBtns');
+    if (isAdmin()) {
+        adminBtns.style.display = 'flex';
+        adminBtns.innerHTML = `
+            <button onclick="editNotice('${notice.id}')" style="padding:8px 16px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#1e293b; font-family:inherit; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#1e293b'">
+                <i class="fas fa-pen" style="font-size:12px;"></i> 수정
+            </button>
+            <button onclick="deleteNotice('${notice.id}')" style="padding:8px 16px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#ef4444; font-family:inherit; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.background='#fef2f2'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='white'">
+                <i class="fas fa-trash" style="font-size:12px;"></i> 삭제
+            </button>
+        `;
+    } else {
+        adminBtns.style.display = 'none';
+    }
+
+    modal.style.display = 'block';
+}
+
+/**
+ * 공지사항 상세 모달 닫기
+ */
+function closeNoticeDetail() {
+    document.getElementById('noticeDetailModal').style.display = 'none';
+}
+
+/**
+ * 공지사항 수정 (write.html로 이동)
+ */
+function editNotice(noticeId) {
+    window.location.href = 'write.html?board=application_notice&edit=' + noticeId;
+}
+
+/**
+ * 공지사항 삭제
+ */
+async function deleteNotice(noticeId) {
+    if (!confirm('이 공지사항을 삭제하시겠습니까?\n\n삭제된 글은 복구할 수 없습니다.')) return;
+    try {
+        await supabaseAPI.hardDelete('application_notices', noticeId);
+        alert('공지사항이 삭제되었습니다.');
+        closeNoticeDetail();
+        await loadApplicationsList();
+    } catch (error) {
+        console.error('공지 삭제 실패:', error);
+        alert('삭제에 실패했습니다. 다시 시도해주세요.');
+    }
+}
+
+/**
+ * 공지사항 행 HTML 생성
+ */
+function renderNoticeRows(notices) {
+    const admin = isAdmin();
+    return notices.map(notice => {
+        const dateStr = notice.published_at
+            ? getTimeAgo(notice.published_at)
+            : '';
+        return `
+            <tr style="cursor:pointer; background:#faf8ff;" onclick="openNoticeDetail(event, '${notice.id}')">
+                <td style="text-align:center;">
+                    <span style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:0.5px;">공지</span>
+                </td>
+                <td>
+                    <div style="font-size:14px; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-bullhorn" style="color:#9480c5; font-size:12px;"></i>
+                        ${escapeHtml(notice.subject)}
+                    </div>
+                </td>
+                <td style="font-weight:500; color:#9480c5;">${escapeHtml(notice.author || '관리자')}</td>
+                <td>
+                    <span style="display:inline-flex; align-items:center; gap:4px; background:#f0ecf9; color:#7d6aad; font-size:11px; font-weight:600; padding:4px 10px; border-radius:12px;">
+                        <i class="fas fa-thumbtack" style="font-size:9px;"></i> 고정
+                    </span>
+                </td>
+                <td style="font-size:12px; color:#64748b;">${dateStr}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ==================== 초기화 ====================
+
 // 삭제 확인 버튼 이벤트
 document.addEventListener('DOMContentLoaded', () => {
     loadApplicationsList();
+    
+    // 관리자면 공지 작성 버튼 표시
+    if (isAdmin()) {
+        const btn = document.getElementById('adminNoticeBtn');
+        if (btn) btn.style.display = 'inline-flex';
+    }
+
+    // 공지사항 상세 모달 삽입
+    if (!document.getElementById('noticeDetailModal')) {
+        const modalHtml = `
+        <div id="noticeDetailModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; animation:fadeIn 0.2s ease;">
+            <div style="background:white; max-width:680px; width:90%; margin:6% auto; border-radius:16px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="padding:24px 28px 16px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="flex:1;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                            <span style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; font-size:10px; font-weight:700; padding:3px 10px; border-radius:4px;">공지</span>
+                        </div>
+                        <h3 id="noticeDetailSubject" style="font-size:20px; font-weight:700; color:#1e293b; margin:0 0 8px 0; line-height:1.4;"></h3>
+                        <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#94a3b8;">
+                            <span id="noticeDetailAuthor"></span>
+                            <span style="color:#e2e8f0;">|</span>
+                            <span id="noticeDetailDate"></span>
+                        </div>
+                    </div>
+                    <button onclick="closeNoticeDetail()" style="background:none; border:none; cursor:pointer; padding:8px; color:#94a3b8; font-size:18px; transition:color 0.2s;" onmouseover="this.style.color='#1e293b'" onmouseout="this.style.color='#94a3b8'">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="noticeDetailContent" style="padding:24px 28px; overflow-y:auto; flex:1; font-size:15px; line-height:1.8; color:#334155;"></div>
+                <div id="noticeAdminBtns" style="display:none; padding:16px 28px; border-top:1px solid #e2e8f0; gap:8px; justify-content:flex-end;"></div>
+            </div>
+        </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 모달 바깥 클릭 시 닫기
+        document.getElementById('noticeDetailModal').addEventListener('click', function(e) {
+            if (e.target === this) closeNoticeDetail();
+        });
+    }
     
     // 삭제 확인 버튼
     setTimeout(() => {
@@ -158,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, true);
 });
 
-// Load Applications List
+// Load Applications List (+ 공지사항)
 async function loadApplicationsList() {
     const listLoading = document.getElementById('listLoading');
     const tbody = document.getElementById('applicationsBody');
@@ -166,18 +317,31 @@ async function loadApplicationsList() {
     listLoading.classList.add('show');
     
     try {
-        const result = await supabaseAPI.get('applications', { limit: 1000, sort: '-created_at' });
-        
-        if (result.data && result.data.length > 0) {
+        // 공지사항과 신청서를 동시에 로드
+        const [noticeResult, appResult] = await Promise.all([
+            supabaseAPI.query('application_notices', { 'order': 'published_at.desc', 'limit': '50' }).catch(() => []),
+            supabaseAPI.get('applications', { limit: 1000, sort: '-created_at' })
+        ]);
+
+        // 공지사항 저장
+        allAppNotices = Array.isArray(noticeResult) ? noticeResult : [];
+
+        if (appResult.data && appResult.data.length > 0) {
             // 삭제된 신청서 필터링
-            allApplications = result.data.filter(app => !app.deleted);
+            allApplications = appResult.data.filter(app => !app.deleted);
             
             // Update total count
             document.getElementById('totalCount').textContent = allApplications.length;
             
             displayApplications();
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
+            // 공지사항만 있을 수 있으므로 공지 먼저 렌더링
+            let html = '';
+            if (allAppNotices.length > 0) {
+                html += renderNoticeRows(allAppNotices);
+            }
+            html += '<tr><td colspan="5" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
+            tbody.innerHTML = html;
         }
     } catch (error) {
         console.error('Failed to load applications:', error);
@@ -187,14 +351,20 @@ async function loadApplicationsList() {
     }
 }
 
-// Display Applications
+// Display Applications (공지사항 상단 고정 포함)
 function displayApplications() {
     const tbody = document.getElementById('applicationsBody');
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const paginatedApps = allApplications.slice(startIndex, endIndex);
+
+    // 1페이지일 때만 공지사항 상단 고정 표시
+    let noticeHtml = '';
+    if (currentPage === 1 && allAppNotices.length > 0) {
+        noticeHtml = renderNoticeRows(allAppNotices);
+    }
     
-    tbody.innerHTML = paginatedApps.map((app, index) => {
+    const appHtml = paginatedApps.map((app, index) => {
         const rowNumber = allApplications.length - startIndex - index;
         
         // 상태 판단 로직
@@ -273,6 +443,8 @@ function displayApplications() {
             </tr>
         `;
     }).join('');
+
+    tbody.innerHTML = noticeHtml + appHtml;
     
     // Show pagination if needed
     if (allApplications.length > itemsPerPage) {
