@@ -157,6 +157,15 @@
                                 <span id="detailDate" style="font-size:14px; color:#94a3b8;"></span>
                                 <span style="color:#e2e8f0;">|</span>
                                 <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
+                                <!-- 관리자 수정/삭제 버튼 -->
+                                <div id="adminActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
+                                    <button onclick="editPost()" title="수정" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
+                                        <i class="fas fa-pen" style="font-size:13px;"></i>
+                                    </button>
+                                    <button onclick="deletePost()" title="삭제" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'; this.style.background='#fef2f2'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
+                                        <i class="fas fa-trash-alt" style="font-size:13px;"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
                         </article>
@@ -229,6 +238,7 @@
         let allNotices = [];
         let currentPage = 1;
         const itemsPerPage = 15;
+        let currentPostId = null;
 
         // 샘플 데이터 (DB에 데이터가 없을 때 표시)
         const sampleNotices = [
@@ -253,6 +263,7 @@
             }
 
             if (noticeId) {
+                currentPostId = noticeId;
                 showDetailView(noticeId);
             } else {
                 loadNotices();
@@ -392,6 +403,14 @@
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';
 
+                // 관리자 수정/삭제 버튼 표시 (샘플 데이터 제외)
+                if (!String(noticeId).startsWith('sample-')) {
+                    const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                    if (userData2 && userData2.role === 'admin') {
+                        document.getElementById('adminActions').style.display = 'flex';
+                    }
+                }
+
             } catch (error) {
                 console.error('게시글 로드 오류:', error);
                 // 샘플 데이터 fallback
@@ -412,6 +431,25 @@
                             <p>게시글을 불러오는데 실패했습니다.</p>
                         </div>`;
                 }
+            }
+        }
+        // 관리자 수정
+        function editPost() {
+            if (!currentPostId) return;
+            window.location.href = `write.html?board=notice&edit=${currentPostId}`;
+        }
+
+        // 관리자 삭제
+        async function deletePost() {
+            if (!currentPostId) return;
+            if (!confirm('이 게시글을 정말 삭제하시겠습니까?\n\n삭제된 글은 복구할 수 없습니다.')) return;
+            try {
+                await supabaseAPI.hardDelete('notices', currentPostId);
+                alert('게시글이 삭제되었습니다.');
+                window.location.href = 'notice.html';
+            } catch (error) {
+                console.error('삭제 오류:', error);
+                alert('삭제에 실패했습니다. 다시 시도해주세요.');
             }
         }
     </script>
