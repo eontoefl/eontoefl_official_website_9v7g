@@ -940,7 +940,13 @@
    RESPONSIVE — Tablet
    ═══════════════════════════════════════════ */
 @media (max-width: 768px) {
-    .cl .cl-section { padding: 3rem 0; }
+    .cl .cl-section {
+        padding: 3rem 0;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0;
+        padding-right: 0;
+    }
     .cl .section-opening { padding-top: 2rem; padding-bottom: 3rem; }
     .cl .opening-headline { font-size: 1.7rem; }
     .cl .section-headline { font-size: 1.5rem; border-bottom: none; padding-bottom: 0; }
@@ -950,6 +956,7 @@
     .cl .photo-placeholder { max-width: 200px; margin: 0 auto 1rem; }
     .cl .env-screenshots { grid-template-columns: 1fr; gap: 1.5rem; }
     .cl .builder-screenshots { grid-template-columns: 1fr; gap: 1.5rem; }
+    .cl .cl-image-grid-2col { grid-template-columns: 1fr !important; }
     .cl .screenshot-builder { height: 180px; }
     .cl .screenshot-medium { height: 200px; }
     .cl .flow-diagram { gap: 0; justify-content: center; }
