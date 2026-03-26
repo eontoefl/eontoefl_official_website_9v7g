@@ -185,9 +185,10 @@
         position: static;
         display: flex;
         overflow-x: auto;
-        gap: 8px;
-        padding: 16px;
+        gap: 4px;
+        padding: 12px 8px;
         -webkit-overflow-scrolling: touch;
+        justify-content: space-between;
     }
 
     .sidebar-title {
@@ -198,6 +199,41 @@
         white-space: nowrap;
         margin-bottom: 0;
         flex-shrink: 0;
+    }
+
+    /* STEP 네비게이션 모바일: 아이콘 + 한글만 */
+    .step-nav-link {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 6px !important;
+        font-size: 12px !important;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .step-nav-link i {
+        font-size: 18px;
+    }
+
+    .step-label-text {
+        display: none !important;
+    }
+
+    .step-br {
+        display: none;
+    }
+
+    .step-name {
+        font-size: 11px !important;
+        font-weight: 500;
+        color: #64748b;
+    }
+
+    .step-nav-link.active .step-name {
+        color: #9480c5;
+        font-weight: 700;
     }
 
     .sidebar-nav a:hover {
