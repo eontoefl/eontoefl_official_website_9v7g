@@ -207,6 +207,32 @@
         <div id="pagination" style="text-align: center; margin-top: 24px; display: none;"></div>
     </section>
 
+    <!-- Notice Detail View -->
+    <section id="noticeDetailView" style="display:none;">
+        <div style="margin-bottom: 24px;">
+            <a href="application.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                <i class="fas fa-arrow-left"></i> 목록으로
+            </a>
+        </div>
+
+        <div id="noticeDetailLoading" style="text-align:center; padding:60px 20px;">
+            <div class="spinner"></div>
+            <p style="margin-top:12px; font-size:13px; color:#64748b;">로딩 중...</p>
+        </div>
+
+        <article id="noticeDetailArticle" style="display:none;">
+            <h2 id="noticeDetailSubject" style="font-size:22px; font-weight:700; color:#1e293b; margin-bottom:16px; line-height:1.4;"></h2>
+            <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid #e2e8f0; margin-bottom:32px; flex-wrap:wrap;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; font-size:10px; font-weight:700; padding:3px 10px; border-radius:4px;">공지</span>
+                <span id="noticeDetailAuthor" style="font-size:14px; color:#64748b;"></span>
+                <span style="color:#e2e8f0;">|</span>
+                <span id="noticeDetailDate" style="font-size:14px; color:#94a3b8;"></span>
+                <div id="noticeAdminBtns" style="display:none; margin-left:auto; gap:6px; align-items:center;"></div>
+            </div>
+            <div id="noticeDetailContent" style="font-size:15px; line-height:1.8; color:#334155;"></div>
+        </article>
+    </section>
+
     <!-- Delete Confirmation Modal -->
     <div id="deleteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; animation: fadeIn 0.2s ease;">
         <div style="background:white; max-width:420px; margin:15% auto; border-radius:12px; padding:2rem; text-align:center;">
