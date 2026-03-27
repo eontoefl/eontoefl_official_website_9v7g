@@ -166,7 +166,7 @@ iontoefl-website/
 ## 📞 문의
 
 - **카카오톡**: [카카오톡 채널 링크]
-- **이메일**: info@iontoefl.com
+- **이메일**: messijessi@naver.com
 - **전화**: 02-1234-5678
 
 ## 📄 라이선스
