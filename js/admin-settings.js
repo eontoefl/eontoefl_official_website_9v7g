@@ -101,7 +101,7 @@ async function createDefaultSettings() {
                 bank_name: '국민은행',
                 account_number: '123-456-789012',
                 account_holder: '김민서',
-                email: 'info@iontoefl.com',
+                email: 'messijessi@naver.com',
                 kakao_link: 'https://business.kakao.com/_FWxcZC/chats',
                 platform_url: 'https://study.iontoefl.com',
                 platform_login_guide: '이메일로 발송된 비밀번호를 사용하세요',
