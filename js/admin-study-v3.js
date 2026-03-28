@@ -443,6 +443,7 @@ function renderTable() {
                     <strong>${escapeHtml(s.name)}</strong>${statusBadge}${nameWarning}
                     ${s.hasFraud ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:9px; padding:1px 5px; border-radius:3px; margin-left:4px;">FRAUD</span>' : ''}
                 </td>
+                <td style="font-size:12px; color:#64748b; white-space:nowrap;">${escapeHtml(s.email || '')}</td>
                 <td>
                     <span style="display:inline-block; background:${s.programType === 'Fast' ? '#ede9fe' : '#e0f2fe'}; color:${s.programType === 'Fast' ? '#7c3aed' : '#0284c7'}; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600;">
                         ${s.programType}
@@ -459,17 +460,9 @@ function renderTable() {
                     <span style="color:${authColor}; font-weight:700;">${s.authDisplay}</span>
                 </td>
                 <td>
-                    <span style="color:${s.trendColor}; font-size:18px; font-weight:700;">${s.trend}</span>
-                </td>
-                <td>
                     <span style="display:inline-block; width:28px; height:28px; line-height:28px; text-align:center; background:${s.gradeColor}; color:white; border-radius:50%; font-size:13px; font-weight:700;">
                         ${s.grade}
                     </span>
-                </td>
-                <td>
-                    <div style="display:flex; gap:3px; font-size:14px;">
-                        ${s.weekGrass.map(g => `<span>${g}</span>`).join('')}
-                    </div>
                 </td>
                 <td>${lastActivityText}</td>
                 <td>
