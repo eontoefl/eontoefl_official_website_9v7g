@@ -1634,6 +1634,87 @@ async function deleteDeadlineExtension(id) {
 let notifList = [];
 let notifLoaded = false;
 
+// --- 볼드 에디터 기능 ---
+
+/**
+ * 마크다운 볼드(**text**) 토글 함수
+ * - 선택 없이 클릭: 커서 위치에 **** 삽입, 커서를 가운데로
+ * - 텍스트 선택 후 클릭:
+ *   - 이미 **로 감싸져 있으면 → ** 제거 (해제)
+ *   - 아니면 → **선택영역**으로 감싸기 (적용)
+ */
+function toggleBold(textareaId) {
+    const ta = document.getElementById(textareaId);
+    if (!ta) return;
+
+    let start = ta.selectionStart;
+    let end = ta.selectionEnd;
+    const text = ta.value;
+
+    if (start === end) {
+        // 선택 없이 클릭 → **** 삽입, 커서를 가운데로
+        const insert = '****';
+        ta.value = text.slice(0, start) + insert + text.slice(end);
+        ta.selectionStart = ta.selectionEnd = start + 2;
+    } else {
+        const selected = text.slice(start, end);
+
+        // 선택 영역 자체가 **...**인지 확인
+        if (selected.startsWith('**') && selected.endsWith('**') && selected.length >= 4) {
+            // **텍스트** 전체를 선택한 경우 → 해제
+            const inner = selected.slice(2, -2);
+            ta.value = text.slice(0, start) + inner + text.slice(end);
+            ta.selectionStart = start;
+            ta.selectionEnd = start + inner.length;
+        }
+        // 바깥쪽 ±2 글자가 **인지 확인 (안쪽 텍스트만 선택한 경우)
+        else if (start >= 2 && end + 2 <= text.length &&
+                 text.slice(start - 2, start) === '**' && text.slice(end, end + 2) === '**') {
+            // 바깥 ** 제거
+            ta.value = text.slice(0, start - 2) + selected + text.slice(end + 2);
+            ta.selectionStart = start - 2;
+            ta.selectionEnd = start - 2 + selected.length;
+        }
+        // 볼드 적용
+        else {
+            const wrapped = '**' + selected + '**';
+            ta.value = text.slice(0, start) + wrapped + text.slice(end);
+            ta.selectionStart = start;
+            ta.selectionEnd = start + wrapped.length;
+        }
+    }
+    ta.focus();
+}
+
+/**
+ * 마크다운 볼드를 HTML <b> 태그로 변환 (미리보기용)
+ * XSS 방어: escapeHtml 먼저 적용 후 ** 패턴만 <b>로 변환
+ */
+function renderBoldPreview(text) {
+    const escaped = escapeHtml(text);
+    return escaped.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+
+/**
+ * textarea에 Ctrl+B / Cmd+B 단축키 바인딩
+ */
+function bindBoldShortcut(textareaId) {
+    const ta = document.getElementById(textareaId);
+    if (!ta || ta._boldShortcutBound) return;
+    ta._boldShortcutBound = true;
+    ta.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+            e.preventDefault();
+            toggleBold(textareaId);
+        }
+    });
+}
+
+// 발송 폼 textarea에 단축키 바인딩 (DOM 로드 후)
+document.addEventListener('DOMContentLoaded', function() {
+    bindBoldShortcut('notifMessage');
+});
+
 function toggleNotifSection() {
     const body = document.getElementById('notifBody');
     const icon = document.getElementById('notifToggleIcon');
@@ -1706,6 +1787,7 @@ function renderNotifList() {
             : '-';
         const title = n.title || '-';
         const msgPreview = (n.message || '').replace(/\n/g, ' ').substring(0, 50);
+        const msgPreviewHtml = renderBoldPreview(msgPreview + ((n.message || '').length > 50 ? '…' : ''));
         const readBadge = n.is_read
             ? '<span class="notif-badge-read"><i class="fas fa-check-circle"></i> 읽음</span>'
             : '<span class="notif-badge-unread"><i class="fas fa-clock"></i> 안읽음</span>';
@@ -1714,7 +1796,7 @@ function renderNotifList() {
         html += `<tr>
             <td style="font-size:12px; color:#94a3b8; white-space:nowrap;">${created}</td>
             <td style="font-weight:600;">${escapeHtml(title)}</td>
-            <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(msgPreview)}${(n.message || '').length > 50 ? '…' : ''}</td>
+            <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${msgPreviewHtml}</td>
             <td>${readBadge}</td>
             <td style="font-size:12px; color:#94a3b8;">${escapeHtml(createdBy)}</td>
             <td style="text-align:center;">
@@ -1813,7 +1895,12 @@ function editNotification(id) {
                 </div>
                 <div class="field">
                     <label>본문</label>
-                    <textarea id="editNotifMessage" rows="6">${escapeHtml(n.message || '')}</textarea>
+                    <div class="notif-editor-wrap">
+                        <div class="notif-editor-toolbar">
+                            <button type="button" title="볼드 (Ctrl+B)" onclick="toggleBold('editNotifMessage')"><b>B</b></button>
+                        </div>
+                        <textarea id="editNotifMessage" rows="6">${escapeHtml(n.message || '')}</textarea>
+                    </div>
                 </div>
             </div>
             <div class="notif-edit-footer">
@@ -1826,6 +1913,7 @@ function editNotification(id) {
     `;
     document.body.appendChild(modal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeEditModal(); });
+    bindBoldShortcut('editNotifMessage');
     document.getElementById('editNotifTitle').focus();
 }
 
