@@ -103,6 +103,7 @@ async function loadStudentDetail() {
         detailContent.style.display = 'block';
 
         renderProfileHeader();
+        renderPracticeSection();
         renderV3SummaryCards();
         await renderStudyRecordTable();
         loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
@@ -201,6 +202,122 @@ function renderProfileHeader() {
         const btn = document.getElementById('btnManageApp');
         btn.style.display = 'inline-flex';
         btn.onclick = () => { window.location.href = `admin-applications.html?manage=${app.id}`; };
+    }
+}
+
+// ===== 연습코스 관리 =====
+
+function renderPracticeSection() {
+    const { app } = studentData;
+    const section = document.getElementById('practiceSection');
+    if (!section) return;
+
+    // 섹션 표시
+    section.style.display = 'block';
+
+    const practiceEnabled = app.practice_enabled === true;
+    const disabledManually = app.practice_disabled_manually === true;
+    const scheduleEnd = app.schedule_end ? new Date(app.schedule_end) : null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const isEnded = scheduleEnd && scheduleEnd < today;
+
+    // 세그먼트 버튼 상태 반영
+    updatePracticeSegment(practiceEnabled);
+
+    // 상태 정보 렌더링
+    const infoEl = document.getElementById('practiceInfo');
+    if (!infoEl) return;
+
+    // 상태 텍스트 결정
+    let statusText, statusIcon, statusColor;
+    if (practiceEnabled && !disabledManually && isEnded) {
+        statusText = '활성화됨 (자동)'; statusIcon = 'fa-check-circle'; statusColor = '#22c55e';
+    } else if (practiceEnabled && !isEnded) {
+        statusText = '활성화됨 (수동)'; statusIcon = 'fa-check-circle'; statusColor = '#3b82f6';
+    } else if (practiceEnabled) {
+        statusText = '활성화됨'; statusIcon = 'fa-check-circle'; statusColor = '#22c55e';
+    } else if (!practiceEnabled && disabledManually) {
+        statusText = '비활성화 (수동 OFF)'; statusIcon = 'fa-times-circle'; statusColor = '#ef4444';
+    } else if (!practiceEnabled && !isEnded) {
+        statusText = '대기 중 (정규과정 종료 시 자동 활성화)'; statusIcon = 'fa-clock'; statusColor = '#f59e0b';
+    } else {
+        statusText = '비활성화'; statusIcon = 'fa-times-circle'; statusColor = '#ef4444';
+    }
+
+    // 종료일 / D-day
+    let endDateText = '-';
+    let ddayText = '';
+    if (scheduleEnd) {
+        endDateText = formatKSTDate(app.schedule_end);
+        const diffDays = Math.ceil((scheduleEnd - today) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0) {
+            ddayText = `D-${diffDays}`;
+        } else if (diffDays === 0) {
+            ddayText = 'D-Day';
+        } else {
+            ddayText = '종료됨';
+        }
+    }
+
+    infoEl.innerHTML = `
+        <div class="practice-info-item">
+            현재 상태: <span style="color:${statusColor};"><i class="fas ${statusIcon}"></i> ${statusText}</span>
+        </div>
+        <div class="practice-info-item">
+            정규과정 종료일: <span>${endDateText}</span>
+            ${ddayText ? `<span style="margin-left:4px; padding:2px 8px; border-radius:4px; font-size:11px; background:${isEnded ? '#fef2f2' : '#f0f9ff'}; color:${isEnded ? '#ef4444' : '#3b82f6'};">${ddayText}</span>` : ''}
+        </div>
+    `;
+}
+
+function updatePracticeSegment(isEnabled) {
+    const btnOff = document.getElementById('practiceBtnOff');
+    const btnOn = document.getElementById('practiceBtnOn');
+    if (!btnOff || !btnOn) return;
+
+    btnOff.className = isEnabled ? '' : 'active-off';
+    btnOn.className = isEnabled ? 'active-on' : '';
+}
+
+async function togglePracticeMode(enable) {
+    const { app } = studentData;
+    const currentState = app.practice_enabled === true;
+
+    // 이미 같은 상태면 무시
+    if (enable === currentState) return;
+
+    const actionText = enable ? '활성화' : '비활성화';
+    const studentName = studentData.user.name || '학생';
+
+    if (!confirm(`"${studentName}"의 연습코스를 ${actionText}하시겠습니까?`)) return;
+
+    // 버튼 비활성화
+    const btnOff = document.getElementById('practiceBtnOff');
+    const btnOn = document.getElementById('practiceBtnOn');
+    btnOff.disabled = true;
+    btnOn.disabled = true;
+
+    try {
+        const updateData = enable
+            ? { practice_enabled: true, practice_disabled_manually: false }
+            : { practice_enabled: false, practice_disabled_manually: true };
+
+        await supabaseAPI.patch('applications', app.id, updateData);
+
+        // 로컬 데이터 업데이트
+        app.practice_enabled = updateData.practice_enabled;
+        app.practice_disabled_manually = updateData.practice_disabled_manually;
+
+        // UI 갱신
+        renderPracticeSection();
+
+        alert(`✅ 연습코스가 ${actionText}되었습니다.`);
+    } catch (err) {
+        console.error('연습코스 토글 실패:', err);
+        alert('❌ 변경 실패: ' + err.message);
+    } finally {
+        btnOff.disabled = false;
+        btnOn.disabled = false;
     }
 }
 

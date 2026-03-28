@@ -473,6 +473,56 @@
             border-top: 1px solid #e2e8f0;
         }
 
+        /* ===== 연습코스 관리 ===== */
+        .practice-container {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        .practice-header {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px;
+        }
+        .practice-title {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 15px; font-weight: 700; color: #1e293b;
+        }
+        .practice-toggle-wrap {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .practice-segment {
+            display: flex; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden;
+        }
+        .practice-segment button {
+            padding: 6px 20px; border: none; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; background: #f8fafc; color: #64748b;
+        }
+        .practice-segment button.active-off {
+            background: #fef2f2; color: #ef4444; border-right: 1px solid #d1d5db;
+        }
+        .practice-segment button.active-on {
+            background: #f0fdf4; color: #22c55e;
+        }
+        .practice-segment button:not(.active-off):not(.active-on) {
+            border-right: 1px solid #d1d5db;
+        }
+        .practice-segment button:not(.active-off):not(.active-on):hover {
+            background: #e2e8f0;
+        }
+        .practice-segment button:disabled {
+            cursor: not-allowed; opacity: 0.6;
+        }
+        .practice-info {
+            display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px;
+            padding-top: 14px; border-top: 1px solid #f1f5f9;
+        }
+        .practice-info-item {
+            font-size: 12px; color: #64748b;
+        }
+        .practice-info-item span {
+            font-weight: 600; color: #334155;
+        }
+
         /* ===== 전체 학습 기록 테이블 ===== */
         .record-table-container {
             background: white; border-radius: 12px; padding: 24px;
@@ -828,6 +878,25 @@
                     <div id="notifListWrap">
                         <div class="notif-empty"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- 🎮 연습코스 관리 -->
+            <div class="practice-container" id="practiceSection" style="display:none;">
+                <div class="practice-header">
+                    <div class="practice-title">
+                        <i class="fas fa-dumbbell" style="color:#7c3aed;"></i>
+                        연습코스 (Practice Mode)
+                    </div>
+                    <div class="practice-toggle-wrap">
+                        <div class="practice-segment" id="practiceSegment">
+                            <button id="practiceBtnOff" onclick="togglePracticeMode(false)">OFF</button>
+                            <button id="practiceBtnOn" onclick="togglePracticeMode(true)">ON</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="practice-info" id="practiceInfo">
+                    <!-- JS에서 렌더링 -->
                 </div>
             </div>
 
