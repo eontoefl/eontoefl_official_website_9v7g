@@ -316,6 +316,28 @@
             box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
         }
         .notif-form .field-message { flex: 1; }
+        /* 볼드 에디터 툴바 */
+        .notif-editor-toolbar {
+            display: flex; gap: 4px; padding: 6px 8px;
+            border: 1px solid #d1d5db; border-bottom: none;
+            border-radius: 8px 8px 0 0; background: #f1f5f9;
+        }
+        .notif-editor-toolbar button {
+            width: 32px; height: 32px; border: 1px solid #d1d5db;
+            border-radius: 6px; background: #fff; font-weight: 800;
+            font-size: 14px; cursor: pointer; transition: all 0.15s;
+            color: #334155; display: inline-flex; align-items: center;
+            justify-content: center; padding: 0;
+        }
+        .notif-editor-toolbar button:hover {
+            background: #3b82f6; color: #fff; border-color: #3b82f6;
+        }
+        .notif-editor-toolbar button.active {
+            background: #3b82f6; color: #fff; border-color: #3b82f6;
+        }
+        .notif-editor-wrap textarea {
+            border-radius: 0 0 8px 8px !important;
+        }
         .btn-notif-send {
             background: #3b82f6; color: white; border: none;
             padding: 8px 16px; border-radius: 8px; cursor: pointer;
@@ -784,8 +806,13 @@
                             <input type="text" id="notifTitle" placeholder="예: 1주차 주간체크 피드백 도착!">
                         </div>
                         <div class="field field-message">
-                            <label>본문 * <span style="font-weight:400; color:#94a3b8;">(줄바꿈·이모지 가능)</span></label>
-                            <textarea id="notifMessage" rows="4" placeholder="정숙님! 1주차 정말 수고 많으셨어요 🎉&#10;&#10;리딩 점수가 많이 올랐어요!"></textarea>
+                            <label>본문 * <span style="font-weight:400; color:#94a3b8;">(줄바꿈·이모지·**볼드** 가능)</span></label>
+                            <div class="notif-editor-wrap">
+                                <div class="notif-editor-toolbar">
+                                    <button type="button" title="볼드 (Ctrl+B)" onclick="toggleBold('notifMessage')"><b>B</b></button>
+                                </div>
+                                <textarea id="notifMessage" rows="4" placeholder="정숙님! 1주차 정말 수고 많으셨어요 🎉&#10;&#10;리딩 점수가 많이 올랐어요!"></textarea>
+                            </div>
                         </div>
                         <div class="notif-form-bottom">
                             <div class="field">
