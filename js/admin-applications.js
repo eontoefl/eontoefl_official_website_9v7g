@@ -4,6 +4,9 @@ let filteredApplications = [];
 let selectedIds = new Set();
 const itemsPerPage = 20;
 let currentPage = 1;
+let currentAppTypeTab = 'all'; // 'all' | 'challenge' | 'book_only'
+let bookProgressCache = {};  // user_id → { max_page_reached, last_page, is_completed, bookmarks }
+let bookMemoCountCache = {}; // user_id → count
 
 // 관리자 상태 메시지 반환 함수
 function getAdminActionMessage(app) {
@@ -117,6 +120,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('programFilter').addEventListener('change', applyFilters);
     document.getElementById('sortBy').addEventListener('change', applyFilters);
     
+    // URL 해시에서 탭 상태 복원
+    const hash = window.location.hash.replace('#', '');
+    if (['all', 'challenge', 'book_only'].includes(hash)) {
+        currentAppTypeTab = hash;
+    }
+
     // 데이터 로드
     loadApplications();
 });
@@ -128,7 +137,8 @@ async function loadApplications() {
         
         if (result.data && result.data.length > 0) {
             allApplications = result.data;
-            applyFilters();
+            updateTabCounts();
+            switchAppTypeTab(currentAppTypeTab, true);
         } else {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('emptyState').style.display = 'block';
@@ -140,6 +150,93 @@ async function loadApplications() {
     }
 }
 
+// ===== 탭 카운트 업데이트 =====
+function updateTabCounts() {
+    const allCount = allApplications.filter(a => a.deleted !== true && a.deleted !== 'true').length;
+    const challengeCount = allApplications.filter(a => a.application_type !== 'book_only' && a.deleted !== true && a.deleted !== 'true').length;
+    const bookCount = allApplications.filter(a => a.application_type === 'book_only' && a.deleted !== true && a.deleted !== 'true').length;
+    
+    const elAll = document.getElementById('tabCountAll');
+    const elChallenge = document.getElementById('tabCountChallenge');
+    const elBook = document.getElementById('tabCountBook');
+    if (elAll) elAll.textContent = allCount;
+    if (elChallenge) elChallenge.textContent = challengeCount;
+    if (elBook) elBook.textContent = bookCount;
+}
+
+// ===== 탭 전환 =====
+function switchAppTypeTab(tabType, skipReload) {
+    currentAppTypeTab = tabType;
+    window.location.hash = tabType;
+    
+    // 탭 UI 업데이트
+    document.querySelectorAll('.app-type-tab').forEach(btn => {
+        const isActive = btn.dataset.type === tabType;
+        btn.style.color = isActive ? '#9480c5' : '#94a3b8';
+        btn.style.borderBottomColor = isActive ? '#9480c5' : 'transparent';
+        const badge = btn.querySelector('span');
+        if (badge) {
+            badge.style.background = isActive ? '#9480c5' : '#e2e8f0';
+            badge.style.color = isActive ? 'white' : '#64748b';
+        }
+    });
+    
+    // 입문서 탭이면 챌린지 전용 필터 숨기기
+    const statusFilter = document.getElementById('statusFilter');
+    const programFilter = document.getElementById('programFilter');
+    if (tabType === 'book_only') {
+        statusFilter.style.display = 'none';
+        programFilter.style.display = 'none';
+    } else {
+        statusFilter.style.display = '';
+        programFilter.style.display = '';
+    }
+    
+    // 테이블 전환
+    const challengeTable = document.getElementById('challengeTable');
+    const bookTable = document.getElementById('bookTable');
+    if (challengeTable) challengeTable.style.display = tabType === 'book_only' ? 'none' : '';
+    if (bookTable) bookTable.style.display = tabType === 'book_only' ? '' : 'none';
+    
+    // 입문서 탭이면 진도 데이터를 먼저 로드한 뒤 필터 적용
+    if (tabType === 'book_only') {
+        loadBookProgressData().then(() => applyFilters());
+    } else {
+        applyFilters();
+    }
+}
+
+// ===== 입문서 진도/메모 데이터 일괄 로드 =====
+async function loadBookProgressData() {
+    // 이미 로드했으면 스킵
+    if (Object.keys(bookProgressCache).length > 0) return;
+    
+    try {
+        const [progressResult, memosResult] = await Promise.all([
+            supabaseAPI.query('tr_book_progress', { 'order': 'updated_at.desc', 'limit': '1000' }),
+            supabaseAPI.query('tr_book_memos', { 'limit': '5000' })
+        ]);
+        
+        // 진도: user_id별 최신 1건만
+        if (progressResult) {
+            for (const p of progressResult) {
+                if (!bookProgressCache[p.user_id]) {
+                    bookProgressCache[p.user_id] = p;
+                }
+            }
+        }
+        
+        // 메모: user_id별 카운트
+        if (memosResult) {
+            for (const m of memosResult) {
+                bookMemoCountCache[m.user_id] = (bookMemoCountCache[m.user_id] || 0) + 1;
+            }
+        }
+    } catch (e) {
+        console.warn('입문서 진도/메모 로드 실패:', e);
+    }
+}
+
 // 필터 적용
 function applyFilters() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -147,13 +244,26 @@ function applyFilters() {
     const programFilter = document.getElementById('programFilter').value;
     const sortBy = document.getElementById('sortBy').value;
     
+    // 탭 기반 사전 필터링
+    let baseApplications = allApplications;
+    if (currentAppTypeTab === 'challenge') {
+        baseApplications = allApplications.filter(a => a.application_type !== 'book_only');
+    } else if (currentAppTypeTab === 'book_only') {
+        baseApplications = allApplications.filter(a => a.application_type === 'book_only');
+    }
+    
     // 필터링
-    filteredApplications = allApplications.filter(app => {
+    filteredApplications = baseApplications.filter(app => {
         // 검색어 필터
         const matchesSearch = !searchTerm || 
             (app.name && app.name.toLowerCase().includes(searchTerm)) ||
             (app.email && app.email.toLowerCase().includes(searchTerm)) ||
             (app.phone && app.phone.toLowerCase().includes(searchTerm));
+        
+        // 입문서 탭에서는 상태/프로그램 필터 무시
+        if (currentAppTypeTab === 'book_only') {
+            return matchesSearch;
+        }
         
         // 상태 필터 (프로세스 단계 기반)
         const matchesStatus = statusFilter === 'all' || getAppStageFilter(app) === statusFilter;
@@ -192,7 +302,12 @@ function applyFilters() {
     
     // 페이지 초기화
     currentPage = 1;
-    displayApplications();
+    
+    if (currentAppTypeTab === 'book_only') {
+        displayBookApplications();
+    } else {
+        displayApplications();
+    }
 }
 
 // 신청서 표시
@@ -1056,4 +1171,115 @@ async function submitTrackingBulk() {
 
     // 테이블 새로고침
     await loadApplications();
+}
+
+// =====================================================
+// 입문서 신청자 전용 목록 표시 (Phase 3-A)
+// =====================================================
+
+function displayBookApplications() {
+    if (filteredApplications.length === 0) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('applicationsTable').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'block';
+        return;
+    }
+    
+    // 페이지네이션 계산
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageApplications = filteredApplications.slice(startIndex, endIndex);
+    
+    // 입문서 테이블 생성
+    const tableHTML = pageApplications.map(app => {
+        const isSelected = selectedIds.has(app.id);
+        const userId = app.user_id;
+        
+        // 진도 데이터
+        const prog = bookProgressCache[userId];
+        const maxPage = prog?.max_page_reached || 0;
+        const isCompleted = prog?.is_completed || false;
+        const totalPages = 366;
+        const progressPercent = totalPages > 0 ? Math.round((maxPage / totalPages) * 100) : 0;
+        
+        // 메모 수
+        const memoCount = bookMemoCountCache[userId] || 0;
+        
+        // 점수 표시
+        const scoreDisplay = app.current_score != null ? app.current_score : '<span style="color:#94a3b8;">없음</span>';
+        
+        // 토플 이유
+        let reasonDisplay = app.toefl_reason || '-';
+        if (app.toefl_reason === '기타' && app.toefl_reason_detail) {
+            reasonDisplay = app.toefl_reason_detail;
+        }
+        
+        // 유입 경로
+        let sourceDisplay = app.referral_source || '-';
+        if (app.referral_source === '기타' && app.referral_source_detail) {
+            sourceDisplay = app.referral_source_detail;
+        }
+        
+        // 신청일
+        const submittedDate = app.submitted_date 
+            ? new Date(app.submitted_date).toLocaleDateString('ko-KR') 
+            : '-';
+        
+        // 진도 바 색상
+        const progressColor = isCompleted ? '#22c55e' : '#9480c5';
+        
+        return `
+            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}">
+                <td>
+                    <input type="checkbox" 
+                           class="app-checkbox" 
+                           data-id="${app.id}" 
+                           ${isSelected ? 'checked' : ''}
+                           onchange="toggleSelection('${app.id}')">
+                </td>
+                <td style="font-weight: 600;">
+                    ${escapeHtml(app.name)}
+                    <span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">📖 입문서</span>
+                </td>
+                <td style="font-size: 13px;">${escapeHtml(app.email)}</td>
+                <td style="font-size: 13px;">${escapeHtml(app.phone || '-')}</td>
+                <td style="font-size: 13px; font-weight: 600;">${scoreDisplay}</td>
+                <td style="font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(reasonDisplay)}">${escapeHtml(reasonDisplay)}</td>
+                <td style="font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sourceDisplay)}">${escapeHtml(sourceDisplay)}</td>
+                <td style="font-size: 13px; color: #64748b;">${submittedDate}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:6px; min-width:100px;">
+                        <div style="flex:1; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
+                            <div style="width:${progressPercent}%; height:100%; background:${progressColor}; border-radius:3px;"></div>
+                        </div>
+                        <span style="font-size:11px; color:#64748b; white-space:nowrap;">${maxPage}/${totalPages}</span>
+                    </div>
+                </td>
+                <td style="font-size: 13px; text-align: center; font-weight: 600; color: #f59e0b;">${memoCount}</td>
+                <td style="text-align: center;">
+                    ${isCompleted 
+                        ? '<span style="background:#dcfce7; color:#16a34a; padding:3px 8px; border-radius:10px; font-size:11px; font-weight:600;">완독 ✅</span>'
+                        : '<span style="color:#94a3b8; font-size:12px;">-</span>'
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    document.getElementById('bookTableBody').innerHTML = tableHTML;
+    
+    // 카운트 업데이트
+    document.getElementById('totalCount').textContent = filteredApplications.length;
+    document.getElementById('displayCount').textContent = pageApplications.length;
+    
+    // 페이지네이션 업데이트
+    updatePagination();
+    
+    // 선택 카운트 업데이트
+    updateSelectionCount();
+    
+    // 화면 표시
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('applicationsTable').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
 }
