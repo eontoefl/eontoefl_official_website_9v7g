@@ -649,7 +649,8 @@
                 return {
                     subject: subject,
                     content: content,
-                    author_name: userData.name || userData.nickname || '익명',
+                    author_name: userData.nickname || userData.name || '익명',
+                    author_real_name: userData.name || '',
                     author_email: userData.email,
                     published_at: now,
                     hit_count: 0
