@@ -287,6 +287,8 @@
                 document.getElementById('writeBtn').style.display = 'block';
             }
 
+            const isAdmin = userData && userData.role === 'admin';
+
             if (reviewId) {
                 currentPostId = reviewId;
                 showDetailView(reviewId);
@@ -345,7 +347,7 @@
                     <tr onclick="location.href='reviews.html?id=${review.id}'" style="cursor:pointer;">
                         <td style="text-align:center; color:#64748b;">${no}</td>
                         <td style="font-weight:600; color:#1e293b;">${review.subject || ''}</td>
-                        <td style="text-align:center; color:#64748b;">${review.author_name || '익명'}</td>
+                        <td style="text-align:center; color:#64748b;">${formatAuthorName(review)}</td>
                         <td style="text-align:center; color:#94a3b8; font-size:13px;">${date}</td>
                         <td style="text-align:center; color:#94a3b8; font-size:13px;">${review.hit_count || 0}</td>
                     </tr>`;
@@ -417,7 +419,7 @@
                     : '';
 
                 document.getElementById('detailSubject').textContent = review.subject;
-                document.getElementById('detailAuthor').textContent = review.author_name || '익명';
+                document.getElementById('detailAuthor').textContent = formatAuthorName(review);
                 document.getElementById('detailDate').textContent = date;
                 // 조회수 +1 업데이트
                 const newHitCount = (review.hit_count || 0) + 1;
@@ -470,6 +472,14 @@
                 console.error('삭제 오류:', error);
                 alert('삭제에 실패했습니다. 다시 시도해주세요.');
             }
+        }
+
+        function formatAuthorName(review) {
+            const name = review.author_name || '익명';
+            if (isAdmin && review.author_real_name && review.author_real_name !== name) {
+                return `${name}(${review.author_real_name})`;
+            }
+            return name;
         }
 
         async function loadPostNavigation(currentWrId) {
