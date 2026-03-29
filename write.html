@@ -376,13 +376,7 @@
             editPostId = params.get('edit');
             if (editPostId) {
                 editMode = true;
-                // 수정은 관리자만 가능
-                const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-                if (!userData || userData.role !== 'admin') {
-                    alert('관리자만 게시글을 수정할 수 있습니다.');
-                    window.location.href = boardConfig.listUrl;
-                    return;
-                }
+                // 수정 권한: 관리자 또는 본인 글 (loadPostForEdit에서 검증)
             }
 
             // 페이지 세팅
@@ -470,6 +464,16 @@
                 const post = await supabaseAPI.getById(boardConfig.table, postId);
                 if (!post) {
                     alert('게시글을 찾을 수 없습니다.');
+                    window.location.href = boardConfig.listUrl;
+                    return;
+                }
+
+                // 수정 권한 검증: 관리자 또는 본인 글
+                const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                const isAdmin = userData && userData.role === 'admin';
+                const isAuthor = userData && post.author_email && post.author_email === userData.email;
+                if (!isAdmin && !isAuthor) {
+                    alert('본인이 작성한 글만 수정할 수 있습니다.');
                     window.location.href = boardConfig.listUrl;
                     return;
                 }
@@ -646,6 +650,7 @@
                     subject: subject,
                     content: content,
                     author_name: userData.name || userData.nickname || '익명',
+                    author_email: userData.email,
                     published_at: now,
                     hit_count: 0
                 };
