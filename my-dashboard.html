@@ -728,9 +728,29 @@
         <!-- Dashboard Content -->
         <div id="dashboardContent" style="display: none;">
             <!-- Welcome Section -->
-            <div class="welcome-section">
+            <div class="welcome-section" style="position:relative;">
                 <h1 id="welcomeMessage">👋 환영합니다!</h1>
                 <p>내벨업챌린지 진행 현황을 확인하고 관리하세요.</p>
+                <button id="btnSettings" onclick="openNicknameModal()" title="내 정보 수정" style="position:absolute; top:20px; right:20px; background:rgba(255,255,255,0.2); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'"><i class="fas fa-cog"></i></button>
+            </div>
+
+            <!-- 닉네임 설정 모달 -->
+            <div id="nicknameModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+                <div style="background:white; border-radius:16px; padding:32px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.15);">
+                    <h3 id="nicknameModalTitle" style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:8px;">내 정보 수정</h3>
+                    <p id="nicknameModalDesc" style="font-size:13px; color:#64748b; margin-bottom:24px;">닉네임은 후기 등에 표시됩니다.</p>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">닉네임</label>
+                        <div style="position:relative;">
+                            <input type="text" id="modalNickname" placeholder="2~12자, 한글/영문/숫자" minlength="2" maxlength="12" style="width:100%; padding:12px 16px; border:1px solid #e2e8f0; border-radius:8px; font-size:15px; font-family:'Noto Sans KR',sans-serif; box-sizing:border-box; transition:border-color 0.2s;" onfocus="this.style.borderColor='#9480c5'; this.style.boxShadow='0 0 0 3px rgba(148,128,197,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                            <span id="modalNicknameStatus" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px;"></span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">
+                        <button id="btnNicknameCancel" onclick="closeNicknameModal()" style="padding:10px 24px; border:1px solid #e2e8f0; background:white; color:#64748b; font-size:14px; font-weight:600; border-radius:8px; cursor:pointer; font-family:'Noto Sans KR',sans-serif;">취소</button>
+                        <button id="btnNicknameSave" onclick="saveNickname()" style="padding:10px 24px; border:none; background:linear-gradient(135deg,#9480c5 0%,#7d6aad 100%); color:white; font-size:14px; font-weight:600; border-radius:8px; cursor:pointer; font-family:'Noto Sans KR',sans-serif;">저장</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Main Grid: 7:3 Layout -->

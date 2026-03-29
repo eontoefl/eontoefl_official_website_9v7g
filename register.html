@@ -103,6 +103,16 @@
             </div>
 
             <div class="form-group">
+                <label for="nickname" class="form-label required">닉네임</label>
+                <div style="position:relative;">
+                    <input type="text" id="nickname" name="nickname" class="form-input" placeholder="후기 등에 표시될 닉네임" required minlength="2" maxlength="12">
+                    <span id="nicknameStatus" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px;"></span>
+                </div>
+                <div class="form-error"></div>
+                <p style="font-size:11px; color:#94a3b8; margin-top:4px;">2~12자, 한글/영문/숫자 사용 가능</p>
+            </div>
+
+            <div class="form-group">
                 <label for="email" class="form-label required">이메일</label>
                 <input type="email" id="email" name="email" class="form-input" placeholder="example@email.com" required>
                 <div class="form-error"></div>
