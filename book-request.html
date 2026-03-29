@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>입문서 무료 신청 - 이온토플</title>
+    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
+
+    <!-- Noto Sans KR Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/page-layout.css">
+    <link rel="stylesheet" href="css/book-request.css">
+</head>
+<body>
+    <!-- Navigation (네비게이션에 노출하지 않지만 기본 구조 유지) -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <a href="index.html">
+                        <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/black_logo.png" alt="이온토플" style="height: 32px;">
+                    </a>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li class="nav-item">
+                        <a href="index.html">홈</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="about.html">소개</a>
+                        <a href="about.html#instructors" style="display:none;"><i class="fas fa-user-tie"></i> 강사 소개</a>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="programs.html">프로그램</a>
+                        <div class="dropdown-menu">
+                            <a href="programs.html#basic"><i class="fas fa-seedling"></i> 내벨업챌린지</a>
+                            <a href="programs.html#sra"><i class="fas fa-pen-nib"></i> 스라첨삭</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="pricing.html">가격</a>
+                        <div class="dropdown-menu">
+                            <a href="pricing.html#fees"><i class="fas fa-money-bill-wave"></i> 수강료 안내</a>
+                            <a href="pricing.html#discounts"><i class="fas fa-percent"></i> 할인 혜택</a>
+                            <a href="pricing.html#refund"><i class="fas fa-undo"></i> 환불 규정</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="application.html">신청하기</a>
+                        <div class="dropdown-menu">
+                            <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
+                            <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
+                        </div>
+                    </li>
+                    <li class="nav-item has-dropdown">
+                        <a href="notice.html">커뮤니티</a>
+                        <div class="dropdown-menu">
+                            <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
+                            <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                            <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
+                            <a href="faq.html" style="display:none;"><i class="fas fa-question-circle"></i> FAQ</a>
+                        </div>
+                    </li>
+                </ul>
+                <!-- Dynamic Login/User Menu -->
+                <div id="authMenu">
+                    <a href="login.html">LOGIN</a>
+                </div>
+                <div class="hamburger" id="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="form-container">
+        <!-- Form Header -->
+        <div class="form-header">
+            <h1><i class="fas fa-book-open" style="margin-right: 8px;"></i>입문서 무료 신청</h1>
+            <p class="form-description">토플 독학의 첫걸음, 이온토플 입문서를 무료로 받아보세요.</p>
+        </div>
+
+        <!-- Block Screen: 이미 신청한 사용자 -->
+        <div id="alreadyAppliedBlock" class="block-screen" style="display: none;">
+            <div class="block-icon" style="color: var(--accent-color);">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2>이미 신청하셨습니다</h2>
+            <p>입문서를 이미 신청하셨습니다.<br>아래 버튼을 눌러 입문서를 읽어보세요.</p>
+            <a href="my-dashboard.html" class="btn-primary">
+                <i class="fas fa-book-reader"></i> 입문서 읽기
+            </a>
+        </div>
+
+        <!-- Block Screen: 챌린지 기존 신청자 -->
+        <div id="challengeUserBlock" class="block-screen" style="display: none;">
+            <div class="block-icon" style="color: var(--primary-color);">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <h2>이미 내벨업챌린지에 참여 중이십니다</h2>
+            <p>내벨업챌린지 신청자는 입문서를 별도로 신청하실 필요가 없습니다.<br>대시보드에서 모든 학습 자료를 확인하실 수 있습니다.</p>
+            <a href="my-dashboard.html" class="btn-primary">
+                <i class="fas fa-tachometer-alt"></i> 대시보드로 이동
+            </a>
+        </div>
+
+        <!-- 신청 폼 -->
+        <form id="bookRequestForm" style="display: none;">
+
+            <!-- Section 1: 기본 정보 (읽기 전용) -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">1</span>
+                    <h2>기본 정보</h2>
+                </div>
+                <p class="section-description">
+                    <i class="fas fa-info-circle" style="color: var(--primary-color); margin-right: 4px;"></i>
+                    회원 정보에서 자동으로 불러옵니다. 수정이 필요하면 마이페이지에서 변경해주세요.
+                </p>
+                <div class="two-column-grid">
+                    <div class="form-group">
+                        <label>이름</label>
+                        <input type="text" name="name" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>이메일</label>
+                        <input type="email" name="email" readonly>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>전화번호</label>
+                    <input type="tel" name="phone" readonly>
+                </div>
+            </div>
+
+            <!-- Section 2: 현재 토플 점수 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">2</span>
+                    <h2>현재 토플 점수</h2>
+                </div>
+                <div class="form-group">
+                    <label>현재 점수</label>
+                    <input type="number" name="current_score" id="currentScore" placeholder="예: 75" min="0" max="120">
+                    <div class="no-score-check">
+                        <input type="checkbox" id="noScoreCheck">
+                        <label for="noScoreCheck">아직 없음</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: 토플이 필요한 이유 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">3</span>
+                    <h2>토플이 필요한 이유</h2>
+                </div>
+                <div class="form-group">
+                    <label>이유 선택</label>
+                    <select name="toefl_reason" id="toeflReason" required>
+                        <option value="">선택해주세요</option>
+                        <option value="교환학생">교환학생</option>
+                        <option value="유학">유학</option>
+                        <option value="취업">취업</option>
+                        <option value="기타">기타</option>
+                    </select>
+                    <div id="toeflReasonDetail" class="other-detail-input" style="display: none;">
+                        <input type="text" name="toefl_reason_detail" placeholder="직접 입력해주세요">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: 이온토플을 알게 된 경로 -->
+            <div class="form-section">
+                <div class="section-header">
+                    <span class="section-number">4</span>
+                    <h2>이온토플을 알게 된 경로</h2>
+                </div>
+                <div class="form-group">
+                    <label>경로 선택</label>
+                    <select name="referral_source" id="referralSource" required>
+                        <option value="">선택해주세요</option>
+                        <option value="블로그">블로그</option>
+                        <option value="인스타그램">인스타그램</option>
+                        <option value="지인추천">지인추천</option>
+                        <option value="기타">기타</option>
+                    </select>
+                    <div id="referralSourceDetail" class="other-detail-input" style="display: none;">
+                        <input type="text" name="referral_source_detail" placeholder="직접 입력해주세요">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: 개인정보 동의 -->
+            <div class="form-section privacy-section">
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="privacy_agreement" id="privacyAgreement" required>
+                        <span style="position: relative; top: 1px;">개인정보 수집 및 이용에 동의합니다. <a href="#" id="privacyPolicyLink">(개인정보 처리방침 보기)</a></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="form-actions">
+                <button type="submit" class="btn-primary" id="submitBtn">
+                    <i class="fas fa-paper-plane"></i> 입문서 신청하기
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content success-modal">
+            <div class="success-icon">
+                <i class="fas fa-book-open"></i>
+            </div>
+            <h2>입문서가 준비되었습니다!</h2>
+            <p>지금 바로 읽어보세요.<br>토플 독학의 첫걸음을 시작합니다.</p>
+            <button class="btn-primary" onclick="window.location.href='my-dashboard.html'">
+                <i class="fas fa-book-reader"></i> 읽기 시작하기
+            </button>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacyModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="closePrivacyModal">&times;</span>
+            <h2>개인정보 처리방침</h2>
+            <div class="privacy-content">
+                <h3>1. 수집하는 개인정보 항목</h3>
+                <p>이온토플은 수강 신청 및 상담을 위해 다음의 개인정보를 수집합니다:</p>
+                <ul>
+                    <li>필수항목: 성명, 연락처, 이메일</li>
+                    <li>선택항목: 토플 점수, 학습 목적, 유입 경로</li>
+                </ul>
+
+                <h3>2. 개인정보의 수집 및 이용 목적</h3>
+                <ul>
+                    <li>입문서 제공 및 학습 자료 접근 관리</li>
+                    <li>맞춤형 학습 안내 및 서비스 제공</li>
+                    <li>공지사항 전달</li>
+                </ul>
+
+                <h3>3. 개인정보의 보유 및 이용 기간</h3>
+                <p>수집된 개인정보는 서비스 이용 종료 후 1년간 보관되며, 관계 법령에 따라 보존할 필요가 있는 경우 해당 기간 동안 보관됩니다.</p>
+
+                <h3>4. 개인정보의 제3자 제공</h3>
+                <p>이온토플은 원칙적으로 이용자의 개인정보를 제3자에게 제공하지 않습니다.</p>
+
+                <h3>5. 개인정보 처리의 위탁</h3>
+                <p>원활한 서비스 제공을 위해 일부 업무를 외부에 위탁할 수 있으며, 이 경우 관련 법령에 따라 안전하게 관리됩니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">TOEFL 전문 교육기관으로<br>여러분의 목표 달성을 돕습니다</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="index.html#about">소개</a></li>
+                        <li><a href="index.html#programs">프로그램</a></li>
+                        <li><a href="index.html#pricing">가격</a></li>
+                        <li><a href="index.html#reviews">후기</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">학생 서비스</h4>
+                    <ul class="footer-links">
+                        <li><a href="register.html">회원가입</a></li>
+                        <li><a href="application.html">신청하기</a></li>
+                        <li><a href="my-application.html">신청서 조회</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-contact">
+                        <li><i class="fas fa-phone"></i> 02-1234-5678</li>
+                        <li><a href="mailto:messijessi@naver.com"><i class="fas fa-envelope"></i> messijessi@naver.com</a></li>
+                        <li><i class="fas fa-map-marker-alt"></i> 서울시 강남구</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2019-2026 이온. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/book-request.js"></script>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+</body>
+</html>
