@@ -63,10 +63,11 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 const loginData = {
                     id: user.id,
                     name: user.name,
+                    nickname: user.nickname || '',
                     email: user.email,
                     phone: user.phone,
-                    level: user.level || 2,  // 등급 저장
-                    role: user.role || 'user' // 관리자 role 저장
+                    level: user.level || 2,
+                    role: user.role || 'user'
                 };
                 
                 // Save to localStorage
