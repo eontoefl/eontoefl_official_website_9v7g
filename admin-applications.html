@@ -66,8 +66,23 @@
             <p class="admin-subtitle">모든 신청서를 조회하고 관리하세요</p>
         </div>
 
+        <!-- 신청 유형 탭 -->
+        <div class="admin-card" style="padding: 0; margin-bottom: 0; border-bottom: none; border-radius: 12px 12px 0 0;">
+            <div id="appTypeTabs" style="display: flex; border-bottom: 2px solid #e2e8f0;">
+                <button class="app-type-tab active" data-type="all" onclick="switchAppTypeTab('all')" style="flex: 1; padding: 14px 20px; border: none; background: none; font-size: 14px; font-weight: 600; color: #9480c5; cursor: pointer; border-bottom: 3px solid #9480c5; margin-bottom: -2px; transition: all 0.2s;">
+                    전체 <span id="tabCountAll" style="background: #9480c5; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 4px;">0</span>
+                </button>
+                <button class="app-type-tab" data-type="challenge" onclick="switchAppTypeTab('challenge')" style="flex: 1; padding: 14px 20px; border: none; background: none; font-size: 14px; font-weight: 600; color: #94a3b8; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s;">
+                    내벨업챌린지 <span id="tabCountChallenge" style="background: #e2e8f0; color: #64748b; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 4px;">0</span>
+                </button>
+                <button class="app-type-tab" data-type="book_only" onclick="switchAppTypeTab('book_only')" style="flex: 1; padding: 14px 20px; border: none; background: none; font-size: 14px; font-weight: 600; color: #94a3b8; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s;">
+                    📖 입문서 신청 <span id="tabCountBook" style="background: #e2e8f0; color: #64748b; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 4px;">0</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Filters & Search -->
-        <div class="admin-card">
+        <div class="admin-card" style="border-radius: 0 0 12px 12px; border-top: none;">
             <div class="admin-filters">
                 <input type="text" 
                        id="searchInput" 
@@ -155,7 +170,8 @@
 
             <!-- Table -->
             <div id="applicationsTable" style="display: none; overflow-x: auto;">
-                <table class="admin-table">
+                <!-- 챌린지용 테이블 -->
+                <table class="admin-table" id="challengeTable">
                     <thead>
                         <tr>
                             <th style="width: 40px;">
@@ -172,6 +188,29 @@
                         </tr>
                     </thead>
                     <tbody id="tableBody">
+                    </tbody>
+                </table>
+
+                <!-- 입문서 신청용 테이블 -->
+                <table class="admin-table" id="bookTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAllBook" onchange="toggleSelectAll()">
+                            </th>
+                            <th>이름</th>
+                            <th>이메일</th>
+                            <th>전화번호</th>
+                            <th>토플 점수</th>
+                            <th>토플 이유</th>
+                            <th>유입 경로</th>
+                            <th>신청일</th>
+                            <th>읽기 진도</th>
+                            <th>메모</th>
+                            <th>완독</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookTableBody">
                     </tbody>
                 </table>
                 
