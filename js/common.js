@@ -74,7 +74,21 @@ function initHamburgerMenu() {
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthMenu();
     initHamburgerMenu();
+    hideMaterialsForNonAdmin();
 });
+
+/**
+ * 관리자가 아니면 모든 페이지에서 학습 자료 링크 숨김
+ */
+function hideMaterialsForNonAdmin() {
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    if (userData && userData.role === 'admin') return;
+
+    // 네비게이션 드롭다운, 사이드바, 푸터 등 모든 materials.html 링크 숨김
+    document.querySelectorAll('a[href="materials.html"], a[href="materials.html?id"]').forEach(link => {
+        link.style.display = 'none';
+    });
+}
 
 /**
  * '내 신청서' 메뉴 클릭 시 처리
