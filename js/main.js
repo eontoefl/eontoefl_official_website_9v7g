@@ -290,16 +290,22 @@ async function createFloatingButtons() {
         return;
     }
     
-    // 학생인 경우 신청서 접수 여부 확인
+    // 학생인 경우 신청서 접수 여부 확인 (Supabase API 사용)
     try {
-        const response = await fetch(`tables/applications?limit=1000`);
-        const result = await response.json();
+        // supabaseAPI가 로드되지 않은 페이지에서는 스킵
+        if (typeof supabaseAPI === 'undefined') return;
+
+        const myApplications = await supabaseAPI.query('applications', {
+            'email': `eq.${user.email}`,
+            'deleted': 'neq.true',
+            'limit': '10'
+        });
         
-        // 본인의 신청서만 필터링
-        const myApplications = result.data ? result.data.filter(app => app.email === user.email) : [];
+        // 본인의 신청서만 정확히 필터링
+        const matched = (myApplications || []).filter(app => app.email === user.email);
         
         // 신청서가 있는 경우에만 버튼 표시
-        if (myApplications.length > 0) {
+        if (matched.length > 0) {
             createStudentButton();
         }
     } catch (error) {

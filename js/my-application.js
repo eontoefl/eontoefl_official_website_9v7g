@@ -29,20 +29,20 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
     document.getElementById('noResults').style.display = 'none';
     
     try {
-        const response = await fetch(`tables/applications?search=${encodeURIComponent(searchName)}&limit=100`);
-        const data = await response.json();
-        
-        if (data.data && data.data.length > 0) {
-            // Filter by exact or partial name match
-            const filtered = data.data.filter(app => 
-                app.name && app.name.toLowerCase().includes(searchName.toLowerCase())
-            );
-            
-            if (filtered.length > 0) {
-                displayResults(filtered);
-            } else {
-                document.getElementById('noResults').style.display = 'block';
-            }
+        // Supabase API로 이름 기준 검색 (ilike = 대소문자 무시 부분 매칭)
+        const applications = await supabaseAPI.query('applications', {
+            'name': `ilike.*${searchName}*`,
+            'deleted': 'neq.true',
+            'order': 'created_at.desc',
+            'limit': '100'
+        });
+
+        const filtered = (applications || []).filter(app =>
+            app.name && app.name.toLowerCase().includes(searchName.toLowerCase())
+        );
+
+        if (filtered.length > 0) {
+            displayResults(filtered);
         } else {
             document.getElementById('noResults').style.display = 'block';
         }
