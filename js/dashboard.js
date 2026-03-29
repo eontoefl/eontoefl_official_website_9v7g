@@ -1424,7 +1424,7 @@ async function goToBookViewer(app, btnId) {
         });
 
         // 3. 테스트룸 book.html로 이동
-        window.location.href = 'https://www.testroom.eonfl.com/book.html?auth_token=' + token;
+        window.location.href = 'https://testroom.eonfl.com/book.html?auth_token=' + token;
 
     } catch (error) {
         console.error('토큰 발급 실패:', error);
