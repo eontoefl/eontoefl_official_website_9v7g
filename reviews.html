@@ -159,8 +159,8 @@
                                 <span id="detailDate" style="font-size:14px; color:#94a3b8;"></span>
                                 <span style="color:#e2e8f0;">|</span>
                                 <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
-                                <!-- 관리자 수정/삭제 버튼 -->
-                                <div id="adminActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
+                                <!-- 수정/삭제 버튼 (관리자 또는 본인) -->
+                                <div id="postActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
                                     <button onclick="editPost()" title="수정" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
                                         <i class="fas fa-pen" style="font-size:13px;"></i>
                                     </button>
@@ -429,11 +429,14 @@
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';
 
-                // 관리자 수정/삭제 버튼 표시
+                // 수정/삭제 버튼 표시: 관리자 또는 본인 글
                 const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-                if (userData2 && userData2.role === 'admin') {
-                    const adminActions = document.getElementById('adminActions');
-                    adminActions.style.display = 'flex';
+                if (userData2) {
+                    const isAdmin = userData2.role === 'admin';
+                    const isAuthor = review.author_email && review.author_email === userData2.email;
+                    if (isAdmin || isAuthor) {
+                        document.getElementById('postActions').style.display = 'flex';
+                    }
                 }
 
                 // 이전/다음 글 네비게이션
