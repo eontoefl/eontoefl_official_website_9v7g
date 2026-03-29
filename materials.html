@@ -262,10 +262,33 @@
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
             const materialId = params.get('id');
+            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            const isAdmin = userData && userData.role === 'admin';
+
+            // 관리자가 아닌 경우: id 없이 목록 접근 시 홈으로 리다이렉트
+            if (!isAdmin && !materialId) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // 관리자가 아닌 경우: 상세 뷰에서 목록 이동 경로 숨김
+            if (!isAdmin) {
+                // 목록으로 돌아가기 링크 숨김
+                const backLink = document.querySelector('#detailView a[href="materials.html"]');
+                if (backLink) backLink.style.display = 'none';
+                // 사이드바 숨김
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) sidebar.style.display = 'none';
+                // 이전/다음 글 네비게이션 숨김
+                const detailNav = document.getElementById('detailNav');
+                if (detailNav) detailNav.style.display = 'none';
+                // 페이지 헤더 텍스트 변경
+                const pageHeader = document.querySelector('.page-header h1');
+                if (pageHeader) pageHeader.textContent = '학습 자료';
+            }
 
             // 관리자에게만 글쓰기 버튼 표시
-            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-            if (userData && userData.role === 'admin') {
+            if (isAdmin) {
                 document.getElementById('writeBtn').style.display = 'block';
             }
 
