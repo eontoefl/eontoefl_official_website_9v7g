@@ -54,14 +54,45 @@ async function loadDashboard() {
             return;
         }
 
-        const application = matchedApplications[0];
+        // ===== 입문서 / 챌린지 분기 처리 =====
+        const bookApp = matchedApplications.find(a => a.application_type === 'book_only');
+        const challengeApp = matchedApplications.find(a => a.application_type !== 'book_only');
+
+        // 케이스 1: 챌린지 + 입문서 둘 다 있음 → 챌린지 대시보드 + 하단에 입문서 미니카드
+        if (challengeApp && bookApp) {
+            renderWelcome(challengeApp);
+            renderProgressSection(challengeApp);
+            renderActionItems(challengeApp);
+            renderTimeline(challengeApp);
+            await renderQuickMenuGrid(challengeApp);
+            renderShipping(challengeApp);
+            await renderProgramInfo(challengeApp);
+            // 로딩 숨기고 콘텐츠 표시
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+            // 하단에 입문서 미니카드 추가
+            await renderBookOnlyMiniCard(bookApp);
+            return;
+        }
+
+        // 케이스 2: 입문서만 있음 → 입문서 전용 대시보드
+        if (bookApp && !challengeApp) {
+            await renderBookOnlyDashboard(bookApp);
+            // 로딩 숨기고 콘텐츠 표시
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+            return;
+        }
+
+        // 케이스 3: 챌린지만 있음 → 기존 로직 그대로
+        const application = challengeApp || matchedApplications[0];
         
         // 각 섹션 렌더링
         renderWelcome(application);
-        renderProgressSection(application);  // 새로 추가: 원형 진행률 + 타임라인바
-        renderActionItems(application);  // 새로 추가: 지금 해야 할 일
-        renderTimeline(application);      // 새로 추가: 타임라인
-        await renderQuickMenuGrid(application);  // 새로 추가: 빠른 메뉴 그리드
+        renderProgressSection(application);
+        renderActionItems(application);
+        renderTimeline(application);
+        await renderQuickMenuGrid(application);
         renderShipping(application);
         await renderProgramInfo(application);
         
@@ -1219,4 +1250,260 @@ function setupEventListeners() {
             }
         });
     }
+}
+
+// =====================================================
+// 입문서 전용 대시보드 (Phase 2-B)
+// =====================================================
+
+/**
+ * 입문서 전용 대시보드 렌더링
+ * 기존 dashboardContent를 완전히 덮어쓴다.
+ */
+async function renderBookOnlyDashboard(app) {
+    const dashboardContent = document.getElementById('dashboardContent');
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const userId = app.user_id || userData.id;
+
+    // tr_book_progress 조회
+    let progress = null;
+    try {
+        const progressResult = await supabaseAPI.query('tr_book_progress', {
+            'user_id': `eq.${userId}`,
+            'limit': '1',
+            'order': 'updated_at.desc'
+        });
+        if (progressResult && progressResult.length > 0) {
+            progress = progressResult[0];
+        }
+    } catch (e) {
+        console.warn('입문서 진도 조회 실패:', e);
+    }
+
+    // tr_book_memos 조회
+    let memoCount = 0;
+    try {
+        const memos = await supabaseAPI.query('tr_book_memos', {
+            'user_id': `eq.${userId}`
+        });
+        memoCount = memos ? memos.length : 0;
+    } catch (e) {
+        console.warn('입문서 메모 조회 실패:', e);
+    }
+
+    // 진도 데이터 파싱
+    const lastPage = progress?.last_page || 0;
+    const maxPageReached = progress?.max_page_reached || 0;
+    const isCompleted = progress?.is_completed || false;
+    const totalPages = 366;
+    const progressPercent = Math.min(Math.round((maxPageReached / totalPages) * 100), 100);
+    const progressDeg = (progressPercent / 100) * 360;
+
+    // 북마크 수
+    let bookmarkCount = 0;
+    try {
+        if (progress?.bookmarks) {
+            bookmarkCount = Array.isArray(progress.bookmarks) ? progress.bookmarks.length : 0;
+        }
+    } catch (e) {
+        bookmarkCount = 0;
+    }
+
+    // 진행률 표시
+    const progressDisplay = isCompleted
+        ? '<i class="fas fa-check" style="font-size: 40px; -webkit-text-stroke: 2px currentColor;"></i>'
+        : `${progressPercent}%`;
+    const progressLabel = isCompleted ? '완독 완료' : '읽기 진도';
+
+    // 대시보드 HTML 생성
+    dashboardContent.innerHTML = `
+        <!-- 환영 메시지 -->
+        <div class="welcome-section" style="background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);">
+            <h1 style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-book-open"></i>
+                ${app.name || userData.name || ''}님, 입문서가 준비되어 있습니다
+            </h1>
+            <p>토플 독학의 첫걸음, 이온토플 입문서를 읽어보세요.</p>
+        </div>
+
+        <!-- 메인 그리드 -->
+        <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+            <!-- 입문서 진도 카드 -->
+            <div class="dashboard-card" style="margin-bottom: 0;">
+                <div style="display: flex; align-items: center; gap: 30px; flex-wrap: wrap;">
+                    <!-- 원형 프로그레스 -->
+                    <div style="flex-shrink: 0;">
+                        <div class="progress-circle" style="--progress-deg: ${progressDeg}deg; width: 140px; height: 140px;">
+                            <div class="progress-circle-inner" style="width: 116px; height: 116px;">
+                                <div class="progress-percentage" style="color: ${isCompleted ? '#77bf7e' : '#9480c5'};">${progressDisplay}</div>
+                                <div class="progress-label">${progressLabel}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 통계 정보 -->
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                            <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">입문서 읽기 현황</h2>
+                            ${isCompleted ? '<span style="background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">완독 완료 ✅</span>' : ''}
+                        </div>
+
+                        <!-- 통계 그리드 -->
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                            <!-- 페이지 진도 -->
+                            <div style="background: #f8fafc; border-radius: 12px; padding: 16px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #9480c5;">${maxPageReached}</div>
+                                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">/ ${totalPages}페이지</div>
+                            </div>
+                            <!-- 메모 수 -->
+                            <div style="background: #f8fafc; border-radius: 12px; padding: 16px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #f59e0b;">${memoCount}</div>
+                                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">작성한 메모</div>
+                            </div>
+                            <!-- 북마크 수 -->
+                            <div style="background: #f8fafc; border-radius: 12px; padding: 16px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #ef4444;">${bookmarkCount}</div>
+                                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">북마크</div>
+                            </div>
+                        </div>
+
+                        <!-- 이어서 읽기 버튼 -->
+                        <div style="margin-top: 20px;">
+                            <button id="btnGoToBook" class="program-button" style="width: 100%; padding: 16px; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; border: none; cursor: pointer;">
+                                <i class="fas fa-book-reader"></i> ${lastPage > 0 ? `이어서 읽기 (${lastPage}페이지부터)` : '읽기 시작하기'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 내벨업챌린지 유도 영역 -->
+        <div class="dashboard-card" style="margin-top: 24px; background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%); border: 2px solid #fde68a;">
+            <div style="text-align: center; padding: 20px 16px;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🍳</div>
+                <p style="font-size: 15px; color: #92400e; line-height: 1.8; font-weight: 500; margin-bottom: 20px;">
+                    입문서는 레시피, 내벨업챌린지는 요리 실습입니다.<br>
+                    레시피를 백날 째려봐도 요리 실력은 늘지 않습니다.<br>
+                    이제 직접 문제를 풀어볼 차례입니다.
+                </p>
+                <a href="https://eonfl.com/programs.html#basic" class="program-button" style="display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; text-decoration: none; border: none; cursor: pointer;">
+                    <i class="fas fa-rocket"></i> 내벨업챌린지 알아보기
+                </a>
+            </div>
+        </div>
+    `;
+
+    // 이벤트 리스너 바인딩
+    document.getElementById('btnGoToBook').addEventListener('click', () => goToBookViewer(app, 'btnGoToBook'));
+}
+
+/**
+ * 토큰 발급 + 테스트룸 book.html 이동
+ */
+async function goToBookViewer(app, btnId) {
+    const btn = document.getElementById(btnId || 'btnGoToBook');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 이동 중...';
+    }
+
+    try {
+        const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+
+        // 1. 일회용 토큰 생성
+        const token = crypto.randomUUID();
+
+        // 2. tr_auth_tokens 테이블에 저장
+        await supabaseAPI.post('tr_auth_tokens', {
+            token: token,
+            user_id: app.user_id || userData.id,
+            email: app.email || userData.email,
+            expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()  // 5분 유효
+        });
+
+        // 3. 테스트룸 book.html로 이동
+        window.location.href = 'https://www.testroom.eonfl.com/book.html?auth_token=' + token;
+
+    } catch (error) {
+        console.error('토큰 발급 실패:', error);
+        alert('입문서 이동 중 오류가 발생했습니다. 다시 시도해주세요.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+}
+
+/**
+ * 챌린지 대시보드 하단에 입문서 미니카드 추가
+ */
+async function renderBookOnlyMiniCard(bookApp) {
+    const dashboardContent = document.getElementById('dashboardContent');
+    if (!dashboardContent) return;
+
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const userId = bookApp.user_id || userData.id;
+
+    // tr_book_progress 조회
+    let progress = null;
+    try {
+        const progressResult = await supabaseAPI.query('tr_book_progress', {
+            'user_id': `eq.${userId}`,
+            'limit': '1',
+            'order': 'updated_at.desc'
+        });
+        if (progressResult && progressResult.length > 0) {
+            progress = progressResult[0];
+        }
+    } catch (e) {
+        console.warn('입문서 진도 조회 실패:', e);
+    }
+
+    const lastPage = progress?.last_page || 0;
+    const maxPageReached = progress?.max_page_reached || 0;
+    const isCompleted = progress?.is_completed || false;
+    const totalPages = 366;
+
+    // 미니카드 HTML
+    const miniCard = document.createElement('div');
+    miniCard.className = 'dashboard-card';
+    miniCard.style.cssText = 'margin-top: 24px; cursor: pointer; transition: all 0.3s;';
+    miniCard.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #9480c5, #7a62b0); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="fas fa-book-reader" style="color: white; font-size: 22px;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 15px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                    입문서 읽기
+                    ${isCompleted
+                        ? '<span style="background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">완독 ✅</span>'
+                        : `<span style="background: #f0f0ff; color: #9480c5; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">진행중 — ${maxPageReached}/${totalPages}</span>`
+                    }
+                </div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                    ${lastPage > 0 ? `마지막으로 읽은 페이지: ${lastPage}` : '아직 읽기를 시작하지 않았습니다'}
+                </div>
+            </div>
+            <button id="btnMiniCardBook" style="padding: 10px 20px; background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; transition: transform 0.2s;">
+                <i class="fas fa-external-link-alt"></i> 열기
+            </button>
+        </div>
+    `;
+
+    // dashboardContent의 dashboard-grid 다음에 추가
+    const dashboardGrid = dashboardContent.querySelector('.dashboard-grid');
+    if (dashboardGrid) {
+        dashboardGrid.parentNode.insertBefore(miniCard, dashboardGrid.nextSibling);
+    } else {
+        dashboardContent.appendChild(miniCard);
+    }
+
+    // 이벤트 리스너 바인딩
+    document.getElementById('btnMiniCardBook').addEventListener('click', (e) => {
+        e.stopPropagation();
+        goToBookViewer(bookApp, 'btnMiniCardBook');
+    });
 }
