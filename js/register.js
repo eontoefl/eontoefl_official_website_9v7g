@@ -1,14 +1,17 @@
 // ==================== 닉네임 중복 체크 ====================
 let nicknameAvailable = false;
 let nicknameCheckTimer = null;
+let isComposing = false;
 
-document.getElementById('nickname').addEventListener('input', (e) => {
-    const val = e.target.value.trim();
+const nicknameInput = document.getElementById('nickname');
+
+function sanitizeNickname(el) {
+    el.value = el.value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]/g, '');
+}
+
+function checkNickname(val) {
     const status = document.getElementById('nicknameStatus');
     nicknameAvailable = false;
-
-    // 허용 문자: 한글, 영문, 숫자만
-    e.target.value = e.target.value.replace(/[^가-힣a-zA-Z0-9]/g, '');
 
     if (val.length < 2) {
         status.textContent = '';
@@ -36,9 +39,28 @@ document.getElementById('nickname').addEventListener('input', (e) => {
             }
         } catch {
             status.textContent = '';
-            nicknameAvailable = true; // API 오류 시 일단 허용, 서버에서 unique 제약으로 걸림
+            nicknameAvailable = true;
         }
     }, 400);
+}
+
+// 한글 조합 시작 — JS가 개입하지 않음
+nicknameInput.addEventListener('compositionstart', () => {
+    isComposing = true;
+});
+
+// 한글 조합 완료 — 이때 필터링 + 중복체크
+nicknameInput.addEventListener('compositionend', (e) => {
+    isComposing = false;
+    sanitizeNickname(e.target);
+    checkNickname(e.target.value.trim());
+});
+
+// 영문/숫자 등 비조합 입력 처리
+nicknameInput.addEventListener('input', (e) => {
+    if (isComposing) return;
+    sanitizeNickname(e.target);
+    checkNickname(e.target.value.trim());
 });
 
 // ==================== 회원가입 제출 ====================
