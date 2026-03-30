@@ -100,9 +100,27 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         const result = await supabaseAPI.post('users', formData);
 
         if (result) {
-            showAlert('회원가입이 완료되었습니다! 로그인 후 이용해주세요.', 'success');
+            // 자동 로그인: localStorage에 세션 저장
+            const loginData = {
+                id: result.id,
+                name: result.name,
+                nickname: result.nickname || '',
+                email: result.email,
+                phone: result.phone,
+                level: result.level || 2,
+                role: result.role || 'user'
+            };
+            localStorage.setItem('iontoefl_user', JSON.stringify(loginData));
+            localStorage.setItem('iontoefl_login_time', Date.now().toString());
+
+            showAlert('회원가입이 완료되었습니다!', 'success');
             document.getElementById('registerForm').reset();
-            setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+
+            // redirect 파라미터가 있으면 해당 페이지로, 없으면 홈으로
+            const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+            setTimeout(() => {
+                window.location.href = redirectUrl || 'index.html';
+            }, 1500);
         } else {
             throw new Error('회원가입에 실패했습니다');
         }

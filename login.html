@@ -128,10 +128,20 @@
             <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
                 아직 회원이 아니신가요?
             </p>
-            <a href="register.html" class="btn-outline" style="display: inline-block; padding: 10px 20px;">
+            <a id="registerLink" href="register.html" class="btn-outline" style="display: inline-block; padding: 10px 20px;">
                 <i class="fas fa-user-plus"></i> 회원가입하기
             </a>
         </div>
+        <script>
+            // redirect 파라미터가 있으면 회원가입 링크에도 전달
+            (function() {
+                const redirect = new URLSearchParams(window.location.search).get('redirect');
+                if (redirect) {
+                    const link = document.getElementById('registerLink');
+                    link.href = 'register.html?redirect=' + encodeURIComponent(redirect);
+                }
+            })();
+        </script>
     </div>
 
     <!-- Footer -->
