@@ -11,6 +11,315 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
+    <style>
+        /* ==================== 입문서 배너 ==================== */
+        .book-banner {
+            margin-top: 48px;
+            padding: 0;
+            position: relative;
+        }
+
+        .book-banner-inner {
+            display: flex;
+            gap: 36px;
+            align-items: stretch;
+        }
+
+        /* 왼쪽 텍스트 영역 */
+        .book-banner-left {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .book-banner-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #f3eeff 0%, #ece5ff 100%);
+            color: #7c6ab5;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 14px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            letter-spacing: 1.2px;
+            width: fit-content;
+        }
+
+        .book-banner-label i {
+            font-size: 10px;
+        }
+
+        .book-banner-quote {
+            font-size: 15px;
+            line-height: 1.75;
+            color: #334155;
+            margin-bottom: 20px;
+            word-break: keep-all;
+        }
+
+        .book-banner-quote .price-highlight {
+            font-weight: 800;
+            color: #1e293b;
+            text-decoration: line-through;
+            text-decoration-color: #ef4444;
+        }
+
+        .book-banner-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: #fff8f0;
+            border-left: 3px solid #f59e0b;
+            padding: 14px 16px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 20px;
+        }
+
+        .book-banner-warning-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            background: #f59e0b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+
+        .book-banner-warning-icon i {
+            font-size: 10px;
+            color: white;
+        }
+
+        .book-banner-warning-text {
+            font-size: 13.5px;
+            line-height: 1.6;
+            color: #92400e;
+            font-weight: 600;
+        }
+
+        .book-banner-social {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 0;
+            padding-top: 4px;
+        }
+
+        .book-banner-avatars {
+            display: flex;
+            align-items: center;
+        }
+
+        .book-banner-avatars .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            margin-left: -8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+        }
+
+        .book-banner-avatars .avatar:first-child {
+            margin-left: 0;
+        }
+
+        .book-banner-avatars .avatar-1 { background: #a78bfa; color: white; }
+        .book-banner-avatars .avatar-2 { background: #60a5fa; color: white; }
+        .book-banner-avatars .avatar-3 { background: #34d399; color: white; }
+
+        .book-banner-avatars .avatar-count {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #1e293b;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: -8px;
+            border: 2px solid white;
+        }
+
+        .book-banner-social-text {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .book-banner-social-text strong {
+            color: #334155;
+            font-weight: 700;
+        }
+
+        /* 오른쪽 비주얼 영역 */
+        .book-banner-right {
+            width: 480px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .book-banner-image-wrap {
+            position: relative;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .book-banner-image-wrap .book-img-store {
+            height: 200px;
+            width: 48%;
+            object-fit: cover;
+            object-position: right;
+            filter: drop-shadow(0 6px 16px rgba(0,0,0,0.12));
+            border-radius: 6px;
+        }
+
+        .book-banner-image-wrap .book-img-reviews {
+            height: 200px;
+            width: 48%;
+            object-fit: cover;
+            filter: drop-shadow(0 6px 16px rgba(0,0,0,0.12));
+            border-radius: 6px;
+        }
+
+        /* 미니 후기 카드들 */
+        .book-banner-reviews {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .book-mini-review {
+            flex: 1;
+            background: #f1f3f5;
+            color: #334155;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .book-mini-review .mini-stars {
+            color: #fbbf24;
+            font-size: 8px;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+
+        .book-mini-review .mini-text {
+            color: #64748b;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* CTA 버튼 */
+        .book-banner-cta-wrap {
+            width: 100%;
+            text-align: center;
+        }
+
+        .book-banner-cta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #9480c5 0%, #7d6aad 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s;
+            box-shadow: 0 4px 16px rgba(148, 128, 197, 0.35);
+            letter-spacing: -0.3px;
+        }
+
+        .book-banner-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(148, 128, 197, 0.5);
+        }
+
+        .book-banner-cta i {
+            font-size: 18px;
+        }
+
+        .book-banner-cta-sub {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+
+        /* ==================== 배너 반응형 ==================== */
+        @media (max-width: 860px) {
+            .book-banner {
+                padding: 28px 24px 24px;
+            }
+
+            .book-banner-inner {
+                flex-direction: column;
+                gap: 28px;
+            }
+
+            .book-banner-right {
+                width: 100%;
+            }
+
+            .book-banner-image-wrap {
+                height: 160px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .book-banner {
+                padding: 20px 16px 20px;
+                border-radius: 12px;
+            }
+
+            .book-banner-quote {
+                font-size: 13.5px;
+            }
+
+            .book-banner-warning-text {
+                font-size: 12.5px;
+            }
+
+            .book-banner-reviews {
+                flex-direction: column;
+            }
+
+            .book-banner-social {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .book-banner-social-text {
+                font-size: 12px;
+            }
+
+            .book-banner-cta {
+                font-size: 15px;
+                padding: 12px 16px;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -176,6 +485,55 @@
                             </div>
                             <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
                         </article>
+
+                        <!-- 입문서 배너 -->
+                        <div class="book-banner" id="bookBanner" style="display:none;">
+                            <div class="book-banner-inner">
+                                <!-- 왼쪽: 텍스트 영역 -->
+                                <div class="book-banner-left">
+                                    <div class="book-banner-label">
+                                        <i class="fas fa-sparkles"></i> AUTHOR'S EXCLUSIVE MESSAGE
+                                    </div>
+
+                                    <div class="book-banner-quote">
+                                        이 자료는 제가 12년에 걸쳐 정리한 토플 이론을 약 300페이지에 놀러담은 입문서의 내용 중 일부입니다.<br>기존에 29만 원에 판매되었고, 현재 중고 시장에서도 15-20만 원에 거래될 만큼 그 가치를 인정받고 있습니다.
+                                    </div>
+
+                                    <div style="font-size: 15px; line-height: 1.75; color: #334155; word-break: keep-all;">
+                                        솔직히 후기만 자세히 읽어보셔도 점수는 달라질 수 있습니다. 반드시 먼저 읽어보세요. 급하게 먹으면 체하니까요.
+                                        <br><br>
+                                        그래도 입문서 전권이 필요하시다면 우측 링크로 들어가주세요. 경쟁업체 강사분들이 학생을 가장해서 가져가는 일이 너무 많았기 때문에 간단한 신청서를 받고 있습니다. 신청하시면 바로 읽어보실 수 있어요.
+                                    </div>
+
+                                    <div class="book-banner-social" style="margin-top: 20px;">
+                                        <div class="book-banner-avatars">
+                                            <div class="avatar avatar-1"><i class="fas fa-user" style="font-size:12px;"></i></div>
+                                            <div class="avatar avatar-2"><i class="fas fa-user" style="font-size:12px;"></i></div>
+                                            <div class="avatar avatar-3"><i class="fas fa-user" style="font-size:12px;"></i></div>
+                                            <div class="avatar-count">3K+</div>
+                                        </div>
+                                        <div class="book-banner-social-text">
+                                            이미 <strong>3,421명</strong>의 학생들이 무료로 경험하고 검증했습니다.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 오른쪽: 비주얼 + CTA -->
+                                <div class="book-banner-right">
+                                    <div class="book-banner-image-wrap">
+                                        <img src="logo/naver_store.png" alt="이온토플 입문서 세트" class="book-img-store">
+                                        <img src="logo/naver_reviews.png" alt="이온토플 입문서 후기" class="book-img-reviews">
+                                    </div>
+
+                                    <div class="book-banner-cta-wrap">
+                                        <a href="book-request.html" class="book-banner-cta">
+                                            <i class="fas fa-file-alt"></i> 입문서 무료 신청
+                                        </a>
+                                        <div class="book-banner-cta-sub">보안을 위해 간단한 신청 양식 작성이 필요합니다.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; display:none;" id="detailNav">
                             <div style="display:flex; justify-content:space-between;">
@@ -439,6 +797,9 @@
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';
 
+                // 입문서 배너 표시
+                document.getElementById('bookBanner').style.display = 'block';
+
                 // 관리자 수정/삭제 버튼 표시 (샘플 데이터 제외)
                 if (!String(materialId).startsWith('sample-')) {
                     const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
@@ -459,6 +820,8 @@
                     document.getElementById('detailContent').innerHTML = sample.content;
                     document.getElementById('detailLoading').style.display = 'none';
                     document.getElementById('detailArticle').style.display = 'block';
+                    // 입문서 배너 표시
+                    document.getElementById('bookBanner').style.display = 'block';
                 } else {
                     document.getElementById('detailLoading').innerHTML = `
                         <div style="text-align:center; color:#ef4444;">
