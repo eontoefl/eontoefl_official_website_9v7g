@@ -6,6 +6,7 @@ let studentData = null;      // { user, app }
 let scheduleData = [];       // tr_schedule_assignment 전체
 let studyResultsV3 = [];     // study_results_v3 해당 학생
 let deadlineExtensionsData = []; // tr_deadline_extensions 해당 학생
+let weeklyCheckDrafts = [];  // tr_weekly_check_drafts 해당 학생 (승인대기 초안)
 
 // ===== 입문서 총 페이지 수 (추후 DB에서 자동 조회로 교체 예정) =====
 const INTRO_BOOK_TOTAL_PAGES = 300;
@@ -79,7 +80,7 @@ async function loadStudentDetail() {
         const studentUserId = studentData.user.id;
 
         // 병렬로 필요한 데이터 모두 로드
-        const [scheduleResult, studyV3Result, deadlineResult, gradeRules] = await Promise.all([
+        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult] = await Promise.all([
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
@@ -91,12 +92,14 @@ async function loadStudentDetail() {
                 'order': 'original_date.desc',
                 'limit': '200'
             }),
-            loadGradeRules()
+            loadGradeRules(),
+            loadWeeklyCheckDrafts(studentUserId)
         ]);
 
         scheduleData = scheduleResult || [];
         studyResultsV3 = studyV3Result || [];
         deadlineExtensionsData = deadlineResult || [];
+        weeklyCheckDrafts = draftsResult || [];
 
         // 렌더링
         loading.style.display = 'none';
@@ -1868,8 +1871,15 @@ async function loadNotifications() {
 
 function updateNotifCount() {
     const badge = document.getElementById('notifCount');
-    if (notifList.length > 0) {
-        badge.textContent = `${notifList.length}건`;
+    const pendingCount = (weeklyCheckDrafts || []).filter(d => d.status === 'pending').length;
+    const totalCount = notifList.length + pendingCount;
+
+    if (totalCount > 0) {
+        let badgeText = `${notifList.length}건`;
+        if (pendingCount > 0) {
+            badgeText = `${notifList.length}건 · 승인대기 ${pendingCount}건`;
+        }
+        badge.textContent = badgeText;
         badge.style.display = 'inline-flex';
     } else {
         badge.style.display = 'none';
@@ -1879,7 +1889,10 @@ function updateNotifCount() {
 function renderNotifList() {
     const wrap = document.getElementById('notifListWrap');
 
-    if (notifList.length === 0) {
+    const hasDrafts = weeklyCheckDrafts && weeklyCheckDrafts.length > 0;
+    const hasNotifs = notifList.length > 0;
+
+    if (!hasDrafts && !hasNotifs) {
         wrap.innerHTML = '<div class="notif-empty"><i class="fas fa-bell-slash" style="color:#cbd5e1;"></i> 발송된 알림이 없습니다.</div>';
         return;
     }
@@ -1889,12 +1902,16 @@ function renderNotifList() {
             <th>발송일</th>
             <th>제목</th>
             <th>본문 미리보기</th>
-            <th>읽음</th>
+            <th>상태</th>
             <th>발송자</th>
             <th style="width:60px; text-align:center;">수정</th>
             <th style="width:60px; text-align:center;">삭제</th>
         </tr></thead><tbody>`;
 
+    // ── 승인대기/skipped 초안을 맨 위에 삽입 ──
+    html += renderDraftRows();
+
+    // ── 기존 발송 내역 ──
     notifList.forEach(n => {
         const created = n.created_at
             ? new Date(n.created_at).toLocaleString('ko-KR', {
@@ -2073,6 +2090,370 @@ async function deleteNotification(id) {
         await loadNotifications();
     } catch (err) {
         console.error('알림 삭제 실패:', err);
+        alert('❌ 삭제 실패: ' + err.message);
+    }
+}
+
+// ===== 주간체크 승인대기 (tr_weekly_check_drafts) =====
+
+/**
+ * 학생의 주간체크 초안 로드
+ * pending, skipped 상태만 조회 (sent는 이미 tr_notifications에 있으므로 불필요)
+ */
+async function loadWeeklyCheckDrafts(userId) {
+    try {
+        const result = await supabaseAPI.query('tr_weekly_check_drafts', {
+            'user_id': `eq.${userId}`,
+            'status': 'in.(pending,skipped)',
+            'order': 'created_at.desc',
+            'limit': '10'
+        });
+        return result || [];
+    } catch (err) {
+        console.warn('주간체크 초안 로드 실패 (테이블 미생성일 수 있음):', err);
+        return [];
+    }
+}
+
+/**
+ * 주간체크 초안 행 HTML 생성 (발송 내역 테이블 맨 위에 삽입)
+ */
+function renderDraftRows() {
+    if (!weeklyCheckDrafts || weeklyCheckDrafts.length === 0) return '';
+
+    let html = '';
+    weeklyCheckDrafts.forEach(draft => {
+        const created = draft.created_at
+            ? new Date(draft.created_at).toLocaleString('ko-KR', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+              })
+            : '-';
+
+        const isSkipped = draft.status === 'skipped';
+        const weekLabel = draft.week ? `${draft.week}주차` : '';
+        const programLabel = draft.program_type || '';
+        const authLabel = draft.auth_rate != null ? `${draft.auth_rate}%` : '-';
+        const inactiveWeeks = draft.consecutive_inactive_weeks || 0;
+
+        // 제목 + 주차/프로그램 정보
+        const titleDisplay = escapeHtml(draft.title || '-');
+        const metaInfo = [weekLabel, programLabel, `인증률 ${authLabel}`].filter(Boolean).join(' · ');
+
+        // 본문 미리보기 (마크다운 볼드 렌더링)
+        const msgPreview = (draft.message || '').replace(/\n/g, ' ').substring(0, 50);
+        const msgPreviewHtml = renderBoldPreview(msgPreview + ((draft.message || '').length > 50 ? '…' : ''));
+
+        if (isSkipped) {
+            // skipped: 발송 중단 상태 — 발송 버튼 없음
+            html += `<tr style="background: #fef2f2; opacity: 0.7;">
+                <td style="font-size:12px; color:#94a3b8; white-space:nowrap;">${created}</td>
+                <td>
+                    <span style="font-weight:600;">${titleDisplay}</span>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${metaInfo}</div>
+                </td>
+                <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${msgPreviewHtml}</td>
+                <td><span class="draft-badge-skipped"><i class="fas fa-pause-circle"></i> 발송 중단 (${inactiveWeeks}주 미활동)</span></td>
+                <td style="font-size:12px; color:#94a3b8;">n8n</td>
+                <td style="text-align:center;">
+                    <button class="btn-notif-edit" onclick="openDraftPreviewModal('${draft.id}')" title="미리보기">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+                <td style="text-align:center;">
+                    <button class="btn-notif-del" onclick="deleteDraft('${draft.id}')" title="삭제">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+        } else {
+            // pending: 승인대기 — 수정+발송 버튼
+            html += `<tr style="background: linear-gradient(90deg, #fffbeb 0%, #ffffff 100%); border-left: 3px solid #f59e0b;">
+                <td style="font-size:12px; color:#94a3b8; white-space:nowrap;">${created}</td>
+                <td>
+                    <span style="font-weight:600;">${titleDisplay}</span>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${metaInfo}</div>
+                </td>
+                <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${msgPreviewHtml}</td>
+                <td><span class="draft-badge-pending"><i class="fas fa-clock"></i> 승인대기</span></td>
+                <td style="font-size:12px; color:#94a3b8;">${escapeHtml(draft.ai_model || 'n8n')}</td>
+                <td style="text-align:center;">
+                    <button class="btn-draft-review" onclick="openDraftReviewModal('${draft.id}')" title="검토 · 발송">
+                        <i class="fas fa-pen"></i> 검토
+                    </button>
+                </td>
+                <td style="text-align:center;">
+                    <button class="btn-notif-del" onclick="deleteDraft('${draft.id}')" title="삭제">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }
+    });
+
+    return html;
+}
+
+/**
+ * 주간체크 초안 미리보기 모달 (skipped 상태용 — 읽기 전용)
+ */
+function openDraftPreviewModal(draftId) {
+    const draft = weeklyCheckDrafts.find(d => d.id === draftId);
+    if (!draft) return alert('초안을 찾을 수 없습니다.');
+
+    const existing = document.getElementById('draftReviewModal');
+    if (existing) existing.remove();
+
+    const weekLabel = draft.week ? `${draft.week}주차` : '';
+    const programLabel = draft.program_type || '';
+    const authLabel = draft.auth_rate != null ? `${draft.auth_rate}%` : '-';
+    const inactiveWeeks = draft.consecutive_inactive_weeks || 0;
+    const metaInfo = [weekLabel, programLabel, `인증률 ${authLabel}`].filter(Boolean).join(' · ');
+
+    // 본문 렌더링 (마크다운 볼드 + 줄바꿈)
+    const renderedMessage = renderBoldPreview(draft.message || '').replace(/\n/g, '<br>');
+
+    // scoring_summary
+    let scoringHtml = '';
+    if (draft.scoring_summary) {
+        const summaryStr = typeof draft.scoring_summary === 'string'
+            ? draft.scoring_summary
+            : JSON.stringify(draft.scoring_summary, null, 2);
+        scoringHtml = `
+            <div style="margin-top:16px;">
+                <div style="cursor:pointer; font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:4px;"
+                     onclick="var el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.querySelector('.toggle-icon').textContent=el.style.display==='none'?'▼':'▲';">
+                    <span class="toggle-icon">▼</span> scoring_summary (참고용)
+                </div>
+                <pre style="display:none; margin-top:8px; padding:12px; background:#f1f5f9; border-radius:8px; font-size:11px; color:#475569; overflow-x:auto; white-space:pre-wrap; max-height:200px; overflow-y:auto;">${escapeHtml(summaryStr)}</pre>
+            </div>`;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'draftReviewModal';
+    modal.className = 'notif-edit-overlay';
+    modal.innerHTML = `
+        <div class="notif-edit-modal" style="width:600px;">
+            <div class="notif-edit-header">
+                <h3><i class="fas fa-eye" style="color:#94a3b8;"></i> 주간체크 미리보기 (발송 중단)</h3>
+                <button class="notif-edit-close" onclick="closeDraftReviewModal()">&times;</button>
+            </div>
+            <div class="notif-edit-body">
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span class="draft-badge-skipped"><i class="fas fa-pause-circle"></i> 발송 중단 (${inactiveWeeks}주 미활동)</span>
+                    <span style="font-size:12px; color:#94a3b8;">${metaInfo}</span>
+                </div>
+                <div class="field">
+                    <label>제목</label>
+                    <div style="padding:10px 12px; background:#f8fafc; border-radius:8px; font-size:13px; font-weight:600; color:#334155; border:1px solid #e2e8f0;">${escapeHtml(draft.title || '')}</div>
+                </div>
+                <div class="field">
+                    <label>본문</label>
+                    <div style="padding:12px; background:#f8fafc; border-radius:8px; font-size:13px; color:#334155; line-height:1.7; border:1px solid #e2e8f0; max-height:400px; overflow-y:auto;">${renderedMessage}</div>
+                </div>
+                ${scoringHtml}
+            </div>
+            <div class="notif-edit-footer">
+                <button class="btn-notif-cancel" onclick="closeDraftReviewModal()">닫기</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeDraftReviewModal(); });
+}
+
+/**
+ * 주간체크 초안 검토+발송 모달 (pending 상태용 — 수정 후 발송)
+ */
+function openDraftReviewModal(draftId) {
+    const draft = weeklyCheckDrafts.find(d => d.id === draftId);
+    if (!draft) return alert('초안을 찾을 수 없습니다.');
+
+    const existing = document.getElementById('draftReviewModal');
+    if (existing) existing.remove();
+
+    const weekLabel = draft.week ? `${draft.week}주차` : '';
+    const programLabel = draft.program_type || '';
+    const authLabel = draft.auth_rate != null ? `${draft.auth_rate}%` : '-';
+    const metaInfo = [weekLabel, programLabel, `인증률 ${authLabel}`].filter(Boolean).join(' · ');
+
+    // scoring_summary
+    let scoringHtml = '';
+    if (draft.scoring_summary) {
+        const summaryStr = typeof draft.scoring_summary === 'string'
+            ? draft.scoring_summary
+            : JSON.stringify(draft.scoring_summary, null, 2);
+        scoringHtml = `
+            <div style="margin-top:4px;">
+                <div style="cursor:pointer; font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:4px;"
+                     onclick="var el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.querySelector('.toggle-icon').textContent=el.style.display==='none'?'▼':'▲';">
+                    <span class="toggle-icon">▼</span> scoring_summary (참고용)
+                </div>
+                <pre style="display:none; margin-top:8px; padding:12px; background:#f1f5f9; border-radius:8px; font-size:11px; color:#475569; overflow-x:auto; white-space:pre-wrap; max-height:200px; overflow-y:auto;">${escapeHtml(summaryStr)}</pre>
+            </div>`;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'draftReviewModal';
+    modal.className = 'notif-edit-overlay';
+    modal.innerHTML = `
+        <div class="notif-edit-modal" style="width:600px;">
+            <div class="notif-edit-header">
+                <h3><i class="fas fa-clipboard-check" style="color:#f59e0b;"></i> 주간체크 검토 · 발송</h3>
+                <button class="notif-edit-close" onclick="closeDraftReviewModal()">&times;</button>
+            </div>
+            <div class="notif-edit-body">
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span class="draft-badge-pending"><i class="fas fa-clock"></i> 승인대기</span>
+                    <span style="font-size:12px; color:#94a3b8;">${metaInfo}</span>
+                </div>
+                <div class="field">
+                    <label>제목</label>
+                    <input type="text" id="draftEditTitle" value="${escapeHtml(draft.title || '')}">
+                </div>
+                <div class="field">
+                    <label>본문 <span style="font-weight:400; color:#94a3b8;">(**볼드** · 줄바꿈 · 이모지 가능)</span></label>
+                    <div class="notif-editor-wrap">
+                        <div class="notif-editor-toolbar">
+                            <button type="button" title="볼드 (Ctrl+B)" onclick="toggleBold('draftEditMessage')"><b>B</b></button>
+                        </div>
+                        <textarea id="draftEditMessage" rows="16" style="min-height:400px;">${escapeHtml(draft.message || '')}</textarea>
+                    </div>
+                </div>
+                ${scoringHtml}
+            </div>
+            <div class="notif-edit-footer" style="gap:8px;">
+                <button class="btn-notif-cancel" onclick="closeDraftReviewModal()">취소</button>
+                <button class="btn-draft-save" id="draftSaveBtn" onclick="saveDraftOnly('${draft.id}')">
+                    <i class="fas fa-save"></i> 저장만
+                </button>
+                <button class="btn-draft-send" id="draftSendBtn" onclick="sendDraft('${draft.id}')">
+                    <i class="fas fa-paper-plane"></i> 발송
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeDraftReviewModal(); });
+    bindBoldShortcut('draftEditMessage');
+    document.getElementById('draftEditTitle').focus();
+}
+
+function closeDraftReviewModal() {
+    const modal = document.getElementById('draftReviewModal');
+    if (modal) modal.remove();
+}
+
+/**
+ * 초안 저장만 (발송하지 않고 제목/본문만 업데이트)
+ */
+async function saveDraftOnly(draftId) {
+    const title = document.getElementById('draftEditTitle').value.trim();
+    const message = document.getElementById('draftEditMessage').value.trim();
+    const btn = document.getElementById('draftSaveBtn');
+
+    if (!title) return alert('제목을 입력해주세요.');
+    if (!message) return alert('본문을 입력해주세요.');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+
+    try {
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, { title, message });
+
+        // 로컬 데이터 업데이트
+        const draft = weeklyCheckDrafts.find(d => d.id === draftId);
+        if (draft) {
+            draft.title = title;
+            draft.message = message;
+        }
+
+        alert('✅ 초안이 저장되었습니다.');
+        renderNotifList();
+        updateNotifCount();
+    } catch (err) {
+        console.error('초안 저장 실패:', err);
+        alert('❌ 저장 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> 저장만';
+    }
+}
+
+/**
+ * 초안 발송 (tr_notifications INSERT + draft status → sent)
+ */
+async function sendDraft(draftId) {
+    const titleEl = document.getElementById('draftEditTitle');
+    const messageEl = document.getElementById('draftEditMessage');
+    const btn = document.getElementById('draftSendBtn');
+
+    const title = titleEl ? titleEl.value.trim() : '';
+    const message = messageEl ? messageEl.value.trim() : '';
+
+    if (!title) return alert('제목을 입력해주세요.');
+    if (!message) return alert('본문을 입력해주세요.');
+
+    const draft = weeklyCheckDrafts.find(d => d.id === draftId);
+    if (!draft) return alert('초안을 찾을 수 없습니다.');
+
+    const studentName = studentData.user.name || '학생';
+    const weekLabel = draft.week ? ` ${draft.week}주차` : '';
+    if (!confirm(`"${studentName}"님에게${weekLabel} 주간체크를 발송하시겠습니까?`)) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 발송 중...';
+
+    try {
+        // 1. 먼저 수정사항이 있으면 draft에 저장
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, {
+            title: title,
+            message: message
+        });
+
+        // 2. tr_notifications에 INSERT
+        await supabaseAPI.post('tr_notifications', {
+            user_id: draft.user_id,
+            title: title,
+            message: message,
+            created_by: '이온쌤'
+        });
+
+        // 3. draft 상태를 sent로 변경
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, {
+            status: 'sent',
+            sent_at: new Date().toISOString()
+        });
+
+        // 4. 로컬 데이터에서 제거
+        weeklyCheckDrafts = weeklyCheckDrafts.filter(d => d.id !== draftId);
+
+        alert(`✅ "${studentName}"님에게${weekLabel} 주간체크 발송 완료!`);
+        closeDraftReviewModal();
+
+        // 5. 알림 목록 새로고침 (발송된 건이 발송 내역에 나타나도록)
+        await loadNotifications();
+    } catch (err) {
+        console.error('주간체크 발송 실패:', err);
+        alert('❌ 발송 실패: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> 발송';
+    }
+}
+
+/**
+ * 초안 삭제 (hardDelete)
+ */
+async function deleteDraft(draftId) {
+    if (!confirm('이 주간체크 초안을 삭제하시겠습니까?')) return;
+
+    try {
+        await supabaseAPI.hardDelete('tr_weekly_check_drafts', draftId);
+        weeklyCheckDrafts = weeklyCheckDrafts.filter(d => d.id !== draftId);
+        alert('✅ 초안 삭제 완료!');
+        await loadNotifications(); // 목록 새로고침
+    } catch (err) {
+        console.error('초안 삭제 실패:', err);
         alert('❌ 삭제 실패: ' + err.message);
     }
 }
