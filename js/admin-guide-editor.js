@@ -49,6 +49,38 @@ function initQuillEditor() {
         }
     });
 
+    // 이미지 붙여넣기/삽입 시 base64 → Storage 자동 업로드
+    quill.root.addEventListener('paste', () => {
+        // paste 후 DOM 업데이트를 기다린 뒤 변환
+        setTimeout(() => convertBase64Images(), 100);
+    });
+
+    // 툴바 이미지 버튼 커스텀 핸들러
+    const toolbar = quill.getModule('toolbar');
+    toolbar.addHandler('image', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async () => {
+            const file = input.files[0];
+            if (!file) return;
+            try {
+                setSaveStatus('saving', '이미지 업로드 중...');
+                const url = await uploadImageFile(file);
+                const range = quill.getSelection(true);
+                quill.insertEmbed(range.index, 'image', url);
+                quill.setSelection(range.index + 1);
+                setSaveStatus('saved', '이미지 업로드 완료');
+                setTimeout(() => setSaveStatus('saved', '최종 저장됨'), 2000);
+            } catch (e) {
+                console.error('Image upload failed:', e);
+                alert('❌ 이미지 업로드 실패: ' + e.message);
+                setSaveStatus('error', '이미지 업로드 실패');
+            }
+        };
+        input.click();
+    });
+
     // 실시간 미리보기 업데이트
     quill.on('text-change', () => {
         updatePreview();
@@ -124,8 +156,72 @@ function convertSectionsToHtml(sections) {
     }).join('');
 }
 
+// ===== 이미지 업로드 헬퍼 =====
+const STORAGE_BUCKET = 'guide-images';
+
+// File 객체를 Storage에 업로드
+async function uploadImageFile(file) {
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+    const url = `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': file.type,
+            'x-upsert': 'true'
+        },
+        body: file
+    });
+
+    if (!response.ok) {
+        let errMsg = `Storage Error: ${response.status}`;
+        try { const e = await response.json(); errMsg = e.message || e.error || errMsg; } catch(e) {}
+        throw new Error(errMsg);
+    }
+    return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
+}
+
+// 에디터 내 base64 이미지를 찾아서 Storage URL로 교체
+async function convertBase64Images() {
+    const imgs = quill.root.querySelectorAll('img[src^="data:"]');
+    if (imgs.length === 0) return;
+
+    setSaveStatus('saving', `이미지 변환 중... (0/${imgs.length})`);
+    let converted = 0;
+
+    for (const img of imgs) {
+        try {
+            const dataUri = img.src;
+            const mimeMatch = dataUri.match(/data:(.*?);/);
+            const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+            const extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+            const ext = extMap[mime] || 'png';
+            const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+            const publicUrl = await supabaseStorage.uploadBase64(STORAGE_BUCKET, path, dataUri);
+            img.src = publicUrl;
+            converted++;
+            setSaveStatus('saving', `이미지 변환 중... (${converted}/${imgs.length})`);
+        } catch (e) {
+            console.error('Image convert failed:', e);
+        }
+    }
+
+    if (converted > 0) {
+        setSaveStatus('saved', `이미지 ${converted}개 변환 완료`);
+        updatePreview();
+        setTimeout(() => setSaveStatus('saved', '최종 저장됨'), 2000);
+    }
+}
+
 // ===== 저장 =====
 async function saveGuide() {
+    // 저장 전 남아있는 base64 이미지 일괄 변환
+    await convertBase64Images();
+
     const html = quill.root.innerHTML;
 
     if (!html || html === '<p><br></p>') {

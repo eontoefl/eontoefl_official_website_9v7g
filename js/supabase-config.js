@@ -100,17 +100,22 @@ const supabaseAPI = {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                 'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
+                'Prefer': 'return=minimal'
             },
             body: JSON.stringify(data)
         });
         
         if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
+            let errMsg = `API Error: ${response.status}`;
+            try {
+                const errBody = await response.json();
+                errMsg = errBody.message || errBody.msg || errMsg;
+            } catch(e) { /* ignore parse error */ }
+            throw new Error(errMsg);
         }
         
-        const result = await response.json();
-        return result[0];
+        // return=minimal 은 body 없이 204를 반환
+        return { id };
     },
     
     // PUT: 데이터 전체 수정
@@ -181,6 +186,51 @@ const supabaseAPI = {
         }
         
         return await response.json();
+    }
+};
+
+// ===== Supabase Storage 헬퍼 =====
+const supabaseStorage = {
+    /**
+     * base64 데이터 URI를 Supabase Storage에 업로드하고 공개 URL을 반환
+     * @param {string} bucket - Storage 버킷 이름
+     * @param {string} path - 저장 경로 (예: 'guide-images/abc123.png')
+     * @param {string} base64DataUri - 'data:image/png;base64,iVBOR...' 형태의 문자열
+     * @returns {string} 공개 URL
+     */
+    async uploadBase64(bucket, path, base64DataUri) {
+        // data URI 파싱 → Blob 변환
+        const [meta, base64] = base64DataUri.split(',');
+        const mime = meta.match(/:(.*?);/)[1];
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mime });
+
+        const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': mime,
+                'x-upsert': 'true'      // 같은 이름 파일 덮어쓰기
+            },
+            body: blob
+        });
+
+        if (!response.ok) {
+            let errMsg = `Storage Upload Error: ${response.status}`;
+            try {
+                const errBody = await response.json();
+                errMsg = errBody.message || errBody.error || errMsg;
+            } catch(e) { /* ignore */ }
+            throw new Error(errMsg);
+        }
+
+        // 공개 URL 반환
+        return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
     }
 };
 
