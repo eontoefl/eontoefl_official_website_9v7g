@@ -7,6 +7,8 @@ let scheduleData = [];       // tr_schedule_assignment 전체
 let studyResultsV3 = [];     // study_results_v3 해당 학생
 let deadlineExtensionsData = []; // tr_deadline_extensions 해당 학생
 let weeklyCheckDrafts = [];  // tr_weekly_check_drafts 해당 학생 (승인대기 초안)
+let toeflScoresAdmin = [];   // toefl_actual_scores 해당 학생
+let toeflAdminChartInstance = null;
 
 // ===== 입문서 총 페이지 수 (추후 DB에서 자동 조회로 교체 예정) =====
 const INTRO_BOOK_TOTAL_PAGES = 300;
@@ -80,7 +82,7 @@ async function loadStudentDetail() {
         const studentUserId = studentData.user.id;
 
         // 병렬로 필요한 데이터 모두 로드
-        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult] = await Promise.all([
+        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult, toeflResult] = await Promise.all([
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
@@ -93,13 +95,19 @@ async function loadStudentDetail() {
                 'limit': '200'
             }),
             loadGradeRules(),
-            loadWeeklyCheckDrafts(studentUserId)
+            loadWeeklyCheckDrafts(studentUserId),
+            supabaseAPI.query('toefl_actual_scores', {
+                'user_id': `eq.${studentUserId}`,
+                'order': 'test_date.asc',
+                'limit': '100'
+            })
         ]);
 
         scheduleData = scheduleResult || [];
         studyResultsV3 = studyV3Result || [];
         deadlineExtensionsData = deadlineResult || [];
         weeklyCheckDrafts = draftsResult || [];
+        toeflScoresAdmin = toeflResult || [];
 
         // 렌더링
         loading.style.display = 'none';
@@ -110,6 +118,7 @@ async function loadStudentDetail() {
         renderV3SummaryCards();
         await renderStudyRecordTable();
         loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
+        renderToeflAdminSection();
 
     } catch (error) {
         console.error('Failed to load student detail:', error);
@@ -2457,3 +2466,330 @@ async function deleteDraft(draftId) {
         alert('❌ 삭제 실패: ' + err.message);
     }
 }
+
+// ===== 실제 TOEFL 성적 — 관리자 뷰 =====
+
+function renderToeflAdminSection() {
+    var section = document.getElementById('toeflAdminSection');
+    if (!section) return;
+
+    section.style.display = 'block';
+    renderToeflAdminBadge();
+    renderToeflAdminTable();
+    renderToeflAdminChart();
+}
+
+function renderToeflAdminBadge() {
+    var el = document.getElementById('toeflAdminBadge');
+    if (!el) return;
+    var count = toeflScoresAdmin.length;
+
+    if (count === 0) {
+        el.innerHTML = '<span class="toefl-admin-badge toefl-badge-warning">' +
+            '<i class="fas fa-exclamation-circle"></i> 미등록 (0/2)</span>';
+    } else if (count === 1) {
+        el.innerHTML = '<span class="toefl-admin-badge toefl-badge-caution">' +
+            '<i class="fas fa-clock"></i> 1/2 등록</span>';
+    } else {
+        el.innerHTML = '<span class="toefl-admin-badge toefl-badge-complete">' +
+            '<i class="fas fa-check-circle"></i> ' + count + '회 등록 완료</span>';
+    }
+}
+
+function renderToeflAdminTable() {
+    var wrap = document.getElementById('toeflAdminTableWrap');
+    if (!wrap) return;
+
+    if (toeflScoresAdmin.length === 0) {
+        wrap.innerHTML = '<div class="toefl-admin-empty">' +
+            '<i class="fas fa-file-circle-plus"></i>' +
+            '<p>등록된 TOEFL 성적이 없습니다</p>' +
+            '</div>';
+        return;
+    }
+
+    var sorted = toeflScoresAdmin.slice();
+
+    var html = '<table class="toefl-admin-table"><thead><tr>' +
+        '<th>회차</th><th>시험일</th>' +
+        '<th>R</th><th>L</th><th>S</th><th>W</th>' +
+        '<th>Overall</th><th>변화</th>' +
+        '<th>0-120</th><th>메모</th><th>성적표</th>' +
+        '</tr></thead><tbody>';
+
+    sorted.forEach(function(s, idx) {
+        var d = new Date(s.test_date + 'T00:00:00');
+        var dateStr = d.getFullYear() + '.' +
+            String(d.getMonth() + 1).padStart(2, '0') + '.' +
+            String(d.getDate()).padStart(2, '0');
+        var order = (idx + 1) + '회차';
+
+        var changeHtml = '<span class="toefl-change-neutral">-</span>';
+        if (idx > 0) {
+            var prevOverall = Number(sorted[idx - 1].overall);
+            var currOverall = Number(s.overall);
+            var diff = currOverall - prevOverall;
+            if (diff > 0) {
+                changeHtml = '<span class="toefl-change-positive">' +
+                    '<i class="fas fa-arrow-up"></i> +' + diff.toFixed(1) + '</span>';
+            } else if (diff < 0) {
+                changeHtml = '<span class="toefl-change-negative">' +
+                    '<i class="fas fa-arrow-down"></i> ' + diff.toFixed(1) + '</span>';
+            } else {
+                changeHtml = '<span class="toefl-change-neutral">→ 0</span>';
+            }
+        }
+
+        var legacyStr = s.legacy_total ? s.legacy_total + '/120' : '-';
+        var memoStr = s.memo ? escapeHtml(s.memo) : '-';
+        var imageBtn = s.score_image
+            ? '<button class="btn-toefl-image" onclick="openToeflViewer(\'' +
+              s.score_image + '\')"><i class="fas fa-image"></i> 보기</button>'
+            : '-';
+
+        html += '<tr>' +
+            '<td><span style="background:#ede9fe; color:#7c3aed; padding:2px 8px; border-radius:4px; font-weight:700; font-size:11px;">' + order + '</span></td>' +
+            '<td style="font-weight:600;">' + dateStr + '</td>' +
+            '<td class="toefl-score-cell">' + Number(s.reading).toFixed(1) + '</td>' +
+            '<td class="toefl-score-cell">' + Number(s.listening).toFixed(1) + '</td>' +
+            '<td class="toefl-score-cell">' + Number(s.speaking).toFixed(1) + '</td>' +
+            '<td class="toefl-score-cell">' + Number(s.writing).toFixed(1) + '</td>' +
+            '<td class="toefl-overall-cell">' + Number(s.overall).toFixed(1) + '</td>' +
+            '<td>' + changeHtml + '</td>' +
+            '<td style="color:#64748b; font-size:12px;">' + legacyStr + '</td>' +
+            '<td style="font-size:12px; color:#64748b; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + memoStr + '">' + memoStr + '</td>' +
+            '<td>' + imageBtn + '</td>' +
+            '</tr>';
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+function renderToeflAdminChart() {
+    var container = document.getElementById('toeflAdminChartContainer');
+    var canvas = document.getElementById('toeflAdminChart');
+    if (!container || !canvas) return;
+
+    if (toeflScoresAdmin.length < 1) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+
+    var sorted = toeflScoresAdmin.slice();
+    var labels = [];
+    var readingData = [], listeningData = [], speakingData = [], writingData = [], overallData = [];
+
+    sorted.forEach(function(s) {
+        var d = new Date(s.test_date + 'T00:00:00');
+        labels.push((d.getMonth() + 1) + '/' + d.getDate());
+        readingData.push(Number(s.reading));
+        listeningData.push(Number(s.listening));
+        speakingData.push(Number(s.speaking));
+        writingData.push(Number(s.writing));
+        overallData.push(Number(s.overall));
+    });
+
+    var annotations = {};
+    if (studentData && studentData.app && studentData.app.schedule_start) {
+        var sd = new Date(studentData.app.schedule_start + 'T00:00:00');
+        var startLabel = (sd.getMonth() + 1) + '/' + sd.getDate();
+
+        var existingIdx = labels.indexOf(startLabel);
+        if (existingIdx === -1) {
+            var startTime = sd.getTime();
+            var insertIdx = 0;
+            for (var i = 0; i < sorted.length; i++) {
+                var td = new Date(sorted[i].test_date + 'T00:00:00');
+                if (td.getTime() < startTime) {
+                    insertIdx = i + 1;
+                } else {
+                    break;
+                }
+            }
+            labels.splice(insertIdx, 0, startLabel);
+            readingData.splice(insertIdx, 0, null);
+            listeningData.splice(insertIdx, 0, null);
+            speakingData.splice(insertIdx, 0, null);
+            writingData.splice(insertIdx, 0, null);
+            overallData.splice(insertIdx, 0, null);
+        }
+
+        annotations.challengeStart = {
+            type: 'line',
+            xMin: startLabel,
+            xMax: startLabel,
+            borderColor: 'rgba(124, 58, 237, 0.5)',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            label: {
+                display: true,
+                content: '챌린지 시작',
+                position: 'start',
+                backgroundColor: 'rgba(124, 58, 237, 0.85)',
+                color: '#fff',
+                font: { size: 11, weight: '600', family: 'Noto Sans KR' },
+                padding: { x: 8, y: 4 },
+                borderRadius: 6
+            }
+        };
+    }
+
+    if (toeflAdminChartInstance) {
+        toeflAdminChartInstance.destroy();
+    }
+
+    toeflAdminChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Overall',
+                    data: overallData,
+                    borderColor: '#7c3aed',
+                    backgroundColor: 'rgba(124, 58, 237, 0.04)',
+                    borderWidth: 3,
+                    pointRadius: 6,
+                    pointBackgroundColor: '#7c3aed',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 8,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: true,
+                    order: 0
+                },
+                {
+                    label: 'Reading',
+                    data: readingData,
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: true,
+                    order: 1
+                },
+                {
+                    label: 'Listening',
+                    data: listeningData,
+                    borderColor: '#22c55e',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#22c55e',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: true,
+                    order: 2
+                },
+                {
+                    label: 'Speaking',
+                    data: speakingData,
+                    borderColor: '#f59e0b',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#f59e0b',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: true,
+                    order: 3
+                },
+                {
+                    label: 'Writing',
+                    data: writingData,
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ef4444',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: true,
+                    order: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 16,
+                        font: { size: 12, weight: '600', family: 'Noto Sans KR' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    titleFont: { size: 13, weight: '600', family: 'Noto Sans KR' },
+                    bodyFont: { size: 13, family: 'Noto Sans KR' },
+                    padding: 12,
+                    cornerRadius: 10,
+                    displayColors: true,
+                    callbacks: {
+                        label: function(ctx) {
+                            if (ctx.raw === null) return null;
+                            return ' ' + ctx.dataset.label + ': ' + ctx.raw.toFixed(1);
+                        }
+                    }
+                },
+                annotation: { annotations: annotations }
+            },
+            scales: {
+                y: {
+                    min: 1.0,
+                    max: 6.0,
+                    ticks: {
+                        stepSize: 0.5,
+                        callback: function(v) { return v.toFixed(1); },
+                        font: { size: 12, weight: '500', family: 'Noto Sans KR' },
+                        color: '#94a3b8'
+                    },
+                    grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
+                    border: { display: false }
+                },
+                x: {
+                    ticks: {
+                        font: { size: 12, weight: '600', family: 'Noto Sans KR' },
+                        color: '#64748b'
+                    },
+                    grid: { display: false },
+                    border: { display: false }
+                }
+            },
+            interaction: { intersect: false, mode: 'index' }
+        }
+    });
+}
+
+// ===== 이미지 뷰어 =====
+function openToeflViewer(imageUrl) {
+    var overlay = document.getElementById('toeflViewerOverlay');
+    var img = document.getElementById('toeflViewerImg');
+    if (overlay && img) {
+        img.src = imageUrl;
+        overlay.classList.add('active');
+    }
+}
+function closeToeflViewer() {
+    var overlay = document.getElementById('toeflViewerOverlay');
+    if (overlay) overlay.classList.remove('active');
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeToeflViewer();
+});
