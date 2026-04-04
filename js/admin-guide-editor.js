@@ -140,7 +140,7 @@ async function saveGuide() {
         const guideData = {
             html: html,
             content: { html: html },  // 호환성
-            updated_at: new Date().toISOString(),
+            updated_at: Date.now(),
             updated_by: userData.email
         };
 
@@ -164,7 +164,7 @@ async function saveGuide() {
         const versionData = {
             html: html,
             content: { html: html },
-            created_at: new Date().toISOString(),
+            created_at: Date.now(),
             created_by: userData.email
         };
         await supabaseAPI.post('guide_versions', versionData);
