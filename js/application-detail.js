@@ -1051,6 +1051,15 @@ async function submitStudentAgreement() {
             throw new Error('Failed to submit agreement');
         }
         
+        // 텔레그램 알림: 2번 - 학생 프로그램 동의 완료
+        try {
+            await sendEdgeFunctionNotify('student_agreed', {
+                name: currentApplication.name,
+                program: currentApplication.assigned_program || currentApplication.preferred_program,
+                app_id: currentApplication.id
+            });
+        } catch (e) { console.warn('텔레그램 알림 실패:', e); }
+
         const hasContract = agreementData.contract_sent;
         alert(hasContract 
             ? '✅ 동의가 완료되었습니다!\n\n계약서가 자동으로 발송되었습니다.\n계약서 내용을 확인해주세요.' 
@@ -2122,6 +2131,15 @@ async function submitContractAgreement() {
 
         globalApplication = updatedApp;
 
+        // 텔레그램 알림: 3번 - 계약서 서명 완료
+        try {
+            await sendEdgeFunctionNotify('contract_signed', {
+                name: globalApplication.name,
+                program: globalApplication.assigned_program || globalApplication.preferred_program,
+                app_id: globalApplication.id
+            });
+        } catch (e) { console.warn('텔레그램 알림 실패:', e); }
+
         alert('✅ 계약 동의가 완료되었습니다!\n\n입금 안내로 자동 진행됩니다.');
         
         // Step 4 (입금 탭)로 이동
@@ -2545,6 +2563,15 @@ async function confirmDeposit() {
 
         globalApplication = updatedApp;
 
+        // 텔레그램 알림: 4번 - 입금 완료 (콜백 버튼 포함)
+        try {
+            await sendEdgeFunctionNotify('deposit_claimed', {
+                name: globalApplication.name,
+                depositor_name: depositorName,
+                app_id: globalApplication.id
+            });
+        } catch (e) { console.warn('텔레그램 알림 실패:', e); }
+
         alert('✅ 입금 완료 알림이 전송되었습니다!\n\n관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.');
         
         // 페이지 새로고침
@@ -2904,4 +2931,17 @@ async function startChallenge() {
         console.error('Start challenge error:', error);
         alert('❌ 오류가 발생했습니다.');
     }
+}
+
+// ==================== 텔레그램 알림 (Edge Function 경유) ====================
+
+async function sendEdgeFunctionNotify(type, data) {
+    await fetch(`${SUPABASE_URL}/functions/v1/telegram-notify`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ type, data })
+    });
 }
