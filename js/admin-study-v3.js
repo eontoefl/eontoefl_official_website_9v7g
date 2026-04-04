@@ -105,7 +105,18 @@ async function loadStudyData() {
             v3Map[r.user_id].push(r);
         });
 
-        // 7. 등급 규칙 로드
+        // 7. 토플 실제 성적 로드
+        const toeflScores = await supabaseAPI.query('toefl_actual_scores', {
+            'select': 'user_id',
+            'limit': '5000'
+        });
+        const toeflCountMap = {};
+        (toeflScores || []).forEach(s => {
+            if (!toeflCountMap[s.user_id]) toeflCountMap[s.user_id] = 0;
+            toeflCountMap[s.user_id]++;
+        });
+
+        // 8. 등급 규칙 로드
         const gradeRules = await loadGradeRules();
 
         // 7. 학생별 데이터 조합
@@ -280,7 +291,8 @@ async function loadStudyData() {
                 hasFraud,
                 scheduleStart: app.schedule_start,
                 scheduleEnd: app.schedule_end,
-                appStatus: app.app_status || null
+                appStatus: app.app_status || null,
+                toeflCount: toeflCountMap[userId] || 0
             };
         }).filter(Boolean);
 
@@ -465,6 +477,7 @@ function renderTable() {
                     </span>
                 </td>
                 <td>${lastActivityText}</td>
+                <td style="text-align: center;">${getToeflBadge(s.toeflCount)}</td>
                 <td>
                     <button onclick="window.location.href='admin-study-detail-v3.html?id=${s.userId}'" 
                             style="background:#7c3aed; color:white; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">
@@ -614,5 +627,19 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
                 </button>
             </div>
         `).join('');
+    }
+}
+
+// ===== 토플 응시 배지 =====
+function getToeflBadge(count) {
+    if (count === 0) {
+        return '<span style="display:inline-flex; align-items:center; gap:4px; background:#fef2f2; color:#ef4444; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;">' +
+            '<i class="fas fa-exclamation-circle"></i> 0/2</span>';
+    } else if (count === 1) {
+        return '<span style="display:inline-flex; align-items:center; gap:4px; background:#fffbeb; color:#d97706; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;">' +
+            '<i class="fas fa-clock"></i> 1/2</span>';
+    } else {
+        return '<span style="display:inline-flex; align-items:center; gap:4px; background:#dcfce7; color:#16a34a; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;">' +
+            '<i class="fas fa-check-circle"></i> ' + count + '/2</span>';
     }
 }

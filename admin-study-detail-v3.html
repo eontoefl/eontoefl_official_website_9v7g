@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/admin.css">
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"></script>
     <style>
         /* ===== V3 요약 카드 영역 ===== */
         .v3-cards-grid {
@@ -695,6 +697,82 @@
         }
         .detail-summary strong { color: #1e293b; }
 
+        /* ===== 실제 TOEFL 성적 섹션 ===== */
+        .toefl-admin-container {
+            background: white; border-radius: 12px; padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        .toefl-admin-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+        }
+        .toefl-admin-title {
+            font-size: 16px; font-weight: 700; color: #1e293b;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .toefl-admin-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 700;
+        }
+        .toefl-badge-warning { background: #fef2f2; color: #ef4444; }
+        .toefl-badge-caution { background: #fffbeb; color: #d97706; }
+        .toefl-badge-complete { background: #dcfce7; color: #16a34a; }
+
+        .toefl-admin-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .toefl-admin-table th {
+            text-align: left; padding: 10px 12px; background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0; color: #64748b;
+            font-weight: 600; font-size: 12px;
+        }
+        .toefl-admin-table td {
+            padding: 12px; border-bottom: 1px solid #f1f5f9; color: #334155;
+        }
+        .toefl-admin-table tr:hover { background: #faf5ff; }
+
+        .toefl-score-cell { font-weight: 700; font-size: 14px; }
+        .toefl-overall-cell { font-weight: 800; font-size: 15px; color: #7c3aed; }
+        .toefl-change-positive { color: #22c55e; font-size: 11px; font-weight: 700; }
+        .toefl-change-negative { color: #ef4444; font-size: 11px; font-weight: 700; }
+        .toefl-change-neutral { color: #94a3b8; font-size: 11px; font-weight: 600; }
+
+        .btn-toefl-image {
+            background: #eff6ff; color: #3b82f6; border: 1px solid #93c5fd;
+            border-radius: 6px; padding: 4px 10px; cursor: pointer;
+            font-size: 11px; font-weight: 600; white-space: nowrap;
+        }
+        .btn-toefl-image:hover { background: #dbeafe; }
+
+        .toefl-chart-container {
+            margin-top: 20px; padding: 20px;
+            background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;
+        }
+        .toefl-chart-title {
+            font-size: 14px; font-weight: 700; color: #475569; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .toefl-chart-wrap { position: relative; height: 280px; }
+
+        .toefl-admin-empty {
+            text-align: center; padding: 40px 20px; color: #94a3b8;
+        }
+        .toefl-admin-empty i { font-size: 32px; margin-bottom: 12px; display: block; }
+        .toefl-admin-empty p { font-size: 14px; margin: 0; }
+
+        .toefl-viewer-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.75); align-items: center;
+            justify-content: center; padding: 24px; cursor: zoom-out;
+        }
+        .toefl-viewer-overlay.active { display: flex; }
+        .toefl-viewer-overlay img {
+            max-width: 90%; max-height: 85vh; border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); object-fit: contain;
+        }
+
         @media (max-width: 768px) {
             .student-profile-header { flex-direction: column; text-align: center; }
             .student-profile-header .info .meta { justify-content: center; }
@@ -831,6 +909,31 @@
                         <div class="card-prestart-msg"><i class="fas fa-spinner fa-spin"></i> 로딩 중...</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- ===== 실제 TOEFL 성적 ===== -->
+            <div class="toefl-admin-container" id="toeflAdminSection" style="display:none;">
+                <div class="toefl-admin-header">
+                    <div class="toefl-admin-title">
+                        <i class="fas fa-file-alt" style="color: #7c3aed;"></i>
+                        실제 TOEFL 성적
+                    </div>
+                    <div id="toeflAdminBadge"></div>
+                </div>
+                <div id="toeflAdminTableWrap"></div>
+                <div class="toefl-chart-container" id="toeflAdminChartContainer" style="display:none;">
+                    <div class="toefl-chart-title">
+                        <i class="fas fa-chart-line"></i> 성적 추이
+                    </div>
+                    <div class="toefl-chart-wrap">
+                        <canvas id="toeflAdminChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 이미지 뷰어 -->
+            <div class="toefl-viewer-overlay" id="toeflViewerOverlay" onclick="closeToeflViewer()">
+                <img id="toeflViewerImg" src="" alt="성적표" />
             </div>
 
             <!-- 📅 데드라인 연장 관리 -->

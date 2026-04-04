@@ -37,6 +37,9 @@ async function loadDashboardData() {
         document.getElementById('recentLoading').style.display = 'none';
         document.getElementById('recentEmpty').style.display = 'block';
     }
+
+    // 토플 성적 알림 — 독립 호출 (try-catch 바깥)
+    loadToeflAlerts();
 }
 
 // 통계 업데이트
@@ -230,6 +233,74 @@ function filterByStatus(status) {
     }
 }
 
+// ===== 토플 성적 등록 알림 =====
+async function loadToeflAlerts() {
+    try {
+        // created_at is bigint (Date.now()), so compare with numeric timestamp
+        var sevenDaysAgoMs = Date.now() - (7 * 24 * 60 * 60 * 1000);
+
+        var scores = await supabaseAPI.query('toefl_actual_scores', {
+            'created_at': 'gte.' + sevenDaysAgoMs,
+            'order': 'created_at.desc',
+            'limit': '20'
+        });
+
+        if (!scores || scores.length === 0) return;
+
+        var card = document.getElementById('toeflAlertCard');
+        var badge = document.getElementById('toeflAlertBadge');
+        var list = document.getElementById('toeflAlertList');
+
+        card.style.display = 'block';
+        badge.textContent = scores.length;
+
+        list.innerHTML = scores.map(function(s) {
+            var d = new Date(s.created_at);
+            var timeStr = d.getFullYear() + '.' +
+                String(d.getMonth() + 1).padStart(2, '0') + '.' +
+                String(d.getDate()).padStart(2, '0') + ' ' +
+                String(d.getHours()).padStart(2, '0') + ':' +
+                String(d.getMinutes()).padStart(2, '0');
+
+            var testD = new Date(s.test_date + 'T00:00:00');
+            var testDateStr = testD.getFullYear() + '.' +
+                String(testD.getMonth() + 1).padStart(2, '0') + '.' +
+                String(testD.getDate()).padStart(2, '0');
+
+            return '<div style="display:flex; align-items:center; justify-content:space-between; ' +
+                'padding:14px 16px; border-left:4px solid #7c3aed; background:#faf5ff; ' +
+                'border-radius:0 8px 8px 0; margin-bottom:8px;">' +
+                '<div style="flex:1;">' +
+                    '<div style="font-size:14px; font-weight:600; color:#1e293b;">' +
+                        '\ud83d\udcca ' + escapeHtml(s.user_name || '\ud559\uc0dd') +
+                        '\ub2d8\uc774 TOEFL \uc131\uc801\uc744 \ub4f1\ub85d\ud588\uc2b5\ub2c8\ub2e4' +
+                    '</div>' +
+                    '<div style="font-size:12px; color:#64748b; margin-top:4px;">' +
+                        '\uc2dc\ud5d8\uc77c: ' + testDateStr +
+                        ' | R ' + Number(s.reading).toFixed(1) +
+                        ' / L ' + Number(s.listening).toFixed(1) +
+                        ' / S ' + Number(s.speaking).toFixed(1) +
+                        ' / W ' + Number(s.writing).toFixed(1) +
+                        ' / <strong style="color:#7c3aed;">Overall ' +
+                        Number(s.overall).toFixed(1) + '</strong>' +
+                        ' | \ub4f1\ub85d: ' + timeStr +
+                    '</div>' +
+                '</div>' +
+                '<button onclick="window.location.href=\'admin-study-detail-v3.html?id=' +
+                    s.user_id + '\'" ' +
+                    'style="background:white; border:1px solid #e2e8f0; padding:6px 12px; ' +
+                    'border-radius:6px; cursor:pointer; font-size:12px; color:#475569; ' +
+                    'font-weight:500; white-space:nowrap; margin-left:12px;">' +
+                    '\ud559\uc0dd \ubcf4\uae30 <i class="fas fa-chevron-right" style="font-size:10px;"></i>' +
+                '</button>' +
+            '</div>';
+        }).join('');
+
+    } catch (err) {
+        console.warn('\ud1a0\ud50c \uc54c\ub9bc \ub85c\ub4dc \uc2e4\ud328:', err);
+    }
+}
+
 // 단계별 통계 표시
 function displayStepStatistics(stepCount, applications) {
     const stepNames = {
@@ -245,7 +316,8 @@ function displayStepStatistics(stepCount, applications) {
         10: '챌린지시작'
     };
     
-    // 긴급 카드 다음에 단계별 통계 카드 추가
+    // 토플 알림 카드 다음에 단계별 통계 카드 추가
+    const toeflCard = document.getElementById('toeflAlertCard');
     const urgentCard = document.getElementById('urgentCard');
     
     // 기존 단계별 카드가 있으면 제거
@@ -303,11 +375,13 @@ function displayStepStatistics(stepCount, applications) {
         </div>
     `;
     
-    // 긴급 카드 다음에 삽입
-    if (urgentCard && urgentCard.style.display !== 'none') {
+    // 토플 알림 카드 다음에 삽입 (순서: 긴급 → 토플알림 → 단계별 → 최근신청서)
+    if (toeflCard) {
+        toeflCard.insertAdjacentHTML('afterend', stepStatsHTML);
+    } else if (urgentCard) {
         urgentCard.insertAdjacentHTML('afterend', stepStatsHTML);
     } else {
-        // 긴급 카드가 없으면 최근 신청서 카드 앞에 삽입
+        // 둘 다 없으면 최근 신청서 카드 앞에 삽입
         const recentCard = document.querySelector('.admin-card:last-of-type');
         if (recentCard) {
             recentCard.insertAdjacentHTML('beforebegin', stepStatsHTML);
