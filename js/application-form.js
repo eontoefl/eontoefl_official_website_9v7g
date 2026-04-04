@@ -1025,28 +1025,24 @@ function setupDateDropdowns() {
     });
 }
 
-// ==================== 텔레그램 알림 ====================
+// ==================== 텔레그램 알림 (Edge Function 경유) ====================
 
 async function sendTelegramNotification(formData) {
-    const BOT_TOKEN = '8429679066:AAGRxlntlVcu8C8Y2ZEzdiGg0WCFKlSdSis';
-    const CHAT_ID = '1753336274';
-
-    const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-    const text = `📋 새 신청서 접수!\n\n` +
-        `👤 이름: ${formData.name || '-'}\n` +
-        `📧 이메일: ${formData.email || '-'}\n` +
-        `📱 전화: ${formData.phone || '-'}\n` +
-        `🎯 목표: ${formData.target_score || '-'}점\n` +
-        `📚 희망 프로그램: ${formData.preferred_program || '-'}\n` +
-        `🕐 접수 시간: ${now}`;
-
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    await fetch(`${SUPABASE_URL}/functions/v1/telegram-notify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
         body: JSON.stringify({
-            chat_id: CHAT_ID,
-            text: text,
-            parse_mode: 'HTML'
+            type: 'new_application',
+            data: {
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+                target_score: formData.target_score,
+                preferred_program: formData.preferred_program
+            }
         })
     });
 }
