@@ -94,9 +94,9 @@ async function loadStudyData() {
             scheduleLookup[prog][`${s.week}_${s.day}`] = taskCount;
         });
 
-        // 6. study_results_v3 (V3 인증률 계산용)
+        // 6. study_results_v3 (V3 인증률 계산용 + 알림판 연속미제출 판정용)
         const v3Records = await supabaseAPI.query('study_results_v3', {
-            'select': 'user_id,locked_auth_rate,initial_record,error_note_submitted',
+            'select': 'user_id,locked_auth_rate,initial_record,error_note_submitted,section_type,week,day,completed_at',
             'limit': '10000'
         });
         const v3Map = {};
@@ -244,25 +244,55 @@ async function loadStudyData() {
                 }
             }
 
-            // ── 최근 활동 ──
-            const lastActivity = myRecords.length > 0
-                ? Math.max(...myRecords.map(r => new Date(r.completed_at).getTime()))
+            // ── 최근 활동 (study_results_v3 기반) ──
+            const v3Completed = myV3.filter(r => r.completed_at).map(r => new Date(r.completed_at).getTime());
+            const lastActivity = v3Completed.length > 0
+                ? Math.max(...v3Completed)
                 : null;
             const daysSinceActivity = lastActivity
                 ? Math.floor((today - lastActivity) / (1000 * 60 * 60 * 24))
                 : 999;
 
-            // ── 연속 미제출 일수 ──
+            // ── 연속 미제출 일수 (study_results_v3 + 스케줄 기반, 알림판과 동일 기준) ──
+            // v3 제출 Set 구성
+            const myV3Submitted = new Set();
+            myV3.forEach(r => {
+                if (r.initial_record) myV3Submitted.add(`${r.section_type}|${r.week}|${r.day}`);
+            });
+
+            const dayEngToKrLocal = { 'sunday': '일', 'monday': '월', 'tuesday': '화', 'wednesday': '수', 'thursday': '목', 'friday': '금', 'saturday': '토' };
+
+            // 스케줄에서 이 학생의 날짜별 과제 그룹핑
+            const myTasksByDate = {};
+            (scheduleData || []).forEach(sched => {
+                if ((sched.program || '').toLowerCase() !== prog) return;
+                if (sched.week > totalWeeks) return;
+                const dayIndex = dayEngNames.indexOf(sched.day);
+                if (dayIndex < 0) return;
+                const taskDate = new Date(startDate);
+                taskDate.setDate(taskDate.getDate() + (sched.week - 1) * 7 + dayIndex);
+                if (taskDate >= today) return;
+                if (taskDate < startDate) return;
+                const dateStr = taskDate.toISOString().split('T')[0];
+                const dayKr = dayEngToKrLocal[sched.day];
+                for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
+                    const parsed = parseScheduleSection(sec);
+                    if (!parsed || parsed.taskType === 'unknown') continue;
+                    if (!myTasksByDate[dateStr]) myTasksByDate[dateStr] = [];
+                    myTasksByDate[dateStr].push({ sectionType: parsed.taskType, week: sched.week, dayKr });
+                }
+            });
+
             let consecutiveMissing = 0;
-            for (let d = 1; d <= 7; d++) {
+            for (let d = 1; d <= 14; d++) {
                 const checkDate = new Date(today);
                 checkDate.setDate(checkDate.getDate() - d);
                 if (checkDate < startDate) break;
-                const checkDay = checkDate.getDay();
-                if (checkDay === 6) continue;
                 const dateStr = checkDate.toISOString().split('T')[0];
-                const hasRecord = myRecords.some(r => new Date(r.completed_at).toISOString().split('T')[0] === dateStr);
-                if (!hasRecord) consecutiveMissing++;
+                const dayTasks = myTasksByDate[dateStr];
+                if (!dayTasks || dayTasks.length === 0) continue; // 과제 없는 날은 스킵
+                const hasAny = dayTasks.some(t => myV3Submitted.has(`${t.sectionType}|${t.week}|${t.dayKr}`));
+                if (!hasAny) consecutiveMissing++;
                 else break;
             }
 
@@ -299,8 +329,8 @@ async function loadStudyData() {
         // 통계 카드 업데이트
         updateStatCards(allStudentData, allAuthRecords);
 
-        // 알림판 업데이트
-        updateAlertBoard(allStudentData, allRecords, allAuthRecords);
+        // 알림판 업데이트 (study_results_v3 + 스케줄 기반)
+        updateAlertBoard(allStudentData, v3Records, scheduleData);
 
         // 필터 적용 및 렌더링
         applyFilters();
@@ -514,96 +544,121 @@ function getDayName(dateStr) {
     return days[new Date(dateStr).getDay()] + '요일';
 }
 
-// ===== 오늘의 알림판 =====
-function updateAlertBoard(students, allRecords, allAuthRecords) {
+// ===== 오늘의 알림판 (study_results_v3 + 스케줄 기반) =====
+function updateAlertBoard(students, v3Records, scheduleData) {
     const alertList = document.getElementById('alertList');
     const alertBadge = document.getElementById('alertBadge');
     const alerts = [];
 
-    const yesterday = getYesterdayDateKST();
-    const yesterdayDay = new Date(yesterday).getDay();
-
-    const isWeekday = yesterdayDay !== 6;
-
-    const now = new Date();
-    const oneDayAgoMs = now.getTime() - 24 * 60 * 60 * 1000;
+    const today = getEffectiveToday();
+    const dayEngNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
     // 테스트 계정 제외
     const TEST_ACCOUNTS = ['홍길동', '김철수'];
 
-    // 진행 중인 학생만 (종료/환불/중도포기 제외)
+    // study_results_v3를 user_id별 → (section_type|week|day) Set으로 구성
+    // initial_record가 존재하면 "제출한 것"으로 판정 (상세 페이지와 동일 기준)
+    const v3SubmittedMap = {};
+    (v3Records || []).forEach(r => {
+        if (!r.initial_record) return;
+        if (!v3SubmittedMap[r.user_id]) v3SubmittedMap[r.user_id] = new Set();
+        v3SubmittedMap[r.user_id].add(`${r.section_type}|${r.week}|${r.day}`);
+    });
+
+    // 진행 중인 학생만 (종료/환불/중도포기/미시작 제외)
     const activeStudents = students.filter(s => {
         const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
-        return !ls || (ls.key !== 'completed' && ls.key !== 'refunded' && ls.key !== 'dropped');
+        if (ls && (ls.key === 'completed' || ls.key === 'refunded' || ls.key === 'dropped')) return false;
+        // 미시작 제외
+        const startDate = new Date(s.scheduleStart);
+        if (today < startDate) return false;
+        return true;
     });
 
     activeStudents.forEach(s => {
         if (TEST_ACCOUNTS.includes(s.name)) return;
 
-        const myRecords = allRecords.filter(r => r.user_id === s.userId);
-        const myAuthRecords = allAuthRecords.filter(r => r.user_id === s.userId);
+        const startDate = new Date(s.scheduleStart);
+        const prog = s.programType.toLowerCase();
+        const submitted = v3SubmittedMap[s.userId] || new Set();
 
-        // --- 🚨 Fraud 감지 (최근 24시간) ---
-        const recentFraud = myAuthRecords.filter(r => {
-            const t = new Date(r.created_at).getTime();
-            return t >= oneDayAgoMs && r.fraud_flag;
-        });
-        recentFraud.forEach(fr => {
-            const detail = [];
-            if (fr.no_text_flag) detail.push('텍스트 미입력');
-            if (fr.no_selection_flag) detail.push('선택지 미선택');
-            if (fr.focus_lost_count > 3) detail.push(`창 이탈 ${fr.focus_lost_count}회`);
-            alerts.push({
-                priority: 1,
-                type: 'fraud',
-                color: '#ef4444',
-                icon: '🚨',
-                title: `${s.name} - ${detail.join(', ') || 'Fraud 감지'}`,
-                subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | fraud_flag = true`,
-                userId: s.userId
-            });
-        });
+        // 한글 요일 매핑 (study_results_v3의 day 컬럼은 한글)
+        const dayEngToKr = { 'sunday': '일', 'monday': '월', 'tuesday': '화', 'wednesday': '수', 'thursday': '목', 'friday': '금', 'saturday': '토' };
 
-        // --- 🟠 연속 미제출 2일+ (이탈 위험) ---
-        if (s.consecutiveMissing >= 2) {
-            const missedDays = [];
-            const startDate = new Date(s.scheduleStart);
-            for (let d = 1; d <= s.consecutiveMissing + 3; d++) {
-                const checkDate = new Date(now);
-                checkDate.setDate(checkDate.getDate() - d);
-                if (checkDate < startDate) break;
-                const checkDay = checkDate.getDay();
-                if (checkDay === 6 || checkDay === 0) continue;
-                const dateStr = checkDate.toISOString().split('T')[0];
-                const hasRecord = myRecords.some(r => new Date(r.completed_at).toISOString().split('T')[0] === dateStr);
-                if (!hasRecord) missedDays.push(getDayName(dateStr).replace('요일', ''));
-                else break;
+        // 스케줄에서 해당 프로그램의 과제를 날짜별로 그룹핑
+        // key: 'YYYY-MM-DD' → [{ section_type, week, dayKr }]
+        const tasksByDate = {};
+        (scheduleData || []).forEach(sched => {
+            if ((sched.program || '').toLowerCase() !== prog) return;
+            if (sched.week > s.totalWeeks) return;
+            const dayIndex = dayEngNames.indexOf(sched.day);
+            if (dayIndex < 0) return;
+            const taskDate = new Date(startDate);
+            taskDate.setDate(taskDate.getDate() + (sched.week - 1) * 7 + dayIndex);
+            if (taskDate >= today) return;  // 오늘 이후는 제외
+            if (taskDate < startDate) return;
+            const dateStr = taskDate.toISOString().split('T')[0];
+            const dayKr = dayEngToKr[sched.day];
+            for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
+                const parsed = parseScheduleSection(sec);
+                if (!parsed || parsed.taskType === 'unknown') continue;
+                if (!tasksByDate[dateStr]) tasksByDate[dateStr] = { tasks: [], dayKr, week: sched.week };
+                tasksByDate[dateStr].tasks.push({ sectionType: parsed.taskType, week: sched.week, dayKr });
             }
-            if (missedDays.length >= 2) {
-                alerts.push({
-                    priority: 2,
-                    type: 'consecutive',
-                    color: '#f59e0b',
-                    icon: '⚠️',
-                    title: `${s.name} - ${missedDays.length}일 연속 미제출 (${missedDays.reverse().join(', ')})`,
-                    subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}% → 이탈 위험`,
-                    userId: s.userId
-                });
+        });
+
+        // 어제부터 역순으로 순회하며 연속 미제출 일수 계산
+        // - 스케줄에 과제가 있는 날만 체크 (토요일 등 과제 없는 날은 자동 스킵)
+        // - 해당 날의 과제 중 하나라도 제출했으면 "제출한 날"로 판정
+        const missedDays = [];
+        for (let d = 1; d <= 14; d++) {
+            const checkDate = new Date(today);
+            checkDate.setDate(checkDate.getDate() - d);
+            if (checkDate < startDate) break;
+            const dateStr = checkDate.toISOString().split('T')[0];
+
+            // 이 날에 스케줄상 과제가 없으면 건너뜀
+            const dayTasks = tasksByDate[dateStr];
+            if (!dayTasks || dayTasks.tasks.length === 0) continue;
+
+            // 이 날의 과제 중 하나라도 제출했는지 확인
+            const hasAnySubmission = dayTasks.tasks.some(t =>
+                submitted.has(`${t.sectionType}|${t.week}|${t.dayKr}`)
+            );
+
+            if (!hasAnySubmission) {
+                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                missedDays.push(dayNames[checkDate.getDay()]);
+            } else {
+                break;  // 제출한 날을 만나면 중단
             }
         }
 
-
+        if (missedDays.length >= 2) {
+            alerts.push({
+                type: 'consecutive',
+                color: '#f59e0b',
+                icon: '⚠️',
+                title: `${s.name} - ${missedDays.length}일 연속 미제출 (${missedDays.reverse().join(', ')})`,
+                subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}%`,
+                userId: s.userId
+            });
+        }
     });
 
-    // 우선순위 정렬
-    alerts.sort((a, b) => a.priority - b.priority);
+    // 연속 미제출 일수 많은 순으로 정렬
+    alerts.sort((a, b) => {
+        const aDays = parseInt(a.title.match(/(\d+)일/)?.[1] || '0');
+        const bDays = parseInt(b.title.match(/(\d+)일/)?.[1] || '0');
+        return bDays - aDays;
+    });
 
     // 렌더링
     if (alerts.length === 0) {
         alertList.innerHTML = `
             <div style="padding: 32px; text-align: center; color: #22c55e;">
                 <i class="fas fa-check-circle" style="font-size: 32px;"></i>
-                <p style="margin-top: 12px; font-weight: 600;">✅ 오늘은 특이사항 없습니다</p>
+                <p style="margin-top: 12px; font-weight: 600;">오늘은 특이사항 없습니다</p>
             </div>
         `;
         alertBadge.style.display = 'none';
@@ -612,7 +667,7 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
         alertBadge.style.display = 'inline-block';
 
         alertList.innerHTML = alerts.map(a => `
-            <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-left:4px solid ${a.color}; background:${a.type === 'fraud' ? '#fef2f2' : a.type === 'consecutive' ? '#fffbeb' : a.type === 'missing' ? '#fef2f2' : '#fefce8'}; border-radius:0 8px 8px 0; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-left:4px solid ${a.color}; background:#fffbeb; border-radius:0 8px 8px 0; margin-bottom:8px;">
                 <div style="flex:1;">
                     <div style="font-size:14px; font-weight:600; color:#1e293b;">
                         ${a.icon} ${escapeHtml(a.title)}
