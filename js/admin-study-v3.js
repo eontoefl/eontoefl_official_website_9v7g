@@ -244,25 +244,55 @@ async function loadStudyData() {
                 }
             }
 
-            // ── 최근 활동 ──
-            const lastActivity = myRecords.length > 0
-                ? Math.max(...myRecords.map(r => new Date(r.completed_at).getTime()))
+            // ── 최근 활동 (study_results_v3 기반) ──
+            const v3Completed = myV3.filter(r => r.completed_at).map(r => new Date(r.completed_at).getTime());
+            const lastActivity = v3Completed.length > 0
+                ? Math.max(...v3Completed)
                 : null;
             const daysSinceActivity = lastActivity
                 ? Math.floor((today - lastActivity) / (1000 * 60 * 60 * 24))
                 : 999;
 
-            // ── 연속 미제출 일수 ──
+            // ── 연속 미제출 일수 (study_results_v3 + 스케줄 기반, 알림판과 동일 기준) ──
+            // v3 제출 Set 구성
+            const myV3Submitted = new Set();
+            myV3.forEach(r => {
+                if (r.initial_record) myV3Submitted.add(`${r.section_type}|${r.week}|${r.day}`);
+            });
+
+            const dayEngToKrLocal = { 'sunday': '일', 'monday': '월', 'tuesday': '화', 'wednesday': '수', 'thursday': '목', 'friday': '금', 'saturday': '토' };
+
+            // 스케줄에서 이 학생의 날짜별 과제 그룹핑
+            const myTasksByDate = {};
+            (scheduleData || []).forEach(sched => {
+                if ((sched.program || '').toLowerCase() !== prog) return;
+                if (sched.week > totalWeeks) return;
+                const dayIndex = dayEngNames.indexOf(sched.day);
+                if (dayIndex < 0) return;
+                const taskDate = new Date(startDate);
+                taskDate.setDate(taskDate.getDate() + (sched.week - 1) * 7 + dayIndex);
+                if (taskDate >= today) return;
+                if (taskDate < startDate) return;
+                const dateStr = taskDate.toISOString().split('T')[0];
+                const dayKr = dayEngToKrLocal[sched.day];
+                for (const sec of [sched.section1, sched.section2, sched.section3, sched.section4]) {
+                    const parsed = parseScheduleSection(sec);
+                    if (!parsed || parsed.taskType === 'unknown') continue;
+                    if (!myTasksByDate[dateStr]) myTasksByDate[dateStr] = [];
+                    myTasksByDate[dateStr].push({ sectionType: parsed.taskType, week: sched.week, dayKr });
+                }
+            });
+
             let consecutiveMissing = 0;
-            for (let d = 1; d <= 7; d++) {
+            for (let d = 1; d <= 14; d++) {
                 const checkDate = new Date(today);
                 checkDate.setDate(checkDate.getDate() - d);
                 if (checkDate < startDate) break;
-                const checkDay = checkDate.getDay();
-                if (checkDay === 6) continue;
                 const dateStr = checkDate.toISOString().split('T')[0];
-                const hasRecord = myRecords.some(r => new Date(r.completed_at).toISOString().split('T')[0] === dateStr);
-                if (!hasRecord) consecutiveMissing++;
+                const dayTasks = myTasksByDate[dateStr];
+                if (!dayTasks || dayTasks.length === 0) continue; // 과제 없는 날은 스킵
+                const hasAny = dayTasks.some(t => myV3Submitted.has(`${t.sectionType}|${t.week}|${t.dayKr}`));
+                if (!hasAny) consecutiveMissing++;
                 else break;
             }
 
