@@ -19,6 +19,134 @@
 <style>
     /* Fraud 기준표 토글 */
     .fraud-criteria-hidden { display: none !important; }
+
+    /* ===== 주간체크 일괄검토 모달 ===== */
+    .batch-modal-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+        animation: batchFadeIn 0.2s ease;
+    }
+    @keyframes batchFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .batch-modal {
+        background: white; border-radius: 16px; width: 95vw; max-width: 960px;
+        height: 85vh; max-height: 700px; display: flex; flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden;
+    }
+    .batch-modal-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 24px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+    }
+    .batch-modal-header h3 {
+        margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .batch-modal-close {
+        background: none; border: none; font-size: 24px; color: #94a3b8;
+        cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;
+    }
+    .batch-modal-close:hover { background: #f1f5f9; color: #475569; }
+    .batch-modal-body {
+        display: flex; flex: 1; overflow: hidden;
+    }
+
+    /* 좌측 학생 리스트 */
+    .batch-student-list {
+        width: 240px; min-width: 240px; border-right: 1px solid #e2e8f0;
+        overflow-y: auto; background: #f8fafc;
+    }
+    .batch-student-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s;
+    }
+    .batch-student-item:hover { background: #e2e8f0; }
+    .batch-student-item.active { background: #ede9fe; border-left: 3px solid #7c3aed; }
+    .batch-student-item.sent { opacity: 0.5; }
+    .batch-student-item.skipped { opacity: 0.5; }
+    .batch-student-status { flex-shrink: 0; font-size: 14px; }
+    .batch-student-info { flex: 1; min-width: 0; }
+    .batch-student-name { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .batch-student-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .batch-divider {
+        padding: 8px 16px; font-size: 11px; color: #94a3b8; font-weight: 600;
+        border-bottom: 1px solid #f1f5f9; background: #f1f5f9; text-transform: uppercase;
+    }
+
+    /* 우측 검토 영역 */
+    .batch-review-area {
+        flex: 1; overflow-y: auto; padding: 20px 24px;
+    }
+    .batch-review-content {
+        display: flex; flex-direction: column; gap: 12px; height: 100%;
+    }
+    .batch-review-header-info {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .batch-field { display: flex; flex-direction: column; gap: 4px; }
+    .batch-field label {
+        font-size: 12px; font-weight: 600; color: #64748b;
+    }
+    .batch-field input[type="text"] {
+        padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+        font-size: 13px; font-family: 'Noto Sans KR', sans-serif;
+        width: 100%; box-sizing: border-box;
+    }
+    .batch-field input[type="text"]:focus {
+        outline: none; border-color: #7c3aed;
+        box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+    }
+    .batch-field textarea {
+        padding: 12px; border: 1px solid #d1d5db; border-radius: 8px;
+        font-size: 13px; font-family: 'Noto Sans KR', sans-serif;
+        width: 100%; box-sizing: border-box; resize: vertical;
+        min-height: 200px; line-height: 1.7;
+    }
+    .batch-field textarea:focus {
+        outline: none; border-color: #7c3aed;
+        box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+    }
+    .batch-readonly-field {
+        padding: 10px 12px; background: #f8fafc; border-radius: 8px;
+        font-size: 13px; font-weight: 600; color: #334155; border: 1px solid #e2e8f0;
+    }
+    .batch-readonly-message {
+        padding: 12px; background: #f8fafc; border-radius: 8px;
+        font-size: 13px; color: #334155; line-height: 1.7;
+        border: 1px solid #e2e8f0; max-height: 350px; overflow-y: auto;
+    }
+
+    /* 하단 버튼 영역 */
+    .batch-actions {
+        display: flex; justify-content: flex-end; gap: 8px;
+        padding-top: 12px; border-top: 1px solid #e2e8f0; flex-shrink: 0;
+    }
+    .batch-btn-save {
+        background: white; color: #475569; border: 1px solid #d1d5db;
+        padding: 8px 16px; border-radius: 8px; cursor: pointer;
+        font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .batch-btn-save:hover { background: #f8fafc; border-color: #94a3b8; }
+    .batch-btn-skip {
+        background: white; color: #475569; border: 1px solid #d1d5db;
+        padding: 8px 16px; border-radius: 8px; cursor: pointer;
+        font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .batch-btn-skip:hover { background: #f8fafc; }
+    .batch-btn-send {
+        background: #7c3aed; color: white; border: none;
+        padding: 8px 20px; border-radius: 8px; cursor: pointer;
+        font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .batch-btn-send:hover { background: #6d28d9; }
+    .batch-btn-send:disabled { background: #c4b5fd; cursor: not-allowed; }
+
+    /* 반응형 */
+    @media (max-width: 768px) {
+        .batch-modal { width: 98vw; height: 92vh; max-height: none; }
+        .batch-modal-body { flex-direction: column; }
+        .batch-student-list { width: 100%; min-width: 100%; max-height: 140px; border-right: none; border-bottom: 1px solid #e2e8f0; }
+    }
 </style>
 </head>
 <body>
@@ -40,7 +168,7 @@
                     <i class="fas fa-book-reader"></i> 학습 관리
                 </a>
                 <a href="admin-study-v3.html" class="admin-nav-link active">
-                    <i class="fas fa-flask"></i> 학습관리2
+                    <i class="fas fa-flask"></i> 학습관리2 <span id="navWeeklyCheckBadge" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; min-width:16px; text-align:center; line-height:16px;">0</span>
                 </a>
                 <a href="admin-questions.html" class="admin-nav-link">
                     <i class="fas fa-puzzle-piece"></i> 문제 관리

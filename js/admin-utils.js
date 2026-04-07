@@ -349,6 +349,41 @@ function getDeadlineDisplay(app) {
  * @param {Object} app - 신청서 객체
  * @returns {string} HTML 문자열
  */
+/**
+ * 네비게이션 주간체크 뱃지 업데이트
+ * 모든 admin 페이지에서 호출 — pending 상태의 주간체크 건수를 nav에 표시
+ */
+async function updateNavWeeklyCheckBadge() {
+    try {
+        const badge = document.getElementById('navWeeklyCheckBadge');
+        if (!badge) return;
+
+        const result = await supabaseAPI.query('tr_weekly_check_drafts', {
+            'status': 'eq.pending',
+            'select': 'id',
+            'limit': '100'
+        });
+        const count = (result || []).length;
+
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (e) {
+        // 테이블 미생성 등 에러 무시
+        console.warn('주간체크 뱃지 조회 실패:', e);
+    }
+}
+
+// 페이지 로드 시 자동 실행 (admin 페이지에서만)
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('navWeeklyCheckBadge')) {
+        updateNavWeeklyCheckBadge();
+    }
+});
+
 function getScoreDisplay(app) {
     const current = app.score_total_old || app.score_total_new || null;
     const target = app.target_cutoff_old || app.target_cutoff_new || null;
