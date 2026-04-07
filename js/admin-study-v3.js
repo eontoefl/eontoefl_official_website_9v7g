@@ -2,6 +2,7 @@
 
 let allStudentData = [];
 let filteredStudentData = [];
+let weeklyCheckPendingDrafts = [];  // 주간체크 승인대기 drafts (전체)
 
 // 스케줄 전역 변수 (잔디/알림용)
 let scheduleLookup = {};
@@ -326,10 +327,22 @@ async function loadStudyData() {
             };
         }).filter(Boolean);
 
+        // 주간체크 pending drafts 조회
+        try {
+            weeklyCheckPendingDrafts = await supabaseAPI.query('tr_weekly_check_drafts', {
+                'status': 'in.(pending,skipped)',
+                'order': 'created_at.desc',
+                'limit': '100'
+            }) || [];
+        } catch (e) {
+            console.warn('주간체크 drafts 조회 실패:', e);
+            weeklyCheckPendingDrafts = [];
+        }
+
         // 통계 카드 업데이트
         updateStatCards(allStudentData, allAuthRecords);
 
-        // 알림판 업데이트 (study_results_v3 + 스케줄 기반)
+        // 알림판 업데이트 (study_results_v3 + 스케줄 기반 + 주간체크)
         updateAlertBoard(allStudentData, v3Records, scheduleData);
 
         // 필터 적용 및 렌더링
@@ -545,7 +558,17 @@ function getDayName(dateStr) {
 }
 
 // ===== 오늘의 알림판 (study_results_v3 + 스케줄 기반) =====
+// 캐싱: refreshAlertBoardAfterBatch에서 v3Records/scheduleData 없이 재호출 시 사용
+let _cachedV3Records = null;
+let _cachedScheduleData = null;
+
 function updateAlertBoard(students, v3Records, scheduleData) {
+    // 캐싱 처리
+    if (v3Records != null) _cachedV3Records = v3Records;
+    if (scheduleData != null) _cachedScheduleData = scheduleData;
+    v3Records = _cachedV3Records || [];
+    scheduleData = _cachedScheduleData || [];
+
     const alertList = document.getElementById('alertList');
     const alertBadge = document.getElementById('alertBadge');
     const alerts = [];
@@ -653,8 +676,40 @@ function updateAlertBoard(students, v3Records, scheduleData) {
         return bDays - aDays;
     });
 
+    // ── 주간체크 알림 (pending drafts) ──
+    const pendingDrafts = weeklyCheckPendingDrafts.filter(d => d.status === 'pending');
+    let weeklyCheckAlertHtml = '';
+    if (pendingDrafts.length > 0) {
+        const names = pendingDrafts.map(d => d.student_name || '학생');
+        const firstName = names[0];
+        const fastCount = pendingDrafts.filter(d => (d.program_type || '').toLowerCase().includes('fast')).length;
+        const stdCount = pendingDrafts.length - fastCount;
+        const programInfo = [fastCount > 0 ? `Fast ${fastCount}명` : '', stdCount > 0 ? `Standard ${stdCount}명` : ''].filter(Boolean).join(' · ');
+        const createdAt = pendingDrafts[0].created_at ? new Date(pendingDrafts[0].created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        const titleText = pendingDrafts.length === 1
+            ? `${firstName}님의 주간체크가 등록되었습니다`
+            : `${firstName} 외 ${pendingDrafts.length - 1}명의 주간체크가 등록되었습니다`;
+
+        weeklyCheckAlertHtml = `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-left:4px solid #7c3aed; background:#f5f3ff; border-radius:0 8px 8px 0; margin-bottom:8px;">
+                <div style="flex:1;">
+                    <div style="font-size:14px; font-weight:600; color:#1e293b;">
+                        <i class="fas fa-clipboard-check" style="color:#7c3aed;"></i> ${escapeHtml(titleText)}
+                    </div>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                        ${programInfo}${createdAt ? ' | ' + createdAt + ' 생성' : ''}
+                    </div>
+                </div>
+                <button onclick="openBatchReviewModal()" 
+                        style="background:#7c3aed; color:white; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; margin-left:12px;">
+                    일괄 확인하기 <i class="fas fa-arrow-right" style="font-size:10px;"></i>
+                </button>
+            </div>`;
+    }
+
     // 렌더링
-    if (alerts.length === 0) {
+    const totalAlertCount = alerts.length + (pendingDrafts.length > 0 ? 1 : 0);
+    if (totalAlertCount === 0) {
         alertList.innerHTML = `
             <div style="padding: 32px; text-align: center; color: #22c55e;">
                 <i class="fas fa-check-circle" style="font-size: 32px;"></i>
@@ -663,10 +718,10 @@ function updateAlertBoard(students, v3Records, scheduleData) {
         `;
         alertBadge.style.display = 'none';
     } else {
-        alertBadge.textContent = alerts.length;
+        alertBadge.textContent = totalAlertCount;
         alertBadge.style.display = 'inline-block';
 
-        alertList.innerHTML = alerts.map(a => `
+        const consecutiveAlertsHtml = alerts.map(a => `
             <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-left:4px solid ${a.color}; background:#fffbeb; border-radius:0 8px 8px 0; margin-bottom:8px;">
                 <div style="flex:1;">
                     <div style="font-size:14px; font-weight:600; color:#1e293b;">
@@ -682,6 +737,398 @@ function updateAlertBoard(students, v3Records, scheduleData) {
                 </button>
             </div>
         `).join('');
+
+        alertList.innerHTML = weeklyCheckAlertHtml + consecutiveAlertsHtml;
+    }
+}
+
+// ===== 주간체크 일괄검토 모달 =====
+
+let batchReviewCurrentIndex = 0;
+
+function openBatchReviewModal() {
+    const pendingDrafts = weeklyCheckPendingDrafts.filter(d => d.status === 'pending');
+    const skippedDrafts = weeklyCheckPendingDrafts.filter(d => d.status === 'skipped');
+
+    if (pendingDrafts.length === 0 && skippedDrafts.length === 0) {
+        alert('검토할 주간체크가 없습니다.');
+        return;
+    }
+
+    batchReviewCurrentIndex = 0;
+
+    const existing = document.getElementById('batchReviewModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'batchReviewModal';
+    modal.className = 'batch-modal-overlay';
+    modal.innerHTML = `
+        <div class="batch-modal">
+            <div class="batch-modal-header">
+                <h3><i class="fas fa-clipboard-check" style="color:#7c3aed;"></i> 주간체크 일괄 검토 <span id="batchHeaderCount" style="font-size:14px; color:#64748b; font-weight:400;">(${pendingDrafts.length}명 대기)</span></h3>
+                <button class="batch-modal-close" onclick="closeBatchReviewModal()">&times;</button>
+            </div>
+            <div class="batch-modal-body">
+                <div class="batch-student-list" id="batchStudentList"></div>
+                <div class="batch-review-area" id="batchReviewArea">
+                    <div style="display:flex; align-items:center; justify-content:center; height:100%; color:#94a3b8;">
+                        <div style="text-align:center;">
+                            <i class="fas fa-hand-pointer" style="font-size:32px; margin-bottom:12px;"></i>
+                            <p>왼쪽에서 학생을 선택해주세요</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeBatchReviewModal(); });
+
+    renderBatchStudentList();
+
+    // 자동으로 첫 번째 pending 학생 선택
+    if (pendingDrafts.length > 0) {
+        selectBatchDraft(pendingDrafts[0].id);
+    }
+}
+
+function closeBatchReviewModal() {
+    const modal = document.getElementById('batchReviewModal');
+    if (modal) modal.remove();
+    // 알림판 새로고침 (발송 완료된 것 반영)
+    refreshAlertBoardAfterBatch();
+}
+
+async function refreshAlertBoardAfterBatch() {
+    try {
+        weeklyCheckPendingDrafts = await supabaseAPI.query('tr_weekly_check_drafts', {
+            'status': 'in.(pending,skipped)',
+            'order': 'created_at.desc',
+            'limit': '100'
+        }) || [];
+    } catch (e) {
+        weeklyCheckPendingDrafts = [];
+    }
+    // 알림판 재렌더링 (기존 데이터 재활용)
+    if (typeof updateAlertBoard === 'function' && allStudentData.length > 0) {
+        updateAlertBoard(allStudentData, null, null);
+    }
+    // nav 뱃지 업데이트
+    if (typeof updateNavWeeklyCheckBadge === 'function') {
+        updateNavWeeklyCheckBadge();
+    }
+}
+
+function renderBatchStudentList() {
+    const listEl = document.getElementById('batchStudentList');
+    if (!listEl) return;
+
+    const pendingDrafts = weeklyCheckPendingDrafts.filter(d => d.status === 'pending');
+    const skippedDrafts = weeklyCheckPendingDrafts.filter(d => d.status === 'skipped');
+
+    let html = '';
+
+    // pending drafts
+    pendingDrafts.forEach((draft, idx) => {
+        const weekLabel = draft.week ? `${draft.week}주차` : '';
+        const programLabel = draft.program_type || '';
+        const authLabel = draft.auth_rate != null ? `${draft.auth_rate}%` : '-';
+        const isSent = draft.status === 'sent';
+
+        html += `
+            <div class="batch-student-item ${isSent ? 'sent' : ''}" id="batchItem_${draft.id}" onclick="selectBatchDraft('${draft.id}')">
+                <div class="batch-student-status" id="batchStatus_${draft.id}">
+                    <i class="fas fa-clock" style="color:#f59e0b;"></i>
+                </div>
+                <div class="batch-student-info">
+                    <div class="batch-student-name">${escapeHtml(draft.student_name || '학생')}</div>
+                    <div class="batch-student-meta">${weekLabel} · ${programLabel} · ${authLabel}</div>
+                </div>
+            </div>`;
+    });
+
+    // skipped drafts
+    if (skippedDrafts.length > 0) {
+        html += `<div class="batch-divider"><span>발송 중단</span></div>`;
+        skippedDrafts.forEach(draft => {
+            const weekLabel = draft.week ? `${draft.week}주차` : '';
+            const inactiveWeeks = draft.consecutive_inactive_weeks || 0;
+            html += `
+                <div class="batch-student-item skipped" id="batchItem_${draft.id}" onclick="selectBatchDraft('${draft.id}')">
+                    <div class="batch-student-status">
+                        <i class="fas fa-pause-circle" style="color:#94a3b8;"></i>
+                    </div>
+                    <div class="batch-student-info">
+                        <div class="batch-student-name" style="color:#94a3b8;">${escapeHtml(draft.student_name || '학생')}</div>
+                        <div class="batch-student-meta">${weekLabel} · ${inactiveWeeks}주 미활동</div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    listEl.innerHTML = html;
+}
+
+function selectBatchDraft(draftId) {
+    const draft = weeklyCheckPendingDrafts.find(d => d.id === draftId);
+    if (!draft) return;
+
+    // 좌측 리스트 active 상태 업데이트
+    document.querySelectorAll('.batch-student-item').forEach(el => el.classList.remove('active'));
+    const item = document.getElementById('batchItem_' + draftId);
+    if (item) item.classList.add('active');
+
+    const reviewArea = document.getElementById('batchReviewArea');
+    if (!reviewArea) return;
+
+    const isSkipped = draft.status === 'skipped';
+    const isSent = draft.status === 'sent';
+    const weekLabel = draft.week ? `${draft.week}주차` : '';
+    const programLabel = draft.program_type || '';
+    const authLabel = draft.auth_rate != null ? `${draft.auth_rate}%` : '-';
+    const metaInfo = [weekLabel, programLabel, `인증률 ${authLabel}`].filter(Boolean).join(' · ');
+
+    // scoring_summary
+    let scoringHtml = '';
+    if (draft.scoring_summary) {
+        const summaryStr = typeof draft.scoring_summary === 'string'
+            ? draft.scoring_summary
+            : JSON.stringify(draft.scoring_summary, null, 2);
+        scoringHtml = `
+            <div style="margin-top:8px;">
+                <div style="cursor:pointer; font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:4px;"
+                     onclick="var el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.querySelector('.toggle-icon').textContent=el.style.display==='none'?'\u25BC':'\u25B2';">
+                    <span class="toggle-icon">\u25BC</span> scoring_summary (참고용)
+                </div>
+                <pre style="display:none; margin-top:8px; padding:12px; background:#f1f5f9; border-radius:8px; font-size:11px; color:#475569; overflow-x:auto; white-space:pre-wrap; max-height:200px; overflow-y:auto;">${escapeHtml(summaryStr)}</pre>
+            </div>`;
+    }
+
+    if (isSent) {
+        // 이미 발송 완료
+        reviewArea.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:center; height:100%; color:#22c55e;">
+                <div style="text-align:center;">
+                    <i class="fas fa-check-circle" style="font-size:40px; margin-bottom:12px;"></i>
+                    <p style="font-weight:600; font-size:16px;">${escapeHtml(draft.student_name || '학생')}님 발송 완료</p>
+                </div>
+            </div>`;
+    } else if (isSkipped) {
+        // skipped: 읽기 전용
+        const renderedMessage = batchRenderBold(draft.message || '').replace(/\n/g, '<br>');
+        reviewArea.innerHTML = `
+            <div class="batch-review-content">
+                <div class="batch-review-header-info">
+                    <span style="background:#fee2e2; color:#ef4444; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600;">
+                        <i class="fas fa-pause-circle"></i> 발송 중단 (${draft.consecutive_inactive_weeks || 0}주 미활동)
+                    </span>
+                    <span style="font-size:12px; color:#94a3b8;">${metaInfo}</span>
+                </div>
+                <div class="batch-field">
+                    <label>제목</label>
+                    <div class="batch-readonly-field">${escapeHtml(draft.title || '')}</div>
+                </div>
+                <div class="batch-field" style="flex:1;">
+                    <label>본문</label>
+                    <div class="batch-readonly-message">${renderedMessage}</div>
+                </div>
+                ${scoringHtml}
+            </div>`;
+    } else {
+        // pending: 수정 + 발송 가능
+        reviewArea.innerHTML = `
+            <div class="batch-review-content">
+                <div class="batch-review-header-info">
+                    <span style="background:#fef3c7; color:#d97706; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600;">
+                        <i class="fas fa-clock"></i> 승인대기
+                    </span>
+                    <span style="font-size:12px; color:#94a3b8;">${metaInfo}</span>
+                </div>
+                <div class="batch-field">
+                    <label>제목</label>
+                    <input type="text" id="batchEditTitle" value="${escapeHtml(draft.title || '')}">
+                </div>
+                <div class="batch-field" style="flex:1;">
+                    <label>본문 <span style="font-weight:400; color:#94a3b8;">(**볼드** · 줄바꿈 가능)</span></label>
+                    <textarea id="batchEditMessage" rows="14">${escapeHtml(draft.message || '')}</textarea>
+                </div>
+                ${scoringHtml}
+                <div class="batch-actions">
+                    <button class="batch-btn-save" id="batchSaveBtn" onclick="batchSaveDraft('${draft.id}')">
+                        <i class="fas fa-save"></i> 저장만
+                    </button>
+                    <button class="batch-btn-skip" onclick="batchGoNext('${draft.id}')">
+                        다음 <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button class="batch-btn-send" id="batchSendBtn" onclick="batchSendDraft('${draft.id}')">
+                        <i class="fas fa-paper-plane"></i> 발송하기
+                    </button>
+                </div>
+            </div>`;
+
+        // Ctrl+B 단축키
+        const ta = document.getElementById('batchEditMessage');
+        if (ta) {
+            ta.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault();
+                    batchToggleBold('batchEditMessage');
+                }
+            });
+        }
+    }
+}
+
+function batchRenderBold(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    const escaped = div.innerHTML;
+    return escaped.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+
+function batchToggleBold(textareaId) {
+    const ta = document.getElementById(textareaId);
+    if (!ta) return;
+    let start = ta.selectionStart;
+    let end = ta.selectionEnd;
+    const text = ta.value;
+    if (start === end) {
+        const insert = '****';
+        ta.value = text.slice(0, start) + insert + text.slice(end);
+        ta.selectionStart = ta.selectionEnd = start + 2;
+    } else {
+        const selected = text.slice(start, end);
+        if (selected.startsWith('**') && selected.endsWith('**') && selected.length >= 4) {
+            const inner = selected.slice(2, -2);
+            ta.value = text.slice(0, start) + inner + text.slice(end);
+            ta.selectionStart = start;
+            ta.selectionEnd = start + inner.length;
+        } else {
+            const wrapped = '**' + selected + '**';
+            ta.value = text.slice(0, start) + wrapped + text.slice(end);
+            ta.selectionStart = start;
+            ta.selectionEnd = start + wrapped.length;
+        }
+    }
+    ta.focus();
+}
+
+async function batchSaveDraft(draftId) {
+    const title = document.getElementById('batchEditTitle')?.value.trim();
+    const message = document.getElementById('batchEditMessage')?.value.trim();
+    const btn = document.getElementById('batchSaveBtn');
+
+    if (!title) return alert('제목을 입력해주세요.');
+    if (!message) return alert('본문을 입력해주세요.');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+
+    try {
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, { title, message });
+        const draft = weeklyCheckPendingDrafts.find(d => d.id === draftId);
+        if (draft) { draft.title = title; draft.message = message; }
+        alert('저장 완료!');
+    } catch (err) {
+        alert('저장 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> 저장만';
+    }
+}
+
+async function batchSendDraft(draftId) {
+    const titleEl = document.getElementById('batchEditTitle');
+    const messageEl = document.getElementById('batchEditMessage');
+    const btn = document.getElementById('batchSendBtn');
+
+    const title = titleEl ? titleEl.value.trim() : '';
+    const message = messageEl ? messageEl.value.trim() : '';
+
+    if (!title) return alert('제목을 입력해주세요.');
+    if (!message) return alert('본문을 입력해주세요.');
+
+    const draft = weeklyCheckPendingDrafts.find(d => d.id === draftId);
+    if (!draft) return alert('초안을 찾을 수 없습니다.');
+
+    const studentName = draft.student_name || '학생';
+    const weekLabel = draft.week ? ` ${draft.week}주차` : '';
+    if (!confirm(`"${studentName}"님에게${weekLabel} 주간체크를 발송하시겠습니까?`)) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 발송 중...';
+
+    try {
+        // 1. draft 업데이트
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, { title, message });
+
+        // 2. tr_notifications INSERT
+        await supabaseAPI.post('tr_notifications', {
+            user_id: draft.user_id,
+            title: title,
+            message: message,
+            created_by: '이온쌤'
+        });
+
+        // 3. draft status → sent
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, {
+            status: 'sent',
+            sent_at: new Date().toISOString()
+        });
+
+        // 4. 로컬 데이터 업데이트
+        draft.status = 'sent';
+
+        // 5. 좌측 리스트에서 해당 학생 완료 표시
+        const statusEl = document.getElementById('batchStatus_' + draftId);
+        if (statusEl) statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:#22c55e;"></i>';
+        const itemEl = document.getElementById('batchItem_' + draftId);
+        if (itemEl) itemEl.classList.add('sent');
+
+        // 6. 카운트 업데이트
+        const remaining = weeklyCheckPendingDrafts.filter(d => d.status === 'pending').length;
+        const headerCount = document.getElementById('batchHeaderCount');
+        if (headerCount) headerCount.textContent = remaining > 0 ? `(${remaining}명 대기)` : '(모두 완료!)';
+
+        // 7. 자동으로 다음 학생
+        const nextDraft = weeklyCheckPendingDrafts.find(d => d.status === 'pending');
+        if (nextDraft) {
+            selectBatchDraft(nextDraft.id);
+        } else {
+            // 모두 완료
+            const reviewArea = document.getElementById('batchReviewArea');
+            if (reviewArea) {
+                reviewArea.innerHTML = `
+                    <div style="display:flex; align-items:center; justify-content:center; height:100%;">
+                        <div style="text-align:center;">
+                            <div style="font-size:48px; margin-bottom:16px;">&#127881;</div>
+                            <p style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:8px;">모든 주간체크 발송이 완료되었습니다!</p>
+                            <p style="font-size:13px; color:#64748b;">모달을 닫으면 알림판이 자동으로 업데이트됩니다.</p>
+                            <button onclick="closeBatchReviewModal()" style="margin-top:20px; background:#7c3aed; color:white; border:none; padding:10px 24px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;">
+                                닫기
+                            </button>
+                        </div>
+                    </div>`;
+            }
+        }
+    } catch (err) {
+        console.error('주간체크 발송 실패:', err);
+        alert('발송 실패: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> 발송하기';
+    }
+}
+
+function batchGoNext(currentDraftId) {
+    const pendingDrafts = weeklyCheckPendingDrafts.filter(d => d.status === 'pending');
+    const currentIdx = pendingDrafts.findIndex(d => d.id === currentDraftId);
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < pendingDrafts.length) {
+        selectBatchDraft(pendingDrafts[nextIdx].id);
+    } else if (pendingDrafts.length > 0) {
+        // 마지막이면 처음으로
+        selectBatchDraft(pendingDrafts[0].id);
     }
 }
 
