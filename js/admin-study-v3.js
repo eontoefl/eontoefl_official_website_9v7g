@@ -934,6 +934,11 @@ function selectBatchDraft(draftId) {
                     <div class="batch-readonly-message">${renderedMessage}</div>
                 </div>
                 ${scoringHtml}
+                <div class="batch-actions">
+                    <button class="batch-btn-delete" onclick="batchDeleteDraft('${draft.id}')" title="이 초안 삭제">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                </div>
             </div>`;
     } else {
         // pending: 수정 + 발송 가능
@@ -955,6 +960,10 @@ function selectBatchDraft(draftId) {
                 </div>
                 ${scoringHtml}
                 <div class="batch-actions">
+                    <button class="batch-btn-delete" onclick="batchDeleteDraft('${draft.id}')" title="이 초안 삭제">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                    <div style="flex:1;"></div>
                     <button class="batch-btn-save" id="batchSaveBtn" onclick="batchSaveDraft('${draft.id}')">
                         <i class="fas fa-save"></i> 저장만
                     </button>
@@ -1129,6 +1138,53 @@ function batchGoNext(currentDraftId) {
     } else if (pendingDrafts.length > 0) {
         // 마지막이면 처음으로
         selectBatchDraft(pendingDrafts[0].id);
+    }
+}
+
+async function batchDeleteDraft(draftId) {
+    const draft = weeklyCheckPendingDrafts.find(d => d.id === draftId);
+    if (!draft) return;
+
+    const studentName = draft.student_name || '학생';
+    const weekLabel = draft.week ? ` ${draft.week}주차` : '';
+    if (!confirm(`"${studentName}"${weekLabel} 주간체크 초안을 삭제하시겠습니까?`)) return;
+
+    try {
+        await supabaseAPI.hardDelete('tr_weekly_check_drafts', draftId);
+
+        // 로컬 데이터에서 제거
+        weeklyCheckPendingDrafts = weeklyCheckPendingDrafts.filter(d => d.id !== draftId);
+
+        // 좌측 리스트 재렌더링
+        renderBatchStudentList();
+
+        // 카운트 업데이트
+        const remaining = weeklyCheckPendingDrafts.filter(d => d.status === 'pending').length;
+        const headerCount = document.getElementById('batchHeaderCount');
+        if (headerCount) headerCount.textContent = remaining > 0 ? `(${remaining}명 대기)` : '(모두 완료!)';
+
+        // 다음 학생 선택
+        const nextDraft = weeklyCheckPendingDrafts.find(d => d.status === 'pending');
+        if (nextDraft) {
+            selectBatchDraft(nextDraft.id);
+        } else if (weeklyCheckPendingDrafts.length > 0) {
+            selectBatchDraft(weeklyCheckPendingDrafts[0].id);
+        } else {
+            // 전부 삭제됨
+            const reviewArea = document.getElementById('batchReviewArea');
+            if (reviewArea) {
+                reviewArea.innerHTML = `
+                    <div style="display:flex; align-items:center; justify-content:center; height:100%; color:#94a3b8;">
+                        <div style="text-align:center;">
+                            <i class="fas fa-inbox" style="font-size:32px; margin-bottom:12px;"></i>
+                            <p>검토할 주간체크가 없습니다.</p>
+                        </div>
+                    </div>`;
+            }
+        }
+    } catch (err) {
+        console.error('초안 삭제 실패:', err);
+        alert('삭제 실패: ' + err.message);
     }
 }
 

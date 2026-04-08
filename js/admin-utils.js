@@ -345,11 +345,6 @@ function getDeadlineDisplay(app) {
 }
 
 /**
- * 점수 표시 (현재 → 목표)
- * @param {Object} app - 신청서 객체
- * @returns {string} HTML 문자열
- */
-/**
  * 네비게이션 주간체크 뱃지 업데이트
  * 모든 admin 페이지에서 호출 — pending 상태의 주간체크 건수를 nav에 표시
  */
@@ -384,6 +379,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+/**
+ * 점수 표시 (현재 → 목표)
+ * @param {Object} app - 신청서 객체
+ * @returns {string} HTML 문자열
+ */
 function getScoreDisplay(app) {
     const current = app.score_total_old || app.score_total_new || null;
     const target = app.target_cutoff_old || app.target_cutoff_new || null;
