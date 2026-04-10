@@ -581,3 +581,16 @@ body {
     margin: 0;
     padding: 0;
 }
+
+/* ===== 대시보드 페이지에서 mypage-content 안의 dashboard-container 보정 ===== */
+.mypage-content .dashboard-container {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 대시보드 로딩/빈 상태도 mypage-content 안에서 정상 표시 */
+.mypage-content .loading,
+.mypage-content .empty-state {
+    min-height: 300px;
+}

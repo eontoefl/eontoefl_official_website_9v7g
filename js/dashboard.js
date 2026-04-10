@@ -5,6 +5,7 @@
 
 document.addEventListener('DOMContentLoaded', async function() {
     await checkLogin();
+    updateSidebarUserInfo();
     await loadDashboard();
     setupEventListeners();
 });
@@ -1511,14 +1512,10 @@ async function renderBookOnlyMiniCard(bookApp) {
     });
 }
 
-// ==================== 닉네임 설정 ====================
-
-let modalNicknameAvailable = false;
-let modalNicknameTimer = null;
-let isNicknameForced = false;
+// ==================== 닉네임 미설정 → 내 정보 수정 페이지로 안내 ====================
 
 /**
- * 닉네임 미설정 유저 체크 → 강제 모달
+ * 닉네임 미설정 유저 체크 → my-profile.html로 리다이렉트
  */
 async function checkNicknameSetup(currentUser) {
     if (!currentUser.email) return;
@@ -1528,116 +1525,23 @@ async function checkNicknameSetup(currentUser) {
             'limit': '1'
         });
         if (users && users.length > 0 && !users[0].nickname) {
-            isNicknameForced = true;
-            openNicknameModal(true);
+            alert('닉네임이 설정되지 않았습니다.\n내 정보 수정 페이지에서 설정해주세요.');
+            window.location.href = 'my-profile.html';
         }
     } catch (e) {
         console.error('닉네임 체크 오류:', e);
     }
 }
 
-function openNicknameModal(forced) {
-    const modal = document.getElementById('nicknameModal');
-    if (!modal) return;
-    modal.style.display = 'flex';
+// ==================== 사이드바 사용자 정보 표시 ====================
 
-    if (forced) {
-        isNicknameForced = true;
-        document.getElementById('nicknameModalTitle').textContent = '닉네임을 설정해주세요';
-        document.getElementById('nicknameModalDesc').textContent = '후기 등에 표시될 닉네임을 설정해주세요. 나중에 변경할 수 있습니다.';
-        document.getElementById('btnNicknameCancel').style.display = 'none';
-    } else {
-        isNicknameForced = false;
-        document.getElementById('nicknameModalTitle').textContent = '내 정보 수정';
-        document.getElementById('nicknameModalDesc').textContent = '닉네임은 후기 등에 표시됩니다.';
-        document.getElementById('btnNicknameCancel').style.display = '';
-        const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
-        if (currentUser.nickname) {
-            document.getElementById('modalNickname').value = currentUser.nickname;
-        }
-    }
-
-    modalNicknameAvailable = false;
-    document.getElementById('modalNicknameStatus').textContent = '';
-
-    const input = document.getElementById('modalNickname');
-    input.oninput = function() {
-        const val = this.value.replace(/[^가-힣a-zA-Z0-9]/g, '');
-        this.value = val;
-        const status = document.getElementById('modalNicknameStatus');
-        modalNicknameAvailable = false;
-
-        if (val.length < 2) { status.textContent = ''; return; }
-
-        status.textContent = '확인 중...';
-        status.style.color = '#94a3b8';
-
-        clearTimeout(modalNicknameTimer);
-        modalNicknameTimer = setTimeout(async () => {
-            try {
-                const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
-                if (currentUser.nickname && currentUser.nickname === val) {
-                    status.textContent = '현재 닉네임';
-                    status.style.color = '#94a3b8';
-                    modalNicknameAvailable = true;
-                    return;
-                }
-                const result = await supabaseAPI.query('users', { 'nickname': `eq.${val}`, 'limit': '1' });
-                if (result && result.length > 0) {
-                    status.textContent = '이미 사용 중';
-                    status.style.color = '#ef4444';
-                    modalNicknameAvailable = false;
-                } else {
-                    status.textContent = '사용 가능';
-                    status.style.color = '#22c55e';
-                    modalNicknameAvailable = true;
-                }
-            } catch {
-                status.textContent = '';
-                modalNicknameAvailable = true;
-            }
-        }, 400);
-    };
-}
-
-function closeNicknameModal() {
-    if (isNicknameForced) return;
-    document.getElementById('nicknameModal').style.display = 'none';
-}
-
-async function saveNickname() {
-    const nickname = document.getElementById('modalNickname').value.trim();
-    if (nickname.length < 2) {
-        alert('닉네임을 2자 이상 입력해주세요.');
-        return;
-    }
-    if (!modalNicknameAvailable) {
-        alert('닉네임 중복을 확인해주세요.');
-        return;
-    }
-
-    const btn = document.getElementById('btnNicknameSave');
-    btn.disabled = true;
-    btn.textContent = '저장 중...';
-
-    try {
-        const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
-        const users = await supabaseAPI.query('users', { 'email': `eq.${currentUser.email}`, 'limit': '1' });
-        if (!users || users.length === 0) throw new Error('사용자를 찾을 수 없습니다.');
-
-        await supabaseAPI.patch('users', users[0].id, { nickname: nickname });
-
-        currentUser.nickname = nickname;
-        localStorage.setItem('iontoefl_user', JSON.stringify(currentUser));
-
-        document.getElementById('nicknameModal').style.display = 'none';
-        isNicknameForced = false;
-        alert('닉네임이 저장되었습니다.');
-    } catch (error) {
-        console.error('닉네임 저장 오류:', error);
-        alert('닉네임 저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '저장';
-    }
+/**
+ * 사이드바에 사용자 이름/이메일 표시
+ */
+function updateSidebarUserInfo() {
+    const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const nameEl = document.getElementById('sidebarUserName');
+    const emailEl = document.getElementById('sidebarUserEmail');
+    if (nameEl) nameEl.textContent = currentUser.name || '사용자';
+    if (emailEl) emailEl.textContent = currentUser.email || '';
 }

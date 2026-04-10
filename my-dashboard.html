@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/dashboard-layout.css">
+    <link rel="stylesheet" href="css/mypage-layout.css">
     <style>
         * {
             margin: 0;
@@ -23,52 +24,6 @@
             background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
             min-height: 100vh;
             padding-bottom: 60px;
-        }
-
-        /* Navigation */
-        nav {
-            background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
-            padding: 20px 0;
-            box-shadow: 0 4px 12px rgba(148, 128, 197, 0.2);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        nav .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        nav .logo {
-            font-size: 24px;
-            font-weight: 700;
-            color: white;
-            text-decoration: none;
-            position: relative;
-            top: -5px;
-        }
-
-        nav .menu {
-            display: flex;
-            gap: 30px;
-            list-style: none;
-            align-items: center;
-        }
-
-        nav .menu a {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            transition: opacity 0.3s;
-        }
-
-        nav .menu a:hover {
-            opacity: 0.8;
         }
 
         /* Dashboard Container */
@@ -701,24 +656,60 @@
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav>
-        <div class="container">
-            <a href="index.html" class="logo">
-                <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo
-/white_logo.png" alt="이온토플" style="height: 30px; width: auto; vertical-align: middle; position: relative; top: 5px;">
+    <!-- Navigation (마이페이지 공통) -->
+    <nav class="mypage-nav">
+        <div class="mypage-nav-container">
+            <a href="index.html" class="mypage-nav-logo">
+                <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/white_logo.png" alt="이온토플" style="height: 30px; width: auto; vertical-align: middle; position: relative; top: 5px;">
             </a>
-            <ul class="menu" id="navMenu">
+            <ul class="mypage-nav-menu">
                 <li><a href="index.html">홈</a></li>
                 <li><a href="index.html#programs">프로그램</a></li>
-                <li><a href="my-dashboard.html" class="active">내 대시보드</a></li>
+                <li><a href="my-dashboard.html">내 대시보드</a></li>
                 <li><a href="#" id="logoutBtn">로그아웃</a></li>
             </ul>
         </div>
     </nav>
 
+    <!-- Main Content -->
+    <div class="mypage-container">
+        <!-- 사이드 네비게이션 -->
+        <aside class="mypage-sidebar">
+            <div class="sidebar-user-info" id="sidebarUserInfo">
+                <div class="sidebar-user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="sidebar-user-name" id="sidebarUserName">사용자</div>
+                <div class="sidebar-user-email" id="sidebarUserEmail">email@example.com</div>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="my-dashboard.html" class="sidebar-menu-item active">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>내 대시보드</span>
+                </a>
+                <a href="my-profile.html" class="sidebar-menu-item">
+                    <i class="fas fa-user-edit"></i>
+                    <span>내 정보 수정</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 모바일 탭 바 -->
+        <div class="mypage-tab-bar">
+            <a href="my-dashboard.html" class="mypage-tab active">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>내 대시보드</span>
+            </a>
+            <a href="my-profile.html" class="mypage-tab">
+                <i class="fas fa-user-edit"></i>
+                <span>내 정보 수정</span>
+            </a>
+        </div>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="mypage-content">
     <!-- Dashboard Container -->
-    <div class="dashboard-container">
+    <div class="dashboard-container" style="max-width: none; margin: 0; padding: 0;">
         <!-- Loading State -->
         <div id="loadingState" class="loading">
             <i class="fas fa-spinner"></i>
@@ -728,29 +719,9 @@
         <!-- Dashboard Content -->
         <div id="dashboardContent" style="display: none;">
             <!-- Welcome Section -->
-            <div class="welcome-section" style="position:relative;">
+            <div class="welcome-section">
                 <h1 id="welcomeMessage">👋 환영합니다!</h1>
                 <p>내벨업챌린지 진행 현황을 확인하고 관리하세요.</p>
-                <button id="btnSettings" onclick="openNicknameModal()" title="내 정보 수정" style="position:absolute; top:20px; right:20px; background:rgba(255,255,255,0.2); border:none; color:white; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'"><i class="fas fa-cog"></i></button>
-            </div>
-
-            <!-- 닉네임 설정 모달 -->
-            <div id="nicknameModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-                <div style="background:white; border-radius:16px; padding:32px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.15);">
-                    <h3 id="nicknameModalTitle" style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:8px;">내 정보 수정</h3>
-                    <p id="nicknameModalDesc" style="font-size:13px; color:#64748b; margin-bottom:24px;">닉네임은 후기 등에 표시됩니다.</p>
-                    <div style="margin-bottom:16px;">
-                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">닉네임</label>
-                        <div style="position:relative;">
-                            <input type="text" id="modalNickname" placeholder="2~12자, 한글/영문/숫자" minlength="2" maxlength="12" style="width:100%; padding:12px 16px; border:1px solid #e2e8f0; border-radius:8px; font-size:15px; font-family:'Noto Sans KR',sans-serif; box-sizing:border-box; transition:border-color 0.2s;" onfocus="this.style.borderColor='#9480c5'; this.style.boxShadow='0 0 0 3px rgba(148,128,197,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
-                            <span id="modalNicknameStatus" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px;"></span>
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">
-                        <button id="btnNicknameCancel" onclick="closeNicknameModal()" style="padding:10px 24px; border:1px solid #e2e8f0; background:white; color:#64748b; font-size:14px; font-weight:600; border-radius:8px; cursor:pointer; font-family:'Noto Sans KR',sans-serif;">취소</button>
-                        <button id="btnNicknameSave" onclick="saveNickname()" style="padding:10px 24px; border:none; background:linear-gradient(135deg,#9480c5 0%,#7d6aad 100%); color:white; font-size:14px; font-weight:600; border-radius:8px; cursor:pointer; font-family:'Noto Sans KR',sans-serif;">저장</button>
-                    </div>
-                </div>
             </div>
 
             <!-- Main Grid: 7:3 Layout -->
@@ -841,32 +812,11 @@
                     <div class="program-actions" id="programActions">
                         <!-- Program action buttons will be populated by JavaScript -->
                     </div>
-                    
-                    <!-- 설정 -->
-                    <div class="dashboard-card" style="margin-top: 20px;">
-                        <div class="card-header">
-                            <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink: 0;" class="card-icon">
-                                <circle cx="12" cy="12" r="3" fill="none" stroke="#9480c5" stroke-width="1.5"/>
-                                <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round"/>
-                            </svg>
-                            <h2>설정</h2>
-                        </div>
-                        <div style="padding: 16px;">
-                            <a href="change-password.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border: 1px solid #e5e7eb; border-radius: 10px; text-decoration: none; transition: all 0.3s; cursor: pointer;">
-                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-key" style="color: white; font-size: 18px;"></i>
-                                </div>
-                                <div style="flex: 1;">
-                                    <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">비밀번호 변경</div>
-                                    <div style="font-size: 12px; color: #64748b;">계정 보안을 위해 주기적으로 변경하세요</div>
-                                </div>
-                                <i class="fas fa-chevron-right" style="color: #cbd5e1;"></i>
-                            </a>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
+    </div>
+        </main>
     </div>
 
     <!-- Floating Kakao Talk Button -->
