@@ -255,6 +255,26 @@ function getContractStyles() {
                 .contract-content {
                     padding: 16px;
                 }
+                .copywrite-container {
+                    display: block;
+                }
+                .copywrite-hint {
+                    position: static !important;
+                    transform: none !important;
+                    display: block;
+                    color: #b0b0b0 !important;
+                    font-size: 13px;
+                    padding: 4px 8px 0;
+                    white-space: normal !important;
+                }
+                .contract-input-copy {
+                    width: 100% !important;
+                    box-sizing: border-box;
+                }
+                .copywrite-status {
+                    display: block !important;
+                    margin: 4px 0 0 8px !important;
+                }
             }
 
             @media print {
