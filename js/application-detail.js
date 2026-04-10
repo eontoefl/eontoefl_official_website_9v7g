@@ -1,6 +1,7 @@
 // Application Detail Page
 let currentApplication = null;
 let globalApplication = null; // Phase 2: 글로벌 변수
+let _studentInfo = { name: '', phone: '', id: '' }; // 알림톡용 학생 기본정보 (변하지 않음)
 
 // Utility function to escape HTML
 function escapeHtml(unsafe) {
@@ -141,6 +142,7 @@ async function loadApplicationDetail() {
             
             currentApplication = app;
             globalApplication = app;
+            _studentInfo = { name: app.name, phone: app.phone, id: app.id };
             
             console.log('Calling displayApplicationDetail...');
             displayApplicationDetail(app);
@@ -1064,10 +1066,10 @@ async function submitStudentAgreement() {
         if (agreementData.contract_sent) {
             try {
                 await sendKakaoAlimTalk('contract_sent', {
-                    name: currentApplication.name,
-                    phone: currentApplication.phone,
+                    name: currentApplication.name || _studentInfo.name,
+                    phone: currentApplication.phone || _studentInfo.phone,
                     program: currentApplication.assigned_program || currentApplication.preferred_program,
-                    app_id: currentApplication.id
+                    app_id: currentApplication.id || _studentInfo.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
         }
@@ -2156,13 +2158,13 @@ async function submitContractAgreement() {
         try {
             const settings = await getSiteSettings();
             await sendKakaoAlimTalk('payment_request', {
-                name: globalApplication.name,
-                phone: globalApplication.phone,
+                name: globalApplication.name || _studentInfo.name,
+                phone: globalApplication.phone || _studentInfo.phone,
                 price: String((globalApplication.final_price || 0).toLocaleString()),
                 bank: settings?.bank_name || '',
                 account: settings?.account_number || '',
                 holder: settings?.account_holder || '',
-                app_id: globalApplication.id
+                app_id: globalApplication.id || _studentInfo.id
             });
         } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
