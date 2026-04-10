@@ -58,9 +58,9 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "이온토플입니다.",
         "",
         `${data.program} 계약서가 발송되었습니다.`,
-        "아래 링크에서 계약 내용을 확인하시고 동의해주세요.",
+        "아래 링크에서 계약 내용을 꼼꼼히 확인하신 후 동의해주세요.",
         "",
-        "* 24시간 이내 미확인 시 계약이 자동 취소됩니다.",
+        "* 24시간 이내 미동의 시 자동 취소됩니다.",
         "",
         link,
       ].join("\n");
@@ -72,14 +72,15 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
-        "계약이 완료되었습니다. 아래 계좌로 입금을 진행해주세요.",
+        "계약이 완료되었습니다.",
+        "아래 계좌로 입금을 진행해주세요.",
         "",
-        `금액: ${data.price}원`,
-        `은행: ${data.bank}`,
-        `계좌번호: ${data.account}`,
-        `예금주: ${data.holder}`,
+        `- 금액: ${data.price}원`,
+        `- 은행: ${data.bank}`,
+        `- 계좌번호: ${data.account}`,
+        `- 예금주: ${data.holder}`,
         "",
-        "* 24시간 이내 미입금 시 계약이 자동 취소됩니다.",
+        "* 24시간 이내 미입금 시 자동 취소됩니다.",
         "",
         link,
       ].join("\n");
@@ -91,12 +92,10 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
-        "입금이 정상적으로 확인되었습니다.",
+        "입금이 확인되었습니다.",
         "이용방법 안내를 곧 보내드리겠습니다.",
         "",
-        "감사합니다.",
-        "",
-        link,
+        "조금만 기다려주세요!",
       ].join("\n");
 
     case "guide_uploaded":
@@ -115,34 +114,35 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         link,
       ].join("\n");
 
-    case "shipping_sent":
+    case "shipping_sent": {
+      const trackingUrl = `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
       return [
-        "이온토플 - 교재 택배 발송 안내",
+        "이온토플 - 택배 발송 안내",
         "",
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
-        "신청하신 교재가 택배로 발송되었습니다.",
+        "택배가 발송되었습니다.",
         "",
-        `택배사: ${data.courier}`,
-        `운송장번호: ${data.tracking_number}`,
+        `- 택배사: ${data.courier}`,
+        `- 운송장번호: ${data.tracking_number}`,
         "",
-        "아래 링크에서 배송현황을 확인하실 수 있습니다.",
+        "아래 링크에서 배송 현황을 확인하실 수 있습니다.",
         "",
-        link,
+        trackingUrl,
       ].join("\n");
+    }
 
     case "challenge_reminder":
       return [
-        "이온토플 - 챌린지 시작 안내",
+        "이온토플 - Friendly Reminder :-)",
         "",
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
-        `신청하신 ${data.program}이 ${data.start_date}부터 시작됩니다.`,
+        `신청하신 ${data.program}이 ${data.start_date}부터 시작됩니다`,
         "",
-        "*이용방법이 숙지되어 있지 않으면 절대로 프로그램을 따라오실 수 없습니다.",
-        "최소 이틀 전까지 이용방법을 꼼꼼히 읽으며 정독해주세요.",
+        `*이용방법이 숙지되어있지 않으면 절대로 ${data.program}을 따라오실 수 없습니다. 최소 이틀전까지 이용방법을 꼼꼼히 읽으며 정독해주세요`,
         "",
         link,
       ].join("\n");
@@ -189,13 +189,17 @@ async function sendLunaSoftAlimTalk(
     msg_content: msgContent,
     sms_content: smsContent,
     use_sms: "1",                        // 알림톡 실패 시 SMS 대체 발송
-    btn_url: [
+  };
+
+  // 버튼이 있는 템플릿만 btn_url 추가 (입금확인완료는 버튼 없음)
+  if (templateId !== TEMPLATE_IDS.payment_confirmed) {
+    message.btn_url = [
       {
         url_pc: btnUrl,
         url_mobile: btnUrl,
       },
-    ],
-  };
+    ];
+  }
 
   // 택배 발송인 경우 carrier_code, invoice_number 추가
   if (templateId === TEMPLATE_IDS.shipping_sent) {
@@ -287,7 +291,10 @@ Deno.serve(async (req) => {
     // 메시지 본문 생성
     const msgContent = buildMsgContent(type, data);
     const smsContent = buildSmsContent(type);
-    const btnUrl = `${SITE_URL}/application-detail.html?id=${data.app_id}`;
+    // 택배 발송은 CJ택배 조회 링크, 나머지는 신청서 링크
+    const btnUrl = type === "shipping_sent"
+      ? `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`
+      : `${SITE_URL}/application-detail.html?id=${data.app_id}`;
 
     // LunaSoft API 호출
     const result = await sendLunaSoftAlimTalk(

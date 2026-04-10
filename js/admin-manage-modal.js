@@ -1399,8 +1399,8 @@ async function markShippingCompletedFromModal(appId) {
                 await sendKakaoAlimTalk('shipping_sent', {
                     name: app.name || currentManageApp.name,
                     phone: app.phone || currentManageApp.phone,
-                    courier: app.shipping_courier || currentManageApp.shipping_courier || 'CJ대한통운',
-                    tracking_number: app.shipping_tracking_number || currentManageApp.shipping_tracking_number || '',
+                    courier: 'CJ대한통운',
+                    tracking_number: trackingNumber?.trim() || app.shipping_tracking_number || currentManageApp.shipping_tracking_number || '',
                     app_id: app.id || currentManageApp.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
