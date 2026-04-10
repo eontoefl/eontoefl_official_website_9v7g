@@ -2,6 +2,27 @@
 
 let currentManageApp = null;
 
+// 카카오 알림톡 발송 (Edge Function 경유)
+async function sendKakaoAlimTalk(type, data) {
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ type, data })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            console.warn('알림톡 발송 실패:', result);
+        }
+        return result;
+    } catch (e) {
+        console.warn('알림톡 발송 에러:', e);
+    }
+}
+
 // 모달 열기
 async function openManageModal(appId) {
     try {
@@ -89,47 +110,19 @@ function loadModalInfoTab(app) {
     
     // 목표 점수
     let targetDisplay = '';
-    if (app.no_target_score) {
-        targetDisplay = '없음 (고고익선 🚀)';
-    } else if (app.target_cutoff_old) {
+    if (app.target_cutoff_old) {
         targetDisplay = `${app.target_cutoff_old}점`;
-        const parts = [];
-        if (app.target_reading_old) parts.push(`R:${app.target_reading_old}`);
-        if (app.target_listening_old) parts.push(`L:${app.target_listening_old}`);
-        if (app.target_speaking_old) parts.push(`S:${app.target_speaking_old}`);
-        if (app.target_writing_old) parts.push(`W:${app.target_writing_old}`);
-        if (parts.length) targetDisplay += ` (${parts.join(' / ')})`;
-    } else if (app.target_cutoff_new) {
-        targetDisplay = `${app.target_cutoff_new} 레벨`;
-        const parts = [];
-        if (app.target_reading_new) parts.push(`R:${app.target_reading_new}`);
-        if (app.target_listening_new) parts.push(`L:${app.target_listening_new}`);
-        if (app.target_speaking_new) parts.push(`S:${app.target_speaking_new}`);
-        if (app.target_writing_new) parts.push(`W:${app.target_writing_new}`);
-        if (parts.length) targetDisplay += ` (${parts.join(' / ')})`;
+    } else if (app.target_level_reading || app.target_level_listening || app.target_level_speaking || app.target_level_writing) {
+        targetDisplay = `Reading ${app.target_level_reading || '-'} / Listening ${app.target_level_listening || '-'} / Speaking ${app.target_level_speaking || '-'} / Writing ${app.target_level_writing || '-'}`;
     }
     
     // 현재 점수
     let currentDisplay = '';
-    if (app.has_toefl_score === 'yes') {
-        if (app.score_total_old) {
-            currentDisplay = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
-        } else if (app.score_total_new) {
-            currentDisplay = `총점 ${app.score_total_new} 레벨 (R:${app.score_reading_new || '-'} / L:${app.score_listening_new || '-'} / S:${app.score_speaking_new || '-'} / W:${app.score_writing_new || '-'})`;
-        }
+    if (app.score_total_old) {
+        currentDisplay = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
+    } else if (app.score_level_reading || app.score_level_listening || app.score_level_speaking || app.score_level_writing) {
+        currentDisplay = `R:${app.score_level_reading || '-'} / L:${app.score_level_listening || '-'} / S:${app.score_level_speaking || '-'} / W:${app.score_level_writing || '-'}`;
     }
-
-    // 알게 된 경로
-    let referralDisplay = '';
-    const referralParts = [];
-    if (app.referral_source && app.referral_source.length) {
-        referralParts.push(Array.isArray(app.referral_source) ? app.referral_source.join(', ') : app.referral_source);
-    }
-    if (app.referral_search_keyword) referralParts.push(`검색어: ${app.referral_search_keyword}`);
-    if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
-    if (app.referral_from_friend === 'yes' && app.referral_friend_name) referralParts.push(`지인: ${app.referral_friend_name}`);
-    if (app.referral_other) referralParts.push(`기타: ${app.referral_other}`);
-    referralDisplay = referralParts.join(' / ') || '-';
     
     container.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
@@ -138,23 +131,15 @@ function loadModalInfoTab(app) {
                 <h3 class="info-card-title"><i class="fas fa-user"></i> 기본 정보</h3>
                 <div class="info-item">
                     <label>이름</label>
-                    <div>${app.name || '-'}</div>
+                    <div>${app.name}</div>
                 </div>
                 <div class="info-item">
                     <label>이메일</label>
-                    <div>${app.email || '-'}</div>
+                    <div>${app.email}</div>
                 </div>
                 <div class="info-item">
                     <label>전화번호</label>
-                    <div>${app.phone || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>주소</label>
-                    <div>${app.address || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>입금 계좌</label>
-                    <div>${app.bank_account || '-'}</div>
+                    <div>${app.phone}</div>
                 </div>
                 <div class="info-item">
                     <label>직업</label>
@@ -166,10 +151,6 @@ function loadModalInfoTab(app) {
             <div class="info-card">
                 <h3 class="info-card-title"><i class="fas fa-chart-line"></i> 점수 정보</h3>
                 <div class="info-item">
-                    <label>토플 점수 유무</label>
-                    <div>${app.has_toefl_score === 'yes' ? '있음' : app.has_toefl_score === 'no' ? '없음' : '-'}</div>
-                </div>
-                <div class="info-item">
                     <label>현재 점수</label>
                     <div>${currentDisplay || '미제출'}</div>
                 </div>
@@ -178,12 +159,8 @@ function loadModalInfoTab(app) {
                     <div>${targetDisplay || '미입력'}</div>
                 </div>
                 <div class="info-item">
-                    <label>목표 점수 메모</label>
-                    <div style="white-space: pre-wrap;">${app.target_note || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>마감 기한</label>
-                    <div>${app.submission_deadline || '-'}</div>
+                    <label>목표 기한</label>
+                    <div>${app.target_deadline ? new Date(app.target_deadline).toLocaleDateString('ko-KR') : '-'}</div>
                 </div>
             </div>
             
@@ -192,7 +169,7 @@ function loadModalInfoTab(app) {
                 <h3 class="info-card-title"><i class="fas fa-clipboard"></i> 신청 정보</h3>
                 <div class="info-item">
                     <label>신청일</label>
-                    <div>${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}</div>
+                    <div>${new Date(app.submitted_date).toLocaleDateString('ko-KR')}</div>
                 </div>
                 <div class="info-item">
                     <label>희망 프로그램</label>
@@ -203,202 +180,26 @@ function loadModalInfoTab(app) {
                     <div>${app.preferred_start_date || '-'}</div>
                 </div>
                 <div class="info-item">
-                    <label>희망 목표 달성 시점</label>
-                    <div>${app.preferred_completion || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>하루 평균 공부 가능 시간</label>
-                    <div>${app.daily_study_time || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>프로그램 관련 의견</label>
-                    <div style="white-space: pre-wrap;">${app.program_note || '-'}</div>
-                </div>
-                <div class="info-item">
                     <label>현재 단계</label>
                     <div>STEP ${app.current_step || 1}</div>
                 </div>
             </div>
         </div>
         
-        <!-- 학습 정보 -->
+        <!-- 추가 정보 섹션 -->
+        ${app.address ? `
         <div class="info-card" style="margin-top: 24px;">
-            <h3 class="info-card-title"><i class="fas fa-book-reader"></i> 학습 정보</h3>
+            <h3 class="info-card-title"><i class="fas fa-map-marker-alt"></i> 배송 정보</h3>
             <div class="info-item">
-                <label>토플 필요 이유</label>
-                <div>${app.toefl_reason || '-'}</div>
+                <label>주소</label>
+                <div>${app.address}</div>
             </div>
-            <div class="info-item" style="margin-top: 12px;">
-                <label>토플 필요 이유 상세</label>
-                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.toefl_reason_detail || '-'}</div>
-            </div>
-            <div class="info-item" style="margin-top: 12px;">
-                <label>현재 공부 방법</label>
-                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.current_study_method || '-'}</div>
-            </div>
-        </div>
-
-        <!-- 라이팅 샘플 -->
-        ${app.writing_sample_1 || app.writing_sample_2 ? `
-        <div class="info-card" style="margin-top: 24px;">
-            <h3 class="info-card-title"><i class="fas fa-pen-fancy"></i> 라이팅 샘플</h3>
-            ${app.writing_sample_1 ? `
-            <div class="info-item">
-                <label>라이팅 샘플 1</label>
-                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.writing_sample_1}</div>
-            </div>` : ''}
-            ${app.writing_sample_2 ? `
-            <div class="info-item" style="margin-top: 12px;">
-                <label>라이팅 샘플 2</label>
-                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.writing_sample_2}</div>
-            </div>` : ''}
         </div>
         ` : ''}
 
-        <!-- 기타 정보 -->
-        <div class="info-card" style="margin-top: 24px;">
-            <h3 class="info-card-title"><i class="fas fa-info-circle"></i> 기타 정보</h3>
-            <div class="info-item">
-                <label>기억에 남는 블로그 글</label>
-                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.memorable_blog_content || '-'}</div>
-            </div>
-            <div class="info-item" style="margin-top: 12px;">
-                <label>이온토플을 알게 된 경로</label>
-                <div>${referralDisplay}</div>
-            </div>
-            <div class="info-item" style="margin-top: 12px;">
-                <label>추가 전달사항</label>
-                <div style="white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; max-height: 200px; overflow-y: auto; font-size: 13px;">${app.additional_notes || '-'}</div>
-            </div>
-        </div>
-        
-        <!-- 관리자: 신청서 수정 / 다운로드 버튼 -->
-        <div style="margin-top: 24px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
-            <button onclick="downloadApplicationTxt('${app.id}')" 
-                    style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
-                <i class="fas fa-download"></i> 다운로드
-            </button>
-            <button onclick="window.open('application-form.html?edit=${app.id}', '_blank')" 
-                    style="background: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
-                <i class="fas fa-pen"></i> 신청서 수정하기
-            </button>
-        </div>
-
-        <!-- 수강 상태 관리 (입금 확인된 학생만 표시) -->
+        <!-- 수강 상태 관리 (세팅 완료된 학생만 표시) -->
         ${renderAppStatusSection(app)}
     `;
-}
-
-// ===== 신청서 TXT 다운로드 =====
-async function downloadApplicationTxt(appId) {
-    try {
-        const app = await supabaseAPI.getById('applications', appId);
-        if (!app) { alert('신청서를 불러올 수 없습니다.'); return; }
-
-        // 현재 점수 텍스트
-        let currentScore = '없음';
-        if (app.has_toefl_score === 'yes') {
-            if (app.score_total_old) {
-                currentScore = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
-            } else if (app.score_total_new) {
-                currentScore = `총점 ${app.score_total_new} 레벨 (R:${app.score_reading_new || '-'} / L:${app.score_listening_new || '-'} / S:${app.score_speaking_new || '-'} / W:${app.score_writing_new || '-'})`;
-            }
-        }
-
-        // 목표 점수 텍스트
-        let targetScore = '미입력';
-        if (app.no_target_score) {
-            targetScore = '없음 (고고익선)';
-        } else if (app.target_cutoff_old) {
-            targetScore = `${app.target_cutoff_old}점`;
-            const parts = [];
-            if (app.target_reading_old) parts.push(`R:${app.target_reading_old}`);
-            if (app.target_listening_old) parts.push(`L:${app.target_listening_old}`);
-            if (app.target_speaking_old) parts.push(`S:${app.target_speaking_old}`);
-            if (app.target_writing_old) parts.push(`W:${app.target_writing_old}`);
-            if (parts.length) targetScore += ` (${parts.join(' / ')})`;
-        } else if (app.target_cutoff_new) {
-            targetScore = `${app.target_cutoff_new} 레벨`;
-            const parts = [];
-            if (app.target_reading_new) parts.push(`R:${app.target_reading_new}`);
-            if (app.target_listening_new) parts.push(`L:${app.target_listening_new}`);
-            if (app.target_speaking_new) parts.push(`S:${app.target_speaking_new}`);
-            if (app.target_writing_new) parts.push(`W:${app.target_writing_new}`);
-            if (parts.length) targetScore += ` (${parts.join(' / ')})`;
-        }
-
-        // 알게 된 경로
-        const referralParts = [];
-        if (app.referral_source && app.referral_source.length) {
-            referralParts.push(Array.isArray(app.referral_source) ? app.referral_source.join(', ') : app.referral_source);
-        }
-        if (app.referral_search_keyword) referralParts.push(`검색어: ${app.referral_search_keyword}`);
-        if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
-        if (app.referral_from_friend === 'yes' && app.referral_friend_name) referralParts.push(`지인: ${app.referral_friend_name}`);
-        if (app.referral_other) referralParts.push(`기타: ${app.referral_other}`);
-        const referralText = referralParts.join(' / ') || '-';
-
-        const lines = [
-            `========================================`,
-            `  이온토플 신청서`,
-            `  다운로드 일시: ${new Date().toLocaleString('ko-KR')}`,
-            `========================================`,
-            ``,
-            `[ 기본 정보 ]`,
-            `1. 이름 : ${app.name || '-'}`,
-            `2. 이메일 : ${app.email || '-'}`,
-            `3. 전화번호 : ${app.phone || '-'}`,
-            `4. 주소 : ${app.address || '-'}`,
-            `5. 입금 계좌 : ${app.bank_account || '-'}`,
-            `6. 직업 : ${app.occupation || '-'}`,
-            ``,
-            `[ 점수 정보 ]`,
-            `7. 토플 점수 유무 : ${app.has_toefl_score === 'yes' ? '있음' : app.has_toefl_score === 'no' ? '없음' : '-'}`,
-            `8. 현재 점수 : ${currentScore}`,
-            `9. 목표 점수 : ${targetScore}`,
-            `10. 목표 점수 메모 : ${app.target_note || '-'}`,
-            `11. 마감 기한 : ${app.submission_deadline || '-'}`,
-            ``,
-            `[ 학습 정보 ]`,
-            `12. 현재 공부 방법 : ${app.current_study_method || '-'}`,
-            `13. 하루 평균 공부 가능 시간 : ${app.daily_study_time || '-'}`,
-            `14. 토플 필요 이유 : ${app.toefl_reason || '-'}`,
-            `15. 토플 필요 이유 상세 : ${app.toefl_reason_detail || '-'}`,
-            ``,
-            `[ 라이팅 샘플 ]`,
-            `16. 라이팅 샘플 1 :`,
-            `${app.writing_sample_1 || '-'}`,
-            ``,
-            `17. 라이팅 샘플 2 :`,
-            `${app.writing_sample_2 || '-'}`,
-            ``,
-            `[ 신청 정보 ]`,
-            `18. 신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}`,
-            `19. 희망 프로그램 : ${app.preferred_program || '-'}`,
-            `20. 희망 시작일 : ${app.preferred_start_date || '-'}`,
-            `21. 희망 목표 달성 시점 : ${app.preferred_completion || '-'}`,
-            `22. 프로그램 관련 의견 : ${app.program_note || '-'}`,
-            ``,
-            `[ 기타 정보 ]`,
-            `23. 기억에 남는 블로그 글 : ${app.memorable_blog_content || '-'}`,
-            `24. 이온토플을 알게 된 경로 : ${referralText}`,
-            `25. 추가 전달사항 : ${app.additional_notes || '-'}`,
-            ``,
-            `========================================`,
-        ];
-
-        const content = lines.join('\n');
-        const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `신청서_${app.name || '이름없음'}_${app.phone || '번호없음'}_${app.occupation || '직업없음'}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        console.error('Download error:', error);
-        alert('다운로드에 실패했습니다.');
-    }
 }
 
 // ===== 개별분석 탭 =====
@@ -412,7 +213,7 @@ function loadModalAnalysisTab(app) {
     const cursorStyle = hasAnalysis ? '' : 'cursor: pointer;';
     
     // 학생용 링크 생성
-    const studentLink = `${window.location.origin}/application-detail.html?id=${app.id}#step2`;
+    const studentLink = `${window.location.origin}/analysis.html?id=${app.id}`;
     
     let html = `
         ${hasAnalysis ? `
@@ -770,7 +571,16 @@ async function saveModalAnalysis(event) {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
         
         if (updatedApp) {
-            alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/application-detail.html?id=${currentManageApp.id}#step2`);
+            // 알림톡: 개별분석 완료 안내
+            try {
+                await sendKakaoAlimTalk('analysis_complete', {
+                    name: updatedApp.name,
+                    phone: updatedApp.phone,
+                    app_id: updatedApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
+            alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
             
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;
@@ -797,7 +607,7 @@ function previewAnalysis(appId) {
     
     // 현재 페이지의 base URL을 기준으로 상대 경로 생성
     const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '');
-    const previewUrl = `${baseUrl}/application-detail.html?id=${appId}#step2`;
+    const previewUrl = `${baseUrl}/analysis.html?id=${appId}`;
     
     console.log('Preview URL:', previewUrl);
     
@@ -1432,6 +1242,15 @@ async function confirmDepositFromModal(appId) {
         });
         
         if (updatedApp) {
+            // 알림톡: 입금 확인 완료
+            try {
+                await sendKakaoAlimTalk('payment_confirmed', {
+                    name: updatedApp.name,
+                    phone: updatedApp.phone,
+                    app_id: updatedApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 입금이 확인되었습니다!');
             currentManageApp = updatedApp;
             loadModalTab('contract');
@@ -1521,6 +1340,17 @@ async function sendUsageGuideFromModal(appId) {
         });
         
         if (updatedApp) {
+            // 알림톡: 이용방법 안내
+            try {
+                await sendKakaoAlimTalk('guide_uploaded', {
+                    name: updatedApp.name,
+                    phone: updatedApp.phone,
+                    program: updatedApp.assigned_program || '',
+                    start_date: updatedApp.schedule_start || '',
+                    app_id: updatedApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 이용방법이 전달되었습니다!');
             currentManageApp = updatedApp;
             loadModalTab('usage');
@@ -1564,6 +1394,17 @@ async function markShippingCompletedFromModal(appId) {
                 message: `실물 교재가 발송되었습니다.${trackingNumber ? ` (운송장: ${trackingNumber})` : ''}`
             });
             
+            // 알림톡: 택배 발송 안내
+            try {
+                await sendKakaoAlimTalk('shipping_sent', {
+                    name: app.name,
+                    phone: app.phone,
+                    courier: app.shipping_courier || 'CJ대한통운',
+                    tracking_number: app.shipping_tracking_number || '',
+                    app_id: app.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 택배 발송이 완료 처리되었습니다!');
             currentManageApp = app;
             loadModalTab('shipping'); // usage -> shipping으로 변경
@@ -1791,9 +1632,9 @@ function openStudentView() {
     }
 }
 
-// 알림톡 예약 함수
+// 알림톡 예약 함수 (챌린지 D-1 알림톡 실제 발송)
 async function scheduleKakaoNotification(appId) {
-    if (!confirm('알림톡 예약을 완료 처리하시겠습니까?')) {
+    if (!confirm('챌린지 시작 알림톡을 발송하시겠습니까?')) {
         return;
     }
     
@@ -1804,16 +1645,27 @@ async function scheduleKakaoNotification(appId) {
         });
         
         if (app) {
+            // 알림톡: 챌린지 시작 D-1 안내 (실제 발송)
+            try {
+                await sendKakaoAlimTalk('challenge_reminder', {
+                    name: app.name,
+                    phone: app.phone,
+                    program: app.assigned_program || '',
+                    start_date: app.schedule_start || '',
+                    app_id: app.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             // 알림 생성
             await createNotification({
                 application_id: appId,
                 user_email: app.email,
                 type: 'kakaotalk_scheduled',
                 icon: 'fa-comment-dots',
-                message: '알림톡이 예약되었습니다.'
+                message: '챌린지 시작 알림톡이 발송되었습니다.'
             });
             
-            alert('✅ 알림톡 예약이 완료되었습니다!');
+            alert('✅ 챌린지 시작 알림톡이 발송되었습니다!');
             currentManageApp = app;
             loadModalTab('shipping');
         } else {
@@ -1855,7 +1707,7 @@ document.addEventListener('keydown', function(e) {
 // ===== 수강 상태 관리 섹션 =====
 function renderAppStatusSection(app) {
     const status = getAppLiveStatus(app);
-    if (!status) return ''; // 입금 미확인이면 표시 안 함
+    if (!status) return ''; // 세팅 미완료면 표시 안 함
 
     const statuses = [
         { key: 'active', label: '진행중', color: '#7c3aed', bg: '#ede9fe', icon: 'fa-running' },
@@ -1905,7 +1757,7 @@ function renderAppStatusSection(app) {
         <div id="appStatusForm" style="display:none; margin-top:12px; padding:20px; background:#f8fafc; border-radius:10px;">
             <div style="margin-bottom:12px;">
                 <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">사유</label>
-                <input type="text" id="appStatusReason" placeholder="사유 입력..."
+                <input type="text" id="appStatusReason" placeholder="환불 사유 입력..."
                     style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
             </div>
             <div style="margin-bottom:16px;">
@@ -1927,15 +1779,17 @@ let pendingAppStatus = null;
 
 function selectAppStatus(key) {
     const current = getAppLiveStatus(currentManageApp);
-    if (current && current.key === key) return;
+    if (current && current.key === key) return; // 이미 같은 상태
 
     if (key === 'refunded' || key === 'dropped') {
         pendingAppStatus = key;
         document.getElementById('appStatusForm').style.display = 'block';
         document.getElementById('appStatusReason').value = '';
         document.getElementById('appStatusRefundAmount').value = '';
+        // 버튼 하이라이트
         highlightAppStatusBtn(key);
     } else if (key === 'active') {
+        // 진행중으로 되돌리기
         if (!confirm('수강 상태를 "진행중"으로 되돌리시겠습니까?')) return;
         changeAppStatus('active', '', 0);
     }
@@ -1965,6 +1819,7 @@ function highlightAppStatusBtn(activeKey) {
 function cancelAppStatusChange() {
     pendingAppStatus = null;
     document.getElementById('appStatusForm').style.display = 'none';
+    // 원래 상태로 버튼 복원
     const current = getAppLiveStatus(currentManageApp);
     if (current) highlightAppStatusBtn(current.key);
 }
@@ -1989,6 +1844,7 @@ async function changeAppStatus(status, reason, amount) {
             updateData.refund_amount = amount || 0;
             updateData.refund_at = Date.now();
         } else {
+            // 진행중으로 되돌리기
             updateData.refund_reason = null;
             updateData.refund_amount = null;
             updateData.refund_at = null;
