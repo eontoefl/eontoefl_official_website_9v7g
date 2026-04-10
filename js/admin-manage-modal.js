@@ -139,8 +139,12 @@ function downloadInfoTxt() {
         if (app.score_history) lines.push(`추가 설명 : ${app.score_history}`);
     } else {
         lines.push('TOEFL 응시 여부 : 없음');
-        lines.push(`Writing Sample 1 : ${app.writing_sample_1 || '-'}`);
-        lines.push(`Writing Sample 2 : ${app.writing_sample_2 || '-'}`);
+        lines.push('');
+        lines.push('Q1: What are your hobbies or interests, and why do you enjoy them?');
+        lines.push(`A1: ${app.writing_sample_1 || '-'}`);
+        lines.push('');
+        lines.push('Q2: Describe a challenge you faced recently and how you dealt with it.');
+        lines.push(`A2: ${app.writing_sample_2 || '-'}`);
     }
 
     lines.push('');
@@ -302,11 +306,11 @@ function loadModalInfoTab(app) {
             ` : `
                 <div class="info-item"><label>TOEFL 응시 여부</label><div>없음</div></div>
                 <div class="info-item">
-                    <label>Writing Sample 1</label>
+                    <label>Q1: What are your hobbies or interests, and why do you enjoy them?</label>
                     <div style="white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.writing_sample_1 || '-'}</div>
                 </div>
                 <div class="info-item">
-                    <label>Writing Sample 2</label>
+                    <label>Q2: Describe a challenge you faced recently and how you dealt with it.</label>
                     <div style="white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.writing_sample_2 || '-'}</div>
                 </div>
             `}
