@@ -2195,66 +2195,66 @@ function getPricingBox(app, showPaymentNotice = true) {
     if (!app.assigned_program) return '';
     
     return `
-        <div style="padding: 24px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px;">
-            <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+        <div style="padding: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px;">
+            <div style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
                 <i class="fas fa-receipt" style="color: #9480c5;"></i> 이용가 및 할인 내역
             </div>
             
             ${app.program_price ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">정가</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.program_price.toLocaleString()}원</span>
+                <span style="color: #64748b; font-size: 13px;">정가</span>
+                <span style="font-weight: 600; color: #1e293b; font-size: 13px;">${app.program_price.toLocaleString()}원</span>
             </div>
             ` : ''}
             
             ${app.discount_amount ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">시험료 지원</span>
-                <span style="font-weight: 600; color: #22c55e; font-size: 15px;">-${app.discount_amount.toLocaleString()}원</span>
+                <span style="color: #64748b; font-size: 13px;">시험료 지원</span>
+                <span style="font-weight: 600; color: #22c55e; font-size: 13px;">-${app.discount_amount.toLocaleString()}원</span>
             </div>
             <div style="padding: 8px 0 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
+                <p style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
                     ※ 실제시험 2회 진행 및 점수 인증, 후기 1회 작성 조건이 포함되어있습니다.
                 </p>
             </div>
             ` : ''}
             
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">실제 이용가</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${((app.program_price || 1000000) - (app.discount_amount || 210000)).toLocaleString()}원</span>
+                <span style="color: #64748b; font-size: 13px;">실제 이용가</span>
+                <span style="font-weight: 600; color: #1e293b; font-size: 13px;">${((app.program_price || 1000000) - (app.discount_amount || 210000)).toLocaleString()}원</span>
             </div>
             
             ${app.additional_discount ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">추가 할인</span>
-                <span style="font-weight: 600; color: #ef4444; font-size: 15px;">-${app.additional_discount.toLocaleString()}원</span>
+                <span style="color: #64748b; font-size: 13px;">추가 할인</span>
+                <span style="font-weight: 600; color: #ef4444; font-size: 13px;">-${app.additional_discount.toLocaleString()}원</span>
             </div>
             ` : ''}
             
             ${app.discount_reason ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">할인 사유</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 14px;">${escapeHtml(app.discount_reason)}</span>
+                <span style="color: #64748b; font-size: 13px;">할인 사유</span>
+                <span style="font-weight: 600; color: #1e293b; font-size: 12px;">${escapeHtml(app.discount_reason)}</span>
             </div>
             ` : ''}
             
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">보증금 (환불)</span>
-                <span style="font-weight: 600; color: #3b82f6; font-size: 15px;">+100,000원</span>
+                <span style="color: #64748b; font-size: 13px;">보증금 (환불)</span>
+                <span style="font-weight: 600; color: #3b82f6; font-size: 13px;">+100,000원</span>
             </div>
             <div style="padding: 8px 0 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
+                <p style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
                     ※ 과제 인증률에 따라 환불되는 금액입니다.
                 </p>
             </div>
             
             ${app.final_price ? `
             <div style="display: flex; justify-content: space-between; padding: 16px 0; margin-top: 8px;">
-                <span style="color: #1e293b; font-size: 17px; font-weight: 700;">최종 입금금액</span>
-                <span style="font-weight: 700; color: #9480c5; font-size: 22px;">${app.final_price.toLocaleString()}원</span>
+                <span style="color: #1e293b; font-size: 14px; font-weight: 700;">최종 입금금액</span>
+                <span style="font-weight: 700; color: #9480c5; font-size: 19px;">${app.final_price.toLocaleString()}원</span>
             </div>
             <div style="padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 12px;">
-                <p style="font-size: 13px; color: #475569; line-height: 1.7; margin: 0;">
+                <p style="font-size: 11px; color: #475569; line-height: 1.7; margin: 0;">
                     ✓ <strong>일절 추가 금액 없으며, 모든 것이 포함된 금액입니다.</strong><br>
                     ✓ 중간에 목표점수 달성 시, 아직 시작하지 않은 프로그램은 <strong>전액환불</strong>이 가능합니다.${showPaymentNotice ? '<br>✓ <strong>결제는 최종적으로 프로그램 및 가격, 계약서까지 동의 후 가장 마지막에 진행됩니다.</strong>' : ''}
                 </p>
@@ -2276,9 +2276,9 @@ async function loadPaymentTab(app) {
     if (!app.contract_agreed) {
         paymentContent.innerHTML = `
             <div style="text-align: center; padding: 80px 40px; color: #94a3b8;">
-                <i class="fas fa-lock" style="font-size: 64px; margin-bottom: 24px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #64748b;">입금 안내 대기 중</h3>
-                <p style="font-size: 15px; line-height: 1.6;">
+                <i class="fas fa-lock" style="font-size: 48px; margin-bottom: 20px; color: #cbd5e1;"></i>
+                <h3 style="font-size: 17px; font-weight: 600; margin-bottom: 10px; color: #64748b;">입금 안내 대기 중</h3>
+                <p style="font-size: 13px; line-height: 1.6;">
                     계약서에 동의하시면 입금 안내가 표시됩니다.<br/>
                     먼저 계약서 탭에서 계약에 동의해 주세요.
                 </p>
@@ -2292,15 +2292,15 @@ async function loadPaymentTab(app) {
         paymentContent.innerHTML = `
             <div style="background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%); padding: 32px; border-radius: 16px; border: 2px solid #22c55e; margin-bottom: 32px;">
                 <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 32px; color: #22c55e;"></i>
+                    <i class="fas fa-check-circle" style="font-size: 26px; color: #22c55e;"></i>
                     <div>
-                        <h3 style="font-size: 20px; font-weight: 700; color: #166534; margin: 0;">✅ 입금 확인 완료</h3>
-                        <p style="font-size: 14px; color: #15803d; margin: 8px 0 0 0;">
+                        <h3 style="font-size: 17px; font-weight: 700; color: #166534; margin: 0;">✅ 입금 확인 완료</h3>
+                        <p style="font-size: 12px; color: #15803d; margin: 6px 0 0 0;">
                             ${new Date(app.deposit_confirmed_by_admin_at).toLocaleString('ko-KR')}에 입금이 확인되었습니다.
                         </p>
                     </div>
                 </div>
-                <p style="font-size: 15px; color: #166534; margin: 0; line-height: 1.6;">
+                <p style="font-size: 13px; color: #166534; margin: 0; line-height: 1.6;">
                     입금액: <strong>${(app.final_price || 0).toLocaleString()}원</strong><br/>
                     곧 이용 방법 안내가 발송됩니다.
                 </p>
@@ -2316,10 +2316,10 @@ async function loadPaymentTab(app) {
         paymentContent.innerHTML = `
             <div style="background: linear-gradient(135deg, #fff4e6 0%, #fefce8 100%); padding: 32px; border-radius: 16px; border: 2px solid #f59e0b; margin-bottom: 32px;">
                 <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-clock" style="font-size: 32px; color: #f59e0b;"></i>
+                    <i class="fas fa-clock" style="font-size: 26px; color: #f59e0b;"></i>
                     <div>
-                        <h3 style="font-size: 20px; font-weight: 700; color: #92400e; margin: 0;">⏳ 입금 확인 대기 중</h3>
-                        <p style="font-size: 14px; color: #a16207; margin: 8px 0 0 0;">
+                        <h3 style="font-size: 17px; font-weight: 700; color: #92400e; margin: 0;">⏳ 입금 확인 대기 중</h3>
+                        <p style="font-size: 12px; color: #a16207; margin: 6px 0 0 0;">
                             ${new Date(app.deposit_confirmed_by_student_at).toLocaleString('ko-KR')}에 입금 완료 알림을 보내셨습니다.
                         </p>
                     </div>
@@ -2368,25 +2368,25 @@ async function loadPaymentTab(app) {
         }
         
         deadlineHTML = `
-            <div style="background: linear-gradient(135deg, ${timerBg} 0%, #fef2f2 100%); padding: 24px; border-radius: 16px; border: 2px solid ${timerBorder}; margin-bottom: 32px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);">
-                <div class="payment-deadline-flex" style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                    <div style="background: white; padding: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);">
-                        <i class="fas ${timerIcon}" style="font-size: 32px; color: ${timerColor};"></i>
+            <div style="background: linear-gradient(135deg, ${timerBg} 0%, #fef2f2 100%); padding: 20px; border-radius: 14px; border: 2px solid ${timerBorder}; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);">
+                <div class="payment-deadline-flex" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div style="background: white; padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);">
+                        <i class="fas ${timerIcon}" style="font-size: 24px; color: ${timerColor};"></i>
                     </div>
-                    <div style="flex: 1; min-width: 150px;">
-                        <h3 style="font-size: 20px; font-weight: 700; color: ${timerColor}; margin: 0 0 8px 0;">
+                    <div style="flex: 1; min-width: 130px;">
+                        <h3 style="font-size: 17px; font-weight: 700; color: ${timerColor}; margin: 0 0 6px 0;">
                             ⏰ 입금 기한 안내
                         </h3>
-                        <p style="font-size: 15px; color: ${timerTextColor}; margin: 0; line-height: 1.6;">
+                        <p style="font-size: 13px; color: ${timerTextColor}; margin: 0; line-height: 1.6;">
                             ${remaining > 0 
-                                ? `계약 동의 후 <strong style="color: ${timerColor}; font-size: 16px;">24시간 이내</strong>에 입금을 완료해주세요.` 
-                                : `<strong style="color: ${timerColor}; font-size: 16px;">입금 기한이 초과되었습니다.</strong> 빠른 입금 부탁드립니다.`
+                                ? `계약 동의 후 <strong style="color: ${timerColor}; font-size: 14px;">24시간 이내</strong>에 입금을 완료해주세요.` 
+                                : `<strong style="color: ${timerColor}; font-size: 14px;">입금 기한이 초과되었습니다.</strong> 빠른 입금 부탁드립니다.`
                             }
                         </p>
                     </div>
-                    <div class="payment-timer-box" style="text-align: center; padding: 20px; background: white; border-radius: 16px; min-width: 180px; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);">
-                        <div style="font-size: 14px; color: #64748b; margin-bottom: 8px; font-weight: 600;">남은 시간</div>
-                        <div id="paymentTimer" class="payment-timer-text" style="font-size: 36px; font-weight: 700; color: ${timerColor}; line-height: 1; font-family: 'Courier New', monospace;">
+                    <div class="payment-timer-box" style="text-align: center; padding: 16px; background: white; border-radius: 14px; min-width: 150px; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 600;">남은 시간</div>
+                        <div id="paymentTimer" class="payment-timer-text" style="font-size: 30px; font-weight: 700; color: ${timerColor}; line-height: 1; font-family: 'Courier New', monospace;">
                             ${remaining > 0 
                                 ? `${String(Math.max(0, hours)).padStart(2, '0')}:${String(Math.max(0, minutes)).padStart(2, '0')}:${String(Math.max(0, seconds)).padStart(2, '0')}`
                                 : '00:00:00'
@@ -2399,39 +2399,39 @@ async function loadPaymentTab(app) {
     }
     
     paymentContent.innerHTML = paymentInfoHtml + deadlineHTML + `
-        <div style="background: #f8fafc; padding: 32px; border-radius: 16px; margin-top: 32px;">
-            <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 16px 0;">
-                <i class="fas fa-credit-card" style="color: #9480c5; margin-right: 8px;"></i>
+        <div style="background: #f8fafc; padding: 24px; border-radius: 14px; margin-top: 24px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;">
+                <i class="fas fa-credit-card" style="color: #9480c5; margin-right: 6px;"></i>
                 입금 완료 확인
             </h3>
-            <p style="font-size: 15px; color: #64748b; margin: 0 0 24px 0; line-height: 1.6;">
+            <p style="font-size: 13px; color: #64748b; margin: 0 0 20px 0; line-height: 1.6;">
                 위 계좌로 입금을 완료하셨다면 아래 정보를 입력하고 버튼을 눌러 주세요.<br/>
                 관리자가 입금을 확인한 후 이용 방법 안내를 보내드립니다.
             </p>
             
-            <div style="margin-bottom: 20px;">
-                <label for="depositorName" style="display: block; font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">
-                    <i class="fas fa-user" style="color: #9480c5; margin-right: 6px;"></i>
+            <div style="margin-bottom: 16px;">
+                <label for="depositorName" style="display: block; font-size: 12px; font-weight: 600; color: #1e293b; margin-bottom: 6px;">
+                    <i class="fas fa-user" style="color: #9480c5; margin-right: 5px;"></i>
                     입금자명 <span style="color: #ef4444;">*</span>
                 </label>
                 <input type="text" id="depositorName" value="${app.name || ''}" placeholder="실제 입금하신 분의 성함을 입력해주세요"
-                       style="width: 100%; padding: 14px; border: 2px solid #e2e8f0; border-radius: 8px; 
-                              font-size: 15px; transition: all 0.3s;"
+                       style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
+                              font-size: 13px; transition: all 0.3s;"
                        onfocus="this.style.borderColor='#9480c5'"
                        onblur="this.style.borderColor='#e2e8f0'">
-                <p style="font-size: 13px; color: #64748b; margin: 8px 0 0 0;">
+                <p style="font-size: 11px; color: #64748b; margin: 6px 0 0 0;">
                     💡 본인이 직접 입금하신 경우 그대로 두시고, 다른 분(부모님, 배우자 등)이 입금하신 경우 실제 입금자명으로 수정해주세요.
                 </p>
             </div>
             
             <button onclick="confirmDeposit()" 
-                    style="width: 100%; padding: 18px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
-                           color: white; border: none; border-radius: 12px; font-size: 17px; font-weight: 600; 
+                    style="width: 100%; padding: 14px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
+                           color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; 
                            cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
-                <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
+                <i class="fas fa-check-circle" style="margin-right: 6px;"></i>
                 입금 완료했습니다
             </button>
-            <p style="font-size: 13px; color: #64748b; text-align: center; margin: 16px 0 0 0; line-height: 1.6;">
+            <p style="font-size: 11px; color: #64748b; text-align: center; margin: 12px 0 0 0; line-height: 1.6;">
                 입금 확인 후 자동으로 다음 단계로 진행됩니다.
             </p>
         </div>
@@ -2484,34 +2484,34 @@ async function getPaymentInfo(app) {
         <!-- 입금탭 모바일 반응형 스타일 -->
         <style>
             @media (max-width: 768px) {
-                .payment-wrap { padding: 20px !important; }
-                .payment-wrap h2 { font-size: 20px !important; margin-bottom: 20px !important; }
-                .payment-wrap h2 svg { width: 24px !important; height: 24px !important; }
-                .payment-wrap h3 { font-size: 16px !important; }
-                .payment-wrap h4 { font-size: 14px !important; }
-                .payment-account-section { padding: 16px !important; margin-bottom: 20px !important; }
-                .payment-account-section h3 { margin-bottom: 16px !important; }
-                .payment-account-table { font-size: 14px !important; }
-                .payment-account-table td { padding: 10px 12px !important; }
-                .payment-account-number { font-size: 15px !important; letter-spacing: 0 !important; word-break: break-all; }
-                .payment-account-value { font-size: 15px !important; }
-                .payment-amount-big { font-size: 26px !important; }
-                .payment-amount-section { padding: 16px !important; margin-bottom: 20px !important; }
-                .payment-info-section { padding: 16px !important; }
-                .payment-deadline-flex { gap: 12px !important; }
-                .payment-deadline-flex h3 { font-size: 16px !important; }
-                .payment-deadline-flex p { font-size: 13px !important; }
-                .payment-timer-box { min-width: 0 !important; width: 100% !important; padding: 12px !important; }
-                .payment-timer-text { font-size: 28px !important; }
+                .payment-wrap { padding: 16px !important; }
+                .payment-wrap h2 { font-size: 17px !important; margin-bottom: 16px !important; }
+                .payment-wrap h2 svg { width: 20px !important; height: 20px !important; }
+                .payment-wrap h3 { font-size: 14px !important; }
+                .payment-wrap h4 { font-size: 12px !important; }
+                .payment-account-section { padding: 14px !important; margin-bottom: 16px !important; }
+                .payment-account-section h3 { margin-bottom: 12px !important; }
+                .payment-account-table { font-size: 12px !important; }
+                .payment-account-table td { padding: 8px 10px !important; }
+                .payment-account-number { font-size: 13px !important; letter-spacing: 0 !important; word-break: break-all; }
+                .payment-account-value { font-size: 13px !important; }
+                .payment-amount-big { font-size: 22px !important; }
+                .payment-amount-section { padding: 14px !important; margin-bottom: 16px !important; }
+                .payment-info-section { padding: 14px !important; }
+                .payment-deadline-flex { gap: 10px !important; }
+                .payment-deadline-flex h3 { font-size: 14px !important; }
+                .payment-deadline-flex p { font-size: 11px !important; }
+                .payment-timer-box { min-width: 0 !important; width: 100% !important; padding: 10px !important; }
+                .payment-timer-text { font-size: 24px !important; }
             }
         </style>
 
         <!-- 이용가 및 할인 내역 -->
         ${getPricingBox(app, false)}
         
-        <div class="payment-wrap" style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0; margin-bottom: 32px;">
-            <h2 style="text-align: center; font-size: 28px; font-weight: 700; margin: 0 0 32px 0; color: #1e293b;">
-                <svg width="32" height="32" viewBox="0 0 24 24" style="display: inline-block; vertical-align: middle; margin-right: 12px;">
+        <div class="payment-wrap" style="background: white; padding: 32px; border-radius: 16px; border: 2px solid #e2e8f0; margin-bottom: 24px;">
+            <h2 style="text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 24px 0; color: #1e293b;">
+                <svg width="28" height="28" viewBox="0 0 24 24" style="display: inline-block; vertical-align: middle; margin-right: 10px;">
                     <rect x="2" y="4" width="20" height="14" rx="2" fill="none" stroke="#9480c5" stroke-width="1.5"/>
                     <rect x="2" y="8" width="20" height="3" fill="#9480c5"/>
                     <line x1="5" y1="15" x2="10" y2="15" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round"/>
@@ -2519,66 +2519,65 @@ async function getPaymentInfo(app) {
                 입금 안내
             </h2>
             
-            <div class="payment-account-section" style="background: #f8fafc; padding: 32px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 32px;">
-                <h3 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 24px 0; text-align: center;">
+            <div class="payment-account-section" style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 0 0 20px 0; text-align: center;">
                     입금 계좌 정보
                 </h3>
-                <table class="payment-account-table" style="width: 100%; border-collapse: collapse; font-size: 16px;">
+                <table class="payment-account-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
                     <tr>
-                        <td style="padding: 16px; background: white; border-radius: 12px 12px 0 0; font-weight: 600; white-space: nowrap;">은행</td>
-                        <td class="payment-account-value" style="padding: 16px; background: white; border-radius: 12px 12px 0 0; font-size: 18px; font-weight: 700; color: #1e293b;">${bankName}</td>
+                        <td style="padding: 12px; background: white; border-radius: 12px 12px 0 0; font-weight: 600; white-space: nowrap;">은행</td>
+                        <td class="payment-account-value" style="padding: 12px; background: white; border-radius: 12px 12px 0 0; font-size: 15px; font-weight: 700; color: #1e293b;">${bankName}</td>
                     </tr>
                     <tr>
-                        <td style="padding: 16px; background: white; font-weight: 600; white-space: nowrap;">계좌번호</td>
-                        <td style="padding: 16px; background: white;">
-                            <span class="payment-account-number" style="font-size: 22px; font-weight: 700; color: #1e293b; letter-spacing: 1px;">${accountNumber}</span>
-                            <button onclick="copyToClipboard('${accountNumber}', '계좌번호')" 
-                                    style="margin-left: 8px; padding: 6px 12px; background: #9480c5; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
-                                <i class="fas fa-copy"></i> 복사
-                            </button>
+                        <td style="padding: 12px; background: white; font-weight: 600; white-space: nowrap;">계좌번호</td>
+                        <td style="padding: 12px; background: white;">
+                            <span class="payment-account-number" style="font-size: 19px; font-weight: 700; color: #1e293b; letter-spacing: 0.5px;">${accountNumber}</span>
+                            <i class="fas fa-copy" onclick="copyToClipboard('${accountNumber}', '계좌번호')" 
+                               style="margin-left: 6px; font-size: 12px; color: #9480c5; cursor: pointer; vertical-align: middle;" 
+                               title="계좌번호 복사"></i>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 16px; background: white; border-radius: 0 0 12px 12px; font-weight: 600; white-space: nowrap;">예금주</td>
-                        <td class="payment-account-value" style="padding: 16px; background: white; border-radius: 0 0 12px 12px; font-size: 18px; font-weight: 600;">${accountHolder}</td>
+                        <td style="padding: 12px; background: white; border-radius: 0 0 12px 12px; font-weight: 600; white-space: nowrap;">예금주</td>
+                        <td class="payment-account-value" style="padding: 12px; background: white; border-radius: 0 0 12px 12px; font-size: 15px; font-weight: 600;">${accountHolder}</td>
                     </tr>
                 </table>
             </div>
             
-            <div class="payment-amount-section" style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 32px;">
-                <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 16px 0;">
+            <div class="payment-amount-section" style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;">
                     <i class="fas fa-won-sign" style="margin-right: 8px; color: #9480c5;"></i>
                     입금 금액
                 </h3>
-                <div style="text-align: center; padding: 16px; background: white; border-radius: 12px;">
-                    <p style="margin: 0 0 8px 0; font-size: 16px; color: #64748b;">최종 입금 금액</p>
-                    <p class="payment-amount-big" style="margin: 0; font-size: 36px; font-weight: 700; color: #9480c5;">
+                <div style="text-align: center; padding: 14px; background: white; border-radius: 12px;">
+                    <p style="margin: 0 0 6px 0; font-size: 14px; color: #64748b;">최종 입금 금액</p>
+                    <p class="payment-amount-big" style="margin: 0; font-size: 30px; font-weight: 700; color: #9480c5;">
                         ${(app.final_price || 0).toLocaleString()}원
                     </p>
                 </div>
-                <div style="background: #fffbeb; padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid #fde68a;">
-                    <p style="font-size: 14px; color: #78716c; margin: 0; text-align: center; line-height: 1.8; font-weight: 600;">
+                <div style="background: #fffbeb; padding: 12px; border-radius: 8px; margin-top: 12px; border: 1px solid #fde68a;">
+                    <p style="font-size: 12px; color: #78716c; margin: 0; text-align: center; line-height: 1.7; font-weight: 600;">
                         ⚠️ <strong>위 금액과 동일하게 입금해주세요</strong><br/>
-                        <span style="font-size: 13px; font-weight: 400;">
+                        <span style="font-size: 11px; font-weight: 400;">
                             (입금액이 다를 경우 확인이 지연될 수 있습니다)
                         </span>
                     </p>
                 </div>
-                <p style="font-size: 13px; color: #64748b; margin: 16px 0 0 0; text-align: center; line-height: 1.8;">
+                <p style="font-size: 11px; color: #64748b; margin: 12px 0 0 0; text-align: center; line-height: 1.7;">
                     * 보증금 100,000원 포함<br/>
-                    <span style="font-size: 12px;">
+                    <span style="font-size: 10px;">
                         (과제인증률에 따라 최소 0원 ~ 최대 100,000원 환급)<br/>
                         - 70% 미만: 0원 / 70~94%: 부분 환급 / 95% 이상: 전액 환급
                     </span>
                 </p>
             </div>
             
-            <div class="payment-info-section" style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #1e293b; margin: 0 0 12px 0;">
-                    <i class="fas fa-info-circle" style="margin-right: 8px; color: #9480c5;"></i>
+            <div class="payment-info-section" style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 10px 0;">
+                    <i class="fas fa-info-circle" style="margin-right: 6px; color: #9480c5;"></i>
                     입금 안내
                 </h4>
-                <ul style="margin: 0; padding-left: 24px; font-size: 14px; color: #64748b; line-height: 1.8;">
+                <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #64748b; line-height: 1.8;">
                     <li>관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.</li>
                     <li>입금 관련 문의는 카카오톡으로 해주세요.</li>
                 </ul>
