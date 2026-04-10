@@ -1122,6 +1122,7 @@ async function previewSelectedContract() {
                 </div>
             `;
             document.body.appendChild(previewModal);
+            setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
         }
     } catch (error) {
         console.error('Preview error:', error);
@@ -1180,6 +1181,7 @@ async function previewSentContract(appId) {
         </div>
     `;
     document.body.appendChild(previewModal);
+    setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
 }
 
 // 계약서 변경 (동의 전)

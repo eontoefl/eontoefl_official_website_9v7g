@@ -1656,6 +1656,7 @@ async function loadContractTab(app) {
             </div>
             ${contractHTML}
         `;
+        setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
         return;
     }
 
@@ -1685,6 +1686,7 @@ async function loadContractTab(app) {
             </div>
             ${contractHTML}
         `;
+        setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
         return;
     }
 
@@ -1743,6 +1745,9 @@ async function loadContractTab(app) {
 
     // 타이머 업데이트
     startContractTimer(sentTime);
+    
+    // 렌더링 후 넘치는 입력 필드 보정
+    setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
 }
 
 /**

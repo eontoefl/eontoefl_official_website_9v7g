@@ -172,6 +172,39 @@ function validateContractInputs() {
 }
 
 /**
+ * 렌더링 후 넘치는 따라쓰기/자유입력 필드 너비 보정
+ * - DOM에 계약서가 삽입된 후 호출
+ * - 부모 블록을 넘치는 input만 줄여줌 (정상 크기는 그대로)
+ */
+function fixContractInputOverflow() {
+    document.querySelectorAll('.copywrite-container').forEach(container => {
+        const parent = container.parentElement;
+        if (!parent) return;
+        const parentWidth = parent.getBoundingClientRect().width;
+        const containerWidth = container.getBoundingClientRect().width;
+        
+        if (containerWidth > parentWidth) {
+            const input = container.querySelector('.contract-input-copy');
+            if (input) {
+                input.style.width = parentWidth + 'px';
+            }
+        }
+    });
+    
+    document.querySelectorAll('.contract-input-free').forEach(input => {
+        const parent = input.parentElement;
+        if (!parent) return;
+        const parentWidth = parent.getBoundingClientRect().width;
+        const inputWidth = input.getBoundingClientRect().width;
+        
+        if (inputWidth > parentWidth) {
+            input.style.width = parentWidth + 'px';
+            input.style.minWidth = '0';
+        }
+    });
+}
+
+/**
  * 계약서 미리보기용 샘플 데이터
  */
 function getContractSampleData() {
