@@ -1060,6 +1060,18 @@ async function submitStudentAgreement() {
             });
         } catch (e) { console.warn('텔레그램 알림 실패:', e); }
 
+        // 알림톡: 계약서 발송 안내 (계약서가 자동 발송된 경우에만)
+        if (agreementData.contract_sent) {
+            try {
+                await sendKakaoAlimTalk('contract_sent', {
+                    name: currentApplication.name,
+                    phone: currentApplication.phone,
+                    program: currentApplication.assigned_program || currentApplication.preferred_program,
+                    app_id: currentApplication.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+        }
+
         const hasContract = agreementData.contract_sent;
         alert(hasContract 
             ? '✅ 동의가 완료되었습니다!\n\n계약서가 자동으로 발송되었습니다.\n계약서 내용을 확인해주세요.' 
@@ -2140,6 +2152,20 @@ async function submitContractAgreement() {
             });
         } catch (e) { console.warn('텔레그램 알림 실패:', e); }
 
+        // 알림톡: 입금 안내
+        try {
+            const settings = await getSiteSettings();
+            await sendKakaoAlimTalk('payment_request', {
+                name: globalApplication.name,
+                phone: globalApplication.phone,
+                price: String((globalApplication.final_price || 0).toLocaleString()),
+                bank: settings?.bank_name || '',
+                account: settings?.account_number || '',
+                holder: settings?.account_holder || '',
+                app_id: globalApplication.id
+            });
+        } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
         alert('✅ 계약 동의가 완료되었습니다!\n\n입금 안내로 자동 진행됩니다.');
         
         // Step 4 (입금 탭)로 이동
@@ -2944,4 +2970,28 @@ async function sendEdgeFunctionNotify(type, data) {
         },
         body: JSON.stringify({ type, data })
     });
+}
+
+// ==================== 카카오 알림톡 (Edge Function 경유) ====================
+
+async function sendKakaoAlimTalk(type, data) {
+    try {
+        console.log('📱 알림톡 발송 시도:', type, JSON.stringify(data));
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ type, data })
+        });
+        const result = await resp.json();
+        console.log('📱 알림톡 응답:', JSON.stringify(result));
+        if (!result.success) {
+            console.warn('알림톡 발송 실패:', result);
+        }
+        return result;
+    } catch (e) {
+        console.warn('알림톡 발송 에러:', e);
+    }
 }
