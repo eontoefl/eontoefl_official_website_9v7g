@@ -44,7 +44,7 @@ function parseContractTemplate(template, studentData = {}) {
         return `<span class="copywrite-container" style="position: relative; display: inline-block; max-width: 100%; overflow: hidden; background: linear-gradient(to right, #fef3c7 0%, #fefce8 100%); border-radius: 4px; padding: 0; vertical-align: bottom;">
                     <span class="copywrite-hint" 
                           id="${displayId}"
-                          style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: #d1d5db; pointer-events: none; z-index: 1; font-family: inherit; font-size: inherit; white-space: pre;">${escapeHtml(answer)}</span>
+                          style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: #d1d5db; pointer-events: none; z-index: 1; font-family: inherit; font-size: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 16px);">${escapeHtml(answer)}</span>
                     <input type="text" 
                            class="contract-input contract-input-copy" 
                            data-answer="${escapeHtml(answer)}"
@@ -265,13 +265,7 @@ function getContractStyles() {
                     overflow: hidden;
                     vertical-align: bottom;
                 }
-                /* 힌트: absolute 위치 유지 (inline style), 넘치면 잘림 */
-                .copywrite-hint {
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    max-width: calc(100% - 16px);
-                }
+                /* 힌트: 인라인 스타일에서 이미 nowrap + overflow hidden 처리됨 */
                 /* input: 컨테이너 안에서 넘치지 않도록 */
                 .contract-input-copy {
                     max-width: 100% !important;
