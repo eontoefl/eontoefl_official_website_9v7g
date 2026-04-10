@@ -284,6 +284,14 @@ function getContractStyles() {
                 user-select: none;
             }
             
+            @media (max-width: 768px) {
+                .contract-content {
+                    font-size: 13px;
+                    line-height: 1.7;
+                    padding: 20px;
+                }
+            }
+
             @media print {
                 .contract-input {
                     border: none !important;
