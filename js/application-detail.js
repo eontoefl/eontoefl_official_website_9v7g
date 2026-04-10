@@ -2369,11 +2369,11 @@ async function loadPaymentTab(app) {
         
         deadlineHTML = `
             <div style="background: linear-gradient(135deg, ${timerBg} 0%, #fef2f2 100%); padding: 24px; border-radius: 16px; border: 2px solid ${timerBorder}; margin-bottom: 32px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);">
-                <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="payment-deadline-flex" style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
                     <div style="background: white; padding: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);">
                         <i class="fas ${timerIcon}" style="font-size: 32px; color: ${timerColor};"></i>
                     </div>
-                    <div style="flex: 1;">
+                    <div style="flex: 1; min-width: 150px;">
                         <h3 style="font-size: 20px; font-weight: 700; color: ${timerColor}; margin: 0 0 8px 0;">
                             ⏰ 입금 기한 안내
                         </h3>
@@ -2384,9 +2384,9 @@ async function loadPaymentTab(app) {
                             }
                         </p>
                     </div>
-                    <div style="text-align: center; padding: 20px; background: white; border-radius: 16px; min-width: 180px; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);">
+                    <div class="payment-timer-box" style="text-align: center; padding: 20px; background: white; border-radius: 16px; min-width: 180px; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);">
                         <div style="font-size: 14px; color: #64748b; margin-bottom: 8px; font-weight: 600;">남은 시간</div>
-                        <div id="paymentTimer" style="font-size: 36px; font-weight: 700; color: ${timerColor}; line-height: 1; font-family: 'Courier New', monospace;">
+                        <div id="paymentTimer" class="payment-timer-text" style="font-size: 36px; font-weight: 700; color: ${timerColor}; line-height: 1; font-family: 'Courier New', monospace;">
                             ${remaining > 0 
                                 ? `${String(Math.max(0, hours)).padStart(2, '0')}:${String(Math.max(0, minutes)).padStart(2, '0')}:${String(Math.max(0, seconds)).padStart(2, '0')}`
                                 : '00:00:00'
@@ -2481,10 +2481,35 @@ async function getPaymentInfo(app) {
     const accountHolder = settings?.account_holder || '김민서';
     
     return `
+        <!-- 입금탭 모바일 반응형 스타일 -->
+        <style>
+            @media (max-width: 768px) {
+                .payment-wrap { padding: 20px !important; }
+                .payment-wrap h2 { font-size: 20px !important; margin-bottom: 20px !important; }
+                .payment-wrap h2 svg { width: 24px !important; height: 24px !important; }
+                .payment-wrap h3 { font-size: 16px !important; }
+                .payment-wrap h4 { font-size: 14px !important; }
+                .payment-account-section { padding: 16px !important; margin-bottom: 20px !important; }
+                .payment-account-section h3 { margin-bottom: 16px !important; }
+                .payment-account-table { font-size: 14px !important; }
+                .payment-account-table td { padding: 10px 12px !important; }
+                .payment-account-number { font-size: 15px !important; letter-spacing: 0 !important; word-break: break-all; }
+                .payment-account-value { font-size: 15px !important; }
+                .payment-amount-big { font-size: 26px !important; }
+                .payment-amount-section { padding: 16px !important; margin-bottom: 20px !important; }
+                .payment-info-section { padding: 16px !important; }
+                .payment-deadline-flex { gap: 12px !important; }
+                .payment-deadline-flex h3 { font-size: 16px !important; }
+                .payment-deadline-flex p { font-size: 13px !important; }
+                .payment-timer-box { min-width: 0 !important; width: 100% !important; padding: 12px !important; }
+                .payment-timer-text { font-size: 28px !important; }
+            }
+        </style>
+
         <!-- 이용가 및 할인 내역 -->
         ${getPricingBox(app, false)}
         
-        <div style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0; margin-bottom: 32px;">
+        <div class="payment-wrap" style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0; margin-bottom: 32px;">
             <h2 style="text-align: center; font-size: 28px; font-weight: 700; margin: 0 0 32px 0; color: #1e293b;">
                 <svg width="32" height="32" viewBox="0 0 24 24" style="display: inline-block; vertical-align: middle; margin-right: 12px;">
                     <rect x="2" y="4" width="20" height="14" rx="2" fill="none" stroke="#9480c5" stroke-width="1.5"/>
@@ -2494,40 +2519,40 @@ async function getPaymentInfo(app) {
                 입금 안내
             </h2>
             
-            <div style="background: #f8fafc; padding: 32px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 32px;">
+            <div class="payment-account-section" style="background: #f8fafc; padding: 32px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 32px;">
                 <h3 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 24px 0; text-align: center;">
                     입금 계좌 정보
                 </h3>
-                <table style="width: 100%; border-collapse: collapse; font-size: 16px;">
+                <table class="payment-account-table" style="width: 100%; border-collapse: collapse; font-size: 16px;">
                     <tr>
-                        <td style="padding: 16px; background: white; border-radius: 12px 12px 0 0; font-weight: 600; width: 35%;">은행</td>
-                        <td style="padding: 16px; background: white; border-radius: 12px 12px 0 0; font-size: 18px; font-weight: 700; color: #1e293b;">${bankName}</td>
+                        <td style="padding: 16px; background: white; border-radius: 12px 12px 0 0; font-weight: 600; white-space: nowrap;">은행</td>
+                        <td class="payment-account-value" style="padding: 16px; background: white; border-radius: 12px 12px 0 0; font-size: 18px; font-weight: 700; color: #1e293b;">${bankName}</td>
                     </tr>
                     <tr>
-                        <td style="padding: 16px; background: white; font-weight: 600;">계좌번호</td>
+                        <td style="padding: 16px; background: white; font-weight: 600; white-space: nowrap;">계좌번호</td>
                         <td style="padding: 16px; background: white;">
-                            <span style="font-size: 22px; font-weight: 700; color: #1e293b; letter-spacing: 1px;">${accountNumber}</span>
+                            <span class="payment-account-number" style="font-size: 22px; font-weight: 700; color: #1e293b; letter-spacing: 1px;">${accountNumber}</span>
                             <button onclick="copyToClipboard('${accountNumber}', '계좌번호')" 
-                                    style="margin-left: 12px; padding: 6px 12px; background: #9480c5; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; transform: translateY(-3px);">
+                                    style="margin-left: 8px; padding: 6px 12px; background: #9480c5; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">
                                 <i class="fas fa-copy"></i> 복사
                             </button>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 16px; background: white; border-radius: 0 0 12px 12px; font-weight: 600;">예금주</td>
-                        <td style="padding: 16px; background: white; border-radius: 0 0 12px 12px; font-size: 18px; font-weight: 600;">${accountHolder}</td>
+                        <td style="padding: 16px; background: white; border-radius: 0 0 12px 12px; font-weight: 600; white-space: nowrap;">예금주</td>
+                        <td class="payment-account-value" style="padding: 16px; background: white; border-radius: 0 0 12px 12px; font-size: 18px; font-weight: 600;">${accountHolder}</td>
                     </tr>
                 </table>
             </div>
             
-            <div style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 32px;">
+            <div class="payment-amount-section" style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 32px;">
                 <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 16px 0;">
                     <i class="fas fa-won-sign" style="margin-right: 8px; color: #9480c5;"></i>
                     입금 금액
                 </h3>
                 <div style="text-align: center; padding: 16px; background: white; border-radius: 12px;">
                     <p style="margin: 0 0 8px 0; font-size: 16px; color: #64748b;">최종 입금 금액</p>
-                    <p style="margin: 0; font-size: 36px; font-weight: 700; color: #9480c5;">
+                    <p class="payment-amount-big" style="margin: 0; font-size: 36px; font-weight: 700; color: #9480c5;">
                         ${(app.final_price || 0).toLocaleString()}원
                     </p>
                 </div>
@@ -2548,7 +2573,7 @@ async function getPaymentInfo(app) {
                 </p>
             </div>
             
-            <div style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <div class="payment-info-section" style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0;">
                 <h4 style="font-size: 16px; font-weight: 600; color: #1e293b; margin: 0 0 12px 0;">
                     <i class="fas fa-info-circle" style="margin-right: 8px; color: #9480c5;"></i>
                     입금 안내
