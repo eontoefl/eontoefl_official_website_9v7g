@@ -1467,72 +1467,7 @@ function loadModalShippingTab(app) {
                 ` : ''}
             </div>
             
-            ${!app.kakaotalk_notification_sent ? `
-            <!-- 알림톡 예약 섹션 -->
-            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9ef 100%); padding: 32px; border-radius: 16px; border: 2px solid #f59e0b; margin-top: 24px;">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
-                    <i class="fas fa-comment-dots" style="font-size: 32px; color: #f59e0b;"></i>
-                    <div>
-                        <h3 style="font-size: 20px; font-weight: 700; color: #92400e; margin: 0;">📱 알림톡 예약</h3>
-                        <p style="font-size: 14px; color: #78350f; margin: 4px 0 0 0;">
-                            학생에게 챌린지 시작 전 알림톡을 예약하세요.
-                        </p>
-                    </div>
-                </div>
-                
-                <div style="background: white; padding: 24px; border-radius: 12px; margin-bottom: 20px;">
-                    <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 16px 0;">📋 알림 정보</h4>
-                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b; width: 120px;">학생 이름</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.name}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">연락처</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.phone}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">프로그램</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.assigned_program || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">시작일</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.schedule_start || '-'}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div style="background: #fff8e1; padding: 16px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
-                    <div style="font-size: 13px; color: #78350f; line-height: 1.6;">
-                        <i class="fas fa-info-circle" style="margin-right: 6px;"></i>
-                        <strong>알림톡 전송 안내</strong><br>
-                        • 전송 내용: 챌린지 시작 안내, 플랫폼 접속 정보<br>
-                        • 예약 후에는 취소할 수 없습니다.
-                    </div>
-                </div>
-                
-                <button onclick="scheduleKakaoNotification('${app.id}')" 
-                        style="width: 100%; padding: 16px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
-                               color: white; border: none; border-radius: 12px; font-size: 17px; font-weight: 600; 
-                               cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
-                    <i class="fas fa-paper-plane" style="margin-right: 8px;"></i>
-                    알림톡 예약 완료
-                </button>
-            </div>
-            ` : `
-            <!-- 알림톡 예약 완료 -->
-            <div style="background: #dcfce7; padding: 24px; border-radius: 12px; margin-top: 24px; border: 2px solid #22c55e;">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 32px; color: #22c55e;"></i>
-                    <div>
-                        <div style="font-weight: 700; font-size: 18px; color: #166534;">✅ 알림톡 예약 완료</div>
-                        <div style="font-size: 14px; margin-top: 4px; color: #166534;">
-                            ${app.kakaotalk_notification_sent_at ? new Date(app.kakaotalk_notification_sent_at).toLocaleString('ko-KR') : ''}에 예약되었습니다.
-                        </div>
-                    </div>
-                </div>
-            </div>
-            `}
+
         `;
     } else {
         // 발송 대기 중
@@ -1629,51 +1564,6 @@ function loadModalShippingTab(app) {
 function openStudentView() {
     if (currentManageApp) {
         window.open(`/application-detail.html?id=${currentManageApp.id}`, '_blank');
-    }
-}
-
-// 알림톡 예약 함수 (챌린지 D-1 알림톡 실제 발송)
-async function scheduleKakaoNotification(appId) {
-    if (!confirm('챌린지 시작 알림톡을 발송하시겠습니까?')) {
-        return;
-    }
-    
-    try {
-        const app = await supabaseAPI.patch('applications', appId, {
-                kakaotalk_notification_sent: true,
-                kakaotalk_notification_sent_at: Date.now()
-        });
-        
-        if (app) {
-            // 알림톡: 챌린지 시작 D-1 안내 (실제 발송)
-            try {
-                await sendKakaoAlimTalk('challenge_reminder', {
-                    name: app.name || currentManageApp.name,
-                    phone: app.phone || currentManageApp.phone,
-                    program: app.assigned_program || currentManageApp.assigned_program || '',
-                    start_date: app.schedule_start || currentManageApp.schedule_start || '',
-                    app_id: app.id || currentManageApp.id
-                });
-            } catch (e) { console.warn('알림톡 발송 실패:', e); }
-
-            // 알림 생성
-            await createNotification({
-                application_id: appId,
-                user_email: app.email,
-                type: 'kakaotalk_scheduled',
-                icon: 'fa-comment-dots',
-                message: '챌린지 시작 알림톡이 발송되었습니다.'
-            });
-            
-            alert('✅ 챌린지 시작 알림톡이 발송되었습니다!');
-            currentManageApp = app;
-            loadModalTab('shipping');
-        } else {
-            alert('❌ 처리에 실패했습니다.');
-        }
-    } catch (error) {
-        console.error('Schedule KakaoTalk notification error:', error);
-        alert('❌ 오류가 발생했습니다.');
     }
 }
 

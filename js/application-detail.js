@@ -1447,12 +1447,7 @@ function loadStudentTabs(app) {
             return '마이페이지에 이용 방법이 업로드 됐어요! 꼼꼼히 확인해주세요 📌';
         }
         
-        // 9. 택배 발송 등록 ~ 알림톡 전송 완료 전
-        if (!app.kakaotalk_notification_sent) {
-            return '택배 발송이 시작됐어요! 슝~ 📦';
-        }
-        
-        // 10. 알림톡 전송 완료 ~ (그 이후도 동일)
+        // 9. 세팅 완료
         return '세팅이 모두 완료됐어요! 꼼꼼히 읽어보신 뒤 잘 준비해주세요 🎉';
     };
     

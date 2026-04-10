@@ -50,12 +50,7 @@ function getAdminActionMessage(app) {
         return { text: '택배를 발송해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
     
-    // 9. 택배 발송 등록 ~ 알림톡 예약 완료 전
-    if (!app.kakaotalk_notification_sent) {
-        return { text: '알림톡 예약을 진행해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
-    }
-    
-    // 10. 모든 세팅 완료 → 운영 상태로 전환 (isLive로 디자인 구분)
+    // 9. 모든 세팅 완료 → 운영 상태로 전환 (isLive로 디자인 구분)
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {
         if (liveStatus.key === 'ready') return { text: '시작 대기', color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
@@ -85,9 +80,7 @@ function getAppStageFilter(app) {
     if (!app.guide_sent) return 'need_guide';
     // 8. 택배 발송 필요
     if (!app.shipping_completed) return 'need_shipping';
-    // 9. 알림톡 예약 필요
-    if (!app.kakaotalk_notification_sent) return 'need_kakao';
-    // 10. 세팅 완료 → 운영 상태 세분화
+    // 9. 세팅 완료 → 운영 상태 세분화
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {
         if (liveStatus.key === 'ready') return 'live_ready';
@@ -749,35 +742,6 @@ async function bulkSendGuide() {
     } catch (error) {
         console.error('Bulk guide send error:', error);
         alert('일부 이용방법 전달에 실패했습니다.');
-    }
-}
-
-// ===== 일괄 알림톡 발송완료 =====
-async function bulkSendKakao() {
-    if (selectedIds.size === 0) {
-        alert('선택된 신청서가 없습니다.');
-        return;
-    }
-
-    if (!confirm(`${selectedIds.size}명의 알림톡 발송완료 처리를 하시겠습니까?`)) return;
-
-    try {
-        const updateData = {
-            kakaotalk_notification_sent: true,
-            kakaotalk_notification_sent_at: Date.now()
-        };
-
-        const promises = Array.from(selectedIds).map(id =>
-            supabaseAPI.patch('applications', id, updateData)
-        );
-
-        await Promise.all(promises);
-        alert(`✅ ${selectedIds.size}명의 알림톡 발송완료 처리되었습니다!`);
-        clearSelection();
-        loadApplications();
-    } catch (error) {
-        console.error('Bulk kakao send error:', error);
-        alert('일부 알림톡 발송완료 처리에 실패했습니다.');
     }
 }
 
