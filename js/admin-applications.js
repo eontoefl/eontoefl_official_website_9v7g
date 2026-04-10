@@ -10,6 +10,11 @@ let bookMemoCountCache = {}; // user_id → count
 
 // 관리자 상태 메시지 반환 함수
 function getAdminActionMessage(app) {
+    // 입문서 신청은 별도 배지 표시
+    if (app.application_type === 'book_only') {
+        return { text: '📖 입문서 신청', color: '#7c3aed', bgColor: '#ede9fe' };
+    }
+    
     // 1. 신청서 제출 ~ 관리자 분석 등록 전
     if (!app.analysis_status || !app.analysis_content) {
         return { text: '개별 분석을 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
@@ -64,6 +69,8 @@ function getAdminActionMessage(app) {
 
 // 앱 상태를 필터 카테고리로 분류
 function getAppStageFilter(app) {
+    // 입문서 신청은 별도 카테고리
+    if (app.application_type === 'book_only') return 'book_only';
     // 1. 개별분석 미등록
     if (!app.analysis_status || !app.analysis_content) return 'need_analysis';
     // 2. 학생 동의 대기
