@@ -142,7 +142,7 @@ async function loadApplicationDetail() {
             
             currentApplication = app;
             globalApplication = app;
-            _studentInfo = { name: app.name, phone: app.phone, id: app.id };
+            _studentInfo = { name: app.name, phone: app.phone, id: app.id, final_price: app.final_price };
             
             console.log('Calling displayApplicationDetail...');
             displayApplicationDetail(app);
@@ -2160,7 +2160,7 @@ async function submitContractAgreement() {
             await sendKakaoAlimTalk('payment_request', {
                 name: globalApplication.name || _studentInfo.name,
                 phone: globalApplication.phone || _studentInfo.phone,
-                price: String((globalApplication.final_price || 0).toLocaleString()),
+                price: String((globalApplication.final_price || _studentInfo.final_price || 0).toLocaleString()),
                 bank: settings?.bank_name || '',
                 account: settings?.account_number || '',
                 holder: settings?.account_holder || '',
