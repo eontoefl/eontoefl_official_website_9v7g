@@ -29,7 +29,7 @@ function parseContractTemplate(template, studentData = {}) {
                        data-field-id="${fieldId}"
                        placeholder="${escapeHtml(placeholder)}" 
                        required
-                       style="display: inline-block; min-width: min(200px, 100%); max-width: 100%; padding: 4px 8px; border: none; border-bottom: 2px solid #3b82f6; background: #f0f9ff; font-family: inherit; font-size: inherit; box-sizing: border-box;">`;
+                       style="display: inline-block; min-width: 200px; padding: 4px 8px; border: none; border-bottom: 2px solid #3b82f6; background: #f0f9ff; font-family: inherit; font-size: inherit;">`;
     });
     
     // 3. 따라쓰기 빈칸 {{copy:내용}}
@@ -41,21 +41,7 @@ function parseContractTemplate(template, studentData = {}) {
         // 고유 fieldId 생성 (저장/불러오기용)
         const fieldId = `copy_${inputCounter - 1}_${answer.substring(0, 10).replace(/\s/g, '_')}`;
         
-        return `<span class="copywrite-container" style="position: relative; display: inline-block; max-width: 100%; overflow: hidden; background: linear-gradient(to right, #fef3c7 0%, #fefce8 100%); border-radius: 4px; padding: 0; vertical-align: bottom;">
-                    <span class="copywrite-hint" 
-                          id="${displayId}"
-                          style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: #d1d5db; pointer-events: none; z-index: 1; font-family: inherit; font-size: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 16px);">${escapeHtml(answer)}</span>
-                    <input type="text" 
-                           class="contract-input contract-input-copy" 
-                           data-answer="${escapeHtml(answer)}"
-                           data-field-id="${fieldId}"
-                           data-display-id="${displayId}"
-                           placeholder=""
-                           required
-                           oninput="validateCopywrite(this)"
-                           style="display: inline-block; width: min(${minWidth}px, 100%); max-width: 100%; padding: 4px 8px; border: none; border-bottom: 2px solid #eab308; background: transparent; font-family: inherit; font-size: inherit; position: relative; z-index: 2; letter-spacing: 0.02em; color: #1e293b; box-sizing: border-box;">
-                    <span class="copywrite-status" style="margin-left: 8px; display: inline-block; vertical-align: middle;"></span>
-                </span>`;
+        return `<span class="copywrite-container" style="position: relative; display: inline-block; background: linear-gradient(to right, #fef3c7 0%, #fefce8 100%); border-radius: 4px; padding: 0;"><span class="copywrite-hint" id="${displayId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: #d1d5db; pointer-events: none; z-index: 1; font-family: inherit; font-size: inherit; white-space: pre;">${escapeHtml(answer)}</span><input type="text" class="contract-input contract-input-copy" data-answer="${escapeHtml(answer)}" data-field-id="${fieldId}" data-display-id="${displayId}" placeholder="" required oninput="validateCopywrite(this)" style="display: inline-block; width: ${minWidth}px; max-width: 100%; padding: 4px 8px; border: none; border-bottom: 2px solid #eab308; background: transparent; font-family: inherit; font-size: inherit; position: relative; z-index: 2; letter-spacing: 0.02em; color: #1e293b;"><span class="copywrite-status" style="margin-left: 8px; display: inline-block; vertical-align: middle;"></span></span>`;
     });
     
     return html;
@@ -86,11 +72,10 @@ function validateCopywrite(input) {
         hint.style.color = '#d1d5db';
     }
     
-    // 입력 필드 너비 자동 조절 (container max-width 존중)
+    // 입력 필드 너비 자동 조절
     const minWidth = Math.max(answer.length * 16 + 40, 180);
     const currentWidth = Math.max(value.length * 16 + 40, minWidth);
-    input.style.width = `min(${currentWidth}px, 100%)`;
-    container.style.width = `min(${currentWidth}px, 100%)`;
+    input.style.width = `${currentWidth}px`;
     
     // 검증
     if (value === answer) {
@@ -255,29 +240,24 @@ function getContractStyles() {
             @media (max-width: 768px) {
                 .contract-content {
                     padding: 16px;
-                    overflow-wrap: break-word;
-                    word-break: keep-all;
                 }
-                /* 컨테이너: inline-block 유지하되 부모 너비 초과 방지 */
                 .copywrite-container {
-                    display: inline-block;
-                    max-width: 100%;
-                    overflow: hidden;
-                    vertical-align: bottom;
+                    max-width: 100% !important;
                 }
-                /* 힌트: 인라인 스타일에서 이미 nowrap + overflow hidden 처리됨 */
-                /* input: 컨테이너 안에서 넘치지 않도록 */
+                .copywrite-hint {
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    max-width: calc(100% - 16px) !important;
+                }
                 .contract-input-copy {
                     max-width: 100% !important;
-                    box-sizing: border-box;
+                    box-sizing: border-box !important;
                 }
-                .copywrite-status {
-                    margin-left: 4px !important;
-                }
-                /* 자유입력도 넘침 방지 */
                 .contract-input-free {
+                    min-width: 0 !important;
                     max-width: 100% !important;
-                    box-sizing: border-box;
+                    box-sizing: border-box !important;
                 }
             }
 
