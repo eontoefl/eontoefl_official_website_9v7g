@@ -1,0 +1,583 @@
+/* =============================================
+   마이페이지 공통 레이아웃 (대시보드 + 내 정보 수정)
+   ============================================= */
+
+/* ===== 상단 네비게이션 ===== */
+.mypage-nav {
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    padding: 20px 0;
+    box-shadow: 0 4px 12px rgba(148, 128, 197, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.mypage-nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mypage-nav-logo {
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+    text-decoration: none;
+    position: relative;
+    top: -5px;
+}
+
+.mypage-nav-menu {
+    display: flex;
+    gap: 30px;
+    list-style: none;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+}
+
+.mypage-nav-menu a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 15px;
+    transition: opacity 0.3s;
+}
+
+.mypage-nav-menu a:hover {
+    opacity: 0.8;
+}
+
+/* ===== 메인 컨테이너 ===== */
+.mypage-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px;
+    display: flex;
+    gap: 30px;
+    min-height: calc(100vh - 72px);
+}
+
+/* ===== 사이드바 ===== */
+.mypage-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+}
+
+.sidebar-user-info {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 20px;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    margin-bottom: 16px;
+}
+
+.sidebar-user-avatar {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+    font-size: 28px;
+    color: white;
+}
+
+.sidebar-user-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.sidebar-user-email {
+    font-size: 13px;
+    color: #94a3b8;
+    word-break: break-all;
+}
+
+.sidebar-menu {
+    background: white;
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.sidebar-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #64748b;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.sidebar-menu-item:hover {
+    background: #f8fafc;
+    color: #1e293b;
+}
+
+.sidebar-menu-item.active {
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    color: white;
+}
+
+.sidebar-menu-item i {
+    font-size: 18px;
+    width: 22px;
+    text-align: center;
+}
+
+/* ===== 모바일 탭 바 ===== */
+.mypage-tab-bar {
+    display: none;
+    background: white;
+    border-radius: 12px;
+    padding: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    margin-bottom: 20px;
+}
+
+.mypage-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.mypage-tab.active {
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    color: white;
+}
+
+.mypage-tab:not(.active):hover {
+    background: #f8fafc;
+    color: #1e293b;
+}
+
+/* ===== 메인 콘텐츠 ===== */
+.mypage-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ===== 프로필 카드 ===== */
+.profile-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.profile-card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.profile-card-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    flex-shrink: 0;
+}
+
+.profile-card-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+}
+
+.profile-card-desc {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+
+/* ===== 비밀번호 확인 카드 ===== */
+.verify-card {
+    max-width: 480px;
+    margin: 60px auto;
+    text-align: center;
+}
+
+.verify-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    font-size: 36px;
+    color: white;
+}
+
+.verify-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+}
+
+.verify-desc {
+    font-size: 15px;
+    color: #64748b;
+    margin: 0 0 32px 0;
+}
+
+.verify-card .profile-form-group {
+    text-align: left;
+}
+
+/* ===== 타이머 ===== */
+.verify-timer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #16a34a;
+    margin-bottom: 28px;
+}
+
+.verify-timer.timer-warning {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+/* ===== 폼 공통 ===== */
+.profile-form-group {
+    margin-bottom: 24px;
+}
+
+.profile-label {
+    display: block;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.profile-label i {
+    color: #9480c5;
+    margin-right: 4px;
+}
+
+.profile-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.3s;
+    box-sizing: border-box;
+    background: white;
+    color: #1e293b;
+}
+
+.profile-input:focus {
+    outline: none;
+    border-color: #9480c5;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.1);
+}
+
+.profile-input-readonly {
+    background: #f8fafc;
+    color: #94a3b8;
+    cursor: not-allowed;
+    border-color: #f1f5f9;
+}
+
+.profile-input-readonly:focus {
+    border-color: #f1f5f9;
+    box-shadow: none;
+}
+
+.profile-input-wrapper {
+    position: relative;
+}
+
+.nickname-status {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.profile-hint {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+.profile-hint i {
+    color: #cbd5e1;
+    margin-right: 2px;
+}
+
+/* ===== 비밀번호 변경 링크 ===== */
+.profile-password-link {
+    margin: 32px 0;
+    padding-top: 24px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.profile-password-link a {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.profile-password-link a:hover {
+    border-color: #9480c5;
+    box-shadow: 0 4px 12px rgba(148, 128, 197, 0.1);
+    transform: translateY(-1px);
+}
+
+.password-link-icon {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.password-link-content {
+    flex: 1;
+}
+
+.password-link-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 2px;
+}
+
+.password-link-desc {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.password-link-arrow {
+    color: #cbd5e1;
+    font-size: 14px;
+}
+
+/* ===== 버튼 ===== */
+.profile-btn {
+    padding: 16px 32px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.profile-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.profile-btn-primary {
+    background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);
+    color: white;
+    width: 100%;
+}
+
+.profile-btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(148, 128, 197, 0.3);
+}
+
+.profile-btn-secondary {
+    background: white;
+    color: #64748b;
+    border: 2px solid #e5e7eb;
+}
+
+.profile-btn-secondary:hover:not(:disabled) {
+    border-color: #9480c5;
+    color: #9480c5;
+}
+
+.profile-btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.profile-btn-group .profile-btn {
+    flex: 1;
+}
+
+/* ===== 카카오 플로팅 버튼 (기존 스타일 보강) ===== */
+.kakao-float-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: #FEE500;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3C1E1E;
+    font-size: 28px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    text-decoration: none;
+    z-index: 9999;
+    transition: transform 0.3s;
+}
+
+.kakao-float-btn:hover {
+    transform: scale(1.1);
+}
+
+/* ===== 반응형 ===== */
+@media (max-width: 768px) {
+    /* 사이드바 숨기기 */
+    .mypage-sidebar {
+        display: none;
+    }
+
+    /* 탭 바 표시 */
+    .mypage-tab-bar {
+        display: flex;
+    }
+
+    /* 컨테이너 세로 배치 */
+    .mypage-container {
+        flex-direction: column;
+        gap: 0;
+        padding: 16px;
+    }
+
+    /* 카드 패딩 축소 */
+    .profile-card {
+        padding: 24px 20px;
+        border-radius: 16px;
+    }
+
+    .verify-card {
+        margin: 20px auto;
+    }
+
+    .verify-title {
+        font-size: 24px;
+    }
+
+    .profile-card-title {
+        font-size: 20px;
+    }
+
+    .profile-card-header {
+        gap: 12px;
+        margin-bottom: 24px;
+        padding-bottom: 20px;
+    }
+
+    .profile-card-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+        border-radius: 12px;
+    }
+
+    .profile-btn-group {
+        flex-direction: column-reverse;
+    }
+
+    /* 네비게이션 반응형 */
+    .mypage-nav-menu {
+        gap: 15px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .mypage-nav-menu {
+        gap: 10px;
+    }
+
+    .mypage-nav-menu a {
+        font-size: 13px;
+    }
+
+    .profile-input {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    .verify-icon {
+        width: 64px;
+        height: 64px;
+        font-size: 28px;
+    }
+}
+
+/* ===== body 배경 ===== */
+body {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+}

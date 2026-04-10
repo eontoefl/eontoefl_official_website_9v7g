@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 정보 수정 - 이온토플</title>
+    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/mypage-layout.css">
+</head>
+<body>
+    <!-- Navigation (대시보드와 동일한 스타일) -->
+    <nav class="mypage-nav">
+        <div class="mypage-nav-container">
+            <a href="index.html" class="mypage-nav-logo">
+                <img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/white_logo.png" alt="이온토플" style="height: 30px; width: auto; vertical-align: middle; position: relative; top: 5px;">
+            </a>
+            <ul class="mypage-nav-menu">
+                <li><a href="index.html">홈</a></li>
+                <li><a href="index.html#programs">프로그램</a></li>
+                <li><a href="my-dashboard.html">내 대시보드</a></li>
+                <li><a href="#" id="logoutBtn">로그아웃</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="mypage-container">
+        <!-- 사이드 네비게이션 -->
+        <aside class="mypage-sidebar">
+            <div class="sidebar-user-info" id="sidebarUserInfo">
+                <div class="sidebar-user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="sidebar-user-name" id="sidebarUserName">사용자</div>
+                <div class="sidebar-user-email" id="sidebarUserEmail">email@example.com</div>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="my-dashboard.html" class="sidebar-menu-item">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>내 대시보드</span>
+                </a>
+                <a href="my-profile.html" class="sidebar-menu-item active">
+                    <i class="fas fa-user-edit"></i>
+                    <span>내 정보 수정</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 모바일 탭 바 -->
+        <div class="mypage-tab-bar">
+            <a href="my-dashboard.html" class="mypage-tab">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>내 대시보드</span>
+            </a>
+            <a href="my-profile.html" class="mypage-tab active">
+                <i class="fas fa-user-edit"></i>
+                <span>내 정보 수정</span>
+            </a>
+        </div>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="mypage-content">
+            <!-- ===== 1단계: 비밀번호 확인 ===== -->
+            <div id="verifySection">
+                <div class="profile-card verify-card">
+                    <div class="verify-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h1 class="verify-title">본인 확인</h1>
+                    <p class="verify-desc">개인정보 보호를 위해 비밀번호를 입력해주세요.</p>
+
+                    <form id="verifyForm">
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-envelope"></i> 이메일
+                            </label>
+                            <input type="text" id="verifyEmail" class="profile-input" readonly>
+                        </div>
+
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-key"></i> 비밀번호
+                            </label>
+                            <input type="password" id="verifyPassword" class="profile-input" placeholder="현재 비밀번호를 입력하세요" required autofocus>
+                        </div>
+
+                        <button type="submit" class="profile-btn profile-btn-primary" id="verifyBtn">
+                            <i class="fas fa-check"></i> 확인
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ===== 2단계: 정보 수정 ===== -->
+            <div id="editSection" style="display: none;">
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-icon">
+                            <i class="fas fa-user-edit"></i>
+                        </div>
+                        <div>
+                            <h1 class="profile-card-title">내 정보 수정</h1>
+                            <p class="profile-card-desc">개인 정보를 확인하고 수정할 수 있습니다.</p>
+                        </div>
+                    </div>
+
+                    <!-- 잠금 해제 후 남은 시간 표시 -->
+                    <div class="verify-timer" id="verifyTimer">
+                        <i class="fas fa-unlock"></i> 본인 확인 완료 (<span id="timerCountdown">5:00</span> 남음)
+                    </div>
+
+                    <form id="editForm">
+                        <!-- 이메일 (읽기 전용) -->
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-envelope"></i> 이메일 (변경 불가)
+                            </label>
+                            <input type="text" id="editEmail" class="profile-input profile-input-readonly" readonly>
+                            <p class="profile-hint"><i class="fas fa-info-circle"></i> 이메일은 로그인 ID로 사용되므로 변경할 수 없습니다.</p>
+                        </div>
+
+                        <!-- 이름 -->
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-user"></i> 이름
+                            </label>
+                            <input type="text" id="editName" class="profile-input" placeholder="이름을 입력하세요" required>
+                        </div>
+
+                        <!-- 닉네임 -->
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-id-badge"></i> 닉네임
+                            </label>
+                            <div class="profile-input-wrapper">
+                                <input type="text" id="editNickname" class="profile-input" placeholder="2~12자, 한글/영문/숫자" minlength="2" maxlength="12" required>
+                                <span class="nickname-status" id="nicknameStatus"></span>
+                            </div>
+                            <p class="profile-hint"><i class="fas fa-info-circle"></i> 후기 등에 표시되는 이름입니다. 2~12자, 한글/영문/숫자 사용 가능</p>
+                        </div>
+
+                        <!-- 전화번호 -->
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-phone"></i> 전화번호
+                            </label>
+                            <input type="tel" id="editPhone" class="profile-input" placeholder="010-1234-5678" required>
+                        </div>
+
+                        <!-- 비밀번호 변경 링크 -->
+                        <div class="profile-password-link">
+                            <a href="change-password.html">
+                                <div class="password-link-icon">
+                                    <i class="fas fa-key"></i>
+                                </div>
+                                <div class="password-link-content">
+                                    <div class="password-link-title">비밀번호 변경</div>
+                                    <div class="password-link-desc">계정 보안을 위해 주기적으로 변경하세요</div>
+                                </div>
+                                <i class="fas fa-chevron-right password-link-arrow"></i>
+                            </a>
+                        </div>
+
+                        <!-- 버튼 -->
+                        <div class="profile-btn-group">
+                            <button type="button" class="profile-btn profile-btn-secondary" onclick="window.history.back()">
+                                <i class="fas fa-arrow-left"></i> 취소
+                            </button>
+                            <button type="submit" class="profile-btn profile-btn-primary" id="saveBtn">
+                                <i class="fas fa-save"></i> 저장
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/my-profile.js"></script>
+</body>
+</html>
