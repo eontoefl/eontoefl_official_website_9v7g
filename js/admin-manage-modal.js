@@ -108,94 +108,150 @@ function loadModalTab(tabName) {
 function loadModalInfoTab(app) {
     const container = document.getElementById('modalTabInfo');
     
-    // 목표 점수
-    let targetDisplay = '';
-    if (app.target_cutoff_old) {
-        targetDisplay = `${app.target_cutoff_old}점`;
-    } else if (app.target_level_reading || app.target_level_listening || app.target_level_speaking || app.target_level_writing) {
-        targetDisplay = `Reading ${app.target_level_reading || '-'} / Listening ${app.target_level_listening || '-'} / Speaking ${app.target_level_speaking || '-'} / Writing ${app.target_level_writing || '-'}`;
+    // 현재 점수 (개정전/개정후 구분)
+    let currentScoreHTML = '';
+    if (app.has_toefl_score === 'yes') {
+        if (app.score_version === 'new' || app.score_total_new || app.score_reading_new) {
+            currentScoreHTML = `
+                <div class="info-item"><label>Overall</label><div>${app.score_total_new || '-'}</div></div>
+                <div class="info-item"><label>Reading</label><div>${app.score_reading_new || '-'}</div></div>
+                <div class="info-item"><label>Listening</label><div>${app.score_listening_new || '-'}</div></div>
+                <div class="info-item"><label>Speaking</label><div>${app.score_speaking_new || '-'}</div></div>
+                <div class="info-item"><label>Writing</label><div>${app.score_writing_new || '-'}</div></div>
+            `;
+        } else {
+            currentScoreHTML = `
+                <div class="info-item"><label>Overall</label><div>${app.score_total_old || '-'}</div></div>
+                <div class="info-item"><label>Reading</label><div>${app.score_reading_old || '-'}</div></div>
+                <div class="info-item"><label>Listening</label><div>${app.score_listening_old || '-'}</div></div>
+                <div class="info-item"><label>Speaking</label><div>${app.score_speaking_old || '-'}</div></div>
+                <div class="info-item"><label>Writing</label><div>${app.score_writing_old || '-'}</div></div>
+            `;
+        }
     }
-    
-    // 현재 점수
-    let currentDisplay = '';
-    if (app.score_total_old) {
-        currentDisplay = `총점 ${app.score_total_old}점 (R:${app.score_reading_old || 0} / L:${app.score_listening_old || 0} / S:${app.score_speaking_old || 0} / W:${app.score_writing_old || 0})`;
-    } else if (app.score_level_reading || app.score_level_listening || app.score_level_speaking || app.score_level_writing) {
-        currentDisplay = `R:${app.score_level_reading || '-'} / L:${app.score_level_listening || '-'} / S:${app.score_level_speaking || '-'} / W:${app.score_level_writing || '-'}`;
+
+    // 목표 점수 (개정전/개정후 구분)
+    let targetScoreHTML = '';
+    if (app.no_target_score) {
+        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>없음 (고고익선 🚀)</div></div>`;
+    } else if (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) {
+        targetScoreHTML = `
+            <div class="info-item"><label>커트라인 (Total)</label><div>${app.target_cutoff_new || '-'}</div></div>
+            <div class="info-item"><label>Reading</label><div>${app.target_reading_new || '-'}</div></div>
+            <div class="info-item"><label>Listening</label><div>${app.target_listening_new || '-'}</div></div>
+            <div class="info-item"><label>Writing</label><div>${app.target_writing_new || '-'}</div></div>
+            <div class="info-item"><label>Speaking</label><div>${app.target_speaking_new || '-'}</div></div>
+        `;
+    } else if (app.target_cutoff_old || app.target_reading_old) {
+        targetScoreHTML = `
+            <div class="info-item"><label>커트라인 (Total)</label><div>${app.target_cutoff_old || '-'}</div></div>
+            <div class="info-item"><label>Reading</label><div>${app.target_reading_old || '-'}</div></div>
+            <div class="info-item"><label>Listening</label><div>${app.target_listening_old || '-'}</div></div>
+            <div class="info-item"><label>Speaking</label><div>${app.target_speaking_old || '-'}</div></div>
+            <div class="info-item"><label>Writing</label><div>${app.target_writing_old || '-'}</div></div>
+        `;
+    } else {
+        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
     }
-    
+
+    // 유입 경로 정리
+    let referralParts = [];
+    if (app.referral_search_keyword) referralParts.push(`검색: ${app.referral_search_keyword}`);
+    if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
+    if (app.referral_from_friend === 'yes') referralParts.push(`지인 추천${app.referral_friend_name ? ' (' + app.referral_friend_name + ')' : ''}`);
+    if (app.referral_other) referralParts.push(app.referral_other);
+
     container.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-            <!-- 기본 정보 -->
-            <div class="info-card">
-                <h3 class="info-card-title"><i class="fas fa-user"></i> 기본 정보</h3>
-                <div class="info-item">
-                    <label>이름</label>
-                    <div>${app.name}</div>
-                </div>
-                <div class="info-item">
-                    <label>이메일</label>
-                    <div>${app.email}</div>
-                </div>
-                <div class="info-item">
-                    <label>전화번호</label>
-                    <div>${app.phone}</div>
-                </div>
-                <div class="info-item">
-                    <label>직업</label>
-                    <div>${app.occupation || '-'}</div>
-                </div>
+        <!-- 1. 기본 정보 & 배송/환불 -->
+        <div class="info-card">
+            <h3 class="info-card-title"><i class="fas fa-user"></i> 기본 정보</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+                <div class="info-item"><label>이름</label><div>${app.name || '-'}</div></div>
+                <div class="info-item"><label>전화번호</label><div>${app.phone || '-'}</div></div>
+                <div class="info-item"><label>이메일</label><div>${app.email || '-'}</div></div>
+                <div class="info-item"><label>직업</label><div>${app.occupation || '-'}</div></div>
             </div>
-            
-            <!-- 점수 정보 -->
-            <div class="info-card">
-                <h3 class="info-card-title"><i class="fas fa-chart-line"></i> 점수 정보</h3>
-                <div class="info-item">
-                    <label>현재 점수</label>
-                    <div>${currentDisplay || '미제출'}</div>
-                </div>
-                <div class="info-item">
-                    <label>목표 점수</label>
-                    <div>${targetDisplay || '미입력'}</div>
-                </div>
-                <div class="info-item">
-                    <label>목표 기한</label>
-                    <div>${app.target_deadline ? new Date(app.target_deadline).toLocaleDateString('ko-KR') : '-'}</div>
-                </div>
-            </div>
-            
-            <!-- 신청 정보 -->
-            <div class="info-card">
-                <h3 class="info-card-title"><i class="fas fa-clipboard"></i> 신청 정보</h3>
-                <div class="info-item">
-                    <label>신청일</label>
-                    <div>${new Date(app.submitted_date).toLocaleDateString('ko-KR')}</div>
-                </div>
-                <div class="info-item">
-                    <label>희망 프로그램</label>
-                    <div>${app.preferred_program || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>희망 시작일</label>
-                    <div>${app.preferred_start_date || '-'}</div>
-                </div>
-                <div class="info-item">
-                    <label>현재 단계</label>
-                    <div>STEP ${app.current_step || 1}</div>
-                </div>
-            </div>
+            <div class="info-item"><label>주소</label><div>${app.address || '-'}</div></div>
+            <div class="info-item"><label>환불 계좌</label><div>${app.bank_account || '-'}</div></div>
         </div>
-        
-        <!-- 추가 정보 섹션 -->
-        ${app.address ? `
-        <div class="info-card" style="margin-top: 24px;">
-            <h3 class="info-card-title"><i class="fas fa-map-marker-alt"></i> 배송 정보</h3>
-            <div class="info-item">
-                <label>주소</label>
-                <div>${app.address}</div>
-            </div>
+
+        <!-- 2. 현재 토플 점수 / 라이팅 샘플 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-chart-bar"></i> 현재 토플 점수</h3>
+            ${app.has_toefl_score === 'yes' ? `
+                <div class="info-item"><label>TOEFL 응시 여부</label><div>있음 (${app.score_version === 'new' ? '개정후' : '개정전'})</div></div>
+                ${currentScoreHTML}
+                ${app.score_history ? `<div class="info-item"><label>추가 설명</label><div style="white-space:pre-wrap;">${app.score_history}</div></div>` : ''}
+            ` : `
+                <div class="info-item"><label>TOEFL 응시 여부</label><div>없음</div></div>
+                <div class="info-item">
+                    <label>Writing Sample 1</label>
+                    <div style="white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.writing_sample_1 || '-'}</div>
+                </div>
+                <div class="info-item">
+                    <label>Writing Sample 2</label>
+                    <div style="white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.writing_sample_2 || '-'}</div>
+                </div>
+            `}
         </div>
-        ` : ''}
+
+        <!-- 3. 학습 현황 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-book-reader"></i> 학습 현황</h3>
+            <div class="info-item"><label>현재 공부 방법</label><div style="white-space:pre-wrap;">${app.current_study_method || '-'}</div></div>
+            <div class="info-item"><label>하루 평균 공부 시간</label><div>${app.daily_study_time || '-'}</div></div>
+        </div>
+
+        <!-- 4. 목표 점수 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(개정후)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(개정전)' : ''}</h3>
+            ${targetScoreHTML}
+            ${app.target_note ? `<div class="info-item"><label>추가 설명</label><div style="white-space:pre-wrap;">${app.target_note}</div></div>` : ''}
+        </div>
+
+        <!-- 5. 마감 기한 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-calendar-alt"></i> 마감 기한</h3>
+            <div class="info-item"><label>마지막 응시 가능일</label><div>${app.submission_deadline || '-'}</div></div>
+            <div class="info-item"><label>희망 완료일</label><div>${app.preferred_completion || '-'}</div></div>
+        </div>
+
+        <!-- 6. 토플 필요 이유 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-question-circle"></i> 토플이 필요한 이유</h3>
+            <div class="info-item"><label>목적</label><div>${app.toefl_reason || '-'}</div></div>
+            <div class="info-item"><label>상세 설명</label><div style="white-space:pre-wrap;">${app.toefl_reason_detail || '-'}</div></div>
+        </div>
+
+        <!-- 7. 블로그 인상 깊은 내용 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-blog"></i> 기억에 남는 블로그 글</h3>
+            <div class="info-item"><div style="white-space:pre-wrap;">${app.memorable_blog_content || '-'}</div></div>
+        </div>
+
+        <!-- 8. 프로그램 & 일정 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-clipboard"></i> 프로그램 및 일정</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+                <div class="info-item"><label>희망 프로그램</label><div>${app.preferred_program || '-'}</div></div>
+                <div class="info-item"><label>희망 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
+                <div class="info-item"><label>신청일</label><div>${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}</div></div>
+                <div class="info-item"><label>현재 단계</label><div>STEP ${app.current_step || 1}</div></div>
+            </div>
+            ${app.program_note ? `<div class="info-item"><label>추가 의견</label><div style="white-space:pre-wrap;">${app.program_note}</div></div>` : ''}
+        </div>
+
+        <!-- 9. 유입 경로 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-route"></i> 유입 경로</h3>
+            <div class="info-item"><div>${referralParts.length > 0 ? referralParts.join(' / ') : '-'}</div></div>
+        </div>
+
+        <!-- 10. 추가 전달 사항 -->
+        <div class="info-card" style="margin-top: 16px;">
+            <h3 class="info-card-title"><i class="fas fa-comment-dots"></i> 추가 전달 사항</h3>
+            <div class="info-item"><div style="white-space:pre-wrap;">${app.additional_notes || '-'}</div></div>
+        </div>
 
         <!-- 수강 상태 관리 (세팅 완료된 학생만 표시) -->
         ${renderAppStatusSection(app)}
