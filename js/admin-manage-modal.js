@@ -574,9 +574,9 @@ async function saveModalAnalysis(event) {
             // 알림톡: 개별분석 완료 안내
             try {
                 await sendKakaoAlimTalk('analysis_complete', {
-                    name: updatedApp.name,
-                    phone: updatedApp.phone,
-                    app_id: updatedApp.id
+                    name: updatedApp.name || currentManageApp.name,
+                    phone: updatedApp.phone || currentManageApp.phone,
+                    app_id: updatedApp.id || currentManageApp.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
@@ -1245,9 +1245,9 @@ async function confirmDepositFromModal(appId) {
             // 알림톡: 입금 확인 완료
             try {
                 await sendKakaoAlimTalk('payment_confirmed', {
-                    name: updatedApp.name,
-                    phone: updatedApp.phone,
-                    app_id: updatedApp.id
+                    name: updatedApp.name || currentManageApp.name,
+                    phone: updatedApp.phone || currentManageApp.phone,
+                    app_id: updatedApp.id || currentManageApp.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
@@ -1343,11 +1343,11 @@ async function sendUsageGuideFromModal(appId) {
             // 알림톡: 이용방법 안내
             try {
                 await sendKakaoAlimTalk('guide_uploaded', {
-                    name: updatedApp.name,
-                    phone: updatedApp.phone,
-                    program: updatedApp.assigned_program || '',
-                    start_date: updatedApp.schedule_start || '',
-                    app_id: updatedApp.id
+                    name: updatedApp.name || currentManageApp.name,
+                    phone: updatedApp.phone || currentManageApp.phone,
+                    program: updatedApp.assigned_program || currentManageApp.assigned_program || '',
+                    start_date: updatedApp.schedule_start || currentManageApp.schedule_start || '',
+                    app_id: updatedApp.id || currentManageApp.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
@@ -1397,11 +1397,11 @@ async function markShippingCompletedFromModal(appId) {
             // 알림톡: 택배 발송 안내
             try {
                 await sendKakaoAlimTalk('shipping_sent', {
-                    name: app.name,
-                    phone: app.phone,
-                    courier: app.shipping_courier || 'CJ대한통운',
-                    tracking_number: app.shipping_tracking_number || '',
-                    app_id: app.id
+                    name: app.name || currentManageApp.name,
+                    phone: app.phone || currentManageApp.phone,
+                    courier: app.shipping_courier || currentManageApp.shipping_courier || 'CJ대한통운',
+                    tracking_number: app.shipping_tracking_number || currentManageApp.shipping_tracking_number || '',
+                    app_id: app.id || currentManageApp.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
@@ -1648,11 +1648,11 @@ async function scheduleKakaoNotification(appId) {
             // 알림톡: 챌린지 시작 D-1 안내 (실제 발송)
             try {
                 await sendKakaoAlimTalk('challenge_reminder', {
-                    name: app.name,
-                    phone: app.phone,
-                    program: app.assigned_program || '',
-                    start_date: app.schedule_start || '',
-                    app_id: app.id
+                    name: app.name || currentManageApp.name,
+                    phone: app.phone || currentManageApp.phone,
+                    program: app.assigned_program || currentManageApp.assigned_program || '',
+                    start_date: app.schedule_start || currentManageApp.schedule_start || '',
+                    app_id: app.id || currentManageApp.id
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
