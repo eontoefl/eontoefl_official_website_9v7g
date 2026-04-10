@@ -104,6 +104,118 @@ function loadModalTab(tabName) {
     }
 }
 
+// ===== 기본정보 TXT 다운로드 =====
+function downloadInfoTxt() {
+    const app = currentManageApp;
+    if (!app) return;
+
+    let lines = [];
+    lines.push('=== 기본 정보 ===');
+    lines.push(`이름 : ${app.name || '-'}`);
+    lines.push(`전화번호 : ${app.phone || '-'}`);
+    lines.push(`이메일 : ${app.email || '-'}`);
+    lines.push(`직업 : ${app.occupation || '-'}`);
+    lines.push(`주소 : ${app.address || '-'}`);
+    lines.push(`환불 계좌 : ${app.bank_account || '-'}`);
+
+    lines.push('');
+    lines.push('=== 현재 토플 점수 ===');
+    if (app.has_toefl_score === 'yes') {
+        if (app.score_version === 'new' || app.score_total_new || app.score_reading_new) {
+            lines.push('버전 : 개정후');
+            lines.push(`Overall : ${app.score_total_new || '-'}`);
+            lines.push(`Reading : ${app.score_reading_new || '-'}`);
+            lines.push(`Listening : ${app.score_listening_new || '-'}`);
+            lines.push(`Speaking : ${app.score_speaking_new || '-'}`);
+            lines.push(`Writing : ${app.score_writing_new || '-'}`);
+        } else {
+            lines.push('버전 : 개정전');
+            lines.push(`Overall : ${app.score_total_old || '-'}`);
+            lines.push(`Reading : ${app.score_reading_old || '-'}`);
+            lines.push(`Listening : ${app.score_listening_old || '-'}`);
+            lines.push(`Speaking : ${app.score_speaking_old || '-'}`);
+            lines.push(`Writing : ${app.score_writing_old || '-'}`);
+        }
+        if (app.score_history) lines.push(`추가 설명 : ${app.score_history}`);
+    } else {
+        lines.push('TOEFL 응시 여부 : 없음');
+        lines.push(`Writing Sample 1 : ${app.writing_sample_1 || '-'}`);
+        lines.push(`Writing Sample 2 : ${app.writing_sample_2 || '-'}`);
+    }
+
+    lines.push('');
+    lines.push('=== 학습 현황 ===');
+    lines.push(`현재 공부 방법 : ${app.current_study_method || '-'}`);
+    lines.push(`하루 평균 공부 시간 : ${app.daily_study_time || '-'}`);
+
+    lines.push('');
+    lines.push('=== 목표 점수 ===');
+    if (app.no_target_score) {
+        lines.push('목표 점수 : 없음 (고고익선)');
+    } else if (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) {
+        lines.push('버전 : 개정후');
+        lines.push(`커트라인 (Total) : ${app.target_cutoff_new || '-'}`);
+        lines.push(`Reading : ${app.target_reading_new || '-'}`);
+        lines.push(`Listening : ${app.target_listening_new || '-'}`);
+        lines.push(`Writing : ${app.target_writing_new || '-'}`);
+        lines.push(`Speaking : ${app.target_speaking_new || '-'}`);
+    } else if (app.target_cutoff_old || app.target_reading_old) {
+        lines.push('버전 : 개정전');
+        lines.push(`커트라인 (Total) : ${app.target_cutoff_old || '-'}`);
+        lines.push(`Reading : ${app.target_reading_old || '-'}`);
+        lines.push(`Listening : ${app.target_listening_old || '-'}`);
+        lines.push(`Speaking : ${app.target_speaking_old || '-'}`);
+        lines.push(`Writing : ${app.target_writing_old || '-'}`);
+    } else {
+        lines.push('목표 점수 : 미입력');
+    }
+    if (app.target_note) lines.push(`추가 설명 : ${app.target_note}`);
+
+    lines.push('');
+    lines.push('=== 마감 기한 ===');
+    lines.push(`마지막 응시 가능일 : ${app.submission_deadline || '-'}`);
+    lines.push(`희망 완료일 : ${app.preferred_completion || '-'}`);
+
+    lines.push('');
+    lines.push('=== 토플이 필요한 이유 ===');
+    lines.push(`목적 : ${app.toefl_reason || '-'}`);
+    lines.push(`상세 설명 : ${app.toefl_reason_detail || '-'}`);
+
+    lines.push('');
+    lines.push('=== 기억에 남는 블로그 글 ===');
+    lines.push(app.memorable_blog_content || '-');
+
+    lines.push('');
+    lines.push('=== 프로그램 및 일정 ===');
+    lines.push(`희망 프로그램 : ${app.preferred_program || '-'}`);
+    lines.push(`희망 시작일 : ${app.preferred_start_date || '-'}`);
+    lines.push(`신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}`);
+    lines.push(`현재 단계 : STEP ${app.current_step || 1}`);
+    if (app.program_note) lines.push(`추가 의견 : ${app.program_note}`);
+
+    lines.push('');
+    lines.push('=== 유입 경로 ===');
+    let refParts = [];
+    if (app.referral_search_keyword) refParts.push(`검색: ${app.referral_search_keyword}`);
+    if (app.referral_social_media) refParts.push(`SNS: ${app.referral_social_media}`);
+    if (app.referral_from_friend === 'yes') refParts.push(`지인 추천${app.referral_friend_name ? ' (' + app.referral_friend_name + ')' : ''}`);
+    if (app.referral_other) refParts.push(app.referral_other);
+    lines.push(refParts.length > 0 ? refParts.join(' / ') : '-');
+
+    lines.push('');
+    lines.push('=== 추가 전달 사항 ===');
+    lines.push(app.additional_notes || '-');
+
+    const text = lines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${app.name || '학생'}_기본정보.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 // ===== 기본정보 탭 =====
 function loadModalInfoTab(app) {
     const container = document.getElementById('modalTabInfo');
@@ -162,6 +274,11 @@ function loadModalInfoTab(app) {
     if (app.referral_other) referralParts.push(app.referral_other);
 
     container.innerHTML = `
+        <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+            <button onclick="downloadInfoTxt()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:600; color:#475569; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f8fafc'">
+                <i class="fas fa-download" style="font-size:12px;"></i> TXT 다운로드
+            </button>
+        </div>
         <!-- 1. 기본 정보 & 배송/환불 -->
         <div class="info-card">
             <h3 class="info-card-title"><i class="fas fa-user"></i> 기본 정보</h3>
