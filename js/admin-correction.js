@@ -370,9 +370,9 @@ function displayCorrections() {
         const taskType = (item.task_type || '').toLowerCase();
         let taskTypeLabel = item.task_type || '-';
         let taskTypeCss = '';
-        if (taskType === 'email') { taskTypeLabel = 'Email'; taskTypeCss = 'task-type-email'; }
-        else if (taskType === 'discussion') { taskTypeLabel = 'Discussion'; taskTypeCss = 'task-type-discussion'; }
-        else if (taskType === 'interview') { taskTypeLabel = 'Interview'; taskTypeCss = 'task-type-interview'; }
+        if (taskType === 'writing_email') { taskTypeLabel = 'Email'; taskTypeCss = 'task-type-email'; }
+        else if (taskType === 'writing_discussion') { taskTypeLabel = 'Discussion'; taskTypeCss = 'task-type-discussion'; }
+        else if (taskType === 'speaking_interview') { taskTypeLabel = 'Interview'; taskTypeCss = 'task-type-interview'; }
 
         return `
             <tr style="${isSelected ? 'background: #f0f9ff;' : ''}">
