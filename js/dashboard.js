@@ -151,7 +151,7 @@ function renderProgressSection(app) {
         ? '<i class="fas fa-check" style="font-size: 40px; -webkit-text-stroke: 2px currentColor;"></i>' 
         : `${progress}%`;
     
-    const progressLabel = progress === 100 ? '세팅 완료' : '현재 진행률';
+    const progressLabel = progress === 100 ? '준비 완료' : '현재 진행률';
 
     // 프로그램 이름
     const programName = app.assigned_program || '내벨업챌린지';
@@ -808,7 +808,7 @@ function renderShipping(app) {
         shippingContent.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #64748b;">
                 <i class="fas fa-lock" style="font-size: 48px; margin-bottom: 16px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #475569;">아직 프로그램이 세팅되지 않았어요</h3>
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #475569;">아직 프로그램이 준비되지 않았어요</h3>
                 <p style="font-size: 13px; line-height: 1.6; color: #64748b;">관리자가 이용방법을 업로드하면<br>프로그램 정보가 자동으로 표시됩니다.</p>
             </div>
         `;
@@ -973,7 +973,7 @@ async function renderProgramInfo(app) {
         programDetails.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #64748b;">
                 <i class="fas fa-lock" style="font-size: 48px; margin-bottom: 16px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #475569;">아직 프로그램이 세팅되지 않았어요</h3>
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #475569;">아직 프로그램이 준비되지 않았어요</h3>
                 <p style="font-size: 13px; line-height: 1.6; color: #64748b;">관리자가 이용방법을 업로드하면<br>프로그램 정보가 자동으로 표시됩니다.</p>
             </div>
         `;

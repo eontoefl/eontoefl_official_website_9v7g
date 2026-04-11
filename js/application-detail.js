@@ -1382,7 +1382,7 @@ function loadStudentTabs(app) {
             step = 4;
         }
         
-        // STEP 5: 세팅 (관리자가 입금 확인함)
+        // STEP 5: 시작 (관리자가 입금 확인함)
         if (app.deposit_confirmed_by_admin) {
             step = 5;
         }
@@ -1402,7 +1402,7 @@ function loadStudentTabs(app) {
         { id: 2, name: '승인받기', icon: 'fa-clipboard-check', tab: 'studentAnalysis', unlockStep: 2 },
         { id: 3, name: '계약서 작성', icon: 'fa-file-signature', tab: 'contract', unlockStep: 3 },
         { id: 4, name: '입금', icon: 'fa-credit-card', tab: 'payment', unlockStep: 4 },
-        { id: 5, name: '세팅', icon: 'fa-book-open', tab: 'usage', unlockStep: 5 }
+        { id: 5, name: '시작', icon: 'fa-book-open', tab: 'usage', unlockStep: 5 }
     ];
     
     // 현재 상황에 맞는 상태 메시지 반환
@@ -1447,8 +1447,8 @@ function loadStudentTabs(app) {
             return '마이페이지에 이용 방법이 업로드 됐어요! 꼼꼼히 확인해주세요 📌';
         }
         
-        // 9. 세팅 완료
-        return '세팅이 모두 완료됐어요! 꼼꼼히 읽어보신 뒤 잘 준비해주세요 🎉';
+        // 9. 시작 준비 완료
+        return '시작 준비가 모두 완료됐어요! 꼼꼼히 읽어보신 뒤 잘 준비해주세요 🎉';
     };
     
     const tabsHTML = ''; // 사이드바 네비게이션으로 대체
@@ -2341,7 +2341,7 @@ async function loadPaymentTab(app) {
                 </div>
                 <p style="font-size: 15px; color: #92400e; margin: 0; line-height: 1.6;">
                     관리자가 입금을 확인 중입니다.<br/>
-                    확인 후 이용 방법 전달 및 챌린지 시작을 위한 세팅이 진행됩니다.
+                    확인 후 이용 방법 전달 및 챌린지 시작을 위한 준비가 진행됩니다.
                 </p>
             </div>
             
@@ -2744,7 +2744,6 @@ async function loadUsageTab(app) {
                 
                 <div style="background: #f8fafc; padding: 32px; border-radius: 16px; margin-bottom: 24px;">
                     <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 24px 0;">
-                        <i class="fas fa-laptop" style="color: #9480c5; margin-right: 8px;"></i>
                         🌐 플랫폼 접속 정보
                     </h3>
                     <div style="background: white; padding: 24px; border-radius: 12px; border: 2px solid #e2e8f0; margin-bottom: 16px;">
@@ -2769,7 +2768,6 @@ async function loadUsageTab(app) {
                 
                 <div style="background: #f0f9ff; padding: 24px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 24px;">
                     <h4 style="font-size: 16px; font-weight: 600; color: #0c4a6e; margin: 0 0 16px 0;">
-                        <i class="fas fa-calendar-alt" style="margin-right: 8px;"></i>
                         📅 일정 정보
                     </h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -2820,20 +2818,19 @@ async function loadUsageTab(app) {
                 </div>
                 ` : ''}
                 
-                <div style="background: #f0f9ff; padding: 24px; border-radius: 12px; border: 1px solid #bae6fd;">
-                    <h4 style="font-size: 16px; font-weight: 600; color: #0c4a6e; margin: 0 0 16px 0;">
-                        <i class="fas fa-comment-dots" style="margin-right: 8px;"></i>
-                        💬 문의하기
+                <div style="background: linear-gradient(135deg, #f8f4ff 0%, #f0ebff 100%); padding: 24px; border-radius: 12px; border: 1px solid #d4c8ef; text-align: center;">
+                    <h4 style="font-size: 16px; font-weight: 600; color: #5e4a8b; margin: 0 0 8px 0;">
+                        모든 준비가 완료됐어요! 🎉
                     </h4>
-                    <p style="margin: 0; font-size: 14px; color: #0c4a6e; line-height: 1.8;">
-                        학습 중 궁금한 점이 있으시면 언제든지 연락 주세요.<br/>
-                        <a href="${kakaoLink}" target="_blank" 
-                           style="color: #06b6d4; font-weight: 700; text-decoration: none; background: #f0f9ff; 
-                                  padding: 8px 16px; border-radius: 8px; border: 2px solid #06b6d4; 
-                                  display: inline-block; margin-top: 8px;">
-                            <i class="fas fa-comment" style="margin-right: 6px;"></i>카카오톡 상담
-                        </a>
+                    <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                        진행 상황과 프로그램 정보를 대시보드에서 한눈에 확인하세요.
                     </p>
+                    <a href="my-dashboard.html" 
+                       style="display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
+                              color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; 
+                              box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
+                        📋 대시보드로 이동
+                    </a>
                 </div>
             </div>
         `;
@@ -2857,7 +2854,6 @@ async function loadUsageTab(app) {
             <!-- 플랫폼 접속 정보 -->
             <div style="background: #f8fafc; padding: 32px; border-radius: 16px; margin-bottom: 24px;">
                 <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 24px 0;">
-                    <i class="fas fa-laptop" style="color: #9480c5; margin-right: 8px;"></i>
                     🌐 플랫폼 접속 정보
                 </h3>
                 <div style="background: white; padding: 24px; border-radius: 12px; border: 2px solid #e2e8f0; margin-bottom: 16px;">
@@ -2893,7 +2889,6 @@ async function loadUsageTab(app) {
                    style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
                           color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 700; 
                           box-shadow: 0 4px 16px rgba(148, 128, 197, 0.3); transition: all 0.3s;">
-                    <i class="fas fa-book-open" style="margin-right: 8px;"></i>
                     📖 내벨업챌린지 이용방법 자세히 보기
                 </a>
             </div>
@@ -2939,21 +2934,20 @@ async function loadUsageTab(app) {
             </div>
             ` : ''}
             
-            <!-- 문의하기 -->
-            <div style="background: #f0f9ff; padding: 24px; border-radius: 12px; border: 1px solid #bae6fd; margin-bottom: 32px;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #0c4a6e; margin: 0 0 16px 0;">
-                    <i class="fas fa-comment-dots" style="margin-right: 8px;"></i>
-                    💬 문의하기
+            <!-- 대시보드 이동 -->
+            <div style="background: linear-gradient(135deg, #f8f4ff 0%, #f0ebff 100%); padding: 24px; border-radius: 12px; border: 1px solid #d4c8ef; margin-bottom: 32px; text-align: center;">
+                <h4 style="font-size: 16px; font-weight: 600; color: #5e4a8b; margin: 0 0 8px 0;">
+                    모든 준비가 완료됐어요! 🎉
                 </h4>
-                <p style="margin: 0; font-size: 14px; color: #0c4a6e; line-height: 1.8;">
-                    학습 중 궁금한 점이 있으시면 언제든지 연락 주세요.<br/>
-                    <a href="${kakaoLink}" target="_blank" 
-                       style="color: #06b6d4; font-weight: 700; text-decoration: none; background: #f0f9ff; 
-                              padding: 8px 16px; border-radius: 8px; border: 2px solid #06b6d4; 
-                              display: inline-block; margin-top: 8px;">
-                        <i class="fas fa-comment" style="margin-right: 6px;"></i>카카오톡 상담
-                    </a>
+                <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                    진행 상황과 프로그램 정보를 대시보드에서 한눈에 확인하세요.
                 </p>
+                <a href="my-dashboard.html" 
+                   style="display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
+                          color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; 
+                          box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
+                    📋 대시보드로 이동
+                </a>
             </div>
             
             <!-- 다음 단계 안내 (배송 완료 전에만 표시) -->

@@ -2,6 +2,27 @@
 
 let currentManageApp = null;
 
+// 카카오 알림톡 발송 (Edge Function 경유)
+async function sendKakaoAlimTalk(type, data) {
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ type, data })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            console.warn('알림톡 발송 실패:', result);
+        }
+        return result;
+    } catch (e) {
+        console.warn('알림톡 발송 에러:', e);
+    }
+}
+
 // 모달 열기
 async function openManageModal(appId) {
     try {
@@ -550,6 +571,15 @@ async function saveModalAnalysis(event) {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
         
         if (updatedApp) {
+            // 알림톡: 개별분석 완료 안내
+            try {
+                await sendKakaoAlimTalk('analysis_complete', {
+                    name: updatedApp.name,
+                    phone: updatedApp.phone,
+                    app_id: updatedApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
             
             // 앱 데이터 업데이트
@@ -1212,6 +1242,15 @@ async function confirmDepositFromModal(appId) {
         });
         
         if (updatedApp) {
+            // 알림톡: 입금 확인 완료
+            try {
+                await sendKakaoAlimTalk('payment_confirmed', {
+                    name: updatedApp.name,
+                    phone: updatedApp.phone,
+                    app_id: updatedApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 입금이 확인되었습니다!');
             currentManageApp = updatedApp;
             loadModalTab('contract');
@@ -1301,6 +1340,17 @@ async function sendUsageGuideFromModal(appId) {
         });
         
         if (updatedApp) {
+            // 알림톡: 이용방법 안내
+            try {
+                await sendKakaoAlimTalk('guide_uploaded', {
+                    name: updatedApp.name,
+                    phone: updatedApp.phone,
+                    program: updatedApp.assigned_program || '',
+                    start_date: updatedApp.schedule_start || '',
+                    app_id: updatedApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 이용방법이 전달되었습니다!');
             currentManageApp = updatedApp;
             loadModalTab('usage');
@@ -1344,6 +1394,17 @@ async function markShippingCompletedFromModal(appId) {
                 message: `실물 교재가 발송되었습니다.${trackingNumber ? ` (운송장: ${trackingNumber})` : ''}`
             });
             
+            // 알림톡: 택배 발송 안내
+            try {
+                await sendKakaoAlimTalk('shipping_sent', {
+                    name: app.name,
+                    phone: app.phone,
+                    courier: app.shipping_courier || 'CJ대한통운',
+                    tracking_number: app.shipping_tracking_number || '',
+                    app_id: app.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             alert('✅ 택배 발송이 완료 처리되었습니다!');
             currentManageApp = app;
             loadModalTab('shipping'); // usage -> shipping으로 변경
@@ -1571,9 +1632,9 @@ function openStudentView() {
     }
 }
 
-// 알림톡 예약 함수
+// 알림톡 예약 함수 (챌린지 D-1 알림톡 실제 발송)
 async function scheduleKakaoNotification(appId) {
-    if (!confirm('알림톡 예약을 완료 처리하시겠습니까?')) {
+    if (!confirm('챌린지 시작 알림톡을 발송하시겠습니까?')) {
         return;
     }
     
@@ -1584,16 +1645,27 @@ async function scheduleKakaoNotification(appId) {
         });
         
         if (app) {
+            // 알림톡: 챌린지 시작 D-1 안내 (실제 발송)
+            try {
+                await sendKakaoAlimTalk('challenge_reminder', {
+                    name: app.name,
+                    phone: app.phone,
+                    program: app.assigned_program || '',
+                    start_date: app.schedule_start || '',
+                    app_id: app.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
             // 알림 생성
             await createNotification({
                 application_id: appId,
                 user_email: app.email,
                 type: 'kakaotalk_scheduled',
                 icon: 'fa-comment-dots',
-                message: '알림톡이 예약되었습니다.'
+                message: '챌린지 시작 알림톡이 발송되었습니다.'
             });
             
-            alert('✅ 알림톡 예약이 완료되었습니다!');
+            alert('✅ 챌린지 시작 알림톡이 발송되었습니다!');
             currentManageApp = app;
             loadModalTab('shipping');
         } else {
