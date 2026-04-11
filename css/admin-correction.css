@@ -378,6 +378,7 @@
     border-radius: 12px;
     padding: 16px;
     overflow-y: auto;
+    transition: none;
 }
 
 .corr-toggle-panel-annotated {

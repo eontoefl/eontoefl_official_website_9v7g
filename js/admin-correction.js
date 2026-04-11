@@ -715,6 +715,7 @@ function resetTogglePanels() {
     const firstPanel = document.getElementById('firstFeedbackPanel');
     firstPanel.classList.remove('open');
     firstPanel.style.height = '';
+    firstPanel.style.maxHeight = '';
     firstPanel.innerHTML = '';
     const firstBtn = document.getElementById('toggleFirstFeedback');
     if (firstBtn) { firstBtn.classList.remove('active'); firstBtn.innerHTML = '<i class="fas fa-eye"></i> 1차 피드백 보기'; }
@@ -743,6 +744,7 @@ function toggleFirstFeedbackPanel() {
     if (panel.classList.contains('open')) {
         panel.classList.remove('open');
         panel.style.height = '';
+        panel.style.maxHeight = '';
         if (resizeHandle) resizeHandle.style.display = 'none';
         btn.classList.remove('active');
         btn.innerHTML = '<i class="fas fa-eye"></i> 1차 피드백 보기';
@@ -865,33 +867,44 @@ function buildFb1MemoPanel() {
  * Bind drag-to-resize: dragging the handle adjusts the height
  * of the specified target element (the toggle panel).
  */
+/**
+ * Bind drag-to-resize on a handle element.
+ * Stores target reference via _resizeTarget so re-opens work correctly.
+ */
 function bindResizeHandle(handle, target) {
-    if (!target) return;
+    if (!target || !handle) return;
 
-    // Remove previous listener if any (by cloning)
-    const newHandle = handle.cloneNode(true);
-    handle.parentNode.replaceChild(newHandle, handle);
+    // Update target reference each time (panel may be re-opened)
+    handle._resizeTarget = target;
 
-    let startY = 0;
-    let startH = 0;
+    // Only attach the listener once on this DOM element
+    if (handle._resizeBound) return;
+    handle._resizeBound = true;
 
-    function onMouseMove(e) {
-        const delta = e.clientY - startY;
-        const newH = Math.max(180, Math.min(startH + delta, window.innerHeight * 0.65));
-        target.style.height = newH + 'px';
-    }
-
-    function onMouseUp() {
-        newHandle.classList.remove('dragging');
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-    }
-
-    newHandle.addEventListener('mousedown', (e) => {
+    handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        startY = e.clientY;
-        startH = target.getBoundingClientRect().height;
-        newHandle.classList.add('dragging');
+        e.stopPropagation();
+
+        const tgt = handle._resizeTarget;
+        if (!tgt) return;
+
+        const startY = e.clientY;
+        const startH = tgt.getBoundingClientRect().height;
+        handle.classList.add('dragging');
+
+        function onMouseMove(ev) {
+            const delta = ev.clientY - startY;
+            const newH = Math.max(180, Math.min(startH + delta, window.innerHeight * 0.65));
+            tgt.style.height = newH + 'px';
+            tgt.style.maxHeight = newH + 'px';
+        }
+
+        function onMouseUp() {
+            handle.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     });
