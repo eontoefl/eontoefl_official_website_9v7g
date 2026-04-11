@@ -313,35 +313,38 @@ async function createFloatingButtons() {
     }
 }
 
+// 학생 대시보드 버튼 스타일
+const STUDENT_BTN_STYLE = `
+    display: flex;
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%);
+    color: white;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(148, 128, 197, 0.4);
+    font-size: 24px;
+    z-index: 9999;
+    transition: all 0.3s ease;
+    text-decoration: none;
+`;
+
 // 학생 대시보드 버튼 생성
 function createStudentButton() {
-    // 학생 대시보드 버튼이 없으면 생성
-    if (!document.getElementById('studentDashboardBtn')) {
-        const studentBtn = document.createElement('a');
+    let studentBtn = document.getElementById('studentDashboardBtn');
+    
+    if (!studentBtn) {
+        studentBtn = document.createElement('a');
         studentBtn.id = 'studentDashboardBtn';
         studentBtn.href = 'my-dashboard.html';
         studentBtn.target = '_blank';
         studentBtn.rel = 'noopener noreferrer';
         studentBtn.title = '내 대시보드';
         studentBtn.innerHTML = '<i class="fas fa-tachometer-alt"></i>';
-        studentBtn.style.cssText = `
-            display: flex;
-            position: fixed;
-            bottom: 100px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%);
-            color: white;
-            border-radius: 50%;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 16px rgba(148, 128, 197, 0.4);
-            font-size: 24px;
-            z-index: 9999;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        `;
         
         studentBtn.addEventListener('mouseover', function() {
             this.style.transform = 'translateY(-6px) scale(1.05)';
@@ -350,43 +353,46 @@ function createStudentButton() {
         
         studentBtn.addEventListener('mouseout', function() {
             this.style.transform = 'translateY(0) scale(1)';
-            this.style.boxShadow = '0 8px 24px rgba(148, 128, 197, 0.4)';
+            this.style.boxShadow = '0 4px 16px rgba(148, 128, 197, 0.4)';
         });
         
         document.body.appendChild(studentBtn);
-    } else {
-        // 이미 있으면 표시만
-        document.getElementById('studentDashboardBtn').style.display = 'flex';
     }
+    
+    // 항상 최신 스타일 적용
+    studentBtn.style.cssText = STUDENT_BTN_STYLE;
 }
+
+// 관리자 대시보드 버튼 스타일
+const ADMIN_BTN_STYLE = `
+    display: flex;
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+    color: white;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+    font-size: 24px;
+    z-index: 9999;
+    transition: all 0.3s ease;
+    text-decoration: none;
+`;
 
 // 관리자 대시보드 버튼 생성
 function createAdminButton() {
-    // 관리자 대시보드 버튼이 없으면 생성
-    if (!document.getElementById('adminDashboardBtn')) {
-        const adminBtn = document.createElement('a');
+    let adminBtn = document.getElementById('adminDashboardBtn');
+    
+    if (!adminBtn) {
+        adminBtn = document.createElement('a');
         adminBtn.id = 'adminDashboardBtn';
         adminBtn.href = 'admin-dashboard.html';
         adminBtn.title = '관리자 대시보드';
         adminBtn.innerHTML = '<i class="fas fa-crown"></i>';
-        adminBtn.style.cssText = `
-            display: flex;
-            position: fixed;
-            bottom: 100px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
-            color: white;
-            border-radius: 50%;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
-            font-size: 24px;
-            z-index: 9999;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        `;
         
         adminBtn.addEventListener('mouseover', function() {
             this.style.transform = 'translateY(-6px) scale(1.05)';
@@ -395,12 +401,12 @@ function createAdminButton() {
         
         adminBtn.addEventListener('mouseout', function() {
             this.style.transform = 'translateY(0) scale(1)';
-            this.style.boxShadow = '0 8px 24px rgba(124, 58, 237, 0.4)';
+            this.style.boxShadow = '0 4px 16px rgba(124, 58, 237, 0.4)';
         });
         
         document.body.appendChild(adminBtn);
-    } else {
-        // 이미 있으면 표시만
-        document.getElementById('adminDashboardBtn').style.display = 'flex';
     }
+    
+    // 항상 최신 스타일 적용
+    adminBtn.style.cssText = ADMIN_BTN_STYLE;
 }
