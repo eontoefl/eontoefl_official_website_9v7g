@@ -158,6 +158,15 @@ function getScore(item) {
  * Get the elapsed time since feedback creation for pending items.
  * Returns: { text, cssClass } or null if not pending.
  */
+/**
+ * Parse a timestamp value (ISO string, PG string, or ms number) to ms.
+ */
+function parseTimestampMs(val) {
+    if (!val) return NaN;
+    if (typeof val === 'number') return val;
+    return new Date(val).getTime();
+}
+
 function getElapsedTime(item) {
     const status = getCorrectionStatus(item);
     if (!status.isPending) return null;
@@ -173,7 +182,9 @@ function getElapsedTime(item) {
     if (!feedbackAt) return null;
 
     const now = Date.now();
-    const elapsed = now - feedbackAt;
+    const feedbackMs = parseTimestampMs(feedbackAt);
+    if (isNaN(feedbackMs)) return null;
+    const elapsed = now - feedbackMs;
     const hours = elapsed / (1000 * 60 * 60);
 
     let text = '';
@@ -220,8 +231,10 @@ function updateStats() {
         if (item.released_1 || item.released_2) approved++;
 
         // "오늘 생성" = feedback_1_at or feedback_2_at is today
-        if ((item.feedback_1_at && item.feedback_1_at >= todayStartMs) ||
-            (item.feedback_2_at && item.feedback_2_at >= todayStartMs)) {
+        const fb1Ms = parseTimestampMs(item.feedback_1_at);
+        const fb2Ms = parseTimestampMs(item.feedback_2_at);
+        if ((!isNaN(fb1Ms) && fb1Ms >= todayStartMs) ||
+            (!isNaN(fb2Ms) && fb2Ms >= todayStartMs)) {
             today++;
         }
     });
@@ -289,10 +302,10 @@ function applyFilters() {
             const kstNow = new Date(now + 9 * 60 * 60 * 1000);
             const todayStart = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
             const todayStartMs = todayStart.getTime() - 9 * 60 * 60 * 1000;
-            if (!(
-                (item.feedback_1_at && item.feedback_1_at >= todayStartMs) ||
-                (item.feedback_2_at && item.feedback_2_at >= todayStartMs)
-            )) {
+            const fb1Ms = parseTimestampMs(item.feedback_1_at);
+            const fb2Ms = parseTimestampMs(item.feedback_2_at);
+            if (!((!isNaN(fb1Ms) && fb1Ms >= todayStartMs) ||
+                  (!isNaN(fb2Ms) && fb2Ms >= todayStartMs))) {
                 return false;
             }
         }
