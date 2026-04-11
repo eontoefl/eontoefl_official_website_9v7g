@@ -391,29 +391,31 @@
 
 /* Drag handle for resizing .corr-toggle-panel-annotated */
 .corr-resize-handle {
-    height: 10px;
+    height: 18px;
     cursor: row-resize;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 12px;
+    margin: 4px 0 12px;
     user-select: none;
-    border-radius: 0 0 8px 8px;
-    background: #f1f5f9;
-    transition: background 0.15s;
+    border-radius: 6px;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+    transition: background 0.15s, border-color 0.15s;
 }
 
 .corr-resize-handle:hover,
 .corr-resize-handle.dragging {
-    background: #e2e8f0;
+    background: #cbd5e1;
+    border-color: #94a3b8;
 }
 
 .corr-resize-handle::after {
     content: '';
     display: block;
-    width: 40px;
-    height: 3px;
-    background: #94a3b8;
+    width: 48px;
+    height: 4px;
+    background: #64748b;
     border-radius: 2px;
 }
 
