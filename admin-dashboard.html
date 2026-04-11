@@ -38,6 +38,9 @@
                 <a href="admin-study-v3.html" class="admin-nav-link">
                     <i class="fas fa-flask"></i> 학습관리2 <span id="navWeeklyCheckBadge" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; min-width:16px; text-align:center; line-height:16px;">0</span>
                 </a>
+                <a href="admin-correction.html" class="admin-nav-link">
+                    <i class="fas fa-pen-nib"></i> 첨삭 관리
+                </a>
                 <a href="admin-questions.html" class="admin-nav-link">
                     <i class="fas fa-puzzle-piece"></i> 문제 관리
                 </a>
@@ -128,6 +131,22 @@
                 <div class="stat-card-trend">
                     <span style="color: #64748b;">
                         <i class="fas fa-info-circle"></i> 전체의 <span id="rejectionRate">-</span>%
+                    </span>
+                </div>
+            </div>
+
+            <div class="stat-card" onclick="location.href='admin-correction.html?status=pending'" style="cursor:pointer;">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">첨삭 승인 대기</span>
+                    <div class="stat-card-icon" style="background: #fff7ed; color: #f59e0b;">
+                        <i class="fas fa-pen-nib"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="correctionPending">-</div>
+                <div class="stat-card-label">Correction Pending</div>
+                <div class="stat-card-trend">
+                    <span style="color: #64748b;">
+                        <i class="fas fa-arrow-right"></i> 클릭하여 관리
                     </span>
                 </div>
             </div>

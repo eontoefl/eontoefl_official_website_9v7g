@@ -40,6 +40,9 @@ async function loadDashboardData() {
 
     // 토플 성적 알림 — 독립 호출 (try-catch 바깥)
     loadToeflAlerts();
+
+    // 첨삭 승인 대기 건수 — 독립 호출
+    loadCorrectionPendingCount();
 }
 
 // 통계 업데이트
@@ -386,5 +389,43 @@ function displayStepStatistics(stepCount, applications) {
         if (recentCard) {
             recentCard.insertAdjacentHTML('beforebegin', stepStatsHTML);
         }
+    }
+}
+
+// ===== 첨삭 승인 대기 건수 =====
+async function loadCorrectionPendingCount() {
+    try {
+        const el = document.getElementById('correctionPending');
+        if (!el) return;
+
+        const data = await supabaseAPI.query('correction_submissions', {
+            'select': 'id,feedback_1,feedback_2,released_1,released_2,status',
+            'limit': '1000'
+        });
+
+        if (!data || data.length === 0) {
+            el.textContent = '0';
+            return;
+        }
+
+        // Count pending approvals
+        let pendingCount = 0;
+        data.forEach(item => {
+            // feedback_1 exists but not released
+            if (item.feedback_1 && !item.released_1) {
+                pendingCount++;
+                return;
+            }
+            // feedback_2 exists, released_1 true, but released_2 false
+            if (item.released_1 && item.feedback_2 && !item.released_2) {
+                pendingCount++;
+            }
+        });
+
+        el.textContent = pendingCount;
+    } catch (e) {
+        console.warn('첨삭 대기 건수 로드 실패:', e);
+        const el = document.getElementById('correctionPending');
+        if (el) el.textContent = '0';
     }
 }
