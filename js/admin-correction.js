@@ -714,9 +714,14 @@ function resetTogglePanels() {
     // Reset first feedback panel
     const firstPanel = document.getElementById('firstFeedbackPanel');
     firstPanel.classList.remove('open');
+    firstPanel.style.height = '';
     firstPanel.innerHTML = '';
     const firstBtn = document.getElementById('toggleFirstFeedback');
     if (firstBtn) { firstBtn.classList.remove('active'); firstBtn.innerHTML = '<i class="fas fa-eye"></i> 1차 피드백 보기'; }
+
+    // Hide resize handle
+    const resizeHandle = document.getElementById('firstFbResizeHandle');
+    if (resizeHandle) resizeHandle.style.display = 'none';
 
     // Reset original draft panel
     const draftPanel = document.getElementById('originalDraftPanel');
@@ -732,10 +737,13 @@ function resetTogglePanels() {
 function toggleFirstFeedbackPanel() {
     const panel = document.getElementById('firstFeedbackPanel');
     const btn = document.getElementById('toggleFirstFeedback');
+    const resizeHandle = document.getElementById('firstFbResizeHandle');
     const item = currentModalItem;
 
     if (panel.classList.contains('open')) {
         panel.classList.remove('open');
+        panel.style.height = '';
+        if (resizeHandle) resizeHandle.style.display = 'none';
         btn.classList.remove('active');
         btn.innerHTML = '<i class="fas fa-eye"></i> 1차 피드백 보기';
         return;
@@ -749,19 +757,30 @@ function toggleFirstFeedbackPanel() {
     const isWriting = taskType.startsWith('writing');
 
     let html = '';
+
     if (isWriting && fb1.annotated_html) {
-        html += `<div class="corr-toggle-panel-annotated">${fb1.annotated_html}</div>`;
-        html += '<div class="corr-resize-handle" title="드래그하여 높이 조절"></div>';
+        // Split layout: left annotated + right memo
+        html += '<div class="corr-fb1-split" data-fb-scope="fb1">';
+        html += '  <div class="corr-fb1-split-left">';
+        html += `    <div class="corr-toggle-panel-annotated" id="fb1Annotated">${fb1.annotated_html}</div>`;
+        html += '  </div>';
+        html += '  <div class="corr-fb1-split-right" id="fb1Memo"></div>';
+        html += '</div>';
     } else if (!isWriting && fb1.per_question) {
-        html += '<div class="corr-toggle-panel-annotated">';
+        // Speaking: split per Q + shared memo panel
+        html += '<div class="corr-fb1-split" data-fb-scope="fb1">';
+        html += '  <div class="corr-fb1-split-left">';
+        html += '    <div class="corr-toggle-panel-annotated" id="fb1Annotated">';
         fb1.per_question.forEach((pq, i) => {
             html += `<div class="corr-feedback-question"><div class="corr-feedback-q-label">Q${pq.q || (i + 1)}</div>`;
             if (pq.annotated_html) html += `<div class="corr-feedback-q-body">${pq.annotated_html}</div>`;
             if (pq.comment) html += `<div class="corr-feedback-q-comment">${escapeHtml(pq.comment)}</div>`;
             html += '</div>';
         });
+        html += '    </div>';
+        html += '  </div>';
+        html += '  <div class="corr-fb1-split-right" id="fb1Memo"></div>';
         html += '</div>';
-        html += '<div class="corr-resize-handle" title="드래그하여 높이 조절"></div>';
     }
 
     if (fb1.summary) {
@@ -776,39 +795,103 @@ function toggleFirstFeedbackPanel() {
     btn.classList.add('active');
     btn.innerHTML = '<i class="fas fa-eye-slash"></i> 1차 피드백 닫기';
 
-    // Bind drag-to-resize on the handle
-    const handle = panel.querySelector('.corr-resize-handle');
-    if (handle) bindResizeHandle(handle);
+    // Build memo panel for 1차 feedback (reuse buildMemoPanel with "fb1" scope)
+    buildFb1MemoPanel();
+
+    // Show and bind resize handle (targets the entire panel)
+    if (resizeHandle) {
+        resizeHandle.style.display = 'flex';
+        bindResizeHandle(resizeHandle, panel);
+    }
+}
+
+/**
+ * Build memo panel for 1차 feedback toggle.
+ * Uses #fb1Annotated and #fb1Memo with scope "fb1".
+ */
+function buildFb1MemoPanel() {
+    const splitWrap = document.querySelector('.corr-fb1-split[data-fb-scope="fb1"]');
+    const annotatedEl = document.getElementById('fb1Annotated');
+    const memoEl = document.getElementById('fb1Memo');
+    if (!splitWrap || !annotatedEl || !memoEl) return;
+
+    const marks = annotatedEl.querySelectorAll('.correction-mark[data-comment]');
+    if (marks.length === 0) {
+        memoEl.innerHTML = '<div class="corr-memo-empty">교정 코멘트가 없습니다.</div>';
+        return;
+    }
+
+    memoEl.innerHTML = '<div class="corr-memo-header">1차 교정 메모</div>';
+
+    marks.forEach((mark, i) => {
+        const comment = mark.getAttribute('data-comment');
+        const uid = `fb1_${i}`;
+        mark.setAttribute('data-memo-id', uid);
+
+        const card = document.createElement('div');
+        card.className = 'corr-memo-card';
+        card.setAttribute('data-memo-id', uid);
+        card.textContent = comment;
+        memoEl.appendChild(card);
+    });
+
+    // Left mark click → activate right memo + scroll
+    marks.forEach(mark => {
+        mark.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = mark.getAttribute('data-memo-id');
+            activateMemoPair(splitWrap, id);
+        });
+    });
+
+    // Right memo card click → activate left mark + scroll
+    memoEl.querySelectorAll('.corr-memo-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = card.getAttribute('data-memo-id');
+            activateMemoPair(splitWrap, id);
+        });
+    });
+
+    // Click empty area to deactivate
+    splitWrap.addEventListener('click', (e) => {
+        if (!e.target.closest('.correction-mark') && !e.target.closest('.corr-memo-card')) {
+            deactivateAllMemo(splitWrap);
+        }
+    });
 }
 
 /**
  * Bind drag-to-resize: dragging the handle adjusts the height
- * of the immediately preceding .corr-toggle-panel-annotated element.
+ * of the specified target element (the toggle panel).
  */
-function bindResizeHandle(handle) {
-    const target = handle.previousElementSibling;
-    if (!target || !target.classList.contains('corr-toggle-panel-annotated')) return;
+function bindResizeHandle(handle, target) {
+    if (!target) return;
+
+    // Remove previous listener if any (by cloning)
+    const newHandle = handle.cloneNode(true);
+    handle.parentNode.replaceChild(newHandle, handle);
 
     let startY = 0;
     let startH = 0;
 
     function onMouseMove(e) {
         const delta = e.clientY - startY;
-        const newH = Math.max(120, Math.min(startH + delta, window.innerHeight * 0.6));
+        const newH = Math.max(180, Math.min(startH + delta, window.innerHeight * 0.65));
         target.style.height = newH + 'px';
     }
 
     function onMouseUp() {
-        handle.classList.remove('dragging');
+        newHandle.classList.remove('dragging');
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
     }
 
-    handle.addEventListener('mousedown', (e) => {
+    newHandle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         startY = e.clientY;
         startH = target.getBoundingClientRect().height;
-        handle.classList.add('dragging');
+        newHandle.classList.add('dragging');
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     });

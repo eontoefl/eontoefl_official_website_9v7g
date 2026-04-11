@@ -369,8 +369,10 @@
 }
 
 .corr-toggle-panel.open {
-    max-height: 2000px;
-    margin: 0 24px 16px;
+    max-height: none;
+    height: 400px;
+    min-height: 180px;
+    margin: 0 24px 0;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
@@ -382,21 +384,17 @@
     font-size: 14px;
     line-height: 1.8;
     color: #1e293b;
-    margin-bottom: 0;
-    min-height: 120px;
-    max-height: 60vh;
-    height: 300px;
-    overflow-y: auto;
+    margin-bottom: 12px;
 }
 
-/* Drag handle for resizing .corr-toggle-panel-annotated */
+/* Drag handle for resizing toggle panel */
 .corr-resize-handle {
     height: 18px;
     cursor: row-resize;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 4px 0 12px;
+    margin: 0 24px 12px;
     user-select: none;
     border-radius: 6px;
     background: #e2e8f0;
@@ -417,6 +415,30 @@
     height: 4px;
     background: #64748b;
     border-radius: 2px;
+}
+
+/* First-feedback split layout inside toggle panel */
+.corr-fb1-split {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.corr-fb1-split-left {
+    flex: 1;
+    min-width: 0;
+}
+
+.corr-fb1-split-left .corr-toggle-panel-annotated {
+    margin-bottom: 0;
+}
+
+.corr-fb1-split-right {
+    width: 240px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-left: 1px solid #e2e8f0;
+    padding-left: 12px;
 }
 
 .corr-toggle-panel-summary {
