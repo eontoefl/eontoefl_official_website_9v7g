@@ -852,7 +852,8 @@ function renderWritingModal(container, feedback) {
     // Render summary / level / encouragement
     const summaryEl = document.getElementById('adminFbSummary');
     if (summaryEl) {
-        renderFeedbackSummary(summaryEl, feedback);
+        const round = currentModalItem ? getDraftRound(currentModalItem) : '1';
+        renderFeedbackSummary(summaryEl, feedback, round);
     }
 }
 
@@ -912,7 +913,8 @@ function renderSpeakingModal(container, feedback) {
     // Render summary / level / encouragement
     const summaryEl = document.getElementById('adminSpkSummary');
     if (summaryEl) {
-        renderFeedbackSummary(summaryEl, feedback);
+        const round = currentModalItem ? getDraftRound(currentModalItem) : '1';
+        renderFeedbackSummary(summaryEl, feedback, round);
     }
 }
 
@@ -1107,7 +1109,7 @@ function bindTooltipEvents(container) {
 
 // ===== Feedback Summary Rendering =====
 
-function renderFeedbackSummary(container, feedback) {
+function renderFeedbackSummary(container, feedback, round) {
     if (!container || !feedback) return;
 
     let html = '';
@@ -1130,7 +1132,8 @@ function renderFeedbackSummary(container, feedback) {
         </div>`;
     }
 
-    if (feedback.encouragement) {
+    // Encouragement is only for 2nd round feedback
+    if (round === '2' && feedback.encouragement) {
         html += `<div class="corr-feedback-encouragement-card">
             <div class="corr-feedback-encouragement-title"><i class="fas fa-star"></i> 격려 메시지</div>
             <div class="corr-feedback-encouragement-text">${escapeHtml(feedback.encouragement)}</div>
@@ -1542,11 +1545,13 @@ function makeSummaryEditable() {
         <div class="corr-feedback-level-label">Level Score</div>
     </div>`;
 
-    // Encouragement textarea
-    html += `<div class="corr-feedback-encouragement-card">
-        <div class="corr-feedback-encouragement-title"><i class="fas fa-star"></i> 격려 메시지</div>
-        <textarea class="corr-editable-textarea" id="editEncouragement">${escapeHtml(feedback.encouragement || '')}</textarea>
-    </div>`;
+    // Encouragement textarea (only for 2nd round)
+    if (isFinal) {
+        html += `<div class="corr-feedback-encouragement-card">
+            <div class="corr-feedback-encouragement-title"><i class="fas fa-star"></i> 격려 메시지</div>
+            <textarea class="corr-editable-textarea" id="editEncouragement">${escapeHtml(feedback.encouragement || '')}</textarea>
+        </div>`;
+    }
 
     // Level change textarea (only for 2nd round)
     if (isFinal) {
