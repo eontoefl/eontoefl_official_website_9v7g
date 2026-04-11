@@ -222,7 +222,7 @@
     margin-top: 0;
 }
 
-/* 반응형 */
+/* 반응형 - 태블릿 */
 @media (max-width: 968px) {
     .progress-section {
         flex-direction: column;
@@ -239,26 +239,190 @@
     }
 }
 
+/* 반응형 - 모바일 */
 @media (max-width: 768px) {
+    /* 가로 스크롤 방지 */
+    body {
+        overflow-x: hidden;
+    }
+
+    /* 그리드 1열 */
     .dashboard-grid {
         grid-template-columns: 1fr !important;
     }
     
+    /* 카드 패딩 축소 */
+    .dashboard-card,
+    .progress-section,
+    .quick-menu,
+    .program-info,
+    .notifications {
+        padding: 20px 16px;
+    }
+
+    /* 빠른 메뉴 2열 */
     .quick-menu-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .quick-menu-button {
+        padding: 18px 12px;
+        min-height: 80px;
+    }
+    
+    .quick-menu-icon {
+        font-size: 26px;
+        margin-bottom: 8px;
+    }
+    
+    .quick-menu-text {
+        font-size: 12px;
+    }
+
+    /* 원형 프로그레스 + 타임라인 세로 배치 */
+    .progress-main-layout {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 20px !important;
     }
     
     .progress-circle {
-        width: 140px;
-        height: 140px;
+        width: 120px;
+        height: 120px;
     }
     
     .progress-circle-inner {
-        width: 110px;
-        height: 110px;
+        width: 96px;
+        height: 96px;
     }
     
     .progress-percentage {
+        font-size: 28px;
+    }
+    
+    .progress-label {
+        font-size: 10px;
+    }
+
+    /* 타임라인바 세로 배치 후 조정 */
+    .timeline-bar-section {
+        width: 100%;
+        padding-left: 0 !important;
+    }
+    
+    .timeline-title {
+        font-size: 15px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    /* 타임라인 스텝 5개씩 2줄 */
+    .timeline-bar {
+        display: grid !important;
+        grid-template-columns: repeat(5, 1fr) !important;
+        gap: 8px 4px !important;
+        overflow-x: visible;
+        padding-bottom: 0;
+        margin-left: 0;
+    }
+    
+    .timeline-bar::before {
+        display: none;
+    }
+    
+    .timeline-step {
+        min-width: 0;
+    }
+    
+    .timeline-step-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+        margin-bottom: 6px;
+    }
+    
+    .timeline-step-label {
+        font-size: 10px;
+        max-width: none;
+        line-height: 1.2;
+    }
+
+    /* 프로그램 정보 URL 넘침 방지 */
+    .program-value {
+        word-break: break-all;
+        overflow-wrap: break-word;
+    }
+
+    /* 프로그램 행 세로 배치 */
+    .program-row {
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 0;
+    }
+
+    /* 액션 아이템 모바일 */
+    .action-item {
+        padding: 16px;
+        gap: 12px;
+    }
+    
+    .action-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 22px;
+    }
+    
+    .action-title {
+        font-size: 14px;
+    }
+    
+    .action-button {
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+
+    /* 타임라인 아이템 모바일 */
+    .timeline-content {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .timeline-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    /* 빠른 링크 모바일 */
+    .quick-link-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+    
+    .quick-link-title {
+        font-size: 13px;
+    }
+    
+    .quick-link-description {
+        font-size: 11px;
+    }
+
+    /* 배송 정보 모바일 */
+    .shipping-icon {
         font-size: 36px;
+    }
+
+    /* 입문서 대시보드 모바일 */
+    .book-progress-layout {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 20px !important;
+    }
+    
+    .book-stats-section {
+        min-width: 0 !important;
+        width: 100%;
     }
 }

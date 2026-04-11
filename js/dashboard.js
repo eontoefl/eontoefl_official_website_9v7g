@@ -167,7 +167,7 @@ function renderProgressSection(app) {
                 진행 상황
             </h2>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="progress-main-layout" style="display: flex; align-items: center; gap: 10px;">
             <div class="progress-circle" style="--progress-deg: ${progressDeg}deg;">
                 <div class="progress-circle-inner">
                     <div class="progress-percentage">${progressDisplay}</div>
@@ -1334,7 +1334,7 @@ async function renderBookOnlyDashboard(app) {
         <div class="dashboard-grid" style="grid-template-columns: 1fr;">
             <!-- 입문서 진도 카드 -->
             <div class="dashboard-card" style="margin-bottom: 0;">
-                <div style="display: flex; align-items: center; gap: 30px; flex-wrap: wrap;">
+                <div class="book-progress-layout" style="display: flex; align-items: center; gap: 30px; flex-wrap: wrap;">
                     <!-- 원형 프로그레스 -->
                     <div style="flex-shrink: 0;">
                         <div class="progress-circle" style="--progress-deg: ${progressDeg}deg; width: 140px; height: 140px;">
@@ -1346,7 +1346,7 @@ async function renderBookOnlyDashboard(app) {
                     </div>
 
                     <!-- 통계 정보 -->
-                    <div style="flex: 1; min-width: 250px;">
+                    <div class="book-stats-section" style="flex: 1; min-width: 250px;">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
                             <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">입문서 읽기 현황</h2>
                             ${isCompleted ? '<span style="background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">완독 완료 ✅</span>' : ''}

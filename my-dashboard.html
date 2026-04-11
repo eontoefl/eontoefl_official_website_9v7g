@@ -433,12 +433,27 @@
 
         /* Responsive Design */
         @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 0 4px;
+            }
+
             .dashboard-grid {
                 grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .welcome-section {
+                padding: 24px 20px;
+                margin-bottom: 16px;
+                border-radius: 12px;
             }
 
             .welcome-section h1 {
-                font-size: 24px;
+                font-size: 20px;
+            }
+
+            .welcome-section p {
+                font-size: 14px;
             }
 
             .menu-buttons {
@@ -452,6 +467,14 @@
             nav .menu {
                 gap: 15px;
                 font-size: 14px;
+            }
+
+            .card-header h2 {
+                font-size: 17px;
+            }
+
+            .card-icon {
+                font-size: 20px;
             }
         }
 
