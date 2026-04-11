@@ -290,15 +290,22 @@ async function createFloatingButtons() {
         return;
     }
     
-    // 학생인 경우 신청서 접수 여부 확인
+    // 학생인 경우 신청서 접수 여부 확인 (Supabase API 사용)
     try {
-        const result = await supabaseAPI.get('applications', { limit: 1000 });
+        // supabaseAPI가 로드되지 않은 페이지에서는 스킵
+        if (typeof supabaseAPI === 'undefined') return;
+
+        const myApplications = await supabaseAPI.query('applications', {
+            'email': `eq.${user.email}`,
+            'deleted': 'neq.true',
+            'limit': '10'
+        });
         
-        // 본인의 신청서만 필터링
-        const myApplications = result.data ? result.data.filter(app => app.email === user.email) : [];
+        // 본인의 신청서만 정확히 필터링
+        const matched = (myApplications || []).filter(app => app.email === user.email);
         
         // 신청서가 있는 경우에만 버튼 표시
-        if (myApplications.length > 0) {
+        if (matched.length > 0) {
             createStudentButton();
         }
     } catch (error) {
@@ -320,21 +327,20 @@ function createStudentButton() {
         studentBtn.style.cssText = `
             display: flex;
             position: fixed;
-            bottom: 30px;
-            left: 30px;
-            width: 70px;
-            height: 70px;
+            bottom: 100px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
             background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%);
             color: white;
-            border-radius: 16px;
+            border-radius: 50%;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 8px 24px rgba(148, 128, 197, 0.4);
-            font-size: 28px;
+            box-shadow: 0 4px 16px rgba(148, 128, 197, 0.4);
+            font-size: 24px;
             z-index: 9999;
             transition: all 0.3s ease;
             text-decoration: none;
-            border: 3px solid rgba(255, 255, 255, 0.2);
         `;
         
         studentBtn.addEventListener('mouseover', function() {
@@ -366,21 +372,20 @@ function createAdminButton() {
         adminBtn.style.cssText = `
             display: flex;
             position: fixed;
-            bottom: 30px;
-            left: 30px;
-            width: 70px;
-            height: 70px;
+            bottom: 100px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
             background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
             color: white;
-            border-radius: 16px;
+            border-radius: 50%;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
-            font-size: 28px;
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+            font-size: 24px;
             z-index: 9999;
             transition: all 0.3s ease;
             text-decoration: none;
-            border: 3px solid rgba(255, 255, 255, 0.2);
         `;
         
         adminBtn.addEventListener('mouseover', function() {

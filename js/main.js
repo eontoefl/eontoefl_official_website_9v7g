@@ -327,21 +327,20 @@ function createStudentButton() {
         studentBtn.style.cssText = `
             display: flex;
             position: fixed;
-            bottom: 30px;
-            left: 30px;
-            width: 70px;
-            height: 70px;
+            bottom: 100px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
             background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%);
             color: white;
-            border-radius: 16px;
+            border-radius: 50%;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 8px 24px rgba(148, 128, 197, 0.4);
-            font-size: 28px;
+            box-shadow: 0 4px 16px rgba(148, 128, 197, 0.4);
+            font-size: 24px;
             z-index: 9999;
             transition: all 0.3s ease;
             text-decoration: none;
-            border: 3px solid rgba(255, 255, 255, 0.2);
         `;
         
         studentBtn.addEventListener('mouseover', function() {
@@ -373,21 +372,20 @@ function createAdminButton() {
         adminBtn.style.cssText = `
             display: flex;
             position: fixed;
-            bottom: 30px;
-            left: 30px;
-            width: 70px;
-            height: 70px;
+            bottom: 100px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
             background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
             color: white;
-            border-radius: 16px;
+            border-radius: 50%;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
-            font-size: 28px;
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+            font-size: 24px;
             z-index: 9999;
             transition: all 0.3s ease;
             text-decoration: none;
-            border: 3px solid rgba(255, 255, 255, 0.2);
         `;
         
         adminBtn.addEventListener('mouseover', function() {

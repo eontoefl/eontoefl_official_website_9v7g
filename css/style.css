@@ -248,14 +248,23 @@ h1, h2, h3, h4, h5, h6,
 
 @media (max-width: 768px) {
     .kakao-float-btn {
-        width: 55px;
-        height: 55px;
+        width: 50px;
+        height: 50px;
         bottom: 20px;
         right: 20px;
     }
     
     .kakao-float-btn i {
-        font-size: 24px;
+        font-size: 22px;
+    }
+    
+    #studentDashboardBtn,
+    #adminDashboardBtn {
+        width: 50px !important;
+        height: 50px !important;
+        bottom: 80px !important;
+        right: 20px !important;
+        font-size: 20px !important;
     }
 }
 
