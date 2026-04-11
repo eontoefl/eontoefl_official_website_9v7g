@@ -210,6 +210,50 @@
         </div>
     </div>
 
+    <!-- Detail Modal (Section 2: Read-only) -->
+    <div class="corr-modal-overlay" id="corrDetailModal">
+        <div class="corr-modal">
+            <!-- Modal Header -->
+            <div class="corr-modal-header">
+                <div class="corr-modal-header-left">
+                    <span class="corr-modal-student-name" id="modalStudentName">-</span>
+                    <div class="corr-modal-meta">
+                        <span class="corr-modal-meta-tag" id="modalSession">-</span>
+                        <span class="corr-modal-meta-tag" id="modalTaskType">-</span>
+                        <span class="corr-modal-meta-tag" id="modalDraftRound">-</span>
+                        <span class="correction-badge" id="modalStatusBadge">-</span>
+                    </div>
+                </div>
+                <button class="corr-modal-close" onclick="closeCorrectionModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Toggle Buttons -->
+            <div class="corr-modal-toggles" id="modalToggles">
+                <button class="corr-toggle-btn" id="toggleFirstFeedback" onclick="toggleFirstFeedbackPanel()" style="display:none;">
+                    <i class="fas fa-eye"></i> 1차 피드백 보기
+                </button>
+                <button class="corr-toggle-btn" id="toggleOriginalDraft" onclick="toggleOriginalDraftPanel()">
+                    <i class="fas fa-file-alt"></i> 학생 원문 보기
+                </button>
+            </div>
+
+            <!-- Toggle Panels -->
+            <div class="corr-toggle-panel" id="firstFeedbackPanel"></div>
+            <div class="corr-toggle-panel" id="originalDraftPanel"></div>
+
+            <!-- Modal Body -->
+            <div class="corr-modal-body" id="modalBody">
+                <div class="corr-modal-body-loading" id="modalLoading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>데이터를 불러오는 중...</p>
+                </div>
+                <div id="modalContent" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript -->
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-utils.js"></script>

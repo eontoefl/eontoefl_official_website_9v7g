@@ -524,7 +524,605 @@ function updateSelectionCount() {
     }
 }
 
-// ===== Detail Modal Placeholder (Section 2) =====
-function openCorrectionDetail(id) {
-    alert('상세 모달은 구간 2에서 구현');
+// ===== Section 2: Detail Modal (Read-only) =====
+
+// Current modal state
+let currentModalItem = null;
+
+/**
+ * Supabase Storage public URL helper
+ */
+function getStorageUrl(bucket, path) {
+    if (!path) return '';
+    if (path.indexOf('http') === 0) return path;
+    return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+
+/**
+ * Open the detail modal for a given correction submission ID.
+ */
+async function openCorrectionDetail(id) {
+    const overlay = document.getElementById('corrDetailModal');
+    const loading = document.getElementById('modalLoading');
+    const content = document.getElementById('modalContent');
+
+    // Show modal with loading
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    loading.style.display = 'block';
+    content.style.display = 'none';
+
+    // Reset toggle panels
+    resetTogglePanels();
+
+    try {
+        // Try to find item in cache first
+        let item = allCorrections.find(c => c.id === id);
+
+        // If not in cache or missing feedback JSONB, re-fetch
+        if (!item || (!item.feedback_1 && !item.feedback_2)) {
+            const fresh = await supabaseAPI.getById('correction_submissions', id);
+            if (fresh) {
+                item = fresh;
+                // Update cache
+                const idx = allCorrections.findIndex(c => c.id === id);
+                if (idx >= 0) allCorrections[idx] = item;
+            }
+        }
+
+        if (!item) {
+            content.innerHTML = '<div style="text-align:center; padding:40px; color:#888;">데이터를 찾을 수 없습니다.</div>';
+            loading.style.display = 'none';
+            content.style.display = 'block';
+            return;
+        }
+
+        currentModalItem = item;
+
+        // Populate header
+        populateModalHeader(item);
+
+        // Setup toggle buttons
+        setupToggleButtons(item);
+
+        // Render body based on task type
+        const taskType = (item.task_type || '').toLowerCase();
+        const isWriting = taskType.startsWith('writing');
+        const round = getDraftRound(item);
+        const feedback = round === '2' && item.feedback_2 ? parseFeedback(item.feedback_2) : parseFeedback(item.feedback_1);
+
+        if (!feedback) {
+            content.innerHTML = '<div style="text-align:center; padding:40px; color:#888;">피드백 데이터가 없습니다.</div>';
+            loading.style.display = 'none';
+            content.style.display = 'block';
+            return;
+        }
+
+        if (isWriting) {
+            renderWritingModal(content, feedback);
+        } else {
+            renderSpeakingModal(content, feedback);
+        }
+
+        loading.style.display = 'none';
+        content.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error opening correction detail:', error);
+        content.innerHTML = `<div style="text-align:center; padding:40px; color:#dc2626;">오류가 발생했습니다: ${escapeHtml(error.message)}</div>`;
+        loading.style.display = 'none';
+        content.style.display = 'block';
+    }
+}
+
+/**
+ * Close the detail modal.
+ */
+function closeCorrectionModal() {
+    const overlay = document.getElementById('corrDetailModal');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    currentModalItem = null;
+    resetTogglePanels();
+}
+
+// Close on overlay click (not modal content)
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('corrDetailModal');
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeCorrectionModal();
+        });
+    }
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay && overlay.classList.contains('open')) {
+            closeCorrectionModal();
+        }
+    });
+});
+
+/**
+ * Parse feedback JSONB (may be string or object).
+ */
+function parseFeedback(fb) {
+    if (!fb) return null;
+    if (typeof fb === 'string') {
+        try { return JSON.parse(fb); } catch (e) { return null; }
+    }
+    return fb;
+}
+
+/**
+ * Populate modal header with item info.
+ */
+function populateModalHeader(item) {
+    const user = usersCache[item.user_id] || { name: '(알수없음)', email: '' };
+    const status = getCorrectionStatus(item);
+    const round = getDraftRound(item);
+
+    // Task type label
+    const taskType = (item.task_type || '').toLowerCase();
+    let taskTypeLabel = item.task_type || '-';
+    if (taskType === 'writing_email') taskTypeLabel = 'Email';
+    else if (taskType === 'writing_discussion') taskTypeLabel = 'Discussion';
+    else if (taskType === 'speaking_interview') taskTypeLabel = 'Interview';
+
+    document.getElementById('modalStudentName').textContent = user.name;
+    document.getElementById('modalSession').textContent = item.session_number ? `S${item.session_number}` : '-';
+    document.getElementById('modalTaskType').textContent = taskTypeLabel;
+    document.getElementById('modalDraftRound').textContent = `${round}차`;
+    
+    const badge = document.getElementById('modalStatusBadge');
+    badge.textContent = status.text;
+    badge.className = `correction-badge ${status.cssClass}`;
+}
+
+/**
+ * Setup toggle buttons (1차 피드백 보기 / 학생 원문 보기).
+ */
+function setupToggleButtons(item) {
+    const round = getDraftRound(item);
+    const toggleFirstBtn = document.getElementById('toggleFirstFeedback');
+    const toggleOriginalBtn = document.getElementById('toggleOriginalDraft');
+
+    // "1차 피드백 보기" — only show when viewing 2nd round feedback
+    if (round === '2' && item.feedback_1) {
+        toggleFirstBtn.style.display = 'inline-flex';
+    } else {
+        toggleFirstBtn.style.display = 'none';
+    }
+
+    // "학생 원문 보기" — always show
+    toggleOriginalBtn.style.display = 'inline-flex';
+}
+
+function resetTogglePanels() {
+    // Reset first feedback panel
+    const firstPanel = document.getElementById('firstFeedbackPanel');
+    firstPanel.classList.remove('open');
+    firstPanel.innerHTML = '';
+    const firstBtn = document.getElementById('toggleFirstFeedback');
+    if (firstBtn) { firstBtn.classList.remove('active'); firstBtn.innerHTML = '<i class="fas fa-eye"></i> 1차 피드백 보기'; }
+
+    // Reset original draft panel
+    const draftPanel = document.getElementById('originalDraftPanel');
+    draftPanel.classList.remove('open');
+    draftPanel.innerHTML = '';
+    const draftBtn = document.getElementById('toggleOriginalDraft');
+    if (draftBtn) { draftBtn.classList.remove('active'); draftBtn.innerHTML = '<i class="fas fa-file-alt"></i> 학생 원문 보기'; }
+}
+
+/**
+ * Toggle 1차 피드백 패널.
+ */
+function toggleFirstFeedbackPanel() {
+    const panel = document.getElementById('firstFeedbackPanel');
+    const btn = document.getElementById('toggleFirstFeedback');
+    const item = currentModalItem;
+
+    if (panel.classList.contains('open')) {
+        panel.classList.remove('open');
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-eye"></i> 1차 피드백 보기';
+        return;
+    }
+
+    if (!item || !item.feedback_1) return;
+    const fb1 = parseFeedback(item.feedback_1);
+    if (!fb1) return;
+
+    const taskType = (item.task_type || '').toLowerCase();
+    const isWriting = taskType.startsWith('writing');
+
+    let html = '';
+    if (isWriting && fb1.annotated_html) {
+        html += `<div class="corr-toggle-panel-annotated">${fb1.annotated_html}</div>`;
+    } else if (!isWriting && fb1.per_question) {
+        html += '<div class="corr-toggle-panel-annotated">';
+        fb1.per_question.forEach((pq, i) => {
+            html += `<div class="corr-feedback-question"><div class="corr-feedback-q-label">Q${pq.q || (i + 1)}</div>`;
+            if (pq.annotated_html) html += `<div class="corr-feedback-q-body">${pq.annotated_html}</div>`;
+            if (pq.comment) html += `<div class="corr-feedback-q-comment">${escapeHtml(pq.comment)}</div>`;
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    if (fb1.summary) {
+        html += `<div class="corr-toggle-panel-summary">
+            <div class="corr-toggle-panel-summary-title"><i class="fas fa-comment-dots"></i> 1차 총평</div>
+            <div class="corr-toggle-panel-summary-text">${escapeHtml(fb1.summary)}</div>
+        </div>`;
+    }
+
+    panel.innerHTML = html;
+    panel.classList.add('open');
+    btn.classList.add('active');
+    btn.innerHTML = '<i class="fas fa-eye-slash"></i> 1차 피드백 닫기';
+}
+
+/**
+ * Toggle 학생 원문 패널.
+ */
+function toggleOriginalDraftPanel() {
+    const panel = document.getElementById('originalDraftPanel');
+    const btn = document.getElementById('toggleOriginalDraft');
+    const item = currentModalItem;
+
+    if (panel.classList.contains('open')) {
+        panel.classList.remove('open');
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-file-alt"></i> 학생 원문 보기';
+        return;
+    }
+
+    if (!item) return;
+
+    const round = getDraftRound(item);
+    const taskType = (item.task_type || '').toLowerCase();
+    const isWriting = taskType.startsWith('writing');
+
+    let html = '';
+    if (isWriting) {
+        const draftText = round === '2' ? (item.draft_2_text || '') : (item.draft_1_text || '');
+        if (draftText) {
+            html = `<div class="corr-toggle-panel-draft">${escapeHtml(draftText)}</div>`;
+        } else {
+            html = '<div style="padding:10px; color:#888; text-align:center;">원문 데이터가 없습니다.</div>';
+        }
+    } else {
+        // Speaking: show audio paths
+        const prefix = round === '2' ? 'draft_2_audio_q' : 'draft_1_audio_q';
+        html = '<div style="display:flex; flex-direction:column; gap:6px;">';
+        for (let q = 1; q <= 4; q++) {
+            const path = item[prefix + q] || '';
+            html += `<div class="corr-toggle-panel-audio-path"><strong>Q${q}:</strong> ${path ? escapeHtml(path) : '(파일 없음)'}</div>`;
+        }
+        html += '</div>';
+    }
+
+    panel.innerHTML = html;
+    panel.classList.add('open');
+    btn.classList.add('active');
+    btn.innerHTML = '<i class="fas fa-file-alt"></i> 학생 원문 닫기';
+}
+
+// ===== Writing Modal Rendering =====
+
+function renderWritingModal(container, feedback) {
+    let html = '';
+
+    // Split layout: left annotated + right memo
+    html += '<div class="corr-fb-split-wrap" data-fb-scope="admin">';
+    html += '  <div class="corr-fb-split">';
+    html += '    <div class="corr-fb-split-left">';
+    html += '      <div class="corr-feedback-annotated" id="adminFbAnnotated"></div>';
+    html += '    </div>';
+    html += '    <div class="corr-fb-split-right" id="adminFbMemo"></div>';
+    html += '  </div>';
+    html += '  <div class="corr-feedback-summary" id="adminFbSummary"></div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Render annotated HTML
+    const annotatedEl = document.getElementById('adminFbAnnotated');
+    if (annotatedEl && feedback.annotated_html) {
+        annotatedEl.innerHTML = feedback.annotated_html;
+        bindTooltipEvents(annotatedEl);
+    }
+
+    // Build memo panel (bidirectional click sync)
+    buildMemoPanel('admin');
+
+    // Render summary / level / encouragement
+    const summaryEl = document.getElementById('adminFbSummary');
+    if (summaryEl) {
+        renderFeedbackSummary(summaryEl, feedback);
+    }
+}
+
+// ===== Speaking Modal Rendering =====
+
+function renderSpeakingModal(container, feedback) {
+    // Per-question data
+    const questions = feedback.per_question || [];
+    
+    let html = '';
+
+    // Tab navigation
+    html += '<div class="corr-spk-tabs" id="spkTabs">';
+    for (let i = 0; i < Math.max(questions.length, 4); i++) {
+        html += `<button class="corr-spk-tab ${i === 0 ? 'active' : ''}" data-q="${i}" onclick="switchSpeakingTab(${i})">Q${i + 1}</button>`;
+    }
+    html += '</div>';
+
+    // Tab panels — split layout for each Q
+    html += '<div class="corr-fb-split-wrap" data-fb-scope="admin-spk">';
+    for (let i = 0; i < Math.max(questions.length, 4); i++) {
+        const pq = questions[i] || {};
+        html += `<div class="corr-spk-q-panel ${i === 0 ? 'active' : ''}" data-q="${i}">`;
+        html += '  <div class="corr-fb-split">';
+        html += '    <div class="corr-fb-split-left">';
+        html += `      <div class="corr-feedback-annotated" id="adminSpkFb_${i}"></div>`;
+        if (pq.comment) {
+            html += `<div class="corr-feedback-q-comment" style="margin-top:12px;">${escapeHtml(pq.comment)}</div>`;
+        }
+        html += '    </div>';
+        html += `    <div class="corr-fb-split-right" id="adminSpkMemo_${i}"></div>`;
+        html += '  </div>';
+        html += '</div>';
+    }
+
+    // Summary area
+    html += '  <div class="corr-feedback-summary" id="adminSpkSummary"></div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Render annotated HTML for each Q
+    for (let i = 0; i < Math.max(questions.length, 4); i++) {
+        const pq = questions[i] || {};
+        const el = document.getElementById(`adminSpkFb_${i}`);
+        if (el && pq.annotated_html) {
+            el.innerHTML = pq.annotated_html;
+            bindTooltipEvents(el);
+        } else if (el) {
+            el.innerHTML = '<div style="color:#888; padding:20px; text-align:center;">이 질문의 피드백이 없습니다.</div>';
+        }
+    }
+
+    // Build memo panels for all Qs (all marks visible — recommended approach)
+    buildSpkMemoPanels();
+
+    // Render summary / level / encouragement
+    const summaryEl = document.getElementById('adminSpkSummary');
+    if (summaryEl) {
+        renderFeedbackSummary(summaryEl, feedback);
+    }
+}
+
+/**
+ * Switch Speaking Q tab.
+ */
+function switchSpeakingTab(idx) {
+    // Update tab buttons
+    document.querySelectorAll('.corr-spk-tab').forEach(tab => {
+        tab.classList.toggle('active', parseInt(tab.dataset.q) === idx);
+    });
+
+    // Update panels
+    document.querySelectorAll('.corr-spk-q-panel').forEach(panel => {
+        panel.classList.toggle('active', parseInt(panel.dataset.q) === idx);
+    });
+}
+
+/**
+ * Build memo panels for all Speaking Q panels.
+ * Each Q has its own memo panel on the right side.
+ */
+function buildSpkMemoPanels() {
+    const wrap = document.querySelector('.corr-fb-split-wrap[data-fb-scope="admin-spk"]');
+    if (!wrap) return;
+
+    // Get all Q panels
+    const panels = wrap.querySelectorAll('.corr-spk-q-panel');
+    panels.forEach((panel, i) => {
+        const annotatedEl = document.getElementById(`adminSpkFb_${i}`);
+        const memoEl = document.getElementById(`adminSpkMemo_${i}`);
+        if (!annotatedEl || !memoEl) return;
+
+        const marks = annotatedEl.querySelectorAll('.correction-mark[data-comment]');
+        if (marks.length === 0) {
+            memoEl.innerHTML = '<div class="corr-memo-empty">교정 코멘트가 없습니다.</div>';
+            return;
+        }
+
+        memoEl.innerHTML = '<div class="corr-memo-header">교정 메모 (Q' + (i + 1) + ')</div>';
+
+        marks.forEach((mark, j) => {
+            const comment = mark.getAttribute('data-comment');
+            const uid = `spk_${i}_${j}`;
+
+            mark.setAttribute('data-memo-id', uid);
+
+            const card = document.createElement('div');
+            card.className = 'corr-memo-card';
+            card.setAttribute('data-memo-id', uid);
+            card.textContent = comment;
+            memoEl.appendChild(card);
+        });
+
+        // Bidirectional click events — scoped to this Q panel
+        marks.forEach(mark => {
+            mark.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = mark.getAttribute('data-memo-id');
+                activateMemoPair(panel, id);
+            });
+        });
+
+        memoEl.querySelectorAll('.corr-memo-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = card.getAttribute('data-memo-id');
+                activateMemoPair(panel, id);
+            });
+        });
+
+        // Click empty area to deactivate
+        panel.addEventListener('click', (e) => {
+            if (!e.target.closest('.correction-mark') && !e.target.closest('.corr-memo-card')) {
+                deactivateAllMemo(panel);
+            }
+        });
+    });
+}
+
+// ===== Memo Panel (Writing) — Bidirectional Highlight =====
+
+/**
+ * Build memo panel for writing feedback.
+ * Mirrors testroom's _buildMemoPanel logic.
+ */
+function buildMemoPanel(scope) {
+    const wrap = document.querySelector(`.corr-fb-split-wrap[data-fb-scope="${scope}"]`);
+    if (!wrap) return;
+
+    const annotatedEl = document.getElementById(`${scope}FbAnnotated`);
+    const memoEl = document.getElementById(`${scope}FbMemo`);
+    if (!annotatedEl || !memoEl) return;
+
+    const marks = annotatedEl.querySelectorAll('.correction-mark[data-comment]');
+    if (marks.length === 0) {
+        memoEl.innerHTML = '<div class="corr-memo-empty">교정 코멘트가 없습니다.</div>';
+        return;
+    }
+
+    memoEl.innerHTML = '<div class="corr-memo-header">교정 메모</div>';
+
+    marks.forEach((mark, i) => {
+        const comment = mark.getAttribute('data-comment');
+        const uid = `${scope}_${i}`;
+
+        mark.setAttribute('data-memo-id', uid);
+
+        const card = document.createElement('div');
+        card.className = 'corr-memo-card';
+        card.setAttribute('data-memo-id', uid);
+        card.textContent = comment;
+        memoEl.appendChild(card);
+    });
+
+    // Left mark click → activate right memo + scroll
+    marks.forEach(mark => {
+        mark.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = mark.getAttribute('data-memo-id');
+            activateMemoPair(wrap, id);
+        });
+    });
+
+    // Right memo card click → activate left mark + scroll
+    memoEl.querySelectorAll('.corr-memo-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = card.getAttribute('data-memo-id');
+            activateMemoPair(wrap, id);
+        });
+    });
+
+    // Click empty area to deactivate
+    wrap.addEventListener('click', (e) => {
+        if (!e.target.closest('.correction-mark') && !e.target.closest('.corr-memo-card')) {
+            deactivateAllMemo(wrap);
+        }
+    });
+}
+
+/**
+ * Activate a memo-id pair and deactivate all others.
+ */
+function activateMemoPair(container, memoId) {
+    // If same one is already active, toggle off
+    const alreadyActive = container.querySelector(`.correction-mark.memo-active[data-memo-id="${memoId}"]`);
+    deactivateAllMemo(container);
+    if (alreadyActive) return;
+
+    // Activate mark
+    const mark = container.querySelector(`.correction-mark[data-memo-id="${memoId}"]`);
+    if (mark) {
+        mark.classList.add('memo-active');
+        mark.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Activate memo card
+    const card = container.querySelector(`.corr-memo-card[data-memo-id="${memoId}"]`);
+    if (card) {
+        card.classList.add('memo-active');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+/**
+ * Deactivate all memo highlights within a container.
+ */
+function deactivateAllMemo(container) {
+    container.querySelectorAll('.memo-active').forEach(el => {
+        el.classList.remove('memo-active');
+    });
+}
+
+// ===== Tooltip Events (for marks outside split wrap) =====
+
+function bindTooltipEvents(container) {
+    const marks = container.querySelectorAll('.correction-mark[data-comment]');
+    marks.forEach(mark => {
+        mark.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Inside split wrap → handled by memo panel events
+            if (mark.closest('.corr-fb-split-wrap')) return;
+            // Toggle active for tooltip display
+            container.querySelectorAll('.correction-mark.active').forEach(m => {
+                if (m !== mark) m.classList.remove('active');
+            });
+            mark.classList.toggle('active');
+        });
+    });
+}
+
+// ===== Feedback Summary Rendering =====
+
+function renderFeedbackSummary(container, feedback) {
+    if (!container || !feedback) return;
+
+    let html = '';
+
+    if (feedback.summary) {
+        html += `<div class="corr-feedback-summary-card">
+            <div class="corr-feedback-summary-title"><i class="fas fa-comment-dots"></i> 총평</div>
+            <div class="corr-feedback-summary-text">${escapeHtml(feedback.summary)}</div>
+        </div>`;
+    }
+
+    if (feedback.hint_count !== undefined && feedback.hint_count !== null) {
+        html += `<div class="corr-feedback-hint">교정 포인트: <strong>${feedback.hint_count}</strong>개</div>`;
+    }
+
+    if (feedback.level !== undefined && feedback.level !== null) {
+        html += `<div class="corr-feedback-level-card">
+            <div class="corr-feedback-level-badge">${Number(feedback.level).toFixed(1)}</div>
+            <div class="corr-feedback-level-label">Level Score</div>
+        </div>`;
+    }
+
+    if (feedback.encouragement) {
+        html += `<div class="corr-feedback-encouragement-card">
+            <div class="corr-feedback-encouragement-title"><i class="fas fa-star"></i> 격려 메시지</div>
+            <div class="corr-feedback-encouragement-text">${escapeHtml(feedback.encouragement)}</div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
 }
