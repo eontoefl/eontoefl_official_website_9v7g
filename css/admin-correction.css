@@ -1,0 +1,216 @@
+/* ===== Admin Correction Page Styles ===== */
+
+/* Stats card active state (clicked filter) */
+.correction-stat-card {
+    cursor: pointer;
+}
+
+.correction-stat-card.active {
+    border-color: var(--admin-accent);
+    box-shadow: 0 0 0 2px rgba(148, 128, 197, 0.2), 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* Stat card label */
+.stat-card-label {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Status badges */
+.correction-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.correction-badge-pending {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.correction-badge-waiting {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.correction-badge-complete {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.correction-badge-processing {
+    background: #f1f5f9;
+    color: #94a3b8;
+}
+
+/* Elapsed time indicator */
+.elapsed-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.elapsed-green {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.elapsed-orange {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.elapsed-red {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Selection bar */
+.correction-selection-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #0369a1;
+}
+
+/* Task type badge */
+.task-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.task-type-email {
+    background: #ede9fe;
+    color: #7c3aed;
+}
+
+.task-type-discussion {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.task-type-interview {
+    background: #cffafe;
+    color: #0891b2;
+}
+
+/* Draft round badge */
+.draft-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.draft-badge-1 {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.draft-badge-2 {
+    background: #ede9fe;
+    color: #7c3aed;
+}
+
+/* Score display */
+.score-display {
+    font-weight: 700;
+    font-size: 14px;
+}
+
+/* Admin loading spinner (reuse from admin.css, add if missing) */
+.admin-loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+}
+
+.admin-loading i {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* Admin empty state */
+.admin-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+}
+
+.admin-empty i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.admin-empty-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.admin-empty-text {
+    font-size: 14px;
+    color: #94a3b8;
+}
+
+/* Outline button */
+.admin-btn-outline {
+    background: white;
+    color: var(--admin-secondary);
+    border: 1px solid var(--admin-border);
+}
+
+.admin-btn-outline:hover {
+    background: #f8fafc;
+    border-color: var(--admin-accent);
+    color: var(--admin-accent);
+}
+
+/* Admin card header for dashboard card */
+.admin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.admin-card-action {
+    font-size: 14px;
+    color: var(--admin-accent);
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.admin-card-action:hover {
+    text-decoration: underline;
+}
