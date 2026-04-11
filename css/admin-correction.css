@@ -821,4 +821,377 @@
     .corr-modal-student-name {
         font-size: 16px;
     }
+
+    .corr-modal-footer {
+        padding: 12px 16px;
+    }
+}
+
+/* ================================================
+   구간 3: 편집 모드
+   ================================================ */
+
+/* 편집/취소 버튼 (헤더 영역) */
+.corr-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7c3aed;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.corr-edit-btn:hover {
+    background: #f5f3ff;
+    border-color: #7c3aed;
+}
+
+.corr-edit-btn.editing {
+    background: #fef2f2;
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.corr-edit-btn.editing:hover {
+    background: #fee2e2;
+}
+
+/* 모달 푸터 (임시 저장 / 승인 버튼) */
+.corr-modal-footer {
+    display: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+    flex-shrink: 0;
+}
+
+.corr-modal-footer.show {
+    display: flex;
+}
+
+.corr-footer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 22px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.corr-footer-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.corr-footer-btn-save {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.corr-footer-btn-save:hover:not(:disabled) {
+    background: #e2e8f0;
+}
+
+.corr-footer-btn-approve {
+    background: #7c3aed;
+    color: #fff;
+}
+
+.corr-footer-btn-approve:hover:not(:disabled) {
+    background: #6d28d9;
+}
+
+/* 편집 모드 표시 배너 */
+.corr-edit-banner {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 24px;
+    background: #fffbeb;
+    border-bottom: 1px solid #fde68a;
+    font-size: 13px;
+    font-weight: 600;
+    color: #b45309;
+    flex-shrink: 0;
+}
+
+.corr-edit-banner.show {
+    display: flex;
+}
+
+.corr-edit-banner i {
+    font-size: 14px;
+}
+
+/* 편집 가능 메모 카드 */
+.corr-memo-card.editable {
+    position: relative;
+    padding-right: 30px;
+}
+
+.corr-memo-card .memo-delete-btn {
+    display: none;
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: #fee2e2;
+    color: #dc2626;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.corr-memo-card.editable .memo-delete-btn {
+    display: flex;
+}
+
+.corr-memo-card .memo-delete-btn:hover {
+    background: #fca5a5;
+}
+
+/* 인라인 편집 textarea (메모 카드) */
+.corr-memo-edit-textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px 10px;
+    border: 2px solid #9480c5;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1e293b;
+    resize: vertical;
+    font-family: inherit;
+    outline: none;
+    background: #fefbff;
+}
+
+.corr-memo-edit-textarea:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+/* 편집 가능 총평/격려 영역 */
+.corr-editable-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #1e293b;
+    resize: vertical;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+}
+
+.corr-editable-textarea:focus {
+    border-color: #9480c5;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.1);
+}
+
+/* 편집 가능 점수 드롭다운 */
+.corr-editable-select {
+    padding: 10px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 800;
+    color: #9480c5;
+    background: #fff;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.corr-editable-select:focus {
+    border-color: #9480c5;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.1);
+}
+
+/* Speaking 편집 가능 comment textarea */
+.corr-spk-comment-textarea {
+    width: 100%;
+    min-height: 50px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #666;
+    font-style: italic;
+    resize: vertical;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+    margin-top: 12px;
+}
+
+.corr-spk-comment-textarea:focus {
+    border-color: #9480c5;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.1);
+}
+
+/* 새 마크 추가 팝업 (텍스트 선택 시) */
+.corr-add-mark-popup {
+    position: absolute;
+    z-index: 10001;
+    display: none;
+    background: #1f2937;
+    color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    font-size: 13px;
+    overflow: hidden;
+}
+
+.corr-add-mark-popup.show {
+    display: block;
+}
+
+.corr-add-mark-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.corr-add-mark-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* 코멘트 입력 팝업 (마크 추가 시) */
+.corr-comment-input-popup {
+    position: fixed;
+    z-index: 10002;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    width: 400px;
+    max-width: 90vw;
+    padding: 20px;
+}
+
+.corr-comment-input-popup.show {
+    display: block;
+}
+
+.corr-comment-input-popup h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 12px;
+}
+
+.corr-comment-input-popup textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    font-family: inherit;
+    outline: none;
+    resize: vertical;
+    margin-bottom: 12px;
+}
+
+.corr-comment-input-popup textarea:focus {
+    border-color: #9480c5;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.1);
+}
+
+.corr-comment-input-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.corr-comment-input-actions button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.corr-comment-input-actions .btn-cancel {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.corr-comment-input-actions .btn-confirm {
+    background: #7c3aed;
+    color: #fff;
+}
+
+.corr-comment-input-actions .btn-confirm:hover {
+    background: #6d28d9;
+}
+
+/* 편집 모드 — annotated 영역 커서 변경 */
+.corr-fb-split-left.edit-mode {
+    cursor: text;
+    user-select: text;
+}
+
+/* level_change 편집 영역 */
+.corr-feedback-level-change-card {
+    background: #f5f3ff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+}
+
+.corr-feedback-level-change-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7c3aed;
+    margin-bottom: 8px;
+}
+
+.corr-feedback-level-change-title i {
+    margin-right: 6px;
+}
+
+.corr-feedback-level-change-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #444;
 }
