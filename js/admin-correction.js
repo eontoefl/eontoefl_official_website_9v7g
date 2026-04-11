@@ -1778,3 +1778,139 @@ closeCorrectionModal = function() {
     cancelAddMark();
     _originalCloseCorrectionModal();
 }
+
+// =====================================================================
+// Section 5: Bulk Actions + Excel Download
+// =====================================================================
+
+// ===== 5-1 & 5-2. Bulk Approve =====
+
+async function bulkApprove() {
+    if (selectedIds.size === 0) return;
+
+    // Filter: only pending items
+    const pendingItems = allCorrections.filter(item =>
+        selectedIds.has(item.id) && getCorrectionStatus(item).isPending
+    );
+
+    if (pendingItems.length === 0) {
+        alert('선택된 건 중 승인 대기 상태인 건이 없습니다.');
+        return;
+    }
+
+    if (!confirm(`${pendingItems.length}건을 승인하시겠습니까?\n\n⚠️ AI 피드백 원본 그대로 학생에게 공개됩니다.`)) return;
+
+    let successCount = 0;
+    let failCount = 0;
+    const now = new Date().toISOString();
+
+    // Process in parallel
+    const promises = pendingItems.map(async (item) => {
+        try {
+            const updateData = {};
+
+            // Determine which released flag to set
+            if (item.feedback_1 && !item.released_1) {
+                updateData.released_1 = true;
+                updateData.released_1_at = now;
+            } else if (item.released_1 && item.feedback_2 && !item.released_2) {
+                updateData.released_2 = true;
+                updateData.released_2_at = now;
+            } else {
+                return; // Not actually pending
+            }
+
+            await supabaseAPI.patch('correction_submissions', item.id, updateData);
+
+            // Update cache
+            Object.assign(item, updateData);
+            const idx = allCorrections.findIndex(c => c.id === item.id);
+            if (idx >= 0) Object.assign(allCorrections[idx], updateData);
+
+            successCount++;
+        } catch (err) {
+            console.error(`Bulk approve failed for ${item.id}:`, err);
+            failCount++;
+        }
+    });
+
+    await Promise.all(promises);
+
+    // Result message
+    let msg = `승인 완료: ${successCount}건`;
+    if (failCount > 0) msg += `, 실패: ${failCount}건`;
+    alert(msg);
+
+    // Refresh
+    clearSelection();
+    updateStats();
+    applyFilters();
+}
+
+// ===== 5-3. Excel Download =====
+
+function downloadExcel() {
+    if (filteredCorrections.length === 0) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+    }
+
+    if (typeof XLSX === 'undefined') {
+        alert('엑셀 라이브러리를 로드하지 못했습니다. 페이지를 새로고침해주세요.');
+        return;
+    }
+
+    const rows = filteredCorrections.map(item => {
+        const user = usersCache[item.user_id] || { name: '(알수없음)', email: '' };
+        const status = getCorrectionStatus(item);
+        const round = getDraftRound(item);
+        const score = getScore(item);
+
+        // Task type label
+        const taskType = (item.task_type || '').toLowerCase();
+        let taskTypeLabel = item.task_type || '-';
+        if (taskType === 'writing_email') taskTypeLabel = 'Email';
+        else if (taskType === 'writing_discussion') taskTypeLabel = 'Discussion';
+        else if (taskType === 'speaking_interview') taskTypeLabel = 'Interview';
+
+        // Format dates
+        const submitDate = item.draft_1_submitted_at
+            ? new Date(item.draft_1_submitted_at).toLocaleString('ko-KR')
+            : '';
+        const feedbackDate = (item.feedback_2_at || item.feedback_1_at)
+            ? new Date(item.feedback_2_at || item.feedback_1_at).toLocaleString('ko-KR')
+            : '';
+
+        return {
+            '학생 이름': user.name,
+            '이메일': user.email,
+            '세션': item.session_number ? `S${item.session_number}` : '-',
+            '과제 유형': taskTypeLabel,
+            '차수': `${round}차`,
+            '점수': score !== null ? score : '-',
+            '상태': status.text,
+            '제출일': submitDate,
+            '피드백 생성일': feedbackDate
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '첨삭 목록');
+
+    // Column widths
+    ws['!cols'] = [
+        { wch: 12 }, // 학생 이름
+        { wch: 25 }, // 이메일
+        { wch: 6 },  // 세션
+        { wch: 12 }, // 과제 유형
+        { wch: 6 },  // 차수
+        { wch: 6 },  // 점수
+        { wch: 14 }, // 상태
+        { wch: 20 }, // 제출일
+        { wch: 20 }, // 피드백 생성일
+    ];
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `첨삭관리_${today}.xlsx`);
+}
