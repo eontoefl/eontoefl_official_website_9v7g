@@ -382,9 +382,39 @@
     font-size: 14px;
     line-height: 1.8;
     color: #1e293b;
-    margin-bottom: 12px;
-    max-height: 300px;
+    margin-bottom: 0;
+    min-height: 120px;
+    max-height: 60vh;
+    height: 300px;
     overflow-y: auto;
+}
+
+/* Drag handle for resizing .corr-toggle-panel-annotated */
+.corr-resize-handle {
+    height: 10px;
+    cursor: row-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    user-select: none;
+    border-radius: 0 0 8px 8px;
+    background: #f1f5f9;
+    transition: background 0.15s;
+}
+
+.corr-resize-handle:hover,
+.corr-resize-handle.dragging {
+    background: #e2e8f0;
+}
+
+.corr-resize-handle::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 3px;
+    background: #94a3b8;
+    border-radius: 2px;
 }
 
 .corr-toggle-panel-summary {
