@@ -751,6 +751,7 @@ function toggleFirstFeedbackPanel() {
     let html = '';
     if (isWriting && fb1.annotated_html) {
         html += `<div class="corr-toggle-panel-annotated">${fb1.annotated_html}</div>`;
+        html += '<div class="corr-resize-handle" title="드래그하여 높이 조절"></div>';
     } else if (!isWriting && fb1.per_question) {
         html += '<div class="corr-toggle-panel-annotated">';
         fb1.per_question.forEach((pq, i) => {
@@ -760,6 +761,7 @@ function toggleFirstFeedbackPanel() {
             html += '</div>';
         });
         html += '</div>';
+        html += '<div class="corr-resize-handle" title="드래그하여 높이 조절"></div>';
     }
 
     if (fb1.summary) {
@@ -773,6 +775,43 @@ function toggleFirstFeedbackPanel() {
     panel.classList.add('open');
     btn.classList.add('active');
     btn.innerHTML = '<i class="fas fa-eye-slash"></i> 1차 피드백 닫기';
+
+    // Bind drag-to-resize on the handle
+    const handle = panel.querySelector('.corr-resize-handle');
+    if (handle) bindResizeHandle(handle);
+}
+
+/**
+ * Bind drag-to-resize: dragging the handle adjusts the height
+ * of the immediately preceding .corr-toggle-panel-annotated element.
+ */
+function bindResizeHandle(handle) {
+    const target = handle.previousElementSibling;
+    if (!target || !target.classList.contains('corr-toggle-panel-annotated')) return;
+
+    let startY = 0;
+    let startH = 0;
+
+    function onMouseMove(e) {
+        const delta = e.clientY - startY;
+        const newH = Math.max(120, Math.min(startH + delta, window.innerHeight * 0.6));
+        target.style.height = newH + 'px';
+    }
+
+    function onMouseUp() {
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        startY = e.clientY;
+        startH = target.getBoundingClientRect().height;
+        handle.classList.add('dragging');
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
 }
 
 /**
