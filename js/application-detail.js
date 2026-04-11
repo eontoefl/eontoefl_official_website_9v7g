@@ -1754,8 +1754,23 @@ async function loadContractTab(app) {
  * 저장된 계약서 입력값을 필드에 채우기
  */
 function fillContractInputs(contractInputs) {
-    if (!contractInputs || typeof contractInputs !== 'object') {
+    if (!contractInputs) {
         console.log('No contract inputs to fill');
+        return;
+    }
+    
+    // 문자열이면 객체로 변환
+    if (typeof contractInputs === 'string') {
+        try {
+            contractInputs = JSON.parse(contractInputs);
+        } catch (e) {
+            console.log('Failed to parse contract inputs:', e);
+            return;
+        }
+    }
+    
+    if (typeof contractInputs !== 'object') {
+        console.log('Invalid contract inputs type');
         return;
     }
     
