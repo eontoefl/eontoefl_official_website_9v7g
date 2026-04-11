@@ -1126,3 +1126,655 @@ function renderFeedbackSummary(container, feedback) {
 
     container.innerHTML = html;
 }
+
+// =====================================================================
+// Section 3: Edit Mode + Save + Approve
+// =====================================================================
+
+let isEditMode = false;
+let originalFeedbackBackup = null; // Deep copy for cancel
+
+/**
+ * Toggle edit mode on/off.
+ */
+function toggleEditMode() {
+    if (isEditMode) {
+        exitEditMode();
+    } else {
+        enterEditMode();
+    }
+}
+
+function enterEditMode() {
+    if (!currentModalItem) return;
+
+    isEditMode = true;
+
+    // Backup original feedback for cancel
+    const round = getDraftRound(currentModalItem);
+    const fbKey = round === '2' && currentModalItem.feedback_2 ? 'feedback_2' : 'feedback_1';
+    const fbData = parseFeedback(currentModalItem[fbKey]);
+    originalFeedbackBackup = JSON.parse(JSON.stringify(fbData));
+
+    // UI updates
+    const editBtn = document.getElementById('editModeBtn');
+    editBtn.classList.add('editing');
+    editBtn.innerHTML = '<i class="fas fa-times"></i> 편집 취소';
+
+    document.getElementById('editBanner').classList.add('show');
+    document.getElementById('modalFooter').classList.add('show');
+    document.getElementById('btnTempSave').disabled = false;
+    document.getElementById('btnApprove').disabled = false;
+
+    // Make memo cards editable + add delete buttons
+    makeMemosEditable();
+
+    // Make summary/level/encouragement editable
+    makeSummaryEditable();
+
+    // Enable text selection for new mark addition
+    enableMarkAddition();
+
+    // Speaking: make Q comments editable
+    makeSpeakingCommentsEditable();
+}
+
+function exitEditMode() {
+    if (!currentModalItem || !originalFeedbackBackup) return;
+
+    isEditMode = false;
+
+    // UI updates
+    const editBtn = document.getElementById('editModeBtn');
+    editBtn.classList.remove('editing');
+    editBtn.innerHTML = '<i class="fas fa-edit"></i> 편집';
+
+    document.getElementById('editBanner').classList.remove('show');
+    document.getElementById('modalFooter').classList.remove('show');
+
+    // Hide popups and disable mark addition
+    hideAddMarkPopup();
+    cancelAddMark();
+    disableMarkAddition();
+
+    // Re-render modal from backup to discard changes
+    const content = document.getElementById('modalContent');
+    const taskType = (currentModalItem.task_type || '').toLowerCase();
+    const isWriting = taskType.startsWith('writing');
+
+    if (isWriting) {
+        renderWritingModal(content, originalFeedbackBackup);
+    } else {
+        renderSpeakingModal(content, originalFeedbackBackup);
+    }
+
+    originalFeedbackBackup = null;
+}
+
+// ===== 3-2. Inline Comment Editing =====
+
+function makeMemosEditable() {
+    document.querySelectorAll('.corr-memo-card').forEach(card => {
+        card.classList.add('editable');
+
+        // Add delete button
+        if (!card.querySelector('.memo-delete-btn')) {
+            const delBtn = document.createElement('button');
+            delBtn.className = 'memo-delete-btn';
+            delBtn.innerHTML = '<i class="fas fa-times"></i>';
+            delBtn.title = '교정 삭제';
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteMark(card);
+            };
+            card.appendChild(delBtn);
+        }
+
+        // Replace click handler: double-click to edit
+        card.ondblclick = (e) => {
+            e.stopPropagation();
+            startInlineEdit(card);
+        };
+    });
+}
+
+function startInlineEdit(card) {
+    if (card.querySelector('.corr-memo-edit-textarea')) return; // Already editing
+
+    const currentText = card.getAttribute('data-memo-id')
+        ? getMarkComment(card.getAttribute('data-memo-id'))
+        : card.textContent.trim();
+
+    // Save original text content nodes (excluding delete button)
+    const originalText = currentText;
+
+    // Clear text content but keep delete button
+    const delBtn = card.querySelector('.memo-delete-btn');
+    card.textContent = '';
+    if (delBtn) card.appendChild(delBtn);
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'corr-memo-edit-textarea';
+    textarea.value = originalText;
+    card.insertBefore(textarea, delBtn);
+    textarea.focus();
+
+    // Ctrl+Enter or blur to finish
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            finishInlineEdit(card, textarea);
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            finishInlineEdit(card, textarea, originalText); // revert
+        }
+    });
+
+    textarea.addEventListener('blur', () => {
+        // Small delay to allow button clicks
+        setTimeout(() => finishInlineEdit(card, textarea), 150);
+    });
+}
+
+function finishInlineEdit(card, textarea, revertText) {
+    if (!textarea || !textarea.parentNode) return;
+
+    const newText = revertText !== undefined ? revertText : textarea.value.trim();
+    const memoId = card.getAttribute('data-memo-id');
+
+    // Remove textarea
+    textarea.remove();
+
+    // Restore text content (keep delete button)
+    const delBtn = card.querySelector('.memo-delete-btn');
+    const textNode = document.createTextNode(newText || '(비어있음)');
+    if (delBtn) {
+        card.insertBefore(textNode, delBtn);
+    } else {
+        card.appendChild(textNode);
+    }
+
+    // Sync to mark's data-comment
+    if (memoId && newText) {
+        syncCommentToMark(memoId, newText);
+    }
+}
+
+function getMarkComment(memoId) {
+    const mark = document.querySelector(`.correction-mark[data-memo-id="${memoId}"]`);
+    return mark ? (mark.getAttribute('data-comment') || '') : '';
+}
+
+function syncCommentToMark(memoId, newComment) {
+    const mark = document.querySelector(`.correction-mark[data-memo-id="${memoId}"]`);
+    if (mark) {
+        mark.setAttribute('data-comment', newComment);
+    }
+}
+
+// ===== 3-3. Mark Deletion =====
+
+function deleteMark(card) {
+    if (!confirm('이 교정을 삭제하시겠습니까?')) return;
+
+    const memoId = card.getAttribute('data-memo-id');
+
+    // Remove the <mark> tag from annotated HTML, keep inner text
+    const mark = document.querySelector(`.correction-mark[data-memo-id="${memoId}"]`);
+    if (mark) {
+        const parent = mark.parentNode;
+        while (mark.firstChild) {
+            parent.insertBefore(mark.firstChild, mark);
+        }
+        parent.removeChild(mark);
+        // Normalize text nodes
+        parent.normalize();
+    }
+
+    // Remove memo card
+    card.remove();
+}
+
+// ===== 3-4. New Mark Addition =====
+
+let pendingMarkRange = null;
+
+function enableMarkAddition() {
+    // Add mouseup listener to annotated areas
+    document.querySelectorAll('.corr-fb-split-left').forEach(el => {
+        el.classList.add('edit-mode');
+    });
+
+    document.addEventListener('mouseup', onTextSelectionForMark);
+}
+
+function disableMarkAddition() {
+    document.querySelectorAll('.corr-fb-split-left').forEach(el => {
+        el.classList.remove('edit-mode');
+    });
+
+    document.removeEventListener('mouseup', onTextSelectionForMark);
+    hideAddMarkPopup();
+}
+
+function onTextSelectionForMark(e) {
+    if (!isEditMode) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        hideAddMarkPopup();
+        return;
+    }
+
+    const range = sel.getRangeAt(0);
+
+    // Check if selection is inside an annotated area
+    const annotatedArea = range.startContainer.parentElement?.closest('.corr-feedback-annotated') ||
+                          range.startContainer.closest?.('.corr-feedback-annotated');
+    if (!annotatedArea) {
+        hideAddMarkPopup();
+        return;
+    }
+
+    // Check if selection contains existing marks
+    const fragment = range.cloneContents();
+    if (fragment.querySelector('.correction-mark')) {
+        hideAddMarkPopup();
+        alert('이미 교정이 있는 부분입니다');
+        sel.removeAllRanges();
+        return;
+    }
+
+    // Check if selection starts or ends inside a mark
+    if (range.startContainer.parentElement?.closest('.correction-mark') ||
+        range.endContainer.parentElement?.closest('.correction-mark')) {
+        hideAddMarkPopup();
+        alert('이미 교정이 있는 부분입니다');
+        sel.removeAllRanges();
+        return;
+    }
+
+    // Show popup near selection
+    const rect = range.getBoundingClientRect();
+    const popup = document.getElementById('addMarkPopup');
+    popup.style.left = `${rect.left + rect.width / 2 - 60}px`;
+    popup.style.top = `${rect.top - 40}px`;
+    popup.classList.add('show');
+
+    pendingMarkRange = range;
+}
+
+function hideAddMarkPopup() {
+    document.getElementById('addMarkPopup').classList.remove('show');
+}
+
+function onAddMarkClick() {
+    hideAddMarkPopup();
+    if (!pendingMarkRange) return;
+
+    // Show comment input popup
+    document.getElementById('commentInputPopup').classList.add('show');
+    const textarea = document.getElementById('newMarkComment');
+    textarea.value = '';
+    textarea.focus();
+}
+
+function cancelAddMark() {
+    document.getElementById('commentInputPopup').classList.remove('show');
+    document.getElementById('newMarkComment').value = '';
+    pendingMarkRange = null;
+    window.getSelection()?.removeAllRanges();
+}
+
+function confirmAddMark() {
+    const comment = document.getElementById('newMarkComment').value.trim();
+    if (!comment) {
+        alert('코멘트를 입력해주세요.');
+        return;
+    }
+
+    if (!pendingMarkRange) {
+        cancelAddMark();
+        return;
+    }
+
+    try {
+        const range = pendingMarkRange;
+
+        // Try surroundContents first (works for single text node)
+        const mark = document.createElement('mark');
+        mark.className = 'correction-mark';
+        mark.setAttribute('data-comment', comment);
+
+        try {
+            range.surroundContents(mark);
+        } catch (e) {
+            // Fallback: extractContents + insertNode
+            const contents = range.extractContents();
+            mark.appendChild(contents);
+            range.insertNode(mark);
+        }
+
+        // Find the containing annotated area and its memo panel
+        const annotatedArea = mark.closest('.corr-feedback-annotated');
+        if (annotatedArea) {
+            rebuildMemoPanelAfterChange(annotatedArea);
+        }
+
+    } catch (err) {
+        console.error('Mark addition failed:', err);
+        alert('교정 추가에 실패했습니다. 한 문장 내에서만 선택해주세요.');
+    }
+
+    cancelAddMark();
+}
+
+/**
+ * After adding/deleting a mark, rebuild the memo panel
+ * for the containing annotated area.
+ */
+function rebuildMemoPanelAfterChange(annotatedEl) {
+    // Determine which memo panel to rebuild
+    const id = annotatedEl.id;
+
+    if (id === 'adminFbAnnotated') {
+        // Writing panel
+        buildMemoPanel('admin');
+        if (isEditMode) makeMemosEditable();
+    } else if (id && id.startsWith('adminSpkFb_')) {
+        // Speaking panel — rebuild all
+        buildSpkMemoPanels();
+        if (isEditMode) makeMemosEditable();
+    }
+}
+
+// ===== 3-5. Editable Summary / Level / Encouragement =====
+
+function makeSummaryEditable() {
+    const item = currentModalItem;
+    if (!item) return;
+
+    const round = getDraftRound(item);
+    const fbKey = round === '2' && item.feedback_2 ? 'feedback_2' : 'feedback_1';
+    const feedback = parseFeedback(item[fbKey]);
+    if (!feedback) return;
+
+    const taskType = (item.task_type || '').toLowerCase();
+    const isWriting = taskType.startsWith('writing');
+    const isFinal = (round === '2');
+    const summaryElId = isWriting ? 'adminFbSummary' : 'adminSpkSummary';
+    const summaryEl = document.getElementById(summaryElId);
+    if (!summaryEl) return;
+
+    let html = '';
+
+    // Summary textarea
+    html += `<div class="corr-feedback-summary-card">
+        <div class="corr-feedback-summary-title"><i class="fas fa-comment-dots"></i> 총평</div>
+        <textarea class="corr-editable-textarea" id="editSummary">${escapeHtml(feedback.summary || '')}</textarea>
+    </div>`;
+
+    // Hint count (read-only, auto-calculated)
+    html += `<div class="corr-feedback-hint">교정 포인트: <strong id="editHintCount">${feedback.hint_count || 0}</strong>개 (저장 시 자동 계산)</div>`;
+
+    // Level dropdown
+    html += `<div class="corr-feedback-level-card">
+        <select class="corr-editable-select" id="editLevel">`;
+    for (let v = 1.0; v <= 6.0; v += 0.5) {
+        const selected = (feedback.level !== undefined && feedback.level !== null && Number(feedback.level) === v) ? 'selected' : '';
+        html += `<option value="${v}" ${selected}>${v.toFixed(1)}</option>`;
+    }
+    html += `</select>
+        <div class="corr-feedback-level-label">Level Score</div>
+    </div>`;
+
+    // Encouragement textarea
+    html += `<div class="corr-feedback-encouragement-card">
+        <div class="corr-feedback-encouragement-title"><i class="fas fa-star"></i> 격려 메시지</div>
+        <textarea class="corr-editable-textarea" id="editEncouragement">${escapeHtml(feedback.encouragement || '')}</textarea>
+    </div>`;
+
+    // Level change textarea (only for 2nd round)
+    if (isFinal) {
+        html += `<div class="corr-feedback-level-change-card">
+            <div class="corr-feedback-level-change-title"><i class="fas fa-chart-line"></i> 점수 변화 설명</div>
+            <textarea class="corr-editable-textarea" id="editLevelChange">${escapeHtml(feedback.level_change || '')}</textarea>
+        </div>`;
+    }
+
+    summaryEl.innerHTML = html;
+}
+
+// ===== 3-8. Speaking: Editable Q Comments =====
+
+function makeSpeakingCommentsEditable() {
+    const item = currentModalItem;
+    if (!item) return;
+    const taskType = (item.task_type || '').toLowerCase();
+    if (taskType.startsWith('writing')) return;
+
+    const round = getDraftRound(item);
+    const fbKey = round === '2' && item.feedback_2 ? 'feedback_2' : 'feedback_1';
+    const feedback = parseFeedback(item[fbKey]);
+    if (!feedback || !feedback.per_question) return;
+
+    const qCount = Math.max(feedback.per_question.length, 4);
+    for (let i = 0; i < qCount; i++) {
+        const pq = feedback.per_question[i] || {};
+        const panel = document.querySelector(`.corr-spk-q-panel[data-q="${i}"]`);
+        if (!panel) continue;
+
+        // Find the existing comment div and replace with textarea
+        const commentDiv = panel.querySelector('.corr-feedback-q-comment');
+        if (commentDiv) {
+            const textarea = document.createElement('textarea');
+            textarea.className = 'corr-spk-comment-textarea';
+            textarea.id = `editSpkComment_${i}`;
+            textarea.value = pq.comment || '';
+            textarea.placeholder = `Q${i + 1} 코멘트를 입력하세요...`;
+            commentDiv.replaceWith(textarea);
+        } else {
+            // No comment div exists, add textarea after annotated area
+            const leftPane = panel.querySelector('.corr-fb-split-left');
+            if (leftPane) {
+                const textarea = document.createElement('textarea');
+                textarea.className = 'corr-spk-comment-textarea';
+                textarea.id = `editSpkComment_${i}`;
+                textarea.value = pq.comment || '';
+                textarea.placeholder = `Q${i + 1} 코멘트를 입력하세요...`;
+                leftPane.appendChild(textarea);
+            }
+        }
+    }
+}
+
+// ===== 3-6. Temp Save =====
+
+async function tempSaveCorrection() {
+    if (!currentModalItem) return;
+
+    const btn = document.getElementById('btnTempSave');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+
+    try {
+        const feedbackData = collectFeedbackFromDOM();
+        const round = getDraftRound(currentModalItem);
+        const fbKey = round === '2' && currentModalItem.feedback_2 ? 'feedback_2' : 'feedback_1';
+
+        const updateData = {};
+        updateData[fbKey] = feedbackData;
+
+        await supabaseAPI.patch('correction_submissions', currentModalItem.id, updateData);
+
+        // Update cache
+        currentModalItem[fbKey] = feedbackData;
+        const idx = allCorrections.findIndex(c => c.id === currentModalItem.id);
+        if (idx >= 0) allCorrections[idx][fbKey] = feedbackData;
+
+        // Update backup so "cancel" won't lose saved changes
+        originalFeedbackBackup = JSON.parse(JSON.stringify(feedbackData));
+
+        alert('임시 저장 완료');
+    } catch (err) {
+        console.error('Temp save error:', err);
+        alert('저장 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> 임시 저장';
+    }
+}
+
+// ===== 3-7. Approve (Release) =====
+
+async function approveCorrection() {
+    if (!currentModalItem) return;
+
+    if (!confirm('이 피드백을 학생에게 공개합니다. 계속하시겠습니까?')) return;
+
+    const btn = document.getElementById('btnApprove');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 승인 중...';
+
+    try {
+        const feedbackData = collectFeedbackFromDOM();
+        const round = getDraftRound(currentModalItem);
+        const fbKey = round === '2' && currentModalItem.feedback_2 ? 'feedback_2' : 'feedback_1';
+
+        const now = new Date().toISOString();
+        const updateData = {};
+        updateData[fbKey] = feedbackData;
+
+        // Determine which released flag to set
+        if (fbKey === 'feedback_1') {
+            updateData.released_1 = true;
+            updateData.released_1_at = now;
+        } else {
+            updateData.released_2 = true;
+            updateData.released_2_at = now;
+        }
+
+        await supabaseAPI.patch('correction_submissions', currentModalItem.id, updateData);
+
+        // Update cache
+        Object.assign(currentModalItem, updateData);
+        const idx = allCorrections.findIndex(c => c.id === currentModalItem.id);
+        if (idx >= 0) Object.assign(allCorrections[idx], updateData);
+
+        alert('승인 완료! 학생에게 피드백이 공개됩니다.');
+
+        // Exit edit mode and close modal
+        isEditMode = false;
+        originalFeedbackBackup = null;
+        closeCorrectionModal();
+
+        // Refresh list
+        updateStats();
+        applyFilters();
+
+    } catch (err) {
+        console.error('Approve error:', err);
+        alert('승인 실패: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> 승인';
+    }
+}
+
+// ===== Collect Feedback from DOM =====
+
+function collectFeedbackFromDOM() {
+    const item = currentModalItem;
+    const taskType = (item.task_type || '').toLowerCase();
+    const isWriting = taskType.startsWith('writing');
+    const round = getDraftRound(item);
+    const isFinal = (round === '2');
+
+    // Get original feedback as base
+    const fbKey = round === '2' && item.feedback_2 ? 'feedback_2' : 'feedback_1';
+    const baseFeedback = parseFeedback(item[fbKey]) || {};
+
+    const result = { ...baseFeedback };
+
+    // Common editable fields
+    const summaryEl = document.getElementById('editSummary');
+    if (summaryEl) result.summary = summaryEl.value.trim();
+
+    const levelEl = document.getElementById('editLevel');
+    if (levelEl) result.level = parseFloat(levelEl.value);
+
+    const encouragementEl = document.getElementById('editEncouragement');
+    if (encouragementEl) result.encouragement = encouragementEl.value.trim();
+
+    if (isFinal) {
+        const levelChangeEl = document.getElementById('editLevelChange');
+        if (levelChangeEl) result.level_change = levelChangeEl.value.trim();
+    }
+
+    if (isWriting) {
+        // Extract annotated_html from DOM
+        const annotatedEl = document.getElementById('adminFbAnnotated');
+        if (annotatedEl) {
+            result.annotated_html = annotatedEl.innerHTML;
+            result.hint_count = annotatedEl.querySelectorAll('.correction-mark').length;
+        }
+    } else {
+        // Speaking: rebuild per_question array
+        const questions = result.per_question || [];
+        const qCount = Math.max(questions.length, 4);
+        const newPerQuestion = [];
+
+        for (let i = 0; i < qCount; i++) {
+            const pq = { ...(questions[i] || {}) };
+
+            // Extract annotated_html for this Q
+            const qAnnotated = document.getElementById(`adminSpkFb_${i}`);
+            if (qAnnotated) {
+                pq.annotated_html = qAnnotated.innerHTML;
+            }
+
+            // Get comment from textarea (edit mode) or keep original
+            const commentTextarea = document.getElementById(`editSpkComment_${i}`);
+            if (commentTextarea) {
+                pq.comment = commentTextarea.value.trim();
+            }
+
+            newPerQuestion.push(pq);
+        }
+
+        result.per_question = newPerQuestion;
+
+        // Count all marks across all Q panels
+        let totalMarks = 0;
+        for (let i = 0; i < qCount; i++) {
+            const qEl = document.getElementById(`adminSpkFb_${i}`);
+            if (qEl) totalMarks += qEl.querySelectorAll('.correction-mark').length;
+        }
+        result.hint_count = totalMarks;
+    }
+
+    return result;
+}
+
+// ===== Override closeCorrectionModal to handle edit mode =====
+
+const _originalCloseCorrectionModal = closeCorrectionModal;
+
+closeCorrectionModal = function() {
+    if (isEditMode) {
+        if (!confirm('편집 중인 내용이 있습니다. 저장하지 않고 닫으시겠습니까?')) return;
+        isEditMode = false;
+        originalFeedbackBackup = null;
+        disableMarkAddition();
+
+        // Reset UI
+        document.getElementById('editBanner').classList.remove('show');
+        document.getElementById('modalFooter').classList.remove('show');
+        const editBtn = document.getElementById('editModeBtn');
+        if (editBtn) { editBtn.classList.remove('editing'); editBtn.innerHTML = '<i class="fas fa-edit"></i> 편집'; }
+    }
+    hideAddMarkPopup();
+    cancelAddMark();
+    _originalCloseCorrectionModal();
+}

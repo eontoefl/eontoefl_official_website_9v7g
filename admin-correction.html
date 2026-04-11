@@ -224,9 +224,19 @@
                         <span class="correction-badge" id="modalStatusBadge">-</span>
                     </div>
                 </div>
-                <button class="corr-modal-close" onclick="closeCorrectionModal()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="corr-edit-btn" id="editModeBtn" onclick="toggleEditMode()">
+                        <i class="fas fa-edit"></i> 편집
+                    </button>
+                    <button class="corr-modal-close" onclick="closeCorrectionModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Edit Mode Banner -->
+            <div class="corr-edit-banner" id="editBanner">
+                <i class="fas fa-edit"></i> 편집 모드 — 수정 후 임시 저장 또는 승인하세요
             </div>
 
             <!-- Toggle Buttons -->
@@ -251,6 +261,33 @@
                 </div>
                 <div id="modalContent" style="display:none;"></div>
             </div>
+
+            <!-- Modal Footer (edit mode) -->
+            <div class="corr-modal-footer" id="modalFooter">
+                <button class="corr-footer-btn corr-footer-btn-save" id="btnTempSave" onclick="tempSaveCorrection()" disabled>
+                    <i class="fas fa-save"></i> 임시 저장
+                </button>
+                <button class="corr-footer-btn corr-footer-btn-approve" id="btnApprove" onclick="approveCorrection()" disabled>
+                    <i class="fas fa-check-circle"></i> 승인
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Mark Popup (appears near text selection) -->
+    <div class="corr-add-mark-popup" id="addMarkPopup">
+        <button class="corr-add-mark-btn" onclick="onAddMarkClick()">
+            <i class="fas fa-highlighter"></i> 교정 추가
+        </button>
+    </div>
+
+    <!-- Comment Input Popup (for new mark) -->
+    <div class="corr-comment-input-popup" id="commentInputPopup">
+        <h4><i class="fas fa-highlighter" style="color:#9480c5;"></i> 교정 코멘트 입력</h4>
+        <textarea id="newMarkComment" placeholder="교정 코멘트를 입력하세요..."></textarea>
+        <div class="corr-comment-input-actions">
+            <button class="btn-cancel" onclick="cancelAddMark()">취소</button>
+            <button class="btn-confirm" onclick="confirmAddMark()">추가</button>
         </div>
     </div>
 
