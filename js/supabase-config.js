@@ -100,7 +100,7 @@ const supabaseAPI = {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                 'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
+                'Prefer': 'return=representation'
             },
             body: JSON.stringify(data)
         });
@@ -114,8 +114,8 @@ const supabaseAPI = {
             throw new Error(errMsg);
         }
         
-        // return=minimal 은 body 없이 204를 반환
-        return { id };
+        const result = await response.json();
+        return result[0] || { id };
     },
     
     // PUT: 데이터 전체 수정
