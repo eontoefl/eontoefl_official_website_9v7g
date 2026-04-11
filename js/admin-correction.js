@@ -1149,6 +1149,7 @@ function renderFeedbackSummary(container, feedback, round) {
 
 let isEditMode = false;
 let originalFeedbackBackup = null; // Deep copy for cancel
+let isDirty = false; // Tracks unsaved changes since last save
 
 /**
  * Toggle edit mode on/off.
@@ -1165,6 +1166,7 @@ function enterEditMode() {
     if (!currentModalItem) return;
 
     isEditMode = true;
+    isDirty = false;
 
     // Backup original feedback for cancel
     const round = getDraftRound(currentModalItem);
@@ -1314,6 +1316,7 @@ function finishInlineEdit(card, textarea, revertText) {
     // Sync to mark's data-comment
     if (memoId && newText) {
         syncCommentToMark(memoId, newText);
+        isDirty = true;
     }
 }
 
@@ -1350,6 +1353,7 @@ function deleteMark(card) {
 
     // Remove memo card
     card.remove();
+    isDirty = true;
 }
 
 // ===== 3-4. New Mark Addition =====
@@ -1484,6 +1488,7 @@ function confirmAddMark() {
     }
 
     cancelAddMark();
+    isDirty = true;
 }
 
 /**
@@ -1562,6 +1567,12 @@ function makeSummaryEditable() {
     }
 
     summaryEl.innerHTML = html;
+
+    // Track changes on summary/level/encouragement/level_change inputs
+    summaryEl.querySelectorAll('textarea, select').forEach(el => {
+        el.addEventListener('input', () => { isDirty = true; });
+        el.addEventListener('change', () => { isDirty = true; });
+    });
 }
 
 // ===== 3-8. Speaking: Editable Q Comments =====
@@ -1605,6 +1616,11 @@ function makeSpeakingCommentsEditable() {
             }
         }
     }
+
+    // Track changes on all speaking comment textareas
+    document.querySelectorAll('.corr-spk-comment-textarea').forEach(el => {
+        el.addEventListener('input', () => { isDirty = true; });
+    });
 }
 
 // ===== 3-6. Temp Save =====
@@ -1634,6 +1650,7 @@ async function tempSaveCorrection() {
         // Update backup so "cancel" won't lose saved changes
         originalFeedbackBackup = JSON.parse(JSON.stringify(feedbackData));
 
+        isDirty = false;
         alert('임시 저장 완료');
     } catch (err) {
         console.error('Temp save error:', err);
@@ -1780,8 +1797,10 @@ function collectFeedbackFromDOM() {
 const _originalCloseCorrectionModal = closeCorrectionModal;
 
 closeCorrectionModal = function() {
-    if (isEditMode) {
+    if (isEditMode && isDirty) {
         if (!confirm('편집 중인 내용이 있습니다. 저장하지 않고 닫으시겠습니까?')) return;
+    }
+    if (isEditMode) {
         isEditMode = false;
         originalFeedbackBackup = null;
         disableMarkAddition();
