@@ -87,6 +87,15 @@ async function loadUsersInfo(userIds) {
     }
 }
 
+// ===== Helper: Task Type Label =====
+function getTaskTypeLabel(taskType) {
+    const t = (taskType || '').toLowerCase();
+    if (t === 'writing_email') return 'Email';
+    if (t === 'writing_discussion') return 'Discussion';
+    if (t === 'speaking_interview') return 'Interview';
+    return taskType || '';
+}
+
 // ===== Status Logic =====
 
 /**
@@ -1838,10 +1847,13 @@ async function approveCorrection() {
 
         if (user.phone) {
             try {
+                const taskLabel = getTaskTypeLabel(currentModalItem.task_type);
+                const draftNum = fbKey === 'feedback_1' ? '1' : '2';
+                const roundStr = `${currentModalItem.session_number || ''}회 ${taskLabel} ${draftNum}차`;
                 const alimResult = await sendKakaoAlimTalk(alimTalkType, {
                     name: user.name || '',
                     phone: user.phone,
-                    round: currentModalItem.session_number || ''
+                    round: roundStr
                 });
                 if (alimResult && alimResult.success) {
                     alert('승인 완료! 알림톡 발송 완료');
@@ -2031,12 +2043,15 @@ async function bulkApprove() {
             // 알림톡 발송 대상 수집
             const user = usersCache[item.user_id] || {};
             if (user.phone && alimTalkType) {
+                const taskLabel = getTaskTypeLabel(item.task_type);
+                const draftNum = alimTalkType === 'correction_feedback_1' ? '1' : '2';
+                const roundStr = `${item.session_number || ''}회 ${taskLabel} ${draftNum}차`;
                 alimTalkItems.push({
                     type: alimTalkType,
                     data: {
                         name: user.name || '',
                         phone: user.phone,
-                        round: item.session_number || ''
+                        round: roundStr
                     }
                 });
             }

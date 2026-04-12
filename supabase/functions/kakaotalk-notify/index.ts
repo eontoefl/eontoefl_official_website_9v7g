@@ -167,6 +167,8 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
     case "correction_feedback_1": {
       const deadline = getDeadlineKST();
       return [
+        "이온토플 - 1차 첨삭 완료 안내",
+        "",
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
@@ -183,6 +185,8 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
 
     case "correction_feedback_2":
       return [
+        "이온토플 - 최종 첨삭 완료 안내",
+        "",
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
