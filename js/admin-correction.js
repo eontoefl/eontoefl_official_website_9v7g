@@ -73,13 +73,13 @@ async function loadUsersInfo(userIds) {
         const idsFilter = userIds.map(id => `"${id}"`).join(',');
         const users = await supabaseAPI.query('users', {
             'id': `in.(${idsFilter})`,
-            'select': 'id,name,email',
+            'select': 'id,name,email,phone',
             'limit': '1000'
         });
 
         if (users && users.length > 0) {
             users.forEach(u => {
-                usersCache[u.id] = { name: u.name || '(이름없음)', email: u.email || '' };
+                usersCache[u.id] = { name: u.name || '(이름없음)', email: u.email || '', phone: u.phone || '' };
             });
         }
     } catch (e) {
@@ -1832,7 +1832,30 @@ async function approveCorrection() {
         const idx = allCorrections.findIndex(c => c.id === currentModalItem.id);
         if (idx >= 0) Object.assign(allCorrections[idx], updateData);
 
-        alert('승인 완료! 학생에게 피드백이 공개됩니다.');
+        // 카카오 알림톡 발송
+        const user = usersCache[currentModalItem.user_id] || {};
+        const alimTalkType = fbKey === 'feedback_1' ? 'correction_feedback_1' : 'correction_feedback_2';
+
+        if (user.phone) {
+            try {
+                const alimResult = await sendKakaoAlimTalk(alimTalkType, {
+                    name: user.name || '',
+                    phone: user.phone,
+                    round: currentModalItem.session_number || ''
+                });
+                if (alimResult && alimResult.success) {
+                    alert('승인 완료! 알림톡 발송 완료');
+                } else {
+                    alert('승인 완료! (알림톡 발송 실패 — 승인은 정상 처리됨)');
+                }
+            } catch (alimErr) {
+                console.error('알림톡 발송 에러:', alimErr);
+                alert('승인 완료! (알림톡 발송 실패 — 승인은 정상 처리됨)');
+            }
+        } else {
+            console.warn('학생 전화번호 없음, 알림톡 미발송');
+            alert('승인 완료! (학생 전화번호 없음 — 알림톡 미발송)');
+        }
 
         // Exit edit mode and close modal
         isEditMode = false;
@@ -1976,18 +1999,24 @@ async function bulkApprove() {
     let failCount = 0;
     const now = new Date().toISOString();
 
+    // 알림톡 일괄 발송용 items 수집
+    const alimTalkItems = [];
+
     // Process in parallel
     const promises = pendingItems.map(async (item) => {
         try {
             const updateData = {};
+            let alimTalkType = '';
 
             // Determine which released flag to set
             if (item.feedback_1 && !item.released_1) {
                 updateData.released_1 = true;
                 updateData.released_1_at = now;
+                alimTalkType = 'correction_feedback_1';
             } else if (item.released_1 && item.feedback_2 && !item.released_2) {
                 updateData.released_2 = true;
                 updateData.released_2_at = now;
+                alimTalkType = 'correction_feedback_2';
             } else {
                 return; // Not actually pending
             }
@@ -1999,6 +2028,19 @@ async function bulkApprove() {
             const idx = allCorrections.findIndex(c => c.id === item.id);
             if (idx >= 0) Object.assign(allCorrections[idx], updateData);
 
+            // 알림톡 발송 대상 수집
+            const user = usersCache[item.user_id] || {};
+            if (user.phone && alimTalkType) {
+                alimTalkItems.push({
+                    type: alimTalkType,
+                    data: {
+                        name: user.name || '',
+                        phone: user.phone,
+                        round: item.session_number || ''
+                    }
+                });
+            }
+
             successCount++;
         } catch (err) {
             console.error(`Bulk approve failed for ${item.id}:`, err);
@@ -2008,9 +2050,28 @@ async function bulkApprove() {
 
     await Promise.all(promises);
 
+    // 알림톡 일괄 발송 (Edge Function bulk 모드)
+    let alimMsg = '';
+    if (alimTalkItems.length > 0) {
+        try {
+            const alimResult = await sendKakaoAlimTalkBulk(alimTalkItems);
+            if (alimResult && alimResult.success) {
+                alimMsg = `\n알림톡 발송: ${alimResult.sent || alimTalkItems.length}건 완료`;
+            } else {
+                const sent = alimResult?.sent || 0;
+                const failed = alimResult?.failed || alimTalkItems.length;
+                alimMsg = `\n알림톡: 성공 ${sent}건, 실패 ${failed}건`;
+            }
+        } catch (alimErr) {
+            console.error('일괄 알림톡 발송 에러:', alimErr);
+            alimMsg = '\n알림톡 발송 실패 (승인은 정상 처리됨)';
+        }
+    }
+
     // Result message
     let msg = `승인 완료: ${successCount}건`;
     if (failCount > 0) msg += `, 실패: ${failCount}건`;
+    msg += alimMsg;
     alert(msg);
 
     // Refresh

@@ -3008,25 +3008,4 @@ async function sendEdgeFunctionNotify(type, data) {
 }
 
 // ==================== 카카오 알림톡 (Edge Function 경유) ====================
-
-async function sendKakaoAlimTalk(type, data) {
-    try {
-        console.log('📱 알림톡 발송 시도:', type, JSON.stringify(data));
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({ type, data })
-        });
-        const result = await resp.json();
-        console.log('📱 알림톡 응답:', JSON.stringify(result));
-        if (!result.success) {
-            console.warn('알림톡 발송 실패:', result);
-        }
-        return result;
-    } catch (e) {
-        console.warn('알림톡 발송 에러:', e);
-    }
-}
+// sendKakaoAlimTalk()는 supabase-config.js에서 공통 유틸로 정의됨

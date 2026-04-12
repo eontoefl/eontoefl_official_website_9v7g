@@ -1,27 +1,7 @@
 // ==================== 관리자 관리 모달 ====================
+// sendKakaoAlimTalk()는 supabase-config.js에서 공통 유틸로 정의됨
 
 let currentManageApp = null;
-
-// 카카오 알림톡 발송 (Edge Function 경유)
-async function sendKakaoAlimTalk(type, data) {
-    try {
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({ type, data })
-        });
-        const result = await resp.json();
-        if (!result.success) {
-            console.warn('알림톡 발송 실패:', result);
-        }
-        return result;
-    } catch (e) {
-        console.warn('알림톡 발송 에러:', e);
-    }
-}
 
 // 모달 열기
 async function openManageModal(appId) {

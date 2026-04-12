@@ -501,3 +501,48 @@ function calcAuthRate(dueTasks, studyRecords, authRecords) {
         authRate: Math.round(authSum / dueTasks.length)
     };
 }
+
+// ===== 공통 유틸: 카카오 알림톡 발송 (Edge Function 경유) =====
+async function sendKakaoAlimTalk(type, data) {
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ type, data })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            console.warn('알림톡 발송 실패:', result);
+        }
+        return result;
+    } catch (e) {
+        console.warn('알림톡 발송 에러:', e);
+        return { success: false, error: e.message };
+    }
+}
+
+// ===== 공통 유틸: 카카오 알림톡 일괄 발송 (Edge Function bulk 모드) =====
+// items: [{ type: 'correction_feedback_1', data: { name, phone, round } }, ...]
+async function sendKakaoAlimTalkBulk(items) {
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ bulk: true, items })
+        });
+        const result = await resp.json();
+        if (!result.success) {
+            console.warn('알림톡 일괄 발송 실패:', result);
+        }
+        return result;
+    } catch (e) {
+        console.warn('알림톡 일괄 발송 에러:', e);
+        return { success: false, error: e.message, sent: 0, failed: items.length };
+    }
+}

@@ -9,6 +9,7 @@ const LUNASOFT_API_KEY = Deno.env.get("LUNASOFT_API_KEY")!;      // API 키
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE_URL = "https://eonfl.com";
+const TESTROOM_URL = "https://testroom.eonfl.com";
 
 // ===== 템플릿 ID 매핑 =====
 const TEMPLATE_IDS: Record<string, number> = {
@@ -19,6 +20,8 @@ const TEMPLATE_IDS: Record<string, number> = {
   guide_uploaded:     50206,  // 이용방법 안내
   shipping_sent:      50207,  // 택배 발송 안내
   challenge_reminder: 50208,  // 챌린지 시작 D-1 안내
+  correction_feedback_1: 50209,  // 1차 첨삭 완료 안내
+  correction_feedback_2: 50210,  // 최종 첨삭 완료 안내
 };
 
 // ===== 택배사 코드 매핑 (LunaSoft carrier_code) =====
@@ -29,6 +32,20 @@ const CARRIER_CODES: Record<string, string> = {
   "로젠택배": "6",
   "롯데택배": "8",
 };
+
+// ===== KST 기준 deadline 계산 (현재 시각 + 24시간) =====
+function getDeadlineKST(): string {
+  const now = new Date();
+  const deadline = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  // KST = UTC+9
+  const kst = new Date(deadline.getTime() + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(kst.getUTCDate()).padStart(2, "0");
+  const h = String(kst.getUTCHours()).padStart(2, "0");
+  const min = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d} ${h}:${min}`;
+}
 
 // ===== 메시지 본문 생성 =====
 function buildMsgContent(type: string, data: Record<string, unknown>): string {
@@ -147,6 +164,34 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         link,
       ].join("\n");
 
+    case "correction_feedback_1": {
+      const deadline = getDeadlineKST();
+      return [
+        `${data.name}님, 안녕하세요.`,
+        "이온토플입니다.",
+        "",
+        `제출하신 ${data.round}회 과제의 1차 첨삭이 완료되었습니다.`,
+        "피드백을 꼼꼼히 읽고 수정본을 제출해주세요.",
+        "",
+        `⏰ 수정본 마감: ${deadline}`,
+        "",
+        "*마감 기한을 넘기면 해당 회차는 자동 종료됩니다.",
+        "",
+        TESTROOM_URL,
+      ].join("\n");
+    }
+
+    case "correction_feedback_2":
+      return [
+        `${data.name}님, 안녕하세요.`,
+        "이온토플입니다.",
+        "",
+        `제출하신 ${data.round}회 수정본의 최종 첨삭이 완료되었습니다.`,
+        "점수와 모범답안을 꼭 확인해주세요.",
+        "",
+        TESTROOM_URL,
+      ].join("\n");
+
     default:
       return "";
   }
@@ -169,12 +214,63 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 교재 택배가 발송되었습니다. 배송현황을 확인해주세요.";
     case "challenge_reminder":
       return "[이온토플] 내일부터 챌린지가 시작됩니다! 이용방법을 꼭 확인해주세요.";
+    case "correction_feedback_1":
+      return "[이온토플] 1차 첨삭이 완료되었습니다. 피드백을 확인하고 수정본을 제출해주세요.";
+    case "correction_feedback_2":
+      return "[이온토플] 최종 첨삭이 완료되었습니다. 점수와 모범답안을 확인해주세요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
 }
 
-// ===== LunaSoft API 호출 =====
+// ===== 버튼 URL 결정 =====
+function getBtnUrl(type: string, data: Record<string, unknown>): string {
+  if (type === "shipping_sent") {
+    return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
+  }
+  if (type === "correction_feedback_1" || type === "correction_feedback_2") {
+    return TESTROOM_URL;
+  }
+  return `${SITE_URL}/application-detail.html?id=${data.app_id}`;
+}
+
+// ===== 버튼 없는 템플릿 여부 =====
+function hasNoButton(templateId: number): boolean {
+  return templateId === TEMPLATE_IDS.payment_confirmed;
+}
+
+// ===== 단건 메시지 객체 생성 =====
+function buildMessageObject(
+  phone: string,
+  msgContent: string,
+  smsContent: string,
+  btnUrl: string,
+  templateId: number,
+  data: Record<string, unknown>,
+  no: string = "0",
+): Record<string, unknown> {
+  const message: Record<string, unknown> = {
+    no,
+    tel_num: phone.replace(/-/g, ""),
+    msg_content: msgContent,
+    sms_content: smsContent,
+    use_sms: "1",
+  };
+
+  if (!hasNoButton(templateId)) {
+    message.btn_url = [{ url_pc: btnUrl, url_mobile: btnUrl }];
+  }
+
+  if (templateId === TEMPLATE_IDS.shipping_sent) {
+    const courierName = (data.courier as string) || "CJ대한통운";
+    message.carrier_code = CARRIER_CODES[courierName] || "1";
+    message.invoice_number = (data.tracking_number as string) || "";
+  }
+
+  return message;
+}
+
+// ===== LunaSoft API 호출 (단건) =====
 async function sendLunaSoftAlimTalk(
   templateId: number,
   phone: string,
@@ -183,30 +279,7 @@ async function sendLunaSoftAlimTalk(
   btnUrl: string,
   data: Record<string, unknown>,
 ) {
-  const message: Record<string, unknown> = {
-    no: "0",
-    tel_num: phone.replace(/-/g, ""),   // 하이픈 제거
-    msg_content: msgContent,
-    sms_content: smsContent,
-    use_sms: "1",                        // 알림톡 실패 시 SMS 대체 발송
-  };
-
-  // 버튼이 있는 템플릿만 btn_url 추가 (입금확인완료는 버튼 없음)
-  if (templateId !== TEMPLATE_IDS.payment_confirmed) {
-    message.btn_url = [
-      {
-        url_pc: btnUrl,
-        url_mobile: btnUrl,
-      },
-    ];
-  }
-
-  // 택배 발송인 경우 carrier_code, invoice_number 추가
-  if (templateId === TEMPLATE_IDS.shipping_sent) {
-    const courierName = (data.courier as string) || "CJ대한통운";
-    message.carrier_code = CARRIER_CODES[courierName] || "1";
-    message.invoice_number = (data.tracking_number as string) || "";
-  }
+  const message = buildMessageObject(phone, msgContent, smsContent, btnUrl, templateId, data);
 
   const requestBody = {
     userid: LUNASOFT_USERID,
@@ -228,6 +301,34 @@ async function sendLunaSoftAlimTalk(
 
   const result = await resp.json();
   console.log("LunaSoft API response:", JSON.stringify(result));
+  return result;
+}
+
+// ===== LunaSoft API 호출 (일괄 — messages 배열) =====
+async function sendLunaSoftAlimTalkBulk(
+  templateId: number,
+  messages: Record<string, unknown>[],
+) {
+  const requestBody = {
+    userid: LUNASOFT_USERID,
+    api_key: LUNASOFT_API_KEY,
+    template_id: templateId,
+    messages,
+  };
+
+  console.log("LunaSoft API bulk request:", JSON.stringify({
+    template_id: templateId,
+    count: messages.length,
+  }));
+
+  const resp = await fetch("https://jupiter.lunasoft.co.kr/api/AlimTalk/message/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+
+  const result = await resp.json();
+  console.log("LunaSoft API bulk response:", JSON.stringify(result));
   return result;
 }
 
@@ -267,6 +368,13 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+
+    // ===== 일괄 발송 모드 (bulk) =====
+    if (body.bulk && Array.isArray(body.items)) {
+      return await handleBulkSend(body, corsHeaders);
+    }
+
+    // ===== 단건 발송 모드 =====
     const { type, data } = body as {
       type: string;
       data: Record<string, unknown>;
@@ -291,10 +399,7 @@ Deno.serve(async (req) => {
     // 메시지 본문 생성
     const msgContent = buildMsgContent(type, data);
     const smsContent = buildSmsContent(type);
-    // 택배 발송은 CJ택배 조회 링크, 나머지는 신청서 링크
-    const btnUrl = type === "shipping_sent"
-      ? `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`
-      : `${SITE_URL}/application-detail.html?id=${data.app_id}`;
+    const btnUrl = getBtnUrl(type, data);
 
     // LunaSoft API 호출
     const result = await sendLunaSoftAlimTalk(
@@ -342,3 +447,112 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// ===== 일괄 발송 핸들러 =====
+async function handleBulkSend(
+  body: { items: Array<{ type: string; data: Record<string, unknown> }> },
+  corsHeaders: Record<string, string>,
+) {
+  const { items } = body;
+
+  if (!items || items.length === 0) {
+    return new Response(
+      JSON.stringify({ success: false, error: "No items provided" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // 템플릿별로 그룹핑 (LunaSoft API는 요청당 1개 template_id)
+  const grouped: Record<number, { messages: Record<string, unknown>[]; logEntries: Record<string, unknown>[] }> = {};
+
+  for (let i = 0; i < items.length; i++) {
+    const { type, data } = items[i];
+    const templateId = TEMPLATE_IDS[type];
+    if (!templateId || !data.phone) continue;
+
+    const msgContent = buildMsgContent(type, data);
+    const smsContent = buildSmsContent(type);
+    const btnUrl = getBtnUrl(type, data);
+
+    const message = buildMessageObject(
+      data.phone as string,
+      msgContent,
+      smsContent,
+      btnUrl,
+      templateId,
+      data,
+      String(i),
+    );
+
+    if (!grouped[templateId]) {
+      grouped[templateId] = { messages: [], logEntries: [] };
+    }
+    grouped[templateId].messages.push(message);
+    grouped[templateId].logEntries.push({
+      application_id: data.app_id || null,
+      student_name: data.name || null,
+      phone: (data.phone as string).replace(/-/g, ""),
+      template_type: type,
+      template_id: templateId,
+      msg_content: msgContent,
+      sms_content: smsContent,
+    });
+  }
+
+  // 템플릿별로 API 호출
+  let totalSuccess = 0;
+  let totalFail = 0;
+  const results: Record<string, unknown>[] = [];
+
+  for (const [tidStr, group] of Object.entries(grouped)) {
+    const tid = Number(tidStr);
+    try {
+      const result = await sendLunaSoftAlimTalkBulk(tid, group.messages);
+      const isSuccess = result.code === 0;
+
+      // 각 메시지별 로그 기록
+      const now = new Date().toISOString();
+      for (let i = 0; i < group.logEntries.length; i++) {
+        const msgResult = result.messages?.[i];
+        const msgSuccess = isSuccess && (!msgResult || msgResult.result_code === "0" || msgResult.result_code === 0);
+        if (msgSuccess) totalSuccess++;
+        else totalFail++;
+
+        await logToDatabase({
+          ...group.logEntries[i],
+          status: msgSuccess ? "sent" : "failed",
+          response_code: result.code,
+          response_msg: msgResult?.result_msg || result.msg || null,
+          sent_at: msgSuccess ? now : null,
+        });
+      }
+
+      results.push({ template_id: tid, code: result.code, count: group.messages.length });
+    } catch (err) {
+      console.error(`Bulk send failed for template ${tid}:`, err);
+      totalFail += group.messages.length;
+
+      for (const entry of group.logEntries) {
+        await logToDatabase({
+          ...entry,
+          status: "failed",
+          response_code: -1,
+          response_msg: err.message,
+        });
+      }
+
+      results.push({ template_id: tid, error: err.message, count: group.messages.length });
+    }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: totalFail === 0,
+      total: items.length,
+      sent: totalSuccess,
+      failed: totalFail,
+      results,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
