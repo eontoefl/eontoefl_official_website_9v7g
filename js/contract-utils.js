@@ -212,7 +212,7 @@ function getContractSampleData() {
         name: '홍길동',
         email: 'hong@example.com',
         phone: '010-1234-5678',
-        assigned_program: '내벨업챌린지 - Fast',
+        assigned_program: '내벨업챌린지 - Fast + 스라첨삭',
         schedule_start: '2026-02-16',
         schedule_end: '2026-03-15',
         final_price: '890,000',

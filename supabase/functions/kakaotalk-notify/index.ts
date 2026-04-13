@@ -20,6 +20,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   guide_uploaded:     50206,  // 이용방법 안내
   shipping_sent:      50207,  // 택배 발송 안내
   challenge_reminder: 50208,  // 챌린지 시작 D-1 안내
+  correction_start_reminder: 50211, // 스라첨삭 시작 D-1 안내
   correction_feedback_1: 50209,  // 1차 첨삭 완료 안내
   correction_feedback_2: 50210,  // 최종 첨삭 완료 안내
 };
@@ -164,6 +165,20 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         link,
       ].join("\n");
 
+    case "correction_start_reminder":
+      return [
+        "이온토플 - 스라첨삭 시작 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,
+        "이온토플입니다.",
+        "",
+        `신청하신 스라첨삭이 ${data.start_date}부터 시작됩니다.`,
+        "",
+        "*테스트룸에서 Speaking & Writing 과제를 제출하시면 전문 피드백을 받으실 수 있습니다.",
+        "",
+        TESTROOM_URL,
+      ].join("\n");
+
     case "correction_feedback_1": {
       const deadline = getDeadlineKST();
       return [
@@ -218,6 +233,8 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 교재 택배가 발송되었습니다. 배송현황을 확인해주세요.";
     case "challenge_reminder":
       return "[이온토플] 내일부터 챌린지가 시작됩니다! 이용방법을 꼭 확인해주세요.";
+    case "correction_start_reminder":
+      return "[이온토플] 내일부터 스라첨삭이 시작됩니다! 테스트룸을 확인해주세요.";
     case "correction_feedback_1":
       return "[이온토플] 1차 첨삭이 완료되었습니다. 피드백을 확인하고 수정본을 제출해주세요.";
     case "correction_feedback_2":
@@ -232,7 +249,7 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "shipping_sent") {
     return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
   }
-  if (type === "correction_feedback_1" || type === "correction_feedback_2") {
+  if (type === "correction_start_reminder" || type === "correction_feedback_1" || type === "correction_feedback_2") {
     return TESTROOM_URL;
   }
   return `${SITE_URL}/application-detail.html?id=${data.app_id}`;

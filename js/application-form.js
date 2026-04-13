@@ -358,7 +358,7 @@ function populateFormData(app) {
         'application_title', 'name', 'phone', 'email', 'address', 'bank_account',
         'occupation', 'score_history', 'current_study_method',
         'target_note', 'toefl_reason_detail', 'memorable_blog_content',
-        'preferred_program', 'program_note',
+        'preferred_program', 'preferred_correction', 'program_note',
         'referral_search_keyword', 'referral_social_media', 'referral_friend_name',
         'referral_other', 'additional_notes'
     ];

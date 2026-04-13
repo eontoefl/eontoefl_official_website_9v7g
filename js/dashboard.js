@@ -1018,7 +1018,7 @@ async function renderProgramInfo(app) {
     programDetails.innerHTML = `
         <div class="program-row">
             <span class="program-label">프로그램</span>
-            <span class="program-value">${app.assigned_program || '-'}</span>
+            <span class="program-value">${app.assigned_program || '-'}${app.correction_enabled ? ' <span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;">+ 스라첨삭</span>' : ''}</span>
         </div>
         <div class="program-row">
             <span class="program-label">시작일</span>
@@ -1028,6 +1028,12 @@ async function renderProgramInfo(app) {
             <span class="program-label">종료일</span>
             <span class="program-value">${formatDateWithDay(app.schedule_end)}</span>
         </div>
+        ${app.correction_enabled && app.correction_start_date ? `
+        <div class="program-row">
+            <span class="program-label">첨삭 시작일</span>
+            <span class="program-value">${formatDateWithDay(app.correction_start_date)}</span>
+        </div>
+        ` : ''}
         <div class="program-row">
             <span class="program-label">플랫폼</span>
             <span class="program-value">${platformUrl}</span>

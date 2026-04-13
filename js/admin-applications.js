@@ -118,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('searchInput').addEventListener('input', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
     document.getElementById('programFilter').addEventListener('change', applyFilters);
+    const correctionFilterEl = document.getElementById('correctionFilter');
+    if (correctionFilterEl) correctionFilterEl.addEventListener('change', applyFilters);
     document.getElementById('sortBy').addEventListener('change', applyFilters);
     
     // URL 해시에서 탭 상태 복원
@@ -242,6 +244,7 @@ function applyFilters() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const statusFilter = document.getElementById('statusFilter').value;
     const programFilter = document.getElementById('programFilter').value;
+    const correctionFilter = document.getElementById('correctionFilter')?.value || 'all';
     const sortBy = document.getElementById('sortBy').value;
     
     // 탭 기반 사전 필터링
@@ -272,7 +275,12 @@ function applyFilters() {
         const matchesProgram = programFilter === 'all' || 
             (app.preferred_program || '') === programFilter;
         
-        return matchesSearch && matchesStatus && matchesProgram;
+        // 첨삭 필터
+        const matchesCorrection = correctionFilter === 'all' ||
+            (correctionFilter === 'enabled' && app.correction_enabled) ||
+            (correctionFilter === 'disabled' && !app.correction_enabled);
+        
+        return matchesSearch && matchesStatus && matchesProgram && matchesCorrection;
     });
     
     // 정렬
@@ -356,6 +364,7 @@ function displayApplications() {
                     <span style="color: #9480c5; font-weight: 500; font-size: 13px;">
                         ${escapeHtml(app.assigned_program || app.preferred_program || '-')}
                     </span>
+                    ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;">첨삭</span>' : ''}
                 </td>
                 <td style="font-size: 13px; color: #64748b;">
                     ${app.schedule_start ? formatDateWithDay(app.schedule_start) : '<span style="color:#94a3b8;">미정</span>'}
@@ -830,6 +839,7 @@ function downloadExcel() {
         '주소': app.address || '',
         '직업': app.occupation || '',
         '프로그램': app.preferred_program || '',
+        '스라첨삭': app.correction_enabled ? '포함' : '-',
         '수업 시작일': app.preferred_start_date || '',
         '제출 데드라인': app.submission_deadline || '',
         '현재 점수': app.total_score || '',

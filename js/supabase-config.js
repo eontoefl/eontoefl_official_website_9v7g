@@ -315,6 +315,36 @@ function getAppLiveStatus(app) {
     return { key: 'active', label: '진행중', color: '#7c3aed', bg: '#ede9fe', icon: 'fa-running' };
 }
 
+// ===== 공통 유틸: 스라첨삭 활성 여부 자동 판정 =====
+// correction_start_date 하루 전(D-1)부터 자동 활성화
+function isCorrectionActive(app) {
+    if (!app.correction_enabled) return false;
+    if (!app.correction_start_date) return false;
+
+    const today = getEffectiveToday();
+    const start = new Date(app.correction_start_date);
+    // D-1: 시작일 하루 전부터 활성화
+    start.setDate(start.getDate() - 1);
+    return today >= start;
+}
+
+// 스라첨삭 상태 정보 반환
+function getCorrectionStatus(app) {
+    if (!app.correction_enabled) return null;
+    if (!app.correction_start_date) return { key: 'pending', label: '시작일 미설정', color: '#94a3b8', icon: 'fa-clock' };
+
+    const today = getEffectiveToday();
+    const start = new Date(app.correction_start_date);
+    const activateDate = new Date(start);
+    activateDate.setDate(activateDate.getDate() - 1);
+
+    if (today < activateDate) {
+        const diff = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+        return { key: 'waiting', label: `D-${diff}`, color: '#3b82f6', icon: 'fa-hourglass-half' };
+    }
+    return { key: 'active', label: '활성화됨', color: '#22c55e', icon: 'fa-pen-nib' };
+}
+
 // ===== 공통 유틸: 등급별 색상 =====
 function getGradeColor(grade) {
     const colors = {
