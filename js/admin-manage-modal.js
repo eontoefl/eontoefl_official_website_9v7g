@@ -442,6 +442,33 @@ function loadModalAnalysisTab(app) {
                 </div>
             </div>
             
+            <!-- 2-1. 스라첨삭 배정 -->
+            <div class="form-group">
+                <label class="form-label">2-1. 스라첨삭 배정</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 포함 여부</label>
+                        <select name="correction_enabled" id="correction_enabled" class="form-select" ${readOnly}
+                                onchange="toggleCorrectionStartDate(); calculateModalPrice();"
+                                style="background-position: right 12px center;">
+                            <option value="false" ${!app.correction_enabled ? 'selected' : ''}>미포함</option>
+                            <option value="true" ${app.correction_enabled ? 'selected' : ''}>포함 (+200,000원)</option>
+                        </select>
+                    </div>
+                    <div id="correctionStartDateWrapper" style="${app.correction_enabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일</label>
+                        <input type="date" name="correction_start_date" id="correction_start_date"
+                               value="${app.correction_start_date || ''}"
+                               ${readOnly}
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                    학생 신청 여부: <strong>${app.preferred_correction === '신청' ? '신청함' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
+                    ${app.correction_enabled ? ' | 시작일 D-1부터 자동 활성화' : ''}
+                </div>
+            </div>
+            
             <!-- 3. 가격 정보 -->
             <div class="form-group">
                 <label class="form-label">3. 가격 정보</label>
@@ -455,6 +482,10 @@ function loadModalAnalysisTab(app) {
                         <tr>
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">시험료 지원</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #22c55e;">-210,000원</td>
+                        </tr>
+                        <tr id="correctionPriceRow" style="${app.correction_enabled ? '' : 'display: none;'}">
+                            <td style="padding: 8px 0; color: #64748b; text-align: left;">스라첨삭</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #3b82f6;">+200,000원</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">
@@ -563,9 +594,8 @@ function loadModalAnalysisTab(app) {
     container.innerHTML = html;
     
     // 이벤트 리스너 추가
-    if (hasAnalysis) {
-        calculateModalPrice();
-    }
+    calculateModalPrice();
+    toggleCorrectionStartDate();
     
     // 결과 선택 옵션에 클릭 이벤트 추가 (읽기 전용 모드가 아닐 때만)
     if (!hasAnalysis) {
@@ -586,12 +616,28 @@ function loadModalAnalysisTab(app) {
     }
 }
 
+// 스라첨삭 시작일 토글
+function toggleCorrectionStartDate() {
+    const enabled = document.getElementById('correction_enabled').value === 'true';
+    const wrapper = document.getElementById('correctionStartDateWrapper');
+    const priceRow = document.getElementById('correctionPriceRow');
+    if (wrapper) {
+        wrapper.style.opacity = enabled ? '1' : '0.4';
+        wrapper.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+    if (priceRow) {
+        priceRow.style.display = enabled ? '' : 'none';
+    }
+}
+
 // 모달 내 가격 계산
 function calculateModalPrice() {
     const additionalDiscount = parseInt(document.getElementById('additional_discount').value) || 0;
+    const correctionEnabled = document.getElementById('correction_enabled')?.value === 'true';
+    const correctionFee = correctionEnabled ? 200000 : 0;
     const basePrice = 790000;
     const deposit = 100000;
-    const finalPrice = basePrice - additionalDiscount + deposit;
+    const finalPrice = basePrice + correctionFee - additionalDiscount + deposit;
     
     document.getElementById('displayAdditionalDiscount').textContent = '-' + additionalDiscount.toLocaleString() + '원';
     document.getElementById('displayFinalPrice').textContent = finalPrice.toLocaleString() + '원';
@@ -705,12 +751,17 @@ async function saveModalAnalysis(event) {
     const basePrice = 1000000;
     const examSupport = 210000;
     const additionalDiscount = parseInt(formData.get('additional_discount')) || 0;
+    const correctionEnabled = formData.get('correction_enabled') === 'true';
+    const correctionFee = correctionEnabled ? 200000 : 0;
     const deposit = 100000;
-    const finalPrice = basePrice - examSupport - additionalDiscount + deposit;
+    const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
     
     const updateData = {
         analysis_status: formData.get('analysis_status'),
         assigned_program: formData.get('assigned_program'),
+        correction_enabled: correctionEnabled,
+        correction_start_date: correctionEnabled ? (formData.get('correction_start_date') || null) : null,
+        correction_fee: correctionFee,
         program_price: basePrice,
         discount_amount: examSupport,
         additional_discount: additionalDiscount,
@@ -1120,11 +1171,14 @@ async function previewSentContract(appId) {
     }
     
     // 학생 데이터
+    const programLabel = app.correction_enabled 
+        ? `${app.assigned_program} + 스라첨삭` 
+        : app.assigned_program;
     const studentData = {
         name: app.name,
         email: app.email,
         phone: app.phone,
-        assigned_program: app.assigned_program,
+        assigned_program: programLabel,
         schedule_start: app.schedule_start,
         schedule_end: app.schedule_end,
         final_price: (app.final_price || 0).toLocaleString(),

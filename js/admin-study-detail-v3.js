@@ -115,6 +115,7 @@ async function loadStudentDetail() {
 
         renderProfileHeader();
         renderPracticeSection();
+        renderCorrectionSection();
         renderV3SummaryCards();
         await renderStudyRecordTable();
         loadDeadlineExtensions();  // 데드라인 연장 건수 배지 표시용
@@ -331,6 +332,56 @@ async function togglePracticeMode(enable) {
         btnOff.disabled = false;
         btnOn.disabled = false;
     }
+}
+
+// ===== 스라첨삭 상태 섹션 =====
+function renderCorrectionSection() {
+    const app = studentData;
+    // correctionSection 요소가 없으면 practiceSection 뒤에 생성
+    let section = document.getElementById('correctionSection');
+    if (!section) {
+        const practiceSection = document.getElementById('practiceSection');
+        if (practiceSection) {
+            section = document.createElement('div');
+            section.id = 'correctionSection';
+            section.className = 'admin-card';
+            section.style.marginBottom = '24px';
+            practiceSection.after(section);
+        } else {
+            return;
+        }
+    }
+
+    if (!app || !app.correction_enabled) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    const corrStatus = typeof getCorrectionStatus === 'function' ? getCorrectionStatus(app) : null;
+    const statusLabel = corrStatus ? corrStatus.label : '-';
+    const statusColor = corrStatus ? corrStatus.color : '#94a3b8';
+    const startDate = app.correction_start_date || '-';
+
+    section.innerHTML = `
+        <div style="padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <i class="fas fa-pen-nib" style="font-size: 20px; color: #3b82f6;"></i>
+                <h3 style="font-size: 16px; font-weight: 700; margin: 0;">스라첨삭</h3>
+                <span style="display:inline-block; background:${statusColor}; color:white; font-size:11px; font-weight:600; padding:3px 10px; border-radius:6px;">${statusLabel}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="background: #f8fafc; padding: 12px; border-radius: 8px;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">시작일</div>
+                    <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${startDate}</div>
+                </div>
+                <div style="background: #f8fafc; padding: 12px; border-radius: 8px;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">상태</div>
+                    <div style="font-size: 14px; font-weight: 600; color: ${statusColor};">${statusLabel}</div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 // ===== 오답노트 모달 =====

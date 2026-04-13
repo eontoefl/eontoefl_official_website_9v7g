@@ -19,6 +19,7 @@ function displayResults(applications) {
                     <div>
                         <h3 class="program-title" style="font-size: 18px; margin-bottom: 8px; color: #1e293b;">
                             ${escapeHtml(app.assigned_program || app.preferred_program || '프로그램 미정')}
+                            ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">+ 스라첨삭</span>' : ''}
                         </h3>
                         <p style="font-size: 13px; color: #64748b;">
                             신청일: ${formatDate(app.created_at)}
@@ -281,6 +282,10 @@ function displayResults(applications) {
                                 <div style="font-weight: 600; color: #1e293b;">${escapeHtml(app.preferred_start_date)}</div>
                             </div>
                             ` : ''}
+                            <div>
+                                <div style="color: #64748b; margin-bottom: 4px;">스라첨삭 신청</div>
+                                <div style="font-weight: 600; color: ${app.preferred_correction === '신청' ? '#2563eb' : '#64748b'};">${escapeHtml(app.preferred_correction || '미신청')}</div>
+                            </div>
                         </div>
                         ${app.program_note ? `
                             <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">

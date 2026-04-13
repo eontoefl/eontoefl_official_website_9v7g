@@ -506,6 +506,13 @@ ${escapeHtml(app.target_notes)}
         </div>
         
         <div class="detail-row">
+            <div class="detail-label">스라첨삭 신청</div>
+            <div class="detail-value" style="color: ${app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight: 600;">
+                ${app.preferred_correction === '신청' ? '✅ 신청' : '미신청'}
+            </div>
+        </div>
+        
+        <div class="detail-row">
             <div class="detail-label">제출 데드라인</div>
             <div class="detail-value">${escapeHtml(app.submission_deadline || '-')}</div>
         </div>
@@ -842,10 +849,22 @@ function getAnalysisSection(app) {
             ` : ''}
             
             ${app.schedule_end ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
                 <span style="color: #64748b; font-size: 15px;">종료일</span>
                 <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.schedule_end}</span>
             </div>
+            ` : ''}
+            ${app.correction_enabled ? `
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                <span style="color: #64748b; font-size: 15px;">스라첨삭</span>
+                <span style="font-weight: 600; color: #2563eb; font-size: 15px;">포함</span>
+            </div>
+            ${app.correction_start_date ? `
+            <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+                <span style="color: #64748b; font-size: 15px;">첨삭 시작일</span>
+                <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.correction_start_date}</span>
+            </div>
+            ` : ''}
             ` : ''}
         </div>
         ` : ''}
@@ -2234,9 +2253,16 @@ function getPricingBox(app, showPaymentNotice = true) {
             </div>
             ` : ''}
             
+            ${app.correction_enabled && app.correction_fee ? `
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                <span style="color: #64748b; font-size: 13px;">스라첨삭 (Speaking & Writing)</span>
+                <span style="font-weight: 600; color: #3b82f6; font-size: 13px;">+${app.correction_fee.toLocaleString()}원</span>
+            </div>
+            ` : ''}
+            
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
                 <span style="color: #64748b; font-size: 13px;">실제 이용가</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 13px;">${((app.program_price || 1000000) - (app.discount_amount || 210000)).toLocaleString()}원</span>
+                <span style="font-weight: 600; color: #1e293b; font-size: 13px;">${((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0)).toLocaleString()}원</span>
             </div>
             
             ${app.additional_discount ? `

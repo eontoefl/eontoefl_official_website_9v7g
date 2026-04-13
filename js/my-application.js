@@ -74,6 +74,7 @@ function displayResults(applications) {
                     <div>
                         <h3 class="program-title" style="font-size: 16px; margin-bottom: 8px;">
                             ${escapeHtml(app.assigned_program || app.preferred_program || '프로그램 미정')}
+                            ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:6px;">+ 스라첨삭</span>' : ''}
                         </h3>
                         <p style="font-size: 12px; color: #64748b;">
                             신청인: ${maskName(app.name)} | 신청일: ${formatDate(app.created_at)}

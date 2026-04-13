@@ -99,9 +99,15 @@ function displayAnalysis(app) {
                     <div class="info-value" style="color: #22c55e;">-${formatPrice(app.discount_amount)}</div>
                 </div>
             ` : ''}
+            ${app.correction_enabled && app.correction_fee ? `
+                <div class="info-row">
+                    <div class="info-label">스라첨삭</div>
+                    <div class="info-value" style="color: #3b82f6;">+${formatPrice(app.correction_fee)}</div>
+                </div>
+            ` : ''}
             <div class="info-row">
                 <div class="info-label">이용가</div>
-                <div class="info-value">${formatPrice((app.program_price || 1000000) - (app.discount_amount || 210000))}</div>
+                <div class="info-value">${formatPrice((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0))}</div>
             </div>
             ${app.additional_discount ? `
                 <div class="info-row">
