@@ -507,8 +507,8 @@ ${escapeHtml(app.target_notes)}
         
         <div class="detail-row">
             <div class="detail-label">스라첨삭 신청</div>
-            <div class="detail-value" style="color: ${app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight: 600;">
-                ${app.preferred_correction === '신청' ? '✅ 신청' : '미신청'}
+            <div class="detail-value" style="color: ${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '#2563eb' : '#64748b'}; font-weight: 600;">
+                ${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '✅ 신청희망' : '미신청'}
             </div>
         </div>
         

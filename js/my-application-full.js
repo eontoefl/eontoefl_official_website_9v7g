@@ -284,7 +284,7 @@ function displayResults(applications) {
                             ` : ''}
                             <div>
                                 <div style="color: #64748b; margin-bottom: 4px;">스라첨삭 신청</div>
-                                <div style="font-weight: 600; color: ${app.preferred_correction === '신청' ? '#2563eb' : '#64748b'};">${escapeHtml(app.preferred_correction || '미신청')}</div>
+                                <div style="font-weight: 600; color: ${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '#2563eb' : '#64748b'};">${escapeHtml(app.preferred_correction || '미신청')}</div>
                             </div>
                         </div>
                         ${app.program_note ? `

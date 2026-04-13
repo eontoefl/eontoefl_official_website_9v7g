@@ -172,6 +172,7 @@ function downloadInfoTxt() {
     lines.push('');
     lines.push('=== 프로그램 및 일정 ===');
     lines.push(`희망 프로그램 : ${app.preferred_program || '-'}`);
+    lines.push(`스라첨삭 신청 : ${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}`);
     lines.push(`희망 시작일 : ${app.preferred_start_date || '-'}`);
     lines.push(`신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}`);
     lines.push(`현재 단계 : STEP ${app.current_step || 1}`);
@@ -335,6 +336,7 @@ function loadModalInfoTab(app) {
             <h3 class="info-card-title"><i class="fas fa-clipboard"></i> 프로그램 및 일정</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
                 <div class="info-item"><label>희망 프로그램</label><div>${app.preferred_program || '-'}</div></div>
+                <div class="info-item"><label>스라첨삭 신청</label><div style="color: ${app.preferred_correction === '신청희망' || app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight:600;">${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}</div></div>
                 <div class="info-item"><label>희망 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
                 <div class="info-item"><label>신청일</label><div>${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}</div></div>
                 <div class="info-item"><label>현재 단계</label><div>STEP ${app.current_step || 1}</div></div>
@@ -464,7 +466,7 @@ function loadModalAnalysisTab(app) {
                     </div>
                 </div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                    학생 신청 여부: <strong>${app.preferred_correction === '신청' ? '신청함' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
+                    학생 신청 여부: <strong>${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
                     ${app.correction_enabled ? ' | 시작일 D-1부터 자동 활성화' : ''}
                 </div>
             </div>
