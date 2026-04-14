@@ -432,48 +432,70 @@ function loadModalAnalysisTab(app) {
             
             <!-- 2. 프로그램 배정 -->
             <div class="form-group">
-                <label class="form-label">2. 프로그램 배정 <span class="required">*</span></label>
-                <select name="assigned_program" class="form-select" required ${readOnly} style="background-position: right 12px center;">
-                    <option value="">선택하세요</option>
-                    <option value="내벨업챌린지 - Fast" ${app.assigned_program === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
-                    <option value="내벨업챌린지 - Standard" ${app.assigned_program === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
-                    <option value="상담 후 결정" ${app.assigned_program === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
-                </select>
-                <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                    학생이 신청한 프로그램: <strong>${app.preferred_program || '-'}</strong>
-                </div>
-            </div>
-            
-            <!-- 2-1. 스라첨삭 배정 -->
-            <div class="form-group">
-                <label class="form-label">2-1. 스라첨삭 배정</label>
+                <label class="form-label">2. 프로그램 배정</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 포함 여부</label>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 프로그램 <span class="required">*</span></label>
+                        <select name="assigned_program" class="form-select" required ${readOnly} style="background-position: right 12px center;">
+                            <option value="">선택하세요</option>
+                            <option value="내벨업챌린지 - Fast" ${app.assigned_program === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
+                            <option value="내벨업챌린지 - Standard" ${app.assigned_program === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
+                            <option value="상담 후 결정" ${app.assigned_program === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
+                        </select>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                            학생 희망: <strong>${app.preferred_program || '-'}</strong>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">스라첨삭</label>
                         <select name="correction_enabled" id="correction_enabled" class="form-select" ${readOnly}
                                 onchange="toggleCorrectionStartDate(); calculateModalPrice();"
                                 style="background-position: right 12px center;">
                             <option value="false" ${!app.correction_enabled ? 'selected' : ''}>미포함</option>
                             <option value="true" ${app.correction_enabled ? 'selected' : ''}>포함 (+200,000원)</option>
                         </select>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                            학생 희망: <strong>${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
+                        </div>
                     </div>
-                    <div id="correctionStartDateWrapper" style="${app.correction_enabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일</label>
-                        <input type="date" name="correction_start_date" id="correction_start_date"
-                               value="${app.correction_start_date || ''}"
-                               ${readOnly}
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
-                    </div>
-                </div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                    학생 신청 여부: <strong>${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
-                    ${app.correction_enabled ? ' | 시작일 D-1부터 자동 활성화' : ''}
                 </div>
             </div>
             
-            <!-- 3. 가격 정보 -->
+            <!-- 3. 일정 -->
             <div class="form-group">
-                <label class="form-label">3. 가격 정보</label>
+                <label class="form-label">3. 일정</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 시작일 (일요일만) <span class="required">*</span></label>
+                        <input type="date" name="schedule_start" id="schedule_start" 
+                               value="${app.schedule_start || ''}" 
+                               required
+                               ${readOnly}
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 종료일 (자동계산)</label>
+                        <input type="date" name="schedule_end" id="schedule_end" 
+                               value="${app.schedule_end || ''}" 
+                               readonly
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-family: 'Pretendard', -apple-system, sans-serif;">
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                    학생이 희망한 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
+                </div>
+                <div id="correctionStartDateWrapper" style="margin-top: 12px; ${app.correction_enabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일${app.correction_enabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
+                    <input type="date" name="correction_start_date" id="correction_start_date"
+                           value="${app.correction_start_date || ''}"
+                           ${readOnly}
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                </div>
+            </div>
+            
+            <!-- 4. 가격 정보 -->
+            <div class="form-group">
+                <label class="form-label">4. 가격 정보</label>
                 <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
                         <tbody>
@@ -517,31 +539,6 @@ function loadModalAnalysisTab(app) {
                                placeholder="할인 사유 입력"
                                style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     </div>
-                </div>
-            </div>
-            
-            <!-- 4. 일정 -->
-            <div class="form-group">
-                <label class="form-label">4. 프로그램 일정 <span class="required">*</span></label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div>
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">시작일 (일요일만 가능)</label>
-                        <input type="date" name="schedule_start" id="schedule_start" 
-                               value="${app.schedule_start || ''}" 
-                               required
-                               ${readOnly}
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
-                    </div>
-                    <div>
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">종료일 (자동계산)</label>
-                        <input type="date" name="schedule_end" id="schedule_end" 
-                               value="${app.schedule_end || ''}" 
-                               readonly
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-family: 'Pretendard', -apple-system, sans-serif;">
-                    </div>
-                </div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                    학생이 희망한 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
                 </div>
             </div>
             
