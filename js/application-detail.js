@@ -1047,9 +1047,10 @@ async function submitStudentAgreement() {
             status: '학생동의완료'
         };
 
-        // 2. 활성 계약서 자동 조회 → 자동 발송
+        // 2. 활성 계약서 자동 조회 → 자동 발송 (첨삭 포함 여부에 따라 타입 구분)
         try {
-            const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'limit': '1' });
+            const contractType = currentApplication.correction_enabled ? 'correction' : 'nevelup';
+            const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'contract_type': `eq.${contractType}`, 'limit': '1' });
             if (contracts && contracts.length > 0) {
                 const contract = contracts[0];
                 agreementData.contract_sent = true;

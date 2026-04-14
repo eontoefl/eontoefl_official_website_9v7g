@@ -927,9 +927,12 @@ async function loadModalContractTab(app) {
                     </label>
                     <select id="contractSelectDropdown" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; margin-bottom: 12px;">
                         <option value="">계약서를 선택하세요...</option>
-                        ${contracts.map(c => `
-                            <option value="${c.id}">${c.version} - ${escapeHtml(c.title)}</option>
-                        `).join('')}
+                        ${contracts.map(c => {
+                            const typeLabel = c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지';
+                            const recommendType = app.correction_enabled ? 'correction' : 'nevelup';
+                            const isRecommend = (c.contract_type || 'nevelup') === recommendType;
+                            return `<option value="${c.id}" ${isRecommend ? 'selected' : ''}>${c.version} [${typeLabel}] - ${escapeHtml(c.title)}${isRecommend ? ' ✓ 추천' : ''}</option>`;
+                        }).join('')}
                     </select>
                     
                     <div style="display: flex; gap: 12px;">
@@ -1121,7 +1124,7 @@ async function previewSelectedContract() {
         
         if (contract) {
             // 샘플 데이터로 미리보기
-            const sampleData = getContractSampleData();
+            const sampleData = getContractSampleData(contract.contract_type);
             const parsedHTML = parseContractTemplate(contract.content, sampleData);
             
             // 모달 표시
@@ -1240,11 +1243,12 @@ async function changeContractBeforeAgreed(appId) {
                 </label>
                 <select id="newContractSelect" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;">
                     <option value="">계약서를 선택하세요...</option>
-                    ${contracts.map(c => `
-                        <option value="${c.id}" ${c.id === currentManageApp.contract_template_id ? 'selected' : ''}>
-                            ${c.version} - ${escapeHtml(c.title)}
-                        </option>
-                    `).join('')}
+                    ${contracts.map(c => {
+                        const typeLabel = c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지';
+                        return `<option value="${c.id}" ${c.id === currentManageApp.contract_template_id ? 'selected' : ''}>
+                            ${c.version} [${typeLabel}] - ${escapeHtml(c.title)}
+                        </option>`;
+                    }).join('')}
                 </select>
             </div>
             
