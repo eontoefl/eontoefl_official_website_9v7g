@@ -116,6 +116,13 @@ async function loadDashboard() {
 function renderWelcome(app) {
     const welcomeMessage = document.getElementById('welcomeMessage');
     welcomeMessage.textContent = `${app.name}님, 환영합니다!`;
+    
+    const welcomeSubMessage = document.getElementById('welcomeSubMessage');
+    if (welcomeSubMessage) {
+        welcomeSubMessage.textContent = app.correction_enabled 
+            ? '내벨업챌린지 + 스라첨삭 진행 현황을 확인하고 관리하세요.'
+            : '내벨업챌린지 진행 현황을 확인하고 관리하세요.';
+    }
 }
 
 /**
@@ -538,10 +545,18 @@ async function renderQuickMenuGrid(app) {
         {
             icon: 'fa-book',
             iconColor: '#f59e0b',
-            title: '이용방법',
+            title: app.correction_enabled ? '내챌\n이용방법' : '이용방법',
             link: `application-detail.html?id=${app.id}#step5`,
             available: !!app.guide_sent
         },
+        ...(app.correction_enabled ? [{
+            icon: 'fa-pen-nib',
+            iconColor: '#2563eb',
+            title: '첨삭\n이용방법',
+            link: 'usage-guide.html?type=correction',
+            available: !!app.guide_sent,
+            external: true
+        }] : []),
         {
             icon: 'fa-file-alt',
             iconColor: '#6366f1',
@@ -737,6 +752,13 @@ function formatTimelineDate(date) {
 function renderWelcome(app) {
     const welcomeMessage = document.getElementById('welcomeMessage');
     welcomeMessage.textContent = `${app.name}님, 환영합니다!`;
+    
+    const welcomeSubMessage = document.getElementById('welcomeSubMessage');
+    if (welcomeSubMessage) {
+        welcomeSubMessage.textContent = app.correction_enabled 
+            ? '내벨업챌린지 + 스라첨삭 진행 현황을 확인하고 관리하세요.'
+            : '내벨업챌린지 진행 현황을 확인하고 관리하세요.';
+    }
 }
 
 /**
@@ -1015,23 +1037,53 @@ async function renderProgramInfo(app) {
         console.warn('사이트 설정 로드 실패, 기본값 사용:', e);
     }
 
+    // 첨삭 종료일 계산 (시작일 + 27일)
+    let correctionEndDate = null;
+    if (app.correction_enabled && app.correction_start_date) {
+        const cStart = new Date(app.correction_start_date);
+        correctionEndDate = new Date(cStart);
+        correctionEndDate.setDate(correctionEndDate.getDate() + 27);
+    }
+
+    // 첨삭 상태 텍스트
+    let correctionStatusHtml = '';
+    if (app.correction_enabled) {
+        const corrStatus = typeof getCorrectionStatus === 'function' ? getCorrectionStatus(app) : null;
+        if (corrStatus) {
+            const statusColors = {
+                'waiting': { bg: '#dbeafe', color: '#2563eb' },
+                'pending': { bg: '#f1f5f9', color: '#94a3b8' },
+                'active': { bg: '#ede9fe', color: '#7c3aed' },
+                'completed': { bg: '#dcfce7', color: '#16a34a' },
+                'refunded': { bg: '#fef2f2', color: '#ef4444' }
+            };
+            const style = statusColors[corrStatus.key] || { bg: '#f1f5f9', color: '#64748b' };
+            const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? '환불' : corrStatus.label;
+            correctionStatusHtml = `<span style="display:inline-block; background:${style.bg}; color:${style.color}; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">${label}</span>`;
+        }
+    }
+
     programDetails.innerHTML = `
         <div class="program-row">
             <span class="program-label">프로그램</span>
             <span class="program-value">${app.assigned_program || '-'}${app.correction_enabled ? ' <span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;">+ 스라첨삭</span>' : ''}</span>
         </div>
         <div class="program-row">
-            <span class="program-label">시작일</span>
+            <span class="program-label">${app.correction_enabled ? '내챌 시작일' : '시작일'}</span>
             <span class="program-value">${formatDateWithDay(app.schedule_start)}</span>
         </div>
         <div class="program-row">
-            <span class="program-label">종료일</span>
+            <span class="program-label">${app.correction_enabled ? '내챌 종료일' : '종료일'}</span>
             <span class="program-value">${formatDateWithDay(app.schedule_end)}</span>
         </div>
         ${app.correction_enabled && app.correction_start_date ? `
         <div class="program-row">
             <span class="program-label">첨삭 시작일</span>
-            <span class="program-value">${formatDateWithDay(app.correction_start_date)}</span>
+            <span class="program-value">${formatDateWithDay(app.correction_start_date)}${correctionStatusHtml}</span>
+        </div>
+        <div class="program-row">
+            <span class="program-label">첨삭 종료일</span>
+            <span class="program-value">${correctionEndDate ? formatDateWithDay(correctionEndDate) : '-'}</span>
         </div>
         ` : ''}
         <div class="program-row">
@@ -1074,9 +1126,14 @@ async function renderProgramInfo(app) {
         <a href="${platformUrl}" target="_blank" class="program-button">
             <i class="fas fa-external-link-alt"></i> 플랫폼 바로가기
         </a>
-        <a href="usage-guide.html" target="_blank" class="program-button secondary" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
-            <i class="fas fa-book"></i> 이용방법 보기
+        <a href="usage-guide.html?type=challenge" target="_blank" class="program-button secondary" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
+            <i class="fas fa-book"></i> ${app.correction_enabled ? '내챌 이용방법' : '이용방법 보기'}
         </a>
+        ${app.correction_enabled ? `
+        <a href="usage-guide.html?type=correction" target="_blank" class="program-button secondary" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border-color: #2563eb;" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
+            <i class="fas fa-pen-nib"></i> 첨삭 이용방법
+        </a>
+        ` : ''}
     `;
 }
 
