@@ -107,6 +107,9 @@ function displayActiveContracts() {
                         <span style="background: #9480c5; color: white; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 14px;">
                             ${escapeHtml(contract.version || 'v1')}
                         </span>
+                        <span style="background: ${contract.contract_type === 'correction' ? '#dbeafe' : '#f0fdf4'}; color: ${contract.contract_type === 'correction' ? '#2563eb' : '#166534'}; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                            ${contract.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지'}
+                        </span>
                         <h3 style="font-size: 18px; font-weight: 600; margin: 0; color: #1e293b;">
                             ${escapeHtml(contract.title)}
                         </h3>
@@ -167,6 +170,9 @@ function displayInactiveContracts() {
                         <span style="background: #94a3b8; color: white; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 14px;">
                             ${escapeHtml(contract.version || 'v1')}
                         </span>
+                        <span style="background: ${contract.contract_type === 'correction' ? '#dbeafe' : '#f0fdf4'}; color: ${contract.contract_type === 'correction' ? '#2563eb' : '#166534'}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                            ${contract.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지'}
+                        </span>
                         <h4 style="font-size: 16px; font-weight: 600; margin: 0; color: #64748b;">
                             ${escapeHtml(contract.title)}
                         </h4>
@@ -205,7 +211,7 @@ function updateLoadContractSelect() {
     
     select.innerHTML = '<option value="">기존 계약서 선택...</option>' + 
         contracts.map(c => `
-            <option value="${c.id}">${c.version} - ${escapeHtml(c.title)}</option>
+            <option value="${c.id}">${c.version} [${c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지'}] - ${escapeHtml(c.title)}</option>
         `).join('');
 }
 
@@ -281,10 +287,12 @@ async function saveNewContract() {
     }
     
     try {
+        const contractType = document.getElementById('newContractType').value || 'nevelup';
         const result = await supabaseAPI.post('contracts', {
             version: version,
             title: title,
             content: content,
+            contract_type: contractType,
             is_active: true,
             created_at: Date.now(),
             updated_at: Date.now()
@@ -294,6 +302,7 @@ async function saveNewContract() {
             alert('✅ 새 계약서가 등록되었습니다!');
             
             // 폼 초기화
+            document.getElementById('newContractType').value = 'nevelup';
             document.getElementById('newContractTitle').value = '';
             document.getElementById('newContractContent').value = '';
             
@@ -400,7 +409,8 @@ function previewContract(contractId) {
         contract = {
             version: document.getElementById('newContractVersion').value,
             title: document.getElementById('newContractTitle').value.trim(),
-            content: document.getElementById('newContractContent').value.trim()
+            content: document.getElementById('newContractContent').value.trim(),
+            contract_type: document.getElementById('newContractType').value || 'nevelup'
         };
         
         if (!contract.title || !contract.content) {
@@ -410,7 +420,7 @@ function previewContract(contractId) {
     }
     
     // 샘플 데이터로 파싱
-    const sampleData = getContractSampleData();
+    const sampleData = getContractSampleData(contract.contract_type);
     const parsedHTML = parseContractTemplate(contract.content, sampleData);
     
     document.getElementById('previewContent').innerHTML = `
