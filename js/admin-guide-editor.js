@@ -3,9 +3,26 @@
 let quill = null;
 let currentGuideId = null;
 let lastSavedHtml = '';
+let currentGuideType = 'challenge'; // URL 파라미터로 결정
+
+// 가이드 타입별 설정
+const GUIDE_TYPE_CONFIG = {
+    challenge: { title: '📝 내벨업챌린지 가이드 편집기', label: '내벨업챌린지' },
+    correction: { title: '📝 첨삭 가이드 편집기', label: '첨삭' }
+};
 
 // ===== 초기화 =====
 document.addEventListener('DOMContentLoaded', () => {
+    // URL 파라미터에서 가이드 타입 결정
+    const urlParams = new URLSearchParams(window.location.search);
+    currentGuideType = urlParams.get('type') || 'challenge';
+    
+    // 에디터 타이틀 업데이트
+    const config = GUIDE_TYPE_CONFIG[currentGuideType] || GUIDE_TYPE_CONFIG.challenge;
+    const titleEl = document.getElementById('editorTitle');
+    if (titleEl) titleEl.textContent = config.title;
+    document.title = config.title + ' - 이온토플';
+    
     checkAdminAuth();
     initQuillEditor();
     loadGuide();
@@ -110,7 +127,10 @@ async function loadGuide() {
     setSaveStatus('loading', '불러오는 중...');
 
     try {
-        const result = await supabaseAPI.get('guide_content', { limit: 1 });
+        const result = await supabaseAPI.get('guide_content', { 
+            limit: 1,
+            filter: { 'guide_type': `eq.${currentGuideType}` }
+        });
 
         if (result.data && result.data.length > 0) {
             const guide = result.data[0];
@@ -236,6 +256,7 @@ async function saveGuide() {
         const guideData = {
             html: html,
             content: { html: html },  // 호환성
+            guide_type: currentGuideType,
             updated_at: Date.now(),
             updated_by: userData.email
         };
@@ -244,7 +265,10 @@ async function saveGuide() {
         if (currentGuideId) {
             saveResult = await supabaseAPI.put('guide_content', currentGuideId, guideData);
         } else {
-            const checkResult = await supabaseAPI.get('guide_content', { limit: 1 });
+            const checkResult = await supabaseAPI.get('guide_content', { 
+                limit: 1,
+                filter: { 'guide_type': `eq.${currentGuideType}` }
+            });
             if (checkResult.data && checkResult.data.length > 0) {
                 currentGuideId = checkResult.data[0].id;
                 saveResult = await supabaseAPI.put('guide_content', currentGuideId, guideData);
@@ -260,6 +284,7 @@ async function saveGuide() {
         const versionData = {
             html: html,
             content: { html: html },
+            guide_type: currentGuideType,
             created_at: Date.now(),
             created_by: userData.email
         };
@@ -279,14 +304,18 @@ async function saveGuide() {
 // ===== 전체 미리보기 =====
 function previewFullPage() {
     const html = quill.root.innerHTML;
-    localStorage.setItem('guide_preview_html', html);
-    window.open('usage-guide.html?preview=true', '_blank');
+    localStorage.setItem('guide_preview_html_' + currentGuideType, html);
+    window.open(`usage-guide.html?type=${currentGuideType}&preview=true`, '_blank');
 }
 
 // ===== 버전 관리 =====
 async function showVersionHistory() {
     try {
-        const result = await supabaseAPI.get('guide_versions', { limit: 20, sort: '-created_at' });
+        const result = await supabaseAPI.get('guide_versions', { 
+            limit: 20, 
+            sort: '-created_at',
+            filter: { 'guide_type': `eq.${currentGuideType}` }
+        });
         const versionList = document.getElementById('versionList');
 
         if (!result.data || result.data.length === 0) {

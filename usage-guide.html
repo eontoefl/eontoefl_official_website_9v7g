@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>내벨업챌린지 이용방법 상세 가이드 - 이온토플</title>
+    <title>이용방법 상세 가이드 - 이온토플</title>
     
     <!-- Noto Sans KR Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -229,8 +229,8 @@
     <div class="guide-container">
         <!-- 헤더 -->
         <div class="guide-header">
-            <h1>📖 내벨업챌린지 이용방법</h1>
-            <p>자세한 이용 가이드를 확인하세요</p>
+            <h1 id="guideTitle">📖 이용방법</h1>
+            <p id="guideSubtitle">자세한 이용 가이드를 확인하세요</p>
         </div>
         
         <!-- 로딩 상태 -->
@@ -437,21 +437,35 @@
         const SUPABASE_URL = 'https://qpqjevecjejvbeuogtbx.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc';
 
+        // 가이드 타입 설정
+        const GUIDE_TYPE_CONFIG = {
+            challenge: { title: '📖 내벨업챌린지 이용방법', subtitle: '내벨업챌린지 상세 이용 가이드를 확인하세요' },
+            correction: { title: '📖 첨삭 이용방법', subtitle: '첨삭 프로그램 상세 이용 가이드를 확인하세요' }
+        };
+
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
+            const guideType = urlParams.get('type') || 'challenge';
             const isPreviewMode = urlParams.get('preview') === 'true';
             
+            // 헤더 타이틀 설정
+            const config = GUIDE_TYPE_CONFIG[guideType] || GUIDE_TYPE_CONFIG.challenge;
+            document.getElementById('guideTitle').textContent = config.title;
+            document.getElementById('guideSubtitle').textContent = config.subtitle;
+            document.title = config.title + ' - 이온토플';
+            
             if (isPreviewMode) {
-                loadPreviewGuide();
+                loadPreviewGuide(guideType);
             } else {
-                await loadGuideFromDB();
+                await loadGuideFromDB(guideType);
             }
         });
         
         // 미리보기: localStorage에서 HTML 불러오기
-        function loadPreviewGuide() {
-            // 새 포맷 (html 직접 저장)
-            const htmlData = localStorage.getItem('guide_preview_html');
+        function loadPreviewGuide(guideType) {
+            // 새 포맷 (html 직접 저장) - 타입별 키 사용
+            const htmlData = localStorage.getItem('guide_preview_html_' + guideType) 
+                          || localStorage.getItem('guide_preview_html');
             if (htmlData) {
                 renderHtml(htmlData);
                 return;
@@ -473,9 +487,9 @@
         }
         
         // DB에서 가이드 로드
-        async function loadGuideFromDB() {
+        async function loadGuideFromDB(guideType) {
             try {
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/guide_content?limit=1`, {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/guide_content?guide_type=eq.${guideType}&limit=1`, {
                     headers: {
                         'apikey': SUPABASE_ANON_KEY,
                         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`

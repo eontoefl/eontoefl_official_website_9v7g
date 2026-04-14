@@ -248,14 +248,14 @@ function loadUsageTemplate() {
     alert('✅ 기본 템플릿이 입력되었습니다!');
 }
 
-// 상세 가이드 미리보기
-function previewGuidePage() {
-    const url = document.getElementById('usageGuideUrl').value.trim() || 'usage-guide.html';
-    window.open(url, '_blank');
+// 상세 가이드 미리보기 (타입별)
+function previewGuidePage(type) {
+    const guideType = type || 'challenge';
+    window.open('usage-guide.html?type=' + guideType, '_blank');
 }
 
-// 상세 가이드 편집
-function openGuideEditor() {
-    // 편집기 페이지로 이동
-    window.location.href = 'admin-guide-editor.html';
+// 상세 가이드 편집 (타입별)
+function openGuideEditor(type) {
+    const guideType = type || 'challenge';
+    window.location.href = 'admin-guide-editor.html?type=' + guideType;
 }
