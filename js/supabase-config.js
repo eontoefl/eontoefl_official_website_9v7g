@@ -329,20 +329,36 @@ function isCorrectionActive(app) {
 }
 
 // 스라첨삭 상태 정보 반환
+// 종료 기준: correction_start_date + 27일 10:00 KST
 function getCorrectionStatus(app) {
     if (!app.correction_enabled) return null;
+
+    // 수동 설정값 우선 (환불)
+    if (app.correction_status === 'refunded') return { key: 'refunded', label: '환불', color: '#ef4444', icon: 'fa-undo' };
+
     if (!app.correction_start_date) return { key: 'pending', label: '시작일 미설정', color: '#94a3b8', icon: 'fa-clock' };
 
     const today = getEffectiveToday();
     const start = new Date(app.correction_start_date);
-    const activateDate = new Date(start);
-    activateDate.setDate(activateDate.getDate() - 1);
 
-    if (today < activateDate) {
+    // 종료 시점: 시작일 + 27일 10:00 KST (= 01:00 UTC)
+    const endDate = new Date(start);
+    endDate.setDate(endDate.getDate() + 27);
+    const endKST = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 1, 0, 0); // UTC 01:00 = KST 10:00
+
+    // 종료 판정
+    if (today >= endKST) {
+        return { key: 'completed', label: '종료', color: '#22c55e', icon: 'fa-check-circle' };
+    }
+
+    // 대기 판정 (시작일 전)
+    if (today < start) {
         const diff = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
         return { key: 'waiting', label: `D-${diff}`, color: '#3b82f6', icon: 'fa-hourglass-half' };
     }
-    return { key: 'active', label: '활성화됨', color: '#22c55e', icon: 'fa-pen-nib' };
+
+    // 진행중
+    return { key: 'active', label: '진행중', color: '#7c3aed', icon: 'fa-pen-nib' };
 }
 
 // ===== 공통 유틸: 등급별 색상 =====
