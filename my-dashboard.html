@@ -54,10 +54,15 @@
             opacity: 0.9;
         }
 
+        /* 대시보드 전용: 전체 컨테이너 넓히기 (오른쪽 칸만 넓어짐) */
+        .mypage-container {
+            max-width: 1320px;
+        }
+
         /* Grid Layout */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 7fr 3fr;
+            grid-template-columns: minmax(0, 650px) 1fr;
             gap: 24px;
             margin-bottom: 30px;
             align-items: start;
@@ -695,7 +700,7 @@
     </nav>
 
     <!-- Main Content -->
-    <div class="mypage-container">
+    <div class="mypage-container" id="dashboardContainer">
         <!-- 사이드 네비게이션 -->
         <aside class="mypage-sidebar">
             <div class="sidebar-user-info" id="sidebarUserInfo">
