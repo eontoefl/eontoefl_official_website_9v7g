@@ -97,6 +97,8 @@ function downloadInfoTxt() {
     lines.push(`직업 : ${app.occupation || '-'}`);
     lines.push(`주소 : ${app.address || '-'}`);
     lines.push(`환불 계좌 : ${app.bank_account || '-'}`);
+    lines.push(`신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleString('ko-KR') : '-'}`);
+    lines.push(`현재 단계 : STEP ${app.current_step || 1}`);
 
     lines.push('');
     lines.push('=== 현재 토플 점수 ===');
@@ -174,8 +176,6 @@ function downloadInfoTxt() {
     lines.push(`희망 프로그램 : ${app.preferred_program || '-'}`);
     lines.push(`스라첨삭 신청 : ${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}`);
     lines.push(`희망 시작일 : ${app.preferred_start_date || '-'}`);
-    lines.push(`신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}`);
-    lines.push(`현재 단계 : STEP ${app.current_step || 1}`);
     if (app.program_note) lines.push(`추가 의견 : ${app.program_note}`);
 
     lines.push('');
@@ -272,6 +272,8 @@ function loadModalInfoTab(app) {
                 <div class="info-item"><label>전화번호</label><div>${app.phone || '-'}</div></div>
                 <div class="info-item"><label>이메일</label><div>${app.email || '-'}</div></div>
                 <div class="info-item"><label>직업</label><div>${app.occupation || '-'}</div></div>
+                <div class="info-item"><label>신청일</label><div>${app.submitted_date ? new Date(app.submitted_date).toLocaleString('ko-KR') : '-'}</div></div>
+                <div class="info-item"><label>현재 단계</label><div>STEP ${app.current_step || 1}</div></div>
             </div>
             <div class="info-item"><label>주소</label><div>${app.address || '-'}</div></div>
             <div class="info-item"><label>환불 계좌</label><div>${app.bank_account || '-'}</div></div>
@@ -338,8 +340,6 @@ function loadModalInfoTab(app) {
                 <div class="info-item"><label>희망 프로그램</label><div>${app.preferred_program || '-'}</div></div>
                 <div class="info-item"><label>스라첨삭 신청</label><div style="color: ${app.preferred_correction === '신청희망' || app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight:600;">${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}</div></div>
                 <div class="info-item"><label>희망 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
-                <div class="info-item"><label>신청일</label><div>${app.submitted_date ? new Date(app.submitted_date).toLocaleDateString('ko-KR') : '-'}</div></div>
-                <div class="info-item"><label>현재 단계</label><div>STEP ${app.current_step || 1}</div></div>
             </div>
             ${app.program_note ? `<div class="info-item"><label>추가 의견</label><div style="white-space:pre-wrap;">${app.program_note}</div></div>` : ''}
         </div>
