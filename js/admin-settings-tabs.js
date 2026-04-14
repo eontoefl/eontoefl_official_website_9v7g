@@ -260,17 +260,66 @@ function loadUsageGuideTab() {
             </h3>
             
             <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
-                학생들이 볼 수 있는 상세 이용 가이드를 편집하고 관리하세요.
+                프로그램별 상세 이용 가이드를 편집하고 관리하세요.<br>
+                각 가이드의 링크를 학생에게 공유하면 해당 이용방법 페이지가 표시됩니다.
             </p>
             
-            <div style="display: flex; gap: 12px;">
-                <button type="button" class="btn-outline" onclick="window.open('usage-guide.html', '_blank')" style="flex: 1;">
-                    <i class="fas fa-eye"></i> 미리보기
-                </button>
-                <button type="button" class="btn-primary" onclick="window.location.href='admin-guide-editor.html'" style="flex: 1;">
-                    <i class="fas fa-edit"></i> 가이드 편집하기
-                </button>
+            <!-- 내벨업챌린지 가이드 -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0;">
+                        <i class="fas fa-flag" style="color: #9480c5; margin-right: 8px;"></i>내벨업챌린지 이용방법
+                    </h4>
+                    <span style="font-size: 12px; color: #94a3b8; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; cursor: pointer;" onclick="copyGuideLink('challenge')" title="클릭하여 복사">
+                        <i class="fas fa-link"></i> usage-guide.html?type=challenge
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn-outline" onclick="window.open('usage-guide.html?type=challenge', '_blank')" style="flex: 1; font-size: 13px;">
+                        <i class="fas fa-eye"></i> 미리보기
+                    </button>
+                    <button type="button" class="btn-primary" onclick="window.location.href='admin-guide-editor.html?type=challenge'" style="flex: 1; font-size: 13px;">
+                        <i class="fas fa-edit"></i> 편집하기
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 첨삭 가이드 -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0;">
+                        <i class="fas fa-pen-nib" style="color: #3b82f6; margin-right: 8px;"></i>첨삭 이용방법
+                    </h4>
+                    <span style="font-size: 12px; color: #94a3b8; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; cursor: pointer;" onclick="copyGuideLink('correction')" title="클릭하여 복사">
+                        <i class="fas fa-link"></i> usage-guide.html?type=correction
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn-outline" onclick="window.open('usage-guide.html?type=correction', '_blank')" style="flex: 1; font-size: 13px;">
+                        <i class="fas fa-eye"></i> 미리보기
+                    </button>
+                    <button type="button" class="btn-primary" onclick="window.location.href='admin-guide-editor.html?type=correction'" style="flex: 1; font-size: 13px;">
+                        <i class="fas fa-edit"></i> 편집하기
+                    </button>
+                </div>
+            </div>
+            
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #92400e;">
+                <i class="fas fa-info-circle"></i> 
+                링크를 클릭하면 전체 URL이 클립보드에 복사됩니다. 카톡, 알림톡 등에 자유롭게 활용하세요.
             </div>
         </div>
     `;
+}
+
+// 가이드 링크 복사
+function copyGuideLink(type) {
+    const baseUrl = window.location.origin;
+    const url = baseUrl + '/usage-guide.html?type=' + type;
+    navigator.clipboard.writeText(url).then(() => {
+        alert('링크가 복사되었습니다!\n\n' + url);
+    }).catch(() => {
+        // fallback
+        prompt('아래 링크를 복사하세요:', url);
+    });
 }
