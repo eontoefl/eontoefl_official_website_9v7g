@@ -1280,7 +1280,7 @@ function loadModalUsageTab(app) {
                     </div>
                 </div>
                 <button onclick="sendUsageGuideFromModal('${app.id}')" class="btn-primary btn-lg" style="width: 100%; margin-top: 16px;">
-                    <i class="fas fa-paper-plane"></i> 이용방법 전달하기
+                    <i class="fas fa-paper-plane"></i> 이용방법 전달하기${app.correction_enabled ? ' (첨삭 포함)' : ''}
                 </button>
                 <div style="font-size: 12px; color: #78350f; text-align: center; margin-top: 12px;">
                     💡 클릭하면 자동으로 STEP 9 (이용방법전달)로 진행됩니다.
@@ -1293,7 +1293,7 @@ function loadModalUsageTab(app) {
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <i class="fas fa-check-circle" style="font-size: 32px;"></i>
                     <div>
-                        <div style="font-weight: 700; font-size: 18px;">✅ 이용방법 전달 완료</div>
+                        <div style="font-weight: 700; font-size: 18px;">✅ 이용방법 전달 완료${app.correction_enabled ? ' (첨삭 포함)' : ''}</div>
                         <div style="font-size: 14px; margin-top: 4px;">
                             ${new Date(app.guide_sent_at).toLocaleString('ko-KR')}에 이용방법을 전달했습니다.
                         </div>

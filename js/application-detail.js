@@ -2811,14 +2811,41 @@ async function loadUsageTab(app) {
                     </h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div style="background: white; padding: 16px; border-radius: 8px;">
-                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">시작일</p>
+                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">내벨업챌린지 시작일</p>
                             <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${app.schedule_start || '-'}</p>
                         </div>
                         <div style="background: white; padding: 16px; border-radius: 8px;">
-                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">종료일</p>
+                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">내벨업챌린지 종료일</p>
                             <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${app.schedule_end || '-'}</p>
                         </div>
                     </div>
+                    ${app.correction_enabled ? `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+                        <div style="background: white; padding: 16px; border-radius: 8px;">
+                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">스라첨삭 시작일</p>
+                            <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${app.correction_start_date || '-'}</p>
+                        </div>
+                        <div style="background: white; padding: 16px; border-radius: 8px;"></div>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <!-- 이용방법 링크 -->
+                <div style="text-align: center; margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                    <a href="usage-guide.html?type=challenge" target="_blank" 
+                       style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
+                              color: white; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 700; 
+                              box-shadow: 0 4px 16px rgba(148, 128, 197, 0.3); transition: all 0.3s;">
+                        📖 내벨업챌린지 이용방법 자세히 보기
+                    </a>
+                    ${app.correction_enabled ? `
+                    <a href="usage-guide.html?type=correction" target="_blank" 
+                       style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                              color: white; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 700; 
+                              box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3); transition: all 0.3s;">
+                        📖 첨삭 이용방법 자세히 보기
+                    </a>
+                    ` : ''}
                 </div>
                 
                 ${necessitiesText ? `
@@ -2886,7 +2913,10 @@ async function loadUsageTab(app) {
                 </h2>
                 <div style="text-align: center; font-size: 16px; color: #6d28d9; line-height: 1.8;">
                     <p style="margin: 0;"><strong>✔️ 성함:</strong> ${app.name}님</p>
-                    <p style="margin: 8px 0 0 0;"><strong>✔️ 프로그램:</strong> ${app.assigned_program || '-'} : ${formatDateWithDay(app.schedule_start)} 시작</p>
+                    <p style="margin: 8px 0 0 0;"><strong>✔️ 내벨업챌린지:</strong> ${app.assigned_program || '-'} / ${formatDateWithDay(app.schedule_start)} 시작</p>
+                    ${app.correction_enabled ? `
+                    <p style="margin: 8px 0 0 0;"><strong>✔️ 스라첨삭:</strong> ${formatDateWithDay(app.correction_start_date)} 시작</p>
+                    ` : ''}
                 </div>
             </div>
             
@@ -2922,16 +2952,24 @@ async function loadUsageTab(app) {
             </div>
             
             <!-- 상세 가이드 링크 -->
-            ${usageGuideUrl ? `
-            <div style="text-align: center; margin-bottom: 24px;">
-                <a href="${usageGuideUrl}" target="_blank" 
+            <div style="text-align: center; margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                ${usageGuideUrl ? `
+                <a href="usage-guide.html?type=challenge" target="_blank" 
                    style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
                           color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 700; 
                           box-shadow: 0 4px 16px rgba(148, 128, 197, 0.3); transition: all 0.3s;">
                     📖 내벨업챌린지 이용방법 자세히 보기
                 </a>
+                ` : ''}
+                ${app.correction_enabled ? `
+                <a href="usage-guide.html?type=correction" target="_blank" 
+                   style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                          color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 700; 
+                          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3); transition: all 0.3s;">
+                    📖 첨삭 이용방법 자세히 보기
+                </a>
+                ` : ''}
             </div>
-            ` : ''}
             
             <!-- Necessities -->
             ${necessitiesText ? `
