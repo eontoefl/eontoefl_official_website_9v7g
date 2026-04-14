@@ -2230,25 +2230,37 @@ function getPricingBox(app, showPaymentNotice = true) {
     if (!app.assigned_program) return '';
     
     return `
+        <style>
+            @media (min-width: 768px) {
+                .pb-title { font-size: 17px !important; }
+                .pb-label { font-size: 15px !important; }
+                .pb-value { font-size: 15px !important; }
+                .pb-reason { font-size: 14px !important; }
+                .pb-note { font-size: 11.5px !important; }
+                .pb-final-label { font-size: 16px !important; }
+                .pb-final-value { font-size: 22px !important; }
+                .pb-info { font-size: 13px !important; }
+            }
+        </style>
         <div style="padding: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px;">
-            <div style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
+            <div class="pb-title" style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
                 <i class="fas fa-receipt" style="color: #9480c5;"></i> 이용가 및 할인 내역
             </div>
             
             ${app.program_price ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">정가</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 13px;">${app.program_price.toLocaleString()}원</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">정가</span>
+                <span class="pb-value" style="font-weight: 600; color: #1e293b; font-size: 13px;">${app.program_price.toLocaleString()}원</span>
             </div>
             ` : ''}
             
             ${app.discount_amount ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">시험료 지원</span>
-                <span style="font-weight: 600; color: #22c55e; font-size: 13px;">-${app.discount_amount.toLocaleString()}원</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">시험료 지원</span>
+                <span class="pb-value" style="font-weight: 600; color: #22c55e; font-size: 13px;">-${app.discount_amount.toLocaleString()}원</span>
             </div>
             <div style="padding: 8px 0 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <p style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
+                <p class="pb-note" style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
                     ※ 실제시험 2회 진행 및 점수 인증, 후기 1회 작성 조건이 포함되어있습니다.
                 </p>
             </div>
@@ -2256,47 +2268,47 @@ function getPricingBox(app, showPaymentNotice = true) {
             
             ${app.correction_enabled && app.correction_fee ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">스라첨삭 (Speaking & Writing)</span>
-                <span style="font-weight: 600; color: #3b82f6; font-size: 13px;">+${app.correction_fee.toLocaleString()}원</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">스라첨삭 (Speaking & Writing)</span>
+                <span class="pb-value" style="font-weight: 600; color: #3b82f6; font-size: 13px;">+${app.correction_fee.toLocaleString()}원</span>
             </div>
             ` : ''}
             
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">실제 이용가</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 13px;">${((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0)).toLocaleString()}원</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">실제 이용가</span>
+                <span class="pb-value" style="font-weight: 600; color: #1e293b; font-size: 13px;">${((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0)).toLocaleString()}원</span>
             </div>
             
             ${app.additional_discount ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">추가 할인</span>
-                <span style="font-weight: 600; color: #ef4444; font-size: 13px;">-${app.additional_discount.toLocaleString()}원</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">추가 할인</span>
+                <span class="pb-value" style="font-weight: 600; color: #ef4444; font-size: 13px;">-${app.additional_discount.toLocaleString()}원</span>
             </div>
             ` : ''}
             
             ${app.discount_reason ? `
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">할인 사유</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 12px;">${escapeHtml(app.discount_reason)}</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">할인 사유</span>
+                <span class="pb-reason" style="font-weight: 600; color: #1e293b; font-size: 12px;">${escapeHtml(app.discount_reason)}</span>
             </div>
             ` : ''}
             
             <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 13px;">보증금 (환불)</span>
-                <span style="font-weight: 600; color: #3b82f6; font-size: 13px;">+100,000원</span>
+                <span class="pb-label" style="color: #64748b; font-size: 13px;">보증금 (환불)</span>
+                <span class="pb-value" style="font-weight: 600; color: #3b82f6; font-size: 13px;">+100,000원</span>
             </div>
             <div style="padding: 8px 0 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <p style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
+                <p class="pb-note" style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
                     ※ 과제 인증률에 따라 환불되는 금액입니다.
                 </p>
             </div>
             
             ${app.final_price ? `
             <div style="display: flex; justify-content: space-between; padding: 16px 0; margin-top: 8px;">
-                <span style="color: #1e293b; font-size: 14px; font-weight: 700;">최종 입금금액</span>
-                <span style="font-weight: 700; color: #9480c5; font-size: 19px;">${app.final_price.toLocaleString()}원</span>
+                <span class="pb-final-label" style="color: #1e293b; font-size: 14px; font-weight: 700;">최종 입금금액</span>
+                <span class="pb-final-value" style="font-weight: 700; color: #9480c5; font-size: 19px;">${app.final_price.toLocaleString()}원</span>
             </div>
             <div style="padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 12px;">
-                <p style="font-size: 11px; color: #475569; line-height: 1.7; margin: 0;">
+                <p class="pb-info" style="font-size: 11px; color: #475569; line-height: 1.7; margin: 0;">
                     ✓ <strong>일절 추가 금액 없으며, 모든 것이 포함된 금액입니다.</strong><br>
                     ✓ 중간에 목표점수 달성 시, 아직 시작하지 않은 프로그램은 <strong>전액환불</strong>이 가능합니다.${showPaymentNotice ? '<br>✓ <strong>결제는 최종적으로 프로그램 및 가격, 계약서까지 동의 후 가장 마지막에 진행됩니다.</strong>' : ''}
                 </p>
