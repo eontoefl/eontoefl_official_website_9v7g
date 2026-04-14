@@ -58,11 +58,37 @@ function getAdminActionMessage(app) {
     // 9. 모든 세팅 완료 → 운영 상태로 전환 (isLive로 디자인 구분)
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {
-        if (liveStatus.key === 'ready') return { text: '시작 대기', color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
-        if (liveStatus.key === 'active') return { text: '진행중', color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true };
-        if (liveStatus.key === 'completed') return { text: '종료', color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
-        if (liveStatus.key === 'refunded') return { text: '환불완료', color: '#ef4444', bgColor: '#fef2f2', icon: 'fa-undo', isLive: true };
-        if (liveStatus.key === 'dropped') return { text: '중도포기', color: '#94a3b8', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
+        // 내챌 상태 텍스트 결정
+        const hasCorrection = app.correction_enabled;
+        const nLabel = hasCorrection ? '내챌 ' : '';
+        let result;
+        if (liveStatus.key === 'ready') result = { text: `${nLabel}시작 대기`, color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
+        else if (liveStatus.key === 'active') result = { text: `${nLabel}진행중`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true };
+        else if (liveStatus.key === 'completed') result = { text: `${nLabel}종료`, color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
+        else if (liveStatus.key === 'refunded') result = { text: '환불완료', color: '#ef4444', bgColor: '#fef2f2', icon: 'fa-undo', isLive: true };
+        else if (liveStatus.key === 'dropped') result = { text: '중도포기', color: '#94a3b8', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
+        
+        // 첨삭 상태 뱃지 추가 (환불/중도포기가 아닌 경우)
+        if (result && hasCorrection && liveStatus.key !== 'refunded' && liveStatus.key !== 'dropped') {
+            const corrStatus = getCorrectionStatus(app);
+            if (corrStatus) {
+                const corrColorMap = {
+                    'waiting': { color: '#3b82f6', icon: 'fa-hourglass-half' },
+                    'pending': { color: '#94a3b8', icon: 'fa-clock' },
+                    'active': { color: '#2563eb', icon: 'fa-pen-nib' },
+                    'completed': { color: '#22c55e', icon: 'fa-check-circle' },
+                    'refunded': { color: '#ef4444', icon: 'fa-undo' }
+                };
+                const corrStyle = corrColorMap[corrStatus.key] || { color: '#94a3b8', icon: 'fa-circle' };
+                const corrLabel = corrStatus.key === 'waiting' ? `첨삭 ${corrStatus.label}` 
+                    : corrStatus.key === 'pending' ? `첨삭 ${corrStatus.label}` 
+                    : corrStatus.key === 'active' ? '첨삭 진행중' 
+                    : corrStatus.key === 'completed' ? '첨삭 종료' 
+                    : corrStatus.key === 'refunded' ? '첨삭 환불' : '첨삭';
+                result.correctionBadge = { text: corrLabel, color: corrStyle.color, icon: corrStyle.icon };
+            }
+        }
+        if (result) return result;
     }
     return { text: '세팅 완료', color: '#22c55e', bgColor: '#dcfce7' };
 }
@@ -366,17 +392,25 @@ function displayApplications() {
                     </span>
                     ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;">첨삭</span>' : ''}
                 </td>
-                <td style="font-size: 13px; color: #64748b;">
-                    ${app.schedule_start ? formatDateWithDay(app.schedule_start) : '<span style="color:#94a3b8;">미정</span>'}
-                    <div style="font-size: 11px; margin-top:2px;">
-                        ${app.schedule_start ? getDday(app.schedule_start) : ''}
-                    </div>
+                <td style="font-size: 12px; color: #64748b; line-height: 1.5;">
+                    ${app.schedule_start 
+                        ? `<div style="white-space:nowrap;">${app.correction_enabled ? '<span style="color:#7c3aed; font-weight:600;">내챌</span> ' : ''}${formatDateWithDay(app.schedule_start)} ${getDday(app.schedule_start)}</div>`
+                        : '<span style="color:#94a3b8;">미정</span>'}
+                    ${app.correction_enabled && app.correction_start_date 
+                        ? `<div style="white-space:nowrap; margin-top:2px;"><span style="color:#2563eb; font-weight:600;">첨삭</span> ${formatDateWithDay(app.correction_start_date)} ${getDday(app.correction_start_date)}</div>`
+                        : ''}
                 </td>
                 <td>
-                    ${actionMessage.isLive 
-                        ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; background: ${actionMessage.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.icon}" style="font-size: 11px;"></i>${actionMessage.text}</div>`
-                        : `<div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">${actionMessage.text}</div>`
-                    }
+                    <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                        ${actionMessage.isLive 
+                            ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.icon}" style="font-size: 10px;"></i>${actionMessage.text}</div>`
+                            : `<div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">${actionMessage.text}</div>`
+                        }
+                        ${actionMessage.correctionBadge 
+                            ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.correctionBadge.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.correctionBadge.icon}" style="font-size: 10px;"></i>${actionMessage.correctionBadge.text}</div>`
+                            : ''
+                        }
+                    </div>
                 </td>
                 <td>
                     <div style="display: flex; gap: 6px;">
