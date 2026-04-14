@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이온토플 콘텐츠 대시보드</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* ===== RESET & BASE ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F5F5F7;--card:#FFFFFF;--border:#E5E7EB;
+  --text:#1A1A1A;--sub:#6B7280;--muted:#9CA3AF;
+  --surface:#EEEEF0;
+  --blog:#16A34A;--insta:#DB2777;
+  --st-scheduled:#6B7280;--st-writing:#D97706;--st-published:#16A34A;
+  --radius:12px;
+  --font:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+html{font-size:15.4px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.55;min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit;background:none;border:none;color:var(--text);outline:none}
+select{font-family:inherit}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+
+/* ===== CONFIG BANNER ===== */
+#config-banner{
+  display:none;background:#FEF3C7;color:#92400E;text-align:center;padding:10px 16px;
+  font-size:.88rem;border-bottom:1px solid #FDE68A;
+}
+
+/* ===== TOP REMINDER BAR ===== */
+#reminder-bar{
+  height:42px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;position:relative;overflow:hidden;border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+#reminder-bar .reminder-text{
+  position:absolute;opacity:0;transition:opacity .5s;font-size:.88rem;color:var(--sub);
+  white-space:nowrap;padding:0 20px;text-align:center;
+}
+#reminder-bar .reminder-text.active{opacity:1}
+#reminder-bar:hover{background:#FAFAFA}
+#reminder-bar .hint{position:absolute;right:12px;font-size:.72rem;color:var(--muted)}
+
+/* Reminder Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1000;display:none;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px);
+}
+.modal-overlay.show{display:flex}
+.modal-box{
+  background:#FFFFFF;border-radius:var(--radius);padding:28px 24px;
+  max-width:560px;width:90%;max-height:80vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.12);
+}
+.modal-box h3{margin-bottom:16px;font-size:1.15rem;font-weight:600;color:var(--text)}
+.modal-box ol{padding-left:20px;display:flex;flex-direction:column;gap:12px}
+.modal-box ol li{color:var(--sub);font-size:.95rem;line-height:1.6}
+.modal-box .close-btn{
+  margin-top:20px;width:100%;padding:10px;background:var(--surface);
+  border-radius:8px;font-size:.95rem;text-align:center;color:var(--text);
+}
+.modal-box .close-btn:hover{background:var(--border)}
+
+/* ===== INTENSITY SLIDER ===== */
+#intensity-section{
+  padding:16px 24px;background:#FFFFFF;border-bottom:1px solid var(--border);
+}
+.intensity-wrap{max-width:800px;margin:0 auto}
+.intensity-label{font-size:.88rem;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:8px;font-weight:500}
+.intensity-label i{color:var(--st-writing)}
+.slider-container{display:flex;align-items:center;gap:16px}
+.slider-container input[type=range]{
+  flex:1;-webkit-appearance:none;appearance:none;height:6px;
+  background:var(--border);border-radius:3px;outline:none;
+}
+.slider-container input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+  background:var(--blog);cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,.35);
+}
+.intensity-levels{
+  display:flex;justify-content:space-between;max-width:calc(100% - 100px);
+  margin-left:auto;margin-right:auto;padding:4px 0;
+}
+.intensity-levels span{font-size:.77rem;color:var(--muted);transition:color .2s}
+.intensity-levels span.active{color:var(--blog);font-weight:600}
+.intensity-desc{
+  text-align:center;font-size:.83rem;color:var(--sub);margin-top:6px;
+  min-height:18px;transition:opacity .2s;
+}
+
+/* ===== MAIN LAYOUT ===== */
+#app-layout{display:flex;flex:1;min-height:0;position:relative}
+#main-content{flex:1;display:flex;flex-direction:column;min-width:0;padding:20px 24px 0}
+
+/* ===== WEEK NAV ===== */
+.week-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;gap:12px;flex-wrap:wrap;
+}
+.week-nav .nav-arrows{display:flex;align-items:center;gap:8px}
+.week-nav button{
+  width:38px;height:38px;border-radius:8px;background:#FFFFFF;
+  display:flex;align-items:center;justify-content:center;font-size:.95rem;
+  border:1px solid var(--border);transition:background .15s;color:var(--text);
+}
+.week-nav button:hover{background:var(--surface)}
+.week-nav .today-btn{width:auto;padding:0 16px;font-size:.83rem;font-weight:500}
+.week-title{font-size:1.12rem;font-weight:600;white-space:nowrap}
+
+/* ===== CALENDAR GRID ===== */
+.calendar-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:12px;flex:1;min-height:0;
+  margin-bottom:16px;
+}
+.day-column{
+  background:#FFFFFF;border-radius:var(--radius);display:flex;flex-direction:column;
+  min-height:200px;border:2px solid transparent;transition:border-color .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.day-column.is-today{border-color:var(--blog)}
+.day-header{
+  padding:10px 12px 8px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--border);
+}
+.day-header .day-label{font-size:.88rem;font-weight:600;color:var(--text)}
+.day-header .day-date{font-size:.77rem;color:var(--sub)}
+.day-body{flex:1;padding:8px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.add-card-btn{
+  width:100%;padding:8px;border:1px dashed var(--border);border-radius:8px;
+  font-size:.83rem;color:var(--muted);text-align:center;transition:all .15s;
+}
+.add-card-btn:hover{border-color:var(--blog);color:var(--blog)}
+
+/* ===== CONTENT CARD ===== */
+.content-card{
+  background:var(--surface);border-radius:10px;padding:10px;position:relative;
+  transition:box-shadow .15s,transform .15s;cursor:grab;
+}
+.content-card:active{cursor:grabbing}
+.content-card.dragging{opacity:.4;transform:scale(.96)}
+.content-card .card-top{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.channel-badge{
+  font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block;
+}
+.channel-badge.blog{background:rgba(22,163,74,.1);color:var(--blog)}
+.channel-badge.instagram{background:rgba(219,39,119,.1);color:var(--insta)}
+.type-label{font-size:.75rem;color:var(--sub);flex:1}
+.status-badge{
+  font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;cursor:pointer;
+  transition:background .15s;display:inline-block;
+}
+.status-badge.예정{background:rgba(107,114,128,.12);color:var(--st-scheduled)}
+.status-badge.작성중{background:rgba(217,119,6,.12);color:var(--st-writing)}
+.status-badge.발행완료{background:rgba(22,163,74,.12);color:var(--st-published)}
+.card-delete{
+  position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:.7rem;
+  color:var(--muted);opacity:0;transition:opacity .15s;background:rgba(0,0,0,.05);
+}
+.content-card:hover .card-delete{opacity:1}
+.card-delete:hover{color:#DC2626;background:rgba(220,38,38,.1)}
+.card-field{margin-top:4px}
+.card-field label{font-size:.68rem;color:var(--muted);display:block;margin-bottom:2px}
+.card-field input{
+  width:100%;font-size:.83rem;padding:5px 8px;background:#FFFFFF;
+  border-radius:6px;border:1px solid var(--border);transition:border-color .15s;color:var(--text);
+}
+.card-field input:focus{border-color:var(--blog)}
+.card-field input::placeholder{color:#C0C0C0}
+.guide-toggle{
+  margin-top:6px;font-size:.68rem;color:var(--muted);cursor:pointer;display:flex;
+  align-items:center;gap:4px;
+}
+.guide-toggle:hover{color:var(--sub)}
+.guide-toggle i{font-size:.6rem;transition:transform .2s}
+.guide-toggle.open i{transform:rotate(90deg)}
+.guide-content{
+  font-size:.75rem;color:var(--sub);line-height:1.55;padding:6px 0 2px;
+  display:none;
+}
+.guide-content.show{display:block}
+
+/* ===== DROP ZONE INDICATOR ===== */
+.day-body.drag-over{background:rgba(22,163,74,.06);border-radius:8px}
+
+/* ===== SIDEBAR ===== */
+#sidebar{
+  width:0;overflow:hidden;transition:width .3s ease;background:#FFFFFF;
+  border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;
+}
+#sidebar.open{width:290px}
+#sidebar-toggle{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:100;
+  background:#FFFFFF;border:1px solid var(--border);border-right:none;
+  border-radius:8px 0 0 8px;padding:12px 6px;writing-mode:vertical-rl;
+  font-size:.8rem;letter-spacing:2px;color:var(--sub);
+  transition:right .3s,background .15s;box-shadow:-2px 0 8px rgba(0,0,0,.04);
+}
+#sidebar-toggle:hover{background:var(--surface)}
+#sidebar.open ~ #sidebar-toggle{right:290px}
+.sidebar-inner{padding:16px;overflow-y:auto;flex:1}
+.sidebar-inner h3{font-size:.98rem;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.sidebar-inner h3 i{color:var(--st-writing)}
+.kw-section{margin-bottom:16px}
+.kw-section-header{
+  font-size:.85rem;font-weight:600;padding:9px 12px;border-radius:8px;
+  background:var(--surface);cursor:pointer;display:flex;justify-content:space-between;
+  align-items:center;transition:background .15s;color:var(--text);
+}
+.kw-section-header:hover{background:var(--border)}
+.kw-section-header.active{background:rgba(22,163,74,.08);color:var(--blog)}
+.kw-section-header .season{font-size:.72rem;color:var(--muted);font-weight:400}
+.kw-list{padding:8px 0 0;display:none;flex-direction:column;gap:4px}
+.kw-list.show{display:flex}
+.kw-item{
+  font-size:.83rem;padding:7px 12px;border-radius:6px;cursor:pointer;
+  color:var(--sub);transition:all .15s;
+}
+.kw-item:hover{background:var(--surface);color:var(--text)}
+
+/* ===== TOAST ===== */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--blog);color:#FFF;padding:10px 24px;border-radius:8px;
+  font-size:.88rem;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:2000;
+  box-shadow:0 4px 16px rgba(22,163,74,.3);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== STATS BAR ===== */
+#stats-section{
+  background:#FFFFFF;border-top:1px solid var(--border);padding:16px 24px;flex-shrink:0;
+}
+.stats-tabs{display:flex;gap:8px;margin-bottom:12px}
+.stats-tabs button{
+  padding:6px 16px;border-radius:6px;font-size:.83rem;background:var(--surface);
+  border:1px solid var(--border);color:var(--sub);transition:all .15s;
+}
+.stats-tabs button.active{background:var(--blog);color:#FFF;border-color:var(--blog);font-weight:600}
+.stats-grid{display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+.stat-item{display:flex;flex-direction:column;gap:2px}
+.stat-item .stat-value{font-size:1.4rem;font-weight:700;color:var(--text)}
+.stat-item .stat-label{font-size:.75rem;color:var(--sub)}
+.stat-progress{flex:1;min-width:120px;max-width:260px}
+.stat-progress .progress-label{font-size:.75rem;color:var(--sub);margin-bottom:4px;display:flex;justify-content:space-between}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-bar .fill{height:100%;background:var(--blog);border-radius:4px;transition:width .4s}
+.stat-channels{display:flex;gap:14px;align-items:center}
+.stat-channels span{font-size:.85rem;display:flex;align-items:center;gap:5px;color:var(--sub)}
+.stat-channels .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+/* ===== ADD MODAL ===== */
+.add-modal .modal-box{max-width:440px}
+.add-modal .form-group{margin-bottom:14px}
+.add-modal .form-group label{font-size:.85rem;color:var(--sub);display:block;margin-bottom:6px;font-weight:500}
+.add-modal select,.add-modal input[type=text]{
+  width:100%;padding:10px 12px;background:#FFFFFF;border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:var(--font);font-size:.92rem;
+}
+.add-modal select:focus,.add-modal input[type=text]:focus{border-color:var(--blog);outline:none}
+.add-modal .btn-row{display:flex;gap:8px;margin-top:18px}
+.add-modal .btn-primary{
+  flex:1;padding:11px;background:var(--blog);color:#FFF;border-radius:8px;
+  font-weight:600;font-size:.92rem;
+}
+.add-modal .btn-primary:hover{background:#15803D}
+.add-modal .btn-secondary{
+  flex:1;padding:11px;background:var(--surface);border-radius:8px;
+  font-size:.92rem;color:var(--text);
+}
+.add-modal .btn-secondary:hover{background:var(--border)}
+
+/* ===== LOADING ===== */
+#loading-overlay{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+}
+#loading-overlay .spinner{
+  width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--blog);
+  border-radius:50%;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-overlay .load-text{font-size:.92rem;color:var(--sub)}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+  .calendar-grid{grid-template-columns:repeat(3,1fr)}
+  #sidebar.open{width:260px}
+  #sidebar.open ~ #sidebar-toggle{right:260px}
+}
+@media(max-width:640px){
+  html{font-size:14.3px}
+  .calendar-grid{grid-template-columns:1fr;gap:10px}
+  #main-content{padding:12px 12px 0}
+  #intensity-section{padding:12px 16px}
+  .week-nav{flex-direction:column;align-items:flex-start;gap:8px}
+  .stats-grid{flex-direction:column;gap:10px}
+  #sidebar.open{position:fixed;right:0;top:0;bottom:0;width:280px;z-index:500;box-shadow:-8px 0 24px rgba(0,0,0,.1)}
+  #sidebar-toggle{z-index:501}
+  .modal-box{padding:20px 16px}
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="load-text">대시보드 로딩 중…</div>
+</div>
+
+<!-- Config Banner -->
+<div id="config-banner">
+  ⚠️ Supabase 연결 정보가 비어 있습니다. 파일 상단의 <code>SUPABASE_URL</code>과 <code>SUPABASE_ANON_KEY</code>를 설정하세요.
+</div>
+
+<!-- Reminder Bar -->
+<div id="reminder-bar" onclick="openReminderModal()">
+  <span class="hint">클릭하여 전체 보기</span>
+</div>
+
+<!-- Reminder Modal -->
+<div class="modal-overlay" id="reminder-modal">
+  <div class="modal-box">
+    <h3><i class="fa-solid fa-lightbulb" style="color:var(--st-writing)"></i> 글 작성 5원칙</h3>
+    <ol id="reminder-list"></ol>
+    <button class="close-btn" onclick="closeReminderModal()">닫기</button>
+  </div>
+</div>
+
+<!-- Intensity Slider -->
+<section id="intensity-section">
+  <div class="intensity-wrap">
+    <div class="intensity-label"><i class="fa-solid fa-bolt"></i> 콘텐츠 강도</div>
+    <div class="slider-container">
+      <span style="font-size:.77rem;color:var(--muted)">1</span>
+      <input type="range" id="intensity-slider" min="1" max="4" value="2" step="1">
+      <span style="font-size:.77rem;color:var(--muted)">4</span>
+    </div>
+    <div class="intensity-levels">
+      <span data-lv="1">최소</span><span data-lv="2">보통</span>
+      <span data-lv="3">집중</span><span data-lv="4">풀파워</span>
+    </div>
+    <div class="intensity-desc" id="intensity-desc"></div>
+  </div>
+</section>
+
+<!-- Main Layout -->
+<div id="app-layout">
+  <main id="main-content">
+    <!-- Week Nav -->
+    <nav class="week-nav">
+      <span class="week-title" id="week-title"></span>
+      <div class="nav-arrows">
+        <button onclick="changeWeek(-1)" title="이전 주"><i class="fa-solid fa-chevron-left"></i></button>
+        <button class="today-btn" onclick="goToday()">오늘</button>
+        <button onclick="changeWeek(1)" title="다음 주"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </nav>
+    <!-- Calendar -->
+    <div class="calendar-grid" id="calendar-grid"></div>
+  </main>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-inner">
+      <h3><i class="fa-solid fa-key"></i> 월별 키워드 전략</h3>
+      <div id="kw-sections"></div>
+    </div>
+  </aside>
+  <button id="sidebar-toggle" onclick="toggleSidebar()">키워드</button>
+</div>
+
+<!-- Stats -->
+<section id="stats-section">
+  <div class="stats-tabs">
+    <button class="active" data-period="week" onclick="switchStatTab('week',this)">이번 주</button>
+    <button data-period="month" onclick="switchStatTab('month',this)">이번 달</button>
+  </div>
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-item"><span class="stat-value" id="stat-total">0</span><span class="stat-label">총 예정</span></div>
+    <div class="stat-item"><span class="stat-value" id="stat-done">0</span><span class="stat-label">작성 완료</span></div>
+    <div class="stat-progress">
+      <div class="progress-label"><span>완료율</span><span id="stat-rate">0%</span></div>
+      <div class="progress-bar"><div class="fill" id="stat-fill" style="width:0%"></div></div>
+    </div>
+    <div class="stat-channels">
+      <span><span class="dot" style="background:var(--blog)"></span> 블로그 <b id="stat-blog">0</b></span>
+      <span><span class="dot" style="background:var(--insta)"></span> 인스타 <b id="stat-insta">0</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- Add Card Modal -->
+<div class="modal-overlay add-modal" id="add-modal">
+  <div class="modal-box">
+    <h3>새 콘텐츠 추가</h3>
+    <div class="form-group">
+      <label>채널</label>
+      <select id="add-channel">
+        <option value="blog">블로그</option>
+        <option value="instagram">인스타그램</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>콘텐츠 유형</label>
+      <select id="add-type">
+        <option value="정보성 신규 글">정보성 신규 글</option>
+        <option value="기존 글 업데이트">기존 글 업데이트</option>
+        <option value="수강생 후기 스토리">수강생 후기 스토리</option>
+        <option value="브랜딩 글">브랜딩 글</option>
+        <option value="성적 인증 카드뉴스">성적 인증 카드뉴스</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>제목 (선택)</label>
+      <input type="text" id="add-title" placeholder="나중에 입력해도 됩니다">
+    </div>
+    <div class="form-group">
+      <label>타겟 키워드 (선택)</label>
+      <input type="text" id="add-keyword" placeholder="나중에 입력해도 됩니다">
+    </div>
+    <input type="hidden" id="add-date">
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="closeAddModal()">취소</button>
+      <button class="btn-primary" onclick="submitNewCard()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// ★ Supabase 연결
+// ============================================================
+const SUPABASE_URL = 'https://qpqjevecjejvbeuogtbx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc';
+// ============================================================
+
+// ---- Globals ----
+let sb = null;
+let currentWeekStart = null;
+let intensityLevel = 2;
+let cardsCache = [];
+let currentStatPeriod = 'week';
+let reminderIdx = 0;
+let reminderTimer = null;
+let draggedCard = null;
+
+const REMINDERS = [
+  '글 첫 3줄에 핵심 답변 넣기 — AI 브리핑 발췌 대비',
+  '직접 만든 이미지/자료 캡쳐 최소 2~3장 포함',
+  '키워드 반복 금지 — 자연어 변형으로 분산',
+  '글 하단에 내부 링크 2~3개 (정보→후기→프로그램)',
+  '모든 정보성 글 하단에 동일한 CTA 넣기',
+];
+
+const GUIDES = {
+  '정보성 신규 글': '아직 선점하지 못한 롱테일 키워드 공략. 검색자의 질문에 완결성 있는 답변 제공. 2,500~4,000자. 자체 제작 이미지 필수. 글 초반에 핵심 답변 배치 (AI 브리핑 대비).',
+  '기존 글 업데이트': '검색 유입 상위 기존 글을 최신 기준으로 수정 후 재발행. 본문 내용 현행화 + 자연어 키워드 변형 반영. 3개월 주기 순환 업데이트 권장.',
+  '수강생 후기 스토리': '단순 후기 복붙 X. 스토리텔링 형태로 작성. 시작점수→최종점수 명시. 수강생의 시작 상황, 막혔던 부분, 해결 과정, 최종 성적 흐름으로 구성. 성적표 실물 이미지 필수. 전환 키워드 타겟.',
+  '브랜딩 글': '이온의 생각과 철학. 검색 유입보다 구독자 유지·체류시간·공유 목적. 토플 정보가 아닌 관점과 경험 중심.',
+  '성적 인증 카드뉴스': '수강생 성적표 이미지 + 점수 변화 숫자를 크게 배치. 캡션 3~4줄로 짧게. 템플릿 하나 만들어서 숫자만 교체.',
+};
+
+const INTENSITY_DESC = {
+  1: '최소 — 주 1회 블로그 + 격주 1회 인스타',
+  2: '보통 — 주 2회 블로그 + 격주 1회 인스타',
+  3: '집중 — 주 3회 블로그 + 주 1회 인스타',
+  4: '풀파워 — 주 4회 블로그 + 주 1회 인스타',
+};
+
+// Intensity templates: { dayOfWeek(0=Mon..4=Fri): [{channel, content_type}] }
+function getIntensityTemplate(level, weekStart) {
+  const weekNum = getISOWeekNumber(weekStart);
+  const isOddWeek = weekNum % 2 === 1;
+
+  switch (level) {
+    case 1: {
+      const tpl = {};
+      tpl[2] = [{ channel: 'blog', content_type: isOddWeek ? '정보성 신규 글' : '수강생 후기 스토리' }];
+      if (isOddWeek) tpl[1] = [{ channel: 'instagram', content_type: '성적 인증 카드뉴스' }];
+      return tpl;
+    }
+    case 2: {
+      const tpl = {};
+      tpl[1] = [{ channel: 'blog', content_type: '정보성 신규 글' }];
+      tpl[3] = [{ channel: 'blog', content_type: isOddWeek ? '수강생 후기 스토리' : '기존 글 업데이트' }];
+      if (isOddWeek) tpl[2] = [{ channel: 'instagram', content_type: '성적 인증 카드뉴스' }];
+      return tpl;
+    }
+    case 3: {
+      const tpl = {};
+      tpl[0] = [{ channel: 'blog', content_type: '정보성 신규 글' }];
+      tpl[2] = [{ channel: 'blog', content_type: '기존 글 업데이트' }];
+      tpl[4] = [{ channel: 'blog', content_type: '수강생 후기 스토리' }];
+      tpl[1] = [{ channel: 'instagram', content_type: '성적 인증 카드뉴스' }];
+      return tpl;
+    }
+    case 4: {
+      const tpl = {};
+      tpl[0] = [{ channel: 'blog', content_type: '정보성 신규 글' }];
+      tpl[2] = [{ channel: 'blog', content_type: '기존 글 업데이트' }];
+      tpl[3] = [{ channel: 'blog', content_type: '브랜딩 글' }];
+      tpl[4] = [{ channel: 'blog', content_type: '수강생 후기 스토리' }];
+      tpl[1] = [{ channel: 'instagram', content_type: '성적 인증 카드뉴스' }];
+      return tpl;
+    }
+    default: return {};
+  }
+}
+
+// ---- Date Helpers ----
+function getMonday(d) {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function fmtDateKR(d) { return `${d.getMonth() + 1}/${d.getDate()}`; }
+function isSameDay(a, b) { return fmtDate(a) === fmtDate(b); }
+function getISOWeekNumber(d) {
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  dt.setUTCDate(dt.getUTCDate() + 4 - (dt.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  return Math.ceil(((dt - yearStart) / 86400000 + 1) / 7);
+}
+
+const DAY_NAMES = ['월', '화', '수', '목', '금'];
+
+// ---- Init ----
+document.addEventListener('DOMContentLoaded', init);
+
+async function init() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    document.getElementById('config-banner').style.display = 'block';
+    document.getElementById('loading-overlay').style.display = 'none';
+    initUI();
+    return;
+  }
+
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Load intensity setting
+  try {
+    const { data } = await sb.from('app_settings').select('value').eq('key', 'intensity_level').single();
+    if (data) intensityLevel = parseInt(data.value) || 2;
+  } catch (e) { console.warn('Settings load failed', e); }
+
+  initUI();
+  await loadWeek();
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+
+function initUI() {
+  initReminders();
+  const slider = document.getElementById('intensity-slider');
+  slider.value = intensityLevel;
+  updateIntensityUI();
+  slider.addEventListener('input', onIntensityChange);
+  currentWeekStart = getMonday(new Date());
+  updateWeekTitle();
+  initSidebar();
+  if (!sb) {
+    renderCalendar([]);
+    updateStats({ total: 0, completed: 0, blog_count: 0, insta_count: 0, completion_rate: 0 });
+    document.getElementById('loading-overlay').style.display = 'none';
+  }
+}
+
+// ---- Reminders ----
+function initReminders() {
+  const bar = document.getElementById('reminder-bar');
+  REMINDERS.forEach((txt, i) => {
+    const el = document.createElement('div');
+    el.className = 'reminder-text' + (i === 0 ? ' active' : '');
+    el.textContent = `${i + 1}. ${txt}`;
+    bar.insertBefore(el, bar.querySelector('.hint'));
+  });
+  const list = document.getElementById('reminder-list');
+  list.innerHTML = REMINDERS.map(r => `<li>${r}</li>`).join('');
+  reminderTimer = setInterval(rotateReminder, 5000);
+}
+function rotateReminder() {
+  const els = document.querySelectorAll('#reminder-bar .reminder-text');
+  els[reminderIdx].classList.remove('active');
+  reminderIdx = (reminderIdx + 1) % REMINDERS.length;
+  els[reminderIdx].classList.add('active');
+}
+function openReminderModal() { document.getElementById('reminder-modal').classList.add('show'); }
+function closeReminderModal() { document.getElementById('reminder-modal').classList.remove('show'); }
+
+// ---- Intensity ----
+function updateIntensityUI() {
+  document.querySelectorAll('.intensity-levels span').forEach(s => {
+    s.classList.toggle('active', parseInt(s.dataset.lv) === intensityLevel);
+  });
+  document.getElementById('intensity-desc').textContent = INTENSITY_DESC[intensityLevel] || '';
+}
+
+async function onIntensityChange(e) {
+  const newLevel = parseInt(e.target.value);
+  if (newLevel === intensityLevel) return;
+  intensityLevel = newLevel;
+  updateIntensityUI();
+  if (sb) {
+    await sb.from('app_settings').upsert({ key: 'intensity_level', value: String(intensityLevel) });
+  }
+  await applyIntensityToWeek();
+}
+
+async function applyIntensityToWeek() {
+  if (!sb) return;
+  const weekDates = [];
+  for (let i = 0; i < 5; i++) weekDates.push(fmtDate(addDays(currentWeekStart, i)));
+
+  const { data: existing } = await sb.from('content_cards')
+    .select('*')
+    .gte('scheduled_date', weekDates[0])
+    .lte('scheduled_date', weekDates[4])
+    .order('sort_order');
+
+  const userEdited = (existing || []).filter(c => c.is_user_edited);
+  const templateCards = (existing || []).filter(c => !c.is_user_edited);
+
+  // Delete old template cards
+  if (templateCards.length > 0) {
+    const ids = templateCards.map(c => c.id);
+    await sb.from('content_cards').delete().in('id', ids);
+  }
+
+  // Generate new template cards
+  const tpl = getIntensityTemplate(intensityLevel, currentWeekStart);
+  const newCards = [];
+  for (const [dayIdx, items] of Object.entries(tpl)) {
+    const date = fmtDate(addDays(currentWeekStart, parseInt(dayIdx)));
+    for (const item of items) {
+      const alreadyExists = userEdited.some(c =>
+        c.scheduled_date === date && c.channel === item.channel && c.content_type === item.content_type
+      );
+      if (!alreadyExists) {
+        newCards.push({
+          scheduled_date: date,
+          channel: item.channel,
+          content_type: item.content_type,
+          title: '',
+          keyword: '',
+          status: '예정',
+          is_user_edited: false,
+          sort_order: parseInt(dayIdx) * 10,
+        });
+      }
+    }
+  }
+
+  if (newCards.length > 0) {
+    await sb.from('content_cards').insert(newCards);
+  }
+
+  await loadWeek();
+}
+
+// ---- Week Navigation ----
+function changeWeek(dir) {
+  currentWeekStart = addDays(currentWeekStart, dir * 7);
+  updateWeekTitle();
+  loadWeek();
+}
+function goToday() {
+  currentWeekStart = getMonday(new Date());
+  updateWeekTitle();
+  loadWeek();
+}
+function updateWeekTitle() {
+  const fri = addDays(currentWeekStart, 4);
+  const y = currentWeekStart.getFullYear();
+  document.getElementById('week-title').textContent =
+    `${y}년 ${currentWeekStart.getMonth() + 1}월 ${currentWeekStart.getDate()}일 — ${fri.getMonth() + 1}월 ${fri.getDate()}일`;
+}
+
+// ---- Load Week Data (with auto-seed) ----
+async function loadWeek() {
+  if (!sb) return;
+  const mon = fmtDate(currentWeekStart);
+  const fri = fmtDate(addDays(currentWeekStart, 4));
+
+  const { data, error } = await sb.from('content_cards')
+    .select('*')
+    .gte('scheduled_date', mon)
+    .lte('scheduled_date', fri)
+    .order('sort_order')
+    .order('created_at');
+
+  if (error) { console.error(error); return; }
+
+  // ★ 핵심 로직: 해당 주에 카드가 하나도 없으면 템플릿 자동 생성
+  if (!data || data.length === 0) {
+    await seedTemplateCards();
+    return; // seedTemplateCards 내부에서 다시 loadWeek 호출
+  }
+
+  cardsCache = data;
+  renderCalendar(cardsCache);
+  loadStats();
+}
+
+// 현재 강도에 맞는 기본 템플릿 카드를 DB에 삽입하고 다시 로드
+async function seedTemplateCards() {
+  if (!sb) return;
+  const tpl = getIntensityTemplate(intensityLevel, currentWeekStart);
+  const newCards = [];
+
+  for (const [dayIdx, items] of Object.entries(tpl)) {
+    const date = fmtDate(addDays(currentWeekStart, parseInt(dayIdx)));
+    for (const item of items) {
+      newCards.push({
+        scheduled_date: date,
+        channel: item.channel,
+        content_type: item.content_type,
+        title: '',
+        keyword: '',
+        status: '예정',
+        is_user_edited: false,
+        sort_order: parseInt(dayIdx) * 10,
+      });
+    }
+  }
+
+  if (newCards.length > 0) {
+    const { error } = await sb.from('content_cards').insert(newCards);
+    if (error) { console.error('Seed failed:', error); return; }
+  }
+
+  // 다시 로드 (이번엔 데이터가 있으므로 재귀 안 됨)
+  const mon = fmtDate(currentWeekStart);
+  const fri = fmtDate(addDays(currentWeekStart, 4));
+  const { data } = await sb.from('content_cards')
+    .select('*')
+    .gte('scheduled_date', mon)
+    .lte('scheduled_date', fri)
+    .order('sort_order')
+    .order('created_at');
+
+  cardsCache = data || [];
+  renderCalendar(cardsCache);
+  loadStats();
+}
+
+// ---- Render Calendar ----
+function renderCalendar(cards) {
+  const grid = document.getElementById('calendar-grid');
+  grid.innerHTML = '';
+  const today = new Date();
+
+  for (let i = 0; i < 5; i++) {
+    const date = addDays(currentWeekStart, i);
+    const dateStr = fmtDate(date);
+    const isToday = isSameDay(date, today);
+    const dayCards = cards.filter(c => c.scheduled_date === dateStr);
+
+    const col = document.createElement('div');
+    col.className = 'day-column' + (isToday ? ' is-today' : '');
+    col.innerHTML = `
+      <div class="day-header">
+        <span class="day-label">${DAY_NAMES[i]}</span>
+        <span class="day-date">${fmtDateKR(date)}</span>
+      </div>
+      <div class="day-body" data-date="${dateStr}"></div>
+    `;
+
+    const body = col.querySelector('.day-body');
+
+    body.addEventListener('dragover', e => { e.preventDefault(); body.classList.add('drag-over'); });
+    body.addEventListener('dragleave', () => body.classList.remove('drag-over'));
+    body.addEventListener('drop', e => { e.preventDefault(); body.classList.remove('drag-over'); handleDrop(e, dateStr); });
+
+    dayCards.forEach(card => body.appendChild(createCardElement(card)));
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-card-btn';
+    addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> 추가';
+    addBtn.onclick = () => openAddModal(dateStr);
+    body.appendChild(addBtn);
+
+    grid.appendChild(col);
+  }
+}
+
+// ---- Card Element ----
+function createCardElement(card) {
+  const el = document.createElement('div');
+  el.className = 'content-card';
+  el.draggable = true;
+  el.dataset.cardId = card.id;
+
+  const chClass = card.channel === 'blog' ? 'blog' : 'instagram';
+  const chLabel = card.channel === 'blog' ? '블로그' : '인스타';
+  const guide = GUIDES[card.content_type] || '';
+
+  el.innerHTML = `
+    <div class="card-top">
+      <span class="channel-badge ${chClass}">${chLabel}</span>
+      <span class="type-label">${card.content_type}</span>
+      <span class="status-badge ${card.status}" data-id="${card.id}">${card.status}</span>
+    </div>
+    <button class="card-delete" title="삭제" data-id="${card.id}"><i class="fa-solid fa-xmark"></i></button>
+    <div class="card-field">
+      <label>제목</label>
+      <input type="text" value="${escHtml(card.title || '')}" placeholder="제목 입력…" data-id="${card.id}" data-field="title">
+    </div>
+    <div class="card-field">
+      <label>키워드</label>
+      <input type="text" value="${escHtml(card.keyword || '')}" placeholder="타겟 키워드…" data-id="${card.id}" data-field="keyword">
+    </div>
+    ${guide ? `
+    <div class="guide-toggle" onclick="toggleGuide(this)">
+      <i class="fa-solid fa-caret-right"></i> 작성 가이드
+    </div>
+    <div class="guide-content">${guide}</div>
+    ` : ''}
+  `;
+
+  el.querySelector('.status-badge').addEventListener('click', e => cycleStatus(e.target));
+
+  el.querySelector('.card-delete').addEventListener('click', e => {
+    e.stopPropagation();
+    deleteCard(e.currentTarget.dataset.id);
+  });
+
+  el.querySelectorAll('input[data-field]').forEach(inp => {
+    let timer;
+    inp.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => saveField(inp.dataset.id, inp.dataset.field, inp.value), 600);
+    });
+  });
+
+  el.addEventListener('dragstart', e => {
+    draggedCard = card.id;
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.id);
+  });
+  el.addEventListener('dragend', () => { el.classList.remove('dragging'); draggedCard = null; });
+
+  return el;
+}
+
+function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// ---- Card Actions ----
+async function cycleStatus(badge) {
+  const id = badge.dataset.id;
+  const order = ['예정', '작성중', '발행완료'];
+  const cur = badge.textContent;
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  badge.textContent = next;
+  badge.className = 'status-badge ' + next;
+  if (sb) {
+    await sb.from('content_cards').update({ status: next }).eq('id', id);
+    const cached = cardsCache.find(c => c.id === id);
+    if (cached) cached.status = next;
+    loadStats();
+  }
+}
+
+async function saveField(id, field, value) {
+  if (!sb) return;
+  const update = { [field]: value, is_user_edited: true };
+  await sb.from('content_cards').update(update).eq('id', id);
+  const cached = cardsCache.find(c => c.id === id);
+  if (cached) { cached[field] = value; cached.is_user_edited = true; }
+}
+
+async function deleteCard(id) {
+  if (!sb) return;
+  await sb.from('content_cards').delete().eq('id', id);
+  cardsCache = cardsCache.filter(c => c.id !== id);
+  renderCalendar(cardsCache);
+  loadStats();
+}
+
+async function handleDrop(e, newDate) {
+  const cardId = e.dataTransfer.getData('text/plain');
+  if (!cardId || !sb) return;
+  await sb.from('content_cards').update({ scheduled_date: newDate }).eq('id', cardId);
+  await loadWeek();
+}
+
+function toggleGuide(el) {
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('show');
+}
+
+// ---- Add Modal ----
+function openAddModal(date) {
+  document.getElementById('add-date').value = date;
+  document.getElementById('add-title').value = '';
+  document.getElementById('add-keyword').value = '';
+  document.getElementById('add-channel').value = 'blog';
+  document.getElementById('add-type').value = '정보성 신규 글';
+  document.getElementById('add-modal').classList.add('show');
+}
+function closeAddModal() { document.getElementById('add-modal').classList.remove('show'); }
+
+async function submitNewCard() {
+  if (!sb) { showToast('Supabase 연결을 설정하세요'); return; }
+  const card = {
+    scheduled_date: document.getElementById('add-date').value,
+    channel: document.getElementById('add-channel').value,
+    content_type: document.getElementById('add-type').value,
+    title: document.getElementById('add-title').value.trim(),
+    keyword: document.getElementById('add-keyword').value.trim(),
+    status: '예정',
+    is_user_edited: !!(document.getElementById('add-title').value.trim() || document.getElementById('add-keyword').value.trim()),
+    sort_order: 50,
+  };
+  await sb.from('content_cards').insert([card]);
+  closeAddModal();
+  await loadWeek();
+  showToast('콘텐츠가 추가되었습니다');
+}
+
+// ---- Stats ----
+async function loadStats() {
+  if (!sb) return;
+  let startDate, endDate;
+  const today = new Date();
+
+  if (currentStatPeriod === 'week') {
+    const mon = getMonday(today);
+    startDate = fmtDate(mon);
+    endDate = fmtDate(addDays(mon, 4));
+  } else {
+    startDate = fmtDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    endDate = fmtDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+  }
+
+  const { data, error } = await sb.from('content_cards')
+    .select('status, channel')
+    .gte('scheduled_date', startDate)
+    .lte('scheduled_date', endDate);
+
+  if (error) { console.error(error); return; }
+
+  const rows = data || [];
+  const stats = {
+    total: rows.length,
+    completed: rows.filter(r => r.status === '발행완료').length,
+    blog_count: rows.filter(r => r.channel === 'blog').length,
+    insta_count: rows.filter(r => r.channel === 'instagram').length,
+    completion_rate: rows.length ? Math.round(rows.filter(r => r.status === '발행완료').length / rows.length * 100) : 0,
+  };
+  updateStats(stats);
+}
+
+function updateStats(s) {
+  document.getElementById('stat-total').textContent = s.total;
+  document.getElementById('stat-done').textContent = s.completed;
+  document.getElementById('stat-rate').textContent = s.completion_rate + '%';
+  document.getElementById('stat-fill').style.width = s.completion_rate + '%';
+  document.getElementById('stat-blog').textContent = s.blog_count;
+  document.getElementById('stat-insta').textContent = s.insta_count;
+}
+
+function switchStatTab(period, btn) {
+  currentStatPeriod = period;
+  document.querySelectorAll('.stats-tabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadStats();
+}
+
+// ---- Sidebar (Keywords) ----
+const KEYWORDS_DATA = [
+  { months: '1~2월', season: '새해/새학기 시작', keywords: ['토플 시작하는 법', '토플 처음 준비', '토플 vs 아이엘츠', '토플 기초 공부법'] },
+  { months: '3~4월', season: '교환학생/봄학기 준비', keywords: ['교환학생 토플', '토플 단기 준비', '토플 2개월 계획', '토플 여름방학 공부 계획'] },
+  { months: '5~6월', season: '여름방학 대비', keywords: ['토플 독학 스케줄', '토플 3개월 플랜', '토플 여름 집중', '토플 방학 공부법'] },
+  { months: '7~8월', season: '성수기 집중', keywords: ['토플 단기 점수 올리기', '토플 80점 넘기기', '토플 급하게 준비', '토플 학원 효과 없을 때'] },
+  { months: '9~10월', season: '대학원 지원 마감 전', keywords: ['토플 100점 공부법', '토플 점수 안 오를 때', '토플 과외 후기', '토플 학원 vs 독학'] },
+  { months: '11~12월', season: '최종 마감 직전', keywords: ['토플 마지막 기회', '토플 시험 직전 공부법', '토플 1주일 벼락치기', '토플 막판 스퍼트'] },
+];
+
+function initSidebar() {
+  const container = document.getElementById('kw-sections');
+  container.innerHTML = '';
+  const currentMonth = new Date().getMonth() + 1;
+
+  KEYWORDS_DATA.forEach((sec) => {
+    const [startM] = sec.months.split('~');
+    const startMonth = parseInt(startM);
+    const endMonth = startMonth + 1;
+    const isActive = currentMonth >= startMonth && currentMonth <= endMonth;
+
+    const section = document.createElement('div');
+    section.className = 'kw-section';
+    section.innerHTML = `
+      <div class="kw-section-header ${isActive ? 'active' : ''}" onclick="toggleKwSection(this)">
+        <span>${sec.months} <span class="season">${sec.season}</span></span>
+        <i class="fa-solid fa-chevron-down" style="font-size:.68rem;color:var(--muted);transition:transform .2s"></i>
+      </div>
+      <div class="kw-list ${isActive ? 'show' : ''}">
+        ${sec.keywords.map(kw => `<div class="kw-item" onclick="copyKeyword('${kw}')">${kw}</div>`).join('')}
+      </div>
+    `;
+    container.appendChild(section);
+  });
+}
+
+function toggleKwSection(header) {
+  const list = header.nextElementSibling;
+  const icon = header.querySelector('i');
+  const isOpen = list.classList.contains('show');
+  list.classList.toggle('show');
+  icon.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+function copyKeyword(kw) {
+  navigator.clipboard.writeText(kw).then(() => showToast('복사되었습니다: ' + kw));
+}
+
+// ---- Toast ----
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---- Close modals on overlay click ----
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => {
+    if (e.target === m) m.classList.remove('show');
+  });
+});
+</script>
+</body>
+</html>
