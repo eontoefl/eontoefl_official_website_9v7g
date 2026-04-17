@@ -97,12 +97,18 @@
 
         /* Program Card - understated */
         .pr-program { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; margin-bottom: 24px; }
-        .pr-program-header { padding: 32px 36px 28px; }
-        .pr-program-header h3 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 6px 0; }
+        .pr-program-header { padding: 32px 36px 28px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .pr-program-header h3 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 10px; }
+        .pr-program-header h3 .pr-revised { font-size: 13px; font-weight: 600; color: #7c3aed; }
+        .pr-program-header .pr-header-right { display: flex; align-items: center; gap: 10px; }
+        .pr-program-header .pr-header-price { font-size: 20px; font-weight: 700; color: #1e293b; }
+        .pr-program-header .pr-toggle-icon { font-size: 13px; color: #94a3b8; transition: transform 0.25s ease; }
+        .pr-program-header.open .pr-toggle-icon { transform: rotate(180deg); }
         .pr-program-header .pr-program-desc { font-size: 14px; color: #94a3b8; margin: 0; }
 
         /* Price table style */
-        .pr-price-table { padding: 0 36px 32px; }
+        .pr-price-table { padding: 0 36px 32px; display: none; }
+        .pr-price-table.open { display: block; }
         .pr-price-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f1f5f9; }
         .pr-price-row:last-child { border-bottom: none; }
         .pr-price-label { font-size: 14px; color: #64748b; }
@@ -201,38 +207,35 @@
 
                         <!-- 내벨업챌린지 -->
                         <div class="pr-program" style="margin-top: 32px;">
-                            <div class="pr-program-header">
-                                <h3>내벨업챌린지</h3>
+                            <div class="pr-program-header" id="priceToggleHeader" onclick="togglePriceDetail()">
+                                <h3>내벨업챌린지 <span class="pr-revised">(2026 개정 반영)</span></h3>
+                                <div class="pr-header-right">
+                                    <span class="pr-header-price">790,000원</span>
+                                    <i class="fas fa-chevron-down pr-toggle-icon"></i>
+                                </div>
                             </div>
-                            <div class="pr-price-table">
+                            <div class="pr-price-table" id="priceDetailTable">
                                 <div class="pr-price-row">
                                     <span class="pr-price-label">수강료</span>
                                     <span class="pr-price-value">1,000,000원</span>
                                 </div>
-                                <div class="pr-price-row">
-                                    <span class="pr-price-label">시험료지원금</span>
-                                    <span class="pr-price-value accent">-210,000원</span>
+                                <div class="pr-price-row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                        <span class="pr-price-label">시험료지원금</span>
+                                        <span class="pr-price-value accent">-210,000원</span>
+                                    </div>
+                                    <span style="font-size: 12px; color: #94a3b8; line-height: 1.6;">수령 조건: 실제 토플 시험 2회 이상 응시 후 점수 인증 + 점수 후기 1회 작성</span>
                                 </div>
                                 <div class="pr-price-row">
                                     <span class="pr-price-label">보증금 (별도)</span>
                                     <span class="pr-price-value">100,000원</span>
                                 </div>
                             </div>
-                            <div class="pr-price-total">
-                                <span class="pr-price-label">이용가</span>
-                                <span class="pr-price-value">790,000원</span>
-                            </div>
-                        </div>
-
-                        <!-- 안내 사항 -->
-                        <div class="pr-info-outline">
-                            <p class="pr-info-outline-title">시험료지원금 수령 조건</p>
-                            <p>시험료지원금은 선택이 아닌 필수 적용 항목입니다. 수령을 위해서는 실제 토플 시험 2회 이상 응시 후 점수 인증, 그리고 점수 후기 1회 작성이 필요합니다.</p>
                         </div>
 
                         <div class="pr-info-muted">
                             <p class="pr-info-muted-title">보증금 안내</p>
-                            <p>보증금은 필수이며, 챌린지 종료 후 인증률에 따라 환급됩니다. 인증률에 따라 전액 환급될 수도, 일부 또는 전혀 환급되지 않을 수도 있습니다.</p>
+                            <p>보증금(+10만)은 필수이며, 챌린지 종료 후 인증률에 따라 환급됩니다. 인증률에 따라 전액 환급될 수도, 일부 또는 전혀 환급되지 않을 수도 있습니다.</p>
                         </div>
 
                         <!-- Fast vs Standard -->
@@ -349,6 +352,14 @@
     </footer>
 
     <script src="js/common.js"></script>
+    <script>
+        function togglePriceDetail() {
+            var header = document.getElementById('priceToggleHeader');
+            var table = document.getElementById('priceDetailTable');
+            header.classList.toggle('open');
+            table.classList.toggle('open');
+        }
+    </script>
 
     <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
