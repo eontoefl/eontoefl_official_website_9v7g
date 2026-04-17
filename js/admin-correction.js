@@ -103,36 +103,44 @@ function getTaskTypeLabel(taskType) {
  * Returns: { text, cssClass, isPending }
  */
 function getCorrectionStatus(item) {
-    // AI processing states
+    // AI processing states — check if stuck (10+ minutes elapsed)
     if (item.status === 'draft1_submitted' && !item.feedback_1) {
-        return { text: 'AI 처리 중', cssClass: 'correction-badge-processing', isPending: false };
+        const submittedMs = parseTimestampMs(item.draft_1_submitted_at);
+        if (!isNaN(submittedMs) && (Date.now() - submittedMs) >= 10 * 60 * 1000) {
+            return { text: '처리 멈춤', cssClass: 'correction-badge-stuck', isPending: false, isStuck: true };
+        }
+        return { text: 'AI 처리 중', cssClass: 'correction-badge-processing', isPending: false, isStuck: false };
     }
     if (item.status === 'draft2_submitted' && !item.feedback_2) {
-        return { text: 'AI 처리 중', cssClass: 'correction-badge-processing', isPending: false };
+        const submittedMs = parseTimestampMs(item.draft_2_submitted_at);
+        if (!isNaN(submittedMs) && (Date.now() - submittedMs) >= 10 * 60 * 1000) {
+            return { text: '처리 멈춤', cssClass: 'correction-badge-stuck', isPending: false, isStuck: true };
+        }
+        return { text: 'AI 처리 중', cssClass: 'correction-badge-processing', isPending: false, isStuck: false };
     }
 
     // feedback_1 exists, released_1 = false → "1차 승인 대기"
     if (item.feedback_1 && !item.released_1) {
-        return { text: '1차 승인 대기', cssClass: 'correction-badge-pending', isPending: true };
+        return { text: '1차 승인 대기', cssClass: 'correction-badge-pending', isPending: true, isStuck: false };
     }
 
     // released_1 = true, feedback_2 exists, released_2 = false → "2차 승인 대기"
     if (item.released_1 && item.feedback_2 && !item.released_2) {
-        return { text: '2차 승인 대기', cssClass: 'correction-badge-pending', isPending: true };
+        return { text: '2차 승인 대기', cssClass: 'correction-badge-pending', isPending: true, isStuck: false };
     }
 
     // released_1 = true, no feedback_2 → "2차 작성 대기"
     if (item.released_1 && !item.feedback_2) {
-        return { text: '2차 작성 대기', cssClass: 'correction-badge-waiting', isPending: false };
+        return { text: '2차 작성 대기', cssClass: 'correction-badge-waiting', isPending: false, isStuck: false };
     }
 
     // released_2 = true → "완료"
     if (item.released_2) {
-        return { text: '완료', cssClass: 'correction-badge-complete', isPending: false };
+        return { text: '완료', cssClass: 'correction-badge-complete', isPending: false, isStuck: false };
     }
 
     // Fallback
-    return { text: '진행중', cssClass: 'correction-badge-processing', isPending: false };
+    return { text: '진행중', cssClass: 'correction-badge-processing', isPending: false, isStuck: false };
 }
 
 /**
@@ -229,12 +237,14 @@ function updateStats() {
     let pending = 0;
     let approved = 0;
     let today = 0;
+    let stuck = 0;
 
     allCorrections.forEach(item => {
         total++;
 
         const status = getCorrectionStatus(item);
         if (status.isPending) pending++;
+        if (status.isStuck) stuck++;
 
         // "승인 완료" = released_1 true or released_2 true
         if (item.released_1 || item.released_2) approved++;
@@ -252,6 +262,7 @@ function updateStats() {
     document.getElementById('statPending').textContent = pending;
     document.getElementById('statApproved').textContent = approved;
     document.getElementById('statToday').textContent = today;
+    document.getElementById('statStuck').textContent = stuck;
 
     updateCardActiveState();
 }
@@ -272,6 +283,8 @@ function filterByCard(filterType) {
         document.getElementById('statusFilter').value = 'pending';
     } else if (filterType === 'approved') {
         document.getElementById('statusFilter').value = 'approved';
+    } else if (filterType === 'stuck') {
+        document.getElementById('statusFilter').value = 'stuck';
     } else {
         document.getElementById('statusFilter').value = 'all';
     }
@@ -303,6 +316,7 @@ function applyFilters() {
             const st = getCorrectionStatus(item);
             if (statusFilter === 'pending' && !st.isPending) return false;
             if (statusFilter === 'approved' && !(item.released_1 || item.released_2)) return false;
+            if (statusFilter === 'stuck' && !st.isStuck) return false;
         }
 
         // Card filter: today
@@ -434,10 +448,17 @@ function displayCorrections() {
                         : '<span style="color: #cbd5e1;">-</span>'}
                 </td>
                 <td>
-                    <button class="admin-btn admin-btn-primary admin-btn-sm" 
-                            onclick="openCorrectionDetail('${item.id}')">
-                        <i class="fas fa-cog"></i> 관리
-                    </button>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button class="admin-btn admin-btn-primary admin-btn-sm" 
+                                onclick="openCorrectionDetail('${item.id}')">
+                            <i class="fas fa-cog"></i> 관리
+                        </button>
+                        ${status.isStuck ? `<button class="admin-btn admin-btn-sm retry-webhook-btn" 
+                                style="background: #dc2626; color: white;" 
+                                onclick="retryWebhook('${item.id}', this)">
+                            <i class="fas fa-redo"></i> 재실행
+                        </button>` : ''}
+                    </div>
                 </td>
             </tr>
         `;
@@ -1996,6 +2017,95 @@ function collectFeedbackFromDOM() {
     }
 
     return result;
+}
+
+// ===== Retry Webhook for Stuck Items =====
+
+async function retryWebhook(id, btnElement) {
+    const item = allCorrections.find(c => c.id === id);
+    if (!item) {
+        alert('해당 제출 건을 찾을 수 없습니다.');
+        return;
+    }
+
+    const user = usersCache[item.user_id] || { name: '(알수없음)', email: '' };
+    const taskType = (item.task_type || '').toLowerCase();
+    const taskLabel = getTaskTypeLabel(item.task_type);
+
+    // Determine draft round from status
+    let draftNum = '';
+    if (item.status === 'draft1_submitted') draftNum = '1';
+    else if (item.status === 'draft2_submitted') draftNum = '2';
+    else {
+        alert('재실행 가능한 상태가 아닙니다.');
+        return;
+    }
+
+    if (!confirm(`${user.name} - ${taskLabel} ${draftNum}차 첨삭을 재실행하시겠습니까?`)) return;
+
+    // Disable button to prevent duplicate clicks
+    if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 재실행 중...';
+    }
+
+    // Determine webhook URL
+    let webhookUrl = '';
+    if (taskType === 'writing_email' || taskType === 'writing_discussion') {
+        if (item.status === 'draft1_submitted') {
+            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-writing-draft1';
+        } else {
+            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-writing-draft2';
+        }
+    } else if (taskType === 'speaking_interview') {
+        if (item.status === 'draft1_submitted') {
+            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-speaking-draft1';
+        } else {
+            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-speaking-draft2';
+        }
+    } else {
+        alert('알 수 없는 과제 유형입니다.');
+        if (btnElement) {
+            btnElement.disabled = false;
+            btnElement.innerHTML = '<i class="fas fa-redo"></i> 재실행';
+        }
+        return;
+    }
+
+    // Build payload identical to student submission
+    const payload = {
+        event: item.status,
+        user_id: item.user_id,
+        user_name: user.name,
+        user_email: user.email,
+        session_number: item.session_number,
+        task_type: item.task_type,
+        task_number: item.task_number
+    };
+
+    try {
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            alert('재실행 요청이 완료되었습니다.');
+            loadCorrections();
+        } else {
+            const errText = await response.text();
+            alert(`재실행 실패: ${errText || response.statusText}. 잠시 후 다시 시도해주세요.`);
+        }
+    } catch (err) {
+        console.error('Retry webhook error:', err);
+        alert(`재실행 실패: ${err.message}. 잠시 후 다시 시도해주세요.`);
+    } finally {
+        if (btnElement) {
+            btnElement.disabled = false;
+            btnElement.innerHTML = '<i class="fas fa-redo"></i> 재실행';
+        }
+    }
 }
 
 // ===== Override closeCorrectionModal to handle edit mode =====
