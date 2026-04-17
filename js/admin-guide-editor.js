@@ -239,6 +239,11 @@ async function convertBase64Images() {
 
 // ===== 저장 =====
 async function saveGuide() {
+    // HTML 모드에서 저장 시 textarea 내용을 Quill에 반영
+    if (isHtmlMode) {
+        quill.root.innerHTML = document.getElementById('htmlSourceEditor').value;
+    }
+
     // 저장 전 남아있는 base64 이미지 일괄 변환
     await convertBase64Images();
 
@@ -414,6 +419,38 @@ function setSaveStatus(type, text) {
     el.innerHTML = type === 'loading' || type === 'saving'
         ? `<i class="fas fa-spinner fa-spin"></i> ${text}`
         : text;
+}
+
+// ===== HTML 편집 모드 토글 =====
+let isHtmlMode = false;
+
+function toggleHtmlMode() {
+    const quillWrapper = document.querySelector('.quill-wrapper');
+    const htmlEditor = document.getElementById('htmlSourceEditor');
+    const toggleBtn = document.getElementById('htmlToggleBtn');
+
+    if (!isHtmlMode) {
+        // WYSIWYG → HTML 모드
+        htmlEditor.value = quill.root.innerHTML;
+        quillWrapper.style.display = 'none';
+        htmlEditor.style.display = 'block';
+        toggleBtn.style.background = '#fef3c7';
+        toggleBtn.style.borderColor = '#f59e0b';
+        toggleBtn.style.color = '#92400e';
+        toggleBtn.innerHTML = '<i class="fas fa-edit"></i> 편집 모드로 돌아가기';
+        isHtmlMode = true;
+    } else {
+        // HTML 모드 → WYSIWYG
+        quill.root.innerHTML = htmlEditor.value;
+        quillWrapper.style.display = '';
+        htmlEditor.style.display = 'none';
+        toggleBtn.style.background = '';
+        toggleBtn.style.borderColor = '';
+        toggleBtn.style.color = '';
+        toggleBtn.innerHTML = '<i class="fas fa-code"></i> HTML 모드';
+        updatePreview();
+        isHtmlMode = false;
+    }
 }
 
 // ===== 뒤로가기 =====

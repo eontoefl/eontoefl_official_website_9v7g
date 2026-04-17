@@ -13,6 +13,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     
+    <!-- Quill.js CSS (에디터에서 저장한 서식 렌더링용) -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
     
@@ -187,6 +190,95 @@
             font-size: 48px;
             margin-bottom: 16px;
             color: #94a3b8;
+        }
+        
+        /* Quill 에디터 콘텐츠 렌더링 스타일 */
+        .guide-section .ql-editor {
+            padding: 0;
+            overflow: visible;
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 16px;
+            line-height: 1.8;
+            color: #334155;
+        }
+        
+        .guide-section .ql-editor h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #6d28d9;
+            margin: 32px 0 16px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #9480c5;
+        }
+        
+        .guide-section .ql-editor h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 28px 0 14px;
+            padding-left: 16px;
+            border-left: 5px solid #9480c5;
+        }
+        
+        .guide-section .ql-editor h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #475569;
+            margin: 24px 0 12px;
+        }
+        
+        .guide-section .ql-editor p {
+            margin-bottom: 14px;
+        }
+        
+        .guide-section .ql-editor img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin: 16px 0;
+            display: block;
+        }
+        
+        .guide-section .ql-editor blockquote {
+            border-left: 4px solid #9480c5;
+            background: #faf5ff;
+            padding: 16px 20px;
+            margin: 16px 0;
+            border-radius: 0 8px 8px 0;
+            color: #6d28d9;
+        }
+        
+        .guide-section .ql-editor ul,
+        .guide-section .ql-editor ol {
+            padding-left: 24px;
+            margin-bottom: 14px;
+        }
+        
+        .guide-section .ql-editor li {
+            margin-bottom: 8px;
+        }
+        
+        .guide-section .ql-editor a {
+            color: #7c3aed;
+            text-decoration: underline;
+        }
+        
+        .guide-section .ql-editor .ql-video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            border-radius: 12px;
+            margin: 16px 0;
+        }
+        
+        /* Quill 툴바 숨기기 (뷰어에서는 불필요) */
+        .guide-section .ql-toolbar {
+            display: none !important;
+        }
+        
+        /* Quill 컨테이너 테두리 제거 */
+        .guide-section .ql-container {
+            border: none !important;
         }
         
         .cta-button {
@@ -536,7 +628,7 @@
             const guideContent = document.getElementById('guideContent');
             
             if (loadingState) loadingState.style.display = 'none';
-            guideContent.innerHTML = `<div class="guide-section">${html}</div>`;
+            guideContent.innerHTML = `<div class="guide-section"><div class="ql-editor">${html}</div></div>`;
         }
         
         // 기존 섹션 렌더링 (하위 호환)
