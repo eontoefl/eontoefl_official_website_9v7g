@@ -152,9 +152,9 @@ function getScore(item) {
     const round = getDraftRound(item);
     let feedback = null;
     if (round === '2' && item.feedback_2) {
-        feedback = typeof item.feedback_2 === 'string' ? JSON.parse(item.feedback_2) : item.feedback_2;
+        feedback = parseFeedback(item.feedback_2);
     } else if (item.feedback_1) {
-        feedback = typeof item.feedback_1 === 'string' ? JSON.parse(item.feedback_1) : item.feedback_1;
+        feedback = parseFeedback(item.feedback_1);
     }
 
     if (feedback && feedback.level !== undefined && feedback.level !== null) {
@@ -666,12 +666,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /**
  * Parse feedback JSONB (may be string or object).
+ * 
+ * Handles multiple storage formats:
+ * 1. Already-parsed object with annotated_html/per_question (GPT-era direct JSONB)
+ * 2. JSON string → parse once
+ * 3. Double-stringified JSON string → parse twice
+ * 4. { text: "{JSON}" } wrapper (Claude node output stored as-is) → unwrap and parse
  */
 function parseFeedback(fb) {
     if (!fb) return null;
+
+    // If it's a string, try to parse it (possibly double-stringified)
     if (typeof fb === 'string') {
-        try { return JSON.parse(fb); } catch (e) { return null; }
+        try {
+            let parsed = JSON.parse(fb);
+            // If still a string after first parse, try once more (double-stringified)
+            if (typeof parsed === 'string') {
+                try { parsed = JSON.parse(parsed); } catch (e2) { return null; }
+            }
+            return parseFeedback(parsed); // recurse to handle {text:...} wrapper
+        } catch (e) {
+            return null;
+        }
     }
+
+    // It's an object — check if it's a known feedback shape
+    if (fb.annotated_html || fb.per_question || fb.summary !== undefined) {
+        return fb; // Already the correct feedback object
+    }
+
+    // Claude wrapper: { text: "{JSON}" } — unwrap the inner JSON string
+    if (fb.text && typeof fb.text === 'string') {
+        try {
+            const inner = JSON.parse(fb.text);
+            if (typeof inner === 'object' && inner !== null) {
+                return inner;
+            }
+        } catch (e) {
+            // fb.text was not valid JSON
+        }
+    }
+
+    // Fallback: return as-is (may still work if fields exist under different keys)
     return fb;
 }
 
