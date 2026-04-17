@@ -115,6 +115,17 @@
                 <div class="stat-card-value" id="statToday">-</div>
                 <div class="stat-card-label">Created Today</div>
             </div>
+
+            <div class="stat-card correction-stat-card" data-filter="stuck" onclick="filterByCard('stuck')">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">처리 멈춤</span>
+                    <div class="stat-card-icon" style="background: #fef2f2; color: #dc2626;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="statStuck">-</div>
+                <div class="stat-card-label">Stuck</div>
+            </div>
         </div>
 
         <!-- Filters & Search -->
@@ -129,6 +140,7 @@
                     <option value="all">전체 상태</option>
                     <option value="pending">승인 대기</option>
                     <option value="approved">승인 완료</option>
+                    <option value="stuck">처리 멈춤</option>
                 </select>
                 
                 <select id="taskTypeFilter" class="admin-select">

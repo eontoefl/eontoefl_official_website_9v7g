@@ -50,6 +50,18 @@
     color: #94a3b8;
 }
 
+.correction-badge-stuck {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+    animation: pulse-stuck 2s infinite;
+}
+
+@keyframes pulse-stuck {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 /* Elapsed time indicator */
 .elapsed-time {
     display: inline-flex;
