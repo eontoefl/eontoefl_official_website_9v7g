@@ -1307,8 +1307,8 @@ function renderFeedbackSummary(container, feedback, round) {
 
     if (feedback.level !== undefined && feedback.level !== null) {
         html += `<div class="corr-feedback-level-card">
-            <div class="corr-feedback-level-badge">${Number(feedback.level).toFixed(1)}</div>
-            <div class="corr-feedback-level-label">Level Score</div>
+            <div class="corr-feedback-level-badge">${Math.round(Number(feedback.level))}</div>
+            <div class="corr-feedback-level-label">Score</div>
         </div>`;
     }
 
@@ -1722,12 +1722,12 @@ function makeSummaryEditable() {
     // Level dropdown
     html += `<div class="corr-feedback-level-card">
         <select class="corr-editable-select" id="editLevel">`;
-    for (let v = 1.0; v <= 6.0; v += 0.5) {
-        const selected = (feedback.level !== undefined && feedback.level !== null && Number(feedback.level) === v) ? 'selected' : '';
-        html += `<option value="${v}" ${selected}>${v.toFixed(1)}</option>`;
+    for (let v = 1; v <= 5; v += 1) {
+        const selected = (feedback.level !== undefined && feedback.level !== null && Math.round(Number(feedback.level)) === v) ? 'selected' : '';
+        html += `<option value="${v}" ${selected}>${v}</option>`;
     }
     html += `</select>
-        <div class="corr-feedback-level-label">Level Score</div>
+        <div class="corr-feedback-level-label">Score</div>
     </div>`;
 
     // Encouragement textarea (only for 2nd round)
@@ -1943,7 +1943,7 @@ function collectFeedbackFromDOM() {
     if (summaryEl) result.summary = summaryEl.value.trim();
 
     const levelEl = document.getElementById('editLevel');
-    if (levelEl) result.level = parseFloat(levelEl.value);
+    if (levelEl) result.level = parseInt(levelEl.value, 10);
 
     const encouragementEl = document.getElementById('editEncouragement');
     if (encouragementEl) result.encouragement = encouragementEl.value.trim();
