@@ -187,14 +187,12 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
-        `제출하신 ${data.round}회 과제의 1차 첨삭이 완료되었습니다.`,
+        `제출하신 ${data.round} 과제의 1차 첨삭이 완료되었습니다.`,
         "피드백을 꼼꼼히 읽고 수정본을 제출해주세요.",
         "",
         `⏰ 수정본 마감: ${deadline}`,
         "",
         "*마감 기한을 넘기면 해당 회차는 자동 종료됩니다.",
-        "",
-        TESTROOM_URL,
       ].join("\n");
     }
 
@@ -205,10 +203,8 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         `${data.name}님, 안녕하세요.`,
         "이온토플입니다.",
         "",
-        `제출하신 ${data.round}회 수정본의 최종 첨삭이 완료되었습니다.`,
-        "점수와 모범답안을 꼭 확인해주세요.",
-        "",
-        TESTROOM_URL,
+        `제출하신 ${data.round} 과제의 최종 첨삭이 완료되었습니다.`,
+        "최종 점수와 모범 답안을 확인해보세요.",
       ].join("\n");
 
     default:
@@ -236,9 +232,9 @@ function buildSmsContent(type: string): string {
     case "correction_start_reminder":
       return "[이온토플] 내일부터 스라첨삭이 시작됩니다! 테스트룸을 확인해주세요.";
     case "correction_feedback_1":
-      return "[이온토플] 1차 첨삭이 완료되었습니다. 피드백을 확인하고 수정본을 제출해주세요.";
+      return "[이온토플] 1차 첨삭이 완료되었습니다. 피드백 확인 후 수정본을 제출해주세요. https://testroom.eonfl.com";
     case "correction_feedback_2":
-      return "[이온토플] 최종 첨삭이 완료되었습니다. 점수와 모범답안을 확인해주세요.";
+      return "[이온토플] 최종 첨삭이 완료되었습니다. 최종 점수와 모범 답안을 확인해보세요. https://testroom.eonfl.com";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
