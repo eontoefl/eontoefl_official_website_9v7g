@@ -1905,8 +1905,7 @@ async function approveCorrection() {
         if (user.phone) {
             try {
                 const taskLabel = getTaskTypeLabel(currentModalItem.task_type);
-                const draftNum = fbKey === 'feedback_1' ? '1' : '2';
-                const roundStr = `${currentModalItem.session_number || ''}회 ${taskLabel} ${draftNum}차`;
+                const roundStr = `${currentModalItem.session_number || ''}회 ${taskLabel}`;
                 const alimResult = await sendKakaoAlimTalk(alimTalkType, {
                     name: user.name || '',
                     phone: user.phone,
@@ -2190,8 +2189,7 @@ async function bulkApprove() {
             const user = usersCache[item.user_id] || {};
             if (user.phone && alimTalkType) {
                 const taskLabel = getTaskTypeLabel(item.task_type);
-                const draftNum = alimTalkType === 'correction_feedback_1' ? '1' : '2';
-                const roundStr = `${item.session_number || ''}회 ${taskLabel} ${draftNum}차`;
+                const roundStr = `${item.session_number || ''}회 ${taskLabel}`;
                 alimTalkItems.push({
                     type: alimTalkType,
                     data: {
