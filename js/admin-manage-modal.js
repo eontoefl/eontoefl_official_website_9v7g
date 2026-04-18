@@ -485,7 +485,7 @@ function loadModalAnalysisTab(app) {
                     학생이 희망한 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
                 </div>
                 <div id="correctionStartDateWrapper" style="margin-top: 12px; ${app.correction_enabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일${app.correction_enabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일만)${app.correction_enabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
                     <input type="date" name="correction_start_date" id="correction_start_date"
                            value="${app.correction_start_date || ''}"
                            ${readOnly}
@@ -613,6 +613,27 @@ function loadModalAnalysisTab(app) {
         scheduleStart.addEventListener('change', calculateModalEndDate);
         programSelect.addEventListener('change', calculateModalEndDate);
     }
+    
+    // 첨삭 시작일 일요일 검증 이벤트
+    const correctionStartDate = document.getElementById('correction_start_date');
+    if (correctionStartDate) {
+        correctionStartDate.addEventListener('change', validateCorrectionStartDate);
+    }
+}
+
+// 첨삭 시작일 일요일 검증
+function validateCorrectionStartDate() {
+    const input = document.getElementById('correction_start_date');
+    if (!input || !input.value) return;
+    
+    const selectedDate = new Date(input.value);
+    const dayOfWeek = selectedDate.getDay();
+    
+    // 일요일(0)이 아니면 경고
+    if (dayOfWeek !== 0) {
+        alert('⚠️ 첨삭 시작일은 일요일만 선택 가능합니다.\n가장 가까운 일요일을 선택해주세요.');
+        input.value = '';
+    }
 }
 
 // 스라첨삭 시작일 토글
@@ -735,6 +756,33 @@ function copyModalStudentLink() {
     alert('✅ 링크가 복사되었습니다!');
 }
 
+// correction_schedules UPSERT (첨삭 스케줄 자동 생성/업데이트)
+async function upsertCorrectionSchedule(userId, startDate, durationWeeks) {
+    const url = `${SUPABASE_URL}/rest/v1/correction_schedules?on_conflict=user_id`;
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation,resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            start_date: startDate,
+            duration_weeks: durationWeeks
+        })
+    });
+    
+    if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.message || `correction_schedules UPSERT 실패: ${response.status}`);
+    }
+    
+    return await response.json();
+}
+
 // 분석 저장
 async function saveModalAnalysis(event) {
     event.preventDefault();
@@ -778,6 +826,18 @@ async function saveModalAnalysis(event) {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
         
         if (updatedApp) {
+            // 첨삭 포함일 때 correction_schedules UPSERT
+            if (correctionEnabled && updateData.correction_start_date) {
+                try {
+                    const userId = updatedApp.user_id || currentManageApp.user_id;
+                    await upsertCorrectionSchedule(userId, updateData.correction_start_date, 4);
+                    console.log('✅ correction_schedules UPSERT 완료');
+                } catch (e) {
+                    console.error('correction_schedules UPSERT 실패:', e);
+                    alert('⚠️ 첨삭 스케줄 저장에 실패했습니다. 테스트룸 쪽에서 수동 확인이 필요합니다.\n\n에러: ' + e.message);
+                }
+            }
+
             // 알림톡: 개별분석 완료 안내
             try {
                 await sendKakaoAlimTalk('analysis_complete', {
