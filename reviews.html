@@ -153,7 +153,119 @@
                                 border-color: #9480c5;
                                 color: white;
                             }
+                            /* 검색창 스타일 */
+                            .review-search-bar {
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                                margin-bottom: 24px;
+                                padding: 14px 18px;
+                                background: #f8fafc;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 12px;
+                            }
+                            .review-search-bar select {
+                                padding: 9px 12px;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                font-size: 13px;
+                                font-weight: 500;
+                                color: #334155;
+                                background: white;
+                                cursor: pointer;
+                                outline: none;
+                                transition: border-color 0.2s;
+                                flex-shrink: 0;
+                            }
+                            .review-search-bar select:focus {
+                                border-color: #9480c5;
+                            }
+                            .review-search-bar input {
+                                flex: 1;
+                                min-width: 0;
+                                padding: 9px 14px;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                font-size: 13px;
+                                color: #334155;
+                                outline: none;
+                                transition: border-color 0.2s;
+                            }
+                            .review-search-bar input:focus {
+                                border-color: #9480c5;
+                            }
+                            .review-search-bar input::placeholder {
+                                color: #94a3b8;
+                            }
+                            .review-search-btn {
+                                display: inline-flex;
+                                align-items: center;
+                                justify-content: center;
+                                gap: 5px;
+                                padding: 9px 18px;
+                                background: linear-gradient(135deg, #9480c5 0%, #7d6aad 100%);
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                font-size: 13px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                                flex-shrink: 0;
+                            }
+                            .review-search-btn:hover {
+                                transform: translateY(-1px);
+                                box-shadow: 0 4px 12px rgba(148,128,197,0.4);
+                            }
+                            .review-search-clear {
+                                display: none;
+                                align-items: center;
+                                justify-content: center;
+                                width: 34px;
+                                height: 34px;
+                                background: white;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                color: #94a3b8;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                                flex-shrink: 0;
+                            }
+                            .review-search-clear:hover {
+                                border-color: #ef4444;
+                                color: #ef4444;
+                                background: #fef2f2;
+                            }
+                            @media (max-width: 640px) {
+                                .review-search-bar {
+                                    flex-wrap: wrap;
+                                    gap: 6px;
+                                    padding: 12px 14px;
+                                }
+                                .review-search-bar select {
+                                    width: 100%;
+                                }
+                                .review-search-bar input {
+                                    flex: 1;
+                                    min-width: 0;
+                                }
+                            }
                         </style>
+
+                        <!-- 검색창 -->
+                        <div class="review-search-bar">
+                            <select id="searchType">
+                                <option value="subject">제목</option>
+                                <option value="author">작성자</option>
+                            </select>
+                            <input type="text" id="searchInput" placeholder="검색어를 입력하세요" onkeydown="if(event.key==='Enter') executeSearch()">
+                            <button class="review-search-btn" onclick="executeSearch()">
+                                <i class="fas fa-search"></i> 검색
+                            </button>
+                            <button class="review-search-clear" id="searchClearBtn" onclick="clearSearch()" title="검색 초기화">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
 
                         <div class="loading" id="listLoading">
                             <div class="spinner"></div>
@@ -167,7 +279,7 @@
                                         <tr>
                                             <th style="width: 60px;">NO</th>
                                             <th>제목</th>
-                                            <th style="width: 100px;">작성자</th>
+                                            <th style="width: 130px;">작성자</th>
                                             <th style="width: 120px;">작성일시</th>
                                             <th style="width: 70px;">조회</th>
                                         </tr>
@@ -286,6 +398,8 @@
         const itemsPerPage = 15;
         let currentPostId = null;
         let isAdmin = false;
+        let currentSearchKeyword = '';
+        let currentSearchType = 'subject';
 
         // 마이그레이션된 후기 콘텐츠의 인라인 스타일 정리
         function sanitizeReviewContent(html) {
@@ -378,9 +492,33 @@
 
         // ==================== 필터 ====================
 
+        function applyFiltersAndSearch() {
+            // 1) 카테고리 필터 적용
+            let result = allReviews;
+            if (activeFilters.size > 0) {
+                result = result.filter(r => activeFilters.has(r.course_type));
+            }
+
+            // 2) 검색 키워드 적용
+            if (currentSearchKeyword) {
+                const keyword = currentSearchKeyword.toLowerCase();
+                if (currentSearchType === 'subject') {
+                    result = result.filter(r => (r.subject || '').toLowerCase().includes(keyword));
+                } else if (currentSearchType === 'author') {
+                    result = result.filter(r => {
+                        const name = formatAuthorName(r).toLowerCase();
+                        return name.includes(keyword);
+                    });
+                }
+            }
+
+            filteredReviews = result;
+            document.getElementById('totalCount').textContent = filteredReviews.length;
+            renderPage(1);
+        }
+
         function toggleFilter(type) {
             if (type === 'all') {
-                // 전체 클릭 → 개별 필터 모두 해제
                 activeFilters.clear();
             } else {
                 if (activeFilters.has(type)) {
@@ -388,13 +526,6 @@
                 } else {
                     activeFilters.add(type);
                 }
-            }
-
-            // 필터 적용
-            if (activeFilters.size === 0) {
-                filteredReviews = allReviews;
-            } else {
-                filteredReviews = allReviews.filter(r => activeFilters.has(r.course_type));
             }
 
             // 버튼 상태 업데이트
@@ -407,9 +538,31 @@
                 }
             });
 
-            // 총 건수 업데이트 + 1페이지로 이동
-            document.getElementById('totalCount').textContent = filteredReviews.length;
-            renderPage(1);
+            applyFiltersAndSearch();
+        }
+
+        // ==================== 검색 ====================
+
+        function executeSearch() {
+            const keyword = document.getElementById('searchInput').value.trim();
+            const type = document.getElementById('searchType').value;
+            currentSearchKeyword = keyword;
+            currentSearchType = type;
+
+            // 초기화 버튼 표시/숨김
+            const clearBtn = document.getElementById('searchClearBtn');
+            clearBtn.style.display = keyword ? 'inline-flex' : 'none';
+
+            applyFiltersAndSearch();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            currentSearchKeyword = '';
+            currentSearchType = 'subject';
+            document.getElementById('searchType').value = 'subject';
+            document.getElementById('searchClearBtn').style.display = 'none';
+            applyFiltersAndSearch();
         }
 
         function renderPage(page) {
