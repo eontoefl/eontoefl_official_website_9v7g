@@ -194,8 +194,26 @@
         /* ===== Section 1: Hero ===== */
         .section-hero {
             padding: 100px 0 80px;
-            background: 
-                linear-gradient(135deg, #FFFDE6 0%, #ffffff 35%, #FFF9CC 55%, #ffffff 75%, #FFFDE6 100%);
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+        .section-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse 60% 80% at 0% 0%, #FFFAC2 0%, transparent 100%),
+                radial-gradient(ellipse 50% 70% at 100% 100%, #FFFAC2 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .section-hero > .section-inner {
+            position: relative;
+            z-index: 1;
         }
         .hero-headline {
             font-size: 32px;
