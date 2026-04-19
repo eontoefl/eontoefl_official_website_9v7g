@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>수강 후기 - 이온토플</title>
+    <title>후기 - 이온토플</title>
     <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,7 +52,7 @@
                         </div>
                     </li>
                     <li class="nav-item">
-                        <a href="reviews.html" class="active">수강후기</a>
+                        <a href="reviews.html" class="active">후기</a>
                     </li>
                     <li class="nav-item has-dropdown">
                         <a href="notice.html">커뮤니티</a>
@@ -78,7 +78,7 @@
     <!-- Page Header -->
     <section class="page-header">
         <div class="container">
-            <h1>수강 후기</h1>
+            <h1>후기</h1>
             <p>이온토플과 함께 목표를 달성한 학생들의 생생한 이야기</p>
         </div>
     </section>
@@ -90,8 +90,9 @@
                 <!-- Sidebar -->
                 <aside class="sidebar">
                     <nav class="sidebar-nav">
-                        <div class="sidebar-title">수강후기</div>
+                        <div class="sidebar-title">후기</div>
                         <a href="reviews.html" class="active"><i class="fas fa-star"></i> 수강 후기</a>
+                        <a href="reviews-book.html"><i class="fas fa-book-open"></i> 입문서 후기</a>
                     </nav>
                 </aside>
 
@@ -412,7 +413,7 @@
                 }
 
                 // 제목 업데이트
-                document.title = review.subject + ' - 수강 후기 - 이온토플';
+                document.title = review.subject + ' - 후기 - 이온토플';
 
                 const date = review.published_at
                     ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
