@@ -113,8 +113,8 @@
                             </div>
                         </div>
 
-                        <!-- 필터 버튼 -->
-                        <div id="filterBar" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px;">
+                        <!-- 필터 + 검색 -->
+                        <div id="filterBar" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:24px;">
                             <button class="filter-btn active" data-type="all" onclick="toggleFilter('all')">
                                 전체
                             </button>
@@ -127,6 +127,21 @@
                             <button class="filter-btn" data-type="첨삭" onclick="toggleFilter('첨삭')">
                                 <i class="fas fa-pen-nib" style="font-size:12px;"></i> 첨삭
                             </button>
+
+                            <!-- 컴팩트 검색 (오른쪽 정렬) -->
+                            <div class="review-search-inline" id="searchArea">
+                                <select id="searchType">
+                                    <option value="subject">제목</option>
+                                    <option value="author">작성자</option>
+                                </select>
+                                <input type="text" id="searchInput" placeholder="검색어 입력" onkeydown="if(event.key==='Enter') executeSearch()">
+                                <button class="search-icon-btn" onclick="executeSearch()" title="검색">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                                <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" title="초기화">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <style>
@@ -153,119 +168,95 @@
                                 border-color: #9480c5;
                                 color: white;
                             }
-                            /* 검색창 스타일 */
-                            .review-search-bar {
-                                display: flex;
+                            /* 컴팩트 인라인 검색 */
+                            .review-search-inline {
+                                display: inline-flex;
                                 align-items: center;
-                                gap: 8px;
-                                margin-bottom: 24px;
-                                padding: 14px 18px;
-                                background: #f8fafc;
-                                border: 1px solid #e2e8f0;
-                                border-radius: 12px;
+                                gap: 4px;
+                                margin-left: auto;
                             }
-                            .review-search-bar select {
-                                padding: 9px 12px;
+                            .review-search-inline select {
+                                padding: 6px 8px;
                                 border: 1px solid #e2e8f0;
-                                border-radius: 8px;
-                                font-size: 13px;
+                                border-radius: 6px;
+                                font-size: 12px;
                                 font-weight: 500;
-                                color: #334155;
+                                color: #475569;
                                 background: white;
                                 cursor: pointer;
                                 outline: none;
                                 transition: border-color 0.2s;
-                                flex-shrink: 0;
                             }
-                            .review-search-bar select:focus {
+                            .review-search-inline select:focus {
                                 border-color: #9480c5;
                             }
-                            .review-search-bar input {
-                                flex: 1;
-                                min-width: 0;
-                                padding: 9px 14px;
+                            .review-search-inline input {
+                                width: 160px;
+                                padding: 6px 10px;
                                 border: 1px solid #e2e8f0;
-                                border-radius: 8px;
-                                font-size: 13px;
+                                border-radius: 6px;
+                                font-size: 12px;
                                 color: #334155;
                                 outline: none;
                                 transition: border-color 0.2s;
                             }
-                            .review-search-bar input:focus {
+                            .review-search-inline input:focus {
                                 border-color: #9480c5;
                             }
-                            .review-search-bar input::placeholder {
+                            .review-search-inline input::placeholder {
                                 color: #94a3b8;
                             }
-                            .review-search-btn {
+                            .search-icon-btn {
                                 display: inline-flex;
                                 align-items: center;
                                 justify-content: center;
-                                gap: 5px;
-                                padding: 9px 18px;
-                                background: linear-gradient(135deg, #9480c5 0%, #7d6aad 100%);
+                                width: 30px;
+                                height: 30px;
+                                background: #9480c5;
                                 color: white;
                                 border: none;
-                                border-radius: 8px;
-                                font-size: 13px;
-                                font-weight: 600;
+                                border-radius: 6px;
+                                font-size: 12px;
                                 cursor: pointer;
                                 transition: all 0.2s;
                                 flex-shrink: 0;
                             }
-                            .review-search-btn:hover {
-                                transform: translateY(-1px);
-                                box-shadow: 0 4px 12px rgba(148,128,197,0.4);
+                            .search-icon-btn:hover {
+                                background: #7d6aad;
+                                box-shadow: 0 2px 8px rgba(148,128,197,0.35);
                             }
-                            .review-search-clear {
+                            .search-clear-btn {
                                 display: none;
                                 align-items: center;
                                 justify-content: center;
-                                width: 34px;
-                                height: 34px;
+                                width: 30px;
+                                height: 30px;
                                 background: white;
                                 border: 1px solid #e2e8f0;
-                                border-radius: 8px;
+                                border-radius: 6px;
                                 color: #94a3b8;
                                 cursor: pointer;
                                 transition: all 0.2s;
                                 flex-shrink: 0;
                             }
-                            .review-search-clear:hover {
+                            .search-clear-btn:hover {
                                 border-color: #ef4444;
                                 color: #ef4444;
                                 background: #fef2f2;
                             }
                             @media (max-width: 640px) {
-                                .review-search-bar {
-                                    flex-wrap: wrap;
-                                    gap: 6px;
-                                    padding: 12px 14px;
-                                }
-                                .review-search-bar select {
+                                .review-search-inline {
                                     width: 100%;
+                                    margin-left: 0;
+                                    margin-top: 4px;
                                 }
-                                .review-search-bar input {
+                                .review-search-inline input {
                                     flex: 1;
+                                    width: auto;
                                     min-width: 0;
                                 }
                             }
                         </style>
-
-                        <!-- 검색창 -->
-                        <div class="review-search-bar">
-                            <select id="searchType">
-                                <option value="subject">제목</option>
-                                <option value="author">작성자</option>
-                            </select>
-                            <input type="text" id="searchInput" placeholder="검색어를 입력하세요" onkeydown="if(event.key==='Enter') executeSearch()">
-                            <button class="review-search-btn" onclick="executeSearch()">
-                                <i class="fas fa-search"></i> 검색
-                            </button>
-                            <button class="review-search-clear" id="searchClearBtn" onclick="clearSearch()" title="검색 초기화">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
 
                         <div class="loading" id="listLoading">
                             <div class="spinner"></div>
