@@ -101,7 +101,7 @@
 
                     <!-- 목록 뷰 -->
                     <section id="listView">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                             <div>
                                 <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">수강 후기</h2>
                                 <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 후기가 있습니다</p>
@@ -112,6 +112,48 @@
                                 </a>
                             </div>
                         </div>
+
+                        <!-- 필터 버튼 -->
+                        <div id="filterBar" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px;">
+                            <button class="filter-btn active" data-type="all" onclick="toggleFilter('all')">
+                                전체
+                            </button>
+                            <button class="filter-btn" data-type="challenge" onclick="toggleFilter('challenge')">
+                                <i class="fas fa-seedling" style="font-size:12px;"></i> 내벨업챌린지
+                            </button>
+                            <button class="filter-btn" data-type="challenge_sra" onclick="toggleFilter('challenge_sra')">
+                                <i class="fas fa-seedling" style="font-size:12px;"></i><i class="fas fa-pen-nib" style="font-size:12px;"></i> 내벨업+첨삭
+                            </button>
+                            <button class="filter-btn" data-type="sra" onclick="toggleFilter('sra')">
+                                <i class="fas fa-pen-nib" style="font-size:12px;"></i> 첨삭
+                            </button>
+                        </div>
+
+                        <style>
+                            .filter-btn {
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 5px;
+                                padding: 7px 16px;
+                                border: 1px solid #e2e8f0;
+                                background: white;
+                                color: #64748b;
+                                border-radius: 20px;
+                                font-size: 13px;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                            }
+                            .filter-btn:hover {
+                                border-color: #9480c5;
+                                color: #9480c5;
+                            }
+                            .filter-btn.active {
+                                background: #9480c5;
+                                border-color: #9480c5;
+                                color: white;
+                            }
+                        </style>
 
                         <div class="loading" id="listLoading">
                             <div class="spinner"></div>
@@ -238,6 +280,8 @@
     <script src="js/main.js"></script>
     <script>
         let allReviews = [];
+        let filteredReviews = [];
+        let activeFilters = new Set();
         let currentPage = 1;
         const itemsPerPage = 15;
         let currentPostId = null;
@@ -318,7 +362,8 @@
                 }
 
                 allReviews = result;
-                document.getElementById('totalCount').textContent = allReviews.length;
+                filteredReviews = allReviews;
+                document.getElementById('totalCount').textContent = filteredReviews.length;
                 document.getElementById('listLoading').style.display = 'none';
                 renderPage(1);
             } catch (error) {
@@ -331,12 +376,48 @@
             }
         }
 
+        // ==================== 필터 ====================
+
+        function toggleFilter(type) {
+            if (type === 'all') {
+                // 전체 클릭 → 개별 필터 모두 해제
+                activeFilters.clear();
+            } else {
+                if (activeFilters.has(type)) {
+                    activeFilters.delete(type);
+                } else {
+                    activeFilters.add(type);
+                }
+            }
+
+            // 필터 적용
+            if (activeFilters.size === 0) {
+                filteredReviews = allReviews;
+            } else {
+                filteredReviews = allReviews.filter(r => activeFilters.has(r.course_type));
+            }
+
+            // 버튼 상태 업데이트
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const btnType = btn.dataset.type;
+                if (btnType === 'all') {
+                    btn.classList.toggle('active', activeFilters.size === 0);
+                } else {
+                    btn.classList.toggle('active', activeFilters.has(btnType));
+                }
+            });
+
+            // 총 건수 업데이트 + 1페이지로 이동
+            document.getElementById('totalCount').textContent = filteredReviews.length;
+            renderPage(1);
+        }
+
         function renderPage(page) {
             currentPage = page;
             const start = (page - 1) * itemsPerPage;
             const end = start + itemsPerPage;
-            const pageData = allReviews.slice(start, end);
-            const total = allReviews.length;
+            const pageData = filteredReviews.slice(start, end);
+            const total = filteredReviews.length;
 
             const tbody = document.getElementById('reviewsBody');
             tbody.innerHTML = pageData.map((review, idx) => {
