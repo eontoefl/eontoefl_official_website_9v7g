@@ -165,7 +165,7 @@
                         </div>
                     </li>
                     <li class="nav-item">
-                        <a href="reviews.html">수강후기</a>
+                        <a href="reviews.html">후기</a>
                     </li>
                     <li class="nav-item has-dropdown">
                         <a href="notice.html" class="active">커뮤니티</a>
@@ -304,7 +304,7 @@
             reviews: {
                 table: 'reviews',
                 title: '수강 후기 작성',
-                headerTitle: '수강 후기',
+                headerTitle: '후기',
                 headerDesc: '이온토플과 함께 목표를 달성한 경험을 공유해주세요',
                 listUrl: 'reviews.html',
                 formTitle: '수강 후기 작성',
@@ -312,6 +312,18 @@
                 requireLogin: true,
                 requireAdmin: false,
                 sidebarActive: 'reviews'
+            },
+            reviews_book: {
+                table: 'reviews_book',
+                title: '입문서 후기 작성',
+                headerTitle: '후기',
+                headerDesc: '이온토플 입문서를 읽은 경험을 공유해주세요',
+                listUrl: 'reviews-book.html',
+                formTitle: '입문서 후기 작성',
+                notice: '입문서 후기는 이온토플 입문서를 읽은 경험을 바탕으로 작성해주세요.',
+                requireLogin: true,
+                requireAdmin: false,
+                sidebarActive: 'reviews_book'
             },
             notice: {
                 table: 'notices',
@@ -434,12 +446,24 @@
                     a.classList.remove('active');
                     if (a.getAttribute('href') === 'application.html') a.classList.add('active');
                 });
+            } else if (boardConfig.sidebarActive === 'reviews' || boardConfig.sidebarActive === 'reviews_book') {
+                // 후기 게시판 → 사이드바를 후기 전용으로 교체
+                const sidebarNav = document.querySelector('.sidebar-nav');
+                sidebarNav.innerHTML = `
+                    <div class="sidebar-title">후기</div>
+                    <a href="reviews.html"${boardConfig.sidebarActive === 'reviews' ? ' class="active"' : ''}><i class="fas fa-star"></i> 수강 후기</a>
+                    <a href="reviews-book.html"${boardConfig.sidebarActive === 'reviews_book' ? ' class="active"' : ''}><i class="fas fa-book-open"></i> 입문서 후기</a>
+                `;
+                // 상단 네비게이션 active 변경
+                document.querySelectorAll('.nav-menu .nav-item a').forEach(a => {
+                    a.classList.remove('active');
+                    if (a.getAttribute('href') === 'reviews.html') a.classList.add('active');
+                });
             } else {
                 const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
                 sidebarLinks.forEach(link => {
                     link.classList.remove('active');
                     const href = link.getAttribute('href');
-                    if (boardConfig.sidebarActive === 'reviews' && href === 'reviews.html') link.classList.add('active');
                     if (boardConfig.sidebarActive === 'notice' && href === 'notice.html') link.classList.add('active');
                     if (boardConfig.sidebarActive === 'materials' && href === 'materials.html') link.classList.add('active');
                 });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>공지사항 - 이온토플</title>
+    <title>입문서 후기 - 이온토플</title>
     <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,10 +52,10 @@
                         </div>
                     </li>
                     <li class="nav-item">
-                        <a href="reviews.html">후기</a>
+                        <a href="reviews.html" class="active">후기</a>
                     </li>
                     <li class="nav-item has-dropdown">
-                        <a href="notice.html" class="active">커뮤니티</a>
+                        <a href="notice.html">커뮤니티</a>
                         <div class="dropdown-menu">
                             <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
                             <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
@@ -78,35 +78,36 @@
     <!-- Page Header -->
     <section class="page-header">
         <div class="container">
-            <h1>공지사항</h1>
-            <p>이온토플의 최신 소식과 공지사항을 확인하세요</p>
+            <h1>후기</h1>
+            <p>이온토플 입문서를 읽은 분들의 솝직한 후기</p>
         </div>
     </section>
 
-    <!-- Page Layout -->
+    <!-- Page Layout (Sidebar + Content) -->
     <div class="page-layout">
         <div class="container">
             <div class="layout-wrapper">
+                <!-- Sidebar -->
                 <aside class="sidebar">
                     <nav class="sidebar-nav">
-                        <div class="sidebar-title">커뮤니티</div>
-                        <a href="notice.html" class="active"><i class="fas fa-bullhorn"></i> 공지사항</a>
-                        <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
-                        <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        <div class="sidebar-title">후기</div>
+                        <a href="reviews.html"><i class="fas fa-star"></i> 수강 후기</a>
+                        <a href="reviews-book.html" class="active"><i class="fas fa-book-open"></i> 입문서 후기</a>
                     </nav>
                 </aside>
 
+                <!-- Main Content -->
                 <main class="main-content">
 
                     <!-- 목록 뷰 -->
                     <section id="listView">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
                             <div>
-                                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">공지사항</h2>
-                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 공지사항이 있습니다</p>
+                                <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">입문서 후기</h2>
+                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 후기가 있습니다</p>
                             </div>
                             <div id="writeBtn" style="display:none;">
-                                <a href="write.html?board=notice" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; text-decoration:none; border-radius:8px; font-size:14px; font-weight:600; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(148,128,197,0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                                <a href="write.html?board=reviews_book" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; text-decoration:none; border-radius:8px; font-size:14px; font-weight:600; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(148,128,197,0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
                                     <i class="fas fa-pen"></i> 글쓰기
                                 </a>
                             </div>
@@ -129,7 +130,7 @@
                                             <th style="width: 70px;">조회</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="noticeBody"></tbody>
+                                    <tbody id="reviewsBody"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -140,7 +141,7 @@
                     <!-- 상세 뷰 -->
                     <section id="detailView" style="display:none;">
                         <div style="margin-bottom: 24px;">
-                            <a href="notice.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                            <a href="reviews-book.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
                                 <i class="fas fa-arrow-left"></i> 목록으로
                             </a>
                         </div>
@@ -158,8 +159,8 @@
                                 <span id="detailDate" style="font-size:14px; color:#94a3b8;"></span>
                                 <span style="color:#e2e8f0;">|</span>
                                 <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
-                                <!-- 관리자 수정/삭제 버튼 -->
-                                <div id="adminActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
+                                <!-- 수정/삭제 버튼 (관리자 또는 본인) -->
+                                <div id="postActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
                                     <button onclick="editPost()" title="수정" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
                                         <i class="fas fa-pen" style="font-size:13px;"></i>
                                     </button>
@@ -236,66 +237,97 @@
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script>
-        let allNotices = [];
+        let allReviews = [];
         let currentPage = 1;
         const itemsPerPage = 15;
         let currentPostId = null;
+        let isAdmin = false;
 
-        // 샘플 데이터 (DB에 데이터가 없을 때 표시)
-        const sampleNotices = [
-            {
-                id: 'sample-1',
-                subject: '이온토플 홈페이지가 새롭게 오픈했습니다',
-                author: '관리자',
-                published_at: '2025-03-22T00:00:00',
-                hit: 0,
-                content: '<p>안녕하세요, 이온토플입니다.</p><p>이온토플 홈페이지가 새롭게 리뉴얼되어 오픈했습니다.</p><p>앞으로 프로그램 신청, 학습 관리, 수강 후기 등 다양한 기능을 편리하게 이용하실 수 있습니다.</p><p>많은 관심 부탁드립니다. 감사합니다.</p>'
-            }
-        ];
+        // 마이그레이션된 후기 콘텐츠의 인라인 스타일 정리
+        function sanitizeReviewContent(html) {
+            if (!html) return '';
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+
+            // 제거할 인라인 스타일 속성 목록
+            const stylePropsToRemove = [
+                'font-family', 'font-size', 'font-weight', 'line-height',
+                'color', 'background-color', 'background',
+                'letter-spacing', 'word-spacing'
+            ];
+
+            const allElements = temp.querySelectorAll('*');
+            allElements.forEach(el => {
+                if (el.style && el.style.length > 0) {
+                    stylePropsToRemove.forEach(prop => {
+                        el.style.removeProperty(prop);
+                    });
+                    // 스타일 속성이 비었으면 style 자체 제거
+                    if (el.getAttribute('style') && el.getAttribute('style').trim() === '') {
+                        el.removeAttribute('style');
+                    }
+                }
+                // face, size 등 레거시 font 속성 제거
+                if (el.tagName === 'FONT') {
+                    el.removeAttribute('face');
+                    el.removeAttribute('size');
+                    el.removeAttribute('color');
+                }
+            });
+
+            return temp.innerHTML;
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
-            const noticeId = params.get('id');
+            const reviewId = params.get('id');
 
-            // 관리자에게만 글쓰기 버튼 표시
+            // 로그인한 사용자에게 글쓰기 버튼 표시
             const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-            if (userData && userData.role === 'admin') {
+            if (userData) {
                 document.getElementById('writeBtn').style.display = 'block';
             }
 
-            if (noticeId) {
-                currentPostId = noticeId;
-                showDetailView(noticeId);
+            isAdmin = !!(userData && userData.role === 'admin');
+
+            if (reviewId) {
+                currentPostId = reviewId;
+                showDetailView(reviewId);
             } else {
-                loadNotices();
+                loadReviews();
             }
         });
 
         // ==================== 목록 ====================
 
-        async function loadNotices() {
+        async function loadReviews() {
             try {
-                const result = await supabaseAPI.query('notices', {
-                    'order': 'id.desc',
+                const result = await supabaseAPI.query('reviews_book', {
+                    'order': 'wr_id.desc',
                     'limit': '1000'
                 });
 
                 if (!result || result.length === 0) {
-                    // DB에 데이터 없으면 샘플 사용
-                    allNotices = sampleNotices;
-                } else {
-                    allNotices = result;
+                    document.getElementById('listLoading').style.display = 'none';
+                    document.getElementById('reviewsBody').innerHTML = `
+                        <tr><td colspan="5" style="text-align:center; padding:60px 20px; color:#64748b;">
+                            <i class="fas fa-inbox" style="font-size:32px; color:#cbd5e1; margin-bottom:12px; display:block;"></i>
+                            등록된 입문서 후기가 없습니다.
+                        </td></tr>`;
+                    return;
                 }
 
-                document.getElementById('totalCount').textContent = allNotices.length;
+                allReviews = result;
+                document.getElementById('totalCount').textContent = allReviews.length;
                 document.getElementById('listLoading').style.display = 'none';
                 renderPage(1);
             } catch (error) {
-                console.warn('DB 로드 실패, 샘플 데이터 사용:', error);
-                allNotices = sampleNotices;
-                document.getElementById('totalCount').textContent = allNotices.length;
-                document.getElementById('listLoading').style.display = 'none';
-                renderPage(1);
+                console.error('후기 로드 오류:', error);
+                document.getElementById('listLoading').innerHTML = `
+                    <div style="text-align:center; color:#ef4444;">
+                        <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
+                        <p>후기를 불러오는데 실패했습니다.</p>
+                    </div>`;
             }
         }
 
@@ -303,25 +335,22 @@
             currentPage = page;
             const start = (page - 1) * itemsPerPage;
             const end = start + itemsPerPage;
-            const pageData = allNotices.slice(start, end);
-            const total = allNotices.length;
+            const pageData = allReviews.slice(start, end);
+            const total = allReviews.length;
 
-            const tbody = document.getElementById('noticeBody');
-            tbody.innerHTML = pageData.map((notice, idx) => {
+            const tbody = document.getElementById('reviewsBody');
+            tbody.innerHTML = pageData.map((review, idx) => {
                 const no = total - start - idx;
-                const date = notice.published_at
-                    ? new Date(notice.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-                    : (notice.date || '');
+                const date = review.published_at
+                    ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                    : '';
                 return `
-                    <tr onclick="location.href='notice.html?id=${notice.id}'" style="cursor:pointer;">
+                    <tr onclick="location.href='reviews-book.html?id=${review.id}'" style="cursor:pointer;">
                         <td style="text-align:center; color:#64748b;">${no}</td>
-                        <td style="font-weight:600; color:#1e293b;">
-                            <span style="background:#9480c5; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">공지</span>
-                            ${notice.subject || ''}
-                        </td>
-                        <td style="text-align:center; color:#64748b;">${notice.author || notice.author_name || '관리자'}</td>
+                        <td style="font-weight:600; color:#1e293b;">${review.subject || ''}</td>
+                        <td style="text-align:center; color:#64748b;">${formatAuthorName(review)}</td>
                         <td style="text-align:center; color:#94a3b8; font-size:13px;">${date}</td>
-                        <td style="text-align:center; color:#94a3b8; font-size:13px;">${notice.hit || notice.hit_count || 0}</td>
+                        <td style="text-align:center; color:#94a3b8; font-size:13px;">${review.hit_count || 0}</td>
                     </tr>`;
             }).join('');
 
@@ -338,21 +367,27 @@
             const maxVisible = 5;
             let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
             let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-            if (endPage - startPage + 1 < maxVisible) startPage = Math.max(1, endPage - maxVisible + 1);
+            if (endPage - startPage + 1 < maxVisible) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
 
             let html = '<div style="display:inline-flex; gap:4px; align-items:center;">';
+
             if (page > 1) {
                 html += `<button onclick="renderPage(1)" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-left"></i></button>`;
                 html += `<button onclick="renderPage(${page - 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-left"></i></button>`;
             }
+
             for (let i = startPage; i <= endPage; i++) {
                 const isActive = i === page;
                 html += `<button onclick="renderPage(${i})" style="padding:8px 12px; border:1px solid ${isActive ? '#9480c5' : '#e2e8f0'}; background:${isActive ? '#9480c5' : 'white'}; color:${isActive ? 'white' : '#64748b'}; border-radius:6px; cursor:pointer; font-size:13px; font-weight:${isActive ? '600' : '400'};">${i}</button>`;
             }
+
             if (page < totalPages) {
                 html += `<button onclick="renderPage(${page + 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-right"></i></button>`;
                 html += `<button onclick="renderPage(${totalPages})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-right"></i></button>`;
             }
+
             html += '</div>';
             const paginationEl = document.getElementById('pagination');
             paginationEl.innerHTML = html;
@@ -361,26 +396,14 @@
 
         // ==================== 상세 ====================
 
-        async function showDetailView(noticeId) {
+        async function showDetailView(reviewId) {
             document.getElementById('listView').style.display = 'none';
             document.getElementById('detailView').style.display = 'block';
 
             try {
-                let notice = null;
-
-                // 샘플 데이터 체크
-                if (String(noticeId).startsWith('sample-')) {
-                    notice = sampleNotices.find(n => n.id === noticeId);
-                } else {
-                    notice = await supabaseAPI.getById('notices', noticeId);
-                }
-
-                if (!notice) {
-                    // 숫자 ID로 샘플 데이터에서도 찾기
-                    notice = sampleNotices.find(n => n.id == noticeId);
-                }
-
-                if (!notice) {
+                // 게시글 로드
+                const review = await supabaseAPI.getById('reviews_book', reviewId);
+                if (!review) {
                     document.getElementById('detailLoading').innerHTML = `
                         <div style="text-align:center; color:#ef4444;">
                             <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
@@ -389,64 +412,53 @@
                     return;
                 }
 
-                document.title = notice.subject + ' - 공지사항 - 이온토플';
+                // 제목 업데이트
+                document.title = review.subject + ' - 입문서 후기 - 이온토플';
 
-                const date = notice.published_at
-                    ? new Date(notice.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
-                    : (notice.date || '');
+                const date = review.published_at
+                    ? new Date(review.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+                    : '';
 
-                document.getElementById('detailSubject').textContent = notice.subject;
-                document.getElementById('detailAuthor').textContent = notice.author || notice.author_name || '관리자';
+                document.getElementById('detailSubject').textContent = review.subject;
+                document.getElementById('detailAuthor').textContent = formatAuthorName(review);
                 document.getElementById('detailDate').textContent = date;
-
                 // 조회수 +1 업데이트
-                const currentHit = notice.hit || notice.hit_count || 0;
-                const newHit = currentHit + 1;
-                document.getElementById('detailHit').textContent = '조회 ' + newHit;
-                if (!String(noticeId).startsWith('sample-')) {
-                    const hitField = notice.hit_count !== undefined ? 'hit_count' : 'hit';
-                    supabaseAPI.patch('notices', noticeId, { [hitField]: newHit }).catch(() => {});
-                }
+                const newHitCount = (review.hit_count || 0) + 1;
+                document.getElementById('detailHit').textContent = '조회 ' + newHitCount;
+                supabaseAPI.patch('reviews_book', reviewId, { hit_count: newHitCount }).catch(() => {});
 
-                document.getElementById('detailContent').innerHTML = notice.content || '';
+                document.getElementById('detailContent').innerHTML = sanitizeReviewContent(review.content || '');
 
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';
 
-                // 관리자 수정/삭제 버튼 표시 (샘플 데이터 제외)
-                if (!String(noticeId).startsWith('sample-')) {
-                    const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-                    if (userData2 && userData2.role === 'admin') {
-                        document.getElementById('adminActions').style.display = 'flex';
+                // 수정/삭제 버튼 표시: 관리자 또는 본인 글
+                const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                if (userData2) {
+                    const isAdmin = userData2.role === 'admin';
+                    const isAuthor = review.author_email && review.author_email === userData2.email;
+                    if (isAdmin || isAuthor) {
+                        document.getElementById('postActions').style.display = 'flex';
                     }
                 }
 
+                // 이전/다음 글 네비게이션
+                loadPostNavigation(review.wr_id);
+
             } catch (error) {
                 console.error('게시글 로드 오류:', error);
-                // 샘플 데이터 fallback
-                const sample = sampleNotices.find(n => n.id == noticeId);
-                if (sample) {
-                    document.title = sample.subject + ' - 공지사항 - 이온토플';
-                    document.getElementById('detailSubject').textContent = sample.subject;
-                    document.getElementById('detailAuthor').textContent = sample.author;
-                    document.getElementById('detailDate').textContent = sample.date || '2025. 03. 22.';
-                    document.getElementById('detailHit').textContent = '조회 ' + (sample.hit || 0);
-                    document.getElementById('detailContent').innerHTML = sample.content;
-                    document.getElementById('detailLoading').style.display = 'none';
-                    document.getElementById('detailArticle').style.display = 'block';
-                } else {
-                    document.getElementById('detailLoading').innerHTML = `
-                        <div style="text-align:center; color:#ef4444;">
-                            <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
-                            <p>게시글을 불러오는데 실패했습니다.</p>
-                        </div>`;
-                }
+                document.getElementById('detailLoading').innerHTML = `
+                    <div style="text-align:center; color:#ef4444;">
+                        <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
+                        <p>게시글을 불러오는데 실패했습니다.</p>
+                    </div>`;
             }
         }
+
         // 관리자 수정
         function editPost() {
             if (!currentPostId) return;
-            window.location.href = `write.html?board=notice&edit=${currentPostId}`;
+            window.location.href = `write.html?board=reviews_book&edit=${currentPostId}`;
         }
 
         // 관리자 삭제
@@ -454,12 +466,66 @@
             if (!currentPostId) return;
             if (!confirm('이 게시글을 정말 삭제하시겠습니까?\n\n삭제된 글은 복구할 수 없습니다.')) return;
             try {
-                await supabaseAPI.hardDelete('notices', currentPostId);
+                await supabaseAPI.hardDelete('reviews_book', currentPostId);
                 alert('게시글이 삭제되었습니다.');
-                window.location.href = 'notice.html';
+                window.location.href = 'reviews-book.html';
             } catch (error) {
                 console.error('삭제 오류:', error);
                 alert('삭제에 실패했습니다. 다시 시도해주세요.');
+            }
+        }
+
+        function formatAuthorName(review) {
+            const name = review.author_name || '익명';
+            if (isAdmin && review.author_real_name && review.author_real_name !== name) {
+                return `${name}(${review.author_real_name})`;
+            }
+            return name;
+        }
+
+        async function loadPostNavigation(currentWrId) {
+            try {
+                // 이전 글 (wr_id가 현재보다 큰 것 중 가장 작은 것)
+                const prevResult = await supabaseAPI.query('reviews_book', {
+                    'wr_id': 'gt.' + currentWrId,
+                    'order': 'wr_id.asc',
+                    'limit': '1',
+                    'select': 'id,subject'
+                });
+
+                // 다음 글 (wr_id가 현재보다 작은 것 중 가장 큰 것)
+                const nextResult = await supabaseAPI.query('reviews_book', {
+                    'wr_id': 'lt.' + currentWrId,
+                    'order': 'wr_id.desc',
+                    'limit': '1',
+                    'select': 'id,subject'
+                });
+
+                const nav = document.getElementById('detailNav');
+                let hasNav = false;
+
+                if (prevResult && prevResult.length > 0) {
+                    const prev = prevResult[0];
+                    const prevEl = document.getElementById('prevPost');
+                    prevEl.href = 'reviews-book.html?id=' + prev.id;
+                    prevEl.querySelector('span').textContent = prev.subject;
+                    prevEl.style.display = 'inline-flex';
+                    hasNav = true;
+                }
+
+                if (nextResult && nextResult.length > 0) {
+                    const next = nextResult[0];
+                    const nextEl = document.getElementById('nextPost');
+                    nextEl.href = 'reviews-book.html?id=' + next.id;
+                    nextEl.querySelector('span').textContent = next.subject;
+                    nextEl.style.display = 'inline-flex';
+                    hasNav = true;
+                }
+
+                if (hasNav) nav.style.display = 'block';
+
+            } catch (e) {
+                console.error('네비게이션 로드 오류:', e);
             }
         }
     </script>
