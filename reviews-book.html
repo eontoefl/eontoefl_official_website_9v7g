@@ -303,7 +303,7 @@
         async function loadReviews() {
             try {
                 const result = await supabaseAPI.query('reviews_book', {
-                    'order': 'wr_id.desc',
+                    'order': 'published_at.desc',
                     'limit': '1000'
                 });
 
@@ -443,7 +443,7 @@
                 }
 
                 // 이전/다음 글 네비게이션
-                loadPostNavigation(review.wr_id);
+                loadPostNavigation(review.published_at);
 
             } catch (error) {
                 console.error('게시글 로드 오류:', error);
@@ -483,20 +483,20 @@
             return name;
         }
 
-        async function loadPostNavigation(currentWrId) {
+        async function loadPostNavigation(currentPublishedAt) {
             try {
-                // 이전 글 (wr_id가 현재보다 큰 것 중 가장 작은 것)
+                // 이전 글 (published_at이 현재보다 새로운 것 중 가장 가까운 것)
                 const prevResult = await supabaseAPI.query('reviews_book', {
-                    'wr_id': 'gt.' + currentWrId,
-                    'order': 'wr_id.asc',
+                    'published_at': 'gt.' + currentPublishedAt,
+                    'order': 'published_at.asc',
                     'limit': '1',
                     'select': 'id,subject'
                 });
 
-                // 다음 글 (wr_id가 현재보다 작은 것 중 가장 큰 것)
+                // 다음 글 (published_at이 현재보다 오래된 것 중 가장 가까운 것)
                 const nextResult = await supabaseAPI.query('reviews_book', {
-                    'wr_id': 'lt.' + currentWrId,
-                    'order': 'wr_id.desc',
+                    'published_at': 'lt.' + currentPublishedAt,
+                    'order': 'published_at.desc',
                     'limit': '1',
                     'select': 'id,subject'
                 });
