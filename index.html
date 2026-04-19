@@ -281,6 +281,33 @@
             margin-top: 8px;
             display: block;
         }
+        .review-highlight-card--cta {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(148, 128, 197, 0.06);
+            border: 1px dashed var(--primary-color);
+            border-radius: 12px;
+            padding: 24px;
+            text-decoration: none;
+            transition: background 0.2s, transform 0.2s;
+        }
+        .review-highlight-card--cta:hover {
+            background: rgba(148, 128, 197, 0.12);
+            transform: translateY(-2px);
+        }
+        .review-cta-number {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary-color);
+        }
+        .review-cta-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-top: 8px;
+        }
         .reviews-note {
             font-size: 14px;
             color: var(--text-light);
@@ -608,11 +635,14 @@
                     <span class="review-highlight-score">37점 &rarr; 53점</span>
                     <span class="review-highlight-meta">부각씨스타 · 2026.01</span>
                 </div>
+                <a href="reviews.html" class="review-highlight-card--cta">
+                    <span class="review-cta-number">156건</span>
+                    <span class="review-cta-text">전체 후기 보기 &rarr;</span>
+                </a>
             </div>
 
             <p class="reviews-note">※ 2026년 1월 이전 수강생 후기는 개정 전 점수(120점 체계) 기준입니다.</p>
             <p class="reviews-stat">10명 중 8.5명 목표점수 달성. 전부 내벨업챌린지 수강생입니다.</p>
-            <a href="reviews.html" class="section-link">&rarr; 156건 전체 후기 보기</a>
         </div>
     </section>
 
