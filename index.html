@@ -194,31 +194,10 @@
         /* ===== Section 1: Hero ===== */
         .section-hero {
             padding: 100px 0 80px;
-            background: #ffffff;
-            position: relative;
-            overflow: hidden;
-        }
-        .section-hero::before {
-            content: '';
-            position: absolute;
-            top: -10%;
-            right: -5%;
-            width: 700px;
-            height: 700px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(148, 128, 197, 0.40) 0%, rgba(148, 128, 197, 0.15) 50%, transparent 75%);
-            pointer-events: none;
-        }
-        .section-hero::after {
-            content: '';
-            position: absolute;
-            bottom: -10%;
-            left: -5%;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 213, 80, 0.45) 0%, rgba(255, 213, 80, 0.18) 50%, transparent 75%);
-            pointer-events: none;
+            background:
+                radial-gradient(circle at 1px 1px, #FFFFC5 1px, transparent 1px);
+            background-size: 28px 28px;
+            background-color: #ffffff;
         }
         .hero-headline {
             font-size: 32px;
