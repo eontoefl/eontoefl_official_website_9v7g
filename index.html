@@ -161,10 +161,10 @@
         /* ===== Split Layout (섹션 2, 3 좌우 분할) ===== */
         .section-split {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1.4fr;
             gap: 48px;
             align-items: center;
-            max-width: 960px;
+            max-width: 1100px;
             margin: 0 auto;
             padding: 0 20px;
             word-break: keep-all;
@@ -178,7 +178,7 @@
             order: -1;
         }
         .section-challenge .section-inner {
-            max-width: 960px;
+            max-width: 1100px;
         }
         .section-challenge .section-split {
             margin-bottom: 64px;
@@ -192,6 +192,30 @@
         .section-hero {
             padding: 100px 0 80px;
             background: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+        .section-hero::before {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(148, 128, 197, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .section-hero::after {
+            content: '';
+            position: absolute;
+            bottom: -15%;
+            left: -8%;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 223, 100, 0.10) 0%, transparent 70%);
+            pointer-events: none;
         }
         .hero-headline {
             font-size: 32px;
