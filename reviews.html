@@ -444,10 +444,9 @@
             return temp.innerHTML;
         }
 
-        // 공유 링크 복사 (OG 메타태그가 포함된 Edge Function URL)
-        const OG_FUNCTION_URL = 'https://qpqjevecjejvbeuogtbx.supabase.co/functions/v1/og-meta';
         function copyShareLink() {
-            const shareUrl = `${OG_FUNCTION_URL}?page=reviews&id=${currentPostId}`;
+            const page = window.location.pathname.split('/').pop();
+            const shareUrl = `https://eonfl.com/${page}?id=${currentPostId}`;
             navigator.clipboard.writeText(shareUrl).then(() => {
                 const btn = document.getElementById('shareBtn');
                 const originalHTML = btn.innerHTML;
@@ -456,7 +455,7 @@
                 setTimeout(() => { btn.innerHTML = originalHTML; btn.title = '공유 링크 복사'; }, 2000);
             }).catch(() => {
                 const t = document.createElement('textarea');
-                t.value = `${OG_FUNCTION_URL}?page=reviews&id=${currentPostId}`;
+                t.value = shareUrl;
                 document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t);
                 alert('공유 링크가 복사되었습니다!');
             });
