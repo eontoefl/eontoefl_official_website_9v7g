@@ -287,9 +287,15 @@
                 <button class="corr-footer-btn corr-footer-btn-save" id="btnTempSave" onclick="tempSaveCorrection()" disabled>
                     <i class="fas fa-save"></i> 임시 저장
                 </button>
-                <button class="corr-footer-btn corr-footer-btn-approve" id="btnApprove" onclick="approveCorrection()" disabled>
-                    <i class="fas fa-check-circle"></i> 승인
-                </button>
+                <div class="corr-approve-wrap">
+                    <button class="corr-footer-btn corr-footer-btn-approve" id="btnApprove" onclick="approveCorrection()" disabled>
+                        <i class="fas fa-check-circle"></i> 즉시 승인
+                    </button>
+                    <button class="corr-footer-btn corr-footer-btn-schedule" id="btnSchedule" onclick="toggleScheduleDropdown()" disabled>
+                        <i class="fas fa-clock"></i> ▾
+                    </button>
+                    <div class="corr-schedule-dropdown" id="scheduleDropdown"></div>
+                </div>
             </div>
         </div>
     </div>

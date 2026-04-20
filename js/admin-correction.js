@@ -119,6 +119,23 @@ function getCorrectionStatus(item) {
         return { text: 'AI 처리 중', cssClass: 'correction-badge-processing', isPending: false, isStuck: false };
     }
 
+    // Scheduled release — show schedule badge if not yet fully released
+    if (item.scheduled_release_at && (!item.released_2 || !item.released_1)) {
+        const schedDate = new Date(item.scheduled_release_at);
+        const kst = new Date(schedDate.getTime() + 9 * 60 * 60 * 1000);
+        const m = kst.getUTCMonth() + 1;
+        const d = kst.getUTCDate();
+        const hh = String(kst.getUTCHours()).padStart(2, '0');
+        const mm = String(kst.getUTCMinutes()).padStart(2, '0');
+        return {
+            text: `승인 예약 · ${m}/${d} ${hh}:${mm}`,
+            cssClass: 'correction-badge-scheduled',
+            isPending: true,
+            isStuck: false,
+            isScheduled: true
+        };
+    }
+
     // feedback_1 exists, released_1 = false → "1차 승인 대기"
     if (item.feedback_1 && !item.released_1) {
         return { text: '1차 승인 대기', cssClass: 'correction-badge-pending', isPending: true, isStuck: false };
@@ -755,6 +772,18 @@ function populateModalHeader(item) {
     const badge = document.getElementById('modalStatusBadge');
     badge.textContent = status.text;
     badge.className = `correction-badge ${status.cssClass}`;
+
+    // Schedule cancel button
+    const existingCancelBtn = document.querySelector('.corr-schedule-cancel-btn');
+    if (existingCancelBtn) existingCancelBtn.remove();
+
+    if (item.scheduled_release_at) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'corr-schedule-cancel-btn';
+        cancelBtn.innerHTML = '<i class="fas fa-times"></i> 예약 취소';
+        cancelBtn.onclick = () => cancelScheduledApproval(item.id);
+        badge.parentNode.insertBefore(cancelBtn, badge.nextSibling);
+    }
 }
 
 /**
@@ -1341,6 +1370,14 @@ function renderFeedbackSummary(container, feedback, round) {
         </div>`;
     }
 
+    // Level change explanation (only for 2nd round)
+    if (round === '2' && feedback.level_change) {
+        html += `<div class="corr-feedback-level-change-card">
+            <div class="corr-feedback-level-change-title"><i class="fas fa-chart-line"></i> 점수 변화 설명</div>
+            <div class="corr-feedback-level-change-text">${escapeHtml(feedback.level_change)}</div>
+        </div>`;
+    }
+
     container.innerHTML = html;
 }
 
@@ -1384,6 +1421,8 @@ function enterEditMode() {
     document.getElementById('modalFooter').classList.add('show');
     document.getElementById('btnTempSave').disabled = false;
     document.getElementById('btnApprove').disabled = false;
+    const btnScheduleEnter = document.getElementById('btnSchedule');
+    if (btnScheduleEnter) btnScheduleEnter.disabled = false;
 
     // Make memo cards editable + add delete buttons
     makeMemosEditable();
@@ -1410,6 +1449,10 @@ function exitEditMode() {
 
     document.getElementById('editBanner').classList.remove('show');
     document.getElementById('modalFooter').classList.remove('show');
+    const btnScheduleExit = document.getElementById('btnSchedule');
+    if (btnScheduleExit) btnScheduleExit.disabled = true;
+    const scheduleDropdownExit = document.getElementById('scheduleDropdown');
+    if (scheduleDropdownExit) scheduleDropdownExit.classList.remove('open');
 
     // Hide popups and disable mark addition
     hideAddMarkPopup();
@@ -1881,6 +1924,7 @@ async function approveCorrection() {
         const now = new Date().toISOString();
         const updateData = {};
         updateData[fbKey] = feedbackData;
+        updateData.scheduled_release_at = null;
 
         // Determine which released flag to set
         if (fbKey === 'feedback_1') {
@@ -1925,6 +1969,20 @@ async function approveCorrection() {
             alert('승인 완료! (학생 전화번호 없음 — 알림톡 미발송)');
         }
 
+        // Clean up edit mode UI before resetting flags
+        disableMarkAddition();
+        document.getElementById('editBanner').classList.remove('show');
+        document.getElementById('modalFooter').classList.remove('show');
+        const btnSchedule = document.getElementById('btnSchedule');
+        if (btnSchedule) btnSchedule.disabled = true;
+        const scheduleDropdown = document.getElementById('scheduleDropdown');
+        if (scheduleDropdown) scheduleDropdown.classList.remove('open');
+        const editModeBtn = document.getElementById('editModeBtn');
+        if (editModeBtn) {
+            editModeBtn.classList.remove('editing');
+            editModeBtn.innerHTML = '<i class="fas fa-edit"></i> 편집';
+        }
+
         // Exit edit mode and close modal
         isEditMode = false;
         originalFeedbackBackup = null;
@@ -1939,7 +1997,7 @@ async function approveCorrection() {
         alert('승인 실패: ' + err.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check-circle"></i> 승인';
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> 즉시 승인';
     }
 }
 
@@ -2125,6 +2183,10 @@ closeCorrectionModal = function() {
         document.getElementById('modalFooter').classList.remove('show');
         const editBtn = document.getElementById('editModeBtn');
         if (editBtn) { editBtn.classList.remove('editing'); editBtn.innerHTML = '<i class="fas fa-edit"></i> 편집'; }
+        const btnScheduleClose = document.getElementById('btnSchedule');
+        if (btnScheduleClose) btnScheduleClose.disabled = true;
+        const scheduleDropdownClose = document.getElementById('scheduleDropdown');
+        if (scheduleDropdownClose) scheduleDropdownClose.classList.remove('open');
     }
     hideAddMarkPopup();
     cancelAddMark();
@@ -2140,9 +2202,9 @@ closeCorrectionModal = function() {
 async function bulkApprove() {
     if (selectedIds.size === 0) return;
 
-    // Filter: only pending items
+    // Filter: only pending items that are NOT already scheduled
     const pendingItems = allCorrections.filter(item =>
-        selectedIds.has(item.id) && getCorrectionStatus(item).isPending
+        selectedIds.has(item.id) && getCorrectionStatus(item).isPending && !item.scheduled_release_at
     );
 
     if (pendingItems.length === 0) {
@@ -2166,6 +2228,7 @@ async function bulkApprove() {
             let alimTalkType = '';
 
             // Determine which released flag to set
+            updateData.scheduled_release_at = null;
             if (item.feedback_1 && !item.released_1) {
                 updateData.released_1 = true;
                 updateData.released_1_at = now;
@@ -2305,4 +2368,171 @@ function downloadExcel() {
 
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `첨삭관리_${today}.xlsx`);
+}
+
+// =====================================================================
+// Section 6: Scheduled Approval
+// =====================================================================
+
+// ===== 6-1. Toggle Schedule Dropdown =====
+
+function toggleScheduleDropdown() {
+    const dropdown = document.getElementById('scheduleDropdown');
+    if (!dropdown) return;
+    dropdown.classList.toggle('open');
+    if (dropdown.classList.contains('open')) {
+        renderSchedulePresets();
+    }
+}
+
+// ===== 6-2. Render Schedule Presets =====
+
+function renderSchedulePresets() {
+    const dropdown = document.getElementById('scheduleDropdown');
+    if (!dropdown) return;
+
+    const now = new Date();
+    const utcMs = now.getTime();
+
+    // KST = UTC + 9h
+    const kstMs = utcMs + 9 * 60 * 60 * 1000;
+    const kstNow = new Date(kstMs);
+
+    const presets = [];
+
+    // Relative presets: +1h, +2h, +3h
+    for (let h = 1; h <= 3; h++) {
+        const target = new Date(utcMs + h * 60 * 60 * 1000);
+        presets.push({ label: `${h}시간 후`, iso: target.toISOString() });
+    }
+
+    // Fixed 18:00 KST today or tomorrow
+    const kstToday18 = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate(), 18, 0, 0));
+    const utcToday18 = new Date(kstToday18.getTime() - 9 * 60 * 60 * 1000);
+    if (utcToday18.getTime() > utcMs) {
+        presets.push({ label: '오늘 18:00', iso: utcToday18.toISOString() });
+    } else {
+        const utcTomorrow18 = new Date(utcToday18.getTime() + 24 * 60 * 60 * 1000);
+        presets.push({ label: '내일 18:00', iso: utcTomorrow18.toISOString() });
+    }
+
+    // Fixed 09:00 KST today or tomorrow
+    const kstToday09 = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate(), 9, 0, 0));
+    const utcToday09 = new Date(kstToday09.getTime() - 9 * 60 * 60 * 1000);
+    if (utcToday09.getTime() > utcMs) {
+        presets.push({ label: '오늘 09:00', iso: utcToday09.toISOString() });
+    } else {
+        const utcTomorrow09 = new Date(utcToday09.getTime() + 24 * 60 * 60 * 1000);
+        presets.push({ label: '내일 09:00', iso: utcTomorrow09.toISOString() });
+    }
+
+    let html = '';
+    presets.forEach(p => {
+        html += `<button class="corr-schedule-preset" onclick="scheduleApproval('${p.iso}')">
+            <i class="fas fa-clock"></i> ${p.label}
+        </button>`;
+    });
+
+    dropdown.innerHTML = html;
+}
+
+// ===== 6-3. Close dropdown on outside click =====
+
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('scheduleDropdown');
+    const btnSched = document.getElementById('btnSchedule');
+    if (!dropdown || !btnSched) return;
+    if (!dropdown.contains(e.target) && !btnSched.contains(e.target)) {
+        dropdown.classList.remove('open');
+    }
+});
+
+// ===== 6-4. Schedule Approval =====
+
+async function scheduleApproval(isoString) {
+    if (!currentModalItem) return;
+
+    // Close dropdown
+    const dropdown = document.getElementById('scheduleDropdown');
+    if (dropdown) dropdown.classList.remove('open');
+
+    // Convert to KST display string
+    const schedDate = new Date(isoString);
+    const kst = new Date(schedDate.getTime() + 9 * 60 * 60 * 1000);
+    const kstMonth = kst.getUTCMonth() + 1;
+    const kstDay = kst.getUTCDate();
+    const kstHH = String(kst.getUTCHours()).padStart(2, '0');
+    const kstMM = String(kst.getUTCMinutes()).padStart(2, '0');
+    const kstStr = `${kstMonth}월 ${kstDay}일 ${kstHH}:${kstMM}`;
+
+    if (!confirm(`${kstStr}에 승인 예약하시겠습니까?`)) return;
+
+    try {
+        const feedbackData = collectFeedbackFromDOM();
+        const round = getDraftRound(currentModalItem);
+        const fbKey = round === '2' && currentModalItem.feedback_2 ? 'feedback_2' : 'feedback_1';
+
+        const updateData = {};
+        updateData[fbKey] = feedbackData;
+        updateData.scheduled_release_at = isoString;
+
+        await supabaseAPI.patch('correction_submissions', currentModalItem.id, updateData);
+
+        // Update cache
+        Object.assign(currentModalItem, updateData);
+        const idx = allCorrections.findIndex(c => c.id === currentModalItem.id);
+        if (idx >= 0) Object.assign(allCorrections[idx], updateData);
+
+        alert(`${kstStr} 승인 예약 완료`);
+
+        // Clean up edit mode UI
+        disableMarkAddition();
+        document.getElementById('editBanner').classList.remove('show');
+        document.getElementById('modalFooter').classList.remove('show');
+        const btnScheduleEl = document.getElementById('btnSchedule');
+        if (btnScheduleEl) btnScheduleEl.disabled = true;
+        const schedDropdown = document.getElementById('scheduleDropdown');
+        if (schedDropdown) schedDropdown.classList.remove('open');
+        const editModeBtn = document.getElementById('editModeBtn');
+        if (editModeBtn) {
+            editModeBtn.classList.remove('editing');
+            editModeBtn.innerHTML = '<i class="fas fa-edit"></i> 편집';
+        }
+        isEditMode = false;
+        originalFeedbackBackup = null;
+
+        closeCorrectionModal();
+        updateStats();
+        applyFilters();
+
+    } catch (err) {
+        console.error('Schedule approval error:', err);
+        alert('예약 실패: ' + err.message);
+    }
+}
+
+// ===== 6-5. Cancel Scheduled Approval =====
+
+async function cancelScheduledApproval(itemId) {
+    if (!confirm('승인 예약을 취소하시겠습니까?')) return;
+
+    try {
+        await supabaseAPI.patch('correction_submissions', itemId, { scheduled_release_at: null });
+
+        // Update cache
+        const idx = allCorrections.findIndex(c => c.id === itemId);
+        if (idx >= 0) allCorrections[idx].scheduled_release_at = null;
+        if (currentModalItem && currentModalItem.id === itemId) {
+            currentModalItem.scheduled_release_at = null;
+        }
+
+        alert('예약이 취소되었습니다.');
+        closeCorrectionModal();
+        updateStats();
+        applyFilters();
+
+    } catch (err) {
+        console.error('Cancel schedule error:', err);
+        alert('예약 취소 실패: ' + err.message);
+    }
 }

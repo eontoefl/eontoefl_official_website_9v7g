@@ -1267,3 +1267,116 @@
     color: #444;
     white-space: pre-line;
 }
+
+/* ================================================
+   승인 예약 기능 스타일
+   ================================================ */
+
+/* 예약 배지 */
+.correction-badge-scheduled {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fcd34d;
+}
+
+/* 승인 버튼 그룹 */
+.corr-approve-wrap {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.corr-approve-wrap .corr-footer-btn-approve {
+    border-radius: 8px 0 0 8px;
+}
+
+/* 예약 버튼 */
+.corr-footer-btn-schedule {
+    border-radius: 0 8px 8px 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    background: #16a34a;
+    color: #fff;
+    padding: 10px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.corr-footer-btn-schedule:hover:not(:disabled) {
+    background: #15803d;
+}
+
+.corr-footer-btn-schedule:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 프리셋 드롭다운 */
+.corr-schedule-dropdown {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    min-width: 180px;
+    z-index: 100;
+    margin-bottom: 8px;
+    padding: 4px;
+}
+
+.corr-schedule-dropdown.open {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* 프리셋 버튼 */
+.corr-schedule-preset {
+    background: none;
+    border: none;
+    padding: 10px 14px;
+    text-align: left;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.corr-schedule-preset:hover {
+    background: #f3f4f6;
+}
+
+.corr-schedule-preset i {
+    color: #9ca3af;
+    margin-right: 0;
+}
+
+/* 예약 취소 버튼 */
+.corr-schedule-cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: inherit;
+}
+
+.corr-schedule-cancel-btn:hover {
+    background: #fde68a;
+}
