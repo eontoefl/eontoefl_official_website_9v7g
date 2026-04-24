@@ -203,6 +203,9 @@ function onAcQuestionTypeChange(qNum) {
     } else if (type === 'simplification') {
         hintEl.classList.add('simplification-hint', 'visible');
         hintEl.textContent = '💡 지문 원문에서 하이라이트할 문장을 [[문장]] 으로 감싸주세요.';
+    } else if (type === 'select_sentence') {
+        hintEl.classList.add('select-sentence-hint', 'visible');
+        hintEl.textContent = '💡 지문 원문에 {A}{B}{C}{D} 문장 라벨 마커가 포함되어 있어야 합니다.';
     } else {
         // normal — 숨김
     }
@@ -426,6 +429,8 @@ function buildAcData() {
             qPrefix += '[insertion]';
         } else if (qData.type === 'simplification') {
             qPrefix += '[simplification]';
+        } else if (qData.type === 'select_sentence') {
+            qPrefix += '[select_sentence]';
         }
         // normal이면 태그 없음 (하위 호환)
 
@@ -501,6 +506,7 @@ function validateAcForm() {
     const highlightQuestions = questionTypes.filter(q => q.type === 'highlight');
     const insertionQuestions = questionTypes.filter(q => q.type === 'insertion');
     const simplificationQuestions = questionTypes.filter(q => q.type === 'simplification');
+    const selectSentenceQuestions = questionTypes.filter(q => q.type === 'select_sentence');
 
     // highlight 중복 검사
     if (highlightQuestions.length > 1) {
@@ -515,6 +521,11 @@ function validateAcForm() {
     // simplification 중복 검사
     if (simplificationQuestions.length > 1) {
         errors.push('simplification 유형 문제는 1개만 설정할 수 있습니다');
+    }
+
+    // select_sentence 중복 검사
+    if (selectSentenceQuestions.length > 1) {
+        errors.push('select_sentence 유형 문제는 1개만 설정할 수 있습니다');
     }
 
     // <<>> 마크업 검사
@@ -540,16 +551,38 @@ function validateAcForm() {
         errors.push('<<>> 마크업이 올바르게 열고 닫혔는지 확인해주세요');
     }
 
-    // (A)(B)(C)(D) 마커 검사 (순서 무관)
+    // (A)(B)(C)(D) 마커 검사 — insertion 전용
+    const hasAnyInsertionMarker = fullPassage.includes('(A)') || fullPassage.includes('(B)') || fullPassage.includes('(C)') || fullPassage.includes('(D)');
     if (insertionQuestions.length > 0) {
-        const hasAllMarkers =
+        const hasAllInsertionMarkers =
             fullPassage.includes('(A)') &&
             fullPassage.includes('(B)') &&
             fullPassage.includes('(C)') &&
             fullPassage.includes('(D)');
-        if (!hasAllMarkers) {
+        if (!hasAllInsertionMarkers) {
             errors.push('insertion 유형 문제가 있으면 지문에 (A)(B)(C)(D) 마커가 필요합니다');
         }
+    }
+    // (A)(B)(C)(D) 역방향: 마커가 있는데 insertion 유형이 없으면 경고
+    if (hasAnyInsertionMarker && insertionQuestions.length === 0) {
+        errors.push('지문에 (A)(B)(C)(D) 마커가 있으면 insertion 유형 문제를 설정해주세요');
+    }
+
+    // {A}{B}{C}{D} 마커 검사 — select_sentence 전용
+    const hasAnySelectMarker = fullPassage.includes('{A}') || fullPassage.includes('{B}') || fullPassage.includes('{C}') || fullPassage.includes('{D}');
+    if (selectSentenceQuestions.length > 0) {
+        const hasAllSelectMarkers =
+            fullPassage.includes('{A}') &&
+            fullPassage.includes('{B}') &&
+            fullPassage.includes('{C}') &&
+            fullPassage.includes('{D}');
+        if (!hasAllSelectMarkers) {
+            errors.push('select_sentence 유형 문제가 있으면 지문에 {A}{B}{C}{D} 마커가 필요합니다');
+        }
+    }
+    // {A}{B}{C}{D} 역방향: 마커가 있는데 select_sentence 유형이 없으면 경고
+    if (hasAnySelectMarker && selectSentenceQuestions.length === 0) {
+        errors.push('지문에 {A}{B}{C}{D} 마커가 있으면 select_sentence 유형 문제를 설정해주세요');
     }
 
     // [[]] 마크업 검사 (simplification)
@@ -879,15 +912,19 @@ function renderAcPreview() {
 
     container.style.color = '';
 
-    // insertion 문제가 있는지 확인
+    // 문제 유형 확인
     let hasInsertionType = false;
     let hasSimplificationType = false;
+    let hasSelectSentenceType = false;
     for (let i = 1; i <= 5; i++) {
         if (getAcQuestionType(i) === 'insertion') {
             hasInsertionType = true;
         }
         if (getAcQuestionType(i) === 'simplification') {
             hasSimplificationType = true;
+        }
+        if (getAcQuestionType(i) === 'select_sentence') {
+            hasSelectSentenceType = true;
         }
     }
 
@@ -932,6 +969,10 @@ function renderAcPreview() {
                 // [[]] → simplification 하이라이트
                 if (hasSimplificationType) {
                     sentHtml = sentHtml.replace(/\[\[([^\]]+?)\]\]/g, '<span class="ac-preview-simplification">$1</span>');
+                }
+                // {A}~{D} → select_sentence 마커
+                if (hasSelectSentenceType) {
+                    sentHtml = sentHtml.replace(/\{([A-D])\}/g, '<span class="ac-preview-select-marker">{$1}</span>');
                 }
 
                 html += `<div style="margin-bottom:4px; color:#1e293b;">${sentHtml}</div>`;
@@ -990,6 +1031,8 @@ function renderAcQuestionPreview(q) {
         typeTag = ' <span style="background:#fff7ed; color:#9a3412; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #fdba74;">[insertion]</span>';
     } else if (q.type === 'simplification') {
         typeTag = ' <span style="background:#f0f9ff; color:#0369a1; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #7dd3fc;">[simplification]</span>';
+    } else if (q.type === 'select_sentence') {
+        typeTag = ' <span style="background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #86efac;">[select_sentence]</span>';
     } else {
         typeTag = ' <span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">[일반]</span>';
     }
