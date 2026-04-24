@@ -200,6 +200,9 @@ function onAcQuestionTypeChange(qNum) {
     } else if (type === 'insertion') {
         hintEl.classList.add('insertion-hint', 'visible');
         hintEl.textContent = '💡 지문 원문에 (A)(B)(C)(D) 삽입 위치 마커가 포함되어 있어야 합니다.';
+    } else if (type === 'simplification') {
+        hintEl.classList.add('simplification-hint', 'visible');
+        hintEl.textContent = '💡 지문 원문에서 하이라이트할 문장을 [[문장]] 으로 감싸주세요.';
     } else {
         // normal — 숨김
     }
@@ -345,9 +348,13 @@ function getAcQuestionData(qNum) {
 function acSanitizeDelimiters(str) {
     if (!str) return '';
 
-    // 1단계: <<...>> 내부를 임시 보호
+    // 1단계: <<...>> 및 [[...]] 내부를 임시 보호
     const preserved = [];
     let safeText = str.replace(/<<([^>]+)>>/g, (match) => {
+        preserved.push(match);
+        return `__HIGHLIGHT_${preserved.length - 1}__`;
+    });
+    safeText = safeText.replace(/\[\[([\s\S]+?)\]\]/g, (match) => {
         preserved.push(match);
         return `__HIGHLIGHT_${preserved.length - 1}__`;
     });
@@ -414,6 +421,8 @@ function buildAcData() {
             qPrefix += '[highlight]';
         } else if (qData.type === 'insertion') {
             qPrefix += '[insertion]';
+        } else if (qData.type === 'simplification') {
+            qPrefix += '[simplification]';
         }
         // normal이면 태그 없음 (하위 호환)
 
@@ -488,6 +497,7 @@ function validateAcForm() {
 
     const highlightQuestions = questionTypes.filter(q => q.type === 'highlight');
     const insertionQuestions = questionTypes.filter(q => q.type === 'insertion');
+    const simplificationQuestions = questionTypes.filter(q => q.type === 'simplification');
 
     // highlight 중복 검사
     if (highlightQuestions.length > 1) {
@@ -497,6 +507,11 @@ function validateAcForm() {
     // insertion 중복 검사
     if (insertionQuestions.length > 1) {
         errors.push('insertion 유형 문제는 1개만 설정할 수 있습니다');
+    }
+
+    // simplification 중복 검사
+    if (simplificationQuestions.length > 1) {
+        errors.push('simplification 유형 문제는 1개만 설정할 수 있습니다');
     }
 
     // <<>> 마크업 검사
@@ -532,6 +547,28 @@ function validateAcForm() {
         if (!hasAllMarkers) {
             errors.push('insertion 유형 문제가 있으면 지문에 (A)(B)(C)(D) 마커가 필요합니다');
         }
+    }
+
+    // [[]] 마크업 검사 (simplification)
+    const simplificationMarkers = fullPassage.match(/\[\[[^\]]+\]\]/g) || [];
+
+    if (simplificationQuestions.length > 0 && simplificationMarkers.length === 0) {
+        errors.push('simplification 유형 문제가 있으면 지문에 [[문장]] 마크업이 필요합니다');
+    }
+
+    if (simplificationMarkers.length > 1) {
+        errors.push('[[]] 마크업은 지문에 1개만 사용할 수 있습니다');
+    }
+
+    if (simplificationMarkers.length > 0 && simplificationQuestions.length === 0) {
+        errors.push('지문에 [[]] 마크업이 있으면 simplification 유형 문제를 설정해주세요');
+    }
+
+    // [[]] 열기/닫기 검사
+    const openBracketCount = (fullPassage.match(/\[\[/g) || []).length;
+    const closeBracketCount = (fullPassage.match(/\]\]/g) || []).length;
+    if (openBracketCount !== closeBracketCount) {
+        errors.push('[[]] 마크업이 올바르게 열고 닫혔는지 확인해주세요');
     }
 
     return errors;
@@ -841,10 +878,13 @@ function renderAcPreview() {
 
     // insertion 문제가 있는지 확인
     let hasInsertionType = false;
+    let hasSimplificationType = false;
     for (let i = 1; i <= 5; i++) {
         if (getAcQuestionType(i) === 'insertion') {
             hasInsertionType = true;
-            break;
+        }
+        if (getAcQuestionType(i) === 'simplification') {
+            hasSimplificationType = true;
         }
     }
 
@@ -885,6 +925,10 @@ function renderAcPreview() {
                 // (A)~(D) → insertion 마커
                 if (hasInsertionType) {
                     sentHtml = sentHtml.replace(/\(([A-D])\)/g, '<span class="ac-preview-insertion-marker">($1)</span>');
+                }
+                // [[]] → simplification 하이라이트
+                if (hasSimplificationType) {
+                    sentHtml = sentHtml.replace(/\[\[([^\]]+?)\]\]/g, '<span class="ac-preview-simplification">$1</span>');
                 }
 
                 html += `<div style="margin-bottom:4px; color:#1e293b;">${sentHtml}</div>`;
@@ -941,6 +985,8 @@ function renderAcQuestionPreview(q) {
         typeTag = ' <span style="background:#fefce8; color:#854d0e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #fde047;">[highlight]</span>';
     } else if (q.type === 'insertion') {
         typeTag = ' <span style="background:#fff7ed; color:#9a3412; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #fdba74;">[insertion]</span>';
+    } else if (q.type === 'simplification') {
+        typeTag = ' <span style="background:#f0f9ff; color:#0369a1; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; border:1px solid #7dd3fc;">[simplification]</span>';
     } else {
         typeTag = ' <span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">[일반]</span>';
     }
