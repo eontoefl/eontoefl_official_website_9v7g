@@ -366,10 +366,13 @@ function acSanitizeDelimiters(str) {
         .replace(/#\|#/g, '# |#')
         .replace(/##/g, '# #');
 
-    // 3단계: <<...>> 복원
-    safeText = safeText.replace(/__HIGHLIGHT_(\d+)__/g, (match, idx) => {
-        return preserved[parseInt(idx)];
-    });
+    // 3단계: 중첩 플레이스홀더까지 완전 복원 ([[]] 안에 <<>>가 있는 경우 대응)
+    let maxIter = 10;
+    while (safeText.includes('__HIGHLIGHT_') && maxIter-- > 0) {
+        safeText = safeText.replace(/__HIGHLIGHT_(\d+)__/g, (match, idx) => {
+            return preserved[parseInt(idx)];
+        });
+    }
 
     return safeText;
 }
