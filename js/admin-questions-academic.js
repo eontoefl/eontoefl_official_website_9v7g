@@ -508,9 +508,9 @@ function validateAcForm() {
     const simplificationQuestions = questionTypes.filter(q => q.type === 'simplification');
     const selectSentenceQuestions = questionTypes.filter(q => q.type === 'select_sentence');
 
-    // highlight 중복 검사
-    if (highlightQuestions.length > 1) {
-        errors.push('highlight 유형 문제는 1개만 설정할 수 있습니다');
+    // highlight 중복 검사 (최대 2개 허용)
+    if (highlightQuestions.length > 2) {
+        errors.push('highlight 유형 문제는 최대 2개까지 설정할 수 있습니다');
     }
 
     // insertion 중복 검사
@@ -532,12 +532,10 @@ function validateAcForm() {
     const fullPassage = paragraphs.map(p => p.original).join('');
     const highlightMarkers = fullPassage.match(/<<[^>]+>>/g) || [];
 
-    if (highlightQuestions.length > 0 && highlightMarkers.length === 0) {
-        errors.push('highlight 유형 문제가 있으면 지문에 <<단어>> 마크업이 필요합니다');
-    }
-
-    if (highlightMarkers.length > 1) {
-        errors.push('<<>> 마크업은 지문에 1개만 사용할 수 있습니다');
+    if (highlightMarkers.length > highlightQuestions.length) {
+        errors.push(`<<>> 마크업(${highlightMarkers.length}개)이 highlight 문제 수(${highlightQuestions.length}개)보다 많습니다`);
+    } else if (highlightQuestions.length > 0 && highlightMarkers.length < highlightQuestions.length) {
+        errors.push(`highlight 문제가 ${highlightQuestions.length}개인데 <<>> 마크업이 ${highlightMarkers.length}개뿐입니다`);
     }
 
     if (highlightMarkers.length > 0 && highlightQuestions.length === 0) {
