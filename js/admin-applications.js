@@ -375,7 +375,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
+                    ${escapeHtml(app.name)}${app.is_incentive_applicant ? ' <span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">프로모션</span>' : ''}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}

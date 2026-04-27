@@ -223,6 +223,27 @@ function loadModalAnalysisTab(app) {
         ` : ''}
         
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
+            <!-- 0. 프로모션 유도 학생 토글 -->
+            <div class="form-group" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #f59e0b; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-bullhorn" style="font-size: 18px; color: #d97706;"></i>
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #92400e;">프로모션 유도 학생</div>
+                            <div style="font-size: 12px; color: #b45309; margin-top: 2px;">ON 시 동의 데드라인 5일 적용 · 알림톡 미발송</div>
+                        </div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
+                        <input type="checkbox" id="incentiveToggle" name="is_incentive_applicant"
+                               ${app.is_incentive_applicant ? 'checked' : ''}
+                               ${hasAnalysis ? 'disabled' : ''}
+                               style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${app.is_incentive_applicant ? '#f59e0b' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                        <span style="position: absolute; top: 3px; left: ${app.is_incentive_applicant ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                    </label>
+                </div>
+            </div>
+
             <!-- 1. 결과 선택 -->
             <div class="form-group">
                 <label class="form-label">1. 결과 선택 <span class="required">*</span></label>
@@ -407,6 +428,21 @@ function loadModalAnalysisTab(app) {
         scheduleStart.addEventListener('change', calculateModalEndDate);
         programSelect.addEventListener('change', calculateModalEndDate);
     }
+    
+    // 프로모션 유도 학생 토글 인터랙션
+    const incentiveToggle = document.getElementById('incentiveToggle');
+    if (incentiveToggle && !hasAnalysis) {
+        incentiveToggle.addEventListener('change', function() {
+            const slider = this.parentElement.querySelectorAll('span');
+            if (this.checked) {
+                slider[0].style.background = '#f59e0b';
+                slider[1].style.left = '25px';
+            } else {
+                slider[0].style.background = '#cbd5e1';
+                slider[1].style.left = '3px';
+            }
+        });
+    }
 }
 
 // 모달 내 가격 계산
@@ -531,6 +567,8 @@ async function saveModalAnalysis(event) {
     const deposit = 100000;
     const finalPrice = basePrice - examSupport - additionalDiscount + deposit;
     
+    const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
+    
     const updateData = {
         analysis_status: formData.get('analysis_status'),
         assigned_program: formData.get('assigned_program'),
@@ -544,23 +582,27 @@ async function saveModalAnalysis(event) {
         analysis_content: formData.get('analysis_content'),
         analysis_saved_at: Date.now(),
         current_step: 2,
-        status: '개별분석완료'
+        status: '개별분석완료',
+        is_incentive_applicant: isIncentive
     };
     
     try {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
         
         if (updatedApp) {
-            // 알림톡: 개별분석 완료 안내
-            try {
-                await sendKakaoAlimTalk('analysis_complete', {
-                    name: updatedApp.name,
-                    phone: updatedApp.phone,
-                    app_id: updatedApp.id
-                });
-            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+            // 알림톡: 개별분석 완료 안내 (프로모션 유도 학생은 알림톡 미발송 — 수동 전달)
+            if (!isIncentive) {
+                try {
+                    await sendKakaoAlimTalk('analysis_complete', {
+                        name: updatedApp.name,
+                        phone: updatedApp.phone,
+                        app_id: updatedApp.id
+                    });
+                } catch (e) { console.warn('알림톡 발송 실패:', e); }
+            }
 
-            alert('✅ 개별분석이 저장되었습니다!\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
+            const incentiveNotice = isIncentive ? '\n\n⚠️ 프로모션 유도 학생 — 알림톡 미발송\n직접 카카오톡으로 안내해주세요.' : '';
+            alert('✅ 개별분석이 저장되었습니다!' + incentiveNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
             
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;

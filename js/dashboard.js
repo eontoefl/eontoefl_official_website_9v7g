@@ -234,16 +234,32 @@ function renderActionItems(app) {
     
     // 2️⃣ 분석 등록 직후 ~ 학생 동의 직전
     if (app.analysis_saved_at && !app.student_agreed_at) {
+        const isIncentive = app.is_incentive_applicant === true;
+        const deadlineDays = isIncentive ? 5 : 1;
         const deadline = new Date(app.analysis_saved_at);
-        deadline.setDate(deadline.getDate() + 1); // 24시간 = 1일
-        const hoursLeft = Math.ceil((deadline - new Date()) / (1000 * 60 * 60));
+        deadline.setDate(deadline.getDate() + deadlineDays);
+        const remainingMs = deadline - new Date();
+        
+        let deadlineText = '마감 임박!';
+        if (remainingMs > 0) {
+            const totalSec = Math.floor(remainingMs / 1000);
+            const days = Math.floor(totalSec / 86400);
+            const hours = Math.floor((totalSec % 86400) / 3600);
+            const minutes = Math.floor((totalSec % 3600) / 60);
+            const seconds = totalSec % 60;
+            if (isIncentive) {
+                deadlineText = `마감: ${days}일 ${hours}시간 ${minutes}분 ${seconds}초 남음`;
+            } else {
+                deadlineText = `마감: ${hours}시간 ${minutes}분 ${seconds}초 남음`;
+            }
+        }
         
         actionItems.push({
             icon: 'fa-file-signature',
             iconColor: '#f59e0b',
             title: '개별 분석 결과를 확인하고 동의해주세요',
-            deadline: hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!',
-            urgent: hoursLeft <= 24,
+            deadline: deadlineText,
+            urgent: remainingMs <= (isIncentive ? 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000),
             link: `application-detail.html?id=${app.id}#step2`,
             linkText: '분석 결과 보기'
         });
