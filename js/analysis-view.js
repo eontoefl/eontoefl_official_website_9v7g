@@ -153,15 +153,70 @@ function displayAnalysis(app) {
     const isIncentive = app.is_incentive_applicant === true;
     const deadlineLabel = isIncentive ? '5일' : '24시간';
     
+    // 안내 문구: 유도학생은 입문서 + 할인/재신청 제한 안내 포함, 일반학생은 기본 문구
+    let guideText;
+    if (isIncentive) {
+        guideText = '개별분석 결과와 입문서를 꼼꼼히 읽어보신 후, <strong>5일 이내</strong>에 동의해주세요.'
+            + '<div style="margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 12px; line-height: 1.7; color: #92400e;">'
+            + '<div style="margin-bottom: 4px;"><i class="fas fa-tag" style="margin-right: 4px;"></i> 프로모션 할인은 이 <strong>5일</strong> 기간에만 유효합니다. 기간 만료 후 재신청 시 할인이 적용되지 않습니다.</div>'
+            + '<div><i class="fas fa-ban" style="margin-right: 4px;"></i> 5일 내 미동의 시 신청이 자동 취소되며, 이후 <strong>5일간 새로운 신청서를 제출할 수 없습니다.</strong></div>'
+            + '</div>';
+    } else {
+        guideText = '개별분석 결과를 확인하신 후, <strong>24시간 이내</strong>에 동의해주세요.';
+    }
+    
+    // 타이머 초기값 계산
+    const viewAnalysisTs = app.analysis_completed_at || app.analysis_saved_at;
+    const viewDeadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+    const viewElapsedMs = viewAnalysisTs ? (Date.now() - new Date(viewAnalysisTs).getTime()) : 0;
+    const viewRemainingMs = viewDeadlineMs - viewElapsedMs;
+    const viewInitialCountdown = formatViewCountdown(viewRemainingMs, isIncentive);
+    const viewUrgentThreshold = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
+    const viewIsExpired = viewRemainingMs <= 0;
+    const viewIsUrgent = !viewIsExpired && viewRemainingMs <= viewUrgentThreshold;
+    
+    // 타이머 색상
+    let viewTimerColor, viewTimerBorderColor;
+    if (viewIsExpired) {
+        viewTimerColor = '#dc2626'; viewTimerBorderColor = '#ef4444';
+    } else if (viewIsUrgent) {
+        viewTimerColor = '#dc2626'; viewTimerBorderColor = '#fca5a5';
+    } else {
+        viewTimerColor = '#92400e'; viewTimerBorderColor = '#f59e0b';
+    }
+    
+    // 만료/긴급 메시지
+    const viewExpiredMsg = viewIsExpired
+        ? `<div style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
+        : (viewIsUrgent ? `<div id="viewCountdownMsg" style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : '');
+    
+    // 인라인 타이머 HTML
+    const viewInlineTimer = viewAnalysisTs ? `
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+            <i class="fas fa-clock" style="font-size: 16px; color: ${viewTimerColor};"></i>
+            <div style="background: white; padding: 6px 14px; border-radius: 8px; border: 2px solid ${viewTimerBorderColor};">
+                <span id="viewCountdownTimer" style="font-size: 18px; font-weight: 700; color: ${viewTimerColor}; font-variant-numeric: tabular-nums;">${viewInitialCountdown}</span>
+            </div>
+            <span style="font-size: 13px; color: ${viewTimerColor}; font-weight: 600;">남음</span>
+        </div>
+        ${viewExpiredMsg}
+    ` : '';
+    
     const agreementSection = needsAgreement ? `
         <div class="agreement-section">
             <div class="agreement-title">
                 <i class="fas fa-exclamation-circle"></i>
                 프로그램 동의 (필수)
             </div>
-            <div class="agreement-warning">
-                위 프로그램 내용을 확인하셨나요?<br>
-                <strong>${deadlineLabel} 이내</strong>에 아래 동의 절차를 완료해주세요.
+            
+            <div id="viewCountdownContainer" style="padding: 16px; background: ${viewIsExpired ? '#fee2e2' : '#fef3c7'}; border: 2px solid ${viewIsExpired ? '#ef4444' : '#f59e0b'}; border-radius: 12px; margin-bottom: 20px;">
+                <div style="font-size: 14px; font-weight: 700; color: ${viewIsExpired ? '#991b1b' : '#92400e'}; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-clipboard-list" style="color: ${viewIsExpired ? '#dc2626' : '#d97706'};"></i> 동의 안내
+                </div>
+                <div style="font-size: 13px; color: ${viewIsExpired ? '#991b1b' : '#92400e'}; line-height: 1.6;">
+                    ${guideText}
+                </div>
+                ${viewInlineTimer}
             </div>
             
             <div class="agreement-checkbox">
@@ -187,8 +242,6 @@ function displayAnalysis(app) {
             <button class="submit-button" id="submitAgreement" disabled>
                 <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
             </button>
-            
-            ${getTimerWarning(app.analysis_completed_at || app.analysis_saved_at, app.is_incentive_applicant)}
         </div>
     ` : '';
     
@@ -288,67 +341,33 @@ function startViewCountdown(completedAt, isIncentive) {
         if (remaining <= 0) {
             clearInterval(viewCountdownInterval);
             el.textContent = '00:00:00';
-            containerEl.className = 'timer-warning';
+            el.style.color = '#dc2626';
+            // 안내 컨테이너를 빨간색으로 전환
             containerEl.style.background = '#fee2e2';
             containerEl.style.borderColor = '#ef4444';
-            el.style.color = '#dc2626';
             const msgEl = document.getElementById('viewCountdownMsg');
-            if (msgEl) { msgEl.textContent = '시간이 초과되었습니다. 관리자에게 문의해주세요.'; msgEl.style.color = '#991b1b'; }
+            if (msgEl) {
+                msgEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.';
+                msgEl.style.color = '#dc2626';
+            }
             return;
         }
         
         el.textContent = formatViewCountdown(remaining, isIncentive);
         
+        // 긴급 시 타이머만 빨간색으로
         if (remaining <= urgentThresholdMs) {
-            containerEl.style.background = '#fee2e2';
-            containerEl.style.borderColor = '#fca5a5';
             el.style.color = '#dc2626';
             const msgEl = document.getElementById('viewCountdownMsg');
-            if (msgEl) { msgEl.textContent = '동의 기한이 얼마 남지 않았습니다!'; msgEl.style.color = '#991b1b'; }
+            if (msgEl) {
+                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!';
+                msgEl.style.color = '#dc2626';
+            }
         }
     }
     
     tick();
     viewCountdownInterval = setInterval(tick, 1000);
-}
-
-// 타이머 경고 메시지 (실시간 카운트다운)
-function getTimerWarning(completedAt, isIncentive) {
-    if (!completedAt) return '';
-    
-    const completedTime = new Date(completedAt).getTime();
-    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    const remainingMs = deadlineMs - (Date.now() - completedTime);
-    const deadlineLabel = isIncentive ? '5일' : '24시간';
-    const initialCountdown = formatViewCountdown(remainingMs, isIncentive);
-    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
-    
-    const isExpired = remainingMs <= 0;
-    const isUrgent = !isExpired && remainingMs <= urgentThresholdMs;
-    
-    let bgColor, borderColor, timerColor, msgColor, msg;
-    if (isExpired) {
-        bgColor = '#fee2e2'; borderColor = '#ef4444'; timerColor = '#dc2626'; msgColor = '#991b1b';
-        msg = '시간이 초과되었습니다. 관리자에게 문의해주세요.';
-    } else if (isUrgent) {
-        bgColor = '#fee2e2'; borderColor = '#fca5a5'; timerColor = '#dc2626'; msgColor = '#991b1b';
-        msg = '동의 기한이 얼마 남지 않았습니다!';
-    } else {
-        bgColor = '#f8f4ff'; borderColor = '#9480c5'; timerColor = '#9480c5'; msgColor = '#6b5b95';
-        msg = `분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.`;
-    }
-    
-    return `
-        <div id="viewCountdownContainer" class="timer-warning" style="background: ${bgColor}; border-color: ${borderColor};">
-            <i class="fas fa-clock timer-icon" style="color: ${timerColor};"></i>
-            <div class="timer-text">
-                <div class="timer-countdown" id="viewCountdownTimer" style="color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</div>
-                <div id="viewCountdownMsg" style="font-size: 13px; color: ${msgColor};">
-                    ${msg}
-                </div>
-            </div>
-        </div>
-    `;
 }
 
 // 동의 제출

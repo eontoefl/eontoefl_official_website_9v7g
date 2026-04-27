@@ -888,19 +888,7 @@ function getAnalysisSection(app) {
             </div>
         </div>
         ` : ''}
-        ${app.analysis_content && app.is_incentive_applicant ? `
-        <div style="padding: 20px; background: #fffbeb; border: 2px solid #fcd34d; border-radius: 12px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: flex-start; gap: 12px;">
-                <i class="fas fa-clock" style="font-size: 24px; color: #d97706; margin-top: 2px;"></i>
-                <div>
-                    <div style="font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 8px;">📋 동의 안내</div>
-                    <div style="font-size: 14px; color: #92400e; line-height: 1.7;">
-                        개별분석 결과와 입문서를 꼼꼼히 읽어보신 후, <strong>5일 이내</strong>에 동의해주세요.
-                    </div>
-                </div>
-            </div>
-        </div>
-        ` : ''}
+
         
         <!-- 동의 섹션 -->
         ${needsAgreement ? getAgreementSection(app) : ''}
@@ -961,23 +949,28 @@ function startAnalysisCountdown(completedAt, isIncentive) {
         if (remaining <= 0) {
             clearInterval(analysisCountdownInterval);
             el.textContent = '00:00:00';
+            el.style.color = '#dc2626';
+            // 안내 컨테이너를 빨간색으로 전환
             containerEl.style.background = '#fee2e2';
             containerEl.style.borderColor = '#ef4444';
-            el.style.color = '#dc2626';
             const msgEl = document.getElementById('analysisCountdownMsg');
-            if (msgEl) { msgEl.textContent = '시간이 초과되었습니다. 관리자에게 문의해주세요.'; msgEl.style.color = '#991b1b'; }
+            if (msgEl) {
+                msgEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.';
+                msgEl.style.color = '#dc2626';
+            }
             return;
         }
         
         el.textContent = formatCountdown(remaining, isIncentive);
         
-        // 색상 전환: 긴급이면 빨간색
+        // 색상 전환: 긴급이면 타이머를 빨간색으로
         if (remaining <= urgentThresholdMs) {
-            containerEl.style.background = '#fee2e2';
-            containerEl.style.borderColor = '#fca5a5';
             el.style.color = '#dc2626';
             const msgEl = document.getElementById('analysisCountdownMsg');
-            if (msgEl) { msgEl.textContent = '동의 기한이 얼마 남지 않았습니다!'; msgEl.style.color = '#991b1b'; }
+            if (msgEl) {
+                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!';
+                msgEl.style.color = '#dc2626';
+            }
         }
     }
     
@@ -1003,33 +996,50 @@ function getAgreementSection(app) {
     const isExpired = remainingMs <= 0;
     const isUrgent = !isExpired && remainingMs <= urgentThresholdMs;
     
-    let timerBg, timerBorder, timerColor, timerMsgColor, timerIcon, timerMsg;
+    // 타이머 상태별 색상 (안내 컨테이너 내부 타이머에 사용)
+    let timerColor, timerBorderColor;
     if (isExpired) {
-        timerBg = '#fee2e2'; timerBorder = '#ef4444'; timerColor = '#dc2626'; timerMsgColor = '#991b1b';
-        timerIcon = 'fa-exclamation-triangle'; timerMsg = '시간이 초과되었습니다. 관리자에게 문의해주세요.';
+        timerColor = '#dc2626'; timerBorderColor = '#ef4444';
     } else if (isUrgent) {
-        timerBg = '#fee2e2'; timerBorder = '#fca5a5'; timerColor = '#dc2626'; timerMsgColor = '#991b1b';
-        timerIcon = 'fa-clock'; timerMsg = '동의 기한이 얼마 남지 않았습니다!';
+        timerColor = '#dc2626'; timerBorderColor = '#fca5a5';
     } else {
-        timerBg = '#f8f4ff'; timerBorder = '#9480c5'; timerColor = '#9480c5'; timerMsgColor = '#6b5b95';
-        timerIcon = 'fa-clock'; timerMsg = `분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.`;
+        timerColor = '#92400e'; timerBorderColor = '#f59e0b';
     }
     
-    const timerHTML = analysisTimestamp ? `
-        <div id="analysisCountdownContainer" style="padding: 16px; background: ${timerBg}; border: 2px solid ${timerBorder}; border-radius: 12px; margin-top: 16px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fas ${timerIcon}" style="font-size: 20px; color: ${timerColor};"></i>
-                    <div>
-                        <div style="font-weight: 600; font-size: 13px; color: ${timerColor};">동의 마감까지</div>
-                        <div id="analysisCountdownMsg" style="font-size: 12px; color: ${timerMsgColor}; margin-top: 2px;">${timerMsg}</div>
-                    </div>
-                </div>
-                <div style="background: white; padding: 10px 20px; border-radius: 8px; border: 2px solid ${timerBorder};">
-                    <span id="analysisCountdownTimer" style="font-size: 22px; font-weight: 700; color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
-                </div>
+    // 안내 영역 배경색: 만료/긴급 시 빨간색, 그 외 노란색
+    let infoBg, infoBorder, infoIconColor, infoTextColor;
+    if (isExpired) {
+        infoBg = '#fee2e2'; infoBorder = '#ef4444'; infoIconColor = '#dc2626'; infoTextColor = '#991b1b';
+    } else if (isUrgent) {
+        infoBg = '#fef3c7'; infoBorder = '#f59e0b'; infoIconColor = '#d97706'; infoTextColor = '#92400e';
+    } else {
+        infoBg = '#fef3c7'; infoBorder = '#f59e0b'; infoIconColor = '#d97706'; infoTextColor = '#92400e';
+    }
+    
+    // 안내 문구: 유도학생은 입문서 + 할인/재신청 제한 안내 포함, 일반학생은 기본 문구
+    const guideText = isIncentive
+        ? `개별분석 결과와 입문서를 꼼꼼히 읽어보신 후, <strong>5일 이내</strong>에 동의해주세요.
+            <div style="margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 12px; line-height: 1.7; color: #92400e;">
+                <div style="margin-bottom: 4px;"><i class="fas fa-tag" style="margin-right: 4px;"></i> 프로모션 할인은 이 <strong>5일</strong> 기간에만 유효합니다. 기간 만료 후 재신청 시 할인이 적용되지 않습니다.</div>
+                <div><i class="fas fa-ban" style="margin-right: 4px;"></i> 5일 내 미동의 시 신청이 자동 취소되며, 이후 <strong>5일간 새로운 신청서를 제출할 수 없습니다.</strong></div>
+            </div>`
+        : '개별분석 결과를 확인하신 후, <strong>24시간 이내</strong>에 동의해주세요.';
+    
+    // 만료 시 경고 문구
+    const expiredMsg = isExpired
+        ? `<div style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
+        : (isUrgent ? `<div id="analysisCountdownMsg" style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : '');
+    
+    // 타이머를 안내 컨테이너 안에 통합
+    const inlineTimer = analysisTimestamp ? `
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+            <i class="fas fa-clock" style="font-size: 16px; color: ${timerColor};"></i>
+            <div style="background: white; padding: 6px 14px; border-radius: 8px; border: 2px solid ${timerBorderColor};">
+                <span id="analysisCountdownTimer" style="font-size: 18px; font-weight: 700; color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
             </div>
+            <span style="font-size: 13px; color: ${timerColor}; font-weight: 600;">남음</span>
         </div>
+        ${expiredMsg}
     ` : '';
     
     return `
@@ -1037,9 +1047,15 @@ function getAgreementSection(app) {
             <div style="font-size: 16px; font-weight: 700; color: #991b1b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
                 <i class="fas fa-exclamation-circle"></i> 프로그램 동의 (필수)
             </div>
-            <div style="font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 20px;">
-                위 프로그램 내용을 확인하셨나요?<br>
-                <strong>${deadlineLabel} 이내</strong>에 아래 동의 절차를 완료해주세요.
+            
+            <div id="analysisCountdownContainer" style="padding: 16px; background: ${infoBg}; border: 2px solid ${infoBorder}; border-radius: 12px; margin-bottom: 20px;">
+                <div style="font-size: 14px; font-weight: 700; color: ${infoTextColor}; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-clipboard-list" style="color: ${infoIconColor};"></i> 동의 안내
+                </div>
+                <div style="font-size: 13px; color: ${infoTextColor}; line-height: 1.6;">
+                    ${guideText}
+                </div>
+                ${inlineTimer}
             </div>
             
             <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; cursor: pointer;" onclick="toggleCheckbox(event, 'agreeProgram')">
@@ -1068,8 +1084,6 @@ function getAgreementSection(app) {
                     style="width: 100%; padding: 16px; background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
                 <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
             </button>
-            
-            ${timerHTML}
         </div>
     `;
 }
