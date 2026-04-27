@@ -8,6 +8,90 @@ let currentAppTypeTab = 'all'; // 'all' | 'challenge' | 'book_only'
 let bookProgressCache = {};  // user_id → { max_page_reached, last_page, is_completed, bookmarks }
 let bookMemoCountCache = {}; // user_id → count
 
+// ===== 유도학생 상태 판별 =====
+// 반환값: 'waiting' (동의 대기) | 'converted' (동의 완료=매출전환) | 'expired' (5일 만료) | null (유도학생 아님/분석 전)
+function getIncentiveStatus(app) {
+    if (!app.is_incentive_applicant) return null;
+    // 동의 완료 → 매출 전환
+    if (app.student_agreed_at) return 'converted';
+    const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
+    if (!analysisTs) return null; // 분석 전
+    const deadlineMs = 5 * 24 * 60 * 60 * 1000;
+    const remaining = deadlineMs - (Date.now() - new Date(analysisTs).getTime());
+    if (remaining <= 0) return 'expired';
+    return 'waiting';
+}
+
+// ===== 유도학생 이름 옆 뱃지 (내챌 탭용) =====
+function getIncentiveNameBadge(app) {
+    const status = getIncentiveStatus(app);
+    if (!status) return '';
+    if (status === 'converted') {
+        return ' <span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">유도전환</span>';
+    }
+    if (status === 'expired') {
+        return ' <span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">프로모션 만료</span>';
+    }
+    // waiting
+    return ' <span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">프로모션</span>';
+}
+
+// ===== 유도학생 이름 옆 뱃지 (입문서 탭용) =====
+function getIncentiveBookBadge(app) {
+    const isIncentive = app.is_incentive_applicant && app.application_type !== 'book_only';
+    if (!isIncentive) {
+        return '<span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">📖 입문서</span>';
+    }
+    const status = getIncentiveStatus(app);
+    if (status === 'converted') {
+        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">🔀 유도전환</span>';
+    }
+    if (status === 'expired') {
+        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">🔀 유도 만료</span>';
+    }
+    // waiting or null (분석 전)
+    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">🔀 유도학생</span>';
+}
+
+// ===== 유도학생 동의 데드라인 타이머 표시 (관리자 상태칸) =====
+function getIncentiveDeadlineDisplay(app) {
+    if (!app.is_incentive_applicant) return '';
+    if (app.student_agreed_at) return ''; // 동의 완료 → 타이머 불필요
+    const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
+    if (!analysisTs) return '';
+    
+    const deadlineMs = 5 * 24 * 60 * 60 * 1000;
+    const elapsed = Date.now() - new Date(analysisTs).getTime();
+    const remaining = deadlineMs - elapsed;
+    
+    // 만료 → 회색
+    if (remaining <= 0) {
+        return '<div style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; background:#f1f5f9; color:#94a3b8; margin-top:4px; white-space:nowrap;"><i class="fas fa-ban" style="font-size:9px;"></i> 동의기한 만료</div>';
+    }
+    
+    const totalSec = Math.floor(remaining / 1000);
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    
+    let timeText;
+    if (days > 0) {
+        timeText = `${days}일 ${hours}시간`;
+    } else if (hours > 0) {
+        timeText = `${hours}시간 ${minutes}분`;
+    } else {
+        timeText = `${minutes}분`;
+    }
+    
+    // 긴급 (24시간 이내)
+    const isUrgent = remaining <= 24 * 60 * 60 * 1000;
+    const bgColor = isUrgent ? '#fee2e2' : '#fef3c7';
+    const textColor = isUrgent ? '#dc2626' : '#92400e';
+    const icon = isUrgent ? 'fa-exclamation-circle' : 'fa-clock';
+    
+    return `<div style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:${bgColor}; color:${textColor}; margin-top:4px; white-space:nowrap;"><i class="fas ${icon}" style="font-size:9px;"></i> 동의 ${timeText} 남음</div>`;
+}
+
 // 관리자 상태 메시지 반환 함수
 function getAdminActionMessage(app) {
     // 입문서 신청은 별도 배지 표시
@@ -180,9 +264,13 @@ async function loadApplications() {
 
 // ===== 탭 카운트 업데이트 =====
 function updateTabCounts() {
-    const allCount = allApplications.filter(a => a.deleted !== true && a.deleted !== 'true').length;
-    const challengeCount = allApplications.filter(a => a.application_type !== 'book_only' && a.deleted !== true && a.deleted !== 'true').length;
-    const bookCount = allApplications.filter(a => a.application_type === 'book_only' && a.deleted !== true && a.deleted !== 'true').length;
+    const notDeleted = a => a.deleted !== true && a.deleted !== 'true';
+    const allCount = allApplications.filter(notDeleted).length;
+    const challengeCount = allApplications.filter(a => a.application_type !== 'book_only' && notDeleted(a)).length;
+    // 입문서 탭: 순수 입문서 신청 + 유도학생(챌린지 신청이지만 is_incentive_applicant=true)
+    const bookCount = allApplications.filter(a => 
+        (a.application_type === 'book_only' || a.is_incentive_applicant) && notDeleted(a)
+    ).length;
     
     const elAll = document.getElementById('tabCountAll');
     const elChallenge = document.getElementById('tabCountChallenge');
@@ -278,7 +366,8 @@ function applyFilters() {
     if (currentAppTypeTab === 'challenge') {
         baseApplications = allApplications.filter(a => a.application_type !== 'book_only');
     } else if (currentAppTypeTab === 'book_only') {
-        baseApplications = allApplications.filter(a => a.application_type === 'book_only');
+        // 순수 입문서 신청 + 유도학생(챌린지 신청이지만 is_incentive_applicant=true)
+        baseApplications = allApplications.filter(a => a.application_type === 'book_only' || a.is_incentive_applicant);
     }
     
     // 필터링
@@ -375,7 +464,7 @@ function displayApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${app.is_incentive_applicant ? ' <span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">프로모션</span>' : ''}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
+                    ${escapeHtml(app.name)}${getIncentiveNameBadge(app)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
                 </td>
                 <td style="font-size: 13px;">
                     ${escapeHtml(app.email)}
@@ -410,6 +499,7 @@ function displayApplications() {
                             ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.correctionBadge.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.correctionBadge.icon}" style="font-size: 10px;"></i>${actionMessage.correctionBadge.text}</div>`
                             : ''
                         }
+                        ${getIncentiveDeadlineDisplay(app)}
                     </div>
                 </td>
                 <td>
@@ -1209,6 +1299,7 @@ function displayBookApplications() {
     const tableHTML = pageApplications.map(app => {
         const isSelected = selectedIds.has(app.id);
         const userId = app.user_id;
+        const isIncentive = app.is_incentive_applicant && app.application_type !== 'book_only';
         
         // 진도 데이터
         const prog = bookProgressCache[userId];
@@ -1236,12 +1327,15 @@ function displayBookApplications() {
         }
         
         // 신청일
-        const submittedDate = app.submitted_date 
-            ? new Date(app.submitted_date).toLocaleDateString('ko-KR') 
+        const submittedDate = (app.submitted_date || app.created_at)
+            ? new Date(app.submitted_date || app.created_at).toLocaleDateString('ko-KR') 
             : '-';
         
         // 진도 바 색상
         const progressColor = isCompleted ? '#22c55e' : '#9480c5';
+        
+        // 뱃지: 유도학생 3단계 vs 순수 입문서 (getIncentiveBookBadge가 알아서 판별)
+        const badgeHtml = getIncentiveBookBadge(app);
         
         return `
             <tr style="${isSelected ? 'background: #f0f9ff;' : ''}">
@@ -1254,7 +1348,7 @@ function displayBookApplications() {
                 </td>
                 <td style="font-weight: 600;">
                     ${escapeHtml(app.name)}
-                    <span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">📖 입문서</span>
+                    ${badgeHtml}
                 </td>
                 <td style="font-size: 13px;">${escapeHtml(app.email)}</td>
                 <td style="font-size: 13px;">${escapeHtml(app.phone || '-')}</td>
@@ -1276,6 +1370,15 @@ function displayBookApplications() {
                         ? '<span style="background:#dcfce7; color:#16a34a; padding:3px 8px; border-radius:10px; font-size:11px; font-weight:600;">완독 ✅</span>'
                         : '<span style="color:#94a3b8; font-size:12px;">-</span>'
                     }
+                </td>
+                <td>
+                    ${isIncentive ? `
+                        <button class="admin-btn admin-btn-primary admin-btn-sm" 
+                                onclick="openManageModal('${app.id}')"
+                                title="신청서 관리">
+                            <i class="fas fa-cog"></i> 관리
+                        </button>
+                    ` : ''}
                 </td>
             </tr>
         `;
