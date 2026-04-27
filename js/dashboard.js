@@ -235,33 +235,21 @@ function renderActionItems(app) {
     // 2️⃣ 분석 등록 직후 ~ 학생 동의 직전
     if (app.analysis_saved_at && !app.student_agreed_at) {
         const isIncentive = app.is_incentive_applicant === true;
-        const deadlineDays = isIncentive ? 5 : 1;
-        const deadline = new Date(app.analysis_saved_at);
-        deadline.setDate(deadline.getDate() + deadlineDays);
-        const remainingMs = deadline - new Date();
+        const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+        const savedTime = new Date(app.analysis_saved_at).getTime();
+        const remainingMs = deadlineMs - (Date.now() - savedTime);
         
-        let deadlineText = '마감 임박!';
-        if (remainingMs > 0) {
-            const totalSec = Math.floor(remainingMs / 1000);
-            const days = Math.floor(totalSec / 86400);
-            const hours = Math.floor((totalSec % 86400) / 3600);
-            const minutes = Math.floor((totalSec % 3600) / 60);
-            const seconds = totalSec % 60;
-            if (isIncentive) {
-                deadlineText = `마감: ${days}일 ${hours}시간 ${minutes}분 ${seconds}초 남음`;
-            } else {
-                deadlineText = `마감: ${hours}시간 ${minutes}분 ${seconds}초 남음`;
-            }
-        }
+        const initialCountdown = formatDashboardCountdown(remainingMs, isIncentive);
         
         actionItems.push({
             icon: 'fa-file-signature',
             iconColor: '#f59e0b',
             title: '개별 분석 결과를 확인하고 동의해주세요',
-            deadline: deadlineText,
+            deadline: `마감: <span id="dashboardAnalysisTimer" style="font-variant-numeric: tabular-nums;">${initialCountdown}</span>`,
             urgent: remainingMs <= (isIncentive ? 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000),
             link: `application-detail.html?id=${app.id}#step2`,
-            linkText: '분석 결과 보기'
+            linkText: '분석 결과 보기',
+            _startCountdown: { savedTime, isIncentive, deadlineMs }
         });
     }
     
@@ -388,6 +376,37 @@ function renderActionItems(app) {
             </a>
         </div>
     `).join('');
+    
+    // 실시간 카운트다운 시작 (분석 동의 타이머)
+    const countdownItem = actionItems.find(i => i._startCountdown);
+    if (countdownItem) {
+        const { savedTime, isIncentive, deadlineMs } = countdownItem._startCountdown;
+        if (window._dashboardCountdownInterval) clearInterval(window._dashboardCountdownInterval);
+        window._dashboardCountdownInterval = setInterval(() => {
+            const el = document.getElementById('dashboardAnalysisTimer');
+            if (!el) { clearInterval(window._dashboardCountdownInterval); return; }
+            const remaining = deadlineMs - (Date.now() - savedTime);
+            el.textContent = formatDashboardCountdown(remaining, isIncentive);
+            if (remaining <= 0) { clearInterval(window._dashboardCountdownInterval); el.textContent = '마감!'; }
+        }, 1000);
+    }
+}
+
+// 대시보드용 카운트다운 포맷: 일반 24:00:00 / 유도 4일 12:00:00
+function formatDashboardCountdown(remainingMs, isIncentive) {
+    if (remainingMs <= 0) return '마감!';
+    const totalSec = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    if (isIncentive) {
+        return `${days}일 ${hh}:${mm}:${ss}`;
+    }
+    return `${hh}:${mm}:${ss}`;
 }
 
 /**

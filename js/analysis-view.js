@@ -243,71 +243,107 @@ function displayAnalysis(app) {
         agreeSchedule.addEventListener('change', updateSubmitButton);
         
         submitBtn.addEventListener('click', () => submitAgreement(app.id));
+        
+        // 실시간 카운트다운 시작
+        if (app.analysis_completed_at) {
+            startViewCountdown(app.analysis_completed_at, app.is_incentive_applicant === true);
+        }
     }
 }
 
-// 남은 시간 포맷팅 (일/시간/분/초 또는 시간/분/초)
-function formatTimerText(remainingMs, isIncentive) {
-    if (remainingMs <= 0) return null;
+// 남은 시간 포맷팅: 일반 24:00:00 / 유도 4일 12:00:00
+function formatViewCountdown(remainingMs, isIncentive) {
+    if (remainingMs <= 0) return '00:00:00';
     const totalSeconds = Math.floor(remainingMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
     if (isIncentive) {
-        return `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
+        return `${days}일 ${hh}:${mm}:${ss}`;
     }
-    return `${hours}시간 ${minutes}분 ${seconds}초`;
+    return `${hh}:${mm}:${ss}`;
 }
 
-// 타이머 경고 메시지
+// 실시간 카운트다운 인터벌 관리
+let viewCountdownInterval = null;
+
+function startViewCountdown(completedAt, isIncentive) {
+    if (viewCountdownInterval) clearInterval(viewCountdownInterval);
+    
+    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+    const completedTime = new Date(completedAt).getTime();
+    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
+    
+    function tick() {
+        const remaining = deadlineMs - (Date.now() - completedTime);
+        const el = document.getElementById('viewCountdownTimer');
+        const containerEl = document.getElementById('viewCountdownContainer');
+        if (!el || !containerEl) { clearInterval(viewCountdownInterval); return; }
+        
+        if (remaining <= 0) {
+            clearInterval(viewCountdownInterval);
+            el.textContent = '00:00:00';
+            containerEl.className = 'timer-warning';
+            containerEl.style.background = '#fee2e2';
+            containerEl.style.borderColor = '#ef4444';
+            el.style.color = '#dc2626';
+            const msgEl = document.getElementById('viewCountdownMsg');
+            if (msgEl) { msgEl.textContent = '시간이 초과되었습니다. 관리자에게 문의해주세요.'; msgEl.style.color = '#991b1b'; }
+            return;
+        }
+        
+        el.textContent = formatViewCountdown(remaining, isIncentive);
+        
+        if (remaining <= urgentThresholdMs) {
+            containerEl.style.background = '#fee2e2';
+            containerEl.style.borderColor = '#fca5a5';
+            el.style.color = '#dc2626';
+            const msgEl = document.getElementById('viewCountdownMsg');
+            if (msgEl) { msgEl.textContent = '동의 기한이 얼마 남지 않았습니다!'; msgEl.style.color = '#991b1b'; }
+        }
+    }
+    
+    tick();
+    viewCountdownInterval = setInterval(tick, 1000);
+}
+
+// 타이머 경고 메시지 (실시간 카운트다운)
 function getTimerWarning(completedAt, isIncentive) {
     if (!completedAt) return '';
     
     const completedTime = new Date(completedAt).getTime();
-    const now = Date.now();
-    const elapsedMs = now - completedTime;
     const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    const remainingMs = deadlineMs - elapsedMs;
+    const remainingMs = deadlineMs - (Date.now() - completedTime);
     const deadlineLabel = isIncentive ? '5일' : '24시간';
-    const remainingText = formatTimerText(remainingMs, isIncentive);
+    const initialCountdown = formatViewCountdown(remainingMs, isIncentive);
     const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     
-    if (remainingMs <= 0) {
-        return `
-            <div class="timer-warning" style="background: #fee2e2; border-color: #ef4444;">
-                <i class="fas fa-exclamation-triangle timer-icon" style="color: #ef4444;"></i>
-                <div class="timer-text">
-                    <div style="font-weight: 700; color: #991b1b; margin-bottom: 4px;">시간 초과</div>
-                    <div style="font-size: 13px; color: #991b1b;">
-                        ${deadlineLabel}이 경과되었습니다. 관리자에게 문의해주세요.
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+    const isExpired = remainingMs <= 0;
+    const isUrgent = !isExpired && remainingMs <= urgentThresholdMs;
     
-    if (remainingMs <= urgentThresholdMs) {
-        return `
-            <div class="timer-warning" style="background: #fee2e2; border-color: #fca5a5;">
-                <i class="fas fa-clock timer-icon" style="color: #ef4444;"></i>
-                <div class="timer-text">
-                    <div class="timer-countdown">${remainingText} 남음</div>
-                    <div style="font-size: 13px; color: #991b1b;">
-                        동의 기한이 얼마 남지 않았습니다. 서둘러 주세요!
-                    </div>
-                </div>
-            </div>
-        `;
+    let bgColor, borderColor, timerColor, msgColor, msg;
+    if (isExpired) {
+        bgColor = '#fee2e2'; borderColor = '#ef4444'; timerColor = '#dc2626'; msgColor = '#991b1b';
+        msg = '시간이 초과되었습니다. 관리자에게 문의해주세요.';
+    } else if (isUrgent) {
+        bgColor = '#fee2e2'; borderColor = '#fca5a5'; timerColor = '#dc2626'; msgColor = '#991b1b';
+        msg = '동의 기한이 얼마 남지 않았습니다!';
+    } else {
+        bgColor = '#f8f4ff'; borderColor = '#9480c5'; timerColor = '#9480c5'; msgColor = '#6b5b95';
+        msg = `분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.`;
     }
     
     return `
-        <div class="timer-warning">
-            <i class="fas fa-info-circle timer-icon"></i>
+        <div id="viewCountdownContainer" class="timer-warning" style="background: ${bgColor}; border-color: ${borderColor};">
+            <i class="fas fa-clock timer-icon" style="color: ${timerColor};"></i>
             <div class="timer-text">
-                <div class="timer-countdown">${remainingText} 남음</div>
-                <div style="font-size: 13px; color: #92400e;">
-                    분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.
+                <div class="timer-countdown" id="viewCountdownTimer" style="color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</div>
+                <div id="viewCountdownMsg" style="font-size: 13px; color: ${msgColor};">
+                    ${msg}
                 </div>
             </div>
         </div>
