@@ -1019,9 +1019,10 @@ function getAgreementSection(app) {
     // 안내 문구: 유도학생은 입문서 + 할인/재신청 제한 안내 포함, 일반학생은 기본 문구
     const guideText = isIncentive
         ? `개별분석 결과와 입문서를 꼼꼼히 읽어보신 후, <strong>5일 이내</strong>에 동의해주세요.
-            <div style="margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 12px; line-height: 1.7; color: #92400e;">
-                <div style="margin-bottom: 4px;"><i class="fas fa-tag" style="margin-right: 4px;"></i> 프로모션 할인은 이 <strong>5일</strong> 기간에만 유효합니다. 기간 만료 후 재신청 시 할인이 적용되지 않습니다.</div>
-                <div><i class="fas fa-ban" style="margin-right: 4px;"></i> 5일 내 미동의 시 신청이 자동 취소되며, 이후 <strong>5일간 새로운 신청서를 제출할 수 없습니다.</strong></div>
+            <div style="margin-top: 10px; padding: 12px 14px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 13px; line-height: 1.7; color: #92400e;">
+                <div style="font-weight: 700; margin-bottom: 6px;">⚠️ 꼭 알아두세요!</div>
+                <div style="margin-bottom: 4px;">· 지금 적용된 할인 혜택은 <strong>이 5일 동의 기간에만 유효</strong>해요. 기간이 지나면 할인은 사라지고, 다시 신청하셔도 같은 할인은 적용되지 않아요.</div>
+                <div>· 동의하지 않고 기간이 지나면 <strong>5일 동안 새로 신청할 수 없어요.</strong></div>
             </div>`
         : '개별분석 결과를 확인하신 후, <strong>24시간 이내</strong>에 동의해주세요.';
     
@@ -1030,16 +1031,16 @@ function getAgreementSection(app) {
         ? `<div style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
         : (isUrgent ? `<div id="analysisCountdownMsg" style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : '');
     
-    // 타이머를 안내 컨테이너 안에 통합
+    // 타이머를 안내 컨테이너 오른쪽에 통합
     const inlineTimer = analysisTimestamp ? `
-        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
-            <i class="fas fa-clock" style="font-size: 16px; color: ${timerColor};"></i>
-            <div style="background: white; padding: 6px 14px; border-radius: 8px; border: 2px solid ${timerBorderColor};">
-                <span id="analysisCountdownTimer" style="font-size: 18px; font-weight: 700; color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
-            </div>
-            <span style="font-size: 13px; color: ${timerColor}; font-weight: 600;">남음</span>
-        </div>
         ${expiredMsg}
+    ` : '';
+    
+    // 타이머 박스 (안내 헤더 오른쪽에 배치)
+    const timerBox = analysisTimestamp ? `
+        <div style="background: white; padding: 8px 16px; border-radius: 8px; border: 2px solid ${timerBorderColor}; flex-shrink: 0; text-align: center;">
+            <span id="analysisCountdownTimer" style="font-size: 20px; font-weight: 700; color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
+        </div>
     ` : '';
     
     return `
@@ -1049,10 +1050,13 @@ function getAgreementSection(app) {
             </div>
             
             <div id="analysisCountdownContainer" style="padding: 16px; background: ${infoBg}; border: 2px solid ${infoBorder}; border-radius: 12px; margin-bottom: 20px;">
-                <div style="font-size: 14px; font-weight: 700; color: ${infoTextColor}; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                    <i class="fas fa-clipboard-list" style="color: ${infoIconColor};"></i> 동의 안내
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div style="font-size: 14px; font-weight: 700; color: ${infoTextColor}; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-clipboard-list" style="color: ${infoIconColor};"></i> 동의 안내
+                    </div>
+                    ${timerBox}
                 </div>
-                <div style="font-size: 13px; color: ${infoTextColor}; line-height: 1.6;">
+                <div style="font-size: 13px; color: ${infoTextColor}; line-height: 1.6; margin-top: 8px;">
                     ${guideText}
                 </div>
                 ${inlineTimer}
