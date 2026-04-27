@@ -1044,22 +1044,22 @@ function getAgreementSection(app) {
     ` : '';
     
     return `
+        <div id="analysisCountdownContainer" style="padding: 20px; background: ${infoBg}; border: 2px solid ${infoBorder}; border-radius: 12px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div style="font-size: 16px; font-weight: 700; color: #991b1b; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-clipboard-list" style="color: ${infoIconColor};"></i> 동의 안내
+                </div>
+                ${timerBox}
+            </div>
+            <div style="font-size: 14px; color: ${infoTextColor}; line-height: 1.7; margin-top: 10px;">
+                ${guideText}
+            </div>
+            ${inlineTimer}
+        </div>
+
         <div style="padding: 24px; background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; margin-bottom: 24px;">
             <div style="font-size: 16px; font-weight: 700; color: #991b1b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
                 <i class="fas fa-exclamation-circle"></i> 프로그램 동의 (필수)
-            </div>
-            
-            <div id="analysisCountdownContainer" style="padding: 16px; background: ${infoBg}; border: 2px solid ${infoBorder}; border-radius: 12px; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                    <div style="font-size: 14px; font-weight: 700; color: ${infoTextColor}; display: flex; align-items: center; gap: 6px;">
-                        <i class="fas fa-clipboard-list" style="color: ${infoIconColor};"></i> 동의 안내
-                    </div>
-                    ${timerBox}
-                </div>
-                <div style="font-size: 13px; color: ${infoTextColor}; line-height: 1.6; margin-top: 8px;">
-                    ${guideText}
-                </div>
-                ${inlineTimer}
             </div>
             
             <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; cursor: pointer;" onclick="toggleCheckbox(event, 'agreeProgram')">
