@@ -104,6 +104,11 @@ async function loadDashboard() {
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('dashboardContent').style.display = 'block';
         
+        // 유도학생(프로모션)인 경우 하단에 입문서 미니카드 추가
+        if (application.is_incentive_applicant) {
+            await renderBookOnlyMiniCard(application);
+        }
+        
     } catch (error) {
         console.error('대시보드 로드 실패:', error);
         alert('대시보드를 불러오는 중 오류가 발생했습니다.');
