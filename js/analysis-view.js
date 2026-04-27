@@ -150,6 +150,9 @@ function displayAnalysis(app) {
     const needsAgreement = (app.analysis_status === '승인' || app.analysis_status === '조건부승인') 
                           && !app.student_program_agreed;
     
+    const isIncentive = app.is_incentive_applicant === true;
+    const deadlineLabel = isIncentive ? '5일' : '24시간';
+    
     const agreementSection = needsAgreement ? `
         <div class="agreement-section">
             <div class="agreement-title">
@@ -158,7 +161,7 @@ function displayAnalysis(app) {
             </div>
             <div class="agreement-warning">
                 위 프로그램 내용을 확인하셨나요?<br>
-                <strong>24시간 이내</strong>에 아래 동의 절차를 완료해주세요.
+                <strong>${deadlineLabel} 이내</strong>에 아래 동의 절차를 완료해주세요.
             </div>
             
             <div class="agreement-checkbox">
@@ -185,7 +188,7 @@ function displayAnalysis(app) {
                 <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
             </button>
             
-            ${getTimerWarning(app.analysis_completed_at)}
+            ${getTimerWarning(app.analysis_completed_at, app.is_incentive_applicant)}
         </div>
     ` : '';
     
@@ -243,35 +246,53 @@ function displayAnalysis(app) {
     }
 }
 
+// 남은 시간 포맷팅 (일/시간/분/초 또는 시간/분/초)
+function formatTimerText(remainingMs, isIncentive) {
+    if (remainingMs <= 0) return null;
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (isIncentive) {
+        return `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
+    }
+    return `${hours}시간 ${minutes}분 ${seconds}초`;
+}
+
 // 타이머 경고 메시지
-function getTimerWarning(completedAt) {
+function getTimerWarning(completedAt, isIncentive) {
     if (!completedAt) return '';
     
     const completedTime = new Date(completedAt).getTime();
     const now = Date.now();
-    const hoursElapsed = Math.floor((now - completedTime) / (1000 * 60 * 60));
-    const hoursRemaining = 24 - hoursElapsed;
+    const elapsedMs = now - completedTime;
+    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+    const remainingMs = deadlineMs - elapsedMs;
+    const deadlineLabel = isIncentive ? '5일' : '24시간';
+    const remainingText = formatTimerText(remainingMs, isIncentive);
+    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     
-    if (hoursRemaining <= 0) {
+    if (remainingMs <= 0) {
         return `
             <div class="timer-warning" style="background: #fee2e2; border-color: #ef4444;">
                 <i class="fas fa-exclamation-triangle timer-icon" style="color: #ef4444;"></i>
                 <div class="timer-text">
                     <div style="font-weight: 700; color: #991b1b; margin-bottom: 4px;">시간 초과</div>
                     <div style="font-size: 13px; color: #991b1b;">
-                        24시간이 경과되었습니다. 관리자에게 문의해주세요.
+                        ${deadlineLabel}이 경과되었습니다. 관리자에게 문의해주세요.
                     </div>
                 </div>
             </div>
         `;
     }
     
-    if (hoursRemaining <= 6) {
+    if (remainingMs <= urgentThresholdMs) {
         return `
             <div class="timer-warning" style="background: #fee2e2; border-color: #fca5a5;">
                 <i class="fas fa-clock timer-icon" style="color: #ef4444;"></i>
                 <div class="timer-text">
-                    <div class="timer-countdown">${hoursRemaining}시간 남음</div>
+                    <div class="timer-countdown">${remainingText} 남음</div>
                     <div style="font-size: 13px; color: #991b1b;">
                         동의 기한이 얼마 남지 않았습니다. 서둘러 주세요!
                     </div>
@@ -284,9 +305,9 @@ function getTimerWarning(completedAt) {
         <div class="timer-warning">
             <i class="fas fa-info-circle timer-icon"></i>
             <div class="timer-text">
-                <div class="timer-countdown">${hoursRemaining}시간 남음</div>
+                <div class="timer-countdown">${remainingText} 남음</div>
                 <div style="font-size: 13px; color: #92400e;">
-                    분석 완료 후 24시간 이내에 동의해주세요.
+                    분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.
                 </div>
             </div>
         </div>

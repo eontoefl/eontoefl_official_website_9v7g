@@ -56,7 +56,7 @@ function loadAnalysisForm(app) {
                     </button>
                 </div>
                 <div style="font-size: 11px; color: #64748b; margin-top: 8px;">
-                    💡 이 링크를 카카오톡이나 이메일로 학생에게 전달하세요. 학생은 24시간 내에 동의해야 합니다.
+                    💡 이 링크를 카카오톡이나 이메일로 학생에게 전달하세요. 학생은 ${app.is_incentive_applicant ? '5일' : '24시간'} 내에 동의해야 합니다.
                 </div>
             </div>
         </div>
@@ -415,10 +415,10 @@ function previewAnalysis() {
             
             <div style="padding: 20px; background: #fef2f2; border-radius: 8px; border: 2px solid #fecaca;">
                 <div style="font-weight: 700; margin-bottom: 12px; color: #991b1b;">
-                    ⏰ 24시간 이내 회신 필요!
+                    ⏰ ${currentApplication?.is_incentive_applicant ? '5일' : '24시간'} 이내 회신 필요!
                 </div>
                 <div style="font-size: 13px; color: #64748b; line-height: 1.6;">
-                    • 24시간 이내 미응답 시 자동 거부 처리됩니다<br>
+                    • ${currentApplication?.is_incentive_applicant ? '5일' : '24시간'} 이내 미응답 시 자동 거부 처리됩니다<br>
                     • 거부 시 5일간 재신청이 불가능합니다
                 </div>
             </div>

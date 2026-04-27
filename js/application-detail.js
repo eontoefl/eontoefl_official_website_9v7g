@@ -873,7 +873,7 @@ function getAnalysisSection(app) {
         ${getPricingBox(app)}
         
         <!-- 중요 안내사항 (가격 정보와 동의 섹션 사이) -->
-        ${app.analysis_content ? `
+        ${app.analysis_content && !app.is_incentive_applicant ? `
         <div style="padding: 20px; background: #fef2f2; border: 2px solid #fca5a5; border-radius: 12px; margin-bottom: 24px;">
             <div style="display: flex; align-items: flex-start; gap: 12px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 24px; color: #dc2626; margin-top: 2px;"></i>
@@ -883,6 +883,19 @@ function getAnalysisSection(app) {
                         토플 일대일 진단서 업로드 시간으로부터 <strong>24시간 이내에 댓글이 없을 시</strong>, 알림 없이 자동으로 <strong style="text-decoration: underline;">승인불가 처리</strong>가 됩니다.
                         토플이 최우선이고, 열심히 하실 마음, 절박함과 의지가 있으신 분들이라고 판단되지 않기 때문에 내린 결정입니다.
                         또한, 이후 <strong>만 5일간 새로운 신청서를 업로드 하실 수 없으니</strong> 반드시 참고해주시기 바랍니다.
+                    </div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+        ${app.analysis_content && app.is_incentive_applicant ? `
+        <div style="padding: 20px; background: #fffbeb; border: 2px solid #fcd34d; border-radius: 12px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fas fa-clock" style="font-size: 24px; color: #d97706; margin-top: 2px;"></i>
+                <div>
+                    <div style="font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 8px;">📋 동의 안내</div>
+                    <div style="font-size: 14px; color: #92400e; line-height: 1.7;">
+                        개별분석 결과와 입문서를 꼼꼼히 읽어보신 후, <strong>5일 이내</strong>에 동의해주세요.
                     </div>
                 </div>
             </div>
@@ -909,31 +922,55 @@ function getAnalysisSection(app) {
     `;
 }
 
+// 남은 시간 포맷팅 (일/시간/분/초 또는 시간/분/초)
+function formatRemainingTime(remainingMs, isIncentive) {
+    if (remainingMs <= 0) return null;
+    
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (isIncentive) {
+        return `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
+    }
+    return `${hours}시간 ${minutes}분 ${seconds}초`;
+}
+
 // 동의 섹션 HTML
 function getAgreementSection(app) {
-    const hoursElapsed = app.analysis_completed_at 
-        ? Math.floor((Date.now() - new Date(app.analysis_completed_at).getTime()) / (1000 * 60 * 60))
+    const isIncentive = app.is_incentive_applicant === true;
+    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+    const deadlineLabel = isIncentive ? '5일' : '24시간';
+    
+    const elapsedMs = app.analysis_completed_at 
+        ? (Date.now() - new Date(app.analysis_completed_at).getTime())
         : 0;
-    const hoursRemaining = 24 - hoursElapsed;
+    const remainingMs = deadlineMs - elapsedMs;
+    const remainingText = formatRemainingTime(remainingMs, isIncentive);
+    
+    // 긴급 기준: 유도학생은 남은 1일 미만, 일반은 6시간 미만
+    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     
     let timerHTML = '';
     if (app.analysis_completed_at) {
-        if (hoursRemaining <= 0) {
+        if (remainingMs <= 0) {
             timerHTML = `
                 <div style="padding: 12px; background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; margin-top: 12px; display: flex; align-items: center; gap: 12px;">
                     <i class="fas fa-exclamation-triangle" style="font-size: 20px; color: #ef4444;"></i>
                     <div>
                         <div style="font-weight: 700; color: #991b1b; margin-bottom: 4px;">시간 초과</div>
-                        <div style="font-size: 13px; color: #991b1b;">24시간이 경과되었습니다. 관리자에게 문의해주세요.</div>
+                        <div style="font-size: 13px; color: #991b1b;">${deadlineLabel}이 경과되었습니다. 관리자에게 문의해주세요.</div>
                     </div>
                 </div>
             `;
-        } else if (hoursRemaining <= 6) {
+        } else if (remainingMs <= urgentThresholdMs) {
             timerHTML = `
                 <div style="padding: 12px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; margin-top: 12px; display: flex; align-items: center; gap: 12px;">
                     <i class="fas fa-clock" style="font-size: 20px; color: #ef4444;"></i>
                     <div>
-                        <div style="font-size: 18px; font-weight: 700; color: #991b1b;">${hoursRemaining}시간 남음</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #991b1b;">${remainingText} 남음</div>
                         <div style="font-size: 13px; color: #991b1b;">동의 기한이 얼마 남지 않았습니다. 서둘러 주세요!</div>
                     </div>
                 </div>
@@ -943,8 +980,8 @@ function getAgreementSection(app) {
                 <div style="padding: 12px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; margin-top: 12px; display: flex; align-items: center; gap: 12px;">
                     <i class="fas fa-info-circle" style="font-size: 20px; color: #f59e0b;"></i>
                     <div>
-                        <div style="font-size: 18px; font-weight: 700; color: #92400e;">${hoursRemaining}시간 남음</div>
-                        <div style="font-size: 13px; color: #92400e;">분석 완료 후 24시간 이내에 동의해주세요.</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #92400e;">${remainingText} 남음</div>
+                        <div style="font-size: 13px; color: #92400e;">분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.</div>
                     </div>
                 </div>
             `;
@@ -958,7 +995,7 @@ function getAgreementSection(app) {
             </div>
             <div style="font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 20px;">
                 위 프로그램 내용을 확인하셨나요?<br>
-                <strong>24시간 이내</strong>에 아래 동의 절차를 완료해주세요.
+                <strong>${deadlineLabel} 이내</strong>에 아래 동의 절차를 완료해주세요.
             </div>
             
             <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; cursor: pointer;" onclick="toggleCheckbox(event, 'agreeProgram')">
