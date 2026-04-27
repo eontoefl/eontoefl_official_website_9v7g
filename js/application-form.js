@@ -83,9 +83,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form submission
     setupFormSubmission();
 
-    // Setup Sunday-only date picker
-    setupSundayOnlyDatePicker();
-    
     // Setup date dropdowns
     setupDateDropdowns();
 
@@ -705,6 +702,17 @@ function validateForm() {
         return false;
     }
 
+    // 희망 수업 시작 시기: 일요일만 선택 가능
+    const startDateInput = document.querySelector('input[name="preferred_start_date"]');
+    if (startDateInput && startDateInput.value) {
+        const selectedDate = new Date(startDateInput.value);
+        if (selectedDate.getDay() !== 0) {
+            alert('수업 시작일은 매주 일요일만 가능합니다. 일요일을 선택해주세요.');
+            startDateInput.focus();
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -956,24 +964,6 @@ function setupWritingCounters() {
 
 // Call setup for writing counters
 setTimeout(setupWritingCounters, 100);
-
-// Setup Sunday-only date picker
-function setupSundayOnlyDatePicker() {
-    const startDateInput = document.querySelector('input[name="preferred_start_date"]');
-    
-    if (!startDateInput) return;
-    
-    // Validate on change (날짜를 실제로 선택했을 때만 검증)
-    startDateInput.addEventListener('change', function() {
-        const selectedDate = new Date(this.value);
-        
-        // Check if it's Sunday (0 = Sunday)
-        if (selectedDate.getDay() !== 0) {
-            alert('수업 시작일은 매주 일요일만 가능합니다. 일요일을 선택해주세요.');
-            this.value = ''; // Clear invalid selection
-        }
-    });
-}
 
 // Setup date dropdowns
 function setupDateDropdowns() {
