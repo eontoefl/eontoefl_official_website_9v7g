@@ -188,7 +188,7 @@ function displayAnalysis(app) {
                 <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
             </button>
             
-            ${getTimerWarning(app.analysis_completed_at, app.is_incentive_applicant)}
+            ${getTimerWarning(app.analysis_completed_at || app.analysis_saved_at, app.is_incentive_applicant)}
         </div>
     ` : '';
     
@@ -213,7 +213,7 @@ function displayAnalysis(app) {
             <div class="analysis-title">개별분석 결과</div>
             <div class="analysis-date">
                 ${escapeHtml(app.name)} 님의 개별분석지
-                ${app.analysis_completed_at ? ` · ${formatDateTime(app.analysis_completed_at)}` : ''}
+                ${(app.analysis_completed_at || app.analysis_saved_at) ? ` · ${formatDateTime(app.analysis_completed_at || app.analysis_saved_at)}` : ''}
             </div>
         </div>
         
@@ -245,8 +245,9 @@ function displayAnalysis(app) {
         submitBtn.addEventListener('click', () => submitAgreement(app.id));
         
         // 실시간 카운트다운 시작
-        if (app.analysis_completed_at) {
-            startViewCountdown(app.analysis_completed_at, app.is_incentive_applicant === true);
+        const viewAnalysisTs = app.analysis_completed_at || app.analysis_saved_at;
+        if (viewAnalysisTs) {
+            startViewCountdown(viewAnalysisTs, app.is_incentive_applicant === true);
         }
     }
 }

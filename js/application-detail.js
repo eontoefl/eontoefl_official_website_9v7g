@@ -991,8 +991,9 @@ function getAgreementSection(app) {
     const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
     const deadlineLabel = isIncentive ? '5일' : '24시간';
     
-    const elapsedMs = app.analysis_completed_at 
-        ? (Date.now() - new Date(app.analysis_completed_at).getTime())
+    const analysisTimestamp = app.analysis_completed_at || app.analysis_saved_at;
+    const elapsedMs = analysisTimestamp 
+        ? (Date.now() - new Date(analysisTimestamp).getTime())
         : 0;
     const remainingMs = deadlineMs - elapsedMs;
     const initialCountdown = formatCountdown(remainingMs, isIncentive);
@@ -1014,7 +1015,7 @@ function getAgreementSection(app) {
         timerIcon = 'fa-clock'; timerMsg = `분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.`;
     }
     
-    const timerHTML = app.analysis_completed_at ? `
+    const timerHTML = analysisTimestamp ? `
         <div id="analysisCountdownContainer" style="padding: 16px; background: ${timerBg}; border: 2px solid ${timerBorder}; border-radius: 12px; margin-top: 16px;">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -1566,8 +1567,9 @@ function loadStudentTabs(app) {
             analysisTab.innerHTML = getAnalysisSection(app);
             // 실시간 카운트다운 시작 (동의 전 + 분석 완료 시점이 있을 때)
             const needsAgreement = (app.analysis_status === '승인' || app.analysis_status === '조건부승인') && !app.student_program_agreed;
-            if (needsAgreement && app.analysis_completed_at) {
-                startAnalysisCountdown(app.analysis_completed_at, app.is_incentive_applicant === true);
+            const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
+            if (needsAgreement && analysisTs) {
+                startAnalysisCountdown(analysisTs, app.is_incentive_applicant === true);
             }
         }
     } else {
