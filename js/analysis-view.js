@@ -202,18 +202,42 @@ function displayAnalysis(app) {
         ${viewExpiredMsg}
     ` : '';
     
-    const agreementSection = needsAgreement ? `
+    // 만료 시 → 따뜻한 안내 + 카톡 버튼 (동의 폼 숨김)
+    // 미만료 시 → 기존 동의 폼
+    let agreementSection = '';
+    if (needsAgreement && viewIsExpired) {
+        agreementSection = `
+        <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 32px 24px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">⏰</div>
+            <h3 style="font-size: 20px; font-weight: 700; color: #334155; margin-bottom: 12px;">동의 기간이 마감되었어요</h3>
+            <p style="font-size: 14px; color: #64748b; line-height: 1.8; margin-bottom: 8px;">
+                아쉽지만 동의 가능한 기간(${deadlineLabel})이 지났어요.
+            </p>
+            <p style="font-size: 14px; color: #64748b; line-height: 1.8; margin-bottom: 24px;">
+                아직 고민 중이시라면 걱정 마세요!<br>
+                카카오톡으로 편하게 연락 주시면, 다시 함께 방법을 찾아볼게요.
+            </p>
+            <a href="http://pf.kakao.com/_FWxcZC" target="_blank"
+               style="display: inline-flex; align-items: center; gap: 8px; padding: 14px 32px; background: #FEE500; color: #3C1E1E; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 12px rgba(254, 229, 0, 0.4); transition: all 0.2s;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(254,229,0,0.5)'"
+               onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 12px rgba(254,229,0,0.4)'">
+                <i class="fas fa-comment" style="font-size: 18px;"></i> 카카오톡 문의하기
+            </a>
+        </div>
+        `;
+    } else if (needsAgreement) {
+        agreementSection = `
         <div class="agreement-section">
             <div class="agreement-title">
                 <i class="fas fa-exclamation-circle"></i>
                 프로그램 동의 (필수)
             </div>
             
-            <div id="viewCountdownContainer" style="padding: 16px; background: ${viewIsExpired ? '#fee2e2' : '#fef3c7'}; border: 2px solid ${viewIsExpired ? '#ef4444' : '#f59e0b'}; border-radius: 12px; margin-bottom: 20px;">
-                <div style="font-size: 14px; font-weight: 700; color: ${viewIsExpired ? '#991b1b' : '#92400e'}; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                    <i class="fas fa-clipboard-list" style="color: ${viewIsExpired ? '#dc2626' : '#d97706'};"></i> 동의 안내
+            <div id="viewCountdownContainer" style="padding: 16px; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; margin-bottom: 20px;">
+                <div style="font-size: 14px; font-weight: 700; color: #92400e; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-clipboard-list" style="color: #d97706;"></i> 동의 안내
                 </div>
-                <div style="font-size: 13px; color: ${viewIsExpired ? '#991b1b' : '#92400e'}; line-height: 1.6;">
+                <div style="font-size: 13px; color: #92400e; line-height: 1.6;">
                     ${guideText}
                 </div>
                 ${viewInlineTimer}
@@ -243,7 +267,8 @@ function displayAnalysis(app) {
                 <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
             </button>
         </div>
-    ` : '';
+        `;
+    }
     
     const alreadyAgreedMessage = app.student_program_agreed ? `
         <div class="analysis-section" style="background: #dcfce7; border: 2px solid #22c55e;">
@@ -340,15 +365,26 @@ function startViewCountdown(completedAt, isIncentive) {
         
         if (remaining <= 0) {
             clearInterval(viewCountdownInterval);
-            el.textContent = '00:00:00';
-            el.style.color = '#dc2626';
-            // 안내 컨테이너를 빨간색으로 전환
-            containerEl.style.background = '#fee2e2';
-            containerEl.style.borderColor = '#ef4444';
-            const msgEl = document.getElementById('viewCountdownMsg');
-            if (msgEl) {
-                msgEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.';
-                msgEl.style.color = '#dc2626';
+            // 동의 섹션 전체를 따뜻한 만료 안내로 교체
+            const agreementEl = containerEl.closest('.agreement-section');
+            if (agreementEl) {
+                const dlLabel = isIncentive ? '5일' : '24시간';
+                agreementEl.outerHTML = `
+                <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 32px 24px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⏰</div>
+                    <h3 style="font-size: 20px; font-weight: 700; color: #334155; margin-bottom: 12px;">동의 기간이 마감되었어요</h3>
+                    <p style="font-size: 14px; color: #64748b; line-height: 1.8; margin-bottom: 8px;">
+                        아쉽지만 동의 가능한 기간(${dlLabel})이 지났어요.
+                    </p>
+                    <p style="font-size: 14px; color: #64748b; line-height: 1.8; margin-bottom: 24px;">
+                        아직 고민 중이시라면 걱정 마세요!<br>
+                        카카오톡으로 편하게 연락 주시면, 다시 함께 방법을 찾아볼게요.
+                    </p>
+                    <a href="http://pf.kakao.com/_FWxcZC" target="_blank"
+                       style="display: inline-flex; align-items: center; gap: 8px; padding: 14px 32px; background: #FEE500; color: #3C1E1E; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 12px rgba(254, 229, 0, 0.4);">
+                        <i class="fas fa-comment" style="font-size: 18px;"></i> 카카오톡 문의하기
+                    </a>
+                </div>`;
             }
             return;
         }
