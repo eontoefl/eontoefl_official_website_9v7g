@@ -922,9 +922,9 @@ function getAnalysisSection(app) {
     `;
 }
 
-// 남은 시간 포맷팅 (일/시간/분/초 또는 시간/분/초)
-function formatRemainingTime(remainingMs, isIncentive) {
-    if (remainingMs <= 0) return null;
+// 남은 시간 포맷팅: 일반 24:00:00 / 유도 4일 12:00:00
+function formatCountdown(remainingMs, isIncentive) {
+    if (remainingMs <= 0) return '00:00:00';
     
     const totalSeconds = Math.floor(remainingMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
@@ -932,10 +932,57 @@ function formatRemainingTime(remainingMs, isIncentive) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    
     if (isIncentive) {
-        return `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
+        return `${days}일 ${hh}:${mm}:${ss}`;
     }
-    return `${hours}시간 ${minutes}분 ${seconds}초`;
+    return `${hh}:${mm}:${ss}`;
+}
+
+// 실시간 카운트다운 인터벌 관리
+let analysisCountdownInterval = null;
+
+function startAnalysisCountdown(completedAt, isIncentive) {
+    if (analysisCountdownInterval) clearInterval(analysisCountdownInterval);
+    
+    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+    const completedTime = new Date(completedAt).getTime();
+    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
+    
+    function tick() {
+        const remaining = deadlineMs - (Date.now() - completedTime);
+        const el = document.getElementById('analysisCountdownTimer');
+        const containerEl = document.getElementById('analysisCountdownContainer');
+        if (!el || !containerEl) { clearInterval(analysisCountdownInterval); return; }
+        
+        if (remaining <= 0) {
+            clearInterval(analysisCountdownInterval);
+            el.textContent = '00:00:00';
+            containerEl.style.background = '#fee2e2';
+            containerEl.style.borderColor = '#ef4444';
+            el.style.color = '#dc2626';
+            const msgEl = document.getElementById('analysisCountdownMsg');
+            if (msgEl) { msgEl.textContent = '시간이 초과되었습니다. 관리자에게 문의해주세요.'; msgEl.style.color = '#991b1b'; }
+            return;
+        }
+        
+        el.textContent = formatCountdown(remaining, isIncentive);
+        
+        // 색상 전환: 긴급이면 빨간색
+        if (remaining <= urgentThresholdMs) {
+            containerEl.style.background = '#fee2e2';
+            containerEl.style.borderColor = '#fca5a5';
+            el.style.color = '#dc2626';
+            const msgEl = document.getElementById('analysisCountdownMsg');
+            if (msgEl) { msgEl.textContent = '동의 기한이 얼마 남지 않았습니다!'; msgEl.style.color = '#991b1b'; }
+        }
+    }
+    
+    tick();
+    analysisCountdownInterval = setInterval(tick, 1000);
 }
 
 // 동의 섹션 HTML
@@ -948,45 +995,41 @@ function getAgreementSection(app) {
         ? (Date.now() - new Date(app.analysis_completed_at).getTime())
         : 0;
     const remainingMs = deadlineMs - elapsedMs;
-    const remainingText = formatRemainingTime(remainingMs, isIncentive);
+    const initialCountdown = formatCountdown(remainingMs, isIncentive);
     
     // 긴급 기준: 유도학생은 남은 1일 미만, 일반은 6시간 미만
     const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
+    const isExpired = remainingMs <= 0;
+    const isUrgent = !isExpired && remainingMs <= urgentThresholdMs;
     
-    let timerHTML = '';
-    if (app.analysis_completed_at) {
-        if (remainingMs <= 0) {
-            timerHTML = `
-                <div style="padding: 12px; background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; margin-top: 12px; display: flex; align-items: center; gap: 12px;">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 20px; color: #ef4444;"></i>
-                    <div>
-                        <div style="font-weight: 700; color: #991b1b; margin-bottom: 4px;">시간 초과</div>
-                        <div style="font-size: 13px; color: #991b1b;">${deadlineLabel}이 경과되었습니다. 관리자에게 문의해주세요.</div>
-                    </div>
-                </div>
-            `;
-        } else if (remainingMs <= urgentThresholdMs) {
-            timerHTML = `
-                <div style="padding: 12px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; margin-top: 12px; display: flex; align-items: center; gap: 12px;">
-                    <i class="fas fa-clock" style="font-size: 20px; color: #ef4444;"></i>
-                    <div>
-                        <div style="font-size: 18px; font-weight: 700; color: #991b1b;">${remainingText} 남음</div>
-                        <div style="font-size: 13px; color: #991b1b;">동의 기한이 얼마 남지 않았습니다. 서둘러 주세요!</div>
-                    </div>
-                </div>
-            `;
-        } else {
-            timerHTML = `
-                <div style="padding: 12px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; margin-top: 12px; display: flex; align-items: center; gap: 12px;">
-                    <i class="fas fa-info-circle" style="font-size: 20px; color: #f59e0b;"></i>
-                    <div>
-                        <div style="font-size: 18px; font-weight: 700; color: #92400e;">${remainingText} 남음</div>
-                        <div style="font-size: 13px; color: #92400e;">분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.</div>
-                    </div>
-                </div>
-            `;
-        }
+    let timerBg, timerBorder, timerColor, timerMsgColor, timerIcon, timerMsg;
+    if (isExpired) {
+        timerBg = '#fee2e2'; timerBorder = '#ef4444'; timerColor = '#dc2626'; timerMsgColor = '#991b1b';
+        timerIcon = 'fa-exclamation-triangle'; timerMsg = '시간이 초과되었습니다. 관리자에게 문의해주세요.';
+    } else if (isUrgent) {
+        timerBg = '#fee2e2'; timerBorder = '#fca5a5'; timerColor = '#dc2626'; timerMsgColor = '#991b1b';
+        timerIcon = 'fa-clock'; timerMsg = '동의 기한이 얼마 남지 않았습니다!';
+    } else {
+        timerBg = '#f8f4ff'; timerBorder = '#9480c5'; timerColor = '#9480c5'; timerMsgColor = '#6b5b95';
+        timerIcon = 'fa-clock'; timerMsg = `분석 완료 후 ${deadlineLabel} 이내에 동의해주세요.`;
     }
+    
+    const timerHTML = app.analysis_completed_at ? `
+        <div id="analysisCountdownContainer" style="padding: 16px; background: ${timerBg}; border: 2px solid ${timerBorder}; border-radius: 12px; margin-top: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas ${timerIcon}" style="font-size: 20px; color: ${timerColor};"></i>
+                    <div>
+                        <div style="font-weight: 600; font-size: 13px; color: ${timerColor};">동의 마감까지</div>
+                        <div id="analysisCountdownMsg" style="font-size: 12px; color: ${timerMsgColor}; margin-top: 2px;">${timerMsg}</div>
+                    </div>
+                </div>
+                <div style="background: white; padding: 10px 20px; border-radius: 8px; border: 2px solid ${timerBorder};">
+                    <span id="analysisCountdownTimer" style="font-size: 22px; font-weight: 700; color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
+                </div>
+            </div>
+        </div>
+    ` : '';
     
     return `
         <div style="padding: 24px; background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; margin-bottom: 24px;">
@@ -1521,6 +1564,11 @@ function loadStudentTabs(app) {
         const analysisTab = document.getElementById('tabStudentAnalysis');
         if (analysisTab) {
             analysisTab.innerHTML = getAnalysisSection(app);
+            // 실시간 카운트다운 시작 (동의 전 + 분석 완료 시점이 있을 때)
+            const needsAgreement = (app.analysis_status === '승인' || app.analysis_status === '조건부승인') && !app.student_program_agreed;
+            if (needsAgreement && app.analysis_completed_at) {
+                startAnalysisCountdown(app.analysis_completed_at, app.is_incentive_applicant === true);
+            }
         }
     } else {
         const analysisTab = document.getElementById('tabStudentAnalysis');
