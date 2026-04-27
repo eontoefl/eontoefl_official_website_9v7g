@@ -971,7 +971,7 @@ function renderQuickMenu(app) {
             icon: 'fa-chart-line',
             text: '개인 분석 보기',
             action: () => window.location.href = `application-detail.html?id=${app.id}#step2`,
-            disabled: !app.analysis_completed_at && !app.student_agreed_at
+            disabled: !app.analysis_completed_at && !app.analysis_saved_at && !app.student_agreed_at
         },
         {
             icon: 'fa-file-contract',
@@ -1255,11 +1255,11 @@ function createNotificationsFromApplication(app) {
         });
     }
 
-    if (app.analysis_completed_at) {
+    if (app.analysis_completed_at || app.analysis_saved_at) {
         notifications.push({
             icon: 'fa-chart-line',
             message: '개인 분석이 완료되었습니다.',
-            time: formatNotificationTime(app.analysis_completed_at)
+            time: formatNotificationTime(app.analysis_completed_at || app.analysis_saved_at)
         });
     }
 
