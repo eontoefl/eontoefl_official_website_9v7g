@@ -963,7 +963,7 @@ function setupSundayOnlyDatePicker() {
     
     if (!startDateInput) return;
     
-    // Validate on change
+    // Validate on change (날짜를 실제로 선택했을 때만 검증)
     startDateInput.addEventListener('change', function() {
         const selectedDate = new Date(this.value);
         
@@ -971,17 +971,6 @@ function setupSundayOnlyDatePicker() {
         if (selectedDate.getDay() !== 0) {
             alert('수업 시작일은 매주 일요일만 가능합니다. 일요일을 선택해주세요.');
             this.value = ''; // Clear invalid selection
-        }
-    });
-    
-    // Also validate on blur
-    startDateInput.addEventListener('blur', function() {
-        if (this.value) {
-            const selectedDate = new Date(this.value);
-            if (selectedDate.getDay() !== 0) {
-                alert('수업 시작일은 매주 일요일만 가능합니다. 일요일을 선택해주세요.');
-                this.value = '';
-            }
         }
     });
 }
