@@ -129,7 +129,10 @@ async function loadApplicationDetail() {
             // 비로그인 상태
             if (!userData) {
                 alert('⚠️ 로그인이 필요합니다.\n\n신청서를 확인하려면 로그인해주세요.');
-                window.location.href = 'login.html';
+                // 로그인 후 원래 페이지로 복귀할 수 있도록 redirect 파라미터 전달
+                // (pathname + search + hash 보존: ex. /application-detail.html?id=XXX#step2)
+                const currentUrl = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+                window.location.href = `login.html?redirect=${currentUrl}`;
                 return;
             }
             
