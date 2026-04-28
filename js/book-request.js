@@ -297,6 +297,24 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // 폼 유효성 검증
     function validateForm() {
+        // 현재 점수 확인 (점수 입력 또는 "아직 없음" 체크 필수)
+        const noScoreCheck = document.getElementById('noScoreCheck');
+        const currentScoreInput = document.getElementById('currentScore');
+        if (!noScoreCheck.checked && currentScoreInput.value.trim() === '') {
+            alert('현재 토플 점수를 입력하거나 "아직 없음"을 체크해주세요.');
+            currentScoreInput.focus();
+            return false;
+        }
+
+        // 목표 점수 확인 (점수 입력 또는 "아직 정하지 않음" 체크 필수)
+        const noTargetScoreCheck = document.getElementById('noTargetScoreCheck');
+        const targetScoreInput = document.getElementById('targetScore');
+        if (!noTargetScoreCheck.checked && targetScoreInput.value.trim() === '') {
+            alert('목표 토플 점수를 입력하거나 "아직 정하지 않음"을 체크해주세요.');
+            targetScoreInput.focus();
+            return false;
+        }
+
         // 유입 경로 선택 확인
         const referralSource = document.getElementById('referralSource');
         if (!referralSource.value) {
