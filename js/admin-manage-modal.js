@@ -376,16 +376,76 @@ function loadModalInfoTab(app) {
 function loadModalAnalysisTab(app) {
     const container = document.getElementById('modalTabAnalysis');
     const hasAnalysis = app.analysis_status && app.analysis_content;
-    
-    // 읽기 전용/수정 모드 설정 (저장된 분석이 있으면 읽기 전용)
+
+    // 예약 발송 대기 중 여부 (정식 컬럼은 비어있고, 예약 시각 + pending 컬럼이 있음)
+    const isScheduled = !hasAnalysis
+        && !!app.analysis_alimtalk_scheduled_at
+        && !!app.analysis_status_pending
+        && !!app.analysis_content_pending;
+
+    // 읽기 전용/수정 모드 설정
+    //  - 저장 완료(공개됨)된 분석: 기본 읽기 전용 (수정 버튼 클릭 시 활성화)
+    //  - 예약 대기 중: 항상 수정 가능
+    //  - 그 외 (최초 저장 전): 항상 수정 가능
     const readOnly = hasAnalysis ? 'disabled' : '';
     const pointerEvents = hasAnalysis ? 'pointer-events: none; opacity: 0.7;' : '';
     const cursorStyle = hasAnalysis ? '' : 'cursor: pointer;';
-    
+
+    // 폼 prefill 시 사용할 값 (예약 중이면 pending 데이터에서 가져옴)
+    const pendingPayload = isScheduled ? (app.analysis_pending_payload || {}) : {};
+    const fillStatus  = isScheduled ? app.analysis_status_pending  : app.analysis_status;
+    const fillContent = isScheduled ? app.analysis_content_pending : app.analysis_content;
+    const fillProgram = isScheduled ? (pendingPayload.assigned_program || '') : (app.assigned_program || '');
+    const fillScheduleStart = isScheduled ? (pendingPayload.schedule_start || '') : (app.schedule_start || '');
+    const fillScheduleEnd   = isScheduled ? (pendingPayload.schedule_end || '')   : (app.schedule_end || '');
+    const fillCorrectionEnabled = isScheduled
+        ? (pendingPayload.correction_enabled === true)
+        : !!app.correction_enabled;
+    const fillCorrectionStartDate = isScheduled ? (pendingPayload.correction_start_date || '') : (app.correction_start_date || '');
+    const fillAdditionalDiscount = isScheduled
+        ? (pendingPayload.additional_discount || 0)
+        : (app.additional_discount || 0);
+    const fillDiscountReason = isScheduled ? (pendingPayload.discount_reason || '') : (app.discount_reason || '');
+    const fillIsIncentive = isScheduled
+        ? (pendingPayload.is_incentive_applicant === true)
+        : !!app.is_incentive_applicant;
+
     // 학생용 링크 생성
     const studentLink = `${window.location.origin}/analysis.html?id=${app.id}`;
-    
+
+    // 예약 발송 대기 배너 (예약 중일 때만)
+    const scheduledAtKstStr = isScheduled ? formatScheduledAtKst(app.analysis_alimtalk_scheduled_at) : '';
+    const scheduledBanner = isScheduled ? `
+        <div id="scheduledReleaseBanner" style="background: linear-gradient(135deg, #fff4e6 0%, #fefce8 100%); border: 2px solid #f59e0b; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 320px;">
+                    <i class="fas fa-clock" style="font-size: 24px; color: #d97706; margin-top: 2px;"></i>
+                    <div>
+                        <div style="font-weight: 700; font-size: 15px; color: #92400e; margin-bottom: 4px;">🕐 예약 발송 대기 중</div>
+                        <div style="font-size: 13px; color: #92400e; line-height: 1.6;">
+                            <strong>${scheduledAtKstStr}</strong>에 학생에게 공개되며<br>알림톡(${fillIsIncentive ? '프로모션 학생 전용 템플릿' : '일반 학생 템플릿'})이 발송됩니다.
+                        </div>
+                        <div style="font-size: 12px; color: #b45309; margin-top: 8px;">
+                            ⓘ 발송 전까지 분석 내용을 자유롭게 수정할 수 있습니다. 수정해도 예약 시각은 유지됩니다.
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                    <button type="button" onclick="openChangeScheduleModal()"
+                            style="padding: 8px 14px; background: white; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                        <i class="fas fa-calendar-alt"></i> 예약 시각 변경
+                    </button>
+                    <button type="button" onclick="cancelScheduledRelease()"
+                            style="padding: 8px 14px; background: white; color: #991b1b; border: 1px solid #ef4444; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                        <i class="fas fa-times"></i> 예약 취소
+                    </button>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
     let html = `
+        ${scheduledBanner}
         ${hasAnalysis ? `
         <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
@@ -425,11 +485,11 @@ function loadModalAnalysisTab(app) {
                     </div>
                     <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
                         <input type="checkbox" id="incentiveToggle" name="is_incentive_applicant"
-                               ${app.is_incentive_applicant ? 'checked' : ''}
+                               ${fillIsIncentive ? 'checked' : ''}
                                ${hasAnalysis ? 'disabled' : ''}
                                style="opacity: 0; width: 0; height: 0;">
-                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${app.is_incentive_applicant ? '#f59e0b' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
-                        <span style="position: absolute; top: 3px; left: ${app.is_incentive_applicant ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillIsIncentive ? '#f59e0b' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                        <span style="position: absolute; top: 3px; left: ${fillIsIncentive ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
                     </label>
                 </div>
             </div>
@@ -439,22 +499,22 @@ function loadModalAnalysisTab(app) {
                 <label class="form-label">1. 결과 선택 <span class="required">*</span></label>
                 <div id="statusOptionsContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; ${pointerEvents}">
                     <label style="${cursorStyle}">
-                        <input type="radio" name="analysis_status" value="승인" ${app.analysis_status === '승인' ? 'checked' : ''} required ${readOnly} style="display: none;">
-                        <div class="status-option status-option-approval" data-value="승인" style="padding: 20px; border: 2px solid ${app.analysis_status === '승인' ? '#86efac' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${app.analysis_status === '승인' ? '#f0fdf4' : '#ffffff'}; transition: all 0.2s;">
+                        <input type="radio" name="analysis_status" value="승인" ${fillStatus === '승인' ? 'checked' : ''} required ${readOnly} style="display: none;">
+                        <div class="status-option status-option-approval" data-value="승인" style="padding: 20px; border: 2px solid ${fillStatus === '승인' ? '#86efac' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${fillStatus === '승인' ? '#f0fdf4' : '#ffffff'}; transition: all 0.2s;">
                             <i class="fas fa-check-circle" style="font-size: 32px; color: #86efac; margin-bottom: 8px;"></i>
                             <div style="font-weight: 600; font-size: 15px; color: #166534;">승인</div>
                         </div>
                     </label>
                     <label style="${cursorStyle}">
-                        <input type="radio" name="analysis_status" value="조건부승인" ${app.analysis_status === '조건부승인' ? 'checked' : ''} ${readOnly} style="display: none;">
-                        <div class="status-option status-option-conditional" data-value="조건부승인" style="padding: 20px; border: 2px solid ${app.analysis_status === '조건부승인' ? '#fcd34d' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${app.analysis_status === '조건부승인' ? '#fef3c7' : '#ffffff'}; transition: all 0.2s;">
+                        <input type="radio" name="analysis_status" value="조건부승인" ${fillStatus === '조건부승인' ? 'checked' : ''} ${readOnly} style="display: none;">
+                        <div class="status-option status-option-conditional" data-value="조건부승인" style="padding: 20px; border: 2px solid ${fillStatus === '조건부승인' ? '#fcd34d' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${fillStatus === '조건부승인' ? '#fef3c7' : '#ffffff'}; transition: all 0.2s;">
                             <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: #fcd34d; margin-bottom: 8px;"></i>
                             <div style="font-weight: 600; font-size: 15px; color: #92400e;">조건부승인</div>
                         </div>
                     </label>
                     <label style="${cursorStyle}">
-                        <input type="radio" name="analysis_status" value="거부" ${app.analysis_status === '거부' ? 'checked' : ''} ${readOnly} style="display: none;">
-                        <div class="status-option status-option-reject" data-value="거부" style="padding: 20px; border: 2px solid ${app.analysis_status === '거부' ? '#fca5a5' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${app.analysis_status === '거부' ? '#fee2e2' : '#ffffff'}; transition: all 0.2s;">
+                        <input type="radio" name="analysis_status" value="거부" ${fillStatus === '거부' ? 'checked' : ''} ${readOnly} style="display: none;">
+                        <div class="status-option status-option-reject" data-value="거부" style="padding: 20px; border: 2px solid ${fillStatus === '거부' ? '#fca5a5' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${fillStatus === '거부' ? '#fee2e2' : '#ffffff'}; transition: all 0.2s;">
                             <i class="fas fa-times-circle" style="font-size: 32px; color: #fca5a5; margin-bottom: 8px;"></i>
                             <div style="font-weight: 600; font-size: 15px; color: #991b1b;">거부</div>
                         </div>
@@ -470,9 +530,9 @@ function loadModalAnalysisTab(app) {
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 프로그램 <span class="required">*</span></label>
                         <select name="assigned_program" class="form-select" required ${readOnly} style="background-position: right 12px center;">
                             <option value="">선택하세요</option>
-                            <option value="내벨업챌린지 - Fast" ${app.assigned_program === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
-                            <option value="내벨업챌린지 - Standard" ${app.assigned_program === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
-                            <option value="상담 후 결정" ${app.assigned_program === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
+                            <option value="내벨업챌린지 - Fast" ${fillProgram === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
+                            <option value="내벨업챌린지 - Standard" ${fillProgram === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
+                            <option value="상담 후 결정" ${fillProgram === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
                         </select>
                         <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                             학생 희망: <strong>${app.preferred_program || '-'}</strong>
@@ -483,8 +543,8 @@ function loadModalAnalysisTab(app) {
                         <select name="correction_enabled" id="correction_enabled" class="form-select" ${readOnly}
                                 onchange="toggleCorrectionStartDate(); calculateModalPrice();"
                                 style="background-position: right 12px center;">
-                            <option value="false" ${!app.correction_enabled ? 'selected' : ''}>미포함</option>
-                            <option value="true" ${app.correction_enabled ? 'selected' : ''}>포함 (+200,000원)</option>
+                            <option value="false" ${!fillCorrectionEnabled ? 'selected' : ''}>미포함</option>
+                            <option value="true" ${fillCorrectionEnabled ? 'selected' : ''}>포함 (+200,000원)</option>
                         </select>
                         <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                             학생 희망: <strong>${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
@@ -500,7 +560,7 @@ function loadModalAnalysisTab(app) {
                     <div>
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 시작일 (일요일만) <span class="required">*</span></label>
                         <input type="date" name="schedule_start" id="schedule_start" 
-                               value="${app.schedule_start || ''}" 
+                               value="${fillScheduleStart}" 
                                required
                                ${readOnly}
                                style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
@@ -508,7 +568,7 @@ function loadModalAnalysisTab(app) {
                     <div>
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 종료일 (자동계산)</label>
                         <input type="date" name="schedule_end" id="schedule_end" 
-                               value="${app.schedule_end || ''}" 
+                               value="${fillScheduleEnd}" 
                                readonly
                                style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-family: 'Pretendard', -apple-system, sans-serif;">
                     </div>
@@ -516,10 +576,10 @@ function loadModalAnalysisTab(app) {
                 <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                     학생이 희망한 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
                 </div>
-                <div id="correctionStartDateWrapper" style="margin-top: 12px; ${app.correction_enabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일만)${app.correction_enabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
+                <div id="correctionStartDateWrapper" style="margin-top: 12px; ${fillCorrectionEnabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일만)${fillCorrectionEnabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
                     <input type="date" name="correction_start_date" id="correction_start_date"
-                           value="${app.correction_start_date || ''}"
+                           value="${fillCorrectionStartDate}"
                            ${readOnly}
                            style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
                 </div>
@@ -539,7 +599,7 @@ function loadModalAnalysisTab(app) {
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">시험료 지원</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #22c55e;">-210,000원</td>
                         </tr>
-                        <tr id="correctionPriceRow" style="${app.correction_enabled ? '' : 'display: none;'}">
+                        <tr id="correctionPriceRow" style="${fillCorrectionEnabled ? '' : 'display: none;'}">
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">스라첨삭</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #3b82f6;">+200,000원</td>
                         </tr>
@@ -547,7 +607,7 @@ function loadModalAnalysisTab(app) {
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">
                                 추가 할인 
                                 <input type="number" name="additional_discount" id="additional_discount" 
-                                       value="${app.additional_discount || 0}" min="0" max="790000"
+                                       value="${fillAdditionalDiscount}" min="0" max="790000"
                                        ${readOnly}
                                        onchange="calculateModalPrice()"
                                        style="width: 120px; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 4px; margin-left: 8px;">원
@@ -564,9 +624,9 @@ function loadModalAnalysisTab(app) {
                         </tr>
                         </tbody>
                     </table>
-                    <div id="discountReasonWrapper" style="margin-top: 12px; display: ${app.additional_discount && app.additional_discount > 0 ? 'block' : 'none'};">
+                    <div id="discountReasonWrapper" style="margin-top: 12px; display: ${fillAdditionalDiscount && fillAdditionalDiscount > 0 ? 'block' : 'none'};">
                         <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 4px;">할인 사유</label>
-                        <input type="text" name="discount_reason" value="${app.discount_reason || ''}" 
+                        <input type="text" name="discount_reason" value="${fillDiscountReason}" 
                                ${readOnly}
                                placeholder="할인 사유 입력"
                                style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -597,7 +657,7 @@ function loadModalAnalysisTab(app) {
 [학습 계획]
 1주차: 기초 문법 다지기
 2-4주차: Reading 실전 연습
-5-8주차: Listening 강화 훈련">${app.analysis_content || ''}</textarea>
+5-8주차: Listening 강화 훈련">${fillContent || ''}</textarea>
             </div>
             
             <!-- 하단 버튼 -->
@@ -612,11 +672,28 @@ function loadModalAnalysisTab(app) {
                     </button>
                     ` : ''}
                 </div>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
                     <button type="button" class="btn-secondary" onclick="closeManageModal()">취소</button>
-                    <button type="submit" class="btn-primary" id="saveAnalysisBtn" ${hasAnalysis ? 'disabled style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px;"' : 'style="padding: 12px 24px;"'}>
-                        <i class="fas fa-save"></i> ${hasAnalysis ? '저장' : '분석 저장'}
-                    </button>
+                    ${isScheduled ? `
+                        <!-- 예약 중: 변경사항 저장 (예약 시각 유지) -->
+                        <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="update-scheduled" style="padding: 12px 24px;">
+                            <i class="fas fa-save"></i> 변경사항 저장
+                        </button>
+                    ` : hasAnalysis ? `
+                        <!-- 이미 공개됨: 기존 흐름 (수정하기 클릭 후 저장) -->
+                        <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="immediate" disabled style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px;">
+                            <i class="fas fa-save"></i> 저장
+                        </button>
+                    ` : `
+                        <!-- 최초 저장: 즉시 발송 / 예약 발송 분기 -->
+                        <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="immediate" style="padding: 12px 24px;">
+                            <i class="fas fa-paper-plane"></i> 즉시 저장 + 발송
+                        </button>
+                        <button type="button" class="btn-primary" onclick="openScheduleModal()"
+                                style="padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            <i class="fas fa-clock"></i> 예약 저장 + 발송
+                        </button>
+                    `}
                 </div>
             </div>
         </form>
@@ -628,7 +705,8 @@ function loadModalAnalysisTab(app) {
     calculateModalPrice();
     toggleCorrectionStartDate();
     
-    // 결과 선택 옵션에 클릭 이벤트 추가 (읽기 전용 모드가 아닐 때만)
+    // 결과 선택 옵션에 클릭 이벤트 추가
+    // (저장 완료 후 읽기 전용 상태가 아닐 때 = 최초 저장 전 또는 예약 대기 중)
     if (!hasAnalysis) {
         document.querySelectorAll('.status-option').forEach(option => {
             option.addEventListener('click', function(e) {
@@ -830,17 +908,37 @@ async function upsertCorrectionSchedule(userId, startDate, durationWeeks) {
     return await response.json();
 }
 
-// 분석 저장
+// ===== 분석 저장 =====
+// 호출 모드 (saveAnalysisBtn 의 data-mode 또는 _scheduledMode 임시 플래그):
+//   - 'immediate'         : 즉시 저장 + 알림톡 즉시 발송 (기존 동작)
+//   - 'scheduled'         : 예약 저장 (DB는 pending 컬럼에 보관, 알림톡은 cron이 발송)
+//   - 'update-scheduled'  : 예약 대기 중인 분석 내용만 수정 (예약 시각은 유지)
 async function saveModalAnalysis(event) {
     event.preventDefault();
-    
-    if (!confirm('개별분석을 저장하시겠습니까?\n\n저장하면 학생이 확인하고 동의할 수 있습니다.')) {
-        return;
-    }
-    
+
     const form = event.target;
+    const saveBtn = document.getElementById('saveAnalysisBtn');
+    // openScheduleModal()이 _scheduledMode='scheduled'와 _scheduledAtIso를 세팅하고 폼을 submit함.
+    let mode = window._scheduledMode || (saveBtn?.dataset?.mode || 'immediate');
+    const scheduledAtIso = window._scheduledAtIso || null;
+    // 한 번 사용했으면 즉시 클리어 (다음 저장 시 영향 방지)
+    window._scheduledMode = null;
+    window._scheduledAtIso = null;
+
+    // 모드별 confirm 메시지
+    let confirmMsg;
+    if (mode === 'scheduled') {
+        const kstStr = formatScheduledAtKst(scheduledAtIso);
+        confirmMsg = `예약 발송으로 저장하시겠습니까?\n\n📅 ${kstStr}에\n   학생에게 공개 + 알림톡 발송됩니다.\n\n발송 전까지 분석 내용을 자유롭게 수정하실 수 있습니다.`;
+    } else if (mode === 'update-scheduled') {
+        confirmMsg = '변경사항을 저장하시겠습니까?\n\n예약 시각은 그대로 유지됩니다.';
+    } else {
+        confirmMsg = '개별분석을 즉시 저장하고 알림톡을 발송하시겠습니까?\n\n학생이 즉시 확인하고 동의할 수 있습니다.';
+    }
+    if (!confirm(confirmMsg)) return;
+
     const formData = new FormData(form);
-    
+
     // 가격 계산
     const basePrice = 1000000;
     const examSupport = 210000;
@@ -849,10 +947,59 @@ async function saveModalAnalysis(event) {
     const correctionFee = correctionEnabled ? 200000 : 0;
     const deposit = 100000;
     const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
-    
+
     const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
-    
     const nowMs = Date.now();
+
+    // === 분기: 예약 발송 ===
+    if (mode === 'scheduled' || mode === 'update-scheduled') {
+        // pending 컬럼에 저장 (정식 컬럼은 건드리지 않음 → 학생에게 공개되지 않음)
+        const pendingPayload = {
+            assigned_program: formData.get('assigned_program'),
+            correction_enabled: correctionEnabled,
+            correction_start_date: correctionEnabled ? (formData.get('correction_start_date') || null) : null,
+            correction_fee: correctionFee,
+            program_price: basePrice,
+            discount_amount: examSupport,
+            additional_discount: additionalDiscount,
+            discount_reason: formData.get('discount_reason') || '',
+            final_price: finalPrice,
+            schedule_start: formData.get('schedule_start'),
+            schedule_end: formData.get('schedule_end'),
+            is_incentive_applicant: isIncentive
+        };
+
+        const updateData = {
+            analysis_status_pending: formData.get('analysis_status'),
+            analysis_content_pending: formData.get('analysis_content'),
+            analysis_pending_payload: pendingPayload
+        };
+        // 'scheduled' 모드일 때만 예약 시각 새로 세팅. 'update-scheduled'는 시각 유지.
+        if (mode === 'scheduled') {
+            updateData.analysis_alimtalk_scheduled_at = scheduledAtIso;
+        }
+
+        try {
+            const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
+            if (!updatedApp) { alert('❌ 저장에 실패했습니다.'); return; }
+
+            currentManageApp = updatedApp;
+
+            if (mode === 'scheduled') {
+                const kstStr = formatScheduledAtKst(updatedApp.analysis_alimtalk_scheduled_at);
+                alert(`✅ 예약 저장 완료!\n\n🕐 ${kstStr}에\n   학생에게 공개 + 알림톡 발송됩니다.\n\n발송 전까지 자유롭게 수정하실 수 있습니다.`);
+            } else {
+                alert('✅ 변경사항이 저장되었습니다.\n\n예약 시각은 그대로 유지됩니다.');
+            }
+            loadModalTab('analysis');
+        } catch (error) {
+            console.error('Save scheduled analysis error:', error);
+            alert('❌ 오류가 발생했습니다.\n\n' + (error.message || ''));
+        }
+        return;
+    }
+
+    // === 분기: 즉시 저장 + 발송 (기존 동작) ===
     const updateData = {
         analysis_status: formData.get('analysis_status'),
         assigned_program: formData.get('assigned_program'),
@@ -870,18 +1017,22 @@ async function saveModalAnalysis(event) {
         analysis_saved_at: nowMs,
         current_step: 2,
         status: '개별분석완료',
-        is_incentive_applicant: isIncentive
+        is_incentive_applicant: isIncentive,
+        // 즉시 저장 시 예약 데이터가 남아있으면 정리 (이론상 이 분기는 isScheduled=false 상태에서만 도달하지만 안전장치)
+        analysis_alimtalk_scheduled_at: null,
+        analysis_status_pending: null,
+        analysis_content_pending: null,
+        analysis_pending_payload: null
     };
 
     // 동의 데드라인 계산 기준: 최초 저장 시에만 기록.
-    // 이후 수정 저장에서는 이 값이 바뀌지 않아야 데드라인이 밀리지 않음.
     if (!currentManageApp.analysis_first_saved_at) {
         updateData.analysis_first_saved_at = nowMs;
     }
-    
+
     try {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
-        
+
         if (updatedApp) {
             // 첨삭 포함일 때 correction_schedules UPSERT
             if (correctionEnabled && updateData.correction_start_date) {
@@ -907,10 +1058,10 @@ async function saveModalAnalysis(event) {
 
             const incentiveNotice = isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '';
             alert('✅ 개별분석이 저장되었습니다!' + incentiveNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
-            
+
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;
-            
+
             // 탭 새로고침
             loadModalTab('analysis');
         } else {
@@ -920,6 +1071,189 @@ async function saveModalAnalysis(event) {
         console.error('Save analysis error:', error);
         alert('❌ 오류가 발생했습니다.');
     }
+}
+
+// ===== 예약 발송: 헬퍼 + UI =====
+
+// timestamptz/ISO 문자열을 KST 가독 포맷으로 변환
+function formatScheduledAtKst(value) {
+    if (!value) return '-';
+    const d = (value instanceof Date) ? value : new Date(value);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    });
+}
+
+// 예약 발송 모달 열기 (최초 저장 시 사용)
+function openScheduleModal() {
+    // 폼 유효성 사전 체크 — 사용자가 필수 항목을 비운 채로 예약 누르는 것 방지
+    const form = document.getElementById('modalAnalysisForm');
+    if (!form) return;
+    if (!form.reportValidity()) return;
+
+    showScheduleModal({
+        title: '🕐 예약 발송 시각 설정',
+        subtitle: '입력하신 분석 내용은 아래 시각에 학생에게 공개되며 알림톡이 발송됩니다.',
+        defaultIso: defaultScheduleIso(),
+        confirmLabel: '예약 저장',
+        onConfirm: (iso) => {
+            // 폼 submit 으로 트리거 (saveModalAnalysis가 실행됨)
+            window._scheduledMode = 'scheduled';
+            window._scheduledAtIso = iso;
+            form.requestSubmit();
+        }
+    });
+}
+
+// 예약 시각 변경 모달 (예약 대기 중인 항목)
+function openChangeScheduleModal() {
+    if (!currentManageApp || !currentManageApp.analysis_alimtalk_scheduled_at) return;
+    showScheduleModal({
+        title: '📅 예약 시각 변경',
+        subtitle: `현재 예약: ${formatScheduledAtKst(currentManageApp.analysis_alimtalk_scheduled_at)}`,
+        defaultIso: currentManageApp.analysis_alimtalk_scheduled_at,
+        confirmLabel: '변경 저장',
+        onConfirm: async (iso) => {
+            try {
+                const updated = await supabaseAPI.patch('applications', currentManageApp.id, {
+                    analysis_alimtalk_scheduled_at: iso
+                });
+                if (!updated) { alert('❌ 변경에 실패했습니다.'); return; }
+                currentManageApp = updated;
+                alert(`✅ 예약 시각이 변경되었습니다.\n\n🕐 ${formatScheduledAtKst(iso)}`);
+                closeScheduleModal();
+                loadModalTab('analysis');
+            } catch (e) {
+                console.error('Change schedule error:', e);
+                alert('❌ 변경 중 오류가 발생했습니다.\n\n' + (e.message || ''));
+            }
+        }
+    });
+}
+
+// 예약 취소
+async function cancelScheduledRelease() {
+    if (!currentManageApp || !currentManageApp.analysis_alimtalk_scheduled_at) return;
+    if (!confirm('예약 발송을 취소하시겠습니까?\n\n분석 내용은 그대로 유지되며,\n다시 [즉시 발송] 또는 [예약 발송]을 선택하실 수 있습니다.\n\n학생에게는 아무런 영향이 없습니다.')) return;
+
+    try {
+        const updated = await supabaseAPI.patch('applications', currentManageApp.id, {
+            analysis_alimtalk_scheduled_at: null,
+            analysis_status_pending: null,
+            analysis_content_pending: null,
+            analysis_pending_payload: null
+        });
+        if (!updated) { alert('❌ 취소에 실패했습니다.'); return; }
+        currentManageApp = updated;
+        alert('✅ 예약이 취소되었습니다.\n\n분석 내용은 폼에 그대로 보존되어 있으니,\n다시 [즉시 발송] 또는 [예약 발송]을 선택해주세요.');
+        loadModalTab('analysis');
+    } catch (e) {
+        console.error('Cancel schedule error:', e);
+        alert('❌ 취소 중 오류가 발생했습니다.\n\n' + (e.message || ''));
+    }
+}
+
+// 기본 예약 시각: 다음 정시 (예: 14:23 → 15:00). 30분 이내면 다다음 정시.
+function defaultScheduleIso() {
+    const d = new Date();
+    d.setMinutes(0, 0, 0);
+    d.setHours(d.getHours() + ((new Date().getMinutes() < 30) ? 1 : 2));
+    return d.toISOString();
+}
+
+// ISO → datetime-local 입력값 형식 (YYYY-MM-DDTHH:mm, KST 기준)
+function isoToDatetimeLocalKst(iso) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    // KST 기준 컴포넌트 추출
+    const kst = new Date(d.getTime() + (9 * 60 - d.getTimezoneOffset()) * 60 * 1000);
+    const yy = kst.getUTCFullYear();
+    const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(kst.getUTCDate()).padStart(2, '0');
+    const hh = String(kst.getUTCHours()).padStart(2, '0');
+    const mi = String(kst.getUTCMinutes()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+// datetime-local 값 (KST 기준 wall time) → ISO 문자열
+function datetimeLocalKstToIso(localStr) {
+    if (!localStr) return null;
+    // localStr 예: "2026-04-30T14:00" (KST 의도)
+    // KST = UTC+9 이므로 9시간 빼서 UTC로 만든 다음 ISO
+    const [datePart, timePart] = localStr.split('T');
+    const [y, m, dd] = datePart.split('-').map(Number);
+    const [hh, mi] = timePart.split(':').map(Number);
+    const utcMs = Date.UTC(y, m - 1, dd, hh - 9, mi, 0, 0);
+    return new Date(utcMs).toISOString();
+}
+
+// 예약 시각 선택 모달 (공통)
+function showScheduleModal({ title, subtitle, defaultIso, confirmLabel, onConfirm }) {
+    closeScheduleModal(); // 기존 인스턴스 제거
+
+    const overlay = document.createElement('div');
+    overlay.id = 'scheduleModalOverlay';
+    overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+    const minLocal = isoToDatetimeLocalKst(new Date(Date.now() + 60 * 1000).toISOString()); // 최소: 1분 후
+    const defaultLocal = isoToDatetimeLocalKst(defaultIso);
+
+    overlay.innerHTML = `
+        <div style="background: white; border-radius: 16px; padding: 28px; max-width: 460px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+            <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">${title}</div>
+            <div style="font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 20px;">${subtitle}</div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">발송 시각 (KST)</label>
+            <input type="datetime-local" id="scheduleAtInput"
+                   value="${defaultLocal}"
+                   min="${minLocal}"
+                   style="width: 100%; padding: 12px 14px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-family: inherit;">
+            <div style="font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                ⓘ 매분 단위로 cron이 체크하므로 실제 발송은 지정 시각의 ±1분 이내에 처리됩니다.<br>
+                ⓘ 한국 표준시(KST) 기준입니다.
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px;">
+                <button type="button" class="btn-secondary" onclick="closeScheduleModal()">취소</button>
+                <button type="button" id="scheduleConfirmBtn"
+                        style="padding: 10px 20px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                    <i class="fas fa-check"></i> ${confirmLabel}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 외부 영역 클릭 시 닫기
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeScheduleModal();
+    });
+
+    document.getElementById('scheduleConfirmBtn').addEventListener('click', () => {
+        const input = document.getElementById('scheduleAtInput');
+        const localStr = input.value;
+        if (!localStr) {
+            alert('발송 시각을 선택해주세요.');
+            return;
+        }
+        const iso = datetimeLocalKstToIso(localStr);
+        if (!iso) { alert('유효한 시각을 선택해주세요.'); return; }
+        // 과거 시각 방지
+        if (new Date(iso).getTime() <= Date.now()) {
+            alert('현재 이후의 시각을 선택해주세요.');
+            return;
+        }
+        // 모달은 onConfirm 안에서 닫는 게 자연스러움(에러 시 유지). 여기선 일단 닫기.
+        closeScheduleModal();
+        onConfirm(iso);
+    });
+}
+
+function closeScheduleModal() {
+    const el = document.getElementById('scheduleModalOverlay');
+    if (el) el.remove();
 }
 
 // 미리보기 함수
