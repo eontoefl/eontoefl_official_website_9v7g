@@ -9,13 +9,13 @@ let bookProgressCache = {};  // user_id → { max_page_reached, last_page, is_co
 let bookMemoCountCache = {}; // user_id → count
 
 // ===== 유도학생 상태 판별 =====
-// 반환값: 'waiting' (동의 대기) | 'converted' (동의 완료=매출전환) | 'expired' (5일 만료) | null (유도학생 아님/분석 전)
+// 반환값: 'waiting' (동의 대기 또는 분석 전) | 'converted' (동의 완료=매출전환) | 'expired' (5일 만료) | null (유도학생 아님)
 function getIncentiveStatus(app) {
     if (!app.is_incentive_applicant) return null;
     // 동의 완료 → 매출 전환
     if (app.student_agreed_at) return 'converted';
     const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
-    if (!analysisTs) return null; // 분석 전
+    if (!analysisTs) return 'waiting'; // 분석 전이어도 프로모션 상태 표시 (목록 일괄처리로 ON된 케이스)
     const deadlineMs = 5 * 24 * 60 * 60 * 1000;
     const remaining = deadlineMs - (Date.now() - new Date(analysisTs).getTime());
     if (remaining <= 0) return 'expired';
