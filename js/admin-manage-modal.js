@@ -877,18 +877,17 @@ async function saveModalAnalysis(event) {
                 }
             }
 
-            // 알림톡: 개별분석 완료 안내 (프로모션 유도 학생은 알림톡 미발송 — 수동 전달)
-            if (!isIncentive) {
-                try {
-                    await sendKakaoAlimTalk('analysis_complete', {
-                        name: updatedApp.name || currentManageApp.name,
-                        phone: updatedApp.phone || currentManageApp.phone,
-                        app_id: updatedApp.id || currentManageApp.id
-                    });
-                } catch (e) { console.warn('알림톡 발송 실패:', e); }
-            }
+            // 알림톡: 개별분석 완료 안내 (프로모션 학생은 전용 템플릿, 일반 학생은 기본 템플릿)
+            const alimTalkType = isIncentive ? 'incentive_analysis_complete' : 'analysis_complete';
+            try {
+                await sendKakaoAlimTalk(alimTalkType, {
+                    name: updatedApp.name || currentManageApp.name,
+                    phone: updatedApp.phone || currentManageApp.phone,
+                    app_id: updatedApp.id || currentManageApp.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
-            const incentiveNotice = isIncentive ? '\n\n⚠️ 프로모션 유도 학생 — 알림톡 미발송\n직접 카카오톡으로 안내해주세요.' : '';
+            const incentiveNotice = isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '';
             alert('✅ 개별분석이 저장되었습니다!' + incentiveNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
             
             // 앱 데이터 업데이트

@@ -13,7 +13,7 @@ const TESTROOM_URL = "https://testroom.eonfl.com";
 
 // ===== 템플릿 ID 매핑 =====
 const TEMPLATE_IDS: Record<string, number> = {
-  analysis_complete:  50202,  // 개별분석 완료 안내
+  analysis_complete:  50202,  // 개별분석 완료 안내 (일반 학생)
   contract_sent:      50203,  // 계약서 발송 안내
   payment_request:    50204,  // 입금 안내
   payment_confirmed:  50205,  // 입금 확인 완료
@@ -23,6 +23,8 @@ const TEMPLATE_IDS: Record<string, number> = {
   correction_start_reminder: 50200, // 스라첨삭 시작 안내
   correction_feedback_1: 50211,  // 1차 첨삭 완료 안내
   correction_feedback_2: 50212,  // 최종 첨삭 완료 안내
+  incentive_analysis_complete: 50214,  // 프로모션 학생: 개별분석 & 입문서 전송 완료 안내
+  incentive_deadline_warning:  50215,  // 프로모션 학생: 동의 마감 6시간 전 안내
 };
 
 // ===== 택배사 코드 매핑 (LunaSoft carrier_code) =====
@@ -204,6 +206,37 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "최종 점수와 모범 답안을 확인해보세요.",
       ].join("\n");
 
+    case "incentive_analysis_complete":
+      return [
+        "이온토플 - 개별분석 & 입문서 전송 완료 안내",
+        "",
+        `${data.name}님, 안녕하세요!`,
+        "",
+        "요청하신 개별분석을 올려드렸어요 :)",
+        "아래 링크에서 분석 결과를 확인하실 수 있습니다.",
+        "",
+        "입문서는 공홈 로그인 후 우측 상단 이름 클릭 > 내 대시보드에서 확인 가능합니다.",
+        "",
+        "[안내]",
+        "- 5일 이내 동의 시 할인 적용된 금액으로 진행됩니다.",
+        "- 할인은 본 안내일로부터 5일간만 유효하며, 이후 재신청 시 적용 불가합니다.",
+        "- 5일 내 미동의 시, 이후 5일간 신청서 제출이 제한됩니다.",
+        "",
+        "궁금한 점은 편하게 문의해주세요 !",
+      ].join("\n");
+
+    case "incentive_deadline_warning": {
+      const hoursLeft = (data.time as string) || "6";
+      return [
+        "이온토플 - 개별분석 동의 마감 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `요청하신 개별분석의 동의 가능 기간이 ${hoursLeft}시간 후 에 만료됩니다.`,
+        "만료 전에 분석 결과를 확인하시고 동의 여부를 결정해주세요!",
+      ].join("\n");
+    }
+
     default:
       return "";
   }
@@ -232,6 +265,10 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 1차 첨삭이 완료되었습니다. 피드백 확인 후 수정본을 제출해주세요. https://testroom.eonfl.com";
     case "correction_feedback_2":
       return "[이온토플] 최종 첨삭이 완료되었습니다. 최종 점수와 모범 답안을 확인해보세요. https://testroom.eonfl.com";
+    case "incentive_analysis_complete":
+      return "[이온토플] 요청하신 개별분석이 등록되었습니다. 5일 이내 확인 후 동의 부탁드려요.";
+    case "incentive_deadline_warning":
+      return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
