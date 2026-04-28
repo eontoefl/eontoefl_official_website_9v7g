@@ -480,7 +480,7 @@ function loadModalAnalysisTab(app) {
                         <i class="fas fa-bullhorn" style="font-size: 18px; color: #d97706;"></i>
                         <div>
                             <div style="font-weight: 600; font-size: 14px; color: #92400e;">프로모션 유도 학생</div>
-                            <div style="font-size: 12px; color: #b45309; margin-top: 2px;">ON 시 동의 데드라인 5일 적용 · 알림톡 미발송</div>
+                            <div style="font-size: 12px; color: #b45309; margin-top: 2px;">ON 시 동의 데드라인 5일 적용 · 프로모션 전용 알림톡 자동 발송</div>
                         </div>
                     </div>
                     <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
