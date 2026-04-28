@@ -162,25 +162,16 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     }
 
-    // 카카오 채널 추가 버튼 클릭 추적
+    // 카카오 채널 추가 버튼 클릭 추적 (내부 상태만 변경, UI 변화 없음)
     let kakaoChannelClicked = false;
 
     function setupKakaoChannelTracking() {
         const btn = document.getElementById('kakaoChannelBtn');
-        const status = document.getElementById('kakaoChannelStatus');
-
         if (!btn) return;
 
         btn.addEventListener('click', function () {
-            // 새 창은 href로 자동 열림. 우리는 클릭 상태만 기록
+            // 새 창은 href로 자동 열림. 내부적으로 클릭 상태만 기록.
             kakaoChannelClicked = true;
-
-            // 버튼 시각적 변경
-            btn.classList.add('clicked');
-            btn.querySelector('span:last-child').textContent = '✓ 카카오 채널 추가하기 (다시 클릭 가능)';
-
-            // 안내 메시지 표시
-            if (status) status.style.display = 'block';
         });
     }
 
