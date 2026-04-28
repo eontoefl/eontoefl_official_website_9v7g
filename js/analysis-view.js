@@ -166,7 +166,8 @@ function displayAnalysis(app) {
     }
     
     // 타이머 초기값 계산
-    const viewAnalysisTs = app.analysis_completed_at || app.analysis_saved_at;
+    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+    const viewAnalysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
     const viewDeadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
     const viewElapsedMs = viewAnalysisTs ? (Date.now() - new Date(viewAnalysisTs).getTime()) : 0;
     const viewRemainingMs = viewDeadlineMs - viewElapsedMs;
@@ -323,7 +324,8 @@ function displayAnalysis(app) {
         submitBtn.addEventListener('click', () => submitAgreement(app.id));
         
         // 실시간 카운트다운 시작
-        const viewAnalysisTs = app.analysis_completed_at || app.analysis_saved_at;
+        // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+        const viewAnalysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
         if (viewAnalysisTs) {
             startViewCountdown(viewAnalysisTs, app.is_incentive_applicant === true);
         }

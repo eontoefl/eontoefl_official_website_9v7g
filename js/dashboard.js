@@ -241,7 +241,9 @@ function renderActionItems(app) {
     if (app.analysis_saved_at && !app.student_agreed_at) {
         const isIncentive = app.is_incentive_applicant === true;
         const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-        const savedTime = new Date(app.analysis_saved_at).getTime();
+        // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+        const deadlineAnchor = app.analysis_first_saved_at || app.analysis_saved_at;
+        const savedTime = new Date(deadlineAnchor).getTime();
         const remainingMs = deadlineMs - (Date.now() - savedTime);
         
         const initialCountdown = formatDashboardCountdown(remainingMs, isIncentive);

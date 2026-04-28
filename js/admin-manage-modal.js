@@ -841,6 +841,7 @@ async function saveModalAnalysis(event) {
     
     const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
     
+    const nowMs = Date.now();
     const updateData = {
         analysis_status: formData.get('analysis_status'),
         assigned_program: formData.get('assigned_program'),
@@ -855,11 +856,17 @@ async function saveModalAnalysis(event) {
         schedule_start: formData.get('schedule_start'),
         schedule_end: formData.get('schedule_end'),
         analysis_content: formData.get('analysis_content'),
-        analysis_saved_at: Date.now(),
+        analysis_saved_at: nowMs,
         current_step: 2,
         status: '개별분석완료',
         is_incentive_applicant: isIncentive
     };
+
+    // 동의 데드라인 계산 기준: 최초 저장 시에만 기록.
+    // 이후 수정 저장에서는 이 값이 바뀌지 않아야 데드라인이 밀리지 않음.
+    if (!currentManageApp.analysis_first_saved_at) {
+        updateData.analysis_first_saved_at = nowMs;
+    }
     
     try {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
