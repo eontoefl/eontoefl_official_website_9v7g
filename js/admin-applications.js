@@ -936,7 +936,7 @@ async function bulkSetIncentive(turnOn) {
         confirmMsg += `• 학생 동의 데드라인: 24시간 → 5일\n`;
         confirmMsg += `• 입문서 탭에 노출됨\n`;
         confirmMsg += `• 이름 옆 "프로모션" 뱃지 표시\n`;
-        confirmMsg += `• (이후 분석 저장 시) 알림톡 미발송, 카카오톡 직접 안내 필요\n\n`;
+        confirmMsg += `• (이후 분석 저장 시) 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내) 자동 발송\n\n`;
         confirmMsg += `진행하시겠습니까?`;
     } else {
         confirmMsg = `선택한 ${selectedApps.length}명 중 ${needChangeApps.length}명의 프로모션 유도 학생 지정을 해제합니다.\n\n`;
