@@ -152,6 +152,8 @@ function downloadInfoTxt() {
         lines.push(`Listening : ${app.target_listening_old || '-'}`);
         lines.push(`Speaking : ${app.target_speaking_old || '-'}`);
         lines.push(`Writing : ${app.target_writing_old || '-'}`);
+    } else if (app.target_score) {
+        lines.push(`목표 점수 : ${app.target_score}점`);
     } else {
         lines.push('목표 점수 : 미입력');
     }
@@ -162,10 +164,14 @@ function downloadInfoTxt() {
     lines.push(`마지막 응시 가능일 : ${app.submission_deadline || '-'}`);
     lines.push(`희망 완료일 : ${app.preferred_completion || '-'}`);
 
-    lines.push('');
-    lines.push('=== 토플이 필요한 이유 ===');
-    lines.push(`목적 : ${app.toefl_reason || '-'}`);
-    lines.push(`상세 설명 : ${app.toefl_reason_detail || '-'}`);
+    if (app.toefl_reason) {
+        lines.push('');
+        lines.push('=== 토플이 필요한 이유 ===');
+        lines.push(`목적 : ${app.toefl_reason}`);
+        if (app.toefl_reason_detail) {
+            lines.push(`상세 설명 : ${app.toefl_reason_detail}`);
+        }
+    }
 
     lines.push('');
     lines.push('=== 기억에 남는 블로그 글 ===');
@@ -247,6 +253,9 @@ function loadModalInfoTab(app) {
             <div class="info-item"><label>Speaking</label><div>${app.target_speaking_old || '-'}</div></div>
             <div class="info-item"><label>Writing</label><div>${app.target_writing_old || '-'}</div></div>
         `;
+    } else if (app.target_score) {
+        // 입문서 신청자용 (단순 숫자 입력)
+        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>${app.target_score}점</div></div>`;
     } else {
         targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
     }
@@ -320,12 +329,14 @@ function loadModalInfoTab(app) {
             <div class="info-item"><label>희망 완료일</label><div>${app.preferred_completion || '-'}</div></div>
         </div>
 
-        <!-- 6. 토플 필요 이유 -->
+        <!-- 6. 토플 필요 이유 (있을 때만 표시 - 과거 신청자용) -->
+        ${app.toefl_reason ? `
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-question-circle"></i> 토플이 필요한 이유</h3>
-            <div class="info-item"><label>목적</label><div>${app.toefl_reason || '-'}</div></div>
-            <div class="info-item"><label>상세 설명</label><div style="white-space:pre-wrap;">${app.toefl_reason_detail || '-'}</div></div>
+            <div class="info-item"><label>목적</label><div>${app.toefl_reason}</div></div>
+            ${app.toefl_reason_detail ? `<div class="info-item"><label>상세 설명</label><div style="white-space:pre-wrap;">${app.toefl_reason_detail}</div></div>` : ''}
         </div>
+        ` : ''}
 
         <!-- 7. 블로그 인상 깊은 내용 -->
         <div class="info-card" style="margin-top: 16px;">

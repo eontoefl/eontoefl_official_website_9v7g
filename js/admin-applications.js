@@ -1047,39 +1047,83 @@ async function bulkExportShipping() {
     }
 }
 
-// 엑셀 다운로드
+// 엑셀 다운로드 (탭에 따라 다른 컬럼 구조로 출력)
 function downloadExcel() {
     if (filteredApplications.length === 0) {
         alert('다운로드할 데이터가 없습니다.');
         return;
     }
-    
-    // 엑셀 데이터 준비
-    const excelData = filteredApplications.map(app => ({
-        '이름': app.name || '',
-        '이메일': app.email || '',
-        '전화번호': app.phone || '',
-        '주소': app.address || '',
-        '직업': app.occupation || '',
-        '프로그램': app.preferred_program || '',
-        '스라첨삭': app.correction_enabled ? '포함' : '-',
-        '수업 시작일': app.preferred_start_date || '',
-        '제출 데드라인': app.submission_deadline || '',
-        '현재 점수': app.total_score || '',
-        '목표 점수': app.target_cutoff_old || app.target_cutoff_new || '',
-        '토플 필요 이유': app.toefl_reason || '',
-        '상태': app.status || '접수완료',
-        '신청일': formatDate(app.created_at),
-        '관리자 코멘트': app.admin_comment || ''
-    }));
-    
+
+    let excelData;
+    let sheetName;
+    let fileName;
+
+    if (currentAppTypeTab === 'book_only') {
+        // 입문서 탭: 광고 발송용 정리된 형태
+        excelData = filteredApplications.map(app => {
+            // UTM 데이터 펼치기
+            let utm = {};
+            if (app.utm_data) {
+                try {
+                    utm = typeof app.utm_data === 'string' ? JSON.parse(app.utm_data) : app.utm_data;
+                } catch (e) { utm = {}; }
+            }
+
+            // 유입경로 (기타면 상세 사용)
+            let referralSource = app.referral_source || '';
+            if (app.referral_source === '기타' && app.referral_source_detail) {
+                referralSource = app.referral_source_detail;
+            }
+
+            return {
+                '이름': app.name || '',
+                '이메일': app.email || '',
+                '전화번호': app.phone || '',
+                '현재점수': app.current_score != null ? app.current_score : (app.no_score ? '없음' : ''),
+                '목표점수': app.no_target_score ? '미정' : (app.target_score != null ? app.target_score : ''),
+                '유입경로(자가응답)': referralSource,
+                '카카오 채널 추가': app.kakao_channel_clicked ? 'O' : 'X',
+                '신청일시': formatDate(app.submitted_date || app.created_at),
+                'UTM Source': utm.utm_source || '',
+                'UTM Medium': utm.utm_medium || '',
+                'UTM Campaign': utm.utm_campaign || '',
+                'UTM Content': utm.utm_content || '',
+                'Referrer': app.referrer_url || '',
+                'Landing URL': app.landing_url || '',
+                'User Agent': app.user_agent || ''
+            };
+        });
+        sheetName = '입문서 신청자 목록';
+        fileName = `이온토플_입문서신청자_${formatDateOnly(Date.now())}.xlsx`;
+    } else {
+        // 챌린지 / 전체 탭: 기존 형식 유지 (토플 이유는 과거 데이터를 위해 유지)
+        excelData = filteredApplications.map(app => ({
+            '이름': app.name || '',
+            '이메일': app.email || '',
+            '전화번호': app.phone || '',
+            '주소': app.address || '',
+            '직업': app.occupation || '',
+            '프로그램': app.preferred_program || '',
+            '스라첨삭': app.correction_enabled ? '포함' : '-',
+            '수업 시작일': app.preferred_start_date || '',
+            '제출 데드라인': app.submission_deadline || '',
+            '현재 점수': app.total_score || '',
+            '목표 점수': app.target_cutoff_old || app.target_cutoff_new || '',
+            '토플 필요 이유': app.toefl_reason || '',
+            '상태': app.status || '접수완료',
+            '신청일': formatDate(app.created_at),
+            '관리자 코멘트': app.admin_comment || ''
+        }));
+        sheetName = '신청서 목록';
+        fileName = `이온토플_신청서_${formatDateOnly(Date.now())}.xlsx`;
+    }
+
     // 워크시트 생성
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '신청서 목록');
-    
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
     // 파일 다운로드
-    const fileName = `이온토플_신청서_${formatDateOnly(Date.now())}.xlsx`;
     XLSX.writeFile(wb, fileName);
 }
 
@@ -1410,25 +1454,46 @@ function displayBookApplications() {
         // 메모 수
         const memoCount = bookMemoCountCache[userId] || 0;
         
-        // 점수 표시
+        // 현재 점수 표시
         const scoreDisplay = app.current_score != null ? app.current_score : '<span style="color:#94a3b8;">없음</span>';
-        
-        // 토플 이유
-        let reasonDisplay = app.toefl_reason || '-';
-        if (app.toefl_reason === '기타' && app.toefl_reason_detail) {
-            reasonDisplay = app.toefl_reason_detail;
+
+        // 목표 점수 표시 (no_target_score 체크 또는 빈값)
+        let targetScoreDisplay;
+        if (app.no_target_score) {
+            targetScoreDisplay = '<span style="color:#94a3b8;">미정</span>';
+        } else if (app.target_score != null) {
+            targetScoreDisplay = app.target_score;
+        } else {
+            targetScoreDisplay = '<span style="color:#94a3b8;">-</span>';
         }
-        
+
         // 유입 경로
         let sourceDisplay = app.referral_source || '-';
         if (app.referral_source === '기타' && app.referral_source_detail) {
             sourceDisplay = app.referral_source_detail;
         }
-        
-        // 신청일
-        const submittedDate = (app.submitted_date || app.created_at)
-            ? new Date(app.submitted_date || app.created_at).toLocaleDateString('ko-KR') 
-            : '-';
+
+        // 유입경로 상세 정보 (referrer / UTM / landing) - 툴팁용
+        const referrerInfoParts = [];
+        if (app.referrer_url) referrerInfoParts.push(`직전: ${app.referrer_url}`);
+        if (app.landing_url) referrerInfoParts.push(`진입: ${app.landing_url}`);
+        if (app.utm_data) {
+            try {
+                const utm = typeof app.utm_data === 'string' ? JSON.parse(app.utm_data) : app.utm_data;
+                const utmStr = Object.entries(utm || {}).map(([k, v]) => `${k}=${v}`).join(', ');
+                if (utmStr) referrerInfoParts.push(`UTM: ${utmStr}`);
+            } catch (e) { /* ignore */ }
+        }
+        const hasReferrerInfo = referrerInfoParts.length > 0;
+        const referrerTooltip = hasReferrerInfo ? referrerInfoParts.join('\n') : '';
+
+        // 카카오 채널 추가 클릭 여부 표시 (이름 옆)
+        const kakaoIcon = app.kakao_channel_clicked
+            ? '<i class="fas fa-comment" style="color:#FEE500; margin-left:4px;" title="카카오 채널 추가 클릭함"></i>'
+            : '';
+
+        // 신청일시 (YYYY-MM-DD HH:mm 24시간제)
+        const submittedDate = formatDate(app.submitted_date || app.created_at);
         
         // 진도 바 색상
         const progressColor = isCompleted ? '#22c55e' : '#9480c5';
@@ -1446,15 +1511,18 @@ function displayBookApplications() {
                            onchange="toggleSelection('${app.id}')">
                 </td>
                 <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}
+                    ${escapeHtml(app.name)}${kakaoIcon}
                     ${badgeHtml}
                 </td>
                 <td style="font-size: 13px;">${escapeHtml(app.email)}</td>
                 <td style="font-size: 13px;">${escapeHtml(app.phone || '-')}</td>
                 <td style="font-size: 13px; font-weight: 600;">${scoreDisplay}</td>
-                <td style="font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(reasonDisplay)}">${escapeHtml(reasonDisplay)}</td>
-                <td style="font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sourceDisplay)}">${escapeHtml(sourceDisplay)}</td>
-                <td style="font-size: 13px; color: #64748b;">${submittedDate}</td>
+                <td style="font-size: 13px; font-weight: 600; color:#7c3aed;">${targetScoreDisplay}</td>
+                <td style="font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sourceDisplay)}">
+                    ${escapeHtml(sourceDisplay)}
+                    ${hasReferrerInfo ? `<i class="fas fa-info-circle" style="color:#9480c5; margin-left:4px; cursor:help;" title="${escapeHtml(referrerTooltip)}"></i>` : ''}
+                </td>
+                <td style="font-size: 12px; color: #64748b; white-space:nowrap;">${submittedDate}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:6px; min-width:100px;">
                         <div style="flex:1; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">

@@ -1,6 +1,38 @@
 // Book Request Form JavaScript
 // 입문서 무료 신청 전용 페이지 로직
 
+// ===== 0. 페이지 진입 즉시 referrer / UTM / userAgent 캐시 =====
+// 로그인 리다이렉트로 인해 referrer가 사라지는 것을 방지하기 위해
+// DOMContentLoaded 이전(스크립트 로드 시점)에 sessionStorage에 저장
+(function cacheReferrerInfo() {
+    try {
+        const STORAGE_KEY = 'book_request_referrer_info';
+
+        // 이미 캐시되어 있으면 덮어쓰지 않음 (로그인 후 돌아왔을 때 보존)
+        if (sessionStorage.getItem(STORAGE_KEY)) return;
+
+        // UTM 파라미터 파싱
+        const params = new URLSearchParams(window.location.search);
+        const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+        const utmData = {};
+        utmKeys.forEach(key => {
+            const val = params.get(key);
+            if (val) utmData[key] = val;
+        });
+
+        const info = {
+            referrer_url: document.referrer || '',
+            landing_url: window.location.href,
+            utm_data: Object.keys(utmData).length > 0 ? utmData : null,
+            user_agent: navigator.userAgent || ''
+        };
+
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(info));
+    } catch (e) {
+        console.warn('referrer 정보 캐시 실패:', e);
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', async function () {
 
     // ===== 1. 로그인 확인 =====
@@ -72,11 +104,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (emailInput) emailInput.value = userData.email || '';
         if (phoneInput) phoneInput.value = userData.phone || '';
 
-        // "아직 없음" 체크박스 토글
-        setupNoScoreCheckbox();
+        // "아직 없음" 체크박스 토글 (현재점수 / 목표점수)
+        setupNoScoreCheckbox('noScoreCheck', 'currentScore', '예: 75');
+        setupNoScoreCheckbox('noTargetScoreCheck', 'targetScore', '예: 100');
 
-        // "기타" 선택 시 직접 입력 필드 표시
+        // "기타" 선택 시 직접 입력 필드 표시 (유입경로만 남음)
         setupConditionalSelects();
+
+        // 카카오 채널 추가 버튼 클릭 추적
+        setupKakaoChannelTracking();
 
         // 개인정보 모달
         setupPrivacyModal();
@@ -85,14 +121,14 @@ document.addEventListener('DOMContentLoaded', async function () {
         setupFormSubmission();
     }
 
-    // "아직 없음" 체크박스
-    function setupNoScoreCheckbox() {
-        const noScoreCheck = document.getElementById('noScoreCheck');
-        const scoreInput = document.getElementById('currentScore');
+    // "아직 없음" 체크박스 (재사용 가능한 형태로 변경)
+    function setupNoScoreCheckbox(checkboxId, inputId, defaultPlaceholder) {
+        const checkbox = document.getElementById(checkboxId);
+        const scoreInput = document.getElementById(inputId);
 
-        if (!noScoreCheck || !scoreInput) return;
+        if (!checkbox || !scoreInput) return;
 
-        noScoreCheck.addEventListener('change', function () {
+        checkbox.addEventListener('change', function () {
             if (this.checked) {
                 scoreInput.value = '';
                 scoreInput.disabled = true;
@@ -100,31 +136,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                 scoreInput.style.background = '#f0f0f0';
             } else {
                 scoreInput.disabled = false;
-                scoreInput.placeholder = '예: 75';
+                scoreInput.placeholder = defaultPlaceholder;
                 scoreInput.style.background = 'white';
             }
         });
     }
 
-    // select → "기타" 선택 시 detail input 표시
+    // select → "기타" 선택 시 detail input 표시 (유입경로만)
     function setupConditionalSelects() {
-        // 토플 필요 이유
-        const reasonSelect = document.getElementById('toeflReason');
-        const reasonDetail = document.getElementById('toeflReasonDetail');
-
-        if (reasonSelect && reasonDetail) {
-            reasonSelect.addEventListener('change', function () {
-                if (this.value === '기타') {
-                    reasonDetail.style.display = 'block';
-                    reasonDetail.querySelector('input').required = true;
-                } else {
-                    reasonDetail.style.display = 'none';
-                    reasonDetail.querySelector('input').required = false;
-                    reasonDetail.querySelector('input').value = '';
-                }
-            });
-        }
-
         // 유입 경로
         const sourceSelect = document.getElementById('referralSource');
         const sourceDetail = document.getElementById('referralSourceDetail');
@@ -141,6 +160,28 @@ document.addEventListener('DOMContentLoaded', async function () {
                 }
             });
         }
+    }
+
+    // 카카오 채널 추가 버튼 클릭 추적
+    let kakaoChannelClicked = false;
+
+    function setupKakaoChannelTracking() {
+        const btn = document.getElementById('kakaoChannelBtn');
+        const status = document.getElementById('kakaoChannelStatus');
+
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            // 새 창은 href로 자동 열림. 우리는 클릭 상태만 기록
+            kakaoChannelClicked = true;
+
+            // 버튼 시각적 변경
+            btn.classList.add('clicked');
+            btn.querySelector('span:last-child').textContent = '✓ 카카오 채널 추가하기 (다시 클릭 가능)';
+
+            // 안내 메시지 표시
+            if (status) status.style.display = 'block';
+        });
     }
 
     // 개인정보 처리방침 모달
@@ -183,7 +224,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 신청 중...';
 
             try {
-                // 점수값 처리
+                // 현재 점수 처리
                 const noScoreCheck = document.getElementById('noScoreCheck');
                 const scoreInput = document.getElementById('currentScore');
                 let currentScore = null;
@@ -193,12 +234,16 @@ document.addEventListener('DOMContentLoaded', async function () {
                     if (isNaN(currentScore)) currentScore = null;
                 }
 
-                // 토플 이유
-                const toeflReason = document.getElementById('toeflReason').value;
-                const toeflReasonDetailInput = document.querySelector('input[name="toefl_reason_detail"]');
-                const toeflReasonDetail = (toeflReason === '기타' && toeflReasonDetailInput)
-                    ? toeflReasonDetailInput.value.trim() || null
-                    : null;
+                // 목표 점수 처리
+                const noTargetScoreCheck = document.getElementById('noTargetScoreCheck');
+                const targetScoreInput = document.getElementById('targetScore');
+                let targetScore = null;
+                const noTargetScore = noTargetScoreCheck.checked;
+
+                if (!noTargetScore && targetScoreInput.value.trim() !== '') {
+                    targetScore = parseInt(targetScoreInput.value, 10);
+                    if (isNaN(targetScore)) targetScore = null;
+                }
 
                 // 유입 경로
                 const referralSource = document.getElementById('referralSource').value;
@@ -206,6 +251,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const referralSourceDetail = (referralSource === '기타' && referralSourceDetailInput)
                     ? referralSourceDetailInput.value.trim() || null
                     : null;
+
+                // sessionStorage에서 referrer/UTM 정보 꺼내기
+                let referrerInfo = {};
+                try {
+                    referrerInfo = JSON.parse(sessionStorage.getItem('book_request_referrer_info') || '{}');
+                } catch (e) {
+                    referrerInfo = {};
+                }
 
                 // 데이터 구성
                 const postData = {
@@ -219,13 +272,20 @@ document.addEventListener('DOMContentLoaded', async function () {
                     status: '승인완료',
                     confirmed: true,
                     current_score: currentScore,
-                    toefl_reason: toeflReason,
-                    toefl_reason_detail: toeflReasonDetail,
+                    target_score: targetScore,
+                    no_target_score: noTargetScore,
                     referral_source: referralSource,
                     referral_source_detail: referralSourceDetail,
                     privacy_agreement: true,
                     submitted_date: new Date().toISOString(),
-                    current_step: 10
+                    current_step: 10,
+                    // 카카오 채널 추가 클릭 여부
+                    kakao_channel_clicked: kakaoChannelClicked,
+                    // 유입 정보
+                    referrer_url: referrerInfo.referrer_url || null,
+                    landing_url: referrerInfo.landing_url || null,
+                    utm_data: referrerInfo.utm_data || null,
+                    user_agent: referrerInfo.user_agent || null
                 };
 
                 // API 호출
@@ -246,24 +306,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // 폼 유효성 검증
     function validateForm() {
-        // 토플 이유 선택 확인
-        const toeflReason = document.getElementById('toeflReason');
-        if (!toeflReason.value) {
-            alert('토플이 필요한 이유를 선택해주세요.');
-            toeflReason.focus();
-            return false;
-        }
-
-        // "기타" 선택 시 직접 입력 확인
-        if (toeflReason.value === '기타') {
-            const detail = document.querySelector('input[name="toefl_reason_detail"]');
-            if (detail && !detail.value.trim()) {
-                alert('토플이 필요한 이유를 직접 입력해주세요.');
-                detail.focus();
-                return false;
-            }
-        }
-
         // 유입 경로 선택 확인
         const referralSource = document.getElementById('referralSource');
         if (!referralSource.value) {
@@ -280,6 +322,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                 detail.focus();
                 return false;
             }
+        }
+
+        // 카카오 채널 추가 확인 (필수)
+        if (!kakaoChannelClicked) {
+            alert('❗ 입문서를 받으시려면 먼저 카카오 채널을 추가해주세요.\n\n노란색 "이온토플 카카오 채널 추가하기" 버튼을 눌러주세요.');
+            const kakaoBtn = document.getElementById('kakaoChannelBtn');
+            if (kakaoBtn) kakaoBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return false;
         }
 
         // 개인정보 동의 확인

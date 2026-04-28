@@ -174,23 +174,18 @@
                 </div>
             </div>
 
-            <!-- Section 3: 토플이 필요한 이유 -->
+            <!-- Section 3: 목표 토플 점수 -->
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">3</span>
-                    <h2>토플이 필요한 이유</h2>
+                    <h2>목표 토플 점수</h2>
                 </div>
                 <div class="form-group">
-                    <label>이유 선택</label>
-                    <select name="toefl_reason" id="toeflReason" required>
-                        <option value="">선택해주세요</option>
-                        <option value="교환학생">교환학생</option>
-                        <option value="유학">유학</option>
-                        <option value="취업">취업</option>
-                        <option value="기타">기타</option>
-                    </select>
-                    <div id="toeflReasonDetail" class="other-detail-input" style="display: none;">
-                        <input type="text" name="toefl_reason_detail" placeholder="직접 입력해주세요">
+                    <label>목표 점수</label>
+                    <input type="number" name="target_score" id="targetScore" placeholder="예: 100" min="0" max="120">
+                    <div class="no-score-check">
+                        <input type="checkbox" id="noTargetScoreCheck">
+                        <label for="noTargetScoreCheck">아직 정하지 않음</label>
                     </div>
                 </div>
             </div>
@@ -216,7 +211,30 @@
                 </div>
             </div>
 
-            <!-- Section 5: 개인정보 동의 -->
+            <!-- Section 5: 카카오 채널 추가 (필수) -->
+            <div class="form-section kakao-section">
+                <div class="section-header">
+                    <span class="section-number">5</span>
+                    <h2>카카오 채널 추가 <span style="color:#ff4444; font-size:0.9rem;">(필수)</span></h2>
+                </div>
+                <div class="kakao-info-box">
+                    <p class="kakao-info-title">📢 입문서를 받으시려면 카카오 채널을 추가해주세요</p>
+                    <ul class="kakao-benefits">
+                        <li>입문서 학습 팁 정기 발송</li>
+                        <li>챌린지 모집 우선 알림</li>
+                        <li>채널 친구 전용 할인 혜택</li>
+                    </ul>
+                </div>
+                <a href="http://pf.kakao.com/_FWxcZC/friend" target="_blank" id="kakaoChannelBtn" class="kakao-channel-btn">
+                    <span class="kakao-icon">💬</span>
+                    <span>이온토플 카카오 채널 추가하기</span>
+                </a>
+                <div id="kakaoChannelStatus" class="kakao-status" style="display:none;">
+                    <i class="fas fa-check-circle"></i> 채널 추가 버튼을 클릭하셨습니다. 카카오톡에서 추가를 완료해주세요.
+                </div>
+            </div>
+
+            <!-- Section 6: 개인정보 동의 -->
             <div class="form-section privacy-section">
                 <div class="form-group checkbox-group">
                     <label class="checkbox-label">
