@@ -885,6 +885,103 @@ async function bulkSendGuide() {
     }
 }
 
+// ===== 일괄 프로모션 뱃지 ON/OFF =====
+// turnOn: true → 프로모션 ON, false → 프로모션 OFF
+// 처리 대상: 챌린지 신청자 + 학생 동의 전(student_agreed_at 없음)
+// 자동 제외: 입문서 신청(application_type === 'book_only'), 학생 동의 완료
+async function bulkSetIncentive(turnOn) {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    // 드롭다운 닫기
+    const dropdown = document.getElementById('bulkDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    // 선택된 신청서 분류
+    const selectedApps = allApplications.filter(a => selectedIds.has(a.id));
+    const bookOnlyApps = selectedApps.filter(a => a.application_type === 'book_only');
+    const agreedApps = selectedApps.filter(a => a.application_type !== 'book_only' && a.student_agreed_at);
+    const targetApps = selectedApps.filter(a => a.application_type !== 'book_only' && !a.student_agreed_at);
+
+    // 변경이 실제로 필요한 대상만 추림 (이미 원하는 상태면 스킵)
+    const needChangeApps = targetApps.filter(a => Boolean(a.is_incentive_applicant) !== Boolean(turnOn));
+    const noChangeApps = targetApps.filter(a => Boolean(a.is_incentive_applicant) === Boolean(turnOn));
+
+    // 처리 가능한 대상이 0명이면 사유 안내 후 종료
+    if (needChangeApps.length === 0) {
+        let msg = '⚠️ 처리할 신청서가 없습니다.\n\n';
+        msg += `선택: ${selectedApps.length}명\n`;
+        if (bookOnlyApps.length > 0) msg += `• 입문서 신청 제외: ${bookOnlyApps.length}명\n`;
+        if (agreedApps.length > 0) msg += `• 학생 동의 완료 제외: ${agreedApps.length}명\n`;
+        if (noChangeApps.length > 0) msg += `• 이미 ${turnOn ? 'ON' : 'OFF'} 상태: ${noChangeApps.length}명`;
+        alert(msg);
+        return;
+    }
+
+    // 확인창 메시지 구성
+    let confirmMsg;
+    if (turnOn) {
+        confirmMsg = `선택한 ${selectedApps.length}명 중 ${needChangeApps.length}명을 프로모션 유도 학생으로 변경합니다.\n\n`;
+        confirmMsg += `처리 대상: ${needChangeApps.length}명 (동의 전인 챌린지 신청자)\n`;
+        const skipParts = [];
+        if (bookOnlyApps.length > 0) skipParts.push(`입문서 신청 ${bookOnlyApps.length}명`);
+        if (agreedApps.length > 0) skipParts.push(`동의 완료 ${agreedApps.length}명`);
+        if (noChangeApps.length > 0) skipParts.push(`이미 ON ${noChangeApps.length}명`);
+        if (skipParts.length > 0) confirmMsg += `제외: ${skipParts.join(' / ')}\n`;
+        confirmMsg += `\n변경 후 적용되는 사항:\n`;
+        confirmMsg += `• 학생 동의 데드라인: 24시간 → 5일\n`;
+        confirmMsg += `• 입문서 탭에 노출됨\n`;
+        confirmMsg += `• 이름 옆 "프로모션" 뱃지 표시\n`;
+        confirmMsg += `• (이후 분석 저장 시) 알림톡 미발송, 카카오톡 직접 안내 필요\n\n`;
+        confirmMsg += `진행하시겠습니까?`;
+    } else {
+        confirmMsg = `선택한 ${selectedApps.length}명 중 ${needChangeApps.length}명의 프로모션 유도 학생 지정을 해제합니다.\n\n`;
+        confirmMsg += `처리 대상: ${needChangeApps.length}명 (동의 전인 챌린지 신청자)\n`;
+        const skipParts = [];
+        if (bookOnlyApps.length > 0) skipParts.push(`입문서 신청 ${bookOnlyApps.length}명`);
+        if (agreedApps.length > 0) skipParts.push(`동의 완료 ${agreedApps.length}명`);
+        if (noChangeApps.length > 0) skipParts.push(`이미 OFF ${noChangeApps.length}명`);
+        if (skipParts.length > 0) confirmMsg += `제외: ${skipParts.join(' / ')}\n`;
+        confirmMsg += `\n변경 후 적용되는 사항:\n`;
+        confirmMsg += `• 학생 동의 데드라인: 5일 → 24시간\n`;
+        confirmMsg += `• 입문서 탭에서 제외됨\n`;
+        confirmMsg += `• "프로모션" 뱃지 제거\n\n`;
+        confirmMsg += `⚠️ 이미 분석이 저장된 학생은 분석 저장 시점부터 24시간 기준으로 재계산되어\n`;
+        confirmMsg += `   이미 24시간이 지났다면 즉시 만료 상태가 됩니다.\n\n`;
+        confirmMsg += `진행하시겠습니까?`;
+    }
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const promises = needChangeApps.map(a =>
+            supabaseAPI.patch('applications', a.id, { is_incentive_applicant: turnOn })
+        );
+
+        await Promise.all(promises);
+
+        // 결과 알림
+        let resultMsg = `✅ ${needChangeApps.length}명 프로모션 ${turnOn ? 'ON' : 'OFF'} 처리 완료`;
+        const skipTotal = bookOnlyApps.length + agreedApps.length + noChangeApps.length;
+        if (skipTotal > 0) {
+            const skipParts = [];
+            if (bookOnlyApps.length > 0) skipParts.push(`입문서 신청 ${bookOnlyApps.length}명`);
+            if (agreedApps.length > 0) skipParts.push(`동의 완료 ${agreedApps.length}명`);
+            if (noChangeApps.length > 0) skipParts.push(`이미 ${turnOn ? 'ON' : 'OFF'} ${noChangeApps.length}명`);
+            resultMsg += `\n⏭️ ${skipTotal}명 제외 (${skipParts.join(' / ')})`;
+        }
+        alert(resultMsg);
+
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk set incentive error:', error);
+        alert('일부 프로모션 설정 변경에 실패했습니다.');
+    }
+}
+
 // ===== 택배송장출력 (선택된 학생) =====
 async function bulkExportShipping() {
     if (selectedIds.size === 0) {
