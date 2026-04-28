@@ -230,6 +230,9 @@ function displayApplicationDetail(app) {
         targetDisplay = `${app.target_cutoff_old}점`;
     } else if (app.target_cutoff_new) {
         targetDisplay = `${formatNewScore(app.target_cutoff_new)} 레벨`;
+    } else if (app.target_score) {
+        // 입문서 신청자용 (단순 숫자 입력)
+        targetDisplay = `${app.target_score}점`;
     } else {
         targetDisplay = '미설정';
     }
