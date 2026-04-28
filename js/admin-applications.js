@@ -14,7 +14,8 @@ function getIncentiveStatus(app) {
     if (!app.is_incentive_applicant) return null;
     // 동의 완료 → 매출 전환
     if (app.student_agreed_at) return 'converted';
-    const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
+    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+    const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
     if (!analysisTs) return 'waiting'; // 분석 전이어도 프로모션 상태 표시 (목록 일괄처리로 ON된 케이스)
     const deadlineMs = 5 * 24 * 60 * 60 * 1000;
     const remaining = deadlineMs - (Date.now() - new Date(analysisTs).getTime());
@@ -57,7 +58,8 @@ function getIncentiveBookBadge(app) {
 function getIncentiveDeadlineDisplay(app) {
     if (!app.is_incentive_applicant) return '';
     if (app.student_agreed_at) return ''; // 동의 완료 → 타이머 불필요
-    const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
+    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+    const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
     if (!analysisTs) return '';
     
     const deadlineMs = 5 * 24 * 60 * 60 * 1000;

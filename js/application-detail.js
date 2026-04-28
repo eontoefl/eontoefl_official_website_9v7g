@@ -984,7 +984,8 @@ function getAgreementSection(app) {
     const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
     const deadlineLabel = isIncentive ? '5일' : '24시간';
     
-    const analysisTimestamp = app.analysis_completed_at || app.analysis_saved_at;
+    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+    const analysisTimestamp = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
     const elapsedMs = analysisTimestamp 
         ? (Date.now() - new Date(analysisTimestamp).getTime())
         : 0;
@@ -1584,8 +1585,9 @@ function loadStudentTabs(app) {
         if (analysisTab) {
             analysisTab.innerHTML = getAnalysisSection(app);
             // 실시간 카운트다운 시작 (동의 전 + 분석 완료 시점이 있을 때)
+            // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
             const needsAgreement = (app.analysis_status === '승인' || app.analysis_status === '조건부승인') && !app.student_program_agreed;
-            const analysisTs = app.analysis_completed_at || app.analysis_saved_at;
+            const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
             if (needsAgreement && analysisTs) {
                 startAnalysisCountdown(analysisTs, app.is_incentive_applicant === true);
             }
