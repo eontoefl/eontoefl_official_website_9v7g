@@ -49,7 +49,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_service_key text;
-    v_edge_url text := 'https://gfbliyfizwkfbpfanjat.supabase.co/functions/v1/kakaotalk-notify';
+    v_edge_url text := 'https://qpqjevecjejvbeuogtbx.supabase.co/functions/v1/kakaotalk-notify';
     rec record;
     v_alim_type text;
     v_now_ms bigint;
