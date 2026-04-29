@@ -9,13 +9,13 @@
     <meta property="og:site_name" content="이온토플">
     <meta property="og:locale" content="ko_KR">
     <meta property="og:title" content="수강 신청서 작성 - 이온토플">
-    <meta property="og:description" content="이온토플 신청서 모든 항목을 정확히 작성해주세요. 상세한 정보는 승인률을 상승시킵니다 : ) 신청서 제목 1 필독 사항 확인 및 기본 정보 홈페이지 또는 블로그에 게재된 필독 공지사항 을 모두 읽었으며, 내용을 확인했습니다. 성함 연락처 이메일 주소 (택배 받을 정확한 주소) 택배...">
+    <meta property="og:description" content="이온토플 수강 신청서입니다. 모든 항목을 정확히 작성해주세요. 상세한 정보는 승인률을 상승시킵니다.">
     <meta property="og:url" content="https://eonfl.com/application-form.html">
     <meta property="og:image" content="https://eonfl.com/logo/og-default.png">
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="수강 신청서 작성 - 이온토플">
-    <meta name="twitter:description" content="이온토플 신청서 모든 항목을 정확히 작성해주세요. 상세한 정보는 승인률을 상승시킵니다 : ) 신청서 제목 1 필독 사항 확인 및 기본 정보 홈페이지 또는 블로그에 게재된 필독 공지사항 을 모두 읽었으며, 내용을 확인했습니다. 성함 연락처 이메일 주소 (택배 받을 정확한 주소) 택배...">
+    <meta name="twitter:description" content="이온토플 수강 신청서입니다. 모든 항목을 정확히 작성해주세요. 상세한 정보는 승인률을 상승시킵니다.">
     <meta name="twitter:image" content="https://eonfl.com/logo/og-default.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -108,18 +108,11 @@
                 </div>
             </div>
 
-            <!-- Section 1: 필독 & 기본정보 (통합) -->
+            <!-- Section 1: 기본 정보 -->
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">1</span>
-                    <h2>필독 사항 확인 및 기본 정보</h2>
-                </div>
-                
-                <div class="form-group checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="confirm_materials" required>
-                        <span style="position: relative; top: -3px;">홈페이지 또는 블로그에 게재된 <strong>필독 공지사항</strong>을 모두 읽었으며, 내용을 확인했습니다.</span>
-                    </label>
+                    <h2>기본 정보</h2>
                 </div>
 
                 <div class="two-column-grid">
@@ -141,14 +134,14 @@
                     <div class="form-group">
                         <label>주소 (택배 받을 정확한 주소)</label>
                         <input type="text" name="address" placeholder="예: 서울특별시 강남구 OO로 123, 456호" required>
-                        <small>택배 발송을 위해 정확한 주소를 입력해주세요 (동/호수 포함)</small>
+                        <small>택배 발송을 위해 <strong>정확한 주소</strong>를 입력해주세요 (동/호수 포함)</small>
                     </div>
                 </div>
 
-                <div class="subsection-title">환불 계좌 정보</div>
+                <div class="subsection-title">환불 계좌 정보 <span style="color: #ff4444; font-weight: 700;">*</span></div>
                 <div class="form-group">
                     <input type="text" name="bank_account" placeholder="은행명 계좌번호 예금주 (예: 신한 110-123-456789 홍길동)" required>
-                    <small>환불이 필요한 경우를 대비한 정보입니다</small>
+                    <small>보증금 환급 및 환불 처리 시 사용됩니다. 정확한 정보를 입력해주세요.</small>
                 </div>
             </div>
 
@@ -252,8 +245,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label>기타 추가 설명</label>
-                        <textarea name="score_history" rows="3" placeholder="점수 관련 추가로 전달하고 싶은 내용이 있다면 자유롭게 작성해주세요"></textarea>
+                        <label>점수 관련 상세 설명</label>
+                        <textarea name="score_history" rows="3" placeholder="예: 2025년 3월에 처음 봤습니다. 한 달 정도 혼자 단어 외우면서 기출문제 풀어보고 시험 봤는데 리딩은 시간이 너무 부족해서 마지막 지문은 거의 찍었고, 리스닝은 중반부터 집중이 안 돼서 놓치는 부분이 많았습니다. 스피킹은 15초 준비시간 안에 말할 내용을 정리하는 게 너무 어려웠고, 라이팅은 통합형에서 리스닝 내용을 거의 못 적었습니다."></textarea>
+                        <small>언제 본 시험인지, 얼마나 준비하고 본 건지, 어디서 어떤 방식으로 공부하고 본 건지 구체적으로 적어주세요. 상세할수록 정확한 분석이 가능하며, 승인률이 높아집니다.</small>
                     </div>
                 </div>
             </div>
@@ -304,7 +298,8 @@
                 
                 <div class="form-group">
                     <label>현재 토플 공부 방법</label>
-                    <textarea name="current_study_method" rows="4" placeholder="독학, 인강, 학원 등 구체적으로 작성" required></textarea>
+                    <textarea name="current_study_method" rows="4" placeholder="예: 올해 1월부터 혼자 공부하기 시작했습니다. 단어는 토플 빈출 단어장으로 하루에 50개씩 외우고 있고, 리딩은 기출문제를 하루에 한 지문씩 시간 재고 풀어보고 있습니다. 리스닝은 유튜브에서 노트테이킹 방법 영상 보면서 연습 중인데 아직 잘 안 됩니다. 스피킹이랑 라이팅은 어떻게 시작해야 할지 몰라서 아직 손도 못 댄 상태입니다." required></textarea>
+                    <small>아직 토플 공부를 시작하지 않았다면 "아직 시작 전"이라고만 쓰셔도 됩니다. 하지만 조금이라도 공부를 시작하셨다면, 어떤 교재·인강·학원을 이용했는지, 어떤 영역을 얼마나 공부했는지, 현재 어디까지 진행했는지 최대한 구체적으로 적어주세요. "독학", "인강" 같은 단답은 분석에 도움이 되지 않습니다. 상세할수록 정확한 분석이 가능하고, 승인률이 높아집니다.</small>
                 </div>
 
                 <div class="form-group">
@@ -344,9 +339,9 @@
                 <!-- 개정후 목표 점수 -->
                 <div id="newTargetSection" class="version-content active">
                     <div class="form-group">
-                        <label>지원 기관의 최소 커트라인 (Total)</label>
+                        <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #ff4444; font-weight: 700;">*</span></label>
                         <input type="number" name="target_cutoff_new" min="1" max="6" step="0.5" placeholder="예: 4.5">
-                        <small>네 섹션의 평균을 0.5 단위로 반올림한 값</small>
+                        <small>⚠️ 본인이 받고 싶은 희망 점수가 아닙니다. 지원하는 학교·기관이 공식적으로 요구하는 최소 지원 자격 점수를 입력해주세요. 희망 점수는 아래 '추가 설명'란에 따로 작성해주세요.</small>
                     </div>
 
                     <div class="subsection-title">영역별 최소 요구 점수 (있는 경우)</div>
@@ -388,8 +383,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label>지원 기관의 최소 커트라인 (Total)</label>
+                        <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #ff4444; font-weight: 700;">*</span></label>
                         <input type="number" name="target_cutoff_old" min="0" max="120" placeholder="예: 90">
+                        <small>⚠️ 본인이 받고 싶은 희망 점수가 아닙니다. 지원하는 학교·기관이 공식적으로 요구하는 최소 지원 자격 점수를 입력해주세요. 희망 점수는 아래 '추가 설명'란에 따로 작성해주세요.</small>
                     </div>
 
                     <div class="subsection-title">영역별 최소 요구 점수 (있는 경우)</div>
@@ -414,8 +410,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label>목표 점수에 대한 추가 설명</label>
-                    <textarea name="target_note" rows="3" placeholder="목표 점수와 관련하여 추가로 전달하고 싶은 내용이 있다면 자유롭게 작성해주세요 (선택)"></textarea>
+                    <label>개인 희망 점수 및 추가 설명</label>
+                    <textarea name="target_note" rows="3" placeholder="예: 커트라인은 4.0이지만 개인적으로 4.5 이상 받고 싶습니다. 경쟁률이 높아서 안정권을 노리고 있습니다..." required></textarea>
+                    <small>위 커트라인과 별도로 본인이 개인적으로 달성하고 싶은 점수가 있다면 반드시 적어주세요. 커트라인과 희망 점수가 다를 경우, 두 가지를 모두 파악해야 정확한 분석이 가능합니다.</small>
                 </div>
 
                 <div class="form-group" style="margin-top: 16px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;">
@@ -459,7 +456,7 @@
                             <option value="">일 (선택)</option>
                         </select>
                     </div>
-                    <small>ETS 홈페이지에서 가능한 시험 날짜를 확인하고 <strong>마지막으로 응시 가능한 시험일</strong>을 입력해주세요. 너무 먼 날짜라면 연도와 월만 입력해도 됩니다.</small>
+                    <small>개인적으로 원하는 시기가 아니라, 최대한 미루고 미뤘을 때 물리적으로 시험을 볼 수 있는 마지막 날짜입니다. 예를 들어 원서 마감이 9월이고, 성적 반영에 2주가 걸린다면, 8월 중순이 마지막 응시 가능일입니다. ETS 홈페이지에서 시험 일정을 확인해주세요.</small>
                 </div>
                 <div class="form-group">
                     <label>희망 목표 달성 시점</label>
@@ -486,7 +483,7 @@
                             <option value="">일 (선택)</option>
                         </select>
                     </div>
-                    <small>개인적으로 목표를 달성하고 싶은 날짜 (선택)</small>
+                    <small>위 마지막 응시일과 별개로, 개인적으로 목표 점수를 달성하고 싶은 시기입니다. (선택)</small>
                 </div>
             </div>
 
@@ -514,7 +511,8 @@
                 </div>
                 <div class="form-group">
                     <label>상세 설명</label>
-                    <textarea name="toefl_reason_detail" rows="4" placeholder="구체적인 이유나 목표" required></textarea>
+                    <textarea name="toefl_reason_detail" rows="4" placeholder="예: 어릴 때부터 영어가 너무 약해서 늘 자신감이 없었습니다. 그래도 해외에서 일해보고 싶다는 꿈은 계속 있었는데, 취업 준비하면서 토플 점수가 필요하다는 걸 알고 나서 더 이상 미루면 안 되겠다고 느꼈습니다. 지금은 경영학과 4학년이고, 졸업 전에 점수를 만들어서 외국계 기업에 지원하는 게 목표입니다. 주변에 토플 공부하는 사람이 없어서 혼자 막막한 상태입니다." required></textarea>
+                    <small>많은 수강생분들을 한 분 한 분 기억하고 이입해서 분석하는 데 있어, 여러분의 꿈과 비전에 대해 듣는 것이 정말 큰 도움이 됩니다. 토플을 통해 어떤 꿈을 이루고 싶으신지, 왜 이 점수가 필요한 상황인지, 여러분만의 스토리를 들려주세요.</small>
                 </div>
             </div>
 
@@ -522,10 +520,11 @@
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">9</span>
-                    <h2>가장 기억에 남는 블로그 글</h2>
+                    <h2>가장 기억에 남는 블로그 글 <span style="color: #ff4444; font-weight: 700;">*</span></h2>
                 </div>
                 <div class="form-group">
-                    <textarea name="memorable_blog_content" rows="4" placeholder="이온토플 블로그/인스타그램에서 읽은 글 중 인상 깊었던 내용 (선택)"></textarea>
+                    <textarea name="memorable_blog_content" rows="4" placeholder='예: "토플 점수가 안 오르는 진짜 이유" 글에서 방향 없이 공부하면 시간만 낭비된다는 내용이 와닿았고, 이 글을 읽고 수강을 결정하게 되었습니다...' required></textarea>
+                    <small>이온토플 블로그의 글을 충분히 읽어보신 후 신청해주세요. 가장 인상 깊었던 글과 그 이유, 그리고 수강을 결정하게 된 계기가 된 글이 있다면 함께 적어주세요. 구체적으로 작성해주셔야 하며, 블로그를 읽지 않고 신청하시면 승인이 어려울 수 있습니다.</small>
                 </div>
             </div>
 
@@ -547,7 +546,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>스라첨삭 (Speaking & Writing 첨삭)</label>
+                        <label>첨삭 (Speaking & Writing 첨삭)</label>
                         <select name="preferred_correction">
                             <option value="">선택</option>
                             <option value="신청희망">신청희망</option>
@@ -575,8 +574,9 @@
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">11</span>
-                    <h2>이온토플을 알게 된 경로</h2>
+                    <h2>이온토플을 알게 된 경로 <span style="color: #ff4444; font-weight: 700;">*</span></h2>
                 </div>
+                <p class="section-description">검색 키워드, 소셜 미디어, 지인 추천, 기타 경로 중 최소 하나는 작성해주세요.</p>
                 
                 <div class="two-column-grid">
                     <div class="form-group">
@@ -597,7 +597,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group no-auto-required">
                     <label>지인 추천</label>
                     <label class="radio-label">
                         <input type="radio" name="referral_from_friend" value="yes">
@@ -610,6 +610,7 @@
                 </div>
 
                 <div class="form-group" id="referralFriendNameGroup" style="display: none;">
+                    <label>추천인 성함 <span id="referralFriendNameStar" style="color: #ff4444; font-weight: 700; display: none;">*</span></label>
                     <input type="text" name="referral_friend_name" placeholder="추천인 성함 (선택)">
                 </div>
 

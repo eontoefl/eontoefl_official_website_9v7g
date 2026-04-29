@@ -118,7 +118,7 @@ function downloadInfoTxt() {
             lines.push(`Speaking : ${app.score_speaking_old || '-'}`);
             lines.push(`Writing : ${app.score_writing_old || '-'}`);
         }
-        if (app.score_history) lines.push(`추가 설명 : ${app.score_history}`);
+        if (app.score_history) lines.push(`점수 관련 상세 설명 : ${app.score_history}`);
     } else {
         lines.push('TOEFL 응시 여부 : 없음');
         lines.push('');
@@ -157,7 +157,7 @@ function downloadInfoTxt() {
     } else {
         lines.push('목표 점수 : 미입력');
     }
-    if (app.target_note) lines.push(`추가 설명 : ${app.target_note}`);
+    if (app.target_note) lines.push(`개인 희망 점수 및 추가 설명 : ${app.target_note}`);
 
     lines.push('');
     lines.push('=== 마감 기한 ===');
@@ -294,7 +294,7 @@ function loadModalInfoTab(app) {
             ${app.has_toefl_score === 'yes' ? `
                 <div class="info-item"><label>TOEFL 응시 여부</label><div>있음 (${app.score_version === 'new' ? '개정후' : '개정전'})</div></div>
                 ${currentScoreHTML}
-                ${app.score_history ? `<div class="info-item"><label>추가 설명</label><div style="white-space:pre-wrap;">${app.score_history}</div></div>` : ''}
+                ${app.score_history ? `<div class="info-item"><label>점수 관련 상세 설명</label><div style="white-space:pre-wrap;">${app.score_history}</div></div>` : ''}
             ` : `
                 <div class="info-item"><label>TOEFL 응시 여부</label><div>없음</div></div>
                 <div class="info-item">
@@ -319,7 +319,7 @@ function loadModalInfoTab(app) {
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(개정후)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(개정전)' : ''}</h3>
             ${targetScoreHTML}
-            ${app.target_note ? `<div class="info-item"><label>추가 설명</label><div style="white-space:pre-wrap;">${app.target_note}</div></div>` : ''}
+            ${app.target_note ? `<div class="info-item"><label>개인 희망 점수 및 추가 설명</label><div style="white-space:pre-wrap;">${app.target_note}</div></div>` : ''}
         </div>
 
         <!-- 5. 마감 기한 -->

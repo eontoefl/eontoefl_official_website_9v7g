@@ -6,15 +6,14 @@ let editApplicationId = null;
 
 // 목표점수 없음 체크박스 토글
 function toggleTargetScore(checked) {
-    const targetSection = document.querySelector('#newTargetSection, #oldTargetSection');
     const allTargetInputs = document.querySelectorAll(
         '#newTargetSection input[type="number"], #oldTargetSection input[type="number"]'
     );
     const versionTabs = document.querySelectorAll('[data-tab="old-target"], [data-tab="new-target"]');
     const targetNote = document.querySelector('textarea[name="target_note"]');
-    
+
     if (checked) {
-        // 비활성화
+        // 비활성화 (값은 보존)
         allTargetInputs.forEach(input => {
             input.disabled = true;
             input.required = false;
@@ -28,6 +27,7 @@ function toggleTargetScore(checked) {
         });
         if (targetNote) {
             targetNote.disabled = true;
+            targetNote.required = false;
             targetNote.style.opacity = '0.4';
         }
     } else {
@@ -44,6 +44,7 @@ function toggleTargetScore(checked) {
         });
         if (targetNote) {
             targetNote.disabled = false;
+            targetNote.required = true;
             targetNote.style.opacity = '1';
         }
     }
@@ -112,6 +113,7 @@ function setupConditionalFields() {
     
     toeflScoreRadios.forEach(radio => {
         radio.addEventListener('change', function() {
+            const scoreHistory = document.querySelector('textarea[name="score_history"]');
             if (this.value === 'yes') {
                 // Has score - show score section, hide writing section
                 toeflScoreSection.style.display = 'block';
@@ -120,7 +122,10 @@ function setupConditionalFields() {
                 // Make writing fields optional
                 document.querySelector('textarea[name="writing_sample_1"]').required = false;
                 document.querySelector('textarea[name="writing_sample_2"]').required = false;
-                
+
+                // 점수 관련 상세 설명 필수
+                if (scoreHistory) scoreHistory.required = true;
+
                 // 현재 토플 점수 총점은 required 설정하지 않음 (validateForm에서 커스텀 검증)
             } else {
                 // No score - hide score section, show writing section
@@ -134,6 +139,9 @@ function setupConditionalFields() {
                 // Remove ALL score field requirements
                 const scoreInputs = toeflScoreSection.querySelectorAll('input');
                 scoreInputs.forEach(input => input.required = false);
+
+                // 점수 관련 상세 설명 required 해제
+                if (scoreHistory) scoreHistory.required = false;
             }
         });
     });
@@ -223,14 +231,30 @@ function setupConditionalFields() {
     // Referral from friend
     const referralFriendRadios = document.querySelectorAll('input[name="referral_from_friend"]');
     const referralFriendNameGroup = document.getElementById('referralFriendNameGroup');
-    
+    const referralFriendNameInput = document.querySelector('input[name="referral_friend_name"]');
+    const referralFriendNameStar = document.getElementById('referralFriendNameStar');
+
     if (referralFriendRadios.length > 0) {
         referralFriendRadios.forEach(radio => {
             radio.addEventListener('change', function() {
                 if (this.value === 'yes') {
                     referralFriendNameGroup.style.display = 'block';
+                    if (referralFriendNameInput) {
+                        referralFriendNameInput.required = true;
+                        referralFriendNameInput.placeholder = '추천인 성함';
+                    }
+                    if (referralFriendNameStar) {
+                        referralFriendNameStar.style.display = 'inline';
+                    }
                 } else {
                     referralFriendNameGroup.style.display = 'none';
+                    if (referralFriendNameInput) {
+                        referralFriendNameInput.required = false;
+                        referralFriendNameInput.placeholder = '추천인 성함 (선택)';
+                    }
+                    if (referralFriendNameStar) {
+                        referralFriendNameStar.style.display = 'none';
+                    }
                 }
             });
         });
@@ -410,22 +434,9 @@ function populateFormData(app) {
     }
 
     // 체크박스
-    if (app.confirm_materials) {
-        const cb = form.querySelector('input[name="confirm_materials"]');
-        if (cb) cb.checked = true;
-    }
     if (app.privacy_agreement) {
         const cb = form.querySelector('input[name="privacy_agreement"]');
         if (cb) cb.checked = true;
-    }
-
-    // 목표점수 없음 체크박스 복원
-    if (app.no_target_score) {
-        const noTargetCb = document.getElementById('noTargetScore');
-        if (noTargetCb) {
-            noTargetCb.checked = true;
-            toggleTargetScore(true);
-        }
     }
 
     // 선택 필드 (select)
@@ -504,6 +515,15 @@ function populateFormData(app) {
         }
         if (newTargetSection && !newTargetSection.classList.contains('active')) {
             newTargetSection.querySelectorAll('input').forEach(i => i.required = false);
+        }
+
+        // 목표점수 없음 체크박스 복원 (탭 전환 후 disabled 처리)
+        if (app.no_target_score) {
+            const noTargetCb = document.getElementById('noTargetScore');
+            if (noTargetCb) {
+                noTargetCb.checked = true;
+                toggleTargetScore(true);
+            }
         }
     }, 100);
 
@@ -689,17 +709,23 @@ function validateForm() {
     }
 
     // 목표 점수: 개정후 또는 개정전 Total 중 하나는 입력해야 함
-    const targetCutoffNew = document.querySelector('input[name="target_cutoff_new"]');
-    const targetCutoffOld = document.querySelector('input[name="target_cutoff_old"]');
-    const hasNewTarget = targetCutoffNew && targetCutoffNew.value.trim() !== '';
-    const hasOldTarget = targetCutoffOld && targetCutoffOld.value.trim() !== '';
-    
-    if (!hasNewTarget && !hasOldTarget) {
-        alert('목표 점수의 커트라인(Total)을 개정후 또는 개정전 중 하나는 입력해주세요.');
-        // 현재 활성 탭의 input에 포커스
-        const activeTarget = document.querySelector('.version-content.active input[name="target_cutoff_new"], .version-content.active input[name="target_cutoff_old"]');
-        if (activeTarget) activeTarget.focus();
-        return false;
+    // 단, "목표 점수 없음" 체크 시 검증 스킵
+    const noTargetCb = document.getElementById('noTargetScore');
+    const isNoTargetScore = noTargetCb && noTargetCb.checked;
+
+    if (!isNoTargetScore) {
+        const targetCutoffNew = document.querySelector('input[name="target_cutoff_new"]');
+        const targetCutoffOld = document.querySelector('input[name="target_cutoff_old"]');
+        const hasNewTarget = targetCutoffNew && targetCutoffNew.value.trim() !== '';
+        const hasOldTarget = targetCutoffOld && targetCutoffOld.value.trim() !== '';
+
+        if (!hasNewTarget && !hasOldTarget) {
+            alert('목표 점수의 커트라인(Total)을 개정후 또는 개정전 중 하나는 입력해주세요.');
+            // 현재 활성 탭의 input에 포커스
+            const activeTarget = document.querySelector('.version-content.active input[name="target_cutoff_new"], .version-content.active input[name="target_cutoff_old"]');
+            if (activeTarget) activeTarget.focus();
+            return false;
+        }
     }
 
     // 희망 수업 시작 시기: 일요일만 선택 가능
@@ -711,6 +737,32 @@ function validateForm() {
             startDateInput.focus();
             return false;
         }
+    }
+
+    // 이온토플을 알게 된 경로: 최소 하나는 입력해야 함
+    const referralSearchKeyword = (document.querySelector('input[name="referral_search_keyword"]')?.value || '').trim();
+    const referralSocialMedia = (document.querySelector('select[name="referral_social_media"]')?.value || '').trim();
+    const referralFromFriend = document.querySelector('input[name="referral_from_friend"]:checked')?.value;
+    const referralFriendName = (document.querySelector('input[name="referral_friend_name"]')?.value || '').trim();
+    const referralOther = (document.querySelector('textarea[name="referral_other"]')?.value || '').trim();
+
+    const hasSearchKeyword = referralSearchKeyword !== '';
+    const hasSocialMedia = referralSocialMedia !== '';
+    const hasFriendReferral = referralFromFriend === 'yes' && referralFriendName !== '';
+    const hasOther = referralOther !== '';
+
+    if (!hasSearchKeyword && !hasSocialMedia && !hasFriendReferral && !hasOther) {
+        // 지인 추천 "예"인데 추천인 성함이 비어있는 경우 안내 분기
+        if (referralFromFriend === 'yes' && referralFriendName === '') {
+            alert('지인 추천을 "예"로 선택하셨다면 추천인 성함을 입력해주세요.');
+            const friendNameInput = document.querySelector('input[name="referral_friend_name"]');
+            if (friendNameInput) friendNameInput.focus();
+            return false;
+        }
+        alert('이온토플을 알게 된 경로를 최소 하나 이상 입력해주세요.');
+        const searchKeywordInput = document.querySelector('input[name="referral_search_keyword"]');
+        if (searchKeywordInput) searchKeywordInput.focus();
+        return false;
     }
 
     return true;
@@ -729,10 +781,13 @@ function collectFormData() {
 
     // Collect all form fields
     for (let [key, value] of formData.entries()) {
-        if (key.startsWith('score_') || key.startsWith('target_')) {
+        if (key === 'score_history' || key === 'target_note') {
+            // 점수/목표 관련 텍스트 필드는 score_/target_ prefix지만 숫자가 아님 → 문자열 그대로
+            data[key] = value;
+        } else if (key.startsWith('score_') || key.startsWith('target_')) {
             // Convert score fields to numbers
             data[key] = value ? parseFloat(value) : null;
-        } else if (key === 'confirm_materials' || key === 'privacy_agreement' || key === 'confirm_kakao') {
+        } else if (key === 'no_target_score' || key === 'privacy_agreement' || key === 'confirm_kakao') {
             // Convert checkboxes to boolean
             data[key] = value === 'on';
         } else {
@@ -773,6 +828,11 @@ function collectFormData() {
         if (data.score_total_new) {
             data.total_score = data.score_total_new;
         }
+    }
+
+    // 토플 점수 "없음" 선택 시 score_history는 사용자에게 보이지 않으므로 null로 초기화
+    if (data.has_toefl_score === 'no') {
+        data.score_history = null;
     }
 
     // 목표점수 없음 체크박스 처리
