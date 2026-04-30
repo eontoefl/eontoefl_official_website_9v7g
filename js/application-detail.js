@@ -556,9 +556,23 @@ ${escapeHtml(app.target_notes)}
         </div>
         ` : ''}
         
+        ${app.give_up_plan ? `
+        <div class="detail-row">
+            <div class="detail-label">포기/조절할 것</div>
+            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.give_up_plan)}</div>
+        </div>
+        ` : ''}
+
+        ${app.tell_plan ? `
+        <div class="detail-row">
+            <div class="detail-label">챌린지를 알린/알릴 사람</div>
+            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.tell_plan)}</div>
+        </div>
+        ` : ''}
+
         ${app.program_note ? `
         <div class="detail-row">
-            <div class="detail-label">프로그램 추가 메모</div>
+            <div class="detail-label">노트북/데스크탑 보유 여부</div>
             <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.program_note)}</div>
         </div>
         ` : ''}

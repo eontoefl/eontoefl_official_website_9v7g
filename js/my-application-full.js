@@ -287,10 +287,22 @@ function displayResults(applications) {
                                 <div style="font-weight: 600; color: ${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '#2563eb' : '#64748b'};">${escapeHtml(app.preferred_correction || '미신청')}</div>
                             </div>
                         </div>
+                        ${app.give_up_plan ? `
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                                <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">포기/조절할 것</div>
+                                <div style="font-size: 13px; color: #1e293b; white-space: pre-wrap;">${escapeHtml(app.give_up_plan)}</div>
+                            </div>
+                        ` : ''}
+                        ${app.tell_plan ? `
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                                <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">챌린지를 알린/알릴 사람</div>
+                                <div style="font-size: 13px; color: #1e293b; white-space: pre-wrap;">${escapeHtml(app.tell_plan)}</div>
+                            </div>
+                        ` : ''}
                         ${app.program_note ? `
                             <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
-                                <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">프로그램 관련 추가 의견</div>
-                                <div style="font-size: 13px; color: #1e293b;">${escapeHtml(app.program_note)}</div>
+                                <div style="color: #64748b; font-size: 12px; margin-bottom: 4px;">노트북/데스크탑 보유 여부</div>
+                                <div style="font-size: 13px; color: #1e293b; white-space: pre-wrap;">${escapeHtml(app.program_note)}</div>
                             </div>
                         ` : ''}
                     </div>
