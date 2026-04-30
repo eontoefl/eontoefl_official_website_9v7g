@@ -102,34 +102,33 @@
         <!-- Form Header -->
         <div class="form-header">
             <h1><i class="fas fa-book-open" style="margin-right: 8px;"></i>입문서 무료 신청</h1>
-            <p class="form-description">토플 독학의 첫걸음, 이온토플 입문서를 무료로 받아보세요.</p>
+            <p class="form-description">입문서 무료 신청 방식이 변경되었습니다.</p>
         </div>
 
-        <!-- Block Screen: 이미 신청한 사용자 -->
-        <div id="alreadyAppliedBlock" class="block-screen" style="display: none;">
-            <div class="block-icon" style="color: var(--accent-color);">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <h2>이미 신청하셨습니다</h2>
-            <p>입문서를 이미 신청하셨습니다.<br>아래 버튼을 눌러 입문서를 읽어보세요.</p>
-            <a href="my-dashboard.html" class="btn-primary">
-                <i class="fas fa-book-reader"></i> 입문서 읽기
-            </a>
-        </div>
-
-        <!-- Block Screen: 챌린지 기존 신청자 -->
-        <div id="challengeUserBlock" class="block-screen" style="display: none;">
+        <!-- 신청 방식 변경 안내 -->
+        <div class="block-screen">
             <div class="block-icon" style="color: var(--primary-color);">
-                <i class="fas fa-user-check"></i>
+                <i class="fas fa-bullhorn"></i>
             </div>
-            <h2>이미 내벨업챌린지에 참여 중이십니다</h2>
-            <p>내벨업챌린지 신청자는 입문서를 별도로 신청하실 필요가 없습니다.<br>대시보드에서 모든 학습 자료를 확인하실 수 있습니다.</p>
-            <a href="my-dashboard.html" class="btn-primary">
-                <i class="fas fa-tachometer-alt"></i> 대시보드로 이동
+            <h2>입문서 무료 신청 방식이 변경되었습니다</h2>
+            <p style="text-align: left;">
+                문제점이 무엇인지도 모르고, 계획도 없는채로 입문서만 받아봤자<br>
+                결국은 라면받침이 되는 경우가 많더라고요.<br>
+                그래서 입문서는 항상 <strong>1:1 개별분석(무료)</strong>와 함께 제공해드리려고 합니다.<br>
+                조금더 한 분 한 분 시간을 많이 쓰게되겠지만 이왕 드리는거 유용하게 사용하셨으면 좋겠습니다.
+            </p>
+            <p style="text-align: left;">
+                아래 신청서를 꼼꼼하게 작성하시면 <strong>1영업일내</strong>로 1:1 개별분석(무료)과 함께 입문서를 전송해드리도록 할게요.
+            </p>
+            <p style="text-align: left; font-size: 0.85rem; color: #888; background: #f7f5fb; padding: 1rem; border-radius: 6px; line-height: 1.7;">
+                * 아래 신청서는 원래 100만원대 내벨업챌린지 신청자분들께 보내드리는 1:1 개별분석을 위해 제작된 양식이라, 엄청나게 자세해요. 작성해주신 내용은 토플 상황 뿐 아니라 공부 가능 시간, 생활 패턴, 성향까지 함께 반영해 최대한 구체적으로 목표달성 전략 보내드리고 있어요.
+            </p>
+            <a href="application-form.html" class="btn-primary">
+                <i class="fas fa-pen"></i> 정규 신청서 작성하기
             </a>
         </div>
 
-        <!-- 신청 폼 -->
+        <!-- 기존 신청 폼 (비활성화) -->
         <form id="bookRequestForm" style="display: none;">
 
             <!-- Section 1: 기본 정보 (읽기 전용) -->
@@ -328,7 +327,6 @@
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
-    <script src="js/book-request.js"></script>
 
     <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
