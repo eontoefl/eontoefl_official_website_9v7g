@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('statusFilter').addEventListener('change', () => { activeCardFilter = 'all'; updateCardActiveState(); applyFilters(); });
     document.getElementById('taskTypeFilter').addEventListener('change', () => { activeCardFilter = 'all'; updateCardActiveState(); applyFilters(); });
     document.getElementById('draftFilter').addEventListener('change', () => { activeCardFilter = 'all'; updateCardActiveState(); applyFilters(); });
+    const sessionFilterEl = document.getElementById('sessionFilter');
+    if (sessionFilterEl) sessionFilterEl.addEventListener('change', () => { activeCardFilter = 'all'; updateCardActiveState(); applyFilters(); });
     document.getElementById('sortBy').addEventListener('change', applyFilters);
 
     loadCorrections();
@@ -55,6 +57,9 @@ async function loadCorrections() {
         // Collect unique user_ids to fetch user info
         const userIds = [...new Set(allCorrections.map(c => c.user_id).filter(Boolean))];
         await loadUsersInfo(userIds);
+
+        // Populate session filter dropdown with unique session numbers
+        populateSessionFilter();
 
         updateStats();
         applyFilters();
@@ -84,6 +89,30 @@ async function loadUsersInfo(userIds) {
         }
     } catch (e) {
         console.warn('사용자 정보 로드 실패:', e);
+    }
+}
+
+// ===== Populate Session Filter =====
+function populateSessionFilter() {
+    const sessionFilterEl = document.getElementById('sessionFilter');
+    if (!sessionFilterEl) return;
+
+    // Collect unique session numbers
+    const sessions = [...new Set(allCorrections.map(c => c.session_number).filter(s => s !== null && s !== undefined))]
+        .sort((a, b) => Number(a) - Number(b));
+
+    // Preserve current selection
+    const currentValue = sessionFilterEl.value;
+
+    let html = '<option value="all">전체 세션</option>';
+    sessions.forEach(s => {
+        html += `<option value="${s}">S${s}</option>`;
+    });
+    sessionFilterEl.innerHTML = html;
+
+    // Restore selection if still valid
+    if (currentValue && (currentValue === 'all' || sessions.includes(Number(currentValue)) || sessions.includes(currentValue))) {
+        sessionFilterEl.value = currentValue;
     }
 }
 
@@ -315,6 +344,8 @@ function applyFilters() {
     const statusFilter = document.getElementById('statusFilter').value;
     const taskTypeFilter = document.getElementById('taskTypeFilter').value;
     const draftFilter = document.getElementById('draftFilter').value;
+    const sessionFilterEl = document.getElementById('sessionFilter');
+    const sessionFilter = sessionFilterEl ? sessionFilterEl.value : 'all';
     const sortBy = document.getElementById('sortBy').value;
 
     filteredCorrections = allCorrections.filter(item => {
@@ -360,6 +391,11 @@ function applyFilters() {
         if (draftFilter !== 'all') {
             const round = getDraftRound(item);
             if (round !== draftFilter) return false;
+        }
+
+        // Session filter
+        if (sessionFilter !== 'all') {
+            if (String(item.session_number) !== String(sessionFilter)) return false;
         }
 
         return true;
@@ -2368,6 +2404,380 @@ function downloadExcel() {
 
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `첨삭관리_${today}.xlsx`);
+}
+
+// ===== 5-4. Text Report Download =====
+// Downloads a comprehensive text file with:
+// - Student info, session, task type, question prompt
+// - 1st draft (text or STT q1~q4) + 1st feedback (annotations + summary + level)
+// - 2nd draft (text or STT q1~q4) + final feedback (+ encouragement + level_change)
+// Filters (student search, session) are applied automatically via filteredCorrections.
+
+async function downloadTextReport() {
+    if (filteredCorrections.length === 0) {
+        alert('다운로드할 데이터가 없습니다.');
+        return;
+    }
+
+    // Show loading state on button
+    const btn = document.querySelector('button[onclick="downloadTextReport()"]');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 생성 중...';
+    }
+
+    try {
+        // 1) Fetch question prompts in batch by task_type
+        const questionsMap = await fetchQuestionsForCorrections(filteredCorrections);
+
+        // 2) Sort: by student name, then session number, then task type
+        const sorted = [...filteredCorrections].sort((a, b) => {
+            const userA = usersCache[a.user_id] || {};
+            const userB = usersCache[b.user_id] || {};
+            const nameA = (userA.name || '').toLowerCase();
+            const nameB = (userB.name || '').toLowerCase();
+            if (nameA !== nameB) return nameA.localeCompare(nameB);
+            const sA = Number(a.session_number) || 0;
+            const sB = Number(b.session_number) || 0;
+            if (sA !== sB) return sA - sB;
+            return (a.task_type || '').localeCompare(b.task_type || '');
+        });
+
+        // 3) Build text content per item
+        const blocks = sorted.map(item => buildTextBlockForItem(item, questionsMap));
+        const fullText = blocks.join('\n\n');
+
+        // 4) Determine filename
+        const today = new Date().toISOString().slice(0, 10);
+        // If a single student is filtered (search shows only one student), use their name
+        const uniqueUsers = [...new Set(sorted.map(c => c.user_id))];
+        let filename;
+        if (uniqueUsers.length === 1) {
+            const user = usersCache[uniqueUsers[0]] || {};
+            const safeName = (user.name || 'student').replace(/[\\/:*?"<>|]/g, '_');
+            filename = `첨삭기록_${safeName}_${today}.txt`;
+        } else {
+            filename = `첨삭기록_전체_${today}.txt`;
+        }
+
+        // 5) Download as .txt file (UTF-8 with BOM for proper encoding on Windows)
+        const blob = new Blob(['\ufeff' + fullText], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+    } catch (err) {
+        console.error('Text report download error:', err);
+        alert('텍스트 다운로드 실패: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+    }
+}
+
+/**
+ * Fetch question prompts for the given corrections, grouped by task_type.
+ * Returns a map: { 'writing_email|0001': {...}, 'speaking_interview|0003': {...}, ... }
+ */
+async function fetchQuestionsForCorrections(items) {
+    const result = {};
+
+    // Collect (task_type, task_number) pairs per question table
+    const emailIds = new Set();
+    const discussionIds = new Set();
+    const interviewIds = new Set();
+
+    items.forEach(it => {
+        const tt = (it.task_type || '').toLowerCase();
+        const tn = it.task_number;
+        if (tn === null || tn === undefined || tn === '') return;
+        const idStr = String(tn).padStart(4, '0');
+        if (tt === 'writing_email') emailIds.add(`email_set_${idStr}`);
+        else if (tt === 'writing_discussion') discussionIds.add(`discussion_set_${idStr}`);
+        else if (tt === 'speaking_interview') interviewIds.add(`interview_set_${idStr}`);
+    });
+
+    // Helper to batch-fetch by ids
+    async function fetchBatch(table, ids) {
+        if (ids.size === 0) return [];
+        // Use 'in.(...)' filter — quote each id since they are strings like "email_set_0001"
+        const idList = [...ids].map(i => `"${i}"`).join(',');
+        try {
+            const data = await supabaseAPI.query(table, {
+                'id': `in.(${idList})`,
+                'limit': '1000'
+            });
+            return data || [];
+        } catch (e) {
+            console.warn(`Failed to fetch ${table}:`, e);
+            return [];
+        }
+    }
+
+    const [emails, discussions, interviews] = await Promise.all([
+        fetchBatch('tr_writing_email', emailIds),
+        fetchBatch('tr_writing_discussion', discussionIds),
+        fetchBatch('tr_speaking_interview', interviewIds)
+    ]);
+
+    emails.forEach(q => { result[`writing_email|${q.id}`] = q; });
+    discussions.forEach(q => { result[`writing_discussion|${q.id}`] = q; });
+    interviews.forEach(q => { result[`speaking_interview|${q.id}`] = q; });
+
+    return result;
+}
+
+/**
+ * Build a full text report block for a single correction submission.
+ */
+function buildTextBlockForItem(item, questionsMap) {
+    const user = usersCache[item.user_id] || { name: '(알수없음)', email: '' };
+    const taskType = (item.task_type || '').toLowerCase();
+    const taskTypeLabel = getTaskTypeLabel(item.task_type) || item.task_type || '-';
+    const isWriting = taskType.startsWith('writing');
+    const sessionStr = item.session_number ? `S${item.session_number}` : '-';
+
+    const lines = [];
+    const SEP = '═══════════════════════════════════════════════════════════';
+    const SUB = '───────────────────────────────────────────────────────────';
+
+    lines.push(SEP);
+    lines.push(`학생: ${user.name}${user.email ? ` (${user.email})` : ''}`);
+    lines.push(`세션: ${sessionStr}  ·  유형: ${taskTypeLabel}${item.task_number !== undefined && item.task_number !== null ? `  ·  문제번호: ${item.task_number}` : ''}`);
+    lines.push(SEP);
+    lines.push('');
+
+    // === [문제] ===
+    lines.push('[문제]');
+    const questionText = formatQuestionPrompt(item, questionsMap);
+    lines.push(questionText || '(문제 정보 없음)');
+    lines.push('');
+
+    // === [1차] ===
+    lines.push(SUB);
+    lines.push('[1차]');
+    lines.push(SUB);
+
+    // 1차 학생 답변
+    lines.push('');
+    lines.push('▶ 학생 답변 (1차)');
+    lines.push(formatStudentDraft(item, 1, isWriting));
+
+    // 1차 첨삭
+    lines.push('');
+    lines.push('▶ 1차 첨삭');
+    if (item.feedback_1) {
+        const fb1 = parseFeedback(item.feedback_1);
+        lines.push(formatFeedback(fb1, isWriting, false));
+    } else {
+        lines.push('(1차 첨삭 데이터 없음)');
+    }
+
+    // === [2차 / 최종] ===
+    const has2nd = !!(item.draft_2_text || item.stt_text_2 || item.feedback_2);
+    if (has2nd) {
+        lines.push('');
+        lines.push(SUB);
+        lines.push('[2차 / 최종]');
+        lines.push(SUB);
+
+        // 2차 학생 답변
+        lines.push('');
+        lines.push('▶ 학생 답변 (2차)');
+        lines.push(formatStudentDraft(item, 2, isWriting));
+
+        // 최종 첨삭
+        lines.push('');
+        lines.push('▶ 최종 첨삭');
+        if (item.feedback_2) {
+            const fb2 = parseFeedback(item.feedback_2);
+            lines.push(formatFeedback(fb2, isWriting, true));
+        } else {
+            lines.push('(2차 첨삭 데이터 없음)');
+        }
+    }
+
+    lines.push('');
+    return lines.join('\n');
+}
+
+/**
+ * Format the question prompt based on task_type.
+ */
+function formatQuestionPrompt(item, questionsMap) {
+    const taskType = (item.task_type || '').toLowerCase();
+    const tn = item.task_number;
+    if (tn === null || tn === undefined || tn === '') return '(문제번호 없음)';
+    const idStr = String(tn).padStart(4, '0');
+
+    let q = null;
+    if (taskType === 'writing_email') q = questionsMap[`writing_email|email_set_${idStr}`];
+    else if (taskType === 'writing_discussion') q = questionsMap[`writing_discussion|discussion_set_${idStr}`];
+    else if (taskType === 'speaking_interview') q = questionsMap[`speaking_interview|interview_set_${idStr}`];
+
+    if (!q) return '(문제 정보를 찾을 수 없습니다)';
+
+    const out = [];
+    if (taskType === 'writing_email') {
+        if (q.scenario) out.push(`- 시나리오: ${q.scenario}`);
+        if (q.task) out.push(`- 과제: ${q.task}`);
+        if (q.to_recipient) out.push(`- 수신자: ${q.to_recipient}`);
+        if (q.subject) out.push(`- 제목: ${q.subject}`);
+        if (q.instruction) out.push(`- 지시사항: ${q.instruction}`);
+    } else if (taskType === 'writing_discussion') {
+        if (q.class_context) out.push(`- 수업 맥락: ${q.class_context}`);
+        if (q.topic) out.push(`- 토론 주제: ${q.topic}`);
+        if (q.student1_opinion) out.push(`- 학생1 의견: ${q.student1_opinion}`);
+        if (q.student2_opinion) out.push(`- 학생2 의견: ${q.student2_opinion}`);
+    } else if (taskType === 'speaking_interview') {
+        if (q.context_text) out.push(`- 상황 설명: ${q.context_text}`);
+        for (let i = 1; i <= 4; i++) {
+            const scriptVal = q[`v${i}_script`];
+            if (scriptVal) out.push(`- Q${i}: ${scriptVal}`);
+        }
+    }
+
+    return out.length > 0 ? out.join('\n') : '(문제 정보 없음)';
+}
+
+/**
+ * Format student draft answer for the given round (1 or 2).
+ */
+function formatStudentDraft(item, round, isWriting) {
+    if (isWriting) {
+        const text = round === 2 ? (item.draft_2_text || '') : (item.draft_1_text || '');
+        return text ? text : '(답변 없음)';
+    } else {
+        // Speaking — STT JSON parsed from stt_text_1 / stt_text_2
+        const sttRaw = round === 2 ? item.stt_text_2 : item.stt_text_1;
+        if (!sttRaw) return '(STT 텍스트 없음)';
+        let stt = sttRaw;
+        if (typeof stt === 'string') {
+            try { stt = JSON.parse(stt); } catch (e) { return sttRaw; }
+        }
+        const out = [];
+        for (let i = 1; i <= 4; i++) {
+            const qKey = `q${i}`;
+            const txt = stt && stt[qKey] ? stt[qKey] : '(없음)';
+            out.push(`Q${i}: ${txt}`);
+        }
+        return out.join('\n\n');
+    }
+}
+
+/**
+ * Format feedback (annotated marks + summary + level + extras for 2nd round).
+ */
+function formatFeedback(feedback, isWriting, isFinal) {
+    if (!feedback) return '(첨삭 데이터 없음)';
+
+    const lines = [];
+
+    if (isWriting) {
+        // Writing: annotated_html → extract marks
+        const marks = extractMarksFromHtml(feedback.annotated_html || '');
+        if (marks.length > 0) {
+            lines.push('• 교정 포인트:');
+            marks.forEach((m, i) => {
+                lines.push(`  ${i + 1}. "${m.text}"`);
+                lines.push(`     → ${m.comment}`);
+            });
+        } else {
+            lines.push('• 교정 포인트: (없음)');
+        }
+    } else {
+        // Speaking: per_question array
+        const perQ = Array.isArray(feedback.per_question) ? feedback.per_question : [];
+        if (perQ.length === 0) {
+            lines.push('• 교정 포인트: (per_question 데이터 없음)');
+        } else {
+            perQ.forEach(pq => {
+                const qNum = pq.q || '?';
+                lines.push(`• Q${qNum} 교정 포인트:`);
+                const marks = extractMarksFromHtml(pq.annotated_html || '');
+                if (marks.length > 0) {
+                    marks.forEach((m, i) => {
+                        lines.push(`  ${i + 1}. "${m.text}"`);
+                        lines.push(`     → ${m.comment}`);
+                    });
+                } else {
+                    lines.push('  (없음)');
+                }
+                if (pq.comment) {
+                    lines.push(`  [Q${qNum} 코멘트] ${pq.comment}`);
+                }
+            });
+        }
+    }
+
+    // Summary
+    if (feedback.summary) {
+        lines.push('');
+        lines.push('• 총평:');
+        lines.push(indent(feedback.summary, '  '));
+    }
+
+    // Level (score)
+    if (feedback.level !== undefined && feedback.level !== null) {
+        lines.push('');
+        lines.push(`• 점수: ${feedback.level} / 5`);
+    }
+
+    // 2nd round extras
+    if (isFinal) {
+        if (feedback.encouragement) {
+            lines.push('');
+            lines.push('• 격려 메시지:');
+            lines.push(indent(feedback.encouragement, '  '));
+        }
+        if (feedback.level_change) {
+            lines.push('');
+            lines.push('• 점수 변화 설명:');
+            lines.push(indent(feedback.level_change, '  '));
+        }
+    }
+
+    return lines.join('\n');
+}
+
+/**
+ * Parse annotated_html and extract array of { text, comment } from
+ * <mark class="correction-mark" data-comment="...">text</mark> tags.
+ */
+function extractMarksFromHtml(html) {
+    if (!html) return [];
+    const result = [];
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+        const marks = doc.querySelectorAll('mark.correction-mark, mark[data-comment], .correction-mark');
+        marks.forEach(m => {
+            const text = (m.textContent || '').trim().replace(/\s+/g, ' ');
+            const comment = (m.getAttribute('data-comment') || '').trim();
+            if (text || comment) {
+                result.push({ text, comment });
+            }
+        });
+    } catch (e) {
+        console.warn('Failed to parse annotated_html:', e);
+    }
+    return result;
+}
+
+/**
+ * Indent every line of a multiline string.
+ */
+function indent(str, prefix) {
+    if (!str) return '';
+    return String(str).split('\n').map(line => prefix + line).join('\n');
 }
 
 // =====================================================================
