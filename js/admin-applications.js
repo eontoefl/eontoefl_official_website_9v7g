@@ -1266,8 +1266,11 @@ function matchTrackingData(rows) {
         const phoneMid = extractPhoneMid(phone);
 
         // DB에서 매칭 (allApplications 사용, 삭제된 신청서 제외)
+        // 운송장은 내벨업챌린지(challenge) 신청자에게만 발송되므로
+        // 입문서(book_only) 등 다른 신청서는 매칭 대상에서 제외
         const matched = allApplications.filter(app => {
             if (app.deleted) return false;
+            if (app.application_type !== 'challenge') return false;
             if (app.name !== name) return false;
             if (phoneMid && app.phone) {
                 const appPhoneMid = extractPhoneMid(app.phone);
