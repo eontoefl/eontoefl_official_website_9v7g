@@ -155,6 +155,10 @@
                     <option value="1">1차</option>
                     <option value="2">2차</option>
                 </select>
+
+                <select id="sessionFilter" class="admin-select">
+                    <option value="all">전체 세션</option>
+                </select>
                 
                 <select id="sortBy" class="admin-select">
                     <option value="newest">최신순</option>
@@ -163,7 +167,10 @@
                     <option value="score_low">점수 낮은순</option>
                 </select>
 
-                <button class="admin-btn admin-btn-sm" style="background:#16a34a; color:white; margin-left:auto;" onclick="downloadExcel()">
+                <button class="admin-btn admin-btn-sm" style="background:#2563eb; color:white; margin-left:auto;" onclick="downloadTextReport()">
+                    <i class="fas fa-file-alt"></i> 텍스트 다운로드
+                </button>
+                <button class="admin-btn admin-btn-sm" style="background:#16a34a; color:white;" onclick="downloadExcel()">
                     <i class="fas fa-file-excel"></i> 엑셀 다운로드
                 </button>
             </div>
