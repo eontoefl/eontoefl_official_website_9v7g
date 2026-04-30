@@ -181,8 +181,10 @@ function downloadInfoTxt() {
     lines.push('=== 프로그램 및 일정 ===');
     lines.push(`희망 프로그램 : ${app.preferred_program || '-'}`);
     lines.push(`스라첨삭 신청 : ${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}`);
-    lines.push(`희망 시작일 : ${app.preferred_start_date || '-'}`);
-    if (app.program_note) lines.push(`추가 의견 : ${app.program_note}`);
+    lines.push(`희망하는 챌린지 시작일 : ${app.preferred_start_date || '-'}`);
+    lines.push(`포기/조절할 것 : ${app.give_up_plan || '-'}`);
+    lines.push(`챌린지를 알린/알릴 사람 : ${app.tell_plan || '-'}`);
+    lines.push(`노트북/데스크탑 보유 여부 : ${app.program_note || '-'}`);
 
     lines.push('');
     lines.push('=== 유입 경로 ===');
@@ -350,9 +352,11 @@ function loadModalInfoTab(app) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
                 <div class="info-item"><label>희망 프로그램</label><div>${app.preferred_program || '-'}</div></div>
                 <div class="info-item"><label>스라첨삭 신청</label><div style="color: ${app.preferred_correction === '신청희망' || app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight:600;">${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}</div></div>
-                <div class="info-item"><label>희망 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
+                <div class="info-item"><label>희망하는 챌린지 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
             </div>
-            ${app.program_note ? `<div class="info-item"><label>추가 의견</label><div style="white-space:pre-wrap;">${app.program_note}</div></div>` : ''}
+            ${app.give_up_plan ? `<div class="info-item"><label>포기/조절할 것</label><div style="white-space:pre-wrap;">${app.give_up_plan}</div></div>` : ''}
+            ${app.tell_plan ? `<div class="info-item"><label>챌린지를 알린/알릴 사람</label><div style="white-space:pre-wrap;">${app.tell_plan}</div></div>` : ''}
+            ${app.program_note ? `<div class="info-item"><label>노트북/데스크탑 보유 여부</label><div style="white-space:pre-wrap;">${app.program_note}</div></div>` : ''}
         </div>
 
         <!-- 9. 유입 경로 -->
@@ -574,7 +578,7 @@ function loadModalAnalysisTab(app) {
                     </div>
                 </div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                    학생이 희망한 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
+                    학생이 희망한 챌린지 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
                 </div>
                 <div id="correctionStartDateWrapper" style="margin-top: 12px; ${fillCorrectionEnabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
                     <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일만)${fillCorrectionEnabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>

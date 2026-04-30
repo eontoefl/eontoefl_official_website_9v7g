@@ -380,6 +380,7 @@ function populateFormData(app) {
         'occupation', 'score_history', 'current_study_method',
         'target_note', 'toefl_reason_detail', 'memorable_blog_content',
         'preferred_program', 'preferred_correction', 'program_note',
+        'give_up_plan', 'tell_plan',
         'referral_search_keyword', 'referral_social_media', 'referral_friend_name',
         'referral_other', 'additional_notes'
     ];

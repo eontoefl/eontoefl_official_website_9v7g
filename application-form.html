@@ -558,15 +558,27 @@
                 </div>
                 <div class="two-column-grid">
                     <div class="form-group">
-                        <label>희망 수업 시작 시기</label>
-                        <input type="date" name="preferred_start_date" required>
+                        <label>희망하는 챌린지 시작일</label>
+                        <input type="date" name="preferred_start_date">
                         <small>수업은 <strong>매주 일요일</strong>에만 시작 가능합니다</small>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>프로그램 관련 추가 의견</label>
-                    <textarea name="program_note" rows="2" placeholder="질문이나 요청사항 (선택)"></textarea>
+                    <label>챌린지는 매일 빠짐없이 과제를 제출해야해요 (토요일 제외). 끝까지 완주하기 위해서 포기하거나 조절할것을 적어주세요.</label>
+                    <textarea name="give_up_plan" rows="3" placeholder="예: 넷플릭스 시간 줄이기, 주말 낮잠 줄이기 등" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>자신의 내벨업챌린지 참여 사실을 알리면 완주율이 높아져요. 누군가가 현재 누가 알고 있나요? 없다면 누구에게 알린 계획인가요?</label>
+                    <textarea name="tell_plan" rows="3" placeholder="예: 부모님도 알고 계시고, 여자친구/남자친구도 알고 있고 응원해주고 있습니다!" required></textarea>
+                    <small>💡 울리시스 계약 효과 (Ulysses Pact Effect) : 미래의 나약한 나를 위해 현재의 내가 미리 제약을 걸어두는 장치</small>
+                </div>
+
+                <div class="form-group">
+                    <label>내벨업챌린지는 노트북 또는 데스크탑으로 진행해야 해요. 노트북과 혹은 데스크탑이 준비되어있나요?</label>
+                    <textarea name="program_note" rows="3" required></textarea>
+                    <small>⚠️ 아이패드 및 태블릿은 가능은 하지만 권장되지 않아요.</small>
                 </div>
             </div>
 
