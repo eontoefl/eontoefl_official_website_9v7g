@@ -2603,6 +2603,15 @@ function buildTextBlockForItem(item, questionsMap) {
         } else {
             lines.push('(2차 첨삭 데이터 없음)');
         }
+
+        // 모범답안
+        lines.push('');
+        lines.push('▶ [모범답안]');
+        if (item.model_answer_text) {
+            lines.push(item.model_answer_text);
+        } else {
+            lines.push('(모범답안 데이터 없음)');
+        }
     }
 
     lines.push('');
