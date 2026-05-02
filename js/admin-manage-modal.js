@@ -684,9 +684,13 @@ function loadModalAnalysisTab(app) {
                             <i class="fas fa-save"></i> 변경사항 저장
                         </button>
                     ` : hasAnalysis ? `
-                        <!-- 이미 공개됨: 기존 흐름 (수정하기 클릭 후 저장) -->
+                        <!-- 이미 공개됨: 수정 저장 — 즉시 발송 / 예약 발송 분기 -->
                         <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="immediate" disabled style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px;">
-                            <i class="fas fa-save"></i> 저장
+                            <i class="fas fa-paper-plane"></i> 즉시 저장 + 발송
+                        </button>
+                        <button type="button" class="btn-primary" id="scheduleAnalysisBtn" onclick="openScheduleModal()" disabled
+                                style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white; border-radius: 8px; font-weight: 600;">
+                            <i class="fas fa-clock"></i> 예약 저장 + 발송
                         </button>
                     ` : `
                         <!-- 최초 저장: 즉시 발송 / 예약 발송 분기 -->
@@ -970,7 +974,9 @@ async function saveModalAnalysis(event) {
             final_price: finalPrice,
             schedule_start: formData.get('schedule_start'),
             schedule_end: formData.get('schedule_end'),
-            is_incentive_applicant: isIncentive
+            is_incentive_applicant: isIncentive,
+            // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
+            is_analysis_update: !!currentManageApp.analysis_first_saved_at
         };
 
         const updateData = {
@@ -1050,8 +1056,12 @@ async function saveModalAnalysis(event) {
                 }
             }
 
-            // 알림톡: 개별분석 완료 안내 (프로모션 학생은 전용 템플릿, 일반 학생은 기본 템플릿)
-            const alimTalkType = isIncentive ? 'incentive_analysis_complete' : 'analysis_complete';
+            // 알림톡: 최초 저장 vs 수정 저장 분기
+            // analysis_first_saved_at가 이미 있었으면 = 이전에 공개한 적 있음 = 수정
+            const isUpdate = !!currentManageApp.analysis_first_saved_at;
+            const alimTalkType = isUpdate
+                ? 'analysis_updated'
+                : (isIncentive ? 'incentive_analysis_complete' : 'analysis_complete');
             try {
                 await sendKakaoAlimTalk(alimTalkType, {
                     name: updatedApp.name || currentManageApp.name,
@@ -1060,8 +1070,10 @@ async function saveModalAnalysis(event) {
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
-            const incentiveNotice = isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '';
-            alert('✅ 개별분석이 저장되었습니다!' + incentiveNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
+            const alimTalkNotice = isUpdate
+                ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
+                : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
+            alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
 
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;
@@ -1323,6 +1335,14 @@ function editAnalysis() {
             saveBtn.removeAttribute('disabled');
             saveBtn.style.opacity = '1';
             saveBtn.style.cursor = 'pointer';
+        }
+        
+        // 예약 저장 버튼 활성화
+        const scheduleBtn = document.getElementById('scheduleAnalysisBtn');
+        if (scheduleBtn) {
+            scheduleBtn.removeAttribute('disabled');
+            scheduleBtn.style.opacity = '1';
+            scheduleBtn.style.cursor = 'pointer';
         }
         
         // 수정하기 버튼 숨기기
