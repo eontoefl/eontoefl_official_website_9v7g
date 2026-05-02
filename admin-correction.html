@@ -262,7 +262,7 @@
 
             <!-- Edit Mode Banner -->
             <div class="corr-edit-banner" id="editBanner">
-                <i class="fas fa-edit"></i> 편집 모드 — 수정 후 임시 저장 또는 승인하세요
+                <i class="fas fa-edit"></i> 편집 모드 — 수정 후 저장 또는 승인하세요
             </div>
 
             <!-- Toggle Buttons -->
@@ -292,11 +292,14 @@
             <!-- Modal Footer (edit mode) -->
             <div class="corr-modal-footer" id="modalFooter">
                 <button class="corr-footer-btn corr-footer-btn-save" id="btnTempSave" onclick="tempSaveCorrection()" disabled>
-                    <i class="fas fa-save"></i> 임시 저장
+                    <i class="fas fa-save"></i> 저장
+                </button>
+                <button class="corr-footer-btn corr-footer-btn-silent" id="btnSilentApprove" onclick="silentApproveCorrection()" disabled>
+                    <i class="fas fa-volume-mute"></i> 조용히 승인
                 </button>
                 <div class="corr-approve-wrap">
                     <button class="corr-footer-btn corr-footer-btn-approve" id="btnApprove" onclick="approveCorrection()" disabled>
-                        <i class="fas fa-check-circle"></i> 즉시 승인
+                        <i class="fas fa-check-circle"></i> 승인
                     </button>
                     <button class="corr-footer-btn corr-footer-btn-schedule" id="btnSchedule" onclick="toggleScheduleDropdown()" disabled>
                         <i class="fas fa-clock"></i> ▾

@@ -977,6 +977,17 @@
     background: #e2e8f0;
 }
 
+.corr-footer-btn-silent {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+.corr-footer-btn-silent:hover:not(:disabled) {
+    background: #e2e8f0;
+    color: #475569;
+}
+
 .corr-footer-btn-approve {
     background: #7c3aed;
     color: #fff;
