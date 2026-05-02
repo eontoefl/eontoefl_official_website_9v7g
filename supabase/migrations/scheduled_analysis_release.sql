@@ -5,7 +5,7 @@
 --   관리자가 개별분석 저장 시, 즉시 발송 대신 특정 시각에 예약 발송 가능.
 --   예약 시각이 도래하면:
 --     (1) 임시 보관된 분석 데이터를 정식 컬럼으로 이전 (학생에게 공개)
---     (2) 알림톡 발송 (analysis_complete or incentive_analysis_complete)
+--     (2) 알림톡 발송 (analysis_complete / incentive_analysis_complete / analysis_updated)
 --     (3) analysis_first_saved_at, analysis_saved_at = 발송 시각으로 세팅
 --         (= 동의 데드라인 카운트다운이 발송 시점부터 시작)
 --
@@ -28,7 +28,8 @@
 --                                                 discount_amount, additional_discount,
 --                                                 discount_reason, final_price,
 --                                                 correction_enabled, correction_start_date,
---                                                 correction_fee, is_incentive_applicant)
+--                                                 correction_fee, is_incentive_applicant,
+--                                                 is_analysis_update)
 --
 -- 실행 방법:
 --   Supabase 대시보드 → SQL Editor에서 본 파일 전체를 실행.
@@ -55,6 +56,7 @@ DECLARE
     v_now_ms bigint;
     v_payload jsonb;
     v_is_incentive boolean;
+    v_is_update boolean;
     v_correction_enabled boolean;
     v_correction_start_date date;
     v_user_id uuid;
@@ -85,6 +87,7 @@ BEGIN
     LOOP
         v_payload := COALESCE(rec.analysis_pending_payload, '{}'::jsonb);
         v_is_incentive := COALESCE((v_payload->>'is_incentive_applicant')::boolean, false);
+        v_is_update := COALESCE((v_payload->>'is_analysis_update')::boolean, false);
 
         -- 임시 보관 데이터를 정식 컬럼으로 이전 + 공개 트리거 컬럼 세팅
         -- payload는 폼에서 완전히 새로 만든 값이므로 키가 있으면 무조건 적용
@@ -136,9 +139,12 @@ BEGIN
                     duration_weeks = EXCLUDED.duration_weeks;
         END IF;
 
-        -- 알림톡 유형 결정
-        v_alim_type := CASE WHEN v_is_incentive THEN 'incentive_analysis_complete'
-                            ELSE 'analysis_complete' END;
+        -- 알림톡 유형 결정 (수정이면 analysis_updated, 최초면 기존 분기)
+        v_alim_type := CASE
+            WHEN v_is_update THEN 'analysis_updated'
+            WHEN v_is_incentive THEN 'incentive_analysis_complete'
+            ELSE 'analysis_complete'
+        END;
 
         -- 알림톡 발송 (전화번호가 있는 경우만)
         IF rec.phone IS NOT NULL AND rec.phone <> '' THEN

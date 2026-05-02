@@ -25,6 +25,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   correction_feedback_2: 50212,  // 최종 첨삭 완료 안내
   incentive_analysis_complete: 50214,  // 프로모션 학생: 개별분석 & 입문서 전송 완료 안내
   incentive_deadline_warning:  50215,  // 프로모션 학생: 동의 마감 6시간 전 안내
+  analysis_updated:            50217,  // 개별분석 수정 안내
 };
 
 // ===== 택배사 코드 매핑 (LunaSoft carrier_code) =====
@@ -237,6 +238,17 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
     }
 
+    case "analysis_updated":
+      return [
+        "이온토플 - 개별분석 수정 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        "앞서 보내드린 개별분석에 수정할 부분이 있어서 내용을 보완해 다시 올려드렸어요!",
+        "",
+        "시간 되실 때 아래 링크에서 한 번 확인 부탁드려요 :)",
+      ].join("\n");
+
     default:
       return "";
   }
@@ -269,6 +281,8 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 요청하신 개별분석이 등록되었습니다. 5일 이내 확인 후 동의 부탁드려요.";
     case "incentive_deadline_warning":
       return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
+    case "analysis_updated":
+      return "[이온토플] 개별분석이 수정되었습니다. 확인 부탁드려요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
