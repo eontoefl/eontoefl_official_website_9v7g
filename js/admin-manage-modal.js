@@ -684,22 +684,26 @@ function loadModalAnalysisTab(app) {
                             <i class="fas fa-save"></i> 변경사항 저장
                         </button>
                     ` : hasAnalysis ? `
-                        <!-- 이미 공개됨: 수정 저장 — 즉시 발송 / 예약 발송 분기 -->
+                        <!-- 이미 공개됨: 수정 모드 — 즉시발송 / 예약발송 / 조용히수정 -->
+                        <button type="button" class="btn-primary" id="silentSaveBtn" onclick="silentSaveAnalysis()" disabled
+                                style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px; background: #64748b; border: none; color: white; border-radius: 8px; font-weight: 600;">
+                            <i class="fas fa-volume-mute"></i> 조용히수정
+                        </button>
                         <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="immediate" disabled style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px;">
-                            <i class="fas fa-paper-plane"></i> 즉시 저장 + 발송
+                            <i class="fas fa-paper-plane"></i> 즉시발송
                         </button>
                         <button type="button" class="btn-primary" id="scheduleAnalysisBtn" onclick="openScheduleModal()" disabled
                                 style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white; border-radius: 8px; font-weight: 600;">
-                            <i class="fas fa-clock"></i> 예약 저장 + 발송
+                            <i class="fas fa-clock"></i> 예약발송
                         </button>
                     ` : `
-                        <!-- 최초 저장: 즉시 발송 / 예약 발송 분기 -->
+                        <!-- 최초 저장: 즉시발송 / 예약발송 (조용히수정 없음) -->
                         <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="immediate" style="padding: 12px 24px;">
-                            <i class="fas fa-paper-plane"></i> 즉시 저장 + 발송
+                            <i class="fas fa-paper-plane"></i> 즉시발송
                         </button>
                         <button type="button" class="btn-primary" onclick="openScheduleModal()"
                                 style="padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                            <i class="fas fa-clock"></i> 예약 저장 + 발송
+                            <i class="fas fa-clock"></i> 예약발송
                         </button>
                     `}
                 </div>
@@ -916,9 +920,20 @@ async function upsertCorrectionSchedule(userId, startDate, durationWeeks) {
     return await response.json();
 }
 
+// ===== 조용히수정 (알림톡 없이 저장) =====
+function silentSaveAnalysis() {
+    const form = document.getElementById('modalAnalysisForm');
+    if (!form) return;
+    if (!form.reportValidity()) return;
+
+    window._scheduledMode = 'silent';
+    form.requestSubmit();
+}
+
 // ===== 분석 저장 =====
 // 호출 모드 (saveAnalysisBtn 의 data-mode 또는 _scheduledMode 임시 플래그):
 //   - 'immediate'         : 즉시 저장 + 알림톡 즉시 발송 (기존 동작)
+//   - 'silent'            : 즉시 저장 + 알림톡 발송 안 함 (조용히수정)
 //   - 'scheduled'         : 예약 저장 (DB는 pending 컬럼에 보관, 알림톡은 cron이 발송)
 //   - 'update-scheduled'  : 예약 대기 중인 분석 내용만 수정 (예약 시각은 유지)
 async function saveModalAnalysis(event) {
@@ -940,6 +955,8 @@ async function saveModalAnalysis(event) {
         confirmMsg = `예약 발송으로 저장하시겠습니까?\n\n📅 ${kstStr}에\n   학생에게 공개 + 알림톡 발송됩니다.\n\n발송 전까지 분석 내용을 자유롭게 수정하실 수 있습니다.`;
     } else if (mode === 'update-scheduled') {
         confirmMsg = '변경사항을 저장하시겠습니까?\n\n예약 시각은 그대로 유지됩니다.';
+    } else if (mode === 'silent') {
+        confirmMsg = '알림톡 없이 조용히 수정하시겠습니까?\n\n내용은 저장되지만 학생에게 알림톡이 발송되지 않습니다.';
     } else {
         confirmMsg = '개별분석을 즉시 저장하고 알림톡을 발송하시겠습니까?\n\n학생이 즉시 확인하고 동의할 수 있습니다.';
     }
@@ -1056,23 +1073,29 @@ async function saveModalAnalysis(event) {
                 }
             }
 
-            // 알림톡: 최초 저장 vs 수정 저장 분기
-            // analysis_first_saved_at가 이미 있었으면 = 이전에 공개한 적 있음 = 수정
-            const isUpdate = !!currentManageApp.analysis_first_saved_at;
-            const alimTalkType = isUpdate
-                ? 'analysis_updated'
-                : (isIncentive ? 'incentive_analysis_complete' : 'analysis_complete');
-            try {
-                await sendKakaoAlimTalk(alimTalkType, {
-                    name: updatedApp.name || currentManageApp.name,
-                    phone: updatedApp.phone || currentManageApp.phone,
-                    app_id: updatedApp.id || currentManageApp.id
-                });
-            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+            // 알림톡: silent 모드가 아닐 때만 발송
+            let alimTalkNotice = '';
+            if (mode === 'silent') {
+                alimTalkNotice = '\n\n🔇 알림톡은 발송되지 않았습니다.';
+            } else {
+                // 최초 저장 vs 수정 저장 분기
+                // analysis_first_saved_at가 이미 있었으면 = 이전에 공개한 적 있음 = 수정
+                const isUpdate = !!currentManageApp.analysis_first_saved_at;
+                const alimTalkType = isUpdate
+                    ? 'analysis_updated'
+                    : (isIncentive ? 'incentive_analysis_complete' : 'analysis_complete');
+                try {
+                    await sendKakaoAlimTalk(alimTalkType, {
+                        name: updatedApp.name || currentManageApp.name,
+                        phone: updatedApp.phone || currentManageApp.phone,
+                        app_id: updatedApp.id || currentManageApp.id
+                    });
+                } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
-            const alimTalkNotice = isUpdate
-                ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
-                : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
+                alimTalkNotice = isUpdate
+                    ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
+                    : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
+            }
             alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
 
             // 앱 데이터 업데이트
@@ -1343,6 +1366,14 @@ function editAnalysis() {
             scheduleBtn.removeAttribute('disabled');
             scheduleBtn.style.opacity = '1';
             scheduleBtn.style.cursor = 'pointer';
+        }
+        
+        // 조용히수정 버튼 활성화
+        const silentBtn = document.getElementById('silentSaveBtn');
+        if (silentBtn) {
+            silentBtn.removeAttribute('disabled');
+            silentBtn.style.opacity = '1';
+            silentBtn.style.cursor = 'pointer';
         }
         
         // 수정하기 버튼 숨기기
