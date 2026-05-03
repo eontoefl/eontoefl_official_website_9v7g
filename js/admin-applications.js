@@ -840,15 +840,33 @@ async function bulkConfirmDeposit() {
     if (!confirm(`${selectedIds.size}명의 입금을 확인 처리하시겠습니까?\n\n각 학생의 최종 입금금액(final_price)으로 자동 처리됩니다.`)) return;
 
     try {
+        const alimTalkItems = [];
+
         const promises = Array.from(selectedIds).map(async (id) => {
-            return supabaseAPI.patch('applications', id, {
+            const updatedApp = await supabaseAPI.patch('applications', id, {
                 deposit_confirmed_by_admin: true,
                 deposit_confirmed_by_admin_at: Date.now(),
                 current_step: 5
             });
+            // 알림톡 일괄 발송용 데이터 수집
+            const app = updatedApp || allApplications.find(a => a.id === id);
+            if (app && app.phone) {
+                alimTalkItems.push({
+                    type: 'payment_confirmed',
+                    data: { name: app.name, phone: app.phone, app_id: app.id }
+                });
+            }
         });
 
         await Promise.all(promises);
+
+        // 알림톡 일괄 발송
+        if (alimTalkItems.length > 0) {
+            try {
+                await sendKakaoAlimTalkBulk(alimTalkItems);
+            } catch (e) { console.warn('일괄 입금확인 알림톡 발송 실패:', e); }
+        }
+
         alert(`✅ ${selectedIds.size}명의 입금이 확인되었습니다!`);
         clearSelection();
         loadApplications();
@@ -873,11 +891,35 @@ async function bulkSendGuide() {
             guide_sent_at: Date.now()
         };
 
-        const promises = Array.from(selectedIds).map(id =>
-            supabaseAPI.patch('applications', id, updateData)
-        );
+        const alimTalkItems = [];
+
+        const promises = Array.from(selectedIds).map(async (id) => {
+            const updatedApp = await supabaseAPI.patch('applications', id, updateData);
+            // 알림톡 일괄 발송용 데이터 수집
+            const app = updatedApp || allApplications.find(a => a.id === id);
+            if (app && app.phone) {
+                alimTalkItems.push({
+                    type: 'guide_uploaded',
+                    data: {
+                        name: app.name,
+                        phone: app.phone,
+                        program: app.assigned_program || '',
+                        start_date: app.schedule_start || '',
+                        app_id: app.id
+                    }
+                });
+            }
+        });
 
         await Promise.all(promises);
+
+        // 알림톡 일괄 발송
+        if (alimTalkItems.length > 0) {
+            try {
+                await sendKakaoAlimTalkBulk(alimTalkItems);
+            } catch (e) { console.warn('일괄 이용방법 알림톡 발송 실패:', e); }
+        }
+
         alert(`✅ ${selectedIds.size}명에게 이용방법이 전달되었습니다!`);
         clearSelection();
         loadApplications();
@@ -1386,6 +1428,8 @@ async function submitTrackingBulk() {
     let successCount = 0;
     const failedItems = [];
 
+    const alimTalkItems = [];
+
     for (const item of toUpdate) {
         try {
             await supabaseAPI.patch('applications', item.appId, {
@@ -1395,10 +1439,31 @@ async function submitTrackingBulk() {
                 shipping_completed_at: Date.now()
             });
             successCount++;
+            // 알림톡 일괄 발송용 데이터 수집
+            const app = allApplications.find(a => a.id === item.appId);
+            if (app && app.phone) {
+                alimTalkItems.push({
+                    type: 'shipping_sent',
+                    data: {
+                        name: app.name || item.name,
+                        phone: app.phone,
+                        courier: 'CJ대한통운',
+                        tracking_number: item.tracking,
+                        app_id: app.id
+                    }
+                });
+            }
         } catch (err) {
             console.error(`운송장 등록 실패: ${item.name}`, err);
             failedItems.push(item.name);
         }
+    }
+
+    // 알림톡 일괄 발송
+    if (alimTalkItems.length > 0) {
+        try {
+            await sendKakaoAlimTalkBulk(alimTalkItems);
+        } catch (e) { console.warn('운송장 일괄등록 알림톡 발송 실패:', e); }
     }
 
     // 결과 알림
