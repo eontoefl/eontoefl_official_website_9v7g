@@ -381,6 +381,9 @@ function loadModalAnalysisTab(app) {
     const container = document.getElementById('modalTabAnalysis');
     const hasAnalysis = app.analysis_status && app.analysis_content;
 
+    // AI 자동 분석 감지: analysis_content는 있지만 analysis_status가 없는 경우
+    const hasAIAnalysis = !app.analysis_status && !!app.analysis_content;
+
     // 예약 발송 대기 중 여부 (정식 컬럼은 비어있고, 예약 시각 + pending 컬럼이 있음)
     const isScheduled = !hasAnalysis
         && !!app.analysis_alimtalk_scheduled_at
@@ -448,8 +451,35 @@ function loadModalAnalysisTab(app) {
         </div>
     ` : '';
 
+    // AI 자동 분석 배너
+    const aiAnalysisBanner = hasAIAnalysis ? `
+        <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fas fa-robot" style="font-size: 24px; color: #8b5cf6; margin-top: 2px;"></i>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 15px; color: #5b21b6; margin-bottom: 6px;">🤖 AI가 자동 생성한 개별분석입니다</div>
+                    <div style="font-size: 13px; color: #6d28d9; line-height: 1.6;">
+                        아래 분석 내용을 검토하신 후, 결과 선택 및 프로그램 배정을 완료하고 발송해주세요.<br>
+                        AI가 자동 생성한 내용이므로 반드시 검토 후 수정이 필요할 수 있습니다.
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap;">
+                        ${app.auto_analysis_type ? `
+                        <div style="display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #c4b5fd; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #5b21b6; font-weight: 600;">
+                            <i class="fas fa-tag"></i> AI 판단: ${app.auto_analysis_type === 'promotion' ? '프로모션 학생' : '일반 학생'}
+                        </div>` : ''}
+                        ${app.applicant_type_score !== null && app.applicant_type_score !== undefined ? `
+                        <div style="display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #c4b5fd; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #5b21b6; font-weight: 600;">
+                            <i class="fas fa-chart-bar"></i> AI 확신도: ${app.applicant_type_score}점
+                        </div>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
     let html = `
         ${scheduledBanner}
+        ${aiAnalysisBanner}
         ${hasAnalysis ? `
         <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">

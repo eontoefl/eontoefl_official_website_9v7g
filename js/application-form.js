@@ -1,5 +1,8 @@
 // Application Form JavaScript
 
+// n8n AI 자동분석 웹훅 URL
+const N8N_WEBHOOK_URL = '여기에_n8n_웹훅_URL_입력';
+
 // 편집 모드 전역 변수
 let isEditMode = false;
 let editApplicationId = null;
@@ -618,6 +621,20 @@ function setupFormSubmission() {
                     await sendTelegramNotification(formData);
                 } catch (notifyErr) {
                     console.warn('텔레그램 알림 발송 실패:', notifyErr);
+                }
+
+                // n8n AI 자동분석 웹훅 호출 (실패해도 신청서 제출에는 영향 없음)
+                try {
+                    const appId = Array.isArray(result) ? result[0]?.id : result?.id;
+                    if (appId) {
+                        await fetch(N8N_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ...formData, app_id: appId })
+                        });
+                    }
+                } catch (webhookErr) {
+                    console.warn('n8n 웹훅 호출 실패:', webhookErr);
                 }
 
                 // Clear auto-saved data
