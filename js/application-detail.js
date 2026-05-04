@@ -3,6 +3,34 @@ let currentApplication = null;
 let globalApplication = null; // Phase 2: 글로벌 변수
 let _studentInfo = { name: '', phone: '', id: '' }; // 알림톡용 학생 기본정보 (변하지 않음)
 
+// ===== 신청서 삭제 (상세 페이지용) =====
+function openDetailDeleteModal() {
+    document.getElementById('detailDeleteModal').style.display = 'block';
+}
+
+function closeDetailDeleteModal() {
+    document.getElementById('detailDeleteModal').style.display = 'none';
+}
+
+async function confirmDetailDelete() {
+    if (!currentApplication) return;
+    
+    const btn = document.getElementById('confirmDetailDeleteBtn');
+    btn.textContent = '삭제 중...';
+    btn.disabled = true;
+    
+    try {
+        await supabaseAPI.delete('applications', currentApplication.id);
+        alert('신청서가 삭제되었습니다.');
+        window.location.href = 'application.html';
+    } catch (error) {
+        console.error('Delete failed:', error);
+        alert('삭제 중 오류가 발생했습니다.');
+        btn.textContent = '삭제하기';
+        btn.disabled = false;
+    }
+}
+
 // Utility function to escape HTML
 function escapeHtml(unsafe) {
     if (unsafe === null || unsafe === undefined) return '';
@@ -123,6 +151,14 @@ async function loadApplicationDetail() {
         if (app) {
             console.log('Application loaded');
             
+            // 삭제된 신청서 차단 (관리자는 열람 가능)
+            if (app.deleted === true && !isAdmin()) {
+                loading.style.display = 'none';
+                errorMessage.style.display = 'block';
+                document.getElementById('errorDetail').textContent = '삭제된 신청서입니다.';
+                return;
+            }
+            
             // 접근 권한 체크
             const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
             
@@ -211,12 +247,28 @@ function displayApplicationDetail(app) {
     
     console.log('Status:', statusText, statusClass);
     
-    // 상태 배지 표시 (신청서 상세 제목 오른쪽)
+    // 상태 배지 + 수정/삭제 버튼 표시 (신청서 상세 제목 오른쪽)
+    const hasAnalysisRegistered = app.analysis_status && app.analysis_content;
+    const canEdit = isOwner(app) && !hasAnalysisRegistered && !app.deleted;
+    
+    let editDeleteButtons = '';
+    if (canEdit) {
+        editDeleteButtons = `
+            <button onclick="window.location.href='application-form.html?edit=${app.id}'" style="display:inline-flex; align-items:center; gap:6px; padding:7px 16px; border:1.5px solid rgba(255,255,255,0.6); background:rgba(255,255,255,0.15); color:white; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; transition:all 0.2s; backdrop-filter:blur(4px);" onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.borderColor='white'" onmouseout="this.style.background='rgba(255,255,255,0.15)'; this.style.borderColor='rgba(255,255,255,0.6)'">
+                <i class="fas fa-pen" style="font-size:11px;"></i> 수정하기
+            </button>
+            <button onclick="openDetailDeleteModal()" style="display:inline-flex; align-items:center; gap:6px; padding:7px 16px; border:1.5px solid rgba(239,68,68,0.5); background:rgba(239,68,68,0.15); color:#fecaca; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; transition:all 0.2s; backdrop-filter:blur(4px);" onmouseover="this.style.background='rgba(239,68,68,0.3)'; this.style.borderColor='rgba(239,68,68,0.8)'; this.style.color='white'" onmouseout="this.style.background='rgba(239,68,68,0.15)'; this.style.borderColor='rgba(239,68,68,0.5)'; this.style.color='#fecaca'">
+                <i class="fas fa-trash-alt" style="font-size:11px;"></i> 삭제
+            </button>
+        `;
+    }
+    
     document.getElementById('detailStatus').innerHTML = `
         <span class="status-badge ${statusClass}" style="font-size: 13px; padding: 7px 14px;">
             <i class="fas ${statusIcon}" style="margin-right: 5px; font-size: 12px;"></i>
             ${statusText}
         </span>
+        ${editDeleteButtons}
     `;
     
     console.log('Status badge set');
