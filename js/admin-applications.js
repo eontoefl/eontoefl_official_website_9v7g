@@ -101,19 +101,31 @@ function getAdminActionMessage(app) {
         return { text: '📖 입문서 신청', color: '#7c3aed', bgColor: '#ede9fe' };
     }
     
-    // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기
+    // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기 → 🟠 검토 대기
     if (app.analysis_content && !app.analysis_status) {
-        return { text: 'AI 분석 검토 대기', color: '#8b5cf6', bgColor: '#ede9fe' };
+        // 예약 발송 대기 중이면 → 🟢 발송 예약됨 (검토 완료 + 발송 시간 대기)
+        if (app.analysis_alimtalk_scheduled_at && app.analysis_status_pending && app.analysis_content_pending) {
+            const schedDate = new Date(app.analysis_alimtalk_scheduled_at);
+            const schedStr = !isNaN(schedDate.getTime()) ? schedDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+            return { text: `발송예약 ${schedStr}`, color: '#14b8a6', bgColor: '#f0fdfa', icon: 'fa-clock' };
+        }
+        return { text: '검토 대기', color: '#f59e0b', bgColor: '#fef3c7', icon: 'fa-bell' };
     }
 
     // 1-b. 신청서 제출 ~ 관리자 분석 등록 전 (분석 내용 없음)
     if (!app.analysis_status || !app.analysis_content) {
+        // 예약 발송 대기 중 (n8n 자동 생성 전이지만 관리자가 직접 예약 저장한 케이스)
+        if (app.analysis_alimtalk_scheduled_at && app.analysis_status_pending && app.analysis_content_pending) {
+            const schedDate = new Date(app.analysis_alimtalk_scheduled_at);
+            const schedStr = !isNaN(schedDate.getTime()) ? schedDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+            return { text: `발송예약 ${schedStr}`, color: '#14b8a6', bgColor: '#f0fdfa', icon: 'fa-clock' };
+        }
         return { text: '개별 분석을 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
     
-    // 2. 관리자 분석 등록 ~ 학생 동의 전
+    // 2. 관리자 분석 등록 완료 → ✅ 발송 완료 (학생 동의 대기)
     if (!app.student_agreed_at) {
-        return { text: '학생 동의를 기다리고 있어요', color: '#3b82f6', bgColor: '#dbeafe' };
+        return { text: '발송완료', color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', subText: '학생 동의 대기' };
     }
     
     // 3. 학생 동의 완료 ~ 관리자 계약서 업로드 전
@@ -188,6 +200,8 @@ function getAdminActionMessage(app) {
 function getAppStageFilter(app) {
     // 입문서 신청은 별도 카테고리
     if (app.application_type === 'book_only') return 'book_only';
+    // 예약 발송 대기 중이면 → 학생 액션 대기 (관리자 할 일 끝남)
+    if (app.analysis_alimtalk_scheduled_at && app.analysis_status_pending && app.analysis_content_pending) return 'student_waiting';
     // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기
     if (app.analysis_content && !app.analysis_status) return 'need_review';
     // 1-b. 개별분석 미등록
@@ -502,7 +516,11 @@ function displayApplications() {
                     <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
                         ${actionMessage.isLive 
                             ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.icon}" style="font-size: 10px;"></i>${actionMessage.text}</div>`
-                            : `<div style="display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">${actionMessage.text}</div>`
+                            : `<div style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">${actionMessage.icon ? `<i class="fas ${actionMessage.icon}" style="font-size: 10px;"></i> ` : ''}${actionMessage.text}</div>`
+                        }
+                        ${actionMessage.subText 
+                            ? `<div style="font-size: 11px; color: #64748b; white-space: nowrap; padding-left: 4px;">${actionMessage.subText}</div>`
+                            : ''
                         }
                         ${actionMessage.correctionBadge 
                             ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.correctionBadge.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.correctionBadge.icon}" style="font-size: 10px;"></i>${actionMessage.correctionBadge.text}</div>`
