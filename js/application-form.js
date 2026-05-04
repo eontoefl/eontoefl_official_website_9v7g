@@ -1,7 +1,7 @@
 // Application Form JavaScript
 
 // n8n AI 자동분석 웹훅 URL
-const N8N_WEBHOOK_URL = '여기에_n8n_웹훅_URL_입력';
+const N8N_WEBHOOK_URL = 'https://eontoefl.app.n8n.cloud/webhook-test/eontoefl-application-webhook';
 
 // 편집 모드 전역 변수
 let isEditMode = false;
