@@ -101,7 +101,12 @@ function getAdminActionMessage(app) {
         return { text: '📖 입문서 신청', color: '#7c3aed', bgColor: '#ede9fe' };
     }
     
-    // 1. 신청서 제출 ~ 관리자 분석 등록 전
+    // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기
+    if (app.analysis_content && !app.analysis_status) {
+        return { text: 'AI 분석 검토 대기', color: '#8b5cf6', bgColor: '#ede9fe' };
+    }
+
+    // 1-b. 신청서 제출 ~ 관리자 분석 등록 전 (분석 내용 없음)
     if (!app.analysis_status || !app.analysis_content) {
         return { text: '개별 분석을 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
@@ -183,7 +188,9 @@ function getAdminActionMessage(app) {
 function getAppStageFilter(app) {
     // 입문서 신청은 별도 카테고리
     if (app.application_type === 'book_only') return 'book_only';
-    // 1. 개별분석 미등록
+    // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기
+    if (app.analysis_content && !app.analysis_status) return 'need_review';
+    // 1-b. 개별분석 미등록
     if (!app.analysis_status || !app.analysis_content) return 'need_analysis';
     // 2. 학생 동의 대기
     if (!app.student_agreed_at) return 'student_waiting';

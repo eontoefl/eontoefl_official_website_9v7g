@@ -178,7 +178,12 @@ function displayApplicationDetail(app) {
     let statusClass = '';
     let statusIcon = '';
     
-    if (!app.analysis_status || !app.analysis_content) {
+    if (app.analysis_content && !app.analysis_status) {
+        // AI 자동 분석 생성 완료, 관리자 검토 대기
+        statusText = '검토중';
+        statusClass = 'status-reviewing';
+        statusIcon = 'fa-robot';
+    } else if (!app.analysis_status || !app.analysis_content) {
         // 신청서 제출 ~ 관리자 분석 등록 전
         statusText = '승인 검토중';
         statusClass = 'status-reviewing';

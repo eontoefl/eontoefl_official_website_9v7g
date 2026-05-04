@@ -1255,9 +1255,9 @@ td:nth-child(5) {
 }
 
 .status-reviewing {
-    background: #f3f4f6;
-    color: #6b7280;
-    border: 1px solid #d1d5db;
+    background: #ede9fe;
+    color: #8b5cf6;
+    border: 1px solid #c4b5fd;
 }
 
 .status-pending {
