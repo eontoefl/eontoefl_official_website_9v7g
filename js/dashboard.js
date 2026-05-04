@@ -313,6 +313,31 @@ function renderActionItems(app) {
                 <i class="fas fa-clock" style="font-size: 48px; margin-bottom: 16px; color: #64748b;"></i>
                 <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">빠르게 입금확인을 체크할게요</h3>
                 <p style="font-size: 14px;">관리자가 확인 중입니다</p>
+
+                <!-- 카카오톡 채팅 안내 블록 -->
+                <div style="margin-top: 28px; border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
+                    <p style="font-size: 15px; line-height: 1.8; color: #1e293b; font-weight: 500; margin: 0 0 12px 0;">
+                        앞으로 챌린지를 진행하며 저랑 과제 피드백, 질문, 일정 조율 등<br>
+                        저와의 모든 소통을 카카오톡으로 진행할거예요!<br>
+                        아래 버튼을 눌러서 채팅방에 성함을 보내주세요!
+                    </p>
+                    <p style="font-size: 14px; color: #64748b; margin: 0 0 12px 0;">
+                        예시: <strong style="color: #1e293b;">"홍길동"</strong>
+                    </p>
+                    <p style="font-size: 14px; line-height: 1.7; color: #ef4444; font-weight: 600; margin: 0 0 20px 0;">
+                        꼭 보내주셔야 원활하게 시작할 수 있어요<br>
+                        제가 이용방법을 준비하는 동안 지금 해주세요!
+                    </p>
+                    <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener noreferrer"
+                       style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+                              background-color: #FEE500; color: #191919; border: none; border-radius: 12px;
+                              padding: 16px 36px; font-size: 17px; font-weight: 700; text-decoration: none;
+                              cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+                              box-shadow: 0 4px 12px rgba(254, 229, 0, 0.4);">
+                        <i class="fas fa-comment" style="font-size: 20px;"></i>
+                        카카오톡 채팅 시작하기
+                    </a>
+                </div>
             </div>
         `;
         return;
