@@ -1033,6 +1033,93 @@ async function bulkSetIncentive(turnOn) {
     }
 }
 
+// ===== 일괄 삭제 처리 (Soft Delete) =====
+async function bulkSoftDelete() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    // 드롭다운 닫기
+    const dropdown = document.getElementById('bulkDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    const selectedApps = allApplications.filter(a => selectedIds.has(a.id));
+    const alreadyDeleted = selectedApps.filter(a => a.deleted === true || a.deleted === 'true');
+    const targetApps = selectedApps.filter(a => a.deleted !== true && a.deleted !== 'true');
+
+    if (targetApps.length === 0) {
+        alert(`⚠️ 처리할 신청서가 없습니다.\n\n선택: ${selectedApps.length}건\n• 이미 삭제 처리됨: ${alreadyDeleted.length}건`);
+        return;
+    }
+
+    const nameList = targetApps.map(a => `  • ${a.name || '(이름없음)'} (${a.email || '-'})`).join('\n');
+    let confirmMsg = `🗑 ${targetApps.length}건의 신청서를 삭제 처리하시겠습니까?\n\n`;
+    confirmMsg += `대상:\n${nameList}\n\n`;
+    if (alreadyDeleted.length > 0) {
+        confirmMsg += `⏭️ 이미 삭제됨 ${alreadyDeleted.length}건 제외\n\n`;
+    }
+    confirmMsg += `• DB에 기록은 보존됩니다\n`;
+    confirmMsg += `• 학생에게는 표시되지 않습니다\n`;
+    confirmMsg += `• 관리자 목록에서 "삭제됨" 뱃지로 표시됩니다`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const promises = targetApps.map(a =>
+            supabaseAPI.delete('applications', a.id)
+        );
+        await Promise.all(promises);
+
+        alert(`✅ ${targetApps.length}건 삭제 처리 완료`);
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk soft delete error:', error);
+        alert('일부 삭제 처리에 실패했습니다.');
+    }
+}
+
+// ===== 일괄 완전 삭제 (Hard Delete - DB 제거) =====
+async function bulkHardDelete() {
+    if (selectedIds.size === 0) {
+        alert('선택된 신청서가 없습니다.');
+        return;
+    }
+
+    // 드롭다운 닫기
+    const dropdown = document.getElementById('bulkDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    const selectedApps = allApplications.filter(a => selectedIds.has(a.id));
+    const nameList = selectedApps.map(a => `  • ${a.name || '(이름없음)'} (${a.email || '-'})`).join('\n');
+
+    // 1차 확인
+    let confirmMsg = `⚠️ ${selectedApps.length}건의 신청서를 DB에서 완전히 삭제하시겠습니까?\n\n`;
+    confirmMsg += `대상:\n${nameList}\n\n`;
+    confirmMsg += `❌ 이 작업은 되돌릴 수 없습니다\n`;
+    confirmMsg += `❌ DB에서 완전히 제거되어 기록이 남지 않습니다`;
+
+    if (!confirm(confirmMsg)) return;
+
+    // 2차 확인 (이중 안전장치)
+    if (!confirm(`정말로 ${selectedApps.length}건을 완전 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+    try {
+        const promises = selectedApps.map(a =>
+            supabaseAPI.hardDelete('applications', a.id)
+        );
+        await Promise.all(promises);
+
+        alert(`✅ ${selectedApps.length}건 완전 삭제 완료\n\nDB에서 영구적으로 제거되었습니다.`);
+        clearSelection();
+        loadApplications();
+    } catch (error) {
+        console.error('Bulk hard delete error:', error);
+        alert('일부 완전 삭제에 실패했습니다.');
+    }
+}
+
 // ===== 택배송장출력 (선택된 학생) =====
 async function bulkExportShipping() {
     if (selectedIds.size === 0) {
