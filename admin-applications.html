@@ -160,6 +160,14 @@
                             <button onclick="clearSelection()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#94a3b8; text-align:left;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
                                 <i class="fas fa-times-circle" style="width:18px; text-align:center;"></i> 선택 해제
                             </button>
+
+                            <div style="border-top:1px solid #e2e8f0; margin:4px 0;"></div>
+                            <button onclick="bulkSoftDelete()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#ef4444; text-align:left;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
+                                <i class="fas fa-trash" style="width:18px; text-align:center;"></i> 삭제 처리
+                            </button>
+                            <button onclick="bulkHardDelete()" style="display:flex; align-items:center; gap:10px; width:100%; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#dc2626; font-weight:600; text-align:left;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
+                                <i class="fas fa-skull-crossbones" style="width:18px; text-align:center;"></i> 완전 삭제 (DB 제거)
+                            </button>
                         </div>
                     </div>
                 </div>
