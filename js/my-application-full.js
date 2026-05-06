@@ -386,7 +386,7 @@ function displayResults(applications) {
                 
                 ${app.status === '거부' ? `
                     <div style="padding: 14px; background: #fee2e2; border-radius: 6px; font-size: 13px; color: #991b1b;">
-                        <i class="fas fa-times-circle"></i> 죄송합니다. 현재 해당 프로그램의 정원이 마감되었습니다.
+                        <i class="fas fa-times-circle"></i> 죄송합니다. 신중한 검토 결과, 이번 프로그램은 적합하지 않다고 판단되었습니다ㅠ 사유는 개별분석에 상세히 기재되어 있으니 확인 부탁드립니다!
                     </div>
                 ` : ''}
             </div>
