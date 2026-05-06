@@ -1493,7 +1493,41 @@ async function loadModalContractTab(app) {
         container.innerHTML = html;
         return;
     }
-    
+
+    // 전체 유예 활성 여부 (계약 동의 전 + 미래 시점)
+    const fullDeferralActive = !app.contract_agreed
+        && app.full_deferral_until
+        && new Date(app.full_deferral_until).getTime() > Date.now();
+
+    // 계약 동의 전이면 "전체 유예 관리" 섹션 노출
+    if (!app.contract_agreed) {
+        html += renderFullDeferralPanel(app);
+    }
+
+    // 전체 유예 중이면 계약서 발송 UI 숨기고 안내만 표시
+    if (fullDeferralActive) {
+        const untilLabel = new Date(app.full_deferral_until).toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric', month: 'long', day: 'numeric',
+            weekday: 'short',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+        html += `
+            <div class="alert alert-info" style="margin-top: 16px;">
+                <i class="fas fa-pause-circle" style="font-size: 24px; margin-right: 12px; color: #7c3aed;"></i>
+                <div>
+                    <div style="font-weight: 700; font-size: 16px;">계약+입금 전체 유예 중</div>
+                    <div style="font-size: 14px; margin-top: 4px;">
+                        ${untilLabel}까지 계약서 발송과 입금 안내가 보류됩니다.<br/>
+                        유예 기한 24시간 전에 학생에게 자동 알림톡이 발송되며, 기한이 지나면 계약서가 자동 발송됩니다.
+                    </div>
+                </div>
+            </div>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+
     // 계약서 발송 섹션
     if (!app.contract_sent) {
         // 계약서 미발송 - 드롭다운 선택
@@ -1629,10 +1663,10 @@ async function loadModalContractTab(app) {
                     <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 16px; border: 1px solid ${app.deposit_deadline_override ? '#7c3aed' : '#e2e8f0'};">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                             <h4 style="font-size: 15px; font-weight: 600; margin: 0;">
-                                <i class="fas fa-calendar-check" style="color: #7c3aed; margin-right: 6px;"></i>입금 기한 관리
+                                <i class="fas fa-calendar-check" style="color: #7c3aed; margin-right: 6px;"></i>입금 기한 관리 (입금만 유예)
                             </h4>
                             <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 600;
-                                ${app.deposit_deadline_override 
+                                ${app.deposit_deadline_override
                                     ? 'background: #ede9fe; color: #7c3aed;'
                                     : 'background: #f1f5f9; color: #64748b;'}">
                                 ${app.deposit_deadline_override ? '관리자 지정' : '기본 (24시간)'}
@@ -1641,8 +1675,8 @@ async function loadModalContractTab(app) {
                         <div style="font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.6;">
                             현재 입금 기한: <strong style="color: #1e293b;">${depositDeadlineInfo.label}</strong><br/>
                             <span style="font-size: 12px;">
-                                ${app.deposit_deadline_override 
-                                    ? '관리자가 직접 지정한 기한입니다.' 
+                                ${app.deposit_deadline_override
+                                    ? '관리자가 직접 지정한 기한입니다.'
                                     : '계약 동의 시각 + 24시간 자동 계산입니다.'}
                             </span>
                         </div>
@@ -2432,6 +2466,148 @@ async function createNotification(notificationData) {
         });
     } catch (error) {
         console.error('알림 생성 중 오류:', error);
+    }
+}
+
+// ===== 전체 유예 (계약+입금) 관리 (full_deferral_until) =====
+
+/**
+ * 전체 유예 관리 패널 HTML 생성
+ * - 학생 동의 후 ~ 계약 동의 전 시점에 노출
+ * - "입금만 유예"는 계약 동의 후 단계의 입금 기한 관리에서 처리됨
+ */
+function renderFullDeferralPanel(app) {
+    const isActive = !!app.full_deferral_until && new Date(app.full_deferral_until).getTime() > Date.now();
+    const untilIso = app.full_deferral_until || '';
+    const inputValue = untilIso ? isoToDatetimeLocalKst(untilIso) : '';
+    const untilLabel = untilIso ? new Date(untilIso).toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    }) : '-';
+
+    return `
+        <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 16px; border: 1px solid ${isActive ? '#7c3aed' : '#e2e8f0'};">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h4 style="font-size: 15px; font-weight: 600; margin: 0;">
+                    <i class="fas fa-pause-circle" style="color: #7c3aed; margin-right: 6px;"></i>유예 관리
+                </h4>
+                <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 600;
+                    ${isActive
+                        ? 'background: #ede9fe; color: #7c3aed;'
+                        : 'background: #f1f5f9; color: #64748b;'}">
+                    ${isActive ? '전체 유예 중' : '유예 없음'}
+                </span>
+            </div>
+            <div style="font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.6;">
+                계약 동의 전 단계 학생에게 적용되는 <strong>"계약+입금 전체 유예"</strong> 기능입니다.<br/>
+                지정한 시각까지는 계약서 발송과 입금 안내가 모두 보류됩니다.<br/>
+                <span style="font-size: 12px; color: #94a3b8;">
+                    💡 계약 동의 이후 단계에서는 "입금만 유예" (입금 기한 관리)가 적용됩니다.
+                </span>
+            </div>
+            ${isActive ? `
+                <div style="background: #faf5ff; padding: 12px 14px; border-radius: 8px; margin-bottom: 12px;">
+                    <div style="font-size: 13px; color: #4c1d95;">
+                        현재 유예 기한: <strong>${untilLabel}</strong>
+                    </div>
+                </div>
+            ` : ''}
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">전체 유예 기한 지정 (KST)</label>
+                    <input type="datetime-local" id="fullDeferralInput"
+                           value="${inputValue}"
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit;">
+                </div>
+                <button type="button" onclick="saveFullDeferralUntil('${app.id}')"
+                        style="padding: 10px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                    <i class="fas fa-save"></i> 저장
+                </button>
+                ${isActive ? `
+                <button type="button" onclick="clearFullDeferralUntil('${app.id}')"
+                        style="padding: 10px 16px; background: white; color: #ef4444; border: 1px solid #ef4444; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                    <i class="fas fa-undo"></i> 해제
+                </button>
+                ` : ''}
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                💡 유예 기한 24시간 전 학생에게 "내일부터 진행해주세요" 알림톡이 자동 발송됩니다.<br/>
+                💡 기한이 지나면 계약서가 자동 발송되고 정상 흐름이 재개됩니다.
+            </div>
+        </div>
+    `;
+}
+
+async function saveFullDeferralUntil(appId) {
+    const input = document.getElementById('fullDeferralInput');
+    if (!input || !input.value) {
+        alert('유예 기한 날짜를 선택해주세요.');
+        return;
+    }
+
+    const iso = datetimeLocalKstToIso(input.value);
+    if (!iso) {
+        alert('유효한 날짜를 선택해주세요.');
+        return;
+    }
+
+    if (new Date(iso).getTime() <= Date.now()) {
+        alert('유예 기한은 현재 시각보다 이후여야 합니다.');
+        return;
+    }
+
+    const kstLabel = new Date(iso).toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    });
+
+    if (!confirm(`전체 유예 기한을 다음으로 지정하시겠습니까?\n\n📅 ${kstLabel}\n\n이 시각까지는 계약서 발송과 입금 안내가 보류되며,\n학생 화면에는 "유예 중"으로 표시됩니다.`)) {
+        return;
+    }
+
+    try {
+        // 새 기한 저장 시 리마인더 발송 기록 초기화 (재발송 가능하도록)
+        const updated = await supabaseAPI.patch('applications', appId, {
+            full_deferral_until: iso,
+            full_deferral_reminder_sent_at: null
+        });
+        if (!updated) {
+            alert('❌ 저장에 실패했습니다.');
+            return;
+        }
+        currentManageApp = updated;
+        alert(`✅ 전체 유예 기한이 지정되었습니다.\n\n📅 ${kstLabel}`);
+        loadModalTab('contract');
+    } catch (e) {
+        console.error('Save full deferral error:', e);
+        alert('❌ 오류가 발생했습니다.\n\n' + (e.message || ''));
+    }
+}
+
+async function clearFullDeferralUntil(appId) {
+    if (!confirm('전체 유예를 해제하시겠습니까?\n\n계약서 발송이 즉시 가능해집니다.')) {
+        return;
+    }
+
+    try {
+        const updated = await supabaseAPI.patch('applications', appId, {
+            full_deferral_until: null,
+            full_deferral_reminder_sent_at: null
+        });
+        if (!updated) {
+            alert('❌ 해제에 실패했습니다.');
+            return;
+        }
+        currentManageApp = updated;
+        alert('✅ 전체 유예가 해제되었습니다.');
+        loadModalTab('contract');
+    } catch (e) {
+        console.error('Clear full deferral error:', e);
+        alert('❌ 오류가 발생했습니다.\n\n' + (e.message || ''));
     }
 }
 

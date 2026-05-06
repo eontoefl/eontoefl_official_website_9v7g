@@ -126,6 +126,66 @@ function handleHashChange() {
     });
 }
 
+/**
+ * 전체 유예 기한 만료 처리:
+ *  - full_deferral_until 이 과거 시점이고 계약서가 아직 발송되지 않았다면
+ *    활성 계약서를 조회해 자동 발송하고 contract_sent 알림톡을 보낸다.
+ *  - 발송 성공 여부와 무관하게 full_deferral_until 은 클리어한다.
+ *  - 처리된 경우 갱신된 application 객체를 반환, 아니면 null.
+ */
+async function maybeProcessFullDeferralExpiry(app) {
+    if (!app || !app.full_deferral_until) return null;
+    const untilMs = new Date(app.full_deferral_until).getTime();
+    if (isNaN(untilMs) || untilMs > Date.now()) return null;
+
+    const updateData = {
+        full_deferral_until: null
+    };
+
+    // 계약서가 이미 발송되어 있다면 그대로 두고 유예 플래그만 클리어
+    if (!app.contract_sent && app.student_agreed_at) {
+        try {
+            const contractType = app.correction_enabled ? 'correction' : 'nevelup';
+            const contracts = await supabaseAPI.query('contracts', {
+                'is_active': 'eq.true',
+                'contract_type': `eq.${contractType}`,
+                'limit': '1'
+            });
+            if (contracts && contracts.length > 0) {
+                const contract = contracts[0];
+                updateData.contract_sent = true;
+                updateData.contract_sent_at = Date.now();
+                updateData.contract_template_id = contract.id;
+                updateData.contract_version = contract.version;
+                updateData.contract_title = contract.title;
+                updateData.contract_snapshot = contract.content;
+                updateData.current_step = Math.max(app.current_step || 0, 4);
+                updateData.status = '계약서발송완료';
+            }
+        } catch (e) {
+            console.warn('전체 유예 만료 후 계약서 자동 발송 실패:', e);
+        }
+    }
+
+    try {
+        const updated = await supabaseAPI.patch('applications', app.id, updateData);
+        if (updated && updateData.contract_sent) {
+            try {
+                await sendKakaoAlimTalk('contract_sent', {
+                    name: app.name,
+                    phone: app.phone,
+                    program: app.assigned_program || app.preferred_program,
+                    app_id: app.id
+                });
+            } catch (e) { console.warn('contract_sent 알림톡 발송 실패:', e); }
+        }
+        return updated || null;
+    } catch (e) {
+        console.warn('전체 유예 만료 처리 실패:', e);
+        return null;
+    }
+}
+
 async function loadApplicationDetail() {
     const loading = document.getElementById('detailLoading');
     const detailCard = document.getElementById('detailCard');
@@ -182,13 +242,20 @@ async function loadApplicationDetail() {
             currentApplication = app;
             globalApplication = app;
             _studentInfo = { name: app.name, phone: app.phone, id: app.id, final_price: app.final_price };
-            
+
+            // 전체 유예 기한이 지났다면 계약서 자동 발송 (idempotent)
+            const expiredApp = await maybeProcessFullDeferralExpiry(app);
+            if (expiredApp) {
+                currentApplication = expiredApp;
+                globalApplication = expiredApp;
+            }
+
             console.log('Calling displayApplicationDetail...');
-            displayApplicationDetail(app);
-            
+            displayApplicationDetail(currentApplication);
+
             console.log('Calling loadStudentTabs...');
             // 학생 탭 표시 (누구나 볼 수 있음)
-            loadStudentTabs(app);
+            loadStudentTabs(currentApplication);
             
             console.log('Showing detail card...');
             detailCard.style.display = 'block';
@@ -1225,23 +1292,30 @@ async function submitStudentAgreement() {
         };
 
         // 2. 활성 계약서 자동 조회 → 자동 발송 (첨삭 포함 여부에 따라 타입 구분)
-        try {
-            const contractType = currentApplication.correction_enabled ? 'correction' : 'nevelup';
-            const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'contract_type': `eq.${contractType}`, 'limit': '1' });
-            if (contracts && contracts.length > 0) {
-                const contract = contracts[0];
-                agreementData.contract_sent = true;
-                agreementData.contract_sent_at = Date.now();
-                agreementData.contract_template_id = contract.id;
-                agreementData.contract_version = contract.version;
-                agreementData.contract_title = contract.title;
-                agreementData.contract_snapshot = contract.content;
-                agreementData.current_step = 4;
-                agreementData.status = '계약서발송완료';
+        //    단, 전체 유예가 활성 상태면 발송을 보류한다 (유예 기한 만료 시 자동 발송됨).
+        const fullDeferralActive = currentApplication.full_deferral_until
+            && new Date(currentApplication.full_deferral_until).getTime() > Date.now();
+        if (fullDeferralActive) {
+            console.log('전체 유예 활성 상태 — 계약서 자동 발송 보류');
+        } else {
+            try {
+                const contractType = currentApplication.correction_enabled ? 'correction' : 'nevelup';
+                const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'contract_type': `eq.${contractType}`, 'limit': '1' });
+                if (contracts && contracts.length > 0) {
+                    const contract = contracts[0];
+                    agreementData.contract_sent = true;
+                    agreementData.contract_sent_at = Date.now();
+                    agreementData.contract_template_id = contract.id;
+                    agreementData.contract_version = contract.version;
+                    agreementData.contract_title = contract.title;
+                    agreementData.contract_snapshot = contract.content;
+                    agreementData.current_step = 4;
+                    agreementData.status = '계약서발송완료';
+                }
+            } catch (contractError) {
+                console.warn('계약서 자동 발송 실패, 수동 발송 필요:', contractError);
+                // 계약서 조회 실패해도 동의 처리는 진행
             }
-        } catch (contractError) {
-            console.warn('계약서 자동 발송 실패, 수동 발송 필요:', contractError);
-            // 계약서 조회 실패해도 동의 처리는 진행
         }
 
         const result = await supabaseAPI.patch('applications', currentApplication.id, agreementData);
@@ -1608,12 +1682,18 @@ function loadStudentTabs(app) {
         if (!app.analysis_status || !app.analysis_content) {
             return '승인여부를 검토중이에요! 잠시만 기다려주세요 ⏳';
         }
-        
+
         // 2. 관리자 분석 등록 ~ 학생 동의 전
         if (!app.student_agreed_at) {
             return '개별분석이 업로드 됐어요! 확인해주세요🔔';
         }
-        
+
+        // 전체 유예 중: 계약 동의 전 단계에서 우선 적용
+        if (!app.contract_agreed && app.full_deferral_until && new Date(app.full_deferral_until).getTime() > Date.now()) {
+            const dateStr = new Date(app.full_deferral_until).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' });
+            return `${dateStr}까지 계약서 작성과 입금이 보류되어 있어요 ⏸️`;
+        }
+
         // 3. 학생 동의 완료 ~ 관리자 계약서 업로드 전
         if (!app.contract_sent) {
             return '계약서를 곧 업로드해드릴게요! 잠시만 기다려주세요 ⏳';
@@ -1824,6 +1904,31 @@ function switchStudentTab(tabName) {
 async function loadContractTab(app) {
     const contractContent = document.getElementById('tabContract');
     if (!contractContent) return;
+
+    // 전체 유예 중: 계약+입금 모두 보류 안내
+    const fullDeferralActive = !app.contract_agreed
+        && app.full_deferral_until
+        && new Date(app.full_deferral_until).getTime() > Date.now();
+    if (fullDeferralActive) {
+        const untilLabel = new Date(app.full_deferral_until).toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric', month: 'long', day: 'numeric',
+            weekday: 'short',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+        contractContent.innerHTML = `
+            <div style="text-align: center; padding: 80px 40px; color: #6d28d9;">
+                <i class="fas fa-pause-circle" style="font-size: 64px; margin-bottom: 24px; color: #c4b5fd;"></i>
+                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #6d28d9;">유예 중</h3>
+                <p style="font-size: 15px; line-height: 1.7; color: #6b7280;">
+                    <strong style="color: #6d28d9;">${untilLabel}</strong>까지<br/>
+                    계약서 작성과 입금이 보류되어 있어요.<br/>
+                    유예 기한 하루 전에 알림톡으로 안내드릴게요.
+                </p>
+            </div>
+        `;
+        return;
+    }
 
     // 계약서가 발송되지 않았으면
     if (!app.contract_sent) {
@@ -2506,9 +2611,34 @@ function getPricingBox(app, showPaymentNotice = true) {
 async function loadPaymentTab(app) {
     const paymentContent = document.getElementById('tabPayment');
     if (!paymentContent) return;
-    
+
     // 입금 정보 HTML 미리 생성
     const paymentInfoHtml = await getPaymentInfo(app);
+
+    // 전체 유예 중이면 입금 안내도 보류
+    const fullDeferralActive = !app.contract_agreed
+        && app.full_deferral_until
+        && new Date(app.full_deferral_until).getTime() > Date.now();
+    if (fullDeferralActive) {
+        const untilLabel = new Date(app.full_deferral_until).toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric', month: 'long', day: 'numeric',
+            weekday: 'short',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+        paymentContent.innerHTML = `
+            <div style="text-align: center; padding: 80px 40px; color: #6d28d9;">
+                <i class="fas fa-pause-circle" style="font-size: 48px; margin-bottom: 20px; color: #c4b5fd;"></i>
+                <h3 style="font-size: 17px; font-weight: 600; margin-bottom: 10px; color: #6d28d9;">유예 중</h3>
+                <p style="font-size: 13px; line-height: 1.7; color: #6b7280;">
+                    <strong style="color: #6d28d9;">${untilLabel}</strong>까지<br/>
+                    입금 안내가 보류되어 있어요.<br/>
+                    유예 기한 하루 전에 알림톡으로 안내드릴게요.
+                </p>
+            </div>
+        `;
+        return;
+    }
 
     // 계약이 완료되지 않았으면
     if (!app.contract_agreed) {

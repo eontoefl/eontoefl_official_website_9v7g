@@ -26,6 +26,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   incentive_analysis_complete: 50214,  // 프로모션 학생: 개별분석 & 입문서 전송 완료 안내
   incentive_deadline_warning:  50215,  // 프로모션 학생: 동의 마감 6시간 전 안내
   analysis_updated:            50217,  // 개별분석 수정 안내
+  full_deferral_reminder:      50220,  // 전체 유예 1일 전 안내 (계약+입금 진행 예정 알림)
 };
 
 // ===== 택배사 코드 매핑 (LunaSoft carrier_code) =====
@@ -249,6 +250,23 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "시간 되실 때 아래 링크에서 한 번 확인 부탁드려요 :)",
       ].join("\n");
 
+    case "full_deferral_reminder": {
+      const deadline = (data.deadline as string) || "";
+      return [
+        "이온토플 - 진행 일정 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,
+        "이온토플입니다.",
+        "",
+        `요청하신 일정에 따라 ${deadline}까지 계약서 작성과 입금이 보류되어 있었습니다.`,
+        "내일부터 계약서 작성과 입금을 진행해주세요.",
+        "",
+        "아래 링크에서 진행 상황을 확인하실 수 있습니다.",
+        "",
+        link,
+      ].join("\n");
+    }
+
     default:
       return "";
   }
@@ -283,6 +301,8 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
     case "analysis_updated":
       return "[이온토플] 개별분석이 수정되었습니다. 확인 부탁드려요.";
+    case "full_deferral_reminder":
+      return "[이온토플] 내일부터 계약서 작성과 입금을 진행해주세요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }

@@ -130,11 +130,23 @@ function getAdminActionMessage(app) {
     
     // 3. 학생 동의 완료 ~ 관리자 계약서 업로드 전
     if (!app.contract_sent) {
+        // 전체 유예 (계약+입금) 활성 시 별도 상태 표시
+        if (app.full_deferral_until && new Date(app.full_deferral_until).getTime() > Date.now()) {
+            const d = new Date(app.full_deferral_until);
+            const dateStr = d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' });
+            return { text: `전체 유예 중 (${dateStr}까지)`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-pause-circle' };
+        }
         return { text: '계약서를 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
-    
+
     // 4. 관리자 계약서 업로드 ~ 학생 계약서 동의 전
     if (!app.contract_agreed) {
+        // 전체 유예 (계약+입금) 활성 시: 계약서가 이미 발송된 케이스(예: 발송 후 admin이 사후 유예 설정)에도 동일하게 표시
+        if (app.full_deferral_until && new Date(app.full_deferral_until).getTime() > Date.now()) {
+            const d = new Date(app.full_deferral_until);
+            const dateStr = d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' });
+            return { text: `전체 유예 중 (${dateStr}까지)`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-pause-circle' };
+        }
         return { text: '계약서 동의를 기다리고 있어요', color: '#3b82f6', bgColor: '#dbeafe' };
     }
     
