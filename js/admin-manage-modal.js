@@ -1547,6 +1547,9 @@ async function loadModalContractTab(app) {
     
     // 입금 확인 섹션
     if (app.contract_agreed) {
+        // 입금 기한 계산 (override 우선, 없으면 contract_agreed_at + 24시간)
+        const depositDeadlineInfo = getDepositDeadlineInfo(app);
+
         if (!app.deposit_confirmed_by_student) {
             html += `
                 <div class="alert alert-info" style="margin-top: 24px;">
@@ -1571,6 +1574,51 @@ async function loadModalContractTab(app) {
                                 <td style="padding: 8px 0; text-align: right; font-weight: 700; font-size: 18px; color: #9480c5;">${(app.final_price || 0).toLocaleString()}원</td>
                             </tr>
                         </table>
+                    </div>
+
+                    <!-- 입금 기한 관리 -->
+                    <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 16px; border: 1px solid ${app.deposit_deadline_override ? '#7c3aed' : '#e2e8f0'};">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <h4 style="font-size: 15px; font-weight: 600; margin: 0;">
+                                <i class="fas fa-calendar-check" style="color: #7c3aed; margin-right: 6px;"></i>입금 기한 관리
+                            </h4>
+                            <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 600;
+                                ${app.deposit_deadline_override 
+                                    ? 'background: #ede9fe; color: #7c3aed;'
+                                    : 'background: #f1f5f9; color: #64748b;'}">
+                                ${app.deposit_deadline_override ? '관리자 지정' : '기본 (24시간)'}
+                            </span>
+                        </div>
+                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.6;">
+                            현재 입금 기한: <strong style="color: #1e293b;">${depositDeadlineInfo.label}</strong><br/>
+                            <span style="font-size: 12px;">
+                                ${app.deposit_deadline_override 
+                                    ? '관리자가 직접 지정한 기한입니다.' 
+                                    : '계약 동의 시각 + 24시간 자동 계산입니다.'}
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">입금 기한 지정 (KST)</label>
+                                <input type="datetime-local" id="depositDeadlineInput"
+                                       value="${depositDeadlineInfo.inputValue}"
+                                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit;">
+                            </div>
+                            <button type="button" onclick="saveDepositDeadlineOverride('${app.id}')"
+                                    style="padding: 10px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                                <i class="fas fa-save"></i> 저장
+                            </button>
+                            ${app.deposit_deadline_override ? `
+                            <button type="button" onclick="clearDepositDeadlineOverride('${app.id}')"
+                                    style="padding: 10px 16px; background: white; color: #ef4444; border: 1px solid #ef4444; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                                <i class="fas fa-undo"></i> 초기화
+                            </button>
+                            ` : ''}
+                        </div>
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                            💡 시작일이 먼 학생에게 입금 기한을 넉넉하게 지정할 수 있습니다.<br/>
+                            💡 초기화하면 기본 24시간 로직으로 돌아갑니다.
+                        </div>
                     </div>
                 </div>
             `;
@@ -2335,6 +2383,113 @@ async function createNotification(notificationData) {
         });
     } catch (error) {
         console.error('알림 생성 중 오류:', error);
+    }
+}
+
+// ===== 입금 기한 관리 (deposit_deadline_override) =====
+
+/**
+ * 입금 기한 정보를 계산하여 반환
+ * - deposit_deadline_override가 있으면 해당 값 사용
+ * - 없으면 contract_agreed_at + 24시간
+ */
+function getDepositDeadlineInfo(app) {
+    let deadlineDate;
+    let isOverride = false;
+
+    if (app.deposit_deadline_override) {
+        deadlineDate = new Date(app.deposit_deadline_override);
+        isOverride = true;
+    } else if (app.contract_agreed_at) {
+        deadlineDate = new Date(new Date(app.contract_agreed_at).getTime() + 24 * 60 * 60 * 1000);
+    } else {
+        return { label: '-', inputValue: '', deadlineMs: null, isOverride: false };
+    }
+
+    const label = deadlineDate.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    });
+
+    // datetime-local 입력값 (KST)
+    const inputValue = isoToDatetimeLocalKst(deadlineDate.toISOString());
+
+    return {
+        label,
+        inputValue,
+        deadlineMs: deadlineDate.getTime(),
+        isOverride
+    };
+}
+
+/**
+ * 입금 기한 override 저장
+ */
+async function saveDepositDeadlineOverride(appId) {
+    const input = document.getElementById('depositDeadlineInput');
+    if (!input || !input.value) {
+        alert('입금 기한 날짜를 선택해주세요.');
+        return;
+    }
+
+    const iso = datetimeLocalKstToIso(input.value);
+    if (!iso) {
+        alert('유효한 날짜를 선택해주세요.');
+        return;
+    }
+
+    const kstLabel = new Date(iso).toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    });
+
+    if (!confirm(`입금 기한을 다음으로 지정하시겠습니까?\n\n📅 ${kstLabel}\n\n학생에게 보이는 입금 마감 타이머가 이 시각 기준으로 변경됩니다.`)) {
+        return;
+    }
+
+    try {
+        const updated = await supabaseAPI.patch('applications', appId, {
+            deposit_deadline_override: iso
+        });
+        if (!updated) {
+            alert('❌ 저장에 실패했습니다.');
+            return;
+        }
+        currentManageApp = updated;
+        alert(`✅ 입금 기한이 지정되었습니다.\n\n📅 ${kstLabel}`);
+        loadModalTab('contract');
+    } catch (e) {
+        console.error('Save deposit deadline override error:', e);
+        alert('❌ 오류가 발생했습니다.\n\n' + (e.message || ''));
+    }
+}
+
+/**
+ * 입금 기한 override 초기화 (기본 24시간으로 복원)
+ */
+async function clearDepositDeadlineOverride(appId) {
+    if (!confirm('입금 기한을 초기화하시겠습니까?\n\n기본 로직(계약 동의 후 24시간)으로 돌아갑니다.')) {
+        return;
+    }
+
+    try {
+        const updated = await supabaseAPI.patch('applications', appId, {
+            deposit_deadline_override: null
+        });
+        if (!updated) {
+            alert('❌ 초기화에 실패했습니다.');
+            return;
+        }
+        currentManageApp = updated;
+        alert('✅ 입금 기한이 초기화되었습니다.\n\n기본 24시간 로직이 적용됩니다.');
+        loadModalTab('contract');
+    } catch (e) {
+        console.error('Clear deposit deadline override error:', e);
+        alert('❌ 오류가 발생했습니다.\n\n' + (e.message || ''));
     }
 }
 

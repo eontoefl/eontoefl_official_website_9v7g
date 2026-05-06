@@ -291,15 +291,26 @@ function renderActionItems(app) {
     
     // 5️⃣ 학생 계약서 동의 직후 ~ 학생 입금 버튼 클릭 직전
     else if (app.contract_agreed_at && !app.deposit_confirmed_by_student_at) {
-        const deadline = new Date(app.contract_agreed_at);
-        deadline.setDate(deadline.getDate() + 1); // 24시간 = 1일
+        // deposit_deadline_override가 있으면 해당 값, 없으면 contract_agreed_at + 24시간
+        const deadline = app.deposit_deadline_override
+            ? new Date(app.deposit_deadline_override)
+            : (() => { const d = new Date(app.contract_agreed_at); d.setDate(d.getDate() + 1); return d; })();
         const hoursLeft = Math.ceil((deadline - new Date()) / (1000 * 60 * 60));
         
+        // 기한 표시: override가 있으면 날짜, 없으면 시간
+        let deadlineText;
+        if (app.deposit_deadline_override) {
+            const daysLeft = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
+            deadlineText = daysLeft > 1 ? `마감: ${daysLeft}일 남음` : (hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!');
+        } else {
+            deadlineText = hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!';
+        }
+
         actionItems.push({
             icon: 'fa-credit-card',
             iconColor: '#77bf7e',
             title: '결제를 진행해주세요',
-            deadline: hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!',
+            deadline: deadlineText,
             urgent: hoursLeft <= 24,
             link: `application-detail.html?id=${app.id}#step4`,
             linkText: '입금 정보 보기'

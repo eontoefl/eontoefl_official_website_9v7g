@@ -2574,13 +2574,29 @@ async function loadPaymentTab(app) {
     }
 
     // 입금 안내 표시
-    // 입금 데드라인 계산 (계약 동의 후 24시간)
+    // 입금 데드라인 계산: deposit_deadline_override가 있으면 해당 값, 없으면 계약 동의 후 24시간
     let deadlineHTML = '';
     if (app.contract_agreed_at) {
-        const agreedTime = new Date(app.contract_agreed_at).getTime();
+        let deadlineMs;
+        let deadlineLabel;
+        if (app.deposit_deadline_override) {
+            // 관리자가 지정한 입금 기한
+            deadlineMs = new Date(app.deposit_deadline_override).getTime();
+            const deadlineDate = new Date(app.deposit_deadline_override);
+            deadlineLabel = deadlineDate.toLocaleString('ko-KR', {
+                timeZone: 'Asia/Seoul',
+                month: 'long', day: 'numeric',
+                weekday: 'short',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+        } else {
+            // 기본: 계약 동의 후 24시간
+            deadlineMs = new Date(app.contract_agreed_at).getTime() + (24 * 60 * 60 * 1000);
+            deadlineLabel = null; // 24시간 표현 사용
+        }
+
         const now = Date.now();
-        const elapsed = now - agreedTime;
-        const remaining = (24 * 60 * 60 * 1000) - elapsed;
+        const remaining = deadlineMs - now;
         
         const hours = Math.floor(remaining / (60 * 60 * 1000));
         const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
@@ -2604,6 +2620,13 @@ async function loadPaymentTab(app) {
             timerBorder = '#f87171';
             timerTextColor = '#991b1b';
         }
+
+        // 기한 안내 텍스트: override가 있으면 날짜 표시, 없으면 24시간 표현
+        const deadlineNotice = remaining > 0
+            ? (deadlineLabel
+                ? `<strong style="color: ${timerColor}; font-size: 14px;">${deadlineLabel}</strong>까지 입금을 완료해주세요.`
+                : `계약 동의 후 <strong style="color: ${timerColor}; font-size: 14px;">24시간 이내</strong>에 입금을 완료해주세요.`)
+            : `<strong style="color: ${timerColor}; font-size: 14px;">입금 기한이 초과되었습니다.</strong> 빠른 입금 부탁드립니다.`;
         
         deadlineHTML = `
             <div style="background: linear-gradient(135deg, ${timerBg} 0%, #fef2f2 100%); padding: 20px; border-radius: 14px; border: 2px solid ${timerBorder}; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);">
@@ -2616,10 +2639,7 @@ async function loadPaymentTab(app) {
                             ⏰ 입금 기한 안내
                         </h3>
                         <p style="font-size: 13px; color: ${timerTextColor}; margin: 0; line-height: 1.6;">
-                            ${remaining > 0 
-                                ? `계약 동의 후 <strong style="color: ${timerColor}; font-size: 14px;">24시간 이내</strong>에 입금을 완료해주세요.` 
-                                : `<strong style="color: ${timerColor}; font-size: 14px;">입금 기한이 초과되었습니다.</strong> 빠른 입금 부탁드립니다.`
-                            }
+                            ${deadlineNotice}
                         </p>
                     </div>
                     <div class="payment-timer-box" style="text-align: center; padding: 16px; background: white; border-radius: 14px; min-width: 150px; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);">
@@ -2677,12 +2697,14 @@ async function loadPaymentTab(app) {
     
     // 실시간 카운트다운 시작
     if (app.contract_agreed_at) {
-        const agreedTime = new Date(app.contract_agreed_at).getTime();
+        // deposit_deadline_override가 있으면 해당 값, 없으면 contract_agreed_at + 24시간
+        const paymentDeadlineMs = app.deposit_deadline_override
+            ? new Date(app.deposit_deadline_override).getTime()
+            : new Date(app.contract_agreed_at).getTime() + (24 * 60 * 60 * 1000);
         
         const updatePaymentTimer = () => {
             const now = Date.now();
-            const elapsed = now - agreedTime;
-            const remaining = (24 * 60 * 60 * 1000) - elapsed;
+            const remaining = paymentDeadlineMs - now;
             
             const timerEl = document.getElementById('paymentTimer');
             if (!timerEl) return;
