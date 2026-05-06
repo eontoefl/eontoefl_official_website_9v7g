@@ -557,7 +557,7 @@ function loadModalAnalysisTab(app) {
             </div>
             
             <!-- 2. 프로그램 배정 -->
-            <div class="form-group">
+            <div class="form-group" id="formGroup-program">
                 <label class="form-label">2. 프로그램 배정</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
@@ -588,7 +588,7 @@ function loadModalAnalysisTab(app) {
             </div>
             
             <!-- 3. 일정 -->
-            <div class="form-group">
+            <div class="form-group" id="formGroup-schedule">
                 <label class="form-label">3. 일정</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
@@ -620,7 +620,7 @@ function loadModalAnalysisTab(app) {
             </div>
             
             <!-- 4. 가격 정보 -->
-            <div class="form-group">
+            <div class="form-group" id="formGroup-price">
                 <label class="form-label">4. 가격 정보</label>
                 <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
@@ -746,7 +746,12 @@ function loadModalAnalysisTab(app) {
     // 이벤트 리스너 추가
     calculateModalPrice();
     toggleCorrectionStartDate();
-    
+
+    // 거부 상태로 저장된 경우 프로그램/일정/가격 섹션 비활성화 적용
+    if (fillStatus === '거부') {
+        setRejectionUIState(true);
+    }
+
     // 결과 선택 옵션에 클릭 이벤트 추가
     // (저장 완료 후 읽기 전용 상태가 아닐 때 = 최초 저장 전 또는 예약 대기 중)
     if (!hasAnalysis) {
@@ -839,24 +844,24 @@ function calculateModalPrice() {
 // 결과 선택 시각적 피드백
 function selectStatus(value, event) {
     if (event) event.preventDefault();
-    
+
     // 모든 옵션의 라디오 버튼 체크 해제
     document.querySelectorAll('#statusOptionsContainer input[type="radio"]').forEach(radio => {
         radio.checked = false;
     });
-    
+
     // 모든 옵션 스타일 초기화
     document.querySelectorAll('.status-option').forEach(option => {
         option.style.border = '2px solid #e2e8f0';
         option.style.background = '#ffffff';
     });
-    
+
     // 선택된 라디오 버튼 체크
     const selectedRadio = document.querySelector(`#statusOptionsContainer input[value="${value}"]`);
     if (selectedRadio) {
         selectedRadio.checked = true;
     }
-    
+
     // 선택된 옵션 스타일 적용
     const selectedOption = document.querySelector(`.status-option[data-value="${value}"]`);
     if (selectedOption) {
@@ -871,6 +876,43 @@ function selectStatus(value, event) {
             selectedOption.style.background = '#fee2e2';
         }
     }
+
+    // 거부 시 프로그램/일정/가격 섹션 비활성화
+    setRejectionUIState(value === '거부');
+}
+
+// 거부 선택 시 프로그램 배정/일정/가격 정보 섹션 비활성화 처리
+function setRejectionUIState(isRejected) {
+    const fieldNames = [
+        'assigned_program',
+        'correction_enabled',
+        'schedule_start',
+        'correction_start_date',
+        'additional_discount',
+        'discount_reason'
+    ];
+    fieldNames.forEach(name => {
+        const el = document.querySelector(`[name="${name}"]`);
+        if (el) el.disabled = isRejected;
+    });
+
+    // required 토글
+    const programEl = document.querySelector('[name="assigned_program"]');
+    const startEl = document.querySelector('[name="schedule_start"]');
+    if (programEl) {
+        if (isRejected) programEl.removeAttribute('required');
+        else programEl.setAttribute('required', '');
+    }
+    if (startEl) {
+        if (isRejected) startEl.removeAttribute('required');
+        else startEl.setAttribute('required', '');
+    }
+
+    // 시각적 그레이아웃
+    ['formGroup-program', 'formGroup-schedule', 'formGroup-price'].forEach(id => {
+        const g = document.getElementById(id);
+        if (g) g.style.opacity = isRejected ? '0.5' : '';
+    });
 }
 
 // 모달 내 종료일 계산
@@ -995,6 +1037,7 @@ async function saveModalAnalysis(event) {
     const formData = new FormData(form);
 
     // 가격 계산
+    const isRejected = formData.get('analysis_status') === '거부';
     const basePrice = 1000000;
     const examSupport = 210000;
     const additionalDiscount = parseInt(formData.get('additional_discount')) || 0;
@@ -1010,17 +1053,17 @@ async function saveModalAnalysis(event) {
     if (mode === 'scheduled' || mode === 'update-scheduled') {
         // pending 컬럼에 저장 (정식 컬럼은 건드리지 않음 → 학생에게 공개되지 않음)
         const pendingPayload = {
-            assigned_program: formData.get('assigned_program'),
-            correction_enabled: correctionEnabled,
-            correction_start_date: correctionEnabled ? (formData.get('correction_start_date') || null) : null,
-            correction_fee: correctionFee,
-            program_price: basePrice,
-            discount_amount: examSupport,
-            additional_discount: additionalDiscount,
-            discount_reason: formData.get('discount_reason') || '',
-            final_price: finalPrice,
-            schedule_start: formData.get('schedule_start'),
-            schedule_end: formData.get('schedule_end'),
+            assigned_program: isRejected ? null : formData.get('assigned_program'),
+            correction_enabled: isRejected ? false : correctionEnabled,
+            correction_start_date: isRejected ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+            correction_fee: isRejected ? 0 : correctionFee,
+            program_price: isRejected ? null : basePrice,
+            discount_amount: isRejected ? null : examSupport,
+            additional_discount: isRejected ? 0 : additionalDiscount,
+            discount_reason: isRejected ? '' : (formData.get('discount_reason') || ''),
+            final_price: isRejected ? null : finalPrice,
+            schedule_start: isRejected ? null : formData.get('schedule_start'),
+            schedule_end: isRejected ? null : formData.get('schedule_end'),
             is_incentive_applicant: isIncentive,
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
             is_analysis_update: !!currentManageApp.analysis_first_saved_at
@@ -1059,17 +1102,17 @@ async function saveModalAnalysis(event) {
     // === 분기: 즉시 저장 + 발송 (기존 동작) ===
     const updateData = {
         analysis_status: formData.get('analysis_status'),
-        assigned_program: formData.get('assigned_program'),
-        correction_enabled: correctionEnabled,
-        correction_start_date: correctionEnabled ? (formData.get('correction_start_date') || null) : null,
-        correction_fee: correctionFee,
-        program_price: basePrice,
-        discount_amount: examSupport,
-        additional_discount: additionalDiscount,
-        discount_reason: formData.get('discount_reason') || '',
-        final_price: finalPrice,
-        schedule_start: formData.get('schedule_start'),
-        schedule_end: formData.get('schedule_end'),
+        assigned_program: isRejected ? null : formData.get('assigned_program'),
+        correction_enabled: isRejected ? false : correctionEnabled,
+        correction_start_date: isRejected ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+        correction_fee: isRejected ? 0 : correctionFee,
+        program_price: isRejected ? null : basePrice,
+        discount_amount: isRejected ? null : examSupport,
+        additional_discount: isRejected ? 0 : additionalDiscount,
+        discount_reason: isRejected ? '' : (formData.get('discount_reason') || ''),
+        final_price: isRejected ? null : finalPrice,
+        schedule_start: isRejected ? null : formData.get('schedule_start'),
+        schedule_end: isRejected ? null : formData.get('schedule_end'),
         analysis_content: formData.get('analysis_content'),
         analysis_saved_at: nowMs,
         current_step: 2,
@@ -1411,7 +1454,13 @@ function editAnalysis() {
         if (editBtn) {
             editBtn.style.display = 'none';
         }
-        
+
+        // 현재 저장된 상태가 '거부'이면 프로그램/일정/가격 섹션은 비활성화 유지
+        const currentStatus = document.querySelector('#statusOptionsContainer input[type="radio"]:checked')?.value;
+        if (currentStatus === '거부') {
+            setRejectionUIState(true);
+        }
+
         alert('💡 수정 모드로 전환되었습니다. 내용을 수정한 후 저장 버튼을 눌러주세요.');
     }
 }
