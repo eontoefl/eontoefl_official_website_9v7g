@@ -1864,13 +1864,16 @@ async function loadContractTab(app) {
         return;
     }
 
-    // 타이머 계산
+    // 타이머 계산: contract_deadline_override가 있으면 해당 값, 없으면 contract_sent_at + 24시간
     const sentTime = new Date(app.contract_sent_at).getTime();
+    const isContractDeferred = !!app.contract_deadline_override;
+    const contractDeadlineMs = isContractDeferred
+        ? new Date(app.contract_deadline_override).getTime()
+        : sentTime + (24 * 60 * 60 * 1000);
     const now = Date.now();
-    const elapsed = now - sentTime;
-    const remaining = (24 * 60 * 60 * 1000) - elapsed;
+    const remaining = contractDeadlineMs - now;
 
-    // 24시간 초과
+    // 기한 초과
     if (remaining <= 0) {
         const contractHTML = await getContractDisplay(app);
         contractContent.innerHTML = `
@@ -1880,7 +1883,7 @@ async function loadContractTab(app) {
                     <div>
                         <h3 style="font-size: 20px; font-weight: 700; color: #991b1b; margin: 0;">⚠️ 동의 기한 초과</h3>
                         <p style="font-size: 14px; color: #b91c1c; margin: 8px 0 0 0;">
-                            계약 동의 기한 24시간이 초과되었습니다.
+                            계약 동의 기한이 초과되었습니다.
                         </p>
                     </div>
                 </div>
@@ -1901,6 +1904,20 @@ async function loadContractTab(app) {
     const timerColor = hours < 6 ? '#dc2626' : '#9480c5';
     const timerBg = hours < 6 ? '#fee2e2' : '#f8f4ff';
 
+    // 기한 안내 문구: 유예 시 날짜 표시, 기본 시 24시간 표현
+    let deadlineSubText;
+    if (isContractDeferred) {
+        const deadlineDate = new Date(app.contract_deadline_override);
+        const deadlineDateLabel = deadlineDate.toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            month: 'long', day: 'numeric', weekday: 'short',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+        deadlineSubText = `${deadlineDateLabel}까지`;
+    } else {
+        deadlineSubText = `${new Date(sentTime).toLocaleString('ko-KR')}부터 24시간`;
+    }
+
     const contractHTML = await getContractDisplay(app);
 
     contractContent.innerHTML = `
@@ -1911,7 +1928,7 @@ async function loadContractTab(app) {
                     <div>
                         <h4 style="font-size: 16px; font-weight: 600; color: ${timerColor}; margin: 0;">계약 동의 기한</h4>
                         <p style="font-size: 13px; color: ${timerColor}; opacity: 0.8; margin: 4px 0 0 0;">
-                            ${new Date(sentTime).toLocaleString('ko-KR')}부터 24시간
+                            ${deadlineSubText}
                         </p>
                     </div>
                 </div>
@@ -1947,8 +1964,8 @@ async function loadContractTab(app) {
         </div>
     `;
 
-    // 타이머 업데이트
-    startContractTimer(sentTime);
+    // 타이머 업데이트 (유예 시 deadline 기준, 기본 시 sentTime + 24h 기준)
+    startContractTimer(sentTime, contractDeadlineMs);
     
     // 렌더링 후 넘치는 입력 필드 보정
     setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
@@ -2302,17 +2319,18 @@ function getContractDisplayOld(app) {
 }
 
 // 계약서 타이머 시작
-function startContractTimer(sentTime) {
+function startContractTimer(sentTime, deadlineMs) {
+    // deadlineMs가 지정되면 절대 시각 기준, 아니면 sentTime + 24시간
+    const targetMs = deadlineMs || (sentTime + 24 * 60 * 60 * 1000);
     const timerInterval = setInterval(() => {
         const now = Date.now();
-        const elapsed = now - sentTime;
-        const remaining = (24 * 60 * 60 * 1000) - elapsed;
+        const remaining = targetMs - now;
 
         if (remaining <= 0) {
             clearInterval(timerInterval);
             const timerElem = document.getElementById('contractTimer');
             if (timerElem) {
-                timerElem.textContent = '00:00';
+                timerElem.textContent = '00:00:00';
                 timerElem.style.color = '#dc2626';
             }
             return;

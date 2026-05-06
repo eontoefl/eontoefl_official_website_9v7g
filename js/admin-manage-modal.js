@@ -1589,6 +1589,57 @@ async function loadModalContractTab(app) {
                             <i class="fas fa-exchange-alt"></i> 다른 계약서로 변경
                         </button>
                     </div>
+
+                    <!-- 계약서 기한 유예 관리 -->
+                    ${(() => {
+                        const contractDeadlineInfo = getContractDeadlineInfo(app);
+                        return `
+                    <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 16px; border: 1px solid ${app.contract_deadline_override ? '#7c3aed' : '#e2e8f0'};">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <h4 style="font-size: 15px; font-weight: 600; margin: 0;">
+                                <i class="fas fa-calendar-plus" style="color: #7c3aed; margin-right: 6px;"></i>계약서 기한 유예
+                            </h4>
+                            <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 600;
+                                ${app.contract_deadline_override
+                                    ? 'background: #ede9fe; color: #7c3aed;'
+                                    : 'background: #f1f5f9; color: #64748b;'}">
+                                ${app.contract_deadline_override ? '유예 적용 중' : '기본 (24시간)'}
+                            </span>
+                        </div>
+                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.6;">
+                            현재 계약서 동의 기한: <strong style="color: #1e293b;">${contractDeadlineInfo.label}</strong><br/>
+                            <span style="font-size: 12px;">
+                                ${app.contract_deadline_override
+                                    ? '관리자가 유예 설정한 기한입니다.'
+                                    : '계약서 발송 시각 + 24시간 자동 계산입니다.'}
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">유예 기한 지정 (KST)</label>
+                                <input type="datetime-local" id="contractDeadlineInput"
+                                       value="${contractDeadlineInfo.inputValue}"
+                                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit;">
+                            </div>
+                            <button type="button" onclick="saveContractDeadlineOverride('${app.id}')"
+                                    style="padding: 10px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                                <i class="fas fa-save"></i> 저장
+                            </button>
+                            ${app.contract_deadline_override ? `
+                            <button type="button" onclick="clearContractDeadlineOverride('${app.id}')"
+                                    style="padding: 10px 16px; background: white; color: #ef4444; border: 1px solid #ef4444; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                                <i class="fas fa-undo"></i> 초기화
+                            </button>
+                            ` : ''}
+                        </div>
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                            💡 학생이 계약서 동의 기한 연장을 요청한 경우, 유예 날짜를 지정하세요.<br/>
+                            💡 저장하면 학생에게 기한 연장 안내 알림톡이 발송됩니다.<br/>
+                            💡 초기화하면 기본 24시간 로직으로 돌아갑니다.
+                        </div>
+                    </div>
+                        `;
+                    })()}
                 `}
             </div>
         `;
@@ -2432,6 +2483,128 @@ async function createNotification(notificationData) {
         });
     } catch (error) {
         console.error('알림 생성 중 오류:', error);
+    }
+}
+
+// ===== 계약서 기한 유예 관리 (contract_deadline_override) =====
+
+/**
+ * 계약서 동의 기한 정보를 계산하여 반환
+ * - contract_deadline_override가 있으면 해당 값 사용
+ * - 없으면 contract_sent_at + 24시간
+ */
+function getContractDeadlineInfo(app) {
+    let deadlineDate;
+    let isOverride = false;
+
+    if (app.contract_deadline_override) {
+        deadlineDate = new Date(app.contract_deadline_override);
+        isOverride = true;
+    } else if (app.contract_sent_at) {
+        deadlineDate = new Date(new Date(app.contract_sent_at).getTime() + 24 * 60 * 60 * 1000);
+    } else {
+        return { label: '-', inputValue: '', deadlineMs: null, isOverride: false };
+    }
+
+    const label = deadlineDate.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    });
+
+    // datetime-local 입력값 (KST)
+    const inputValue = isoToDatetimeLocalKst(deadlineDate.toISOString());
+
+    return {
+        label,
+        inputValue,
+        deadlineMs: deadlineDate.getTime(),
+        isOverride
+    };
+}
+
+/**
+ * 계약서 기한 유예 저장
+ * - DB에 contract_deadline_override 저장
+ * - 유예 안내 알림톡 발송 (580221 — 검수 완료 후 연결)
+ */
+async function saveContractDeadlineOverride(appId) {
+    const input = document.getElementById('contractDeadlineInput');
+    if (!input || !input.value) {
+        alert('유예 기한 날짜를 선택해주세요.');
+        return;
+    }
+
+    const iso = datetimeLocalKstToIso(input.value);
+    if (!iso) {
+        alert('유효한 날짜를 선택해주세요.');
+        return;
+    }
+
+    const kstLabel = new Date(iso).toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: 'long', day: 'numeric',
+        weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    });
+
+    if (!confirm(`계약서 동의 기한을 유예하시겠습니까?\n\n📅 ${kstLabel}\n\n학생에게 보이는 계약서 동의 마감 타이머가 이 시각 기준으로 변경되고,\n기한 연장 안내 알림톡이 발송됩니다.`)) {
+        return;
+    }
+
+    try {
+        const updated = await supabaseAPI.patch('applications', appId, {
+            contract_deadline_override: iso,
+            contract_deferral_reminder_sent_at: null  // 유예 재설정 시 리마인더 초기화
+        });
+        if (!updated) {
+            alert('❌ 저장에 실패했습니다.');
+            return;
+        }
+        currentManageApp = updated;
+
+        // 유예 안내 알림톡 발송 (580221)
+        try {
+            await sendKakaoAlimTalk('contract_deferred', {
+                name: updated.name || currentManageApp.name,
+                phone: updated.phone || currentManageApp.phone,
+                app_id: updated.id || currentManageApp.id,
+                deadline: kstLabel
+            });
+        } catch (e) { console.warn('유예 안내 알림톡 발송 실패:', e); }
+
+        alert(`✅ 계약서 동의 기한이 유예되었습니다.\n\n📅 ${kstLabel}\n\n학생에게 기한 연장 안내 알림톡이 발송되었습니다.`);
+        loadModalTab('contract');
+    } catch (e) {
+        console.error('Save contract deadline override error:', e);
+        alert('❌ 오류가 발생했습니다.\n\n' + (e.message || ''));
+    }
+}
+
+/**
+ * 계약서 기한 유예 초기화 (기본 24시간으로 복원)
+ */
+async function clearContractDeadlineOverride(appId) {
+    if (!confirm('계약서 유예를 초기화하시겠습니까?\n\n기본 로직(계약서 발송 후 24시간)으로 돌아갑니다.')) {
+        return;
+    }
+
+    try {
+        const updated = await supabaseAPI.patch('applications', appId, {
+            contract_deadline_override: null,
+            contract_deferral_reminder_sent_at: null
+        });
+        if (!updated) {
+            alert('❌ 초기화에 실패했습니다.');
+            return;
+        }
+        currentManageApp = updated;
+        alert('✅ 계약서 유예가 초기화되었습니다.\n\n기본 24시간 로직이 적용됩니다.');
+        loadModalTab('contract');
+    } catch (e) {
+        console.error('Clear contract deadline override error:', e);
+        alert('❌ 오류가 발생했습니다.\n\n' + (e.message || ''));
     }
 }
 
