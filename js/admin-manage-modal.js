@@ -2564,12 +2564,13 @@ async function saveContractDeadlineOverride(appId) {
         }
         currentManageApp = updated;
 
-        // 유예 안내 알림톡 발송 (580221)
+        // 유예 안내 알림톡 발송 (50221)
         try {
             await sendKakaoAlimTalk('contract_deferred', {
                 name: updated.name || currentManageApp.name,
                 phone: updated.phone || currentManageApp.phone,
                 app_id: updated.id || currentManageApp.id,
+                program: updated.assigned_program || currentManageApp.assigned_program || '',
                 deadline: kstLabel
             });
         } catch (e) { console.warn('유예 안내 알림톡 발송 실패:', e); }
