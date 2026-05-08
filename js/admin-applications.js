@@ -534,7 +534,7 @@ function displayApplications() {
                         <button class="admin-btn admin-btn-primary admin-btn-sm" 
                                 onclick="openManageModal('${app.id}')"
                                 title="관리">
-                            <i class="fas fa-cog"></i> 관리
+                            <i class="fas fa-cog"></i>
                         </button>
                         <a href="application-detail.html?id=${app.id}" 
                            class="admin-btn admin-btn-secondary admin-btn-sm"
@@ -1723,7 +1723,7 @@ function displayBookApplications() {
                         <button class="admin-btn admin-btn-primary admin-btn-sm" 
                                 onclick="openManageModal('${app.id}')"
                                 title="신청서 관리">
-                            <i class="fas fa-cog"></i> 관리
+                            <i class="fas fa-cog"></i>
                         </button>
                     ` : ''}
                 </td>

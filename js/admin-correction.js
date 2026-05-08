@@ -504,7 +504,7 @@ function displayCorrections() {
                     <div style="display:flex; gap:6px; align-items:center;">
                         <button class="admin-btn admin-btn-primary admin-btn-sm" 
                                 onclick="openCorrectionDetail('${item.id}')">
-                            <i class="fas fa-cog"></i> 관리
+                            <i class="fas fa-cog"></i>
                         </button>
                         ${status.isStuck ? `<button class="admin-btn admin-btn-sm retry-webhook-btn" 
                                 style="background: #dc2626; color: white;" 
