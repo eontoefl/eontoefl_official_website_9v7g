@@ -486,8 +486,8 @@ function displayApplications() {
                            ${isSelected ? 'checked' : ''}
                            onchange="toggleSelection('${app.id}')">
                 </td>
-                <td style="vertical-align: middle;">
-                    <div style="display:flex; flex-direction:column; gap:3px; align-items:flex-start;">
+                <td style="vertical-align: middle; text-align:center;">
+                    <div style="display:flex; flex-direction:column; gap:3px; align-items:center;">
                         ${getIncentiveNameBadge(app)}
                         ${app.deleted ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">삭제됨</span>' : ''}
                     </div>
@@ -1694,8 +1694,8 @@ function displayBookApplications() {
                            ${isSelected ? 'checked' : ''}
                            onchange="toggleSelection('${app.id}')">
                 </td>
-                <td style="vertical-align: middle;">
-                    <div style="display:flex; flex-direction:column; gap:3px; align-items:flex-start;">
+                <td style="vertical-align: middle; text-align:center;">
+                    <div style="display:flex; flex-direction:column; gap:3px; align-items:center;">
                         ${badgeHtml}
                     </div>
                 </td>
