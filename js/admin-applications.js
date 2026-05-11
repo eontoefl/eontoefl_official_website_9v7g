@@ -28,30 +28,30 @@ function getIncentiveNameBadge(app) {
     const status = getIncentiveStatus(app);
     if (!status) return '';
     if (status === 'converted') {
-        return ' <span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">유도전환</span>';
+        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">유도전환</span>';
     }
     if (status === 'expired') {
-        return ' <span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">프로모션 만료</span>';
+        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">프로모션 만료</span>';
     }
     // waiting
-    return ' <span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">프로모션</span>';
+    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">프로모션</span>';
 }
 
 // ===== 유도학생 이름 옆 뱃지 (입문서 탭용) =====
 function getIncentiveBookBadge(app) {
     const isIncentive = app.is_incentive_applicant && app.application_type !== 'book_only';
     if (!isIncentive) {
-        return '<span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">📖 입문서</span>';
+        return '<span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">📖 입문서</span>';
     }
     const status = getIncentiveStatus(app);
     if (status === 'converted') {
-        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">🔀 유도전환</span>';
+        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 유도전환</span>';
     }
     if (status === 'expired') {
-        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">🔀 유도 만료</span>';
+        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 유도 만료</span>';
     }
     // waiting or null (분석 전)
-    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">🔀 유도학생</span>';
+    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 유도학생</span>';
 }
 
 // ===== 유도학생 동의 데드라인 타이머 표시 (관리자 상태칸) =====
@@ -489,7 +489,7 @@ function displayApplications() {
                 <td style="vertical-align: middle;">
                     <div style="display:flex; flex-direction:column; gap:3px; align-items:flex-start;">
                         ${getIncentiveNameBadge(app)}
-                        ${app.deleted ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px;">삭제됨</span>' : ''}
+                        ${app.deleted ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">삭제됨</span>' : ''}
                     </div>
                 </td>
                 <td>
