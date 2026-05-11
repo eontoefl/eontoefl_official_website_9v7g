@@ -486,16 +486,20 @@ function displayApplications() {
                            ${isSelected ? 'checked' : ''}
                            onchange="toggleSelection('${app.id}')">
                 </td>
-                <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${getIncentiveNameBadge(app)}${app.deleted ? ' <span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:4px;">삭제됨</span>' : ''}
+                <td style="vertical-align: middle;">
+                    <div style="display:flex; flex-direction:column; gap:3px; align-items:flex-start;">
+                        ${getIncentiveNameBadge(app)}
+                        ${app.deleted ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px;">삭제됨</span>' : ''}
+                    </div>
                 </td>
-                <td style="font-size: 13px;">
-                    ${escapeHtml(app.email)}
+                <td>
+                    <div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}</div>
+                    <div style="font-size:11px; color:#94a3b8; line-height:1.3; margin-top:1px;">${escapeHtml(app.email)}</div>
                 </td>
                 <td style="font-size: 13px; white-space:nowrap;">
                     ${getScoreDisplay(app)}
                 </td>
-                <td style="font-size: 13px;">
+                <td style="font-size: 13px; white-space:nowrap;">
                     ${getDeadlineDisplay(app)}
                 </td>
                 <td>
@@ -1690,11 +1694,15 @@ function displayBookApplications() {
                            ${isSelected ? 'checked' : ''}
                            onchange="toggleSelection('${app.id}')">
                 </td>
-                <td style="font-weight: 600;">
-                    ${escapeHtml(app.name)}${kakaoIcon}
-                    ${badgeHtml}
+                <td style="vertical-align: middle;">
+                    <div style="display:flex; flex-direction:column; gap:3px; align-items:flex-start;">
+                        ${badgeHtml}
+                    </div>
                 </td>
-                <td style="font-size: 13px;">${escapeHtml(app.email)}</td>
+                <td>
+                    <div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}${kakaoIcon}</div>
+                    <div style="font-size:11px; color:#94a3b8; line-height:1.3; margin-top:1px;">${escapeHtml(app.email)}</div>
+                </td>
                 <td style="font-size: 13px;">${escapeHtml(app.phone || '-')}</td>
                 <td style="font-size: 13px; font-weight: 600;">${scoreDisplay}</td>
                 <td style="font-size: 13px; font-weight: 600; color:#7c3aed;">${targetScoreDisplay}</td>

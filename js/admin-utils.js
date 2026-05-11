@@ -317,8 +317,8 @@ function getDeadlineDisplay(app) {
     
     // submission_deadline이 아직 안 지났으면
     if (sdDate && sdDate >= todayDate) {
-        return `<div style="font-size:13px; color:#1e293b;">${escapeHtml(app.submission_deadline)}</div>
-                <div style="margin-top:2px;">${getRemainingPeriod(app.submission_deadline)}</div>`;
+        return `<div style="font-size:13px; color:#1e293b; white-space:nowrap;">${escapeHtml(app.submission_deadline)}</div>
+                <div style="margin-top:2px; white-space:nowrap;">${getRemainingPeriod(app.submission_deadline)}</div>`;
     }
     
     // 지났으면 preferred_completion으로 전환
@@ -331,14 +331,14 @@ function getDeadlineDisplay(app) {
             pcDate = new Date(app.preferred_completion);
         }
         
-        return `<div style="font-size:13px; color:#1e293b;">${escapeHtml(app.preferred_completion)}</div>
-                <div style="margin-top:2px;">${getRemainingPeriod(app.preferred_completion)}</div>`;
+        return `<div style="font-size:13px; color:#1e293b; white-space:nowrap;">${escapeHtml(app.preferred_completion)}</div>
+                <div style="margin-top:2px; white-space:nowrap;">${getRemainingPeriod(app.preferred_completion)}</div>`;
     }
     
     // 둘 다 없거나 둘 다 지남
     if (sdDate) {
-        return `<div style="font-size:13px; color:#94a3b8;">${escapeHtml(app.submission_deadline)}</div>
-                <div style="margin-top:2px;">${getRemainingPeriod(app.submission_deadline)}</div>`;
+        return `<div style="font-size:13px; color:#94a3b8; white-space:nowrap;">${escapeHtml(app.submission_deadline)}</div>
+                <div style="margin-top:2px; white-space:nowrap;">${getRemainingPeriod(app.submission_deadline)}</div>`;
     }
     
     return '<span style="color:#94a3b8;">-</span>';
