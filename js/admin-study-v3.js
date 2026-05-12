@@ -1139,7 +1139,8 @@ async function batchSendDraft(draftId) {
                         <div style="text-align:center;">
                             <div style="font-size:48px; margin-bottom:16px;">&#127881;</div>
                             <p style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:8px;">모든 주간체크 발송이 완료되었습니다!</p>
-                            <p style="font-size:13px; color:#64748b;">모달을 닫으면 알림판이 자동으로 업데이트됩니다.</p>
+                            <p style="font-size:13px; color:#64748b; margin-bottom:4px;">알림톡 발송 및 테스트룸 등록이 완료되었습니다.</p>
+                            <p style="font-size:13px; color:#64748b;">수정·삭제는 각 학생의 <b>학습관리2 &gt; 학생 알림발송</b> 목록에서 가능합니다.</p>
                             <button onclick="closeBatchReviewModal()" style="margin-top:20px; background:#7c3aed; color:white; border:none; padding:10px 24px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;">
                                 닫기
                             </button>

@@ -2506,7 +2506,7 @@ async function sendDraft(draftId) {
             console.warn('주간체크 알림톡 발송 실패 (사이트 알림은 정상 발송됨):', alimErr);
         }
 
-        alert(`✅ "${studentName}"님에게${weekLabel} 주간체크 발송 완료!`);
+        alert(`✅ ${studentName}님${weekLabel} 주간체크 발송 완료!\n\n• 카카오 알림톡 발송 완료\n• 테스트룸에 주간체크 등록 완료\n\n수정·삭제는 학습관리2 > 학생 알림발송 목록에서 가능합니다.`);
         closeDraftReviewModal();
 
         // 6. 알림 목록 새로고침 (발송된 건이 발송 내역에 나타나도록)
