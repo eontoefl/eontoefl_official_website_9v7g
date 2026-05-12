@@ -913,6 +913,38 @@ async function confirmExtendDeadline() {
 let extModalSchedules = []; // cached correction_schedules for active students
 
 /**
+ * Hardcoded CORRECTION_SCHEDULE mirror (from testroom correction-schedule-data.js).
+ * Used to derive task_number when inserting blank rows for deadline extension.
+ */
+const CORRECTION_SCHEDULE = [
+    { session: 1,  writing: { type: 'email',      number: 901 }, speaking: { number: 901 } },
+    { session: 2,  writing: { type: 'discussion',  number: 901 }, speaking: { number: 902 } },
+    { session: 3,  writing: { type: 'email',      number: 902 }, speaking: { number: 903 } },
+    { session: 4,  writing: { type: 'discussion',  number: 902 }, speaking: { number: 904 } },
+    { session: 5,  writing: { type: 'email',      number: 903 }, speaking: { number: 905 } },
+    { session: 6,  writing: { type: 'discussion',  number: 903 }, speaking: { number: 906 } },
+    { session: 7,  writing: { type: 'email',      number: 904 }, speaking: { number: 907 } },
+    { session: 8,  writing: { type: 'discussion',  number: 904 }, speaking: { number: 908 } },
+    { session: 9,  writing: { type: 'email',      number: 905 }, speaking: { number: 909 } },
+    { session: 10, writing: { type: 'discussion',  number: 905 }, speaking: { number: 910 } },
+    { session: 11, writing: { type: 'email',      number: 906 }, speaking: { number: 911 } },
+    { session: 12, writing: { type: 'discussion',  number: 906 }, speaking: { number: 912 } },
+];
+
+/**
+ * Lookup task_number from CORRECTION_SCHEDULE by session + task_type.
+ */
+function getTaskNumberFromSchedule(sessionNumber, taskType) {
+    const sNum = parseInt(sessionNumber, 10);
+    const entry = CORRECTION_SCHEDULE.find(s => s.session === sNum);
+    if (!entry) return null;
+    const tt = (taskType || '').toLowerCase();
+    if (tt === 'speaking_interview') return entry.speaking.number;
+    if (tt === 'writing_email' || tt === 'writing_discussion') return entry.writing.number;
+    return null;
+}
+
+/**
  * Open the standalone deadline extension modal.
  * Loads active correction students from correction_schedules table.
  */
@@ -1088,18 +1120,31 @@ async function confirmStandaloneExtend() {
             console.log(`✅ 마감 연장 (UPDATE): ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
         } else {
             // No row exists — INSERT a blank row
-            // Determine task_number from CORRECTION_SCHEDULE if available
-            let taskNumber = null;
-            const sNum = parseInt(sessionNumber, 10);
-            // Schedule data is in testroom, but we can derive task_number from session_number
-            // Writing: email sessions 1,4,7,10 → number 901-904; discussion sessions 2,5,8,11 → number 901-906
-            // Speaking: sessions 1-12 → number 901-912
-            // We don't need task_number for the blank row; testroom will populate it on submission
+            const taskNumber = getTaskNumberFromSchedule(sessionNumber, taskType);
+            if (!taskNumber) {
+                statusInfo.className = 'corr-extend-status-info warn';
+                statusInfo.innerHTML = `<i class="fas fa-exclamation-triangle"></i> S${sessionNumber}에 해당하는 ${taskLabel} 스케줄을 찾을 수 없습니다. 세션/유형을 확인하세요.`;
+                statusInfo.style.display = 'block';
+                return;
+            }
+
+            // Validate: check if task_type matches the schedule for this session
+            const schedEntry = CORRECTION_SCHEDULE.find(s => s.session === parseInt(sessionNumber, 10));
+            if (schedEntry && taskType.startsWith('writing_')) {
+                const expectedType = 'writing_' + schedEntry.writing.type;
+                if (taskType !== expectedType) {
+                    statusInfo.className = 'corr-extend-status-info warn';
+                    statusInfo.innerHTML = `<i class="fas fa-exclamation-triangle"></i> S${sessionNumber}의 Writing 유형은 ${schedEntry.writing.type === 'email' ? 'Email' : 'Discussion'}입니다. 유형을 확인하세요.`;
+                    statusInfo.style.display = 'block';
+                    return;
+                }
+            }
 
             const newRow = {
                 user_id: userId,
                 session_number: parseInt(sessionNumber, 10),
                 task_type: taskType,
+                task_number: taskNumber,
                 status: null,
                 deadline_extended_hours: hours
             };
