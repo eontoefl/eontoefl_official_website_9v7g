@@ -1523,3 +1523,221 @@
 .corr-extend-popup-confirm:hover {
     background: #1d4ed8;
 }
+
+/* ===== Top-level Deadline Extension Button ===== */
+.corr-deadline-extend-top-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.corr-deadline-extend-top-btn:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+}
+
+/* ===== Standalone Deadline Extension Modal ===== */
+.corr-extend-modal {
+    background: #fff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    transform: translateY(20px);
+    transition: transform 0.2s;
+}
+
+.corr-modal-overlay.open .corr-extend-modal {
+    transform: translateY(0);
+}
+
+.corr-extend-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.corr-extend-modal-header h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.corr-extend-modal-header h3 i {
+    color: #2563eb;
+}
+
+.corr-extend-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.corr-extend-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.corr-extend-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.corr-extend-select {
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1e293b;
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.corr-extend-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.corr-extend-hours-group {
+    display: flex;
+    gap: 12px;
+}
+
+.corr-extend-hour-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    transition: all 0.15s;
+    flex: 1;
+    justify-content: center;
+}
+
+.corr-extend-hour-option:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.corr-extend-hour-option:has(input:checked) {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+.corr-extend-hour-option input[type="radio"] {
+    accent-color: #2563eb;
+}
+
+.corr-extend-status-info {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.corr-extend-status-info.info {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+.corr-extend-status-info.warn {
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.corr-extend-status-info.success {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.corr-extend-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.corr-extend-modal-cancel {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s;
+}
+
+.corr-extend-modal-cancel:hover {
+    background: #f8fafc;
+}
+
+.corr-extend-modal-confirm {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.corr-extend-modal-confirm:hover {
+    background: #1d4ed8;
+}
+
+.corr-extend-modal-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .corr-extend-modal {
+        max-width: 100%;
+    }
+    .corr-extend-hours-group {
+        flex-direction: column;
+    }
+}

@@ -65,9 +65,14 @@
     <!-- Main Content -->
     <div class="admin-container">
         <!-- Header -->
-        <div class="admin-header">
-            <h1 class="admin-title"><i class="fas fa-pen-nib" style="color: var(--admin-accent);"></i> 첨삭 관리</h1>
-            <p class="admin-subtitle">학생 첨삭 결과를 검토하고 승인하세요</p>
+        <div class="admin-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+                <h1 class="admin-title"><i class="fas fa-pen-nib" style="color: var(--admin-accent);"></i> 첨삭 관리</h1>
+                <p class="admin-subtitle">학생 첨삭 결과를 검토하고 승인하세요</p>
+            </div>
+            <button class="corr-deadline-extend-top-btn" onclick="openDeadlineExtendModal()">
+                <i class="fas fa-clock"></i> 마감 연장
+            </button>
         </div>
 
         <!-- Stats Cards -->
@@ -348,6 +353,75 @@
         <div class="corr-comment-input-actions">
             <button class="btn-cancel" onclick="cancelAddMark()">취소</button>
             <button class="btn-confirm" onclick="confirmAddMark()">추가</button>
+        </div>
+    </div>
+
+    <!-- Standalone Deadline Extension Modal -->
+    <div class="corr-modal-overlay" id="deadlineExtendModal">
+        <div class="corr-extend-modal">
+            <div class="corr-extend-modal-header">
+                <h3><i class="fas fa-clock"></i> 마감 연장</h3>
+                <button class="corr-modal-close" onclick="closeDeadlineExtendModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="corr-extend-modal-body">
+                <!-- Student Selector -->
+                <div class="corr-extend-field">
+                    <label class="corr-extend-label">학생 선택</label>
+                    <select id="extModalStudent" class="corr-extend-select" onchange="onExtModalStudentChange()">
+                        <option value="">학생을 선택하세요</option>
+                    </select>
+                </div>
+                <!-- Session Selector -->
+                <div class="corr-extend-field">
+                    <label class="corr-extend-label">세션</label>
+                    <select id="extModalSession" class="corr-extend-select">
+                        <option value="">세션을 선택하세요</option>
+                    </select>
+                </div>
+                <!-- Task Type Selector -->
+                <div class="corr-extend-field">
+                    <label class="corr-extend-label">과제 유형</label>
+                    <select id="extModalTaskType" class="corr-extend-select">
+                        <option value="">유형을 선택하세요</option>
+                        <option value="writing_email">Writing (Email)</option>
+                        <option value="writing_discussion">Writing (Discussion)</option>
+                        <option value="speaking_interview">Speaking (Interview)</option>
+                    </select>
+                </div>
+                <!-- Draft Round Selector -->
+                <div class="corr-extend-field">
+                    <label class="corr-extend-label">차수</label>
+                    <select id="extModalDraft" class="corr-extend-select">
+                        <option value="1">1차 (첫 제출)</option>
+                        <option value="2">2차 (수정 제출)</option>
+                    </select>
+                </div>
+                <!-- Hours Selector -->
+                <div class="corr-extend-field">
+                    <label class="corr-extend-label">연장 시간</label>
+                    <div class="corr-extend-hours-group">
+                        <label class="corr-extend-hour-option">
+                            <input type="radio" name="extModalHours" value="12"> +12시간
+                        </label>
+                        <label class="corr-extend-hour-option">
+                            <input type="radio" name="extModalHours" value="24" checked> +24시간
+                        </label>
+                        <label class="corr-extend-hour-option">
+                            <input type="radio" name="extModalHours" value="48"> +48시간
+                        </label>
+                    </div>
+                </div>
+                <!-- Status Info -->
+                <div class="corr-extend-status-info" id="extModalStatusInfo" style="display:none;"></div>
+            </div>
+            <div class="corr-extend-modal-footer">
+                <button class="corr-extend-modal-cancel" onclick="closeDeadlineExtendModal()">취소</button>
+                <button class="corr-extend-modal-confirm" id="extModalConfirmBtn" onclick="confirmStandaloneExtend()">
+                    <i class="fas fa-check"></i> 연장하기
+                </button>
+            </div>
         </div>
     </div>
 
