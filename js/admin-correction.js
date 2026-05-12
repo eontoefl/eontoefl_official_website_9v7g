@@ -908,6 +908,231 @@ async function confirmExtendDeadline() {
     }
 }
 
+// ===== Standalone Deadline Extension Modal =====
+
+let extModalSchedules = []; // cached correction_schedules for active students
+
+/**
+ * Open the standalone deadline extension modal.
+ * Loads active correction students from correction_schedules table.
+ */
+async function openDeadlineExtendModal() {
+    const overlay = document.getElementById('deadlineExtendModal');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Reset form
+    document.getElementById('extModalSession').innerHTML = '<option value="">세션을 선택하세요</option>';
+    document.getElementById('extModalTaskType').value = '';
+    document.getElementById('extModalDraft').value = '1';
+    document.querySelector('input[name="extModalHours"][value="24"]').checked = true;
+    const statusInfo = document.getElementById('extModalStatusInfo');
+    statusInfo.style.display = 'none';
+
+    // Load active students
+    const studentSelect = document.getElementById('extModalStudent');
+    studentSelect.innerHTML = '<option value="">불러오는 중...</option>';
+
+    try {
+        // Fetch all correction_schedules
+        const schedules = await supabaseAPI.query('correction_schedules', {
+            'select': 'id,user_id,start_date,duration_weeks',
+            'order': 'start_date.desc',
+            'limit': '500'
+        });
+        extModalSchedules = schedules || [];
+
+        // Filter active: start_date + duration_weeks * 7 days > today
+        const now = new Date();
+        const activeSchedules = extModalSchedules.filter(s => {
+            if (!s.start_date) return false;
+            const start = new Date(s.start_date);
+            const weeks = s.duration_weeks || 4;
+            const endDate = new Date(start.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
+            // Add buffer of 7 days after end
+            endDate.setDate(endDate.getDate() + 7);
+            return endDate >= now;
+        });
+
+        // Load user info for these students if not already cached
+        const missingUserIds = activeSchedules
+            .map(s => s.user_id)
+            .filter(uid => uid && !usersCache[uid]);
+        if (missingUserIds.length > 0) {
+            await loadUsersInfo(missingUserIds);
+        }
+
+        // Populate student dropdown
+        studentSelect.innerHTML = '<option value="">학생을 선택하세요</option>';
+        // Deduplicate by user_id (a student might have multiple schedules)
+        const seen = new Set();
+        activeSchedules.forEach(s => {
+            if (seen.has(s.user_id)) return;
+            seen.add(s.user_id);
+            const user = usersCache[s.user_id] || { name: '(이름없음)' };
+            const opt = document.createElement('option');
+            opt.value = s.user_id;
+            opt.textContent = user.name;
+            opt.dataset.scheduleId = s.id;
+            studentSelect.appendChild(opt);
+        });
+
+        if (activeSchedules.length === 0) {
+            studentSelect.innerHTML = '<option value="">활성 학생이 없습니다</option>';
+        }
+    } catch (err) {
+        console.error('Failed to load correction schedules:', err);
+        studentSelect.innerHTML = '<option value="">학생 목록 로드 실패</option>';
+    }
+}
+
+/**
+ * Close the standalone deadline extension modal.
+ */
+function closeDeadlineExtendModal() {
+    const overlay = document.getElementById('deadlineExtendModal');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+// Close on overlay click
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('deadlineExtendModal');
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeDeadlineExtendModal();
+        });
+    }
+});
+
+/**
+ * When student is selected, populate session dropdown based on their schedule.
+ */
+function onExtModalStudentChange() {
+    const userId = document.getElementById('extModalStudent').value;
+    const sessionSelect = document.getElementById('extModalSession');
+    sessionSelect.innerHTML = '<option value="">세션을 선택하세요</option>';
+
+    if (!userId) return;
+
+    // Find the student's schedule to know duration_weeks
+    const schedule = extModalSchedules.find(s => s.user_id === userId);
+    const weeks = schedule ? (schedule.duration_weeks || 4) : 4;
+    // Total sessions = weeks * 3
+    const totalSessions = weeks * 3;
+
+    for (let i = 1; i <= totalSessions; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `S${i}`;
+        sessionSelect.appendChild(opt);
+    }
+}
+
+/**
+ * Confirm and apply the standalone deadline extension.
+ * Checks if a correction_submissions row exists:
+ *   - If exists → PATCH deadline_extended_hours
+ *   - If not exists → INSERT blank row with deadline_extended_hours
+ */
+async function confirmStandaloneExtend() {
+    const userId = document.getElementById('extModalStudent').value;
+    const sessionNumber = document.getElementById('extModalSession').value;
+    const taskType = document.getElementById('extModalTaskType').value;
+    const draftRound = document.getElementById('extModalDraft').value;
+    const hoursRadio = document.querySelector('input[name="extModalHours"]:checked');
+
+    // Validation
+    if (!userId) { alert('학생을 선택하세요.'); return; }
+    if (!sessionNumber) { alert('세션을 선택하세요.'); return; }
+    if (!taskType) { alert('과제 유형을 선택하세요.'); return; }
+    if (!hoursRadio) { alert('연장 시간을 선택하세요.'); return; }
+
+    const hours = parseInt(hoursRadio.value, 10);
+    const user = usersCache[userId] || { name: '(알수없음)' };
+    const taskLabel = getTaskTypeLabel(taskType);
+    const draftLabel = draftRound === '2' ? '2차' : '1차';
+
+    if (!confirm(`${user.name}님의 S${sessionNumber} ${taskLabel} ${draftLabel}에 마감을 +${hours}시간 연장하시겠습니까?`)) return;
+
+    const confirmBtn = document.getElementById('extModalConfirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+
+    const statusInfo = document.getElementById('extModalStatusInfo');
+
+    try {
+        // Check if a correction_submissions row already exists for this student+session+task_type
+        const existing = await supabaseAPI.query('correction_submissions', {
+            'user_id': `eq.${userId}`,
+            'session_number': `eq.${sessionNumber}`,
+            'task_type': `eq.${taskType}`,
+            'limit': '1'
+        });
+
+        if (existing && existing.length > 0) {
+            // Row exists — UPDATE via PATCH
+            const row = existing[0];
+            await supabaseAPI.patch('correction_submissions', row.id, {
+                deadline_extended_hours: hours
+            });
+
+            // Update local cache if present
+            const idx = allCorrections.findIndex(c => c.id === row.id);
+            if (idx !== -1) allCorrections[idx].deadline_extended_hours = hours;
+
+            statusInfo.className = 'corr-extend-status-info success';
+            statusInfo.innerHTML = `<i class="fas fa-check-circle"></i> 기존 제출 건에 +${hours}시간 연장 완료`;
+            statusInfo.style.display = 'block';
+
+            console.log(`✅ 마감 연장 (UPDATE): ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
+        } else {
+            // No row exists — INSERT a blank row
+            // Determine task_number from CORRECTION_SCHEDULE if available
+            let taskNumber = null;
+            const sNum = parseInt(sessionNumber, 10);
+            // Schedule data is in testroom, but we can derive task_number from session_number
+            // Writing: email sessions 1,4,7,10 → number 901-904; discussion sessions 2,5,8,11 → number 901-906
+            // Speaking: sessions 1-12 → number 901-912
+            // We don't need task_number for the blank row; testroom will populate it on submission
+
+            const newRow = {
+                user_id: userId,
+                session_number: parseInt(sessionNumber, 10),
+                task_type: taskType,
+                status: null,
+                deadline_extended_hours: hours
+            };
+
+            const inserted = await supabaseAPI.post('correction_submissions', newRow);
+
+            // Add to local cache
+            if (inserted) {
+                allCorrections.unshift(inserted);
+            }
+
+            statusInfo.className = 'corr-extend-status-info info';
+            statusInfo.innerHTML = `<i class="fas fa-plus-circle"></i> 빈 행 생성 + ${hours}시간 연장 완료 (미제출 상태)`;
+            statusInfo.style.display = 'block';
+
+            console.log(`✅ 마감 연장 (INSERT blank): ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
+        }
+
+        // Refresh the table
+        updateStats();
+        applyFilters();
+
+    } catch (err) {
+        console.error('❌ 마감 연장 실패:', err);
+        statusInfo.className = 'corr-extend-status-info warn';
+        statusInfo.innerHTML = `<i class="fas fa-exclamation-triangle"></i> 연장 실패: ${err.message}`;
+        statusInfo.style.display = 'block';
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-check"></i> 연장하기';
+    }
+}
+
 /**
  * Setup toggle buttons (1차 피드백 보기 / 학생 원문 보기).
  */
