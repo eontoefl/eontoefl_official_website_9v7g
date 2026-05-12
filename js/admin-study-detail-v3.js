@@ -2488,10 +2488,28 @@ async function sendDraft(draftId) {
         // 4. 로컬 데이터에서 제거
         weeklyCheckDrafts = weeklyCheckDrafts.filter(d => d.id !== draftId);
 
+        // 5. 카카오 알림톡 발송 (주간체크 등록 안내)
+        try {
+            const phone = studentData.user.phone;
+            if (phone) {
+                const weekNum = draft.week || '';
+                await sendKakaoAlimTalk('weekly_check_registered', {
+                    name: studentName,
+                    phone: phone,
+                    week: weekNum
+                });
+                console.log('주간체크 알림톡 발송 완료:', studentName);
+            } else {
+                console.warn('학생 전화번호 없음 — 알림톡 생략:', studentName);
+            }
+        } catch (alimErr) {
+            console.warn('주간체크 알림톡 발송 실패 (사이트 알림은 정상 발송됨):', alimErr);
+        }
+
         alert(`✅ "${studentName}"님에게${weekLabel} 주간체크 발송 완료!`);
         closeDraftReviewModal();
 
-        // 5. 알림 목록 새로고침 (발송된 건이 발송 내역에 나타나도록)
+        // 6. 알림 목록 새로고침 (발송된 건이 발송 내역에 나타나도록)
         await loadNotifications();
     } catch (err) {
         console.error('주간체크 발송 실패:', err);
