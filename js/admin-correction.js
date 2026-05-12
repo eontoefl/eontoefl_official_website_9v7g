@@ -820,6 +820,92 @@ function populateModalHeader(item) {
         cancelBtn.onclick = () => cancelScheduledApproval(item.id);
         badge.parentNode.insertBefore(cancelBtn, badge.nextSibling);
     }
+
+    // Deadline extension button visibility
+    updateExtendDeadlineUI(item);
+}
+
+// ===== Deadline Extension =====
+
+/**
+ * Show/hide the deadline extension button based on item status.
+ * Visible when: student hasn't submitted yet (null status) or waiting for 2차 draft
+ * (feedback1_ready + released_1 = true, but no draft_2 submitted yet).
+ * Hidden when: complete, expired, skipped, or already processing feedback.
+ */
+function updateExtendDeadlineUI(item) {
+    const wrap = document.getElementById('extendDeadlineWrap');
+    const badgeEl = document.getElementById('extendBadge');
+    const popup = document.getElementById('extendPopup');
+    if (!wrap || !badgeEl) return;
+
+    // Close popup whenever modal re-populates
+    if (popup) popup.classList.remove('open');
+
+    const status = item.status || '';
+    const hiddenStates = ['complete', 'expired', 'skipped', 'draft2_submitted', 'feedback2_processing', 'feedback2_ready', 'feedback2_failed'];
+
+    if (hiddenStates.includes(status)) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    // Show for: null (not submitted), draft1_submitted, feedback1_processing,
+    // feedback1_ready (awaiting 2차), feedback1_failed
+    wrap.style.display = 'inline-flex';
+
+    // Show existing extension badge
+    const extHours = item.deadline_extended_hours || 0;
+    if (extHours > 0) {
+        badgeEl.textContent = `+${extHours}h 연장됨`;
+        badgeEl.style.display = 'inline-flex';
+    } else {
+        badgeEl.style.display = 'none';
+    }
+}
+
+/**
+ * Toggle the extension popup open/closed.
+ */
+function toggleExtendPopup() {
+    const popup = document.getElementById('extendPopup');
+    if (!popup) return;
+    popup.classList.toggle('open');
+}
+
+/**
+ * Confirm and save deadline extension.
+ */
+async function confirmExtendDeadline() {
+    if (!currentModalItem) return;
+
+    const selected = document.querySelector('input[name="extendHours"]:checked');
+    if (!selected) return;
+
+    const hours = parseInt(selected.value, 10);
+    const user = usersCache[currentModalItem.user_id] || { name: '(알수없음)' };
+
+    if (!confirm(`${user.name}님의 이 건에 마감을 +${hours}시간 연장하시겠습니까?`)) return;
+
+    try {
+        await supabaseAPI.patch('correction_submissions', currentModalItem.id, {
+            deadline_extended_hours: hours
+        });
+
+        // Update local data
+        currentModalItem.deadline_extended_hours = hours;
+        const idx = allCorrections.findIndex(c => c.id === currentModalItem.id);
+        if (idx !== -1) allCorrections[idx].deadline_extended_hours = hours;
+
+        // Update UI
+        toggleExtendPopup();
+        updateExtendDeadlineUI(currentModalItem);
+
+        console.log(`✅ 마감 연장 완료: ${user.name}, +${hours}h`);
+    } catch (err) {
+        console.error('❌ 마감 연장 실패:', err);
+        alert('마감 연장 저장에 실패했습니다: ' + err.message);
+    }
 }
 
 /**

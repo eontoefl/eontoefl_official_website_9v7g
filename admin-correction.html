@@ -251,6 +251,30 @@
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="corr-extend-wrap" id="extendDeadlineWrap" style="display:none;">
+                        <button class="corr-extend-btn" id="extendDeadlineBtn" onclick="toggleExtendPopup()">
+                            <i class="fas fa-clock"></i> 마감 연장
+                        </button>
+                        <span class="corr-extend-badge" id="extendBadge" style="display:none;"></span>
+                        <div class="corr-extend-popup" id="extendPopup">
+                            <div class="corr-extend-popup-title">마감 연장</div>
+                            <div class="corr-extend-options">
+                                <label class="corr-extend-option">
+                                    <input type="radio" name="extendHours" value="12"> +12시간
+                                </label>
+                                <label class="corr-extend-option">
+                                    <input type="radio" name="extendHours" value="24" checked> +24시간
+                                </label>
+                                <label class="corr-extend-option">
+                                    <input type="radio" name="extendHours" value="48"> +48시간
+                                </label>
+                            </div>
+                            <div class="corr-extend-popup-actions">
+                                <button class="corr-extend-popup-cancel" onclick="toggleExtendPopup()">취소</button>
+                                <button class="corr-extend-popup-confirm" onclick="confirmExtendDeadline()">확인</button>
+                            </div>
+                        </div>
+                    </div>
                     <button class="corr-edit-btn" id="editModeBtn" onclick="toggleEditMode()">
                         <i class="fas fa-edit"></i> 편집
                     </button>
