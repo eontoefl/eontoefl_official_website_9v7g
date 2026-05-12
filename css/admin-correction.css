@@ -1391,3 +1391,135 @@
 .corr-schedule-cancel-btn:hover {
     background: #fde68a;
 }
+
+/* ===== Deadline Extension Button & Popup ===== */
+.corr-extend-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.corr-extend-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: inherit;
+}
+
+.corr-extend-btn:hover {
+    background: #dbeafe;
+}
+
+.corr-extend-badge {
+    display: inline-flex;
+    align-items: center;
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.corr-extend-popup {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    padding: 16px;
+    min-width: 200px;
+    z-index: 1000;
+}
+
+.corr-extend-popup.open {
+    display: block;
+}
+
+.corr-extend-popup-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+}
+
+.corr-extend-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.corr-extend-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    transition: background 0.15s;
+}
+
+.corr-extend-option:hover {
+    background: #f1f5f9;
+}
+
+.corr-extend-option input[type="radio"] {
+    accent-color: #2563eb;
+}
+
+.corr-extend-popup-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.corr-extend-popup-cancel {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.corr-extend-popup-cancel:hover {
+    background: #f8fafc;
+}
+
+.corr-extend-popup-confirm {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s;
+}
+
+.corr-extend-popup-confirm:hover {
+    background: #1d4ed8;
+}
