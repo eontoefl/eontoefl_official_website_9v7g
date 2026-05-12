@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sortBy').addEventListener('change', applyFilters);
 
     loadCorrections();
+    loadDeadlineExtensions();
 });
 
 // ===== Data Loading =====
@@ -825,13 +826,44 @@ function populateModalHeader(item) {
     updateExtendDeadlineUI(item);
 }
 
-// ===== Deadline Extension =====
+// ===== Deadline Extension (via correction_deadline_extensions table) =====
+
+// Local cache for deadline extensions loaded from DB
+let deadlineExtensionsCache = []; // { id, user_id, session_number, task_type, extended_hours, created_at }
+
+/**
+ * Load all correction_deadline_extensions into cache.
+ * Called once on page load, and refreshed after each extension.
+ */
+async function loadDeadlineExtensions() {
+    try {
+        const data = await supabaseAPI.query('correction_deadline_extensions', {
+            'order': 'created_at.desc',
+            'limit': '1000'
+        });
+        deadlineExtensionsCache = data || [];
+    } catch (err) {
+        console.warn('deadline extensions 로드 실패:', err);
+        deadlineExtensionsCache = [];
+    }
+}
+
+/**
+ * Find extension hours for a given user + session + task_type from cache.
+ * Returns the extended_hours value, or 0 if none.
+ */
+function getExtendedHours(userId, sessionNumber, taskType) {
+    const match = deadlineExtensionsCache.find(e =>
+        e.user_id === userId &&
+        String(e.session_number) === String(sessionNumber) &&
+        e.task_type === taskType
+    );
+    return match ? (match.extended_hours || 0) : 0;
+}
 
 /**
  * Show/hide the deadline extension button based on item status.
- * Visible when: student hasn't submitted yet (null status) or waiting for 2차 draft
- * (feedback1_ready + released_1 = true, but no draft_2 submitted yet).
- * Hidden when: complete, expired, skipped, or already processing feedback.
+ * Badge reads from correction_deadline_extensions cache.
  */
 function updateExtendDeadlineUI(item) {
     const wrap = document.getElementById('extendDeadlineWrap');
@@ -850,12 +882,10 @@ function updateExtendDeadlineUI(item) {
         return;
     }
 
-    // Show for: null (not submitted), draft1_submitted, feedback1_processing,
-    // feedback1_ready (awaiting 2차), feedback1_failed
     wrap.style.display = 'inline-flex';
 
-    // Show existing extension badge
-    const extHours = item.deadline_extended_hours || 0;
+    // Show existing extension badge from separate table
+    const extHours = getExtendedHours(item.user_id, item.session_number, item.task_type);
     if (extHours > 0) {
         badgeEl.textContent = `+${extHours}h 연장됨`;
         badgeEl.style.display = 'inline-flex';
@@ -874,7 +904,8 @@ function toggleExtendPopup() {
 }
 
 /**
- * Confirm and save deadline extension.
+ * Confirm and save deadline extension (modal header button).
+ * Inserts/updates a row in correction_deadline_extensions table.
  */
 async function confirmExtendDeadline() {
     if (!currentModalItem) return;
@@ -888,14 +919,12 @@ async function confirmExtendDeadline() {
     if (!confirm(`${user.name}님의 이 건에 마감을 +${hours}시간 연장하시겠습니까?`)) return;
 
     try {
-        await supabaseAPI.patch('correction_submissions', currentModalItem.id, {
-            deadline_extended_hours: hours
-        });
-
-        // Update local data
-        currentModalItem.deadline_extended_hours = hours;
-        const idx = allCorrections.findIndex(c => c.id === currentModalItem.id);
-        if (idx !== -1) allCorrections[idx].deadline_extended_hours = hours;
+        await upsertDeadlineExtension(
+            currentModalItem.user_id,
+            currentModalItem.session_number,
+            currentModalItem.task_type,
+            hours
+        );
 
         // Update UI
         toggleExtendPopup();
@@ -908,41 +937,43 @@ async function confirmExtendDeadline() {
     }
 }
 
+/**
+ * Insert or update a deadline extension in correction_deadline_extensions.
+ * If a row already exists for (user_id, session_number, task_type), update it.
+ * Otherwise insert a new row.
+ */
+async function upsertDeadlineExtension(userId, sessionNumber, taskType, hours) {
+    // Check if extension already exists
+    const existing = deadlineExtensionsCache.find(e =>
+        e.user_id === userId &&
+        String(e.session_number) === String(sessionNumber) &&
+        e.task_type === taskType
+    );
+
+    if (existing) {
+        // UPDATE existing row
+        await supabaseAPI.patch('correction_deadline_extensions', existing.id, {
+            extended_hours: hours
+        });
+        existing.extended_hours = hours;
+    } else {
+        // INSERT new row
+        const newRow = {
+            user_id: userId,
+            session_number: parseInt(sessionNumber, 10),
+            task_type: taskType,
+            extended_hours: hours
+        };
+        const inserted = await supabaseAPI.post('correction_deadline_extensions', newRow);
+        if (inserted) {
+            deadlineExtensionsCache.push(inserted);
+        }
+    }
+}
+
 // ===== Standalone Deadline Extension Modal =====
 
 let extModalSchedules = []; // cached correction_schedules for active students
-
-/**
- * Hardcoded CORRECTION_SCHEDULE mirror (from testroom correction-schedule-data.js).
- * Used to derive task_number when inserting blank rows for deadline extension.
- */
-const CORRECTION_SCHEDULE = [
-    { session: 1,  writing: { type: 'email',      number: 901 }, speaking: { number: 901 } },
-    { session: 2,  writing: { type: 'discussion',  number: 901 }, speaking: { number: 902 } },
-    { session: 3,  writing: { type: 'email',      number: 902 }, speaking: { number: 903 } },
-    { session: 4,  writing: { type: 'discussion',  number: 902 }, speaking: { number: 904 } },
-    { session: 5,  writing: { type: 'email',      number: 903 }, speaking: { number: 905 } },
-    { session: 6,  writing: { type: 'discussion',  number: 903 }, speaking: { number: 906 } },
-    { session: 7,  writing: { type: 'email',      number: 904 }, speaking: { number: 907 } },
-    { session: 8,  writing: { type: 'discussion',  number: 904 }, speaking: { number: 908 } },
-    { session: 9,  writing: { type: 'email',      number: 905 }, speaking: { number: 909 } },
-    { session: 10, writing: { type: 'discussion',  number: 905 }, speaking: { number: 910 } },
-    { session: 11, writing: { type: 'email',      number: 906 }, speaking: { number: 911 } },
-    { session: 12, writing: { type: 'discussion',  number: 906 }, speaking: { number: 912 } },
-];
-
-/**
- * Lookup task_number from CORRECTION_SCHEDULE by session + task_type.
- */
-function getTaskNumberFromSchedule(sessionNumber, taskType) {
-    const sNum = parseInt(sessionNumber, 10);
-    const entry = CORRECTION_SCHEDULE.find(s => s.session === sNum);
-    if (!entry) return null;
-    const tt = (taskType || '').toLowerCase();
-    if (tt === 'speaking_interview') return entry.speaking.number;
-    if (tt === 'writing_email' || tt === 'writing_discussion') return entry.writing.number;
-    return null;
-}
 
 /**
  * Open the standalone deadline extension modal.
@@ -1063,9 +1094,8 @@ function onExtModalStudentChange() {
 
 /**
  * Confirm and apply the standalone deadline extension.
- * Checks if a correction_submissions row exists:
- *   - If exists → PATCH deadline_extended_hours
- *   - If not exists → INSERT blank row with deadline_extended_hours
+ * Always inserts/updates in correction_deadline_extensions table.
+ * No blank rows in correction_submissions.
  */
 async function confirmStandaloneExtend() {
     const userId = document.getElementById('extModalStudent').value;
@@ -1094,78 +1124,13 @@ async function confirmStandaloneExtend() {
     const statusInfo = document.getElementById('extModalStatusInfo');
 
     try {
-        // Check if a correction_submissions row already exists for this student+session+task_type
-        const existing = await supabaseAPI.query('correction_submissions', {
-            'user_id': `eq.${userId}`,
-            'session_number': `eq.${sessionNumber}`,
-            'task_type': `eq.${taskType}`,
-            'limit': '1'
-        });
+        await upsertDeadlineExtension(userId, sessionNumber, taskType, hours);
 
-        if (existing && existing.length > 0) {
-            // Row exists — UPDATE via PATCH
-            const row = existing[0];
-            await supabaseAPI.patch('correction_submissions', row.id, {
-                deadline_extended_hours: hours
-            });
+        statusInfo.className = 'corr-extend-status-info success';
+        statusInfo.innerHTML = `<i class="fas fa-check-circle"></i> ${user.name} S${sessionNumber} ${taskLabel} +${hours}시간 연장 완료`;
+        statusInfo.style.display = 'block';
 
-            // Update local cache if present
-            const idx = allCorrections.findIndex(c => c.id === row.id);
-            if (idx !== -1) allCorrections[idx].deadline_extended_hours = hours;
-
-            statusInfo.className = 'corr-extend-status-info success';
-            statusInfo.innerHTML = `<i class="fas fa-check-circle"></i> 기존 제출 건에 +${hours}시간 연장 완료`;
-            statusInfo.style.display = 'block';
-
-            console.log(`✅ 마감 연장 (UPDATE): ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
-        } else {
-            // No row exists — INSERT a blank row
-            const taskNumber = getTaskNumberFromSchedule(sessionNumber, taskType);
-            if (!taskNumber) {
-                statusInfo.className = 'corr-extend-status-info warn';
-                statusInfo.innerHTML = `<i class="fas fa-exclamation-triangle"></i> S${sessionNumber}에 해당하는 ${taskLabel} 스케줄을 찾을 수 없습니다. 세션/유형을 확인하세요.`;
-                statusInfo.style.display = 'block';
-                return;
-            }
-
-            // Validate: check if task_type matches the schedule for this session
-            const schedEntry = CORRECTION_SCHEDULE.find(s => s.session === parseInt(sessionNumber, 10));
-            if (schedEntry && taskType.startsWith('writing_')) {
-                const expectedType = 'writing_' + schedEntry.writing.type;
-                if (taskType !== expectedType) {
-                    statusInfo.className = 'corr-extend-status-info warn';
-                    statusInfo.innerHTML = `<i class="fas fa-exclamation-triangle"></i> S${sessionNumber}의 Writing 유형은 ${schedEntry.writing.type === 'email' ? 'Email' : 'Discussion'}입니다. 유형을 확인하세요.`;
-                    statusInfo.style.display = 'block';
-                    return;
-                }
-            }
-
-            const newRow = {
-                user_id: userId,
-                session_number: parseInt(sessionNumber, 10),
-                task_type: taskType,
-                task_number: taskNumber,
-                status: null,
-                deadline_extended_hours: hours
-            };
-
-            const inserted = await supabaseAPI.post('correction_submissions', newRow);
-
-            // Add to local cache
-            if (inserted) {
-                allCorrections.unshift(inserted);
-            }
-
-            statusInfo.className = 'corr-extend-status-info info';
-            statusInfo.innerHTML = `<i class="fas fa-plus-circle"></i> 빈 행 생성 + ${hours}시간 연장 완료 (미제출 상태)`;
-            statusInfo.style.display = 'block';
-
-            console.log(`✅ 마감 연장 (INSERT blank): ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
-        }
-
-        // Refresh the table
-        updateStats();
-        applyFilters();
+        console.log(`✅ 마감 연장: ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
 
     } catch (err) {
         console.error('❌ 마감 연장 실패:', err);
