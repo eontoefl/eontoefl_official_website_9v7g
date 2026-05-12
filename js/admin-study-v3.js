@@ -1096,6 +1096,25 @@ async function batchSendDraft(draftId) {
         // 4. 로컬 데이터 업데이트
         draft.status = 'sent';
 
+        // 4-1. 카카오 알림톡 발송 (주간체크 등록 안내)
+        try {
+            const userRows = await supabaseAPI.query('users', { 'id': `eq.${draft.user_id}`, 'select': 'phone' });
+            const phone = userRows && userRows.length > 0 ? userRows[0].phone : null;
+            if (phone) {
+                const weekNum = draft.week || '';
+                await sendKakaoAlimTalk('weekly_check_registered', {
+                    name: studentName,
+                    phone: phone,
+                    week: weekNum
+                });
+                console.log('주간체크 알림톡 발송 완료:', studentName);
+            } else {
+                console.warn('학생 전화번호 없음 — 알림톡 생략:', studentName);
+            }
+        } catch (alimErr) {
+            console.warn('주간체크 알림톡 발송 실패 (사이트 알림은 정상 발송됨):', alimErr);
+        }
+
         // 5. 좌측 리스트에서 해당 학생 완료 표시
         const statusEl = document.getElementById('batchStatus_' + draftId);
         if (statusEl) statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:#22c55e;"></i>';

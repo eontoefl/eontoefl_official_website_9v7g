@@ -28,6 +28,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   analysis_updated:            50217,  // 개별분석 수정 안내
   contract_deferred:           50221,  // 계약서 기한 유예 안내
   contract_deferral_reminder:  50222,  // 계약서 유예 만료 24시간 전 리마인더
+  weekly_check_registered:     50225,  // 주간체크 등록 안내
 };
 
 // ===== 택배사 코드 매핑 (LunaSoft carrier_code) =====
@@ -276,6 +277,17 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         link,
       ].join("\n");
 
+    case "weekly_check_registered":
+      return [
+        "이온토플 - 주간체크 등록 안내",
+        "",
+        `${data.name}님, 안녕하세요!`,
+        "",
+        `진행 중인 내벨업챌린지의 ${data.week}주차 주간체크가 등록되었습니다.`,
+        "",
+        "아래 버튼을 눌러 이번 주 체크 내용을 확인해주세요 :)",
+      ].join("\n");
+
     default:
       return "";
   }
@@ -314,6 +326,8 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 신청 진행이 연기되었습니다. 기한 내 진행 부탁드려요.";
     case "contract_deferral_reminder":
       return "[이온토플] 계약서 동의 마감이 내일까지입니다. 확인 부탁드려요.";
+    case "weekly_check_registered":
+      return "[이온토플] 주간체크가 등록되었습니다. 확인해주세요. https://testroom.eonfl.com";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -324,7 +338,7 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "shipping_sent") {
     return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
   }
-  if (type === "correction_start_reminder" || type === "correction_feedback_1" || type === "correction_feedback_2") {
+  if (type === "correction_start_reminder" || type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered") {
     return TESTROOM_URL;
   }
   return `${SITE_URL}/application-detail.html?id=${data.app_id}`;
