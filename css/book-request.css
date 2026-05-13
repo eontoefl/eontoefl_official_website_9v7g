@@ -10,8 +10,8 @@ input[type="radio"] {
 
 .form-container {
     max-width: 720px;
-    margin: 0 auto;
-    padding: 7rem 1.5rem 3rem;
+    margin: 2rem auto 3rem;
+    padding: 5rem 1.5rem 3rem;
 }
 
 .form-header {
@@ -517,7 +517,7 @@ label:has(+ textarea[required])::after,
 /* ===== Block Screen (already applied / challenge user) ===== */
 .block-screen {
     text-align: center;
-    padding: 4rem 2rem;
+    padding: 0 2rem 4rem;
 }
 
 .block-screen .block-icon {
