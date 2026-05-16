@@ -332,6 +332,7 @@
                                 </div>
                             </div>
                             <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
+                            <div id="detailAttachments" style="display:none;"></div>
                         </article>
 
                         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; display:none;" id="detailNav">
@@ -681,6 +682,9 @@
                 supabaseAPI.patch('reviews', reviewId, { hit_count: newHitCount }).catch(() => {});
 
                 document.getElementById('detailContent').innerHTML = sanitizeReviewContent(review.content || '');
+
+                // 첨부파일 표시
+                renderAttachments(review.attachments, 'detailAttachments');
 
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';

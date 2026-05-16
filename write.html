@@ -123,6 +123,111 @@
             font-size: 13px;
             line-height: 1.6;
         }
+        /* 파일 첨부 영역 */
+        .file-attach-area {
+            border: 2px dashed #e2e8f0;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .file-attach-area:hover, .file-attach-area.dragover {
+            border-color: #9480c5;
+            background: #f8f4ff;
+        }
+        .file-attach-area i {
+            font-size: 28px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .file-attach-area p {
+            color: #64748b;
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+        .file-attach-area .file-hint {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .attached-files {
+            margin-top: 12px;
+        }
+        .attached-file-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .attached-file-item .file-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .attached-file-item .file-icon.audio { background: #ede9fe; color: #7c3aed; }
+        .attached-file-item .file-icon.image { background: #dbeafe; color: #2563eb; }
+        .attached-file-item .file-icon.pdf { background: #fee2e2; color: #dc2626; }
+        .attached-file-item .file-icon.document { background: #dbeafe; color: #2563eb; }
+        .attached-file-item .file-icon.video { background: #fce7f3; color: #db2777; }
+        .attached-file-item .file-icon.other { background: #f1f5f9; color: #64748b; }
+        .attached-file-item .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .attached-file-item .file-name {
+            font-weight: 500;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .attached-file-item .file-size {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .attached-file-item .file-remove {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: none;
+            color: #94a3b8;
+            cursor: pointer;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .attached-file-item .file-remove:hover {
+            background: #fef2f2;
+            color: #ef4444;
+        }
+        .attached-file-item .file-progress {
+            width: 100%;
+            height: 3px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .attached-file-item .file-progress-bar {
+            height: 100%;
+            background: #9480c5;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
@@ -236,6 +341,18 @@
                             <div class="quill-container">
                                 <div id="quillEditor"></div>
                             </div>
+                        </div>
+
+                        <!-- 파일 첨부 영역 -->
+                        <div class="write-form-group">
+                            <label><i class="fas fa-paperclip" style="margin-right:4px;"></i>파일 첨부</label>
+                            <div class="file-attach-area" id="fileAttachArea" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>클릭하거나 파일을 여기에 드래그하세요</p>
+                                <p class="file-hint">최대 20MB / 음원, 이미지, PDF, 문서 등</p>
+                            </div>
+                            <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileSelect(event)">
+                            <div class="attached-files" id="attachedFiles"></div>
                         </div>
 
                         <div class="write-actions">
@@ -362,6 +479,7 @@
         let boardConfig = null;
         let editMode = false;
         let editPostId = null;
+        let attachedFiles = []; // {file, name, size, type, url, uploaded}
 
         // ==================== 초기화 ====================
         document.addEventListener('DOMContentLoaded', function() {
@@ -504,6 +622,19 @@
                 if (post.content) {
                     quill.root.innerHTML = post.content;
                 }
+
+                // 기존 첨부파일 복원
+                if (post.attachments && Array.isArray(post.attachments) && post.attachments.length > 0) {
+                    attachedFiles = post.attachments.map(a => ({
+                        file: null,
+                        name: a.name,
+                        size: a.size,
+                        type: a.type,
+                        url: a.url,
+                        uploaded: true
+                    }));
+                    renderAttachedFiles();
+                }
             } catch (error) {
                 console.error('게시글 로드 실패:', error);
                 alert('게시글을 불러오는데 실패했습니다.');
@@ -634,14 +765,23 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 등록 중...';
 
             try {
+                // 파일 업로드 처리
+                let uploadedAttachments = [];
+                if (attachedFiles.length > 0) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 파일 업로드 중...';
+                    uploadedAttachments = await uploadAllFiles();
+                }
+
                 // 게시판별 데이터 구성
                 const postData = buildPostData(subject, content, userData);
+                postData.attachments = uploadedAttachments;
 
                 if (editMode && editPostId) {
                     // 수정 모드: PATCH
                     await supabaseAPI.patch(boardConfig.table, editPostId, {
                         subject: subject,
-                        content: content
+                        content: content,
+                        attachments: uploadedAttachments
                     });
                     alert('글이 수정되었습니다.');
                 } else {
@@ -710,6 +850,136 @@
             }
 
             return { subject, content, published_at: now };
+        }
+
+        // ==================== 파일 첨부 ====================
+        const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+        // 드래그앤드롭
+        (function() {
+            document.addEventListener('DOMContentLoaded', function() {
+                const area = document.getElementById('fileAttachArea');
+                if (!area) return;
+                ['dragenter', 'dragover'].forEach(evt => {
+                    area.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); area.classList.add('dragover'); });
+                });
+                ['dragleave', 'drop'].forEach(evt => {
+                    area.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); area.classList.remove('dragover'); });
+                });
+                area.addEventListener('drop', e => {
+                    const files = Array.from(e.dataTransfer.files);
+                    addFiles(files);
+                });
+            });
+        })();
+
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            addFiles(files);
+            e.target.value = ''; // 같은 파일 재선택 가능
+        }
+
+        function addFiles(files) {
+            for (const file of files) {
+                if (file.size > MAX_FILE_SIZE) {
+                    alert(`"${file.name}"은(는) 20MB를 초과하여 업로드할 수 없습니다.`);
+                    continue;
+                }
+                // 중복 체크
+                if (attachedFiles.some(f => f.name === file.name && f.size === file.size)) continue;
+                attachedFiles.push({ file, name: file.name, size: file.size, type: file.type, url: null, uploaded: false });
+            }
+            renderAttachedFiles();
+        }
+
+        function removeFile(idx) {
+            attachedFiles.splice(idx, 1);
+            renderAttachedFiles();
+        }
+
+        function getFileCategory(type, name) {
+            if (type.startsWith('audio/') || /\.(mp3|m4a|wav|ogg|aac|flac|wma)$/i.test(name)) return 'audio';
+            if (type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name)) return 'image';
+            if (type === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf';
+            if (type.startsWith('video/') || /\.(mp4|mov|avi|webm|mkv)$/i.test(name)) return 'video';
+            if (/\.(doc|docx|ppt|pptx|xls|xlsx|hwp|hwpx|txt|csv)$/i.test(name)) return 'document';
+            return 'other';
+        }
+
+        function getFileIconClass(category) {
+            const icons = { audio: 'fa-music', image: 'fa-image', pdf: 'fa-file-pdf', video: 'fa-video', document: 'fa-file-alt', other: 'fa-file' };
+            return icons[category] || 'fa-file';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function renderAttachedFiles() {
+            const container = document.getElementById('attachedFiles');
+            if (attachedFiles.length === 0) { container.innerHTML = ''; return; }
+            container.innerHTML = attachedFiles.map((f, i) => {
+                const cat = getFileCategory(f.type, f.name);
+                const icon = getFileIconClass(cat);
+                return `<div class="attached-file-item">
+                    <div class="file-icon ${cat}"><i class="fas ${icon}"></i></div>
+                    <div class="file-info">
+                        <div class="file-name">${f.name}</div>
+                        <div class="file-size">${formatFileSize(f.size)}</div>
+                    </div>
+                    <button class="file-remove" onclick="removeFile(${i})" title="삭제"><i class="fas fa-times"></i></button>
+                </div>`;
+            }).join('');
+        }
+
+        // Supabase Storage에 파일 업로드
+        async function uploadAttachedFile(fileObj) {
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            const ext = fileObj.name.split('.').pop();
+            const safeName = fileObj.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
+            const filePath = `${currentBoard}/${timestamp}_${randomStr}_${safeName}`;
+
+            const url = `${SUPABASE_URL}/storage/v1/object/board-files/${filePath}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': fileObj.file.type || 'application/octet-stream',
+                    'x-upsert': 'true'
+                },
+                body: fileObj.file
+            });
+
+            if (!response.ok) {
+                throw new Error(`파일 업로드 실패: ${response.status}`);
+            }
+
+            return `${SUPABASE_URL}/storage/v1/object/public/board-files/${filePath}`;
+        }
+
+        async function uploadAllFiles() {
+            const results = [];
+            for (const f of attachedFiles) {
+                if (f.uploaded && f.url) {
+                    results.push({ name: f.name, url: f.url, size: f.size, type: f.type });
+                    continue;
+                }
+                try {
+                    const url = await uploadAttachedFile(f);
+                    f.url = url;
+                    f.uploaded = true;
+                    results.push({ name: f.name, url: url, size: f.size, type: f.type });
+                } catch (err) {
+                    console.error('파일 업로드 실패:', f.name, err);
+                    throw new Error(`"${f.name}" 업로드에 실패했습니다.`);
+                }
+            }
+            return results;
         }
 
         // ==================== 뒤로가기 ====================

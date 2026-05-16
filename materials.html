@@ -504,6 +504,7 @@
                                 </div>
                             </div>
                             <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
+                            <div id="detailAttachments" style="display:none;"></div>
                         </article>
 
                         <!-- 입문서 배너 -->
@@ -824,6 +825,9 @@
                 }
 
                 document.getElementById('detailContent').innerHTML = material.content || '';
+
+                // 첨부파일 표시
+                renderAttachments(material.attachments, 'detailAttachments');
 
                 document.getElementById('detailLoading').style.display = 'none';
                 document.getElementById('detailArticle').style.display = 'block';

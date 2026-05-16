@@ -184,6 +184,11 @@ async function showNoticeDetail(noticeId) {
             : '';
         document.getElementById('noticeDetailContent').innerHTML = notice.content || '';
 
+        // 첨부파일 표시
+        if (typeof renderAttachments === 'function') {
+            renderAttachments(notice.attachments, 'noticeDetailAttachments');
+        }
+
         // 관리자 수정/삭제 버튼
         const adminBtns = document.getElementById('noticeAdminBtns');
         if (isAdmin()) {
