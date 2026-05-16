@@ -509,6 +509,56 @@
                         <option value="기타">기타</option>
                     </select>
                 </div>
+
+                <!-- 호주/뉴질랜드 직접 제출 여부 -->
+                <div class="form-group no-auto-required" style="margin-top: 4px; margin-bottom: 1rem; padding: 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        <label style="margin: 0; font-weight: 600; font-size: 0.85rem; color: #333;">호주/뉴질랜드 기관 직접 제출 여부</label>
+                        <span style="color: #ff4444; font-weight: 700; font-size: 0.85rem;">*</span>
+                        <button type="button" class="au-nz-tooltip-btn" onclick="toggleAuNzTooltip()" title="자세히 보기">
+                            <i class="fas fa-question-circle"></i>
+                        </button>
+                    </div>
+                    <div id="auNzTooltipContent" class="au-nz-tooltip-content" style="display: none;">
+                        <div style="font-weight: 600; color: #92400e; margin-bottom: 8px;">호주/뉴질랜드 직접 제출이란?</div>
+                        <p style="margin: 0 0 8px 0; line-height: 1.6; color: #78350f; font-size: 0.82rem;">
+                            토플 점수를 호주 또는 뉴질랜드에 소재한 기관(대학교, 이민국 등)에 <strong>직접</strong> 제출하는 경우에 해당합니다.
+                        </p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.8rem;">
+                            <div style="background: #fef2f2; padding: 10px; border-radius: 6px;">
+                                <div style="font-weight: 600; color: #991b1b; margin-bottom: 4px;">"예" 에 해당하는 경우</div>
+                                <ul style="margin: 0; padding-left: 16px; color: #7f1d1d; line-height: 1.6;">
+                                    <li>호주 대학교에 직접 지원 (입학/편입)</li>
+                                    <li>뉴질랜드 이민국에 비자 신청용 제출</li>
+                                    <li>호주/뉴질랜드 기관 채용 전형에 직접 제출</li>
+                                </ul>
+                            </div>
+                            <div style="background: #f0fdf4; padding: 10px; border-radius: 6px;">
+                                <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">"아니오" 에 해당하는 경우</div>
+                                <ul style="margin: 0; padding-left: 16px; color: #14532d; line-height: 1.6;">
+                                    <li>호주로 교환학생이지만, 점수 제출은 한국 소속 대학교에 하는 경우</li>
+                                    <li>호주/뉴질랜드 관련이지만, 실제 제출처가 한국 기관인 경우</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p style="margin: 8px 0 0 0; font-size: 0.8rem; color: #92400e; font-weight: 500;">
+                            즉, <strong>최종 점수 제출처</strong>가 호주/뉴질랜드 소재 기관인지가 기준입니다.
+                        </p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0;">
+                        <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; padding: 0;">
+                            <input type="radio" name="is_au_nz_direct_submit" value="yes" required style="width: 16px; height: 16px; margin: 0;">
+                            <span style="font-size: 0.9rem; color: #333; line-height: 1; top: 0;">예 - 호주 또는 뉴질랜드 소재 기관에 직접 제출합니다</span>
+                        </label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0; margin-top: 8px;">
+                        <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; padding: 0;">
+                            <input type="radio" name="is_au_nz_direct_submit" value="no" required style="width: 16px; height: 16px; margin: 0;">
+                            <span style="font-size: 0.9rem; color: #333; line-height: 1; top: 0;">아니오 - 해당하지 않습니다</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>상세 설명</label>
                     <textarea name="toefl_reason_detail" rows="4" placeholder="예: 어릴 때부터 영어가 너무 약해서 늘 자신감이 없었습니다. 그래도 해외에서 일해보고 싶다는 꿈은 계속 있었는데, 취업 준비하면서 토플 점수가 필요하다는 걸 알고 나서 더 이상 미루면 안 되겠다고 느꼈습니다. 지금은 경영학과 4학년이고, 졸업 전에 점수를 만들어서 외국계 기업에 지원하는 게 목표입니다. 주변에 토플 공부하는 사람이 없어서 혼자 막막한 상태입니다." required></textarea>

@@ -489,6 +489,7 @@ function displayApplications() {
                 <td style="vertical-align: middle; text-align:center;">
                     <div style="display:flex; flex-direction:column; gap:3px; align-items:center;">
                         ${getIncentiveNameBadge(app)}
+                        ${app.is_au_nz_direct_submit === 'yes' ? '<span style="display:inline-block; background:#fef3c7; color:#92400e; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">AU/NZ</span>' : ''}
                         ${app.deleted ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">삭제됨</span>' : ''}
                     </div>
                 </td>
@@ -1268,6 +1269,7 @@ function downloadExcel() {
             '현재 점수': app.total_score || '',
             '목표 점수': app.target_cutoff_old || app.target_cutoff_new || '',
             '토플 필요 이유': app.toefl_reason || '',
+            '호주/NZ 직접제출': app.is_au_nz_direct_submit === 'yes' ? 'O' : '-',
             '상태': app.status || '접수완료',
             '신청일': formatDate(app.created_at),
             '관리자 코멘트': app.admin_comment || ''
