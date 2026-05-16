@@ -545,7 +545,7 @@
         // 가이드 타입 설정
         const GUIDE_TYPE_CONFIG = {
             challenge: { title: '📖 내벨업챌린지 이용방법', subtitle: '내벨업챌린지 상세 이용 가이드를 확인하세요' },
-            nevelupaustralia: { title: '🇦🇺 내벨업챌린지 Australia 이용방법', subtitle: '내벨업챌린지 Australia 상세 이용 가이드를 확인하세요' },
+            nevelupaustralia: { title: '내벨업챌린지 Australia 이용방법', subtitle: '내벨업챌린지 Australia 상세 이용 가이드를 확인하세요', icon: 'https://flagcdn.com/24x18/au.png' },
             correction: { title: '📖 첨삭 이용방법', subtitle: '첨삭 프로그램 상세 이용 가이드를 확인하세요' }
         };
 
@@ -556,7 +556,12 @@
             
             // 헤더 타이틀 설정
             const config = GUIDE_TYPE_CONFIG[guideType] || GUIDE_TYPE_CONFIG.challenge;
-            document.getElementById('guideTitle').textContent = config.title;
+            const titleEl = document.getElementById('guideTitle');
+            if (config.icon) {
+                titleEl.innerHTML = '<img src="' + config.icon + '" alt="" style="vertical-align: middle; margin-right: 8px; border-radius: 2px; width: 32px; height: 24px;"> ' + config.title;
+            } else {
+                titleEl.textContent = config.title;
+            }
             document.getElementById('guideSubtitle').textContent = config.subtitle;
             document.title = config.title + ' - 이온토플';
             

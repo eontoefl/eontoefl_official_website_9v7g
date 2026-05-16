@@ -8,7 +8,7 @@ let currentGuideType = 'challenge'; // URL 파라미터로 결정
 // 가이드 타입별 설정
 const GUIDE_TYPE_CONFIG = {
     challenge: { title: '📝 내벨업챌린지 가이드 편집기', label: '내벨업챌린지' },
-    nevelupaustralia: { title: '🇦🇺 내벨업챌린지 Australia 가이드 편집기', label: '내벨업챌린지 Australia' },
+    nevelupaustralia: { title: '내벨업챌린지 Australia 가이드 편집기', label: '내벨업챌린지 Australia', icon: 'https://flagcdn.com/24x18/au.png' },
     correction: { title: '📝 첨삭 가이드 편집기', label: '첨삭' }
 };
 
@@ -21,7 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // 에디터 타이틀 업데이트
     const config = GUIDE_TYPE_CONFIG[currentGuideType] || GUIDE_TYPE_CONFIG.challenge;
     const titleEl = document.getElementById('editorTitle');
-    if (titleEl) titleEl.textContent = config.title;
+    if (titleEl) {
+        if (config.icon) {
+            titleEl.innerHTML = '<img src="' + config.icon + '" alt="" style="vertical-align: middle; margin-right: 6px; border-radius: 2px;"> ' + config.title;
+        } else {
+            titleEl.textContent = config.title;
+        }
+    }
     document.title = config.title + ' - 이온토플';
     
     checkAdminAuth();
