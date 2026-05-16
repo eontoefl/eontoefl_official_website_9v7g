@@ -284,6 +284,26 @@ function loadUsageGuideTab() {
                 </div>
             </div>
             
+            <!-- 내벨업챌린지 Australia 가이드 -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0;">
+                        <span style="margin-right: 8px; font-size: 18px;">🇦🇺</span>내벨업챌린지 Australia
+                    </h4>
+                    <span style="font-size: 12px; color: #94a3b8; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; cursor: pointer;" onclick="copyGuideLink('nevelupaustralia')" title="클릭하여 복사">
+                        <i class="fas fa-link"></i> usage-guide.html?type=nevelupaustralia
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn-outline" onclick="window.open('usage-guide.html?type=nevelupaustralia', '_blank')" style="flex: 1; font-size: 13px;">
+                        <i class="fas fa-eye"></i> 미리보기
+                    </button>
+                    <button type="button" class="btn-primary" onclick="window.location.href='admin-guide-editor.html?type=nevelupaustralia'" style="flex: 1; font-size: 13px;">
+                        <i class="fas fa-edit"></i> 편집하기
+                    </button>
+                </div>
+            </div>
+            
             <!-- 첨삭 가이드 -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
