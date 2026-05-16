@@ -288,7 +288,7 @@ function loadUsageGuideTab() {
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                     <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0;">
-                        <span style="margin-right: 8px; font-size: 18px;">🇦🇺</span>내벨업챌린지 Australia
+                        <img src="https://flagcdn.com/24x18/au.png" alt="AU" style="margin-right: 8px; vertical-align: middle; border-radius: 2px;">내벨업챌린지 Australia
                     </h4>
                     <span style="font-size: 12px; color: #94a3b8; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; cursor: pointer;" onclick="copyGuideLink('nevelupaustralia')" title="클릭하여 복사">
                         <i class="fas fa-link"></i> usage-guide.html?type=nevelupaustralia
