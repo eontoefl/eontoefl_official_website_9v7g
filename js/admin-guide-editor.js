@@ -8,6 +8,7 @@ let currentGuideType = 'challenge'; // URL 파라미터로 결정
 // 가이드 타입별 설정
 const GUIDE_TYPE_CONFIG = {
     challenge: { title: '📝 내벨업챌린지 가이드 편집기', label: '내벨업챌린지' },
+    nevelupaustralia: { title: '🇦🇺 내벨업챌린지 Australia 가이드 편집기', label: '내벨업챌린지 Australia' },
     correction: { title: '📝 첨삭 가이드 편집기', label: '첨삭' }
 };
 
