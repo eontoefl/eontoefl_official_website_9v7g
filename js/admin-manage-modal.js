@@ -168,6 +168,9 @@ function downloadInfoTxt() {
         lines.push('');
         lines.push('=== 토플이 필요한 이유 ===');
         lines.push(`목적 : ${app.toefl_reason}`);
+        if (app.is_au_nz_direct_submit === 'yes') {
+            lines.push(`호주/뉴질랜드 직접 제출 : 예`);
+        }
         if (app.toefl_reason_detail) {
             lines.push(`상세 설명 : ${app.toefl_reason_detail}`);
         }
@@ -336,6 +339,9 @@ function loadModalInfoTab(app) {
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-question-circle"></i> 토플이 필요한 이유</h3>
             <div class="info-item"><label>목적</label><div>${app.toefl_reason}</div></div>
+            ${app.is_au_nz_direct_submit === 'yes' ? `
+            <div class="info-item"><label>호주/NZ 직접 제출</label><div><span style="display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:#fef3c7; color:#92400e; border-radius:5px; font-size:12px; font-weight:600;">AU/NZ 호주/뉴질랜드 기관 직접 제출</span></div></div>
+            ` : ''}
             ${app.toefl_reason_detail ? `<div class="info-item"><label>상세 설명</label><div style="white-space:pre-wrap;">${app.toefl_reason_detail}</div></div>` : ''}
         </div>
         ` : ''}

@@ -601,6 +601,11 @@ ${escapeHtml(app.target_notes)}
             <div class="detail-label">토플이 필요한 이유</div>
             <div class="detail-value">
                 <div style="font-weight: 600; color: #9480c5; margin-bottom: 8px;">${escapeHtml(app.toefl_reason)}</div>
+                ${app.is_au_nz_direct_submit === 'yes' ? `
+                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 13px; font-weight: 600; margin-bottom: 8px;">
+                    <span>AU/NZ</span> 호주/뉴질랜드 기관 직접 제출
+                </div>
+                ` : ''}
                 ${app.toefl_reason_detail ? `
                 <div style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; align-self: start;">${escapeHtml(app.toefl_reason_detail)}</div>
                 ` : ''}
@@ -609,7 +614,14 @@ ${escapeHtml(app.target_notes)}
         ` : app.toefl_reason_detail ? `
         <div class="detail-row">
             <div class="detail-label">토플이 필요한 이유</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.toefl_reason_detail)}</div>
+            <div class="detail-value">
+                ${app.is_au_nz_direct_submit === 'yes' ? `
+                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 13px; font-weight: 600; margin-bottom: 8px;">
+                    <span>AU/NZ</span> 호주/뉴질랜드 기관 직접 제출
+                </div>
+                ` : ''}
+                <div style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.toefl_reason_detail)}</div>
+            </div>
         </div>
         ` : ''}
         

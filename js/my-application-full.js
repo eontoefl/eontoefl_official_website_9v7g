@@ -236,6 +236,11 @@ function displayResults(applications) {
                                 <span style="font-weight: 600; color: #1e293b;">${escapeHtml(app.toefl_reason)}</span>
                             </div>
                         ` : ''}
+                        ${app.is_au_nz_direct_submit === 'yes' ? `
+                            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #fef3c7; color: #92400e; border-radius: 5px; font-size: 12px; font-weight: 600; margin-bottom: 8px;">
+                                AU/NZ 호주/뉴질랜드 기관 직접 제출
+                            </div>
+                        ` : ''}
                         ${app.toefl_reason_detail ? `
                             <div style="font-size: 13px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">
                                 ${escapeHtml(app.toefl_reason_detail)}

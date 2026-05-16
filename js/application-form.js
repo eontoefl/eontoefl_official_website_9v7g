@@ -428,6 +428,14 @@ function populateFormData(app) {
         }
     }
 
+    // 호주/뉴질랜드 직접 제출 라디오
+    if (app.is_au_nz_direct_submit) {
+        const radio = form.querySelector(`input[name="is_au_nz_direct_submit"][value="${app.is_au_nz_direct_submit}"]`);
+        if (radio) {
+            radio.checked = true;
+        }
+    }
+
     // 지인 추천 라디오
     if (app.referral_from_friend) {
         const radio = form.querySelector(`input[name="referral_from_friend"][value="${app.referral_from_friend}"]`);
@@ -755,6 +763,15 @@ function validateForm() {
         }
     }
 
+    // 호주/뉴질랜드 직접 제출 여부 필수 체크
+    const auNzRadio = document.querySelector('input[name="is_au_nz_direct_submit"]:checked');
+    if (!auNzRadio) {
+        alert('호주/뉴질랜드 기관 직접 제출 여부를 선택해주세요.');
+        const firstAuNzRadio = document.querySelector('input[name="is_au_nz_direct_submit"]');
+        if (firstAuNzRadio) firstAuNzRadio.focus();
+        return false;
+    }
+
     // 이온토플을 알게 된 경로: 최소 하나는 입력해야 함
     const referralSearchKeyword = (document.querySelector('input[name="referral_search_keyword"]')?.value || '').trim();
     const referralSocialMedia = (document.querySelector('select[name="referral_social_media"]')?.value || '').trim();
@@ -845,6 +862,10 @@ function collectFormData() {
             data.total_score = data.score_total_new;
         }
     }
+
+    // 호주/뉴질랜드 직접 제출 여부
+    const auNzRadio = document.querySelector('input[name="is_au_nz_direct_submit"]:checked');
+    data.is_au_nz_direct_submit = auNzRadio ? auNzRadio.value : null;
 
     // 토플 점수 "없음" 선택 시 score_history는 사용자에게 보이지 않으므로 null로 초기화
     if (data.has_toefl_score === 'no') {
@@ -1008,6 +1029,14 @@ function showSaveIndicator() {
     setTimeout(() => {
         indicator.style.opacity = '0';
     }, 2000);
+}
+
+// AU/NZ tooltip toggle
+function toggleAuNzTooltip() {
+    const content = document.getElementById('auNzTooltipContent');
+    if (content) {
+        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+    }
 }
 
 // Word/sentence counter for writing samples (optional enhancement)
