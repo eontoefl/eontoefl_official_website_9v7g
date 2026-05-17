@@ -278,6 +278,7 @@
                             <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
                             <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
                             <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                            <a href="study-certify.html"><i class="fas fa-camera"></i> Acf5Bd80C778C99d</a>
                         </div>
                     </li>
                 </ul>
@@ -311,6 +312,7 @@
                         <a href="notice.html"><i class="fas fa-bullhorn"></i> 공지사항</a>
                         <a href="materials.html"><i class="fas fa-book"></i> 학습 자료</a>
                         <a href="faq.html"><i class="fas fa-question-circle"></i> FAQ</a>
+                        <a href="study-certify.html"><i class="fas fa-camera"></i> 공부인증</a>
                     </nav>
                 </aside>
 
@@ -341,6 +343,20 @@
                             <div class="quill-container">
                                 <div id="quillEditor"></div>
                             </div>
+                        </div>
+
+                        <!-- 비공개(잠금) 옵션 - 공부인증 전용 -->
+                        <div class="write-form-group" id="privateOptionGroup" style="display:none;">
+                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+                                <input type="checkbox" id="isPrivate" style="display:none;">
+                                <span id="lockToggle" style="display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border:2px solid #e2e8f0; border-radius:10px; transition:all 0.2s; background:white;">
+                                    <i class="fas fa-lock-open" id="lockIcon" style="font-size:16px; color:#94a3b8; transition:all 0.2s;"></i>
+                                </span>
+                                <span style="font-size:14px; color:#475569;">
+                                    <span id="lockLabel" style="font-weight:600;">전체 공개</span>
+                                    <span id="lockDesc" style="display:block; font-size:12px; color:#94a3b8; margin-top:2px;">모든 사용자가 이 글을 볼 수 있습니다</span>
+                                </span>
+                            </label>
                         </div>
 
                         <!-- 파일 첨부 영역 -->
@@ -471,6 +487,19 @@
                 requireLogin: true,
                 requireAdmin: true,
                 sidebarActive: 'application'
+            },
+            study_certify: {
+                table: 'study_certifications',
+                title: '공부인증 작성',
+                headerTitle: '공부인증',
+                headerDesc: '내벨업챌린지 학습 인증을 공유하세요',
+                listUrl: 'study-certify.html',
+                formTitle: '공부인증 작성',
+                notice: '사진, 파일, 글 등으로 학습 인증을 자유롭게 공유해주세요. 비공개 설정 시 관리자와 본인만 열람할 수 있습니다.',
+                requireLogin: true,
+                requireAdmin: false,
+                sidebarActive: 'study_certify',
+                showPrivateOption: true
             }
         };
 
@@ -578,6 +607,7 @@
                     const href = link.getAttribute('href');
                     if (boardConfig.sidebarActive === 'notice' && href === 'notice.html') link.classList.add('active');
                     if (boardConfig.sidebarActive === 'materials' && href === 'materials.html') link.classList.add('active');
+                    if (boardConfig.sidebarActive === 'study_certify' && href === 'study-certify.html') link.classList.add('active');
                 });
             }
 
@@ -585,6 +615,12 @@
             if (boardConfig.notice && !editMode) {
                 document.getElementById('writeNotice').style.display = 'block';
                 document.getElementById('writeNoticeText').textContent = boardConfig.notice;
+            }
+
+            // 비공개 옵션 표시 (공부인증 게시판)
+            if (boardConfig.showPrivateOption) {
+                document.getElementById('privateOptionGroup').style.display = 'block';
+                initPrivateToggle();
             }
 
             // 수정 모드 UI 변경
@@ -621,6 +657,15 @@
                 // 본문 세팅 (Quill 에디터에 HTML 삽입)
                 if (post.content) {
                     quill.root.innerHTML = post.content;
+                }
+
+                // 비공개 설정 복원 (공부인증 게시판)
+                if (currentBoard === 'study_certify' && post.is_private) {
+                    const checkbox = document.getElementById('isPrivate');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                        initPrivateToggle(); // UI 갱신
+                    }
                 }
 
                 // 기존 첨부파일 복원
@@ -778,11 +823,16 @@
 
                 if (editMode && editPostId) {
                     // 수정 모드: PATCH
-                    await supabaseAPI.patch(boardConfig.table, editPostId, {
+                    const patchData = {
                         subject: subject,
                         content: content,
                         attachments: uploadedAttachments
-                    });
+                    };
+                    // 공부인증 게시판: 비공개 설정도 수정
+                    if (currentBoard === 'study_certify') {
+                        patchData.is_private = document.getElementById('isPrivate') ? document.getElementById('isPrivate').checked : false;
+                    }
+                    await supabaseAPI.patch(boardConfig.table, editPostId, patchData);
                     alert('글이 수정되었습니다.');
                 } else {
                     // 새 글 등록: POST
@@ -798,6 +848,44 @@
                 btn.disabled = false;
                 btn.innerHTML = editMode ? '<i class="fas fa-check"></i> 수정하기' : '<i class="fas fa-check"></i> 등록하기';
             }
+        }
+
+        // ==================== 비공개(잠금) 토글 ====================
+        function initPrivateToggle() {
+            const checkbox = document.getElementById('isPrivate');
+            const toggle = document.getElementById('lockToggle');
+            const icon = document.getElementById('lockIcon');
+            const label = document.getElementById('lockLabel');
+            const desc = document.getElementById('lockDesc');
+
+            if (!checkbox || !toggle) return;
+
+            function updateToggleUI() {
+                if (checkbox.checked) {
+                    toggle.style.borderColor = '#ef4444';
+                    toggle.style.background = '#fef2f2';
+                    icon.className = 'fas fa-lock';
+                    icon.style.color = '#ef4444';
+                    label.textContent = '비공개';
+                    label.style.color = '#ef4444';
+                    desc.textContent = '관리자와 본인만 이 글을 볼 수 있습니다';
+                } else {
+                    toggle.style.borderColor = '#e2e8f0';
+                    toggle.style.background = 'white';
+                    icon.className = 'fas fa-lock-open';
+                    icon.style.color = '#94a3b8';
+                    label.textContent = '전체 공개';
+                    label.style.color = '#475569';
+                    desc.textContent = '모든 사용자가 이 글을 볼 수 있습니다';
+                }
+            }
+
+            toggle.addEventListener('click', function() {
+                checkbox.checked = !checkbox.checked;
+                updateToggleUI();
+            });
+
+            updateToggleUI();
         }
 
         // ==================== 게시판별 데이터 빌드 ====================
@@ -844,6 +932,20 @@
                     content: content,
                     author: userData.name || '관리자',
                     pinned: true,
+                    published_at: now,
+                    hit_count: 0
+                };
+            }
+
+            if (currentBoard === 'study_certify') {
+                const isPrivate = document.getElementById('isPrivate') ? document.getElementById('isPrivate').checked : false;
+                return {
+                    subject: subject,
+                    content: content,
+                    author_name: userData.nickname || userData.name || '익명',
+                    author_real_name: userData.name || '',
+                    author_email: userData.email,
+                    is_private: isPrivate,
                     published_at: now,
                     hit_count: 0
                 };
