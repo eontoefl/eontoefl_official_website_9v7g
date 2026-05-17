@@ -570,9 +570,17 @@ function loadModalAnalysisTab(app) {
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 프로그램 <span class="required">*</span></label>
                         <select name="assigned_program" class="form-select" required ${readOnly} style="background-position: right 12px center;">
                             <option value="">선택하세요</option>
-                            <option value="내벨업챌린지 - Fast" ${fillProgram === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
-                            <option value="내벨업챌린지 - Standard" ${fillProgram === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
-                            <option value="상담 후 결정" ${fillProgram === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
+                            <optgroup label="일반 정규과정">
+                                <option value="내벨업챌린지 - Fast" ${fillProgram === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
+                                <option value="내벨업챌린지 - Standard" ${fillProgram === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
+                            </optgroup>
+                            <optgroup label="호주 과정 (Australia)">
+                                <option value="내벨업챌린지 Australia - Fast" ${fillProgram === '내벨업챌린지 Australia - Fast' ? 'selected' : ''}>내벨업챌린지 Australia - Fast (4주)</option>
+                                <option value="내벨업챌린지 Australia - Standard" ${fillProgram === '내벨업챌린지 Australia - Standard' ? 'selected' : ''}>내벨업챌린지 Australia - Standard (8주)</option>
+                            </optgroup>
+                            <optgroup label="기타">
+                                <option value="상담 후 결정" ${fillProgram === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
+                            </optgroup>
                         </select>
                         <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                             학생 희망: <strong>${app.preferred_program || '-'}</strong>
@@ -944,9 +952,9 @@ function calculateModalEndDate() {
     
     // 프로그램에 따라 주수 결정
     let weeks = 0;
-    if (programSelect.value === '내벨업챌린지 - Fast') {
+    if (programSelect.value === '내벨업챌린지 - Fast' || programSelect.value === '내벨업챌린지 Australia - Fast') {
         weeks = 4;
-    } else if (programSelect.value === '내벨업챌린지 - Standard') {
+    } else if (programSelect.value === '내벨업챌린지 - Standard' || programSelect.value === '내벨업챌린지 Australia - Standard') {
         weeks = 8;
     } else {
         endInput.value = '';
@@ -1058,8 +1066,10 @@ async function saveModalAnalysis(event) {
     // === 분기: 예약 발송 ===
     if (mode === 'scheduled' || mode === 'update-scheduled') {
         // pending 컬럼에 저장 (정식 컬럼은 건드리지 않음 → 학생에게 공개되지 않음)
+        const assignedProgramVal = isRejected ? null : formData.get('assigned_program');
         const pendingPayload = {
-            assigned_program: isRejected ? null : formData.get('assigned_program'),
+            assigned_program: assignedProgramVal,
+            course_track: (assignedProgramVal && assignedProgramVal.includes('Australia')) ? 'australia' : 'regular',
             correction_enabled: isRejected ? false : correctionEnabled,
             correction_start_date: isRejected ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
             correction_fee: isRejected ? 0 : correctionFee,
@@ -1106,9 +1116,11 @@ async function saveModalAnalysis(event) {
     }
 
     // === 분기: 즉시 저장 + 발송 (기존 동작) ===
+    const immediateProgram = isRejected ? null : formData.get('assigned_program');
     const updateData = {
         analysis_status: formData.get('analysis_status'),
-        assigned_program: isRejected ? null : formData.get('assigned_program'),
+        assigned_program: immediateProgram,
+        course_track: (immediateProgram && immediateProgram.includes('Australia')) ? 'australia' : 'regular',
         correction_enabled: isRejected ? false : correctionEnabled,
         correction_start_date: isRejected ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
         correction_fee: isRejected ? 0 : correctionFee,

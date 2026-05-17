@@ -105,10 +105,19 @@ function loadAnalysisForm(app) {
                 </label>
                 <select name="assigned_program" class="analysis-select" onchange="calculateEndDate()" required>
                     <option value="">선택하세요</option>
-                    <option value="내벨업챌린지 - Fast" ${app.assigned_program === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
-                    <option value="내벨업챌린지 - Standard" ${app.assigned_program === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
-                    <option value="상담 후 결정" ${app.assigned_program === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
+                    <optgroup label="일반 정규과정">
+                        <option value="내벨업챌린지 - Fast" ${app.assigned_program === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
+                        <option value="내벨업챌린지 - Standard" ${app.assigned_program === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
+                    </optgroup>
+                    <optgroup label="호주 과정 (Australia)">
+                        <option value="내벨업챌린지 Australia - Fast" ${app.assigned_program === '내벨업챌린지 Australia - Fast' ? 'selected' : ''}>내벨업챌린지 Australia - Fast (4주)</option>
+                        <option value="내벨업챌린지 Australia - Standard" ${app.assigned_program === '내벨업챌린지 Australia - Standard' ? 'selected' : ''}>내벨업챌린지 Australia - Standard (8주)</option>
+                    </optgroup>
+                    <optgroup label="기타">
+                        <option value="상담 후 결정" ${app.assigned_program === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
+                    </optgroup>
                 </select>
+                ${app.is_au_nz_direct_submit === 'yes' ? '<div style="font-size: 12px; color: #92400e; background: #fef3c7; padding: 6px 10px; border-radius: 6px; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> AU/NZ 직접 제출 학생 — 호주 과정(Australia) 배정 권장</div>' : ''}
                 <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                     학생이 신청한 프로그램: <strong>${escapeHtml(app.preferred_program || '-')}</strong>
                 </div>
@@ -320,9 +329,9 @@ function calculateEndDate() {
     
     // 프로그램에 따라 주수 결정
     let weeks = 0;
-    if (programSelect.value === '내벨업챌린지 - Fast') {
+    if (programSelect.value === '내벨업챌린지 - Fast' || programSelect.value === '내벨업챌린지 Australia - Fast') {
         weeks = 4;
-    } else if (programSelect.value === '내벨업챌린지 - Standard') {
+    } else if (programSelect.value === '내벨업챌린지 - Standard' || programSelect.value === '내벨업챌린지 Australia - Standard') {
         weeks = 8;
     } else {
         // 상담 후 결정인 경우 종료일 비우기
@@ -450,9 +459,14 @@ async function saveAnalysis(event) {
     const additionalDiscount = parseInt(formData.get('additional_discount')) || 0;
     const finalPrice = basePrice - examSupport - additionalDiscount + deposit; // 890,000 - 추가할인
     
+    // course_track 자동 결정: Australia 프로그램이면 'australia', 아니면 'regular'
+    const assignedProgram = formData.get('assigned_program');
+    const courseTrack = assignedProgram && assignedProgram.includes('Australia') ? 'australia' : 'regular';
+
     const updateData = {
         analysis_status: formData.get('analysis_status'),
-        assigned_program: formData.get('assigned_program'),
+        assigned_program: assignedProgram,
+        course_track: courseTrack,
         program_price: basePrice,
         discount_amount: examSupport,
         additional_discount: additionalDiscount,

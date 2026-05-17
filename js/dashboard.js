@@ -124,9 +124,10 @@ function renderWelcome(app) {
     
     const welcomeSubMessage = document.getElementById('welcomeSubMessage');
     if (welcomeSubMessage) {
+        const challengeLabel = app.course_track === 'australia' ? '내벨업챌린지 Australia' : '내벨업챌린지';
         welcomeSubMessage.textContent = app.correction_enabled 
-            ? '내벨업챌린지 + 스라첨삭 진행 현황을 확인하고 관리하세요.'
-            : '내벨업챌린지 진행 현황을 확인하고 관리하세요.';
+            ? `${challengeLabel} + 스라첨삭 진행 현황을 확인하고 관리하세요.`
+            : `${challengeLabel} 진행 현황을 확인하고 관리하세요.`;
     }
 }
 
@@ -833,9 +834,10 @@ function renderWelcome(app) {
     
     const welcomeSubMessage = document.getElementById('welcomeSubMessage');
     if (welcomeSubMessage) {
+        const challengeLabel = app.course_track === 'australia' ? '내벨업챌린지 Australia' : '내벨업챌린지';
         welcomeSubMessage.textContent = app.correction_enabled 
-            ? '내벨업챌린지 + 스라첨삭 진행 현황을 확인하고 관리하세요.'
-            : '내벨업챌린지 진행 현황을 확인하고 관리하세요.';
+            ? `${challengeLabel} + 스라첨삭 진행 현황을 확인하고 관리하세요.`
+            : `${challengeLabel} 진행 현황을 확인하고 관리하세요.`;
     }
 }
 

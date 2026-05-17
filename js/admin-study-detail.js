@@ -155,6 +155,11 @@ function getProgram(app) {
     return p.includes('Fast') ? 'Fast' : 'Standard';
 }
 
+function isAustraliaTrack(app) {
+    const p = (app.assigned_program || app.preferred_program || '');
+    return p.includes('Australia');
+}
+
 function getTotalWeeks(app) {
     return getProgram(app) === 'Fast' ? 4 : 8;
 }
@@ -190,7 +195,7 @@ function renderProfileHeader() {
     document.getElementById('studentAvatar').textContent = name.charAt(0);
     document.getElementById('studentName').textContent = name;
     document.getElementById('studentProgram').textContent =
-        `내벨업챌린지 - ${getProgram(app)} (${getTotalWeeks(app)}주)`;
+        `${isAustraliaTrack(app) ? '내벨업챌린지 Australia' : '내벨업챌린지'} - ${getProgram(app)} (${getTotalWeeks(app)}주)`;
     
     const start = getScheduleStart(app);
     const end = getScheduleEnd(app);
@@ -760,7 +765,8 @@ function generateWeeklyCheckData() {
 
     let text = '';
     text += `📋 주간체크 - ${name}\n`;
-    text += `프로그램: 내벨업챌린지 - ${program} (${totalWeeks}주)\n`;
+    const weeklyAuLabel = isAustraliaTrack(app) ? '내벨업챌린지 Australia' : '내벨업챌린지';
+    text += `프로그램: ${weeklyAuLabel} - ${program} (${totalWeeks}주)\n`;
     text += `기간: ${toDateStr(weekStart)} ~ ${toDateStr(weekEnd)}\n`;
     text += `주차: ${weekVal}/${totalWeeks}주차\n`;
     text += `\n`;
