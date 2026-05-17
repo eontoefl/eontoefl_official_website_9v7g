@@ -743,6 +743,8 @@ function openAdminPanel() {
                             <option value="${app.preferred_program || ''}">${app.preferred_program || '미정'} (신청한 프로그램)</option>
                             <option value="내벨업챌린지 - Fast">내벨업챌린지 - Fast</option>
                             <option value="내벨업챌린지 - Standard">내벨업챌린지 - Standard</option>
+                            <option value="내벨업챌린지 Australia - Fast">내벨업챌린지 Australia - Fast</option>
+                            <option value="내벨업챌린지 Australia - Standard">내벨업챌린지 Australia - Standard</option>
                             <option value="상담 후 결정">상담 후 결정</option>
                         </select>
                     </div>
@@ -2953,6 +2955,10 @@ async function loadUsageTab(app) {
     const communicationGuide = settings?.communication_guide || '';
     const usageGuideUrl = settings?.usage_guide_url || 'usage-guide.html';
     
+    // 과정 트랙에 따른 가이드 타입 결정
+    const guideType = app.course_track === 'australia' ? 'nevelupaustralia' : 'challenge';
+    const guideLabel = app.course_track === 'australia' ? '내벨업챌린지 Australia' : '내벨업챌린지';
+    
     // 변수 치환 함수
     const replaceVars = (text) => {
         if (!text) return '';
@@ -3068,11 +3074,11 @@ async function loadUsageTab(app) {
                 
                 <!-- 이용방법 링크 -->
                 <div style="text-align: center; margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-                    <a href="usage-guide.html?type=challenge" target="_blank" 
+                    <a href="usage-guide.html?type=${guideType}" target="_blank" 
                        style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
                               color: white; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 700; 
                               box-shadow: 0 4px 16px rgba(148, 128, 197, 0.3); transition: all 0.3s;">
-                        📖 내벨업챌린지 이용방법 자세히 보기
+                        📖 ${guideLabel} 이용방법 자세히 보기
                     </a>
                     ${app.correction_enabled ? `
                     <a href="usage-guide.html?type=correction" target="_blank" 
@@ -3087,7 +3093,7 @@ async function loadUsageTab(app) {
                 ${necessitiesText ? `
                 <div style="background: #fef9ef; padding: 24px; border-radius: 12px; border: 1px solid #fcd34d; margin-bottom: 24px;">
                     <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 16px 0;">
-                        ✅ 내벨업챌린지 Necessities
+                        ✅ ${guideLabel} Necessities
                     </h4>
                     <pre style="font-family: 'Pretendard', sans-serif; font-size: 14px; color: #78350f; line-height: 1.8; margin: 0; white-space: pre-wrap; word-wrap: break-word;">${replaceVars(necessitiesText)}</pre>
                 </div>
@@ -3145,7 +3151,7 @@ async function loadUsageTab(app) {
             <!-- 개인화 정보 -->
             <div style="background: linear-gradient(135deg, #f8f4ff 0%, #faf5ff 100%); padding: 24px; border-radius: 12px; border: 2px solid #9480c5; margin-bottom: 32px;">
                 <h2 style="text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; color: #6d28d9;">
-                    📚 내벨업챌린지 이용방법
+                    📚 ${guideLabel} 이용방법
                 </h2>
                 <div style="text-align: center; font-size: 16px; color: #6d28d9; line-height: 1.8;">
                     <p style="margin: 0;"><strong>✔️ 성함:</strong> ${app.name}님</p>
@@ -3190,11 +3196,11 @@ async function loadUsageTab(app) {
             <!-- 상세 가이드 링크 -->
             <div style="text-align: center; margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
                 ${usageGuideUrl ? `
-                <a href="usage-guide.html?type=challenge" target="_blank" 
+                <a href="usage-guide.html?type=${guideType}" target="_blank" 
                    style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
                           color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 700; 
                           box-shadow: 0 4px 16px rgba(148, 128, 197, 0.3); transition: all 0.3s;">
-                    📖 내벨업챌린지 이용방법 자세히 보기
+                    📖 ${guideLabel} 이용방법 자세히 보기
                 </a>
                 ` : ''}
                 ${app.correction_enabled ? `
@@ -3211,7 +3217,7 @@ async function loadUsageTab(app) {
             ${necessitiesText ? `
             <div style="background: #fef9ef; padding: 24px; border-radius: 12px; border: 1px solid #fcd34d; margin-bottom: 24px;">
                 <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 16px 0;">
-                    ✅ 내벨업챌린지 Necessities
+                    ✅ ${guideLabel} Necessities
                 </h4>
                 <pre style="font-family: 'Pretendard', sans-serif; font-size: 14px; color: #78350f; line-height: 1.8; margin: 0; white-space: pre-wrap; word-wrap: break-word;">${replaceVars(necessitiesText)}</pre>
             </div>

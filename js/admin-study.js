@@ -120,7 +120,9 @@ async function loadStudyData() {
             const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
             const currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
 
-            const programType = (app.assigned_program || app.preferred_program || '').includes('Fast') ? 'Fast' : 'Standard';
+            const programStr = app.assigned_program || app.preferred_program || '';
+            const programType = programStr.includes('Fast') ? 'Fast' : 'Standard';
+            const isAustralia = programStr.includes('Australia');
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
             // ── ★ tr_student_stats에서 읽기 (테스트룸 계산 결과) ──
@@ -253,6 +255,7 @@ async function loadStudyData() {
                 name: user.name || app.name || '-',
                 email: user.email,
                 programType,
+                isAustralia,
                 currentWeek: Math.min(currentWeek, totalWeeks),
                 totalWeeks,
                 avgAuthRate,
@@ -412,7 +415,7 @@ function renderTable() {
                 </td>
                 <td>
                     <span style="display:inline-block; background:${s.programType === 'Fast' ? '#ede9fe' : '#e0f2fe'}; color:${s.programType === 'Fast' ? '#7c3aed' : '#0284c7'}; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600;">
-                        ${s.programType}
+                        ${s.isAustralia ? 'AU ' : ''}${s.programType}
                     </span>
                 </td>
                 <td style="font-size:13px; white-space:nowrap;">
@@ -515,7 +518,7 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
                 color: '#ef4444',
                 icon: '🚨',
                 title: `${s.name} - ${detail.join(', ') || 'Fraud 감지'}`,
-                subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | fraud_flag = true`,
+                subtitle: `${s.isAustralia ? 'AU ' : ''}${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | fraud_flag = true`,
                 userId: s.userId
             });
         });
@@ -542,7 +545,7 @@ function updateAlertBoard(students, allRecords, allAuthRecords) {
                     color: '#f59e0b',
                     icon: '⚠️',
                     title: `${s.name} - ${missedDays.length}일 연속 미제출 (${missedDays.reverse().join(', ')})`,
-                    subtitle: `${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}% → 이탈 위험`,
+                    subtitle: `${s.isAustralia ? 'AU ' : ''}${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}% → 이탈 위험`,
                     userId: s.userId
                 });
             }
