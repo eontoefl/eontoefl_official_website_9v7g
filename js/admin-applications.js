@@ -409,9 +409,9 @@ function applyFilters() {
         // 상태 필터 (프로세스 단계 기반)
         const matchesStatus = statusFilter === 'all' || getAppStageFilter(app) === statusFilter;
         
-        // 프로그램 필터
+        // 프로그램 필터 (배정 프로그램 우선, 없으면 희망 프로그램으로 비교)
         const matchesProgram = programFilter === 'all' || 
-            (app.preferred_program || '') === programFilter;
+            (app.assigned_program || app.preferred_program || '') === programFilter;
         
         // 첨삭 필터
         const matchesCorrection = correctionFilter === 'all' ||
