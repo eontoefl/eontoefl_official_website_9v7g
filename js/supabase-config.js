@@ -186,6 +186,42 @@ const supabaseAPI = {
         }
         
         return await response.json();
+    },
+
+    // 커스텀 쿼리 + 전체 건수 (서버 사이드 페이지네이션용)
+    // Prefer: count=exact 헤더로 Content-Range에서 전체 건수를 받아온다
+    async queryWithCount(table, filters = {}) {
+        let url = `${SUPABASE_URL}/rest/v1/${table}?`;
+
+        Object.keys(filters).forEach(key => {
+            url += `${key}=${encodeURIComponent(filters[key])}&`;
+        });
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'count=exact'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Content-Range: 0-14/8310  →  total = 8310
+        let total = data.length;
+        const contentRange = response.headers.get('Content-Range');
+        if (contentRange) {
+            const match = contentRange.match(/\/(\d+)/);
+            if (match) total = parseInt(match[1], 10);
+        }
+
+        return { data, total };
     }
 };
 

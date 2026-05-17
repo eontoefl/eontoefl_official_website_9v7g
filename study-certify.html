@@ -250,8 +250,8 @@
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script>
-        let allPosts = [];
         let currentPage = 1;
+        let totalCount = 0;
         const itemsPerPage = 15;
         let currentPostId = null;
         let isAdmin = false;
@@ -277,6 +277,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
             const postId = params.get('id');
+            const pageParam = parseInt(params.get('page')) || 1;
 
             const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
             isAdmin = !!(userData && userData.role === 'admin');
@@ -291,36 +292,54 @@
                 currentPostId = postId;
                 showDetailView(postId);
             } else {
-                loadPosts();
+                loadPage(pageParam);
             }
         });
 
-        // ==================== 목록 ====================
+        // ==================== 목록 (서버 사이드 페이지네이션) ====================
 
-        async function loadPosts() {
-            try {
-                let result;
-                if (isAdmin) {
-                    // 관리자: 모든 글 조회 (잠금글 포함)
-                    result = await supabaseAPI.query('study_certifications', {
-                        'order': 'published_at.desc',
-                        'limit': '1000'
-                    });
+        // 서버에서 필터 조건을 빌드
+        function buildFilters(page) {
+            const offset = (page - 1) * itemsPerPage;
+            const filters = {
+                'select': 'id,subject,author_name,author_email,is_private,hit_count,published_at',
+                'order': 'published_at.desc',
+                'limit': String(itemsPerPage),
+                'offset': String(offset)
+            };
+
+            // 일반 사용자: 공개글 + 본인 비공개글만 (PostgREST or 필터)
+            if (!isAdmin) {
+                if (currentUserEmail) {
+                    // or=(is_private.eq.false,author_email.eq.xxx)
+                    filters['or'] = `(is_private.eq.false,author_email.eq.${currentUserEmail})`;
                 } else {
-                    // 일반 사용자: 공개글 + 본인 잠금글만
-                    result = await supabaseAPI.query('study_certifications', {
-                        'order': 'published_at.desc',
-                        'limit': '1000'
-                    });
-                    // 클라이언트에서 필터링: is_private=false 이거나 본인 글
-                    if (result && result.length > 0) {
-                        result = result.filter(post => !post.is_private || post.author_email === currentUserEmail);
-                    }
+                    // 비로그인: 공개글만
+                    filters['is_private'] = 'eq.false';
                 }
+            }
 
-                if (!result || result.length === 0) {
-                    document.getElementById('listLoading').style.display = 'none';
-                    document.getElementById('certifyBody').innerHTML = `
+            return filters;
+        }
+
+        async function loadPage(page) {
+            currentPage = page;
+            const tbody = document.getElementById('certifyBody');
+            const listLoading = document.getElementById('listLoading');
+            listLoading.style.display = 'block';
+            tbody.innerHTML = '';
+            document.getElementById('pagination').style.display = 'none';
+
+            try {
+                const filters = buildFilters(page);
+                const { data, total } = await supabaseAPI.queryWithCount('study_certifications', filters);
+
+                totalCount = total;
+                document.getElementById('totalCount').textContent = totalCount.toLocaleString();
+                listLoading.style.display = 'none';
+
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = `
                         <tr><td colspan="5" style="text-align:center; padding:60px 20px; color:#64748b;">
                             <i class="fas fa-inbox" style="font-size:32px; color:#cbd5e1; margin-bottom:12px; display:block;"></i>
                             등록된 인증글이 없습니다.
@@ -328,30 +347,24 @@
                     return;
                 }
 
-                allPosts = result;
-                document.getElementById('totalCount').textContent = allPosts.length;
-                document.getElementById('listLoading').style.display = 'none';
-                renderPage(1);
+                renderRows(data, page, totalCount);
+                renderPagination(totalCount, page);
             } catch (error) {
                 console.error('게시글 로드 오류:', error);
-                document.getElementById('listLoading').style.display = 'none';
-                document.getElementById('certifyBody').innerHTML = `
+                listLoading.style.display = 'none';
+                tbody.innerHTML = `
                     <tr><td colspan="5" style="text-align:center; padding:60px 20px; color:#64748b;">
                         <i class="fas fa-inbox" style="font-size:32px; color:#cbd5e1; margin-bottom:12px; display:block;"></i>
-                        등록된 인증글이 없습니다.
+                        게시글을 불러오는데 실패했습니다.
                     </td></tr>`;
             }
         }
 
-        function renderPage(page) {
-            currentPage = page;
+        function renderRows(posts, page, total) {
             const start = (page - 1) * itemsPerPage;
-            const end = start + itemsPerPage;
-            const pageData = allPosts.slice(start, end);
-            const total = allPosts.length;
-
             const tbody = document.getElementById('certifyBody');
-            tbody.innerHTML = pageData.map((post, idx) => {
+
+            tbody.innerHTML = posts.map((post, idx) => {
                 const no = total - start - idx;
                 const date = post.published_at
                     ? new Date(post.published_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -369,9 +382,28 @@
                         <td style="text-align:center; color:#94a3b8; font-size:13px;">${post.hit_count || 0}</td>
                     </tr>`;
             }).join('');
-
-            renderPagination(total, page);
         }
+
+        function goToPage(page) {
+            // URL에 page 파라미터 반영 (뒤로가기 지원)
+            const url = new URL(window.location);
+            if (page <= 1) {
+                url.searchParams.delete('page');
+            } else {
+                url.searchParams.set('page', page);
+            }
+            window.history.pushState({page: page}, '', url);
+            loadPage(page);
+            // 페이지 이동 시 상단으로 스크롤
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 브라우저 뒤로가기/앞으로가기 지원
+        window.addEventListener('popstate', function(e) {
+            const params = new URLSearchParams(window.location.search);
+            const page = parseInt(params.get('page')) || 1;
+            loadPage(page);
+        });
 
         function renderPagination(total, page) {
             const totalPages = Math.ceil(total / itemsPerPage);
@@ -390,18 +422,18 @@
             let html = '<div style="display:inline-flex; gap:4px; align-items:center;">';
 
             if (page > 1) {
-                html += `<button onclick="renderPage(1)" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-left"></i></button>`;
-                html += `<button onclick="renderPage(${page - 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-left"></i></button>`;
+                html += `<button onclick="goToPage(1)" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-left"></i></button>`;
+                html += `<button onclick="goToPage(${page - 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-left"></i></button>`;
             }
 
             for (let i = startPage; i <= endPage; i++) {
                 const isActive = i === page;
-                html += `<button onclick="renderPage(${i})" style="padding:8px 12px; border:1px solid ${isActive ? '#9480c5' : '#e2e8f0'}; background:${isActive ? '#9480c5' : 'white'}; color:${isActive ? 'white' : '#64748b'}; border-radius:6px; cursor:pointer; font-size:13px; font-weight:${isActive ? '600' : '400'};">${i}</button>`;
+                html += `<button onclick="goToPage(${i})" style="padding:8px 12px; border:1px solid ${isActive ? '#9480c5' : '#e2e8f0'}; background:${isActive ? '#9480c5' : 'white'}; color:${isActive ? 'white' : '#64748b'}; border-radius:6px; cursor:pointer; font-size:13px; font-weight:${isActive ? '600' : '400'};">${i}</button>`;
             }
 
             if (page < totalPages) {
-                html += `<button onclick="renderPage(${page + 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-right"></i></button>`;
-                html += `<button onclick="renderPage(${totalPages})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-right"></i></button>`;
+                html += `<button onclick="goToPage(${page + 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-right"></i></button>`;
+                html += `<button onclick="goToPage(${totalPages})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-double-right"></i></button>`;
             }
 
             html += '</div>';
