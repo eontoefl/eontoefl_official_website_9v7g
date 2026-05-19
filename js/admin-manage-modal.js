@@ -422,6 +422,9 @@ function loadModalAnalysisTab(app) {
     const fillIsIncentive = isScheduled
         ? (pendingPayload.is_incentive_applicant === true)
         : !!app.is_incentive_applicant;
+    const fillBookAccess = isScheduled
+        ? (pendingPayload.book_access_enabled === true)
+        : !!app.book_access_enabled;
 
     // 학생용 링크 생성
     const studentLink = `${window.location.origin}/analysis.html?id=${app.id}`;
@@ -530,6 +533,26 @@ function loadModalAnalysisTab(app) {
                                style="opacity: 0; width: 0; height: 0;">
                         <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillIsIncentive ? '#f59e0b' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
                         <span style="position: absolute; top: 3px; left: ${fillIsIncentive ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 0-2. 입문서 제공 토글 -->
+            <div class="form-group" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #38bdf8; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-book-open" style="font-size: 18px; color: #0284c7;"></i>
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #0c4a6e;">입문서 제공</div>
+                            <div style="font-size: 12px; color: #0369a1; margin-top: 2px;">ON 시 학생 대시보드에 입문서 열람 카드 표시</div>
+                        </div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
+                        <input type="checkbox" id="bookAccessToggle" name="book_access_enabled"
+                               ${fillBookAccess ? 'checked' : ''}
+                               style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillBookAccess ? '#38bdf8' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                        <span style="position: absolute; top: 3px; left: ${fillBookAccess ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
                     </label>
                 </div>
             </div>
@@ -793,11 +816,31 @@ function loadModalAnalysisTab(app) {
     
     // 프로모션 유도 학생 토글 인터랙션
     const incentiveToggle = document.getElementById('incentiveToggle');
+    const bookAccessToggle = document.getElementById('bookAccessToggle');
     if (incentiveToggle && !hasAnalysis) {
         incentiveToggle.addEventListener('change', function() {
             const slider = this.parentElement.querySelectorAll('span');
             if (this.checked) {
                 slider[0].style.background = '#f59e0b';
+                slider[1].style.left = '25px';
+                // 프로모션 ON → 입문서도 자동 ON
+                if (bookAccessToggle && !bookAccessToggle.checked) {
+                    bookAccessToggle.checked = true;
+                    bookAccessToggle.dispatchEvent(new Event('change'));
+                }
+            } else {
+                slider[0].style.background = '#cbd5e1';
+                slider[1].style.left = '3px';
+            }
+        });
+    }
+
+    // 입문서 제공 토글 인터랙션
+    if (bookAccessToggle) {
+        bookAccessToggle.addEventListener('change', function() {
+            const slider = this.parentElement.querySelectorAll('span');
+            if (this.checked) {
+                slider[0].style.background = '#38bdf8';
                 slider[1].style.left = '25px';
             } else {
                 slider[0].style.background = '#cbd5e1';
@@ -1061,6 +1104,7 @@ async function saveModalAnalysis(event) {
     const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
 
     const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
+    const bookAccessEnabled = document.getElementById('bookAccessToggle')?.checked || false;
     const nowMs = Date.now();
 
     // === 분기: 예약 발송 ===
@@ -1081,6 +1125,7 @@ async function saveModalAnalysis(event) {
             schedule_start: isRejected ? null : formData.get('schedule_start'),
             schedule_end: isRejected ? null : formData.get('schedule_end'),
             is_incentive_applicant: isIncentive,
+            book_access_enabled: bookAccessEnabled,
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
             is_analysis_update: !!currentManageApp.analysis_first_saved_at
         };
@@ -1136,6 +1181,7 @@ async function saveModalAnalysis(event) {
         current_step: 2,
         status: '개별분석완료',
         is_incentive_applicant: isIncentive,
+        book_access_enabled: bookAccessEnabled,
         // 즉시 저장 시 예약 데이터가 남아있으면 정리 (이론상 이 분기는 isScheduled=false 상태에서만 도달하지만 안전장치)
         analysis_alimtalk_scheduled_at: null,
         analysis_status_pending: null,

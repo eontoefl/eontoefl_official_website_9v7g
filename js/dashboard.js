@@ -104,8 +104,8 @@ async function loadDashboard() {
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('dashboardContent').style.display = 'block';
         
-        // 유도학생(프로모션)인 경우 하단에 입문서 미니카드 추가
-        if (application.is_incentive_applicant) {
+        // 입문서 접근 권한이 있는 경우 하단에 입문서 미니카드 추가
+        if (application.is_incentive_applicant || application.book_access_enabled) {
             await renderBookOnlyMiniCard(application);
         }
         

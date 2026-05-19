@@ -290,9 +290,9 @@ function updateTabCounts() {
     const notDeleted = a => a.deleted !== true && a.deleted !== 'true';
     const allCount = allApplications.filter(notDeleted).length;
     const challengeCount = allApplications.filter(a => a.application_type !== 'book_only' && notDeleted(a)).length;
-    // 입문서 탭: 순수 입문서 신청 + 유도학생(챌린지 신청이지만 is_incentive_applicant=true)
-    const bookCount = allApplications.filter(a => 
-        (a.application_type === 'book_only' || a.is_incentive_applicant) && notDeleted(a)
+    // 입문서 탭: 순수 입문서 신청 + 유도학생 + 입문서 제공 학생
+    const bookCount = allApplications.filter(a =>
+        (a.application_type === 'book_only' || a.is_incentive_applicant || a.book_access_enabled) && notDeleted(a)
     ).length;
     
     const elAll = document.getElementById('tabCountAll');
@@ -389,8 +389,8 @@ function applyFilters() {
     if (currentAppTypeTab === 'challenge') {
         baseApplications = allApplications.filter(a => a.application_type !== 'book_only');
     } else if (currentAppTypeTab === 'book_only') {
-        // 순수 입문서 신청 + 유도학생(챌린지 신청이지만 is_incentive_applicant=true)
-        baseApplications = allApplications.filter(a => a.application_type === 'book_only' || a.is_incentive_applicant);
+        // 순수 입문서 신청 + 유도학생 + 입문서 제공 학생
+        baseApplications = allApplications.filter(a => a.application_type === 'book_only' || a.is_incentive_applicant || a.book_access_enabled);
     }
     
     // 필터링
@@ -1030,9 +1030,11 @@ async function bulkSetIncentive(turnOn) {
     if (!confirm(confirmMsg)) return;
 
     try {
-        const promises = needChangeApps.map(a =>
-            supabaseAPI.patch('applications', a.id, { is_incentive_applicant: turnOn })
-        );
+        const promises = needChangeApps.map(a => {
+            const patch = { is_incentive_applicant: turnOn };
+            if (turnOn) patch.book_access_enabled = true;
+            return supabaseAPI.patch('applications', a.id, patch);
+        });
 
         await Promise.all(promises);
 
