@@ -489,6 +489,26 @@ function loadModalAnalysisTab(app) {
     let html = `
         ${scheduledBanner}
         ${aiAnalysisBanner}
+        <!-- 입문서 제공 토글 (form 밖, 즉시 저장) -->
+        <div class="form-group" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #38bdf8; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-book-open" style="font-size: 18px; color: #0284c7;"></i>
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px; color: #0c4a6e;">입문서 제공</div>
+                        <div style="font-size: 12px; color: #0369a1; margin-top: 2px;">ON 시 학생 대시보드에 입문서 열람 카드 표시</div>
+                    </div>
+                </div>
+                <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
+                    <input type="checkbox" id="bookAccessToggle"
+                           ${fillBookAccess ? 'checked' : ''}
+                           style="opacity: 0; width: 0; height: 0;">
+                    <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillBookAccess ? '#38bdf8' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                    <span style="position: absolute; top: 3px; left: ${fillBookAccess ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                </label>
+            </div>
+        </div>
+
         ${hasAnalysis ? `
         <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
@@ -500,13 +520,13 @@ function loadModalAnalysisTab(app) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" 
-                           id="studentLinkInput" 
-                           value="${studentLink}" 
-                           readonly 
+                    <input type="text"
+                           id="studentLinkInput"
+                           value="${studentLink}"
+                           readonly
                            style="width: 320px; padding: 8px 12px; border: 1px solid #86efac; border-radius: 6px; font-size: 12px; background: white; font-family: monospace;">
-                    <button type="button" 
-                            onclick="copyModalStudentLink()" 
+                    <button type="button"
+                            onclick="copyModalStudentLink()"
                             style="padding: 8px 16px; background: #22c55e; color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
                         <i class="fas fa-copy"></i> 복사
                     </button>
@@ -514,10 +534,10 @@ function loadModalAnalysisTab(app) {
             </div>
         </div>
         ` : ''}
-        
+
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
             <!-- 0. 프로모션 유도 학생 토글 -->
-            <div class="form-group" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #f59e0b; margin-bottom: 24px;">
+            <div class="form-group" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #f59e0b; margin-bottom: 24px; ${pointerEvents}">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <i class="fas fa-bullhorn" style="font-size: 18px; color: #d97706;"></i>
@@ -533,26 +553,6 @@ function loadModalAnalysisTab(app) {
                                style="opacity: 0; width: 0; height: 0;">
                         <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillIsIncentive ? '#f59e0b' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
                         <span style="position: absolute; top: 3px; left: ${fillIsIncentive ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- 0-2. 입문서 제공 토글 -->
-            <div class="form-group" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #38bdf8; margin-bottom: 24px;">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fas fa-book-open" style="font-size: 18px; color: #0284c7;"></i>
-                        <div>
-                            <div style="font-weight: 600; font-size: 14px; color: #0c4a6e;">입문서 제공</div>
-                            <div style="font-size: 12px; color: #0369a1; margin-top: 2px;">ON 시 학생 대시보드에 입문서 열람 카드 표시</div>
-                        </div>
-                    </div>
-                    <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
-                        <input type="checkbox" id="bookAccessToggle" name="book_access_enabled"
-                               ${fillBookAccess ? 'checked' : ''}
-                               style="opacity: 0; width: 0; height: 0;">
-                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillBookAccess ? '#38bdf8' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
-                        <span style="position: absolute; top: 3px; left: ${fillBookAccess ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
                     </label>
                 </div>
             </div>
@@ -823,7 +823,7 @@ function loadModalAnalysisTab(app) {
             if (this.checked) {
                 slider[0].style.background = '#f59e0b';
                 slider[1].style.left = '25px';
-                // 프로모션 ON → 입문서도 자동 ON
+                // 프로모션 ON → 입문서도 자동 ON (dispatchEvent로 즉시 DB 저장 트리거)
                 if (bookAccessToggle && !bookAccessToggle.checked) {
                     bookAccessToggle.checked = true;
                     bookAccessToggle.dispatchEvent(new Event('change'));
@@ -835,16 +835,27 @@ function loadModalAnalysisTab(app) {
         });
     }
 
-    // 입문서 제공 토글 인터랙션
+    // 입문서 제공 토글 인터랙션 (즉시 DB 저장)
     if (bookAccessToggle) {
-        bookAccessToggle.addEventListener('change', function() {
+        bookAccessToggle.addEventListener('change', async function() {
             const slider = this.parentElement.querySelectorAll('span');
-            if (this.checked) {
+            const newValue = this.checked;
+            if (newValue) {
                 slider[0].style.background = '#38bdf8';
                 slider[1].style.left = '25px';
             } else {
                 slider[0].style.background = '#cbd5e1';
                 slider[1].style.left = '3px';
+            }
+            try {
+                await supabaseAPI.patch('applications', currentManageApp.id, { book_access_enabled: newValue });
+                currentManageApp.book_access_enabled = newValue;
+            } catch (e) {
+                console.error('입문서 제공 토글 저장 실패:', e);
+                alert('❌ 입문서 제공 설정 저장에 실패했습니다.');
+                this.checked = !newValue;
+                slider[0].style.background = !newValue ? '#38bdf8' : '#cbd5e1';
+                slider[1].style.left = !newValue ? '25px' : '3px';
             }
         });
     }
@@ -1104,7 +1115,6 @@ async function saveModalAnalysis(event) {
     const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
 
     const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
-    const bookAccessEnabled = document.getElementById('bookAccessToggle')?.checked || false;
     const nowMs = Date.now();
 
     // === 분기: 예약 발송 ===
@@ -1125,7 +1135,6 @@ async function saveModalAnalysis(event) {
             schedule_start: isRejected ? null : formData.get('schedule_start'),
             schedule_end: isRejected ? null : formData.get('schedule_end'),
             is_incentive_applicant: isIncentive,
-            book_access_enabled: bookAccessEnabled,
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
             is_analysis_update: !!currentManageApp.analysis_first_saved_at
         };
@@ -1181,7 +1190,6 @@ async function saveModalAnalysis(event) {
         current_step: 2,
         status: '개별분석완료',
         is_incentive_applicant: isIncentive,
-        book_access_enabled: bookAccessEnabled,
         // 즉시 저장 시 예약 데이터가 남아있으면 정리 (이론상 이 분기는 isScheduled=false 상태에서만 도달하지만 안전장치)
         analysis_alimtalk_scheduled_at: null,
         analysis_status_pending: null,
