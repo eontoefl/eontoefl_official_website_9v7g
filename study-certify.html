@@ -308,16 +308,7 @@
                 'offset': String(offset)
             };
 
-            // 일반 사용자: 공개글 + 본인 비공개글만 (PostgREST or 필터)
-            if (!isAdmin) {
-                if (currentUserEmail) {
-                    // or=(is_private.eq.false,author_email.eq.xxx)
-                    filters['or'] = `(is_private.eq.false,author_email.eq.${currentUserEmail})`;
-                } else {
-                    // 비로그인: 공개글만
-                    filters['is_private'] = 'eq.false';
-                }
-            }
+            // 목록에는 비공개글도 표시 (상세 페이지에서 접근 차단)
 
             return filters;
         }
