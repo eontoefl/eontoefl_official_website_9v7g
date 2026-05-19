@@ -945,7 +945,16 @@ async function confirmDepositByAdmin(appId) {
         });
 
         if (app) {
-            // 알림 생성
+            // 알림톡: 입금 확인 완료
+            try {
+                await sendKakaoAlimTalk('payment_confirmed', {
+                    name: app.name,
+                    phone: app.phone,
+                    app_id: app.id
+                });
+            } catch (e) { console.warn('알림톡 발송 실패:', e); }
+
+            // 사이트 내 알림 생성
             await createNotification({
                 application_id: appId,
                 user_email: app.email,

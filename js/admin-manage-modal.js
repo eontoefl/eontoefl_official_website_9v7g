@@ -2225,6 +2225,17 @@ async function confirmDepositFromModal(appId) {
                 });
             } catch (e) { console.warn('알림톡 발송 실패:', e); }
 
+            // 사이트 내 알림 생성
+            try {
+                await createNotification({
+                    application_id: appId,
+                    user_email: updatedApp.email || currentManageApp.email,
+                    type: 'payment_confirmed',
+                    icon: 'fa-check-circle',
+                    message: `입금이 확인되었습니다. (${parseInt(amount).toLocaleString()}원)`
+                });
+            } catch (e) { console.warn('사이트 알림 생성 실패:', e); }
+
             alert('✅ 입금이 확인되었습니다!');
             currentManageApp = updatedApp;
             loadModalTab('contract');
