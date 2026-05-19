@@ -880,7 +880,8 @@
                 }
             }
 
-            toggle.addEventListener('click', function() {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
                 checkbox.checked = !checkbox.checked;
                 updateToggleUI();
             });
