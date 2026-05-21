@@ -1174,8 +1174,12 @@ function getAgreementSection(app) {
                 </label>
             </div>
             
-            <button id="submitAgreementBtn" 
-                    onclick="submitStudentAgreement()" 
+            <div style="text-align: center; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.6;">
+                프로그램·일정·첨삭 등 변경을 원하시면 오른쪽 카카오톡 아이콘을 눌러주세요.
+            </div>
+
+            <button id="submitAgreementBtn"
+                    onclick="submitStudentAgreement()"
                     disabled
                     style="width: 100%; padding: 16px; background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
                 <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
