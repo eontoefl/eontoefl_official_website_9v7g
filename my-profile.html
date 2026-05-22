@@ -152,6 +152,56 @@
                             <input type="tel" id="editPhone" class="profile-input" placeholder="010-1234-5678" required>
                         </div>
 
+                        <!-- 타임존 -->
+                        <div class="profile-form-group">
+                            <label class="profile-label">
+                                <i class="fas fa-globe"></i> 타임존 (마감 기준 시간대)
+                            </label>
+                            <div class="timezone-auto-detect" id="timezoneAutoDetect" style="display:none;">
+                                <i class="fas fa-info-circle"></i> 현재 기기 기준: <strong id="detectedTzLabel"></strong>
+                            </div>
+                            <select id="editTimezone" class="profile-input">
+                                <optgroup label="아시아">
+                                    <option value="Asia/Seoul">🇰🇷 한국 / 일본 (UTC+9)</option>
+                                    <option value="Asia/Shanghai">🇨🇳 중국 / 싱가포르 / 홍콩 / 대만 (UTC+8)</option>
+                                    <option value="Asia/Bangkok">🇹🇭 베트남 / 태국 / 캄보디아 (UTC+7)</option>
+                                    <option value="Asia/Kolkata">🇮🇳 인도 (UTC+5:30)</option>
+                                    <option value="Asia/Dubai">🇦🇪 UAE / 오만 (UTC+4)</option>
+                                    <option value="Asia/Baghdad">🇮🇶 이라크 / 쿠웨이트 (UTC+3)</option>
+                                    <option value="Asia/Manila">🇵🇭 필리핀 (UTC+8)</option>
+                                </optgroup>
+                                <optgroup label="북미">
+                                    <option value="America/New_York">🇺🇸 미국 동부 - 뉴욕 (UTC-5)</option>
+                                    <option value="America/Chicago">🇺🇸 미국 중부 - 시카고 (UTC-6)</option>
+                                    <option value="America/Denver">🇺🇸 미국 산악 - 덴버 (UTC-7)</option>
+                                    <option value="America/Los_Angeles">🇺🇸 미국 서부 - LA (UTC-8)</option>
+                                    <option value="America/Anchorage">🇺🇸 알래스카 (UTC-9)</option>
+                                    <option value="Pacific/Honolulu">🇺🇸 하와이 (UTC-10)</option>
+                                    <option value="America/Toronto">🇨🇦 캐나다 동부 - 토론토 (UTC-5)</option>
+                                    <option value="America/Vancouver">🇨🇦 캐나다 서부 - 밴쿠버 (UTC-8)</option>
+                                </optgroup>
+                                <optgroup label="유럽">
+                                    <option value="Europe/London">🇬🇧 영국 - 런던 (UTC+0)</option>
+                                    <option value="Europe/Paris">🇫🇷 프랑스 / 독일 / 이탈리아 (UTC+1)</option>
+                                    <option value="Europe/Helsinki">🇫🇮 핀란드 / 동유럽 (UTC+2)</option>
+                                    <option value="Europe/Istanbul">🇹🇷 터키 (UTC+3)</option>
+                                    <option value="Europe/Moscow">🇷🇺 러시아 - 모스크바 (UTC+3)</option>
+                                </optgroup>
+                                <optgroup label="오세아니아">
+                                    <option value="Australia/Sydney">🇦🇺 호주 동부 - 시드니 (UTC+10)</option>
+                                    <option value="Australia/Perth">🇦🇺 호주 서부 - 퍼스 (UTC+8)</option>
+                                    <option value="Pacific/Auckland">🇳🇿 뉴질랜드 (UTC+12)</option>
+                                    <option value="Pacific/Guam">🇬🇺 괌 / 사이판 (UTC+10)</option>
+                                </optgroup>
+                                <optgroup label="기타">
+                                    <option value="Africa/Cairo">🇪🇬 이집트 (UTC+2)</option>
+                                    <option value="America/Sao_Paulo">🇧🇷 브라질 (UTC-3)</option>
+                                    <option value="Africa/Johannesburg">🇿🇦 남아프리카 (UTC+2)</option>
+                                </optgroup>
+                            </select>
+                            <p class="profile-hint"><i class="fas fa-info-circle"></i> 해외에 계신 경우 현지 시간대로 변경하면 마감 시간이 현지 새벽 4시 기준으로 적용됩니다.</p>
+                        </div>
+
                         <!-- 비밀번호 변경 링크 -->
                         <div class="profile-password-link">
                             <a href="change-password.html">

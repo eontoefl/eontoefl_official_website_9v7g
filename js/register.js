@@ -90,7 +90,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         password: document.getElementById('password').value,
         level: 2,
         blocked: false,
-        role: 'user'
+        role: 'user',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul'
     };
 
     showLoading(true);

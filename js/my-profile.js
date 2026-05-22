@@ -137,6 +137,24 @@ function showEditSection() {
     document.getElementById('editNickname').value = currentUserData.nickname || '';
     document.getElementById('editPhone').value = currentUserData.phone || '';
 
+    // 타임존 설정
+    const tzSelect = document.getElementById('editTimezone');
+    const savedTz = currentUserData.timezone || 'Asia/Seoul';
+    if (tzSelect) {
+        tzSelect.value = savedTz;
+        // 자동 감지 표시
+        const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (detectedTz && detectedTz !== savedTz) {
+            const detectEl = document.getElementById('timezoneAutoDetect');
+            const labelEl = document.getElementById('detectedTzLabel');
+            if (detectEl && labelEl) {
+                const matchingOption = tzSelect.querySelector(`option[value="${detectedTz}"]`);
+                labelEl.textContent = matchingOption ? matchingOption.textContent : detectedTz;
+                detectEl.style.display = 'block';
+            }
+        }
+    }
+
     // 닉네임 사용 가능 상태로 초기화 (현재 닉네임이므로)
     if (currentUserData.nickname) {
         nicknameAvailable = true;
@@ -291,6 +309,7 @@ function setupEditForm() {
         const name = document.getElementById('editName').value.trim();
         const nickname = document.getElementById('editNickname').value.trim();
         const phone = document.getElementById('editPhone').value.trim();
+        const timezone = document.getElementById('editTimezone').value;
         const saveBtn = document.getElementById('saveBtn');
 
         // 유효성 검사
@@ -324,7 +343,8 @@ function setupEditForm() {
         const hasChanges =
             name !== (currentUserData.name || '') ||
             nickname !== (currentUserData.nickname || '') ||
-            phone !== (currentUserData.phone || '');
+            phone !== (currentUserData.phone || '') ||
+            timezone !== (currentUserData.timezone || 'Asia/Seoul');
 
         if (!hasChanges) {
             alert('변경된 내용이 없습니다.');
@@ -336,7 +356,7 @@ function setupEditForm() {
 
         try {
             // DB 업데이트
-            const updateData = { name, nickname, phone };
+            const updateData = { name, nickname, phone, timezone };
             await supabaseAPI.patch('users', currentUserData.id, updateData);
 
             // localStorage 업데이트
@@ -344,12 +364,14 @@ function setupEditForm() {
             localUser.name = name;
             localUser.nickname = nickname;
             localUser.phone = phone;
+            localUser.timezone = timezone;
             localStorage.setItem('iontoefl_user', JSON.stringify(localUser));
 
             // 현재 데이터도 갱신
             currentUserData.name = name;
             currentUserData.nickname = nickname;
             currentUserData.phone = phone;
+            currentUserData.timezone = timezone;
 
             // 사이드바 이름 갱신
             const nameEl = document.getElementById('sidebarUserName');
