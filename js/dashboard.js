@@ -625,8 +625,9 @@ async function renderQuickMenuGrid(app) {
             icon: 'fa-book',
             iconColor: '#f59e0b',
             title: app.correction_enabled ? '내챌\n이용방법' : '이용방법',
-            link: `application-detail.html?id=${app.id}#step5`,
-            available: !!app.guide_sent
+            link: `usage-guide.html?type=${app.course_track === 'australia' ? 'nevelupaustralia' : 'challenge'}`,
+            available: !!app.guide_sent,
+            external: true
         },
         ...(app.correction_enabled ? [{
             icon: 'fa-pen-nib',
@@ -1027,7 +1028,7 @@ function renderQuickMenu(app) {
         {
             icon: 'fa-book-open',
             text: '이용방법 보기',
-            action: () => window.open('usage-guide.html', '_blank'),
+            action: () => window.open(`usage-guide.html?type=${app.course_track === 'australia' ? 'nevelupaustralia' : 'challenge'}`, '_blank'),
             disabled: !app.guide_sent
         },
         {
@@ -1206,7 +1207,7 @@ async function renderProgramInfo(app) {
         <a href="${platformUrl}" target="_blank" class="program-button">
             <i class="fas fa-external-link-alt"></i> 플랫폼 바로가기
         </a>
-        <a href="usage-guide.html?type=challenge" target="_blank" class="program-button secondary" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
+        <a href="usage-guide.html?type=${app.course_track === 'australia' ? 'nevelupaustralia' : 'challenge'}" target="_blank" class="program-button secondary" ${!app.guide_sent ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
             <i class="fas fa-book"></i> ${app.correction_enabled ? '내챌 이용방법' : '이용방법 보기'}
         </a>
         ${app.correction_enabled ? `
