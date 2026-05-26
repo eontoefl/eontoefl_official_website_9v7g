@@ -837,7 +837,8 @@
                 } else {
                     // 새 글 등록: POST
                     await supabaseAPI.post(boardConfig.table, postData);
-                    alert('글이 등록되었습니다.');
+                    const isPrivatePost = currentBoard === 'study_certify' && postData.is_private;
+                    alert(isPrivatePost ? '🔒 비공개로 글이 등록되었습니다.' : '글이 등록되었습니다.');
                 }
 
                 window.location.href = boardConfig.listUrl;
