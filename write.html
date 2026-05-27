@@ -711,6 +711,50 @@
                     }
                 }
             });
+
+            // 붙여넣기(Ctrl+V)로 이미지 삽입 시 Storage 업로드
+            quill.root.addEventListener('paste', function(e) {
+                const clipboardData = e.clipboardData || window.clipboardData;
+                if (!clipboardData || !clipboardData.items) return;
+
+                const imageItems = Array.from(clipboardData.items).filter(item => item.type.startsWith('image/'));
+                if (imageItems.length === 0) return;
+
+                e.preventDefault();
+                imageItems.forEach(item => {
+                    const file = item.getAsFile();
+                    if (file) insertImageViaStorage(file);
+                });
+            });
+
+            // 드래그앤드롭으로 이미지 삽입 시 Storage 업로드
+            quill.root.addEventListener('drop', function(e) {
+                const files = e.dataTransfer ? e.dataTransfer.files : null;
+                if (!files || files.length === 0) return;
+
+                const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+                if (imageFiles.length === 0) return;
+
+                e.preventDefault();
+                imageFiles.forEach(file => insertImageViaStorage(file));
+            });
+        }
+
+        // 붙여넣기/드래그앤드롭 이미지를 Storage에 업로드 후 에디터에 삽입
+        async function insertImageViaStorage(file) {
+            if (file.size > 5 * 1024 * 1024) {
+                alert('이미지 파일은 5MB 이하만 업로드 가능합니다.');
+                return;
+            }
+            try {
+                const imageUrl = await uploadImage(file);
+                const range = quill.getSelection(true) || { index: quill.getLength() };
+                quill.insertEmbed(range.index, 'image', imageUrl);
+                quill.setSelection(range.index + 1);
+            } catch (error) {
+                console.error('이미지 업로드 실패:', error);
+                alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+            }
         }
 
         // ==================== 이미지 핸들러 ====================
