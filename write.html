@@ -712,49 +712,53 @@
                 }
             });
 
-            // 붙여넣기(Ctrl+V)로 이미지 삽입 시 Storage 업로드
-            quill.root.addEventListener('paste', function(e) {
-                const clipboardData = e.clipboardData || window.clipboardData;
-                if (!clipboardData || !clipboardData.items) return;
-
-                const imageItems = Array.from(clipboardData.items).filter(item => item.type.startsWith('image/'));
-                if (imageItems.length === 0) return;
-
-                e.preventDefault();
-                imageItems.forEach(item => {
-                    const file = item.getAsFile();
-                    if (file) insertImageViaStorage(file);
-                });
-            });
-
-            // 드래그앤드롭으로 이미지 삽입 시 Storage 업로드
-            quill.root.addEventListener('drop', function(e) {
-                const files = e.dataTransfer ? e.dataTransfer.files : null;
-                if (!files || files.length === 0) return;
-
-                const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-                if (imageFiles.length === 0) return;
-
-                e.preventDefault();
-                imageFiles.forEach(file => insertImageViaStorage(file));
-            });
         }
 
-        // 붙여넣기/드래그앤드롭 이미지를 Storage에 업로드 후 에디터에 삽입
-        async function insertImageViaStorage(file) {
-            if (file.size > 10 * 1024 * 1024) {
-                alert('이미지 파일은 10MB 이하만 업로드 가능합니다.');
-                return;
+        // content 내 base64 이미지를 Storage URL로 변환
+        async function convertBase64ImagesToStorage(html) {
+            const base64Regex = /data:image\/([\w+]+);base64,[A-Za-z0-9+/=]+/g;
+            const matches = html.match(base64Regex);
+            if (!matches || matches.length === 0) return html;
+
+            let result = html;
+            for (const base64Data of matches) {
+                try {
+                    const mimeMatch = base64Data.match(/^data:(image\/[\w+]+);base64,(.+)$/s);
+                    if (!mimeMatch) continue;
+
+                    const mimeType = mimeMatch[1];
+                    const raw = mimeMatch[2];
+                    const byteChars = atob(raw);
+                    const byteArray = new Uint8Array(byteChars.length);
+                    for (let i = 0; i < byteChars.length; i++) {
+                        byteArray[i] = byteChars.charCodeAt(i);
+                    }
+                    const blob = new Blob([byteArray], { type: mimeType });
+
+                    const ext = mimeType.split('/')[1].replace('jpeg', 'jpg');
+                    const timestamp = Date.now();
+                    const randomStr = Math.random().toString(36).substring(2, 8);
+                    const filePath = `${currentBoard}/${timestamp}_${randomStr}.${ext}`;
+
+                    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/board-images/${filePath}`, {
+                        method: 'POST',
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': mimeType
+                        },
+                        body: blob
+                    });
+
+                    if (uploadRes.ok) {
+                        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/board-images/${filePath}`;
+                        result = result.replace(base64Data, publicUrl);
+                    }
+                } catch (err) {
+                    console.error('base64 이미지 변환 실패:', err);
+                }
             }
-            try {
-                const imageUrl = await uploadImage(file);
-                const range = quill.getSelection(true) || { index: quill.getLength() };
-                quill.insertEmbed(range.index, 'image', imageUrl);
-                quill.setSelection(range.index + 1);
-            } catch (error) {
-                console.error('이미지 업로드 실패:', error);
-                alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
-            }
+            return result;
         }
 
         // ==================== 이미지 핸들러 ====================
@@ -827,7 +831,7 @@
         // ==================== 글 등록 ====================
         async function submitPost() {
             const subject = document.getElementById('writeSubject').value.trim();
-            const content = quill.root.innerHTML;
+            let content = quill.root.innerHTML;
 
             // 유효성 검사
             if (!subject) {
@@ -854,6 +858,12 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 등록 중...';
 
             try {
+                // base64 이미지를 Storage URL로 변환
+                if (content.includes('data:image')) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 이미지 업로드 중...';
+                    content = await convertBase64ImagesToStorage(content);
+                }
+
                 // 파일 업로드 처리
                 let uploadedAttachments = [];
                 if (attachedFiles.length > 0) {
@@ -866,7 +876,7 @@
                 postData.attachments = uploadedAttachments;
 
                 if (editMode && editPostId) {
-                    // 수정 모드: PATCH
+                    // 수정 모드: PATCH (수정 시에도 base64 변환)
                     const patchData = {
                         subject: subject,
                         content: content,
