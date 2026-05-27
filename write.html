@@ -742,8 +742,8 @@
 
         // 붙여넣기/드래그앤드롭 이미지를 Storage에 업로드 후 에디터에 삽입
         async function insertImageViaStorage(file) {
-            if (file.size > 5 * 1024 * 1024) {
-                alert('이미지 파일은 5MB 이하만 업로드 가능합니다.');
+            if (file.size > 10 * 1024 * 1024) {
+                alert('이미지 파일은 10MB 이하만 업로드 가능합니다.');
                 return;
             }
             try {
@@ -768,9 +768,9 @@
                 const file = input.files[0];
                 if (!file) return;
 
-                // 파일 크기 체크 (5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('이미지 파일은 5MB 이하만 업로드 가능합니다.');
+                // 파일 크기 체크 (10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('이미지 파일은 10MB 이하만 업로드 가능합니다.');
                     return;
                 }
 
