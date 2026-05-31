@@ -20,7 +20,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   guide_uploaded:     50206,  // 이용방법 안내
   shipping_sent:      50207,  // 택배 발송 안내
   challenge_reminder: 50208,  // 챌린지 시작 D-1 안내
-  correction_start_reminder: 50200, // 스라첨삭 시작 안내
+  correction_start_reminder: 50213, // 스라첨삭 시작 안내
   correction_feedback_1: 50211,  // 1차 첨삭 완료 안내
   correction_feedback_2: 50212,  // 최종 첨삭 완료 안내
   incentive_analysis_complete: 50214,  // 프로모션 학생: 개별분석 & 입문서 전송 완료 안내
@@ -173,13 +173,14 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
 
     case "correction_start_reminder":
       return [
-        "이온토플 - Friendly Reminder :-)",
+        "이온토플 - 스라첨삭 시작 안내",
         "",
         `${data.name}님, 안녕하세요.`,
         "",
-        `${data.start_date}부터 ${data.program}이 시작됩니다.`,
+        `신청하신 스라첨삭이 ${data.start_date}부터 시작됩니다.`,
         "",
-        "*이용방법이 숙지되어있지 않으면 절대로 첨삭을 따라오실 수 없습니다. 최소 이틀전까지 이용방법을 꼼꼼히 읽으며 정독하며 캘린더 표시도 해두셔야 합니다.",
+        "아래 버튼에서 진행방법과 일정을 반드시 확인해주세요.",
+        "이용방법을 모르면 절대로 첨삭을 따라오실 수 없습니다.",
       ].join("\n");
 
     case "correction_feedback_1": {
@@ -338,7 +339,10 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "shipping_sent") {
     return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
   }
-  if (type === "correction_start_reminder" || type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered") {
+  if (type === "correction_start_reminder") {
+    return `${SITE_URL}/my-dashboard.html`;
+  }
+  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered") {
     return TESTROOM_URL;
   }
   return `${SITE_URL}/application-detail.html?id=${data.app_id}`;
