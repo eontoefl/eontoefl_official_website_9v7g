@@ -75,7 +75,122 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAuthMenu();
     initHamburgerMenu();
     hideMaterialsForNonAdmin();
+    getFunnelSegment().then(applyFunnelGating).catch(e => console.warn('퍼널 게이팅 실패:', e));
 });
+
+// ==================== 입문서 → 개별분석 퍼널 게이팅 ====================
+// 외부에 노출된 모든 '신청' 진입점을 사용자 상태에 따라 재지정한다.
+//   - 비회원 / 입문서 미신청  → 입문서 무료 신청(book-request.html)
+//   - 입문서 받음 / 개별분석 제출 → 내 대시보드(my-dashboard.html)
+// 내벨업챌린지 신청 폼(application-form.html)은 외부 어떤 링크로도 직접 노출하지 않는다.
+// (관리자는 게이팅 제외, 신청 현황 목록·내 신청서 링크는 그대로 유지)
+
+/**
+ * 현재 사용자의 퍼널 단계를 판정한다.
+ * 반환: 'guest' | 'member_nobook' | 'member_book' | 'member_challenge' | 'admin'
+ * 세션 동안 캐시(sessionStorage)하여 페이지마다 재조회하지 않는다.
+ */
+async function getFunnelSegment() {
+    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    if (!userData) return 'guest';
+    if (userData.role === 'admin') return 'admin';
+
+    const cacheKey = 'iontoefl_funnel_' + userData.email;
+    try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) return cached;
+    } catch (e) { /* sessionStorage 사용 불가 시 무시 */ }
+
+    let segment = 'member_nobook';
+    try {
+        const result = await supabaseAPI.query('applications', {
+            'email': `eq.${userData.email}`,
+            'deleted': 'neq.true',
+            'limit': '100'
+        });
+        const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
+        const hasChallenge = apps.some(a => a.application_type && a.application_type !== 'book_only');
+        const hasBook = apps.some(a =>
+            a.application_type === 'book_only' || a.book_access_enabled || a.is_incentive_applicant
+        );
+        if (hasChallenge) segment = 'member_challenge';
+        else if (hasBook) segment = 'member_book';
+        else segment = 'member_nobook';
+    } catch (e) {
+        console.warn('퍼널 상태 조회 실패:', e);
+    }
+    try { sessionStorage.setItem(cacheKey, segment); } catch (e) { /* 무시 */ }
+    return segment;
+}
+
+// 위치별 목적지/문구 결정
+function _navTarget(seg) {
+    if (seg === 'guest') return { href: 'book-request.html', label: '입문서 무료신청' };
+    if (seg === 'member_nobook') return { href: 'my-dashboard.html', label: '입문서 받기' };
+    return { href: 'my-dashboard.html', label: '내 대시보드' }; // book / challenge
+}
+function _footerTarget(seg) {
+    if (seg === 'guest' || seg === 'member_nobook') return { href: 'book-request.html', label: '입문서 무료신청' };
+    return { href: 'my-dashboard.html', label: '내 대시보드' };
+}
+function _bodyTarget(seg) {
+    if (seg === 'guest' || seg === 'member_nobook') return { href: 'book-request.html', label: '입문서 무료 신청하기' };
+    if (seg === 'member_book') return { href: 'my-dashboard.html', label: '입문서 읽으러 가기' };
+    return { href: 'my-dashboard.html', label: '내 신청 현황 보기' }; // challenge
+}
+
+// 링크 문구 교체 (구조/아이콘 최대한 보존)
+function _setLinkLabel(a, label) {
+    // 복합 버튼(programs 카드 등): .cta-text 만 교체, 부가 설명(.cta-note)은 숨김
+    const textSpan = a.querySelector('.cta-text');
+    if (textSpan) {
+        textSpan.textContent = label;
+        const note = a.querySelector('.cta-note');
+        if (note) note.style.display = 'none';
+        return;
+    }
+    // 아이콘이 있으면 아이콘 보존 + 문구만 교체
+    const icon = a.querySelector('i');
+    if (icon) {
+        a.innerHTML = icon.outerHTML + ' ' + label;
+        return;
+    }
+    a.textContent = label;
+}
+
+/**
+ * 신청 관련 링크(application.html / application-form.html)를 세그먼트에 맞게 재작성.
+ * - 실제 '신청' CTA(신청하기 / 수강 신청 / 신청서 작성)만 골라 바꾼다.
+ *   '신청 현황'·'내 신청서'·'목록으로' 등은 같은 주소를 써도 건드리지 않는다.
+ * - 헤더(nav) / 푸터(footer) / 본문 위치에 따라 문구를 다르게 적용한다.
+ */
+function applyFunnelGating(segment) {
+    if (segment === 'admin') return; // 관리자는 모든 진입점 그대로
+
+    const links = document.querySelectorAll(
+        'a[href="application.html"], a[href="application-form.html"]'
+    );
+
+    links.forEach(a => {
+        const text = (a.textContent || '').replace(/\s+/g, ' ').trim();
+
+        // 바꿀 대상: 실제 신청 CTA 문구만
+        if (!/신청하기|수강 신청|신청서 작성/.test(text)) return;
+
+        let target;
+        if (a.closest('footer')) {
+            target = _footerTarget(segment);
+        } else if (a.closest('nav')) {
+            target = _navTarget(segment);
+        } else {
+            target = _bodyTarget(segment);
+        }
+        if (!target) return;
+
+        a.setAttribute('href', target.href);
+        _setLinkLabel(a, target.label);
+    });
+}
 
 /**
  * 관리자가 아니면 모든 페이지에서 학습 자료 링크 숨김

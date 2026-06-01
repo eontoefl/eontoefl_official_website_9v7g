@@ -64,6 +64,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // 입문서 → 개별분석 퍼널 가드
+    // 내벨업챌린지 신청 폼은 입문서를 받은 사람만(=입문서 안에서 진행) 접근할 수 있다.
+    // 외부에서 주소를 직접 입력해 들어온 미자격 사용자는 적절한 위치로 돌려보낸다.
+    guardFormAccess(userData);
+
     // Pre-fill user information
     if (userData.name) {
         document.querySelector('input[name="name"]').value = userData.name;
@@ -103,6 +108,54 @@ document.addEventListener('DOMContentLoaded', function() {
         setupAutoSave();
     }
 });
+
+/**
+ * 폼 접근 권한 가드
+ * - 관리자: 통과
+ * - 편집 모드(?edit=): 본인 신청서 수정이므로 통과
+ * - 이미 내벨업챌린지 신청서 제출: 본인 신청 현황으로
+ * - 입문서 권한 없는 회원: 대시보드(입문서부터)
+ * - 입문서 받은 회원: 통과
+ * 조회 실패 시에는 막지 않는다(사용성 우선).
+ */
+async function guardFormAccess(userData) {
+    if (userData.role === 'admin') return;
+
+    const editId = new URLSearchParams(window.location.search).get('edit');
+
+    try {
+        const result = await supabaseAPI.query('applications', {
+            'email': `eq.${userData.email}`,
+            'deleted': 'neq.true',
+            'limit': '100'
+        });
+        const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
+        const challengeApp = apps.find(a => a.application_type && a.application_type !== 'book_only');
+        const hasBook = apps.some(a =>
+            a.application_type === 'book_only' || a.book_access_enabled || a.is_incentive_applicant
+        );
+
+        // 편집 모드는 본인 챌린지 신청서 수정 → 통과
+        if (editId) return;
+
+        // 이미 챌린지 신청서를 제출한 경우 → 본인 신청 현황으로
+        if (challengeApp) {
+            alert('이미 내벨업챌린지 신청서를 제출하셨습니다.\n내 신청 현황으로 이동합니다.');
+            window.location.href = `application-detail.html?id=${challengeApp.id}`;
+            return;
+        }
+
+        // 입문서 권한이 없는 회원 → 입문서부터
+        if (!hasBook) {
+            alert('내벨업챌린지 신청은 입문서를 먼저 받으신 후, 입문서 안에서 진행하실 수 있습니다.');
+            window.location.href = 'my-dashboard.html';
+            return;
+        }
+        // hasBook → 통과 (입문서 뷰어를 거쳐 정상 진입)
+    } catch (e) {
+        console.warn('폼 접근 권한 확인 실패:', e);
+    }
+}
 
 // Setup conditional field visibility
 function setupConditionalFields() {
