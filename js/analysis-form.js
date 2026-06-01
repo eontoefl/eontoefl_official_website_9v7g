@@ -693,7 +693,7 @@ async function loadDepositTab(app) {
                         </div>
                     </div>
                     <p style="font-size: 15px; color: #1e3a8a; margin: 16px 0 0 0; line-height: 1.6;">
-                        학생이 "이용방법" 탭에서 확인하고 "챌린지 시작하기" 버튼을 클릭하면 STEP 10으로 진행됩니다.
+                        학생이 "이용방법" 탭에서 내용을 확인할 수 있습니다.
                     </p>
                 </div>
                 
