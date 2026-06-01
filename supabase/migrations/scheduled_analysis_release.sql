@@ -98,9 +98,16 @@ BEGIN
             analysis_status   = rec.analysis_status_pending,
             analysis_content  = rec.analysis_content_pending,
             analysis_saved_at = v_now_ms,
-            -- analysis_first_saved_at: 최초 저장 시점 = 발송 시점으로 통일
+            -- analysis_first_saved_at: 동의 데드라인 타이머의 기준 시각.
+            -- '승인'으로 발송될 때만 시작한다. 조건부승인/거부는 아직 협의/종료 단계이므로
+            -- 타이머를 시작하지 않는다(NULL 유지). 이후 관리자가 '승인'으로 전환 저장하는
+            -- 시점(admin-manage-modal)에서 새로 기록된다.
             -- (이미 값이 있으면 그대로 유지: 예약 → 발송 후 다시 수정 케이스 방지)
-            analysis_first_saved_at = COALESCE(applications.analysis_first_saved_at, v_now_ms),
+            analysis_first_saved_at = CASE
+                WHEN rec.analysis_status_pending = '승인'
+                    THEN COALESCE(applications.analysis_first_saved_at, v_now_ms)
+                ELSE applications.analysis_first_saved_at
+            END,
 
             -- 부가 필드들 (payload에서 복원). 키가 존재하지 않으면 기존 값 유지.
             assigned_program       = CASE WHEN v_payload ? 'assigned_program'       THEN v_payload->>'assigned_program'                       ELSE applications.assigned_program END,

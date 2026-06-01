@@ -69,6 +69,7 @@ BEGIN
         SELECT a.id, a.name, a.phone
         FROM applications a
         WHERE a.is_incentive_applicant = true
+          AND a.analysis_status = '승인'  -- 조건부승인/거부는 동의 마감 타이머가 없으므로 제외
           AND (a.student_agreed_at IS NULL OR a.student_agreed_at = '')
           AND a.analysis_first_saved_at IS NOT NULL
           AND a.incentive_warning_sent_at IS NULL

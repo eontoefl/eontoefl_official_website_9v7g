@@ -894,9 +894,11 @@ function getAnalysisSection(app) {
     
     const status = statusInfo[app.analysis_status] || statusInfo['승인'];
     
-    // 동의가 필요한지 확인
-    const needsAgreement = (app.analysis_status === '승인' || app.analysis_status === '조건부승인') 
-                          && !app.student_program_agreed;
+    // 동의가 필요한지 확인 (동의 체크박스+타이머는 '승인'일 때만 노출)
+    const isConditional = app.analysis_status === '조건부승인';
+    const needsAgreement = app.analysis_status === '승인' && !app.student_program_agreed;
+    // 조건부승인은 아직 협의 단계 → 동의 폼 대신 카톡 문의 안내를 표시
+    const showConditionalContact = isConditional && !app.student_program_agreed;
     
     return `
         <hr style="margin: 32px 0; border: none; border-top: 2px solid #e2e8f0;">
@@ -920,8 +922,8 @@ function getAnalysisSection(app) {
         </div>
         ` : ''}
         
-        <!-- 2. 배정 프로그램 정보 -->
-        ${app.assigned_program ? `
+        <!-- 2. 배정 프로그램 정보 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
+        ${!isConditional && app.assigned_program ? `
         <div style="padding: 24px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px;">
             <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
                 <i class="fas fa-graduation-cap" style="color: #9480c5;"></i> 배정 프로그램 정보
@@ -960,11 +962,11 @@ function getAnalysisSection(app) {
         </div>
         ` : ''}
         
-        <!-- 3. 이용가 및 할인 내역 -->
-        ${getPricingBox(app)}
-        
+        <!-- 3. 이용가 및 할인 내역 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
+        ${!isConditional ? getPricingBox(app) : ''}
+
         <!-- 중요 안내사항 (가격 정보와 동의 섹션 사이) -->
-        ${app.analysis_content && !app.is_incentive_applicant ? `
+        ${app.analysis_content && !app.is_incentive_applicant && !isConditional ? `
         <div style="padding: 20px; background: #fef2f2; border: 2px solid #fca5a5; border-radius: 12px; margin-bottom: 24px;">
             <div style="display: flex; align-items: flex-start; gap: 12px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 24px; color: #dc2626; margin-top: 2px;"></i>
@@ -981,9 +983,26 @@ function getAnalysisSection(app) {
         ` : ''}
 
         
-        <!-- 동의 섹션 -->
+        <!-- 동의 섹션 (승인일 때만) -->
         ${needsAgreement ? getAgreementSection(app) : ''}
-        
+
+        <!-- 조건부승인: 카톡 문의 안내 (동의 폼·타이머 대신) -->
+        ${showConditionalContact ? `
+        <div style="padding: 24px; background: #fffbeb; border: 2px solid #fcd34d; border-radius: 12px; margin-bottom: 24px; text-align: center;">
+            <div style="font-size: 17px; font-weight: 700; color: #92400e; margin-bottom: 10px;">
+                <i class="fas fa-comments"></i> 추가 확인이 필요해요
+            </div>
+            <p style="font-size: 14px; color: #92400e; line-height: 1.8; margin-bottom: 20px;">
+                위 분석 내용을 확인하신 뒤, 아래 버튼을 눌러 카카오톡으로 편하게 문의해주세요.<br>
+                선생님과 이야기 나눈 후 다음 단계를 안내해드릴게요.
+            </p>
+            <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener noreferrer"
+               style="display: inline-flex; align-items: center; gap: 8px; padding: 15px 36px; background: #FEE500; color: #3C1E1E; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 12px rgba(254, 229, 0, 0.4);">
+                <i class="fas fa-comment" style="font-size: 18px;"></i> 카카오톡으로 문의하기
+            </a>
+        </div>
+        ` : ''}
+
         <!-- 동의 완료 메시지 -->
         ${app.student_program_agreed ? `
         <div style="padding: 24px; background: #dcfce7; border: 2px solid #22c55e; border-radius: 12px; text-align: center;">
@@ -1681,7 +1700,7 @@ function loadStudentTabs(app) {
             analysisTab.innerHTML = getAnalysisSection(app);
             // 실시간 카운트다운 시작 (동의 전 + 분석 완료 시점이 있을 때)
             // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-            const needsAgreement = (app.analysis_status === '승인' || app.analysis_status === '조건부승인') && !app.student_program_agreed;
+            const needsAgreement = app.analysis_status === '승인' && !app.student_program_agreed;
             const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
             if (needsAgreement && analysisTs) {
                 startAnalysisCountdown(analysisTs, app.is_incentive_applicant === true);

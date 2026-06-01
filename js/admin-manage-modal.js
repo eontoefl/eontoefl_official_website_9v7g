@@ -426,9 +426,6 @@ function loadModalAnalysisTab(app) {
         ? (pendingPayload.book_access_enabled === true)
         : !!app.book_access_enabled;
 
-    // 학생용 링크 생성
-    const studentLink = `${window.location.origin}/analysis.html?id=${app.id}`;
-
     // 예약 발송 대기 배너 (예약 중일 때만)
     const scheduledAtKstStr = isScheduled ? formatScheduledAtKst(app.analysis_alimtalk_scheduled_at) : '';
     const scheduledBanner = isScheduled ? `
@@ -508,32 +505,6 @@ function loadModalAnalysisTab(app) {
                 </label>
             </div>
         </div>
-
-        ${hasAnalysis ? `
-        <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <i class="fas fa-check-circle" style="font-size: 20px; color: #22c55e;"></i>
-                    <div>
-                        <div style="font-weight: 600; font-size: 14px; color: #166534;">개별분석 저장 완료</div>
-                        <div style="font-size: 12px; color: #15803d; margin-top: 2px;">학생 전달용 링크</div>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text"
-                           id="studentLinkInput"
-                           value="${studentLink}"
-                           readonly
-                           style="width: 320px; padding: 8px 12px; border: 1px solid #86efac; border-radius: 6px; font-size: 12px; background: white; font-family: monospace;">
-                    <button type="button"
-                            onclick="copyModalStudentLink()"
-                            style="padding: 8px 16px; background: #22c55e; color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                        <i class="fas fa-copy"></i> 복사
-                    </button>
-                </div>
-            </div>
-        </div>
-        ` : ''}
 
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
             <!-- 0. 프로모션 유도 학생 토글 -->
@@ -1024,15 +995,6 @@ function calculateModalEndDate() {
     endInput.value = endDateString;
 }
 
-// 학생 링크 복사
-function copyModalStudentLink() {
-    const input = document.getElementById('studentLinkInput');
-    input.select();
-    document.execCommand('copy');
-    
-    alert('✅ 링크가 복사되었습니다!');
-}
-
 // correction_schedules UPSERT (첨삭 스케줄 자동 생성/업데이트)
 async function upsertCorrectionSchedule(userId, startDate, durationWeeks) {
     const url = `${SUPABASE_URL}/rest/v1/correction_schedules?on_conflict=user_id`;
@@ -1197,8 +1159,10 @@ async function saveModalAnalysis(event) {
         analysis_pending_payload: null
     };
 
-    // 동의 데드라인 계산 기준: 최초 저장 시에만 기록.
-    if (!currentManageApp.analysis_first_saved_at) {
+    // 동의 데드라인 계산 기준: '승인'이 되는 순간부터 시작한다.
+    // 조건부승인/거부 동안에는 타이머를 시작하지 않고, '승인'으로 (전)환되는 시점에 새로 기록한다.
+    // (이미 승인 상태에서 수정 저장하는 경우엔 기존 시각을 유지 → 수정해도 리셋되지 않음)
+    if (formData.get('analysis_status') === '승인' && currentManageApp.analysis_status !== '승인') {
         updateData.analysis_first_saved_at = nowMs;
     }
 
@@ -1241,7 +1205,7 @@ async function saveModalAnalysis(event) {
                     ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
                     : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
             }
-            alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice + '\n\n학생 전달용 링크:\n' + `${window.location.origin}/analysis.html?id=${currentManageApp.id}`);
+            alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice);
 
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;
