@@ -144,7 +144,7 @@
             <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
                 아직 회원이 아니신가요?
             </p>
-            <a id="registerLink" href="register.html" class="btn-outline" style="display: inline-block; padding: 10px 20px;">
+            <a id="registerLink" href="book-request.html" class="btn-outline" style="display: inline-block; padding: 10px 20px;">
                 <i class="fas fa-user-plus"></i> 회원가입하기
             </a>
         </div>
@@ -154,7 +154,7 @@
                 const redirect = new URLSearchParams(window.location.search).get('redirect');
                 if (redirect) {
                     const link = document.getElementById('registerLink');
-                    link.href = 'register.html?redirect=' + encodeURIComponent(redirect);
+                    link.href = 'book-request.html?redirect=' + encodeURIComponent(redirect);
                 }
             })();
         </script>

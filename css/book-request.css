@@ -134,6 +134,7 @@ input[type="radio"] {
 .form-group input[type="email"],
 .form-group input[type="tel"],
 .form-group input[type="number"],
+.form-group input[type="password"],
 .form-group select,
 .form-group textarea {
     width: 100%;
@@ -326,6 +327,34 @@ input[type="radio"] {
     border-color: #ccc;
     transform: translateY(-1px);
 }
+
+/* Toast (스크롤 위치와 무관하게 상단 중앙 고정) */
+.br-toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-12px);
+    z-index: 11000;
+    max-width: 90%;
+    padding: 0.85rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    text-align: center;
+}
+
+.br-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.br-toast.error { background: #ef4444; }
+.br-toast.success { background: #22c55e; }
 
 /* Modal Styles */
 .modal {

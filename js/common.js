@@ -25,7 +25,7 @@ function updateAuthMenu() {
         authMenu.innerHTML = `
             <a href="login.html">LOGIN</a>
             <span style="color: #cbd5e1; margin: 0 8px;">|</span>
-            <a href="register.html">JOIN</a>
+            <a href="book-request.html">JOIN</a>
         `;
     }
 }

@@ -251,7 +251,7 @@ function updateNavigation() {
         authMenu.innerHTML = `
             <a href="login.html" style="text-decoration: none; color: #555555; font-size: 14px; font-weight: 200;">LOGIN</a>
             <span style="color: #cbd5e1; margin: 0 10px; font-size: 14px;">|</span>
-            <a href="register.html" style="text-decoration: none; color: #555555; font-size: 14px; font-weight: 200;">JOIN</a>
+            <a href="book-request.html" style="text-decoration: none; color: #555555; font-size: 14px; font-weight: 200;">JOIN</a>
         `;
     }
 }
