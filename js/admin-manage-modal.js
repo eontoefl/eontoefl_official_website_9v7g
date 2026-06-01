@@ -951,7 +951,7 @@ function setRejectionUIState(isRejected) {
     // 시각적 그레이아웃
     ['formGroup-program', 'formGroup-schedule', 'formGroup-price'].forEach(id => {
         const g = document.getElementById(id);
-        if (g) g.style.opacity = blankProgramFields ? '0.5' : '';
+        if (g) g.style.opacity = isRejected ? '0.5' : '';
     });
 }
 
