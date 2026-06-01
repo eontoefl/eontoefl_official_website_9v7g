@@ -619,7 +619,7 @@ function loadModalAnalysisTab(app) {
                     학생이 희망한 챌린지 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
                 </div>
                 <div id="correctionStartDateWrapper" style="margin-top: 12px; ${fillCorrectionEnabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일만)${fillCorrectionEnabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일·월요일만)${fillCorrectionEnabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
                     <input type="date" name="correction_start_date" id="correction_start_date"
                            value="${fillCorrectionStartDate}"
                            ${readOnly}
@@ -779,7 +779,7 @@ function loadModalAnalysisTab(app) {
         programSelect.addEventListener('change', calculateModalEndDate);
     }
     
-    // 첨삭 시작일 일요일 검증 이벤트
+    // 첨삭 시작일 일·월요일 검증 이벤트
     const correctionStartDate = document.getElementById('correction_start_date');
     if (correctionStartDate) {
         correctionStartDate.addEventListener('change', validateCorrectionStartDate);
@@ -832,17 +832,17 @@ function loadModalAnalysisTab(app) {
     }
 }
 
-// 첨삭 시작일 일요일 검증
+// 첨삭 시작일 일·월요일 검증
 function validateCorrectionStartDate() {
     const input = document.getElementById('correction_start_date');
     if (!input || !input.value) return;
-    
+
     const selectedDate = new Date(input.value);
     const dayOfWeek = selectedDate.getDay();
-    
-    // 일요일(0)이 아니면 경고
-    if (dayOfWeek !== 0) {
-        alert('⚠️ 첨삭 시작일은 일요일만 선택 가능합니다.\n가장 가까운 일요일을 선택해주세요.');
+
+    // 일요일(0)·월요일(1)이 아니면 경고
+    if (dayOfWeek !== 0 && dayOfWeek !== 1) {
+        alert('⚠️ 첨삭 시작일은 일요일 또는 월요일만 선택 가능합니다.\n가장 가까운 일요일 또는 월요일을 선택해주세요.');
         input.value = '';
     }
 }
