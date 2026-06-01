@@ -1366,19 +1366,177 @@ async function getSiteSettings() {
 /**
  * 빈 상태 표시
  */
+// 신청서가 하나도 없는 사용자 = 가입은 했으나 마케팅 미동의자.
+// → 입문서 잠금 화면을 띄우고, 동의 시 입문서를 즉시 오픈한다.
 function showEmptyState() {
     document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('dashboardContent').innerHTML = `
-        <div class="empty-state" style="padding: 100px 20px;">
-            <i class="fas fa-inbox" style="font-size: 72px; color: #cbd5e1; margin-bottom: 20px;"></i>
-            <h2 style="color: #64748b; margin-bottom: 10px;">신청서가 없습니다</h2>
-            <p style="color: #94a3b8; margin-bottom: 30px;">아직 프로그램을 신청하지 않으셨네요.</p>
-            <a href="application-form.html" class="program-button" style="display: inline-block;">
-                <i class="fas fa-plus"></i> 프로그램 신청하기
-            </a>
+    const dashboardContent = document.getElementById('dashboardContent');
+    dashboardContent.innerHTML = `
+        <div style="max-width: 720px; margin: 0 auto;">
+            <div class="dashboard-card" style="padding: 0; overflow: hidden; border: 2px solid #e9d5ff;">
+                <!-- 잠금 헤더 -->
+                <div style="background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); color: #fff; padding: 40px 32px; text-align: center;">
+                    <div style="font-size: 56px; margin-bottom: 16px;"><i class="fas fa-lock"></i></div>
+                    <h1 style="font-size: 23px; font-weight: 800; line-height: 1.5; margin: 0;">앗, 10년의 노하우가 압축된 프리미엄 입문서를<br>방금 휴지통에 버리셨네요..</h1>
+                </div>
+                <!-- 본문 -->
+                <div style="padding: 32px;">
+                    <div style="font-size: 15px; color: #334155; line-height: 1.9;">
+                        <p style="margin: 0 0 16px;">아마 스팸 문자가 올까 봐 마케팅 수신 동의를 해제하셨을 겁니다. 그 마음 100% 이해합니다. 저라도 광고 문자는 질색이니까요.</p>
+                        <p style="margin: 0 0 16px;">하지만 안타깝게도, 그 체크 해제 한 번 때문에 현재 <strong>단기 목표 달성자 92%</strong>가 본격적인 시작 전 반드시 읽는 <strong>"프리미엄 입문서"</strong>를 놓치셨습니다.</p>
+                        <p style="margin: 0 0 16px;">노파심에 말씀드리건대, 저희는 흔해 빠진 패키지 홍보나 쓸데없는 스팸으로 수강생의 귀한 시간을 낭비시키지 않습니다. 오직 점수 상승에 직결되는 치명적인 정보와 전략만 전달합니다.</p>
+                        <p style="margin: 0;">혼자서 밑바닥부터 뼈저리게 시행착오를 겪고 싶다면 이 안내를 무시하셔도 좋습니다. 하지만 가장 완벽하게 세팅된 지름길로 가고 싶다면, 지금 바로 아래 버튼을 눌러 권한을 수정하고 입문서를 챙겨가세요.</p>
+                    </div>
+
+                    <!-- 마케팅 수신 동의 (가입 페이지와 동일 문구) -->
+                    <label id="unlockConsentLabel" style="display: flex; align-items: flex-start; gap: 10px; background: #f3f0fa; border: 1px solid #e0d6f5; border-radius: 12px; padding: 16px; margin: 24px 0 0; cursor: pointer; transition: border-color 0.2s, background 0.2s;">
+                        <input type="checkbox" id="unlockMarketingConsent" style="margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; cursor: pointer;">
+                        <span style="font-size: 14px; color: #1e293b; line-height: 1.6;">[선택] 이온토플 시크릿 학습 정보 및 혜택 알림 수신 동의
+                            <span style="display: block; font-size: 12.5px; color: #9480c5; margin-top: 4px;">🎁 동의자 단독 혜택: 체크하신 분들께만 '이온토플 시크릿 입문서'를 즉시 오픈해 드립니다.</span>
+                        </span>
+                    </label>
+                    <p id="unlockConsentHint" style="display: none; color: #dc2626; font-size: 13px; margin: 8px 4px 0;"><i class="fas fa-exclamation-circle"></i> 먼저 위 동의 항목에 체크해주세요.</p>
+
+                    <!-- CTA -->
+                    <button id="btnUnlockGuide" class="program-button" style="width: 100%; padding: 18px; font-size: 16px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px;">
+                        <i class="fas fa-unlock"></i> 10초 만에 동의하고 프리미엄 입문서 열기
+                    </button>
+                </div>
+            </div>
         </div>
     `;
-    document.getElementById('dashboardContent').style.display = 'block';
+    dashboardContent.style.display = 'block';
+
+    const btn = document.getElementById('btnUnlockGuide');
+    if (btn) btn.addEventListener('click', handleUnlockGuide);
+
+    // 체크 시 안내 문구 숨김
+    const consent = document.getElementById('unlockMarketingConsent');
+    if (consent) {
+        consent.addEventListener('change', () => {
+            if (consent.checked) {
+                const hint = document.getElementById('unlockConsentHint');
+                const label = document.getElementById('unlockConsentLabel');
+                if (hint) hint.style.display = 'none';
+                if (label) { label.style.borderColor = '#e0d6f5'; label.style.background = '#f3f0fa'; }
+            }
+        });
+    }
+}
+
+/**
+ * 입문서 잠금 해제: 마케팅 동의 갱신 + 입문서 신청서 생성 → 성공 팝업
+ */
+async function handleUnlockGuide() {
+    const consent = document.getElementById('unlockMarketingConsent');
+    const btn = document.getElementById('btnUnlockGuide');
+
+    // 동의 체크 필수 (미체크 시 동의 처리 금지)
+    if (!consent || !consent.checked) {
+        const hint = document.getElementById('unlockConsentHint');
+        const label = document.getElementById('unlockConsentLabel');
+        if (hint) hint.style.display = 'block';
+        if (label) { label.style.borderColor = '#dc2626'; label.style.background = '#fef2f2'; }
+        if (consent) consent.focus();
+        return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 입문서 여는 중...';
+
+    try {
+        const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+        let user = userData;
+        let userId = userData.id;
+
+        // 세션에 id가 없으면 email로 조회 (안전장치)
+        if (!userId && userData.email) {
+            const found = await supabaseAPI.query('users', {
+                'email': `eq.${userData.email}`,
+                'limit': '1'
+            });
+            if (found && found.length > 0) {
+                user = found[0];
+                userId = found[0].id;
+            }
+        }
+        if (!userId) throw new Error('사용자 정보를 찾을 수 없습니다.');
+
+        const nowIso = new Date().toISOString();
+
+        // 1) 마케팅 동의 갱신
+        await supabaseAPI.patch('users', userId, {
+            marketing_consent: true,
+            marketing_consent_at: nowIso
+        });
+
+        // 2) 입문서 신청서 생성 (중복 방지: 이미 있으면 생성 생략)
+        const existingBook = await supabaseAPI.query('applications', {
+            'user_id': `eq.${userId}`,
+            'application_type': 'eq.book_only',
+            'deleted': 'neq.true',
+            'limit': '1'
+        });
+        if (!existingBook || existingBook.length === 0) {
+            await supabaseAPI.post('applications', {
+                user_id: userId,
+                user_email: user.email,
+                name: user.name,
+                phone: user.phone || null,
+                email: user.email,
+                application_type: 'book_only',
+                program: '입문서 무료 신청',
+                status: '승인완료',
+                confirmed: true,
+                current_score: null,
+                target_score: null,
+                no_target_score: true,
+                referral_source: null,
+                referral_source_detail: null,
+                privacy_agreement: true,
+                submitted_date: nowIso,
+                current_step: 10
+            });
+        }
+
+        // 3) 성공 팝업 → 확인 시 새로고침
+        showGuideUnlockedModal();
+
+    } catch (e) {
+        console.error('입문서 잠금 해제 실패:', e);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        const hint = document.getElementById('unlockConsentHint');
+        if (hint) {
+            hint.style.display = 'block';
+            hint.innerHTML = '<i class="fas fa-exclamation-circle"></i> 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        }
+    }
+}
+
+/**
+ * "입문서가 열렸습니다" 성공 팝업. 확인 클릭 시 대시보드 새로고침.
+ */
+function showGuideUnlockedModal() {
+    let modal = document.getElementById('guideUnlockedModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'guideUnlockedModal';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.6); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;';
+        modal.innerHTML = `
+            <div style="background: #fff; border-radius: 20px; max-width: 400px; width: 100%; padding: 40px 32px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="width: 80px; height: 80px; margin: 0 auto 20px; background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 38px;">🎉</div>
+                <h2 style="font-size: 22px; font-weight: 800; color: #1e293b; margin: 0 0 12px;">입문서가 열렸습니다!</h2>
+                <p style="font-size: 15px; color: #64748b; line-height: 1.7; margin: 0 0 28px;">이제 마이페이지에서 프리미엄 입문서를<br>바로 읽어보실 수 있어요.</p>
+                <button id="btnGuideUnlockedConfirm" class="program-button" style="width: 100%; padding: 16px; font-size: 16px; font-weight: 700; border: none; cursor: pointer;">확인</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+    const confirmBtn = document.getElementById('btnGuideUnlockedConfirm');
+    if (confirmBtn) confirmBtn.addEventListener('click', () => window.location.reload());
 }
 
 /**
