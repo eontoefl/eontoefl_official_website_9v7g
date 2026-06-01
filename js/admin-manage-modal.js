@@ -755,8 +755,8 @@ function loadModalAnalysisTab(app) {
     calculateModalPrice();
     toggleCorrectionStartDate();
 
-    // 거부 상태로 저장된 경우 프로그램/일정/가격 섹션 비활성화 적용
-    if (fillStatus === '거부') {
+    // 거부·조건부승인으로 저장된 경우 프로그램/일정/가격 섹션 비활성화 적용
+    if (fillStatus === '거부' || fillStatus === '조건부승인') {
         setRejectionUIState(true);
     }
 
@@ -916,11 +916,12 @@ function selectStatus(value, event) {
         }
     }
 
-    // 거부 시 프로그램/일정/가격 섹션 비활성화
-    setRejectionUIState(value === '거부');
+    // 거부·조건부승인 시 프로그램/일정/가격 섹션 비활성화 (조건부승인은 아직 협의 전이라 미정)
+    setRejectionUIState(value === '거부' || value === '조건부승인');
 }
 
-// 거부 선택 시 프로그램 배정/일정/가격 정보 섹션 비활성화 처리
+// 거부·조건부승인 선택 시 프로그램 배정/일정/가격 정보 섹션 비활성화 처리
+// (조건부승인은 아직 학생과 협의 전 단계라 프로그램·가격·일정을 미정으로 둔다)
 function setRejectionUIState(isRejected) {
     const fieldNames = [
         'assigned_program',
@@ -950,7 +951,7 @@ function setRejectionUIState(isRejected) {
     // 시각적 그레이아웃
     ['formGroup-program', 'formGroup-schedule', 'formGroup-price'].forEach(id => {
         const g = document.getElementById(id);
-        if (g) g.style.opacity = isRejected ? '0.5' : '';
+        if (g) g.style.opacity = blankProgramFields ? '0.5' : '';
     });
 }
 
@@ -1067,7 +1068,10 @@ async function saveModalAnalysis(event) {
     const formData = new FormData(form);
 
     // 가격 계산
-    const isRejected = formData.get('analysis_status') === '거부';
+    // 거부·조건부승인은 프로그램/가격/일정을 비워서 저장한다.
+    // (거부=종료 / 조건부승인=아직 협의 전. 승인으로 전환 저장할 때 새로 채워짐)
+    const blankProgramFields = formData.get('analysis_status') === '거부'
+        || formData.get('analysis_status') === '조건부승인';
     const basePrice = 1000000;
     const examSupport = 210000;
     const additionalDiscount = parseInt(formData.get('additional_discount')) || 0;
@@ -1082,20 +1086,20 @@ async function saveModalAnalysis(event) {
     // === 분기: 예약 발송 ===
     if (mode === 'scheduled' || mode === 'update-scheduled') {
         // pending 컬럼에 저장 (정식 컬럼은 건드리지 않음 → 학생에게 공개되지 않음)
-        const assignedProgramVal = isRejected ? null : formData.get('assigned_program');
+        const assignedProgramVal = blankProgramFields ? null : formData.get('assigned_program');
         const pendingPayload = {
             assigned_program: assignedProgramVal,
             course_track: (assignedProgramVal && assignedProgramVal.includes('Australia')) ? 'australia' : 'regular',
-            correction_enabled: isRejected ? false : correctionEnabled,
-            correction_start_date: isRejected ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
-            correction_fee: isRejected ? 0 : correctionFee,
-            program_price: isRejected ? null : basePrice,
-            discount_amount: isRejected ? null : examSupport,
-            additional_discount: isRejected ? 0 : additionalDiscount,
-            discount_reason: isRejected ? '' : (formData.get('discount_reason') || ''),
-            final_price: isRejected ? null : finalPrice,
-            schedule_start: isRejected ? null : formData.get('schedule_start'),
-            schedule_end: isRejected ? null : formData.get('schedule_end'),
+            correction_enabled: blankProgramFields ? false : correctionEnabled,
+            correction_start_date: blankProgramFields ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+            correction_fee: blankProgramFields ? 0 : correctionFee,
+            program_price: blankProgramFields ? null : basePrice,
+            discount_amount: blankProgramFields ? null : examSupport,
+            additional_discount: blankProgramFields ? 0 : additionalDiscount,
+            discount_reason: blankProgramFields ? '' : (formData.get('discount_reason') || ''),
+            final_price: blankProgramFields ? null : finalPrice,
+            schedule_start: blankProgramFields ? null : formData.get('schedule_start'),
+            schedule_end: blankProgramFields ? null : formData.get('schedule_end'),
             is_incentive_applicant: isIncentive,
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
             is_analysis_update: !!currentManageApp.analysis_first_saved_at
@@ -1132,21 +1136,21 @@ async function saveModalAnalysis(event) {
     }
 
     // === 분기: 즉시 저장 + 발송 (기존 동작) ===
-    const immediateProgram = isRejected ? null : formData.get('assigned_program');
+    const immediateProgram = blankProgramFields ? null : formData.get('assigned_program');
     const updateData = {
         analysis_status: formData.get('analysis_status'),
         assigned_program: immediateProgram,
         course_track: (immediateProgram && immediateProgram.includes('Australia')) ? 'australia' : 'regular',
-        correction_enabled: isRejected ? false : correctionEnabled,
-        correction_start_date: isRejected ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
-        correction_fee: isRejected ? 0 : correctionFee,
-        program_price: isRejected ? null : basePrice,
-        discount_amount: isRejected ? null : examSupport,
-        additional_discount: isRejected ? 0 : additionalDiscount,
-        discount_reason: isRejected ? '' : (formData.get('discount_reason') || ''),
-        final_price: isRejected ? null : finalPrice,
-        schedule_start: isRejected ? null : formData.get('schedule_start'),
-        schedule_end: isRejected ? null : formData.get('schedule_end'),
+        correction_enabled: blankProgramFields ? false : correctionEnabled,
+        correction_start_date: blankProgramFields ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+        correction_fee: blankProgramFields ? 0 : correctionFee,
+        program_price: blankProgramFields ? null : basePrice,
+        discount_amount: blankProgramFields ? null : examSupport,
+        additional_discount: blankProgramFields ? 0 : additionalDiscount,
+        discount_reason: blankProgramFields ? '' : (formData.get('discount_reason') || ''),
+        final_price: blankProgramFields ? null : finalPrice,
+        schedule_start: blankProgramFields ? null : formData.get('schedule_start'),
+        schedule_end: blankProgramFields ? null : formData.get('schedule_end'),
         analysis_content: formData.get('analysis_content'),
         analysis_saved_at: nowMs,
         current_step: 2,
@@ -1491,9 +1495,9 @@ function editAnalysis() {
             editBtn.style.display = 'none';
         }
 
-        // 현재 저장된 상태가 '거부'이면 프로그램/일정/가격 섹션은 비활성화 유지
+        // 현재 저장된 상태가 '거부'·'조건부승인'이면 프로그램/일정/가격 섹션은 비활성화 유지
         const currentStatus = document.querySelector('#statusOptionsContainer input[type="radio"]:checked')?.value;
-        if (currentStatus === '거부') {
+        if (currentStatus === '거부' || currentStatus === '조건부승인') {
             setRejectionUIState(true);
         }
 
