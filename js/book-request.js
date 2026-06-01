@@ -158,7 +158,39 @@ function initForm(mode, userData) {
     setupKakaoTracking();
     setupAgreements();
     setupModals();
+    loadLegalContent();
     setupSubmit();
+}
+
+// ===== 이용약관 / 개인정보 본문 DB 로드 (site_settings.default) =====
+// 약관은 관리자가 수정할 수 있도록 코드가 아닌 DB에 보관한다.
+// 셀 내용을 textContent로 넣어(자동 이스케이프) white-space:pre-wrap으로 줄바꿈 보존.
+async function loadLegalContent() {
+    const termsEl = document.getElementById('termsContent');
+    const privacyEl = document.getElementById('privacyContent');
+    if (!termsEl && !privacyEl) return;
+
+    try {
+        const rows = await supabaseAPI.query('site_settings', {
+            'setting_key': 'eq.default',
+            'select': 'terms_content,privacy_content',
+            'limit': '1'
+        });
+        const s = (rows && rows[0]) ? rows[0] : {};
+        const fallback = '약관 내용을 불러올 수 없습니다. 문의: messijessi@naver.com';
+
+        if (termsEl) {
+            termsEl.textContent = s.terms_content ? s.terms_content.replace(/\r\n/g, '\n') : fallback;
+        }
+        if (privacyEl) {
+            privacyEl.textContent = s.privacy_content ? s.privacy_content.replace(/\r\n/g, '\n') : fallback;
+        }
+    } catch (e) {
+        console.warn('약관 로드 실패:', e);
+        const msg = '약관을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.';
+        if (termsEl) termsEl.textContent = msg;
+        if (privacyEl) privacyEl.textContent = msg;
+    }
 }
 
 // ===== 닉네임 중복 체크 (register.js와 동일 규칙) =====
