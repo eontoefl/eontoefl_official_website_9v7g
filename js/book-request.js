@@ -62,20 +62,26 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (userData && userData.email) {
         // ===== 로그인 상태: 차단 조건 확인 후 ② 모드 =====
         try {
-            const applications = await supabaseAPI.query('applications', {
-                'user_email': `eq.${encodeURIComponent(userData.email)}`,
-                'order': 'created_at.desc'
+            // 신청서 조회 기준을 사이트 전체(funnel/guard/dashboard)와 통일:
+            //   - email 컬럼 기준 (user_email 아님)
+            //   - 삭제된 신청서(deleted)는 제외 (서버 필터 + 클라이언트 재확인)
+            const result = await supabaseAPI.query('applications', {
+                'email': `eq.${userData.email}`,
+                'deleted': 'neq.true',
+                'order': 'created_at.desc',
+                'limit': '100'
             });
+            const applications = (result || []).filter(app => app.deleted !== true && app.deleted !== 'true');
 
             // 차단B: 내벨업챌린지 참여자 (book_only 이외의 신청서 보유)
-            const challengeApp = (applications || []).find(app => app.application_type !== 'book_only');
+            const challengeApp = applications.find(app => app.application_type !== 'book_only');
             if (challengeApp) {
                 showBlock('blockChallenge');
                 return;
             }
 
             // 차단A: 이미 입문서 신청함
-            const bookApp = (applications || []).find(app => app.application_type === 'book_only');
+            const bookApp = applications.find(app => app.application_type === 'book_only');
             if (bookApp) {
                 showBlock('blockAlreadyApplied');
                 return;
