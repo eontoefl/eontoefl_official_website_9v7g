@@ -109,7 +109,7 @@ async function getFunnelSegment() {
             'limit': '100'
         });
         const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
-        const hasChallenge = apps.some(a => a.application_type && a.application_type !== 'book_only');
+        const hasChallenge = apps.some(a => a.application_type !== 'book_only');
         const hasBook = apps.some(a =>
             a.application_type === 'book_only' || a.book_access_enabled || a.is_incentive_applicant
         );
