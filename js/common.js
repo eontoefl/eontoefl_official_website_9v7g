@@ -216,17 +216,28 @@ async function goToMyApplication(event) {
     try {
         const result = await supabaseAPI.query('applications', {
             'email': `eq.${userData.email}`,
+            'deleted': 'neq.true',
             'order': 'created_at.desc',
-            'limit': '1'
+            'limit': '20'
         });
-        
-        if (result && result.length > 0) {
-            // 신청서가 있으면 가장 최근 신청서 상세 페이지로 이동
-            window.location.href = `application-detail.html?id=${result[0].id}`;
-        } else {
-            // 신청서가 없으면 알림
-            alert('📋 접수한 신청서가 없습니다.\n\n신청서를 먼저 작성해주세요.');
+
+        const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
+
+        // 내벨업챌린지 신청서가 있으면 그 상세로 이동
+        const challengeApp = apps.find(a => a.application_type !== 'book_only');
+        if (challengeApp) {
+            window.location.href = `application-detail.html?id=${challengeApp.id}`;
+            return;
         }
+
+        // 입문서 무료신청만 있는 경우: 상세(챌린지 전용) 대신 대시보드(입문서 보기)로 이동
+        if (apps.length > 0) {
+            window.location.href = 'my-dashboard.html';
+            return;
+        }
+
+        // 신청서가 전혀 없으면 알림
+        alert('📋 접수한 신청서가 없습니다.\n\n신청서를 먼저 작성해주세요.');
     } catch (error) {
         console.error('Failed to check application:', error);
         alert('❌ 신청서 확인 중 오류가 발생했습니다.\n\n잠시 후 다시 시도해주세요.');

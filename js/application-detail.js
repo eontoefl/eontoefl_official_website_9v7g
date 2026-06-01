@@ -179,10 +179,17 @@ async function loadApplicationDetail() {
                 return;
             }
             
+            // 입문서 무료신청(book_only)은 내벨업챌린지 전용 5단계 흐름과 맞지 않음.
+            // 학생에게는 안내 화면 + 대시보드 버튼만 노출하고 종료 (관리자는 정상 열람).
+            if (app.application_type === 'book_only' && !isAdmin()) {
+                showBookOnlyGuard();
+                return;
+            }
+
             currentApplication = app;
             globalApplication = app;
             _studentInfo = { name: app.name, phone: app.phone, id: app.id, final_price: app.final_price };
-            
+
             console.log('Calling displayApplicationDetail...');
             displayApplicationDetail(app);
             
@@ -204,6 +211,26 @@ async function loadApplicationDetail() {
     } finally {
         loading.style.display = 'none';
     }
+}
+
+// 입문서 무료신청자가 이 페이지에 들어왔을 때 보여줄 안내 화면.
+// (5단계 챌린지 흐름은 입문서와 무관하므로 막다른 길 대신 대시보드로 안내)
+function showBookOnlyGuard() {
+    document.getElementById('detailLoading').style.display = 'none';
+    document.getElementById('detailCard').style.display = 'none';
+    const errorMessage = document.getElementById('errorMessage');
+    errorMessage.innerHTML = `
+        <i class="fas fa-book-open" style="font-size: 64px; color: #9480c5; margin-bottom: 20px;"></i>
+        <p style="font-size: 18px; color: #1e293b; font-weight: 700; margin-bottom: 8px;">이 페이지는 내벨업챌린지 신청자 전용입니다</p>
+        <p style="font-size: 14px; color: #64748b; margin-bottom: 32px; line-height: 1.7;">
+            입문서 무료신청은 신청과 동시에 바로 열람할 수 있어요.<br>
+            아래 버튼을 눌러 마이페이지에서 입문서를 확인해보세요.
+        </p>
+        <a href="my-dashboard.html" class="program-button" style="display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; font-size: 15px; font-weight: 700; text-decoration: none;">
+            <i class="fas fa-book-reader"></i> 입문서 보러 가기
+        </a>
+    `;
+    errorMessage.style.display = 'block';
 }
 
 function displayApplicationDetail(app) {
