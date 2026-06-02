@@ -5,7 +5,8 @@
 --   관리자가 개별분석 저장 시, 즉시 발송 대신 특정 시각에 예약 발송 가능.
 --   예약 시각이 도래하면:
 --     (1) 임시 보관된 분석 데이터를 정식 컬럼으로 이전 (학생에게 공개)
---     (2) 알림톡 발송 (analysis_complete / incentive_analysis_complete / analysis_updated)
+--     (2) 알림톡 발송 (analysis_complete / incentive_analysis_complete /
+--         analysis_updated / analysis_registered[조건부승인·거부])
 --     (3) analysis_first_saved_at, analysis_saved_at = 발송 시각으로 세팅
 --         (= 동의 데드라인 카운트다운이 발송 시점부터 시작)
 --
@@ -146,9 +147,10 @@ BEGIN
                     duration_weeks = EXCLUDED.duration_weeks;
         END IF;
 
-        -- 알림톡 유형 결정 (수정이면 analysis_updated, 최초면 기존 분기)
+        -- 알림톡 유형 결정: 수정이면 analysis_updated, 조건부승인/거부면 analysis_registered(50226), 그 외 기존 분기
         v_alim_type := CASE
             WHEN v_is_update THEN 'analysis_updated'
+            WHEN rec.analysis_status_pending IN ('조건부승인', '거부') THEN 'analysis_registered'
             WHEN v_is_incentive THEN 'incentive_analysis_complete'
             ELSE 'analysis_complete'
         END;

@@ -1193,10 +1193,16 @@ async function saveModalAnalysis(event) {
             } else {
                 // 최초 저장 vs 수정 저장 분기
                 // analysis_first_saved_at가 이미 있었으면 = 이전에 공개한 적 있음 = 수정
+                // 조건부승인/거부는 '개별분석 등록 안내(50226 — 확인 필요)' 템플릿으로 발송.
+                // 단 수정 재발송(isUpdate)일 땐 기존 '수정 안내'를 우선한다.
                 const isUpdate = !!currentManageApp.analysis_first_saved_at;
+                const savedStatus = formData.get('analysis_status');
+                const isConditionalOrReject = savedStatus === '조건부승인' || savedStatus === '거부';
                 const alimTalkType = isUpdate
                     ? 'analysis_updated'
-                    : (isIncentive ? 'incentive_analysis_complete' : 'analysis_complete');
+                    : isConditionalOrReject
+                        ? 'analysis_registered'
+                        : (isIncentive ? 'incentive_analysis_complete' : 'analysis_complete');
                 try {
                     await sendKakaoAlimTalk(alimTalkType, {
                         name: updatedApp.name || currentManageApp.name,
@@ -1207,7 +1213,9 @@ async function saveModalAnalysis(event) {
 
                 alimTalkNotice = isUpdate
                     ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
-                    : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
+                    : isConditionalOrReject
+                        ? '\n\n📢 개별분석 등록 안내 알림톡(확인 필요 안내)이 발송되었습니다.'
+                        : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
             }
             alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice);
 

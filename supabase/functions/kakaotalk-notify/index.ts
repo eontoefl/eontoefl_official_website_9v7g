@@ -26,6 +26,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   incentive_analysis_complete: 50214,  // 프로모션 학생: 개별분석 & 입문서 전송 완료 안내
   incentive_deadline_warning:  50215,  // 프로모션 학생: 동의 마감 6시간 전 안내
   analysis_updated:            50217,  // 개별분석 수정 안내
+  analysis_registered:         50226,  // 개별분석 등록 안내 (조건부승인/거부 — 확인 필요)
   contract_deferred:           50221,  // 계약서 기한 유예 안내
   contract_deferral_reminder:  50222,  // 계약서 유예 만료 24시간 전 리마인더
   weekly_check_registered:     50225,  // 주간체크 등록 안내
@@ -253,6 +254,19 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "시간 되실 때 아래 링크에서 한 번 확인 부탁드려요 :)",
       ].join("\n");
 
+    case "analysis_registered":
+      return [
+        "이온토플 - 개별분석 등록 안내",
+        "",
+        `${data.name}님, 안녕하세요!`,
+        "",
+        "요청해주신 개별분석이 등록되었습니다.",
+        "",
+        "다만 바로 승인해드리기에는 확인이 필요한 부분이 있어, 해당 내용을 함께 담아두었어요.",
+        "",
+        "아래 버튼을 눌러 내용을 확인해주세요 :)",
+      ].join("\n");
+
     case "contract_deferred":
       return [
         "이온토플 - 진행 연기 안내",
@@ -323,6 +337,8 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
     case "analysis_updated":
       return "[이온토플] 개별분석이 수정되었습니다. 확인 부탁드려요.";
+    case "analysis_registered":
+      return "[이온토플] 확인이 필요한 부분이 있으니 개별분석 내용 확인 부탁드려요 :)";
     case "contract_deferred":
       return "[이온토플] 신청 진행이 연기되었습니다. 기한 내 진행 부탁드려요.";
     case "contract_deferral_reminder":
