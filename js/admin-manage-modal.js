@@ -390,11 +390,14 @@ function loadModalAnalysisTab(app) {
     // AI 자동 분석 감지: analysis_content는 있지만 analysis_status가 없는 경우
     const hasAIAnalysis = !app.analysis_status && !!app.analysis_content;
 
-    // 예약 발송 대기 중 여부 (정식 컬럼은 비어있고, 예약 시각 + pending 컬럼이 있음)
-    const isScheduled = !hasAnalysis
-        && !!app.analysis_alimtalk_scheduled_at
+    // 미발송 수정본(임시 보관) 존재 여부: 정식 컬럼은 비어있고 pending 컬럼에 내용이 있음.
+    // 예약을 걸어둔 경우 + 예약을 취소했지만 수정본은 보존된 경우를 모두 포함한다.
+    const hasPendingDraft = !hasAnalysis
         && !!app.analysis_status_pending
         && !!app.analysis_content_pending;
+
+    // 예약 발송 대기 중 여부 = 미발송 수정본이 있고, 예약 시각이 설정되어 있는 상태.
+    const isScheduled = hasPendingDraft && !!app.analysis_alimtalk_scheduled_at;
 
     // 읽기 전용/수정 모드 설정
     //  - 저장 완료(공개됨)된 분석: 기본 읽기 전용 (수정 버튼 클릭 시 활성화)
@@ -404,25 +407,26 @@ function loadModalAnalysisTab(app) {
     const pointerEvents = hasAnalysis ? 'pointer-events: none; opacity: 0.7;' : '';
     const cursorStyle = hasAnalysis ? '' : 'cursor: pointer;';
 
-    // 폼 prefill 시 사용할 값 (예약 중이면 pending 데이터에서 가져옴)
-    const pendingPayload = isScheduled ? (app.analysis_pending_payload || {}) : {};
-    const fillStatus  = isScheduled ? app.analysis_status_pending  : app.analysis_status;
-    const fillContent = isScheduled ? app.analysis_content_pending : app.analysis_content;
-    const fillProgram = isScheduled ? (pendingPayload.assigned_program || '') : (app.assigned_program || '');
-    const fillScheduleStart = isScheduled ? (pendingPayload.schedule_start || '') : (app.schedule_start || '');
-    const fillScheduleEnd   = isScheduled ? (pendingPayload.schedule_end || '')   : (app.schedule_end || '');
-    const fillCorrectionEnabled = isScheduled
+    // 폼 prefill 시 사용할 값 (미발송 수정본이 있으면 pending 데이터에서 가져옴.
+    // 예약을 취소해도 수정본은 보존되므로 예약 여부와 무관하게 hasPendingDraft 기준으로 채운다.)
+    const pendingPayload = hasPendingDraft ? (app.analysis_pending_payload || {}) : {};
+    const fillStatus  = hasPendingDraft ? app.analysis_status_pending  : app.analysis_status;
+    const fillContent = hasPendingDraft ? app.analysis_content_pending : app.analysis_content;
+    const fillProgram = hasPendingDraft ? (pendingPayload.assigned_program || '') : (app.assigned_program || '');
+    const fillScheduleStart = hasPendingDraft ? (pendingPayload.schedule_start || '') : (app.schedule_start || '');
+    const fillScheduleEnd   = hasPendingDraft ? (pendingPayload.schedule_end || '')   : (app.schedule_end || '');
+    const fillCorrectionEnabled = hasPendingDraft
         ? (pendingPayload.correction_enabled === true)
         : !!app.correction_enabled;
-    const fillCorrectionStartDate = isScheduled ? (pendingPayload.correction_start_date || '') : (app.correction_start_date || '');
-    const fillAdditionalDiscount = isScheduled
+    const fillCorrectionStartDate = hasPendingDraft ? (pendingPayload.correction_start_date || '') : (app.correction_start_date || '');
+    const fillAdditionalDiscount = hasPendingDraft
         ? (pendingPayload.additional_discount || 0)
         : (app.additional_discount || 0);
-    const fillDiscountReason = isScheduled ? (pendingPayload.discount_reason || '') : (app.discount_reason || '');
-    const fillIsIncentive = isScheduled
+    const fillDiscountReason = hasPendingDraft ? (pendingPayload.discount_reason || '') : (app.discount_reason || '');
+    const fillIsIncentive = hasPendingDraft
         ? (pendingPayload.is_incentive_applicant === true)
         : !!app.is_incentive_applicant;
-    const fillBookAccess = isScheduled
+    const fillBookAccess = hasPendingDraft
         ? (pendingPayload.book_access_enabled === true)
         : !!app.book_access_enabled;
 
@@ -457,8 +461,24 @@ function loadModalAnalysisTab(app) {
         </div>
     ` : '';
 
-    // AI 자동 분석 배너
-    const aiAnalysisBanner = hasAIAnalysis ? `
+    // 예약 취소 후 수정본 보존 배너 (예약은 풀렸지만 미발송 수정본이 남아있는 상태)
+    const preservedDraftBanner = (hasPendingDraft && !isScheduled) ? `
+        <div style="background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 100%); border: 2px solid #06b6d4; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fas fa-save" style="font-size: 24px; color: #0891b2; margin-top: 2px;"></i>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 15px; color: #155e75; margin-bottom: 4px;">💾 작성하신 수정본이 보존되어 있습니다</div>
+                    <div style="font-size: 13px; color: #155e75; line-height: 1.6;">
+                        예약은 취소되었지만 수정 내용은 그대로 남아있습니다 (학생에게는 아직 공개되지 않았습니다).<br>
+                        검토 후 <strong>[즉시발송]</strong> 또는 <strong>[예약발송]</strong>을 선택해주세요.
+                    </div>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
+    // AI 자동 분석 배너 (미발송 수정본이 보존된 상태에서는 표시하지 않음)
+    const aiAnalysisBanner = (hasAIAnalysis && !hasPendingDraft) ? `
         <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
             <div style="display: flex; align-items: flex-start; gap: 12px;">
                 <i class="fas fa-robot" style="font-size: 24px; color: #8b5cf6; margin-top: 2px;"></i>
@@ -485,6 +505,7 @@ function loadModalAnalysisTab(app) {
 
     let html = `
         ${scheduledBanner}
+        ${preservedDraftBanner}
         ${aiAnalysisBanner}
         <!-- 입문서 제공 토글 (form 밖, 즉시 저장) -->
         <div class="form-group" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #38bdf8; margin-bottom: 24px;">
@@ -1298,18 +1319,17 @@ function openChangeScheduleModal() {
 // 예약 취소
 async function cancelScheduledRelease() {
     if (!currentManageApp || !currentManageApp.analysis_alimtalk_scheduled_at) return;
-    if (!confirm('예약 발송을 취소하시겠습니까?\n\n분석 내용은 그대로 유지되며,\n다시 [즉시 발송] 또는 [예약 발송]을 선택하실 수 있습니다.\n\n학생에게는 아무런 영향이 없습니다.')) return;
+    if (!confirm('예약 발송을 취소하시겠습니까?\n\n작성하신 수정본은 그대로 보존되며,\n다시 [즉시 발송] 또는 [예약 발송]을 선택하실 수 있습니다.\n\n학생에게는 아무런 영향이 없습니다.')) return;
 
     try {
+        // 예약 시각만 해제한다. 수정본(pending 컬럼)은 절대 지우지 않는다.
+        // (정식 컬럼은 비어있는 상태이므로 학생에게는 여전히 공개되지 않는다.)
         const updated = await supabaseAPI.patch('applications', currentManageApp.id, {
-            analysis_alimtalk_scheduled_at: null,
-            analysis_status_pending: null,
-            analysis_content_pending: null,
-            analysis_pending_payload: null
+            analysis_alimtalk_scheduled_at: null
         });
         if (!updated) { alert('❌ 취소에 실패했습니다.'); return; }
         currentManageApp = updated;
-        alert('✅ 예약이 취소되었습니다.\n\n분석 내용은 폼에 그대로 보존되어 있으니,\n다시 [즉시 발송] 또는 [예약 발송]을 선택해주세요.');
+        alert('✅ 예약이 취소되었습니다.\n\n작성하신 수정본은 폼에 그대로 보존되어 있으니,\n다시 [즉시 발송] 또는 [예약 발송]을 선택해주세요.');
         loadModalTab('analysis');
     } catch (e) {
         console.error('Cancel schedule error:', e);
