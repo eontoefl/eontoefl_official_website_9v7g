@@ -169,7 +169,10 @@ const supabaseAPI = {
         let url = `${SUPABASE_URL}/rest/v1/${table}?`;
         
         Object.keys(filters).forEach(key => {
-            url += `${key}=${filters[key]}&`;
+            // 값은 URL 인코딩 필수: 이메일의 '+'가 쿼리스트링에서 공백으로 해석돼
+            // 조회가 빗나가는 버그 방지 (예: user+tag@gmail.com). PostgREST는
+            // 인코딩된 in.(...)/select 등 특수문법도 정상 처리함.
+            url += `${key}=${encodeURIComponent(filters[key])}&`;
         });
         
         const response = await fetch(url, {
