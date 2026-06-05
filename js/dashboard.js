@@ -1642,7 +1642,9 @@ async function renderBookOnlyDashboard(app) {
     const otherDoc = otherTrack === 'australia' ? introDocs.australia : introDocs.regular;
     const bookId = curDoc?.id || null;
     const otherBookLabel = otherTrack === 'australia' ? '호주 입문서' : '일반 입문서';
-    const curBookLabel = track === 'australia' ? '호주 입문서' : '일반 입문서';
+    const otherSwitchHtml = otherTrack === 'australia'
+        ? '입문서로 전환하기 <span style="background:#fef3c7; color:#92400e; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600;">🇦🇺 호주</span>'
+        : '일반 입문서로 전환하기';
 
     // 해당 책(book_id)의 진도 조회
     const progress = await getBookProgress(userId, bookId);
@@ -1691,10 +1693,10 @@ async function renderBookOnlyDashboard(app) {
         <div class="welcome-section" style="background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%);">
             <h1 style="display: flex; align-items: center; gap: 10px;">
                 <i class="fas fa-book-open"></i>
-                ${app.name || userData.name || ''}님, ${curBookLabel}가 준비되어 있습니다
+                ${app.name || userData.name || ''}님, 입문서가 준비되어 있습니다
                 ${track === 'australia' ? '<span style="background: rgba(255,255,255,0.25); padding: 3px 10px; border-radius: 20px; font-size: 13px; font-weight: 600;">🇦🇺 호주</span>' : ''}
             </h1>
-            <p>토플 독학의 첫걸음, ${curBookLabel}를 읽어보세요.</p>
+            <p>토플 독학의 첫걸음, 이온토플 입문서를 읽어보세요.</p>
         </div>
 
         <!-- 메인 그리드 -->
@@ -1715,7 +1717,8 @@ async function renderBookOnlyDashboard(app) {
                     <!-- 통계 정보 -->
                     <div class="book-stats-section" style="flex: 1; min-width: 250px;">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-                            <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">${curBookLabel} 읽기 현황</h2>
+                            <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">입문서 읽기 현황</h2>
+                            ${track === 'australia' ? '<span style="background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;">🇦🇺 호주</span>' : ''}
                             ${isCompleted ? '<span style="background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">완독 완료 ✅</span>' : ''}
                         </div>
 
@@ -1746,7 +1749,7 @@ async function renderBookOnlyDashboard(app) {
                             ${otherDoc ? `
                             <div style="text-align: center; margin-top: 12px;">
                                 <a id="btnSwitchBook" href="#" style="font-size: 13px; color: #7a62b0; text-decoration: none; font-weight: 500;">
-                                    <i class="fas fa-book"></i> ${otherBookLabel}로 전환하기
+                                    <i class="fas fa-book"></i> ${otherSwitchHtml}
                                 </a>
                                 <button type="button" onclick="toggleIntroBookHelp()" title="어떤 입문서를 봐야 하나요?" style="border:none; background:none; color:#7a62b0; cursor:pointer; padding:0 4px; font-size:13px;"><i class="fas fa-question-circle"></i></button>
                                 <div id="introBookHelp" style="display:none; margin-top:8px; padding:12px; background:#fffef5; border:1px solid #fde68a; border-radius:8px; font-size:12.5px; color:#78350f; line-height:1.6; text-align:left;">
@@ -1844,7 +1847,9 @@ async function renderBookOnlyMiniCard(bookApp) {
     const otherDoc = otherTrack === 'australia' ? introDocs.australia : introDocs.regular;
     const bookId = curDoc?.id || null;
     const otherBookLabel = otherTrack === 'australia' ? '호주 입문서' : '일반 입문서';
-    const curBookLabel = track === 'australia' ? '호주 입문서' : '일반 입문서';
+    const otherSwitchHtml = otherTrack === 'australia'
+        ? '입문서로 전환하기 <span style="background:#fef3c7; color:#92400e; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600;">🇦🇺 호주</span>'
+        : '일반 입문서로 전환하기';
 
     // 해당 책(book_id)의 진도 조회
     const progress = await getBookProgress(userId, bookId);
@@ -1865,7 +1870,7 @@ async function renderBookOnlyMiniCard(bookApp) {
             </div>
             <div style="flex: 1;">
                 <div style="font-size: 15px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
-                    ${curBookLabel} 읽기
+                    입문서 읽기
                     ${track === 'australia' ? '<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;">🇦🇺 호주</span>' : ''}
                     ${isCompleted
                         ? '<span style="background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">완독 ✅</span>'
@@ -1875,7 +1880,7 @@ async function renderBookOnlyMiniCard(bookApp) {
                 <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
                     ${lastPage > 0 ? `마지막으로 읽은 페이지: ${lastPage}` : '아직 읽기를 시작하지 않았습니다'}
                 </div>
-                ${otherDoc ? `<div style="font-size: 12px; margin-top: 6px;"><a id="btnMiniSwitchBook" href="#" style="color:#7a62b0; text-decoration:none; font-weight:500;"><i class="fas fa-book"></i> ${otherBookLabel}로 전환하기</a></div>` : ''}
+                ${otherDoc ? `<div style="font-size: 12px; margin-top: 6px;"><a id="btnMiniSwitchBook" href="#" style="color:#7a62b0; text-decoration:none; font-weight:500;"><i class="fas fa-book"></i> ${otherSwitchHtml}</a></div>` : ''}
             </div>
             <button id="btnMiniCardBook" style="padding: 10px 20px; background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; transition: transform 0.2s;">
                 <i class="fas fa-external-link-alt"></i> 열기
