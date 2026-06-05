@@ -443,6 +443,9 @@ function setupSubmit() {
                 await maybeUpdateMarketingConsent(state.user);
             }
 
+            // 호주/일반 선택 → 기본 입문서 트랙 저장 (마케팅 동의와 무관, best-effort)
+            await saveIntroBookTrack(state.user);
+
             // ── 마케팅 동의 시에만 입문서 신청 저장 ──
             if (marketingChecked) {
                 await saveApplication(state.user);
@@ -722,6 +725,12 @@ function validateBookForm() {
 
     // 카카오 채널 추가는 선택 항목 (제출을 막지 않음)
 
+    // 호주/뉴질랜드 직접 제출 여부 (입문서 종류 결정)
+    if (!document.querySelector('input[name="is_au_nz_direct_submit"]:checked')) {
+        showToast('호주/뉴질랜드 직접 제출 여부를 선택해주세요.', 'error');
+        return false;
+    }
+
     // 필수 약관 동의
     if (!document.getElementById('agreeTerms').checked) {
         showToast('이용약관에 동의해주세요.', 'error');
@@ -738,4 +747,28 @@ function validateBookForm() {
 function focusEl(id) {
     const el = document.getElementById(id);
     if (el) el.focus();
+}
+
+// ===== 호주/뉴질랜드 안내 토글 =====
+function toggleAuNzTooltip() {
+    const content = document.getElementById('auNzTooltipContent');
+    if (content) content.style.display = content.style.display === 'none' ? 'block' : 'none';
+}
+
+// 라디오 선택값 → 입문서 트랙('australia' | 'regular')
+function getAuNzTrack() {
+    const checked = document.querySelector('input[name="is_au_nz_direct_submit"]:checked');
+    return checked && checked.value === 'yes' ? 'australia' : 'regular';
+}
+
+// 기본 입문서 트랙을 계정에 저장 (마케팅 동의와 무관, best-effort).
+// users.intro_book_track 컬럼이 아직 없으면 조용히 무시된다(계정 생성에는 영향 없음).
+async function saveIntroBookTrack(user) {
+    if (!user || !user.id) return;
+    const track = getAuNzTrack();
+    try {
+        await supabaseAPI.patch('users', user.id, { intro_book_track: track });
+    } catch (e) {
+        console.warn('입문서 트랙 저장 실패(무시):', e);
+    }
 }
