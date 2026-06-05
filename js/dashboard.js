@@ -1562,6 +1562,69 @@ function setupEventListeners() {
 // 입문서 전용 대시보드 (Phase 2-B)
 // =====================================================
 
+// ===== 입문서 트랙(일반/호주) 공통 헬퍼 =====
+// 두 입문서를 tr_book_documents의 sort_order로 식별 (0=일반, 1=호주)
+async function getIntroBookDocs() {
+    try {
+        const rows = await supabaseAPI.query('tr_book_documents', {
+            'is_active': 'eq.true',
+            'order': 'sort_order.asc'
+        });
+        const list = rows || [];
+        return {
+            regular: list.find(b => Number(b.sort_order) === 0) || null,
+            australia: list.find(b => Number(b.sort_order) === 1) || null
+        };
+    } catch (e) {
+        console.warn('입문서 문서 조회 실패:', e);
+        return { regular: null, australia: null };
+    }
+}
+
+// 사용자의 기본 입문서 트랙 (users.intro_book_track, 없으면 regular)
+async function getUserIntroTrack(userId) {
+    if (!userId) return 'regular';
+    try {
+        const rows = await supabaseAPI.query('users', { 'id': `eq.${userId}`, 'limit': '1' });
+        const t = (rows && rows[0]) ? rows[0].intro_book_track : null;
+        return t === 'australia' ? 'australia' : 'regular';
+    } catch (e) {
+        return 'regular';
+    }
+}
+
+// 기본 입문서 트랙 변경 (토글 시 = 최근 선택을 기본으로). 컬럼 없으면 조용히 무시.
+async function setUserIntroTrack(userId, track) {
+    if (!userId) return;
+    try {
+        await supabaseAPI.patch('users', userId, { intro_book_track: track });
+    } catch (e) {
+        console.warn('입문서 트랙 저장 실패(무시):', e);
+    }
+}
+
+// 특정 책(book_id)의 진도 조회
+async function getBookProgress(userId, bookId) {
+    if (!userId || !bookId) return null;
+    try {
+        const rows = await supabaseAPI.query('tr_book_progress', {
+            'user_id': `eq.${userId}`,
+            'book_id': `eq.${bookId}`,
+            'limit': '1'
+        });
+        return (rows && rows[0]) || null;
+    } catch (e) {
+        console.warn('입문서 진도 조회 실패:', e);
+        return null;
+    }
+}
+
+// 입문서 종류 안내 토글 (대시보드용)
+function toggleIntroBookHelp() {
+    const el = document.getElementById('introBookHelp');
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 /**
  * 입문서 전용 대시보드 렌더링
  * 기존 dashboardContent를 완전히 덮어쓴다.
@@ -1571,38 +1634,38 @@ async function renderBookOnlyDashboard(app) {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
     const userId = app.user_id || userData.id;
 
-    // tr_book_progress 조회
-    let progress = null;
-    try {
-        const progressResult = await supabaseAPI.query('tr_book_progress', {
-            'user_id': `eq.${userId}`,
-            'limit': '1',
-            'order': 'updated_at.desc'
-        });
-        if (progressResult && progressResult.length > 0) {
-            progress = progressResult[0];
-        }
-    } catch (e) {
-        console.warn('입문서 진도 조회 실패:', e);
-    }
+    // 표시할 입문서 트랙 결정 (users.intro_book_track, 없으면 regular)
+    const track = await getUserIntroTrack(userId);
+    const otherTrack = track === 'australia' ? 'regular' : 'australia';
+    const introDocs = await getIntroBookDocs();
+    const curDoc = track === 'australia' ? introDocs.australia : introDocs.regular;
+    const otherDoc = otherTrack === 'australia' ? introDocs.australia : introDocs.regular;
+    const bookId = curDoc?.id || null;
+    const otherBookLabel = otherTrack === 'australia' ? '호주 입문서' : '일반 입문서';
 
-    // tr_book_memos 조회
+    // 해당 책(book_id)의 진도 조회
+    const progress = await getBookProgress(userId, bookId);
+
+    // 해당 책(book_id)의 메모 수
     let memoCount = 0;
     try {
-        const memos = await supabaseAPI.query('tr_book_memos', {
-            'user_id': `eq.${userId}`
-        });
-        memoCount = memos ? memos.length : 0;
+        if (bookId) {
+            const memos = await supabaseAPI.query('tr_book_memos', {
+                'user_id': `eq.${userId}`,
+                'book_id': `eq.${bookId}`
+            });
+            memoCount = memos ? memos.length : 0;
+        }
     } catch (e) {
         console.warn('입문서 메모 조회 실패:', e);
     }
 
-    // 진도 데이터 파싱
+    // 진도 데이터 파싱 (총페이지는 책마다 다름)
     const lastPage = progress?.last_page || 0;
     const maxPageReached = progress?.max_page_reached || 0;
     const isCompleted = progress?.is_completed || false;
-    const totalPages = 366;
-    const progressPercent = Math.min(Math.round((maxPageReached / totalPages) * 100), 100);
+    const totalPages = curDoc?.total_pages || 0;
+    const progressPercent = totalPages > 0 ? Math.min(Math.round((maxPageReached / totalPages) * 100), 100) : 0;
     const progressDeg = (progressPercent / 100) * 360;
 
     // 북마크 수
@@ -1678,6 +1741,16 @@ async function renderBookOnlyDashboard(app) {
                             <button id="btnGoToBook" class="program-button" style="width: 100%; padding: 16px; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; border: none; cursor: pointer;">
                                 <i class="fas fa-book-reader"></i> ${lastPage > 0 ? `이어서 읽기 (${lastPage}페이지부터)` : '읽기 시작하기'}
                             </button>
+                            ${otherDoc ? `
+                            <div style="text-align: center; margin-top: 12px;">
+                                <a id="btnSwitchBook" href="#" style="font-size: 13px; color: #7a62b0; text-decoration: none; font-weight: 500;">
+                                    <i class="fas fa-book"></i> ${otherBookLabel} 보기
+                                </a>
+                                <button type="button" onclick="toggleIntroBookHelp()" title="어떤 입문서를 봐야 하나요?" style="border:none; background:none; color:#7a62b0; cursor:pointer; padding:0 4px; font-size:13px;"><i class="fas fa-question-circle"></i></button>
+                                <div id="introBookHelp" style="display:none; margin-top:8px; padding:12px; background:#fffef5; border:1px solid #fde68a; border-radius:8px; font-size:12.5px; color:#78350f; line-height:1.6; text-align:left;">
+                                    <strong>호주 입문서</strong>는 호주·뉴질랜드 기관에 점수를 <strong>직접 제출</strong>하는 분(TOEFL Australia 응시자)을 위한 버전이에요. 그 외에는 <strong>일반 입문서</strong>를 보시면 됩니다. 두 책의 읽기 진도·메모는 따로 저장돼요.
+                                </div>
+                            </div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -1701,13 +1774,21 @@ async function renderBookOnlyDashboard(app) {
     `;
 
     // 이벤트 리스너 바인딩
-    document.getElementById('btnGoToBook').addEventListener('click', () => goToBookViewer(app, 'btnGoToBook'));
+    document.getElementById('btnGoToBook').addEventListener('click', () => goToBookViewer(app, 'btnGoToBook', track));
+    const switchLink = document.getElementById('btnSwitchBook');
+    if (switchLink) {
+        switchLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await setUserIntroTrack(userId, otherTrack);   // 최근 선택을 기본으로 (시간 순서)
+            goToBookViewer(app, 'btnGoToBook', otherTrack);
+        });
+    }
 }
 
 /**
  * 토큰 발급 + 테스트룸 book.html 이동
  */
-async function goToBookViewer(app, btnId) {
+async function goToBookViewer(app, btnId, track) {
     const btn = document.getElementById(btnId || 'btnGoToBook');
     const originalHtml = btn ? btn.innerHTML : '';
     if (btn) {
@@ -1729,8 +1810,9 @@ async function goToBookViewer(app, btnId) {
             expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()  // 5분 유효
         });
 
-        // 3. 테스트룸 book.html로 이동
-        window.location.href = 'https://testroom.eonfl.com/book.html?auth_token=' + token;
+        // 3. 테스트룸 book.html로 이동 (호주 트랙이면 호주 입문서로)
+        const modeParam = track === 'australia' ? '&mode=australia' : '';
+        window.location.href = 'https://testroom.eonfl.com/book.html?auth_token=' + token + modeParam;
 
     } catch (error) {
         console.error('토큰 발급 실패:', error);
@@ -1752,25 +1834,22 @@ async function renderBookOnlyMiniCard(bookApp) {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
     const userId = bookApp.user_id || userData.id;
 
-    // tr_book_progress 조회
-    let progress = null;
-    try {
-        const progressResult = await supabaseAPI.query('tr_book_progress', {
-            'user_id': `eq.${userId}`,
-            'limit': '1',
-            'order': 'updated_at.desc'
-        });
-        if (progressResult && progressResult.length > 0) {
-            progress = progressResult[0];
-        }
-    } catch (e) {
-        console.warn('입문서 진도 조회 실패:', e);
-    }
+    // 표시할 입문서 트랙 (무료 신청 때 고른 책 = 보던 책 이어보기)
+    const track = await getUserIntroTrack(userId);
+    const otherTrack = track === 'australia' ? 'regular' : 'australia';
+    const introDocs = await getIntroBookDocs();
+    const curDoc = track === 'australia' ? introDocs.australia : introDocs.regular;
+    const otherDoc = otherTrack === 'australia' ? introDocs.australia : introDocs.regular;
+    const bookId = curDoc?.id || null;
+    const otherBookLabel = otherTrack === 'australia' ? '호주 입문서' : '일반 입문서';
+
+    // 해당 책(book_id)의 진도 조회
+    const progress = await getBookProgress(userId, bookId);
 
     const lastPage = progress?.last_page || 0;
     const maxPageReached = progress?.max_page_reached || 0;
     const isCompleted = progress?.is_completed || false;
-    const totalPages = 366;
+    const totalPages = curDoc?.total_pages || 0;
 
     // 미니카드 HTML
     const miniCard = document.createElement('div');
@@ -1792,6 +1871,7 @@ async function renderBookOnlyMiniCard(bookApp) {
                 <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
                     ${lastPage > 0 ? `마지막으로 읽은 페이지: ${lastPage}` : '아직 읽기를 시작하지 않았습니다'}
                 </div>
+                ${otherDoc ? `<div style="font-size: 12px; margin-top: 6px;"><a id="btnMiniSwitchBook" href="#" style="color:#7a62b0; text-decoration:none; font-weight:500;"><i class="fas fa-book"></i> ${otherBookLabel} 보기</a></div>` : ''}
             </div>
             <button id="btnMiniCardBook" style="padding: 10px 20px; background: linear-gradient(135deg, #9480c5 0%, #7a62b0 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; transition: transform 0.2s;">
                 <i class="fas fa-external-link-alt"></i> 열기
@@ -1810,8 +1890,17 @@ async function renderBookOnlyMiniCard(bookApp) {
     // 이벤트 리스너 바인딩
     document.getElementById('btnMiniCardBook').addEventListener('click', (e) => {
         e.stopPropagation();
-        goToBookViewer(bookApp, 'btnMiniCardBook');
+        goToBookViewer(bookApp, 'btnMiniCardBook', track);
     });
+    const miniSwitch = document.getElementById('btnMiniSwitchBook');
+    if (miniSwitch) {
+        miniSwitch.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await setUserIntroTrack(userId, otherTrack);   // 최근 선택을 기본으로
+            goToBookViewer(bookApp, 'btnMiniCardBook', otherTrack);
+        });
+    }
 }
 
 // ==================== 닉네임 미설정 → 내 정보 수정 페이지로 안내 ====================
