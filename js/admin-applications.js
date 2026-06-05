@@ -5,8 +5,9 @@ let selectedIds = new Set();
 const itemsPerPage = 20;
 let currentPage = 1;
 let currentAppTypeTab = 'all'; // 'all' | 'challenge' | 'book_only'
-let bookProgressCache = {};  // user_id → { max_page_reached, last_page, is_completed, bookmarks }
-let bookMemoCountCache = {}; // user_id → count
+let bookProgressCache = {};  // user_id → { book_id: progressRow } (책별)
+let bookMemoCountCache = {}; // user_id → { book_id: count } (책별)
+let introBookMeta = {};      // book_id → { track:'regular'|'australia', total_pages }
 
 // ===== 유도학생 상태 판별 =====
 // 반환값: 'waiting' (동의 대기 또는 분석 전) | 'converted' (동의 완료=매출전환) | 'expired' (5일 만료) | null (유도학생 아님)
@@ -354,29 +355,102 @@ async function loadBookProgressData() {
     if (Object.keys(bookProgressCache).length > 0) return;
     
     try {
+        // 입문서 문서 메타(일반=sort_order 0, 호주=1) — 책별 라벨/총페이지
+        try {
+            const docs = await supabaseAPI.query('tr_book_documents', { 'is_active': 'eq.true', 'order': 'sort_order.asc' });
+            (docs || []).forEach(d => {
+                const so = Number(d.sort_order);
+                if (so === 0) introBookMeta[d.id] = { track: 'regular', total_pages: d.total_pages || 0 };
+                else if (so === 1) introBookMeta[d.id] = { track: 'australia', total_pages: d.total_pages || 0 };
+            });
+        } catch (e) {
+            console.warn('입문서 문서 조회 실패:', e);
+        }
+
         const [progressResult, memosResult] = await Promise.all([
             supabaseAPI.query('tr_book_progress', { 'order': 'updated_at.desc', 'limit': '1000' }),
             supabaseAPI.query('tr_book_memos', { 'limit': '5000' })
         ]);
-        
-        // 진도: user_id별 최신 1건만
+
+        // 진도: user_id → { book_id: row } (책별 모두)
         if (progressResult) {
             for (const p of progressResult) {
-                if (!bookProgressCache[p.user_id]) {
-                    bookProgressCache[p.user_id] = p;
-                }
+                if (!bookProgressCache[p.user_id]) bookProgressCache[p.user_id] = {};
+                if (!bookProgressCache[p.user_id][p.book_id]) bookProgressCache[p.user_id][p.book_id] = p;
             }
         }
-        
-        // 메모: user_id별 카운트
+
+        // 메모: user_id → { book_id: count } (책별)
         if (memosResult) {
             for (const m of memosResult) {
-                bookMemoCountCache[m.user_id] = (bookMemoCountCache[m.user_id] || 0) + 1;
+                if (!bookMemoCountCache[m.user_id]) bookMemoCountCache[m.user_id] = {};
+                bookMemoCountCache[m.user_id][m.book_id] = (bookMemoCountCache[m.user_id][m.book_id] || 0) + 1;
             }
         }
     } catch (e) {
         console.warn('입문서 진도/메모 로드 실패:', e);
     }
+}
+
+// 한 사용자의 "읽은 책" 목록을 일반→호주 순서로 반환 (진도/메모/완독 셀 공통)
+function getUserBookLines(userId) {
+    const byBook = bookProgressCache[userId] || {};
+    const memoByBook = bookMemoCountCache[userId] || {};
+    const hasMeta = Object.keys(introBookMeta).length > 0;
+    const lines = [];
+    for (const [bookId, prog] of Object.entries(byBook)) {
+        const meta = introBookMeta[bookId];
+        if (hasMeta && !meta) continue; // 메타가 있으면 입문서(일반/호주)만 표시
+        lines.push({
+            track: meta ? meta.track : null,
+            total: meta ? (meta.total_pages || 0) : 0,
+            maxPage: prog.max_page_reached || 0,
+            isCompleted: prog.is_completed || false,
+            memo: memoByBook[bookId] || 0
+        });
+    }
+    // 일반 먼저, 호주 다음
+    const order = { regular: 0, australia: 1 };
+    lines.sort((a, b) => (order[a.track] ?? 9) - (order[b.track] ?? 9));
+    return lines;
+}
+
+function bookTrackTag(track) {
+    if (track === 'australia') return '<span style="background:#fef3c7; color:#92400e; padding:0 5px; border-radius:6px; font-size:10px; font-weight:600; white-space:nowrap;">🇦🇺호주</span>';
+    if (track === 'regular') return '<span style="background:#ede9fe; color:#7c3aed; padding:0 5px; border-radius:6px; font-size:10px; font-weight:600; white-space:nowrap;">일반</span>';
+    return '<span style="color:#94a3b8; font-size:10px;">입문서</span>';
+}
+
+// 진도 셀 (책별 줄)
+function renderBookProgressCell(userId) {
+    const lines = getUserBookLines(userId);
+    if (lines.length === 0) return '<span style="color:#94a3b8; font-size:12px;">아직 시작 안 함</span>';
+    return lines.map(l => {
+        const pct = l.total > 0 ? Math.round((l.maxPage / l.total) * 100) : 0;
+        const color = l.isCompleted ? '#22c55e' : '#9480c5';
+        const label = l.total > 0 ? `${pct}% · ${l.maxPage}/${l.total}` : `${l.maxPage}p`;
+        return `<div style="display:flex; align-items:center; gap:6px; min-height:22px;">
+            ${bookTrackTag(l.track)}
+            <div style="flex:1; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; min-width:46px;">
+                <div style="width:${l.total > 0 ? pct : 0}%; height:100%; background:${color}; border-radius:3px;"></div>
+            </div>
+            <span style="font-size:11px; color:#64748b; white-space:nowrap;">${label}</span>
+        </div>`;
+    }).join('');
+}
+
+// 메모 셀 (책별 줄, 진도와 정렬)
+function renderBookMemoCell(userId) {
+    const lines = getUserBookLines(userId);
+    if (lines.length === 0) return '<span style="color:#94a3b8; font-size:12px;">-</span>';
+    return lines.map(l => `<div style="min-height:22px; line-height:22px; font-weight:600; color:#f59e0b;">${l.memo}</div>`).join('');
+}
+
+// 완독 셀 (책별 줄, 진도와 정렬)
+function renderBookCompletionCell(userId) {
+    const lines = getUserBookLines(userId);
+    if (lines.length === 0) return '<span style="color:#94a3b8; font-size:12px;">-</span>';
+    return lines.map(l => `<div style="min-height:22px; line-height:22px;">${l.isCompleted ? '<span style="background:#dcfce7; color:#16a34a; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600;">완독</span>' : '<span style="color:#cbd5e1; font-size:12px;">-</span>'}</div>`).join('');
 }
 
 // 필터 적용
@@ -1635,16 +1709,8 @@ function displayBookApplications() {
         const userId = app.user_id;
         const isIncentive = app.is_incentive_applicant && app.application_type !== 'book_only';
         
-        // 진도 데이터
-        const prog = bookProgressCache[userId];
-        const maxPage = prog?.max_page_reached || 0;
-        const isCompleted = prog?.is_completed || false;
-        const totalPages = 366;
-        const progressPercent = totalPages > 0 ? Math.round((maxPage / totalPages) * 100) : 0;
-        
-        // 메모 수
-        const memoCount = bookMemoCountCache[userId] || 0;
-        
+        // 진도/메모/완독은 책별로 렌더 (renderBookProgressCell 등)
+
         // 현재 점수 표시
         const scoreDisplay = app.current_score != null ? app.current_score : '<span style="color:#94a3b8;">없음</span>';
 
@@ -1686,9 +1752,6 @@ function displayBookApplications() {
         // 신청일시 (YYYY-MM-DD HH:mm 24시간제)
         const submittedDate = formatDate(app.submitted_date || app.created_at);
         
-        // 진도 바 색상
-        const progressColor = isCompleted ? '#22c55e' : '#9480c5';
-        
         // 뱃지: 유도학생 3단계 vs 순수 입문서 (getIncentiveBookBadge가 알아서 판별)
         const badgeHtml = getIncentiveBookBadge(app);
         
@@ -1718,21 +1781,11 @@ function displayBookApplications() {
                     ${hasReferrerInfo ? `<i class="fas fa-info-circle" style="color:#9480c5; margin-left:4px; cursor:help;" title="${escapeHtml(referrerTooltip)}"></i>` : ''}
                 </td>
                 <td style="font-size: 12px; color: #64748b; white-space:nowrap;">${submittedDate}</td>
-                <td>
-                    <div style="display:flex; align-items:center; gap:6px; min-width:100px;">
-                        <div style="flex:1; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
-                            <div style="width:${progressPercent}%; height:100%; background:${progressColor}; border-radius:3px;"></div>
-                        </div>
-                        <span style="font-size:11px; color:#64748b; white-space:nowrap;">${maxPage}/${totalPages}</span>
-                    </div>
+                <td style="vertical-align: top; min-width:140px;">
+                    ${renderBookProgressCell(userId)}
                 </td>
-                <td style="font-size: 13px; text-align: center; font-weight: 600; color: #f59e0b;">${memoCount}</td>
-                <td style="text-align: center;">
-                    ${isCompleted 
-                        ? '<span style="background:#dcfce7; color:#16a34a; padding:3px 8px; border-radius:10px; font-size:11px; font-weight:600;">완독 ✅</span>'
-                        : '<span style="color:#94a3b8; font-size:12px;">-</span>'
-                    }
-                </td>
+                <td style="vertical-align: top; font-size: 13px; text-align: center;">${renderBookMemoCell(userId)}</td>
+                <td style="vertical-align: top; text-align: center;">${renderBookCompletionCell(userId)}</td>
                 <td>
                     ${isIncentive ? `
                         <button class="admin-btn admin-btn-primary admin-btn-sm" 
