@@ -867,8 +867,9 @@ function collectFormData() {
 
     // Collect all form fields
     for (let [key, value] of formData.entries()) {
-        if (key === 'score_history' || key === 'target_note') {
+        if (key === 'score_history' || key === 'target_note' || key === 'score_version' || key === 'target_version') {
             // 점수/목표 관련 텍스트 필드는 score_/target_ prefix지만 숫자가 아님 → 문자열 그대로
+            // (score_version/target_version은 'old'/'new' 문자열이므로 parseFloat 하면 NaN→null 됨)
             data[key] = value;
         } else if (key.startsWith('score_') || key.startsWith('target_')) {
             // Convert score fields to numbers
@@ -904,14 +905,19 @@ function collectFormData() {
     delete data.preferred_completion_day;
 
     // Use directly entered total score
-    if (data.has_toefl_score === 'yes' && data.score_version === 'old') {
+    // score_version이 비어있어도 실제 입력된 점수로 판단해서 total_score를 채운다
+    if (data.has_toefl_score === 'yes') {
+        if (!data.score_version) {
+            // 버전 표시가 비어있으면 입력된 점수 쪽으로 자동 보정
+            if (data.score_total_old || data.score_reading_old) {
+                data.score_version = 'old';
+            } else if (data.score_total_new || data.score_reading_new) {
+                data.score_version = 'new';
+            }
+        }
         if (data.score_total_old) {
             data.total_score = data.score_total_old;
-        }
-    }
-    
-    if (data.has_toefl_score === 'yes' && data.score_version === 'new') {
-        if (data.score_total_new) {
+        } else if (data.score_total_new) {
             data.total_score = data.score_total_new;
         }
     }

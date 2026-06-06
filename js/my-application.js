@@ -97,7 +97,7 @@ function displayResults(applications) {
                         </div>
                         <div>
                             <div style="color: #64748b; margin-bottom: 4px;">현재 점수</div>
-                            <div style="font-weight: 600; color: #1e293b;">${app.total_score || (app.has_toefl_score === 'no' ? '점수 없음' : '-')}</div>
+                            <div style="font-weight: 600; color: #1e293b;">${(app.total_score || app.score_total_old || app.score_total_new) || (app.has_toefl_score === 'no' ? '점수 없음' : '-')}</div>
                         </div>
                         <div>
                             <div style="color: #64748b; margin-bottom: 4px;">목표 점수</div>

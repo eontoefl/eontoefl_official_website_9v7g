@@ -9,9 +9,13 @@ function displayResults(applications) {
     resultsList.innerHTML = applications.map(app => {
         const statusClass = app.status === '승인' ? 'status-approved' : 
                           app.status === '거부' ? 'status-rejected' : 'status-pending';
-        const statusIcon = app.status === '승인' ? 'check-circle' : 
+        const statusIcon = app.status === '승인' ? 'check-circle' :
                           app.status === '거부' ? 'times-circle' : 'clock';
-        
+
+        // 버전 표시(score_version)가 비어도 실제 입력된 점수로 판단
+        const isNewVersion = app.score_version === 'new' || app.score_total_new || app.score_reading_new;
+        const displayTotal = (isNewVersion ? app.score_total_new : app.score_total_old) || app.total_score;
+
         return `
             <div class="program-card" style="margin-bottom: 30px; padding: 24px;">
                 <!-- 상단: 프로그램 & 상태 -->
@@ -86,13 +90,13 @@ function displayResults(applications) {
                         ${app.has_toefl_score === 'yes' ? `
                             <div style="margin-bottom: 8px;">
                                 <span style="font-size: 13px; color: #64748b;">버전: </span>
-                                <span style="font-weight: 600; color: #1e293b;">${app.score_version === 'old' ? '개정전 (0-120점)' : '개정후 (1-6 레벨)'}</span>
+                                <span style="font-weight: 600; color: #1e293b;">${isNewVersion ? '개정후 (1-6 레벨)' : '개정전 (0-120점)'}</span>
                             </div>
                             <div style="margin-bottom: 8px;">
                                 <span style="font-size: 13px; color: #64748b;">총점: </span>
-                                <span style="font-weight: 700; font-size: 18px; color: #9480c5;">${app.total_score || '-'}</span>
+                                <span style="font-weight: 700; font-size: 18px; color: #9480c5;">${displayTotal || '-'}</span>
                             </div>
-                            ${app.score_version === 'old' ? `
+                            ${!isNewVersion ? `
                                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px;">
                                     <div><span style="color: #64748b; font-size: 12px;">Reading:</span> <strong>${app.score_reading_old || '-'}</strong></div>
                                     <div><span style="color: #64748b; font-size: 12px;">Listening:</span> <strong>${app.score_listening_old || '-'}</strong></div>

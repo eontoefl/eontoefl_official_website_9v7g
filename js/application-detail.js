@@ -325,14 +325,18 @@ function displayApplicationDetail(app) {
     
     // 현재 점수 표시
     let currentScoreDisplay = '';
-    if (app.has_toefl_score === 'yes' && app.total_score) {
-        if (app.score_version === 'new') {
+    if (app.has_toefl_score === 'yes') {
+        // 버전 표시(score_version)가 비어도 실제 입력된 점수로 판단 (관리자 화면과 동일 기준)
+        const isNewVersion = app.score_version === 'new' || app.score_total_new || app.score_reading_new;
+        const displayTotalNew = app.score_total_new || app.total_score;
+        const displayTotalOld = app.score_total_old || app.total_score;
+        if (isNewVersion) {
             currentScoreDisplay = `
                 <div class="detail-row">
                     <div class="detail-label">현재 토플 점수 (개정후)</div>
                     <div class="detail-value">
                         <div style="font-size: 19px; font-weight: 700; color: #9480c5; margin-bottom: 8px;">
-                            Total: ${formatNewScore(app.total_score)} 레벨
+                            Total: ${formatNewScore(displayTotalNew)} 레벨
                         </div>
                         <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
                             <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
@@ -360,7 +364,7 @@ function displayApplicationDetail(app) {
                     <div class="detail-label">현재 토플 점수 (개정전)</div>
                     <div class="detail-value">
                         <div style="font-size: 19px; font-weight: 700; color: #9480c5; margin-bottom: 8px;">
-                            Total: ${app.total_score}점
+                            Total: ${displayTotalOld || '-'}점
                         </div>
                         <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
                             <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
