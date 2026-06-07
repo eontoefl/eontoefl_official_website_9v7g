@@ -1,0 +1,20 @@
+{
+  "name": "eontoefl-book-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "이온토플 입문서 에디터(BlockNote) 번들 소스. 빌드 결과물은 ../js/book-editor.bundle.* 로 출력됨.",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch"
+  },
+  "dependencies": {
+    "@blocknote/core": "^0.51.4",
+    "@blocknote/mantine": "^0.51.4",
+    "@blocknote/react": "^0.51.4",
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vite": "^8.0.16"
+  }
+}

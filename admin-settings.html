@@ -92,6 +92,10 @@
                     <i class="fas fa-book"></i>
                     <span>이용방법 안내</span>
                 </a>
+                <a href="#book" class="settings-nav-item" onclick="switchTab('book', event)">
+                    <i class="fas fa-book-open-reader"></i>
+                    <span>입문서 관리</span>
+                </a>
                 <a href="#notices" class="settings-nav-item" onclick="switchTab('notices', event)">
                     <i class="fas fa-bullhorn"></i>
                     <span>공지사항 관리</span>
@@ -471,6 +475,23 @@
                 <!-- Usage Guide Settings -->
                 <div id="usageGuideContainer">
                     <!-- Will be loaded from existing admin-settings.js -->
+                </div>
+            </div>
+
+            <!-- Tab: 입문서 관리 -->
+            <div id="tab-book" class="settings-tab">
+                <div class="settings-tab-header">
+                    <h1>📕 입문서 관리</h1>
+                    <p>입문서를 만들고, 페이지 단위로 편집하고, 공개/숨김을 관리하세요</p>
+                </div>
+                <div class="form-container">
+                    <p style="font-size:14px;color:#64748b;margin-bottom:20px; line-height:1.7;">
+                        입문서를 직접 편집할 수 있어요 — 글·대제목·강조·표·사진·영상·음성까지.<br>
+                        여러 권(일반/호주 등)을 만들어 관리하고, 학생에게 공개/숨김도 정할 수 있습니다.
+                    </p>
+                    <button type="button" class="btn-primary" onclick="window.location.href='admin-book-list.html'" style="font-size:14px;">
+                        <i class="fas fa-arrow-right"></i> 입문서 관리 열기
+                    </button>
                 </div>
             </div>
         </div>

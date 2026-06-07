@@ -1,0 +1,93 @@
+/* 입문서 관리 — Ethereal Dashboard */
+:root {
+  --surface: #f8f9fa; --surface-lowest: #ffffff; --surface-low: #f3f4f5;
+  --surface-high: #e7e9eb; --surface-highest: #e1e4e6;
+  --on-surface: #191c1d; --on-surface-variant: #3e484f;
+  --primary: #006688; --primary-container: #50c9ff; --on-primary-container: #00404d;
+  --tertiary: #a53b22; --error: #ba1a1a;
+  --grad: linear-gradient(135deg, #006688 0%, #50c9ff 100%);
+  --amb: 0 10px 32px rgba(25,28,29,0.06);
+  --radius: 0.5rem;
+}
+* { box-sizing: border-box; }
+.booklist-body {
+  margin: 0; font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
+  background: var(--surface); color: var(--on-surface-variant); -webkit-font-smoothing: antialiased;
+}
+
+/* 상단바 */
+.booklist-topbar {
+  position: sticky; top: 0; z-index: 10; height: 66px; background: var(--surface-lowest);
+  box-shadow: 0 1px 0 rgba(25,28,29,0.05); display: flex; align-items: center; justify-content: space-between; padding: 0 28px;
+}
+.booklist-topbar-left, .booklist-topbar-right { display: flex; align-items: center; gap: 14px; }
+.booklist-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--on-surface); margin: 0; }
+
+.btn-ghost { padding: 9px 14px; border: none; background: transparent; color: var(--primary); font: 500 14px "Inter"; cursor: pointer; border-radius: var(--radius); display: inline-flex; align-items: center; gap: 7px; transition: background .15s; }
+.btn-ghost:hover { background: rgba(0,102,136,0.07); }
+.btn-grad { padding: 10px 20px; border: none; border-radius: var(--radius); background: var(--grad); color: #fff; font: 600 14px "Inter"; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: transform .15s, box-shadow .15s; }
+.btn-grad:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,102,136,0.28); }
+
+/* 본문 */
+.booklist-main { max-width: 860px; margin: 0 auto; padding: 32px 24px 80px; }
+.booklist-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* 책 카드 */
+.book-card {
+  background: var(--surface-lowest); border-radius: 14px; box-shadow: var(--amb);
+  padding: 18px 20px; display: flex; align-items: center; gap: 16px;
+}
+.book-card-main { flex: 1; min-width: 0; }
+.book-card-titlerow { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.book-card-title { font-size: 16px; font-weight: 700; color: var(--on-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.book-card-meta { font-size: 13px; color: var(--on-surface-variant); }
+
+/* 배지 */
+.badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.badge-public { background: #dcfce7; color: #15803d; }
+.badge-hidden { background: var(--surface-high); color: var(--on-surface-variant); }
+.badge-role { background: rgba(80,201,255,0.16); color: var(--primary); cursor: pointer; }
+.badge-role:hover { background: rgba(80,201,255,0.28); }
+
+/* 액션 */
+.book-card-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.book-card-edit { padding: 9px 16px; border: none; border-radius: var(--radius); background: var(--surface-high); color: var(--on-primary-container); font: 600 13px "Inter"; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .15s; }
+.book-card-edit:hover { background: var(--surface-highest); }
+.book-mini { width: 34px; height: 34px; border: none; background: transparent; color: var(--on-surface-variant); border-radius: 8px; cursor: pointer; font-size: 13px; transition: background .15s, color .15s; }
+.book-mini:hover { background: var(--surface-low); color: var(--primary); }
+.book-mini.is-danger:hover { background: rgba(165,59,34,0.1); color: var(--tertiary); }
+
+/* 공개 토글 스위치 */
+.toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.toggle input { display: none; }
+.toggle-track { position: absolute; inset: 0; background: var(--surface-high); border-radius: 20px; transition: background .2s; }
+.toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.toggle input:checked + .toggle-track { background: var(--primary-container); }
+.toggle input:checked + .toggle-track + .toggle-thumb { transform: translateX(18px); }
+
+/* 섹션 헤드(휴지통) */
+.booklist-section-head { margin: 8px 0 16px; }
+.booklist-section-head h2 { font-size: 16px; font-weight: 700; color: var(--on-surface); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.booklist-section-head p { font-size: 13px; color: var(--on-surface-variant); margin: 0; }
+.trash-days { font-size: 12px; color: var(--on-surface-variant); }
+
+/* 빈 상태 / 로딩 */
+.booklist-empty { text-align: center; color: var(--on-surface-variant); padding: 64px 20px; }
+.booklist-empty i { font-size: 40px; opacity: .4; margin-bottom: 14px; display: block; }
+.booklist-empty p { font-size: 15px; line-height: 1.7; }
+.booklist-loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 80px 20px; color: var(--on-surface-variant); }
+.booklist-spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--surface-high); border-top-color: var(--primary-container); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 역할 선택 미니 메뉴 */
+.role-menu { position: fixed; z-index: 100; background: var(--surface-lowest); border-radius: 12px; box-shadow: 0 12px 36px rgba(25,28,29,0.16); padding: 6px; display: none; }
+.role-menu.open { display: block; }
+.role-menu button { display: block; width: 140px; text-align: left; padding: 9px 12px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font: 500 13px "Inter"; color: var(--on-surface); }
+.role-menu button:hover { background: var(--surface-low); }
+.role-menu button.active { color: var(--primary); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .book-card { flex-wrap: wrap; }
+  .booklist-topbar { padding: 0 14px; }
+  .booklist-title { font-size: 17px; }
+}

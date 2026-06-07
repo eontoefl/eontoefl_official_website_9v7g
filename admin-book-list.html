@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>입문서 관리 - 이온토플</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/admin-book-list.css">
+</head>
+<body class="booklist-body">
+
+    <header class="booklist-topbar">
+        <div class="booklist-topbar-left">
+            <button class="btn-ghost" onclick="goBack()"><i class="fas fa-arrow-left"></i> 뒤로</button>
+            <h1 class="booklist-title">입문서 관리</h1>
+        </div>
+        <div class="booklist-topbar-right">
+            <button class="btn-ghost" id="trashToggle" onclick="toggleTrash()"><i class="fas fa-trash-can"></i> 휴지통 <span id="trashCount"></span></button>
+            <button class="btn-grad" onclick="createBook()"><i class="fas fa-plus"></i> 새 책 만들기</button>
+        </div>
+    </header>
+
+    <main class="booklist-main">
+        <!-- 활성 책 목록 -->
+        <section id="activeSection">
+            <div class="booklist-list" id="bookList"></div>
+            <div class="booklist-empty" id="bookEmpty" style="display:none;">
+                <i class="fas fa-book"></i>
+                <p>아직 만든 입문서가 없어요.<br>오른쪽 위 <b>새 책 만들기</b>로 시작하세요.</p>
+            </div>
+        </section>
+
+        <!-- 휴지통 -->
+        <section id="trashSection" style="display:none;">
+            <div class="booklist-section-head">
+                <h2><i class="fas fa-trash-can"></i> 휴지통</h2>
+                <p>삭제한 책은 30일간 보관 후 자동으로 영구삭제돼요.</p>
+            </div>
+            <div class="booklist-list" id="trashList"></div>
+            <div class="booklist-empty" id="trashEmpty" style="display:none;">
+                <i class="fas fa-trash-can"></i>
+                <p>휴지통이 비어 있어요.</p>
+            </div>
+        </section>
+
+        <div class="booklist-loading" id="loading">
+            <div class="booklist-spinner"></div><p>불러오는 중...</p>
+        </div>
+    </main>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin-book-list.js"></script>
+</body>
+</html>

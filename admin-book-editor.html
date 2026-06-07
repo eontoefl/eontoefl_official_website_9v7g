@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>입문서 편집기 - 이온토플</title>
+
+    <!-- Inter (디자인 시스템 앵커 폰트) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+
+    <!-- BlockNote 번들 스타일 -->
+    <link rel="stylesheet" href="js/book-editor.bundle.css">
+
+    <!-- 페이지 스타일 (Ethereal Dashboard) -->
+    <link rel="stylesheet" href="css/admin-book-editor.css">
+</head>
+<body class="bookedit-body">
+
+    <!-- ===== 상단바 ===== -->
+    <header class="bookedit-topbar">
+        <div class="bookedit-topbar-left">
+            <button class="btn-ghost" onclick="goBack()" title="뒤로가기">
+                <i class="fas fa-arrow-left"></i> 뒤로
+            </button>
+            <h1 class="bookedit-title" id="editorTitle">입문서</h1>
+            <span class="bookedit-save-status" id="saveStatus">
+                <span class="bookedit-glint"></span> 준비됨
+            </span>
+        </div>
+        <div class="bookedit-topbar-right">
+            <button class="btn-ghost" onclick="showVersions()" title="이전 버전 되돌리기">
+                <i class="fas fa-clock-rotate-left"></i> 버전
+            </button>
+            <button class="btn-grad" id="btnSave" onclick="savePage()" title="저장 (저장해야 학생에게 반영)">
+                <i class="fas fa-floppy-disk"></i> 저장
+            </button>
+        </div>
+    </header>
+
+    <!-- ===== 본문 ===== -->
+    <div class="bookedit-main">
+
+        <!-- 사이드바: 페이지 목록 -->
+        <aside class="bookedit-sidebar">
+            <div class="bookedit-sidebar-head">
+                <h2>페이지</h2>
+                <button class="btn-ghost" onclick="addPage()" title="페이지 추가" style="padding:6px 8px;">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div class="bookedit-page-list" id="pageList">
+                <!-- JS에서 채움 (3·4단계는 임시로 1페이지) -->
+                <div class="bookedit-page-item active">
+                    <span class="bookedit-page-num">1</span>
+                    <span>페이지 1</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 편집 캔버스 -->
+        <main class="bookedit-canvas">
+            <div class="bookedit-paper">
+                <div class="bookedit-loading" id="editorLoading">
+                    <div class="bookedit-spinner"></div>
+                    <p>편집기를 불러오는 중...</p>
+                </div>
+                <div id="bookEditor"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ===== 버전 되돌리기 모달 ===== -->
+    <div class="bookedit-modal-overlay" id="versionModal">
+        <div class="bookedit-modal">
+            <div class="bookedit-modal-head">
+                <h2><i class="fas fa-clock-rotate-left"></i> 이 페이지의 버전</h2>
+                <button class="btn-ghost" onclick="closeVersions()"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="bookedit-modal-body" id="versionList"></div>
+        </div>
+    </div>
+
+    <!-- ===== 스크립트 ===== -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/book-editor.bundle.js"></script>
+    <script src="js/admin-book-editor.js"></script>
+</body>
+</html>
