@@ -289,6 +289,10 @@ body.bookedit-body {
 .bn-editor .bn-block-content:has(> h2.bn-inline-content) { border-left: 5px solid #006688; padding-left: 10px; }
 /* 표 헤더 행 강조 (뷰어와 동일) */
 .bn-editor table tr:first-child td { background: #f0f9ff; font-weight: 700; }
+/* 글 칸 너비를 학생 화면(640px)과 동일하게 → 줄바꿈 위치 일치 */
+.bookedit-paper .bn-editor .bn-block-group { max-width: 640px; }
+/* 위쪽 여백을 학생 화면(약 56px)과 맞춤 */
+.bookedit-paper .bn-editor { padding-top: 44px; }
 
 /* ===== BlockNote 브랜드 톤 맞추기 ===== */
 .bookedit-paper .bn-container {
