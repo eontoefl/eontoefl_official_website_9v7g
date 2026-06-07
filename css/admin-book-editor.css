@@ -276,6 +276,23 @@ body.bookedit-body {
   padding: 12px 8px;
 }
 
+/* ===== 편집 화면 = 학생 화면(뷰어)과 동일하게 (WYSIWYG) ===== */
+/* 뷰어(book-v2-viewer.css)의 본문 스타일과 맞춤 */
+.bn-editor { font-size: 17px; line-height: 1.85; color: #1f2937; }
+.bn-editor h1.bn-inline-content {
+  font-size: 30px; font-weight: 800; letter-spacing: -0.02em; color: #111827;
+  padding-bottom: 8px; border-bottom: 3px solid #50c9ff;
+}
+.bn-editor h2.bn-inline-content {
+  font-size: 23px; font-weight: 700; color: #111827;
+  padding-left: 10px; border-left: 5px solid #006688;
+}
+.bn-editor h3.bn-inline-content { font-size: 19px; font-weight: 700; color: #4b5563; }
+.bn-editor p.bn-inline-content { font-size: 17px; }
+.bn-editor a { color: #006688; text-decoration: underline; }
+/* 표 헤더 행 강조 (뷰어와 동일) */
+.bn-editor table tr:first-child td { background: #f0f9ff; font-weight: 700; }
+
 /* ===== BlockNote 브랜드 톤 맞추기 ===== */
 .bookedit-paper .bn-container {
   --bn-colors-editor-background: transparent;
