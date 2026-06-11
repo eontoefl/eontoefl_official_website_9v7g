@@ -64,9 +64,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // 입문서 → 개별분석 퍼널 가드
-    // 내벨업챌린지 신청 폼은 입문서를 받은 사람만(=입문서 안에서 진행) 접근할 수 있다.
-    // 외부에서 주소를 직접 입력해 들어온 미자격 사용자는 적절한 위치로 돌려보낸다.
+    // 신청 폼 접근 가드
+    // 로그인 회원이면 입문서 수령 여부와 무관하게 작성할 수 있다(URL 직접 진입 허용).
+    // 이미 챌린지 신청서를 제출한 경우만 본인 신청 현황으로 돌려보낸다.
     guardFormAccess(userData);
 
     // Pre-fill user information
@@ -114,8 +114,8 @@ document.addEventListener('DOMContentLoaded', function() {
  * - 관리자: 통과
  * - 편집 모드(?edit=): 본인 신청서 수정이므로 통과
  * - 이미 내벨업챌린지 신청서 제출: 본인 신청 현황으로
- * - 입문서 권한 없는 회원: 대시보드(입문서부터)
- * - 입문서 받은 회원: 통과
+ * - 그 외 로그인 회원: 통과 (입문서 미수령자도 URL 직접 진입 시 작성 허용.
+ *   신청 CTA는 common.js가 입문서 퍼널로 재작성하므로 일반 동선에는 노출되지 않는다.)
  * 조회 실패 시에는 막지 않는다(사용성 우선).
  */
 async function guardFormAccess(userData) {
@@ -131,9 +131,6 @@ async function guardFormAccess(userData) {
         });
         const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
         const challengeApp = apps.find(a => a.application_type !== 'book_only');
-        const hasBook = apps.some(a =>
-            a.application_type === 'book_only' || a.book_access_enabled || a.is_incentive_applicant
-        );
 
         // 편집 모드는 본인 챌린지 신청서 수정 → 통과
         if (editId) return;
@@ -144,14 +141,7 @@ async function guardFormAccess(userData) {
             window.location.href = `application-detail.html?id=${challengeApp.id}`;
             return;
         }
-
-        // 입문서 권한이 없는 회원 → 입문서부터
-        if (!hasBook) {
-            alert('내벨업챌린지 신청은 입문서를 먼저 받으신 후, 입문서 안에서 진행하실 수 있습니다.');
-            window.location.href = 'my-dashboard.html';
-            return;
-        }
-        // hasBook → 통과 (입문서 뷰어를 거쳐 정상 진입)
+        // 그 외 로그인 회원 → 통과 (입문서 미수령자 포함, URL 직접 진입 허용)
     } catch (e) {
         console.warn('폼 접근 권한 확인 실패:', e);
     }
