@@ -135,18 +135,21 @@ function _footerTarget(seg) {
 }
 function _bodyTarget(seg) {
     if (seg === 'guest' || seg === 'member_nobook') return { href: 'book-request.html', label: '입문서 무료 신청하기' };
-    if (seg === 'member_book') return { href: 'my-dashboard.html', label: '입문서 읽으러 가기' };
+    // 입문서 받은 사람은 다음 단계가 챌린지 신청 → 폼을 직접 열어준다.
+    // 단, '진단 후 승인 여부 결정' 안내(.cta-note)는 숨기지 않고 살려 둔다(거절 마케팅 톤 유지).
+    if (seg === 'member_book') return { href: 'application-form.html', label: '내벨업챌린지 신청하기', keepNote: true };
     return { href: 'my-dashboard.html', label: '내 신청 현황 보기' }; // challenge
 }
 
 // 링크 문구 교체 (구조/아이콘 최대한 보존)
-function _setLinkLabel(a, label) {
-    // 복합 버튼(programs 카드 등): .cta-text 만 교체, 부가 설명(.cta-note)은 숨김
+function _setLinkLabel(a, label, keepNote) {
+    // 복합 버튼(programs 카드 등): .cta-text 만 교체, 부가 설명(.cta-note)은 기본 숨김
+    // (keepNote=true면 보존 — 챌린지 신청처럼 안내 문구를 남겨야 하는 경우)
     const textSpan = a.querySelector('.cta-text');
     if (textSpan) {
         textSpan.textContent = label;
         const note = a.querySelector('.cta-note');
-        if (note) note.style.display = 'none';
+        if (note) note.style.display = keepNote ? '' : 'none';
         return;
     }
     // 아이콘이 있으면 아이콘 보존 + 문구만 교체
@@ -188,7 +191,7 @@ function applyFunnelGating(segment) {
         if (!target) return;
 
         a.setAttribute('href', target.href);
-        _setLinkLabel(a, target.label);
+        _setLinkLabel(a, target.label, target.keepNote);
     });
 }
 
