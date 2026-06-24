@@ -999,22 +999,30 @@ async function openDeadlineExtendModal() {
     try {
         // Fetch all correction_schedules
         const schedules = await supabaseAPI.query('correction_schedules', {
-            'select': 'id,user_id,start_date,duration_weeks',
+            'select': 'id,user_id,start_date,duration_weeks,extension_enabled,extension_start_date',
             'order': 'start_date.desc',
             'limit': '500'
         });
         extModalSchedules = schedules || [];
 
-        // Filter active: start_date + duration_weeks * 7 days > today
+        // Filter active: 1학기(start_date + duration_weeks*7) OR 연장(extension_start_date + 27일) 둘 중 하나라도 진행 중/임박
         const now = new Date();
+        const BUFFER_MS = 7 * 24 * 60 * 60 * 1000;
         const activeSchedules = extModalSchedules.filter(s => {
-            if (!s.start_date) return false;
-            const start = new Date(s.start_date);
-            const weeks = s.duration_weeks || 4;
-            const endDate = new Date(start.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
-            // Add buffer of 7 days after end
-            endDate.setDate(endDate.getDate() + 7);
-            return endDate >= now;
+            let active = false;
+            if (s.start_date) {
+                const start = new Date(s.start_date);
+                const weeks = s.duration_weeks || 4;
+                const endDate = new Date(start.getTime() + weeks * 7 * 24 * 60 * 60 * 1000 + BUFFER_MS);
+                if (endDate >= now) active = true;
+            }
+            // 연장 학생: 13~24세션 창(연장 시작일 + 27일 + 버퍼)
+            if (!active && s.extension_enabled && s.extension_start_date) {
+                const extStart = new Date(s.extension_start_date);
+                const extEnd = new Date(extStart.getTime() + 27 * 24 * 60 * 60 * 1000 + BUFFER_MS);
+                if (extEnd >= now) active = true;
+            }
+            return active;
         });
 
         // Load user info for these students if not already cached
@@ -1081,8 +1089,11 @@ function onExtModalStudentChange() {
     // Find the student's schedule to know duration_weeks
     const schedule = extModalSchedules.find(s => s.user_id === userId);
     const weeks = schedule ? (schedule.duration_weeks || 4) : 4;
-    // Total sessions = weeks * 3
-    const totalSessions = weeks * 3;
+    // Total sessions = weeks * 3, 연장(13~24세션) 학생은 24까지 노출
+    let totalSessions = weeks * 3;
+    if (schedule && schedule.extension_enabled && schedule.extension_start_date) {
+        totalSessions = 24;
+    }
 
     for (let i = 1; i <= totalSessions; i++) {
         const opt = document.createElement('option');

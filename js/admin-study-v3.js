@@ -479,7 +479,7 @@ function renderTable() {
         // 스라첨삭 뱃지
         if (s.app && s.app.correction_enabled) {
             const corrStatus = typeof getCorrectionStatus === 'function' ? getCorrectionStatus(s.app) : null;
-            const corrLabel = corrStatus ? corrStatus.label : '첨삭';
+            const corrLabel = corrStatus ? (corrStatus.adminLabel || corrStatus.label) : '첨삭';
             const corrColor = corrStatus ? corrStatus.color : '#3b82f6';
             statusBadge += ` <span style="display:inline-block; background:${corrColor}; color:white; font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px; margin-left:4px;"><i class="fas fa-pen-nib" style="margin-right:2px;"></i>${corrLabel}</span>`;
         }

@@ -367,8 +367,17 @@ function isCorrectionActive(app) {
     return today >= start;
 }
 
+// 시작일 + 27일 10:00 KST(= 01:00 UTC) 종료 시점 헬퍼
+function _correctionEndKST(startDate) {
+    const end = new Date(startDate);
+    end.setDate(end.getDate() + 27);
+    return new Date(end.getFullYear(), end.getMonth(), end.getDate(), 1, 0, 0);
+}
+
 // 스라첨삭 상태 정보 반환
-// 종료 기준: correction_start_date + 27일 10:00 KST
+// 종료 기준: (해당 학기 시작일) + 27일 10:00 KST
+//   연장(extension_enabled + extension_start_date)이 켜진 학생은 13~24세션 학기 기준으로 전환.
+//   학생 라벨: "13~24세션 진행 중/시작 예정", 관리자 라벨(adminLabel): "첨삭 연장중/연장예정"
 function getCorrectionStatus(app) {
     if (!app.correction_enabled) return null;
 
@@ -379,14 +388,40 @@ function getCorrectionStatus(app) {
 
     const today = getEffectiveToday();
     const start = new Date(app.correction_start_date);
+    const end1KST = _correctionEndKST(start); // 1학기 종료
 
-    // 종료 시점: 시작일 + 27일 10:00 KST (= 01:00 UTC)
-    const endDate = new Date(start);
-    endDate.setDate(endDate.getDate() + 27);
-    const endKST = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 1, 0, 0); // UTC 01:00 = KST 10:00
+    // ===== 연장(13~24세션) 활성 학생 =====
+    const hasExt = !!(app.extension_enabled && app.extension_start_date);
+    if (hasExt) {
+        const extStart = new Date(app.extension_start_date);
+        const extEndKST = _correctionEndKST(extStart);
 
+        // 연장 종료
+        if (today >= extEndKST) {
+            return { key: 'completed', label: '종료', color: '#22c55e', icon: 'fa-check-circle' };
+        }
+        // 연장 진행 중
+        if (today >= extStart) {
+            return { key: 'ext_active', label: '13~24세션 진행 중', adminLabel: '첨삭 연장중', color: '#7c3aed', icon: 'fa-pen-nib' };
+        }
+        // 연장 시작 전: 1학기가 아직 진행 중이면 1학기 표시 우선
+        if (today >= start && today < end1KST) {
+            return { key: 'active', label: '진행중', color: '#7c3aed', icon: 'fa-pen-nib' };
+        }
+        // 1학기 시작 전(드문 케이스)
+        if (today < start) {
+            const diff = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+            return { key: 'waiting', label: `D-${diff}`, color: '#3b82f6', icon: 'fa-hourglass-half' };
+        }
+        // 1학기는 끝났고 연장 시작 전 → "시작 예정"
+        const m = extStart.getMonth() + 1;
+        const d = extStart.getDate();
+        return { key: 'ext_waiting', label: `13~24세션 시작 예정 · ${m}/${d}부터`, adminLabel: '첨삭 연장예정', color: '#3b82f6', icon: 'fa-hourglass-half' };
+    }
+
+    // ===== 연장 없음 (기존 로직) =====
     // 종료 판정
-    if (today >= endKST) {
+    if (today >= end1KST) {
         return { key: 'completed', label: '종료', color: '#22c55e', icon: 'fa-check-circle' };
     }
 

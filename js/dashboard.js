@@ -1118,10 +1118,12 @@ async function renderProgramInfo(app) {
         console.warn('사이트 설정 로드 실패, 기본값 사용:', e);
     }
 
-    // 첨삭 종료일 계산 (시작일 + 27일)
+    // 첨삭 종료일 계산 (해당 학기 시작일 + 27일)
+    // 연장(13~24세션) 학생은 연장 시작일 기준으로 종료일 전환
     let correctionEndDate = null;
     if (app.correction_enabled && app.correction_start_date) {
-        const cStart = new Date(app.correction_start_date);
+        const baseStr = (app.extension_enabled && app.extension_start_date) ? app.extension_start_date : app.correction_start_date;
+        const cStart = new Date(baseStr);
         correctionEndDate = new Date(cStart);
         correctionEndDate.setDate(correctionEndDate.getDate() + 27);
     }
@@ -1135,10 +1137,13 @@ async function renderProgramInfo(app) {
                 'waiting': { bg: '#dbeafe', color: '#2563eb' },
                 'pending': { bg: '#f1f5f9', color: '#94a3b8' },
                 'active': { bg: '#ede9fe', color: '#7c3aed' },
+                'ext_active': { bg: '#ede9fe', color: '#7c3aed' },
+                'ext_waiting': { bg: '#dbeafe', color: '#2563eb' },
                 'completed': { bg: '#dcfce7', color: '#16a34a' },
                 'refunded': { bg: '#fef2f2', color: '#ef4444' }
             };
             const style = statusColors[corrStatus.key] || { bg: '#f1f5f9', color: '#64748b' };
+            // active/completed/refunded는 고정 라벨, 그 외(연장 등)는 status.label 사용
             const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? '환불' : corrStatus.label;
             correctionStatusHtml = `<span style="display:inline-block; background:${style.bg}; color:${style.color}; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">${label}</span>`;
         }

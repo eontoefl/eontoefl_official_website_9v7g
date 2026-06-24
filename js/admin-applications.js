@@ -183,14 +183,18 @@ function getAdminActionMessage(app) {
                     'waiting': { color: '#3b82f6', icon: 'fa-hourglass-half' },
                     'pending': { color: '#94a3b8', icon: 'fa-clock' },
                     'active': { color: '#2563eb', icon: 'fa-pen-nib' },
+                    'ext_active': { color: '#7c3aed', icon: 'fa-pen-nib' },
+                    'ext_waiting': { color: '#3b82f6', icon: 'fa-hourglass-half' },
                     'completed': { color: '#22c55e', icon: 'fa-check-circle' },
                     'refunded': { color: '#ef4444', icon: 'fa-undo' }
                 };
                 const corrStyle = corrColorMap[corrStatus.key] || { color: '#94a3b8', icon: 'fa-circle' };
-                const corrLabel = corrStatus.key === 'waiting' ? `첨삭 ${corrStatus.label}` 
-                    : corrStatus.key === 'pending' ? `첨삭 ${corrStatus.label}` 
-                    : corrStatus.key === 'active' ? '첨삭 진행중' 
-                    : corrStatus.key === 'completed' ? '첨삭 종료' 
+                // 연장 상태는 관리자용 짧은 라벨(adminLabel) 우선 사용
+                const corrLabel = corrStatus.adminLabel ? corrStatus.adminLabel
+                    : corrStatus.key === 'waiting' ? `첨삭 ${corrStatus.label}`
+                    : corrStatus.key === 'pending' ? `첨삭 ${corrStatus.label}`
+                    : corrStatus.key === 'active' ? '첨삭 진행중'
+                    : corrStatus.key === 'completed' ? '첨삭 종료'
                     : corrStatus.key === 'refunded' ? '첨삭 환불' : '첨삭';
                 result.correctionBadge = { text: corrLabel, color: corrStyle.color, icon: corrStyle.icon };
             }

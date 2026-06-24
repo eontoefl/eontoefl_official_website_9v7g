@@ -989,6 +989,12 @@ function getAnalysisSection(app) {
                 <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.correction_start_date}</span>
             </div>
             ` : ''}
+            ${app.extension_enabled && app.extension_start_date ? `
+            <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+                <span style="color: #64748b; font-size: 15px;">13~24세션 시작일</span>
+                <span style="font-weight: 600; color: #7c3aed; font-size: 15px;">${app.extension_start_date}</span>
+            </div>
+            ` : ''}
             ` : ''}
         </div>
         ` : ''}

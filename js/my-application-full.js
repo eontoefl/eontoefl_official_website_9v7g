@@ -24,6 +24,7 @@ function displayResults(applications) {
                         <h3 class="program-title" style="font-size: 18px; margin-bottom: 8px; color: #1e293b;">
                             ${escapeHtml(app.assigned_program || app.preferred_program || '프로그램 미정')}
                             ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">+ 스라첨삭</span>' : ''}
+                            ${app.extension_enabled && app.extension_start_date ? '<span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">13~24세션 연장</span>' : ''}
                         </h3>
                         <p style="font-size: 13px; color: #64748b;">
                             신청일: ${formatDate(app.created_at)}

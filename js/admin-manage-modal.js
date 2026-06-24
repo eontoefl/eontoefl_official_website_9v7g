@@ -419,6 +419,8 @@ function loadModalAnalysisTab(app) {
         ? (pendingPayload.correction_enabled === true)
         : !!app.correction_enabled;
     const fillCorrectionStartDate = hasPendingDraft ? (pendingPayload.correction_start_date || '') : (app.correction_start_date || '');
+    // 연장(13~24세션)은 개별분석 발행과 무관한 별도 즉시 액션 → 항상 실제 app 값 사용(pending 미사용)
+    const fillExtensionStartDate = app.extension_start_date || '';
     const fillAdditionalDiscount = hasPendingDraft
         ? (pendingPayload.additional_discount || 0)
         : (app.additional_discount || 0);
@@ -645,6 +647,17 @@ function loadModalAnalysisTab(app) {
                            value="${fillCorrectionStartDate}"
                            ${readOnly}
                            style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                </div>
+                <!-- 첨삭 연장 (13~24세션) — 개별분석 발행과 무관한 독립 액션. 발행 후(읽기전용)에도 동작 -->
+                <div id="correctionExtensionWrapper" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; ${fillCorrectionEnabled ? '' : 'display: none;'}">
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 연장 (13~24세션) <span style="color:#7c3aed; font-size:11px;">결제 확인 후 적용</span></label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="date" id="extension_start_date" value="${fillExtensionStartDate}"
+                               style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                        <button type="button" id="applyExtensionBtn" onclick="applyCorrectionExtension()"
+                                style="padding: 10px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">연장 적용</button>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8; margin-top: 6px;">13~24세션 시작일을 넣고 [연장 적용]. 날짜를 비우고 적용하면 연장이 해제됩니다.</div>
                 </div>
             </div>
             
@@ -873,6 +886,7 @@ function toggleCorrectionStartDate() {
     const enabled = document.getElementById('correction_enabled').value === 'true';
     const wrapper = document.getElementById('correctionStartDateWrapper');
     const priceRow = document.getElementById('correctionPriceRow');
+    const extWrapper = document.getElementById('correctionExtensionWrapper');
     if (wrapper) {
         wrapper.style.opacity = enabled ? '1' : '0.4';
         wrapper.style.pointerEvents = enabled ? 'auto' : 'none';
@@ -880,6 +894,88 @@ function toggleCorrectionStartDate() {
     if (priceRow) {
         priceRow.style.display = enabled ? '' : 'none';
     }
+    // 연장은 첨삭이 켜진 학생에게만 의미가 있음
+    if (extWrapper) {
+        extWrapper.style.display = enabled ? '' : 'none';
+    }
+}
+
+// ===== 첨삭 연장(13~24세션) 적용/해제 — 개별분석 저장과 분리된 즉시 액션 =====
+// applications(대시보드용 미러) + correction_schedules(테스트룸 원본) 양쪽에 기록.
+async function applyCorrectionExtension() {
+    if (!currentManageApp) return;
+    const input = document.getElementById('extension_start_date');
+    const btn = document.getElementById('applyExtensionBtn');
+    const extStart = (input && input.value) ? input.value : '';
+    const enabled = !!extStart;
+    const userId = currentManageApp.user_id;
+
+    if (!userId) { alert('학생 user_id를 찾을 수 없습니다.'); return; }
+
+    if (enabled) {
+        if (!confirm(`${currentManageApp.name || '학생'}님의 13~24세션을 ${extStart}부터 열겠습니까?`)) return;
+    } else {
+        if (!confirm('연장을 해제하시겠습니까?\n13~24세션이 학생 화면에서 숨겨집니다.')) return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = '처리 중...'; }
+    try {
+        // 1) applications 미러 (대시보드/신청상세가 읽음)
+        await supabaseAPI.patch('applications', currentManageApp.id, {
+            extension_enabled: enabled,
+            extension_start_date: extStart || null
+        });
+        currentManageApp.extension_enabled = enabled;
+        currentManageApp.extension_start_date = extStart || null;
+
+        // 2) correction_schedules 원본 (테스트룸이 읽음)
+        await upsertCorrectionExtensionSchedule(userId, enabled, extStart || null);
+
+        // TODO(알림톡): 템플릿 검수 통과 후 "첨삭 연장 완료" 알림톡 발송 연결
+        //   예) if (enabled) await sendKakaoAlimTalk('correction_extension', currentManageApp);
+
+        alert(enabled
+            ? '✅ 연장 적용 완료 — 학생 화면에 13~24세션이 열렸습니다.'
+            : '✅ 연장 해제 완료.');
+    } catch (e) {
+        console.error('첨삭 연장 적용 실패:', e);
+        alert('❌ 연장 적용에 실패했습니다.\n\n' + (e.message || ''));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '연장 적용'; }
+    }
+}
+
+// correction_schedules에 연장 필드 UPSERT (on_conflict=user_id).
+// 행이 없을 경우(신규 insert)에도 NOT NULL 제약을 만족하도록 1학기 기준값을 함께 보냄.
+async function upsertCorrectionExtensionSchedule(userId, enabled, extStartDate) {
+    const url = `${SUPABASE_URL}/rest/v1/correction_schedules?on_conflict=user_id`;
+    const body = {
+        user_id: userId,
+        extension_enabled: enabled,
+        extension_start_date: extStartDate
+    };
+    // 행이 없을 때만 의미가 있는 안전장치(행이 있으면 동일 값 재기록)
+    if (currentManageApp && currentManageApp.correction_start_date) {
+        body.start_date = currentManageApp.correction_start_date;
+        body.duration_weeks = 4;
+    }
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation,resolution=merge-duplicates'
+        },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.message || `correction_schedules 연장 UPSERT 실패: ${response.status}`);
+    }
+    return await response.json();
 }
 
 // 모달 내 가격 계산
@@ -1164,6 +1260,8 @@ async function saveModalAnalysis(event) {
         course_track: (immediateProgram && immediateProgram.includes('Australia')) ? 'australia' : 'regular',
         correction_enabled: blankProgramFields ? false : correctionEnabled,
         correction_start_date: blankProgramFields ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+        // 첨삭을 끄면 연장(13~24세션)도 함께 해제 (고아 데이터 방지)
+        ...((blankProgramFields || !correctionEnabled) ? { extension_enabled: false, extension_start_date: null } : {}),
         correction_fee: blankProgramFields ? 0 : correctionFee,
         program_price: blankProgramFields ? null : basePrice,
         discount_amount: blankProgramFields ? null : examSupport,
@@ -1204,6 +1302,24 @@ async function saveModalAnalysis(event) {
                 } catch (e) {
                     console.error('correction_schedules UPSERT 실패:', e);
                     alert('⚠️ 첨삭 스케줄 저장에 실패했습니다. 테스트룸 쪽에서 수동 확인이 필요합니다.\n\n에러: ' + e.message);
+                }
+            } else if (!correctionEnabled || blankProgramFields) {
+                // 첨삭 OFF → correction_schedules의 연장도 해제 (행이 있을 때만 갱신, 신규 insert 안 함)
+                try {
+                    const userId = updatedApp.user_id || currentManageApp.user_id;
+                    if (userId) {
+                        await fetch(`${SUPABASE_URL}/rest/v1/correction_schedules?user_id=eq.${userId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ extension_enabled: false, extension_start_date: null })
+                        });
+                    }
+                } catch (e) {
+                    console.warn('연장 해제(correction_schedules) 실패:', e);
                 }
             }
 

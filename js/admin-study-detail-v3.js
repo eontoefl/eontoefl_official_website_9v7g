@@ -365,7 +365,7 @@ function renderCorrectionSection() {
 
     section.style.display = 'block';
     const corrStatus = typeof getCorrectionStatus === 'function' ? getCorrectionStatus(app) : null;
-    const statusLabel = corrStatus ? corrStatus.label : '-';
+    const statusLabel = corrStatus ? (corrStatus.adminLabel || corrStatus.label) : '-';
     const statusColor = corrStatus ? corrStatus.color : '#94a3b8';
     const startDate = app.correction_start_date || '-';
 
