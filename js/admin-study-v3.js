@@ -476,13 +476,7 @@ function renderTable() {
         if (sLiveStatus && isEnded) {
             statusBadge = ` <span style="display:inline-block; background:${sLiveStatus.color}; color:white; font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px; margin-left:4px;"><i class="fas ${sLiveStatus.icon}" style="margin-right:2px;"></i>${sLiveStatus.label}</span>`;
         }
-        // 스라첨삭 뱃지
-        if (s.app && s.app.correction_enabled) {
-            const corrStatus = typeof getCorrectionStatus === 'function' ? getCorrectionStatus(s.app) : null;
-            const corrLabel = corrStatus ? (corrStatus.adminLabel || corrStatus.label) : '첨삭';
-            const corrColor = corrStatus ? corrStatus.color : '#3b82f6';
-            statusBadge += ` <span style="display:inline-block; background:${corrColor}; color:white; font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px; margin-left:4px;"><i class="fas fa-pen-nib" style="margin-right:2px;"></i>${corrLabel}</span>`;
-        }
+        // (학습관리2는 내챌 전용 — 첨삭 상태는 신청서 관리/첨삭 관리에서 다룸)
 
         // 인증률 색상 (등급 기준 연동)
         let authColor = '#22c55e';
