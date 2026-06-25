@@ -302,6 +302,8 @@
         .program-row {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            gap: 12px;
             padding: 10px 0;
             border-bottom: 1px solid #e2e8f0;
         }
@@ -313,12 +315,15 @@
         .program-label {
             color: #64748b;
             font-size: 14px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .program-value {
             font-weight: 600;
             color: #1e293b;
             font-size: 14px;
+            text-align: right;
         }
 
         .program-actions {

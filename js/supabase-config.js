@@ -413,10 +413,8 @@ function getCorrectionStatus(app) {
             const diff = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
             return { key: 'waiting', label: `D-${diff}`, color: '#3b82f6', icon: 'fa-hourglass-half' };
         }
-        // 1학기는 끝났고 연장 시작 전 → "시작 예정"
-        const m = extStart.getMonth() + 1;
-        const d = extStart.getDate();
-        return { key: 'ext_waiting', label: `13~24세션 시작 예정 · ${m}/${d}부터`, adminLabel: '첨삭 연장예정', color: '#3b82f6', icon: 'fa-hourglass-half' };
+        // 1학기는 끝났고 연장 시작 전 → "시작 예정" (날짜는 첨삭 시작일 행에 표시되므로 뱃지엔 미포함)
+        return { key: 'ext_waiting', label: '13~24세션 시작 예정', adminLabel: '첨삭 연장예정', color: '#3b82f6', icon: 'fa-hourglass-half' };
     }
 
     // ===== 연장 없음 (기존 로직) =====

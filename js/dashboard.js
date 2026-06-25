@@ -1145,7 +1145,7 @@ async function renderProgramInfo(app) {
             const style = statusColors[corrStatus.key] || { bg: '#f1f5f9', color: '#64748b' };
             // active/completed/refunded는 고정 라벨, 그 외(연장 등)는 status.label 사용
             const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? '환불' : corrStatus.label;
-            correctionStatusHtml = `<span style="display:inline-block; background:${style.bg}; color:${style.color}; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">${label}</span>`;
+            correctionStatusHtml = `<span style="display:inline-block; white-space:nowrap; background:${style.bg}; color:${style.color}; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">${label}</span>`;
         }
     }
 
@@ -1165,7 +1165,7 @@ async function renderProgramInfo(app) {
         ${app.correction_enabled && app.correction_start_date ? `
         <div class="program-row">
             <span class="program-label">첨삭 시작일</span>
-            <span class="program-value">${formatDateWithDay(app.correction_start_date)}${correctionStatusHtml}</span>
+            <span class="program-value">${formatDateWithDay((app.extension_enabled && app.extension_start_date) ? app.extension_start_date : app.correction_start_date)}${correctionStatusHtml}</span>
         </div>
         <div class="program-row">
             <span class="program-label">첨삭 종료일</span>
