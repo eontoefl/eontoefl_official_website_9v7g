@@ -402,7 +402,7 @@ function getCorrectionStatus(app) {
         }
         // 연장 진행 중
         if (today >= extStart) {
-            return { key: 'ext_active', label: '13~24세션 진행 중', adminLabel: '첨삭 연장중', color: '#7c3aed', icon: 'fa-pen-nib' };
+            return { key: 'ext_active', label: '13~24세션 진행 중', adminLabel: '첨삭2 진행중', color: '#7c3aed', icon: 'fa-pen-nib' };
         }
         // 연장 시작 전: 1학기가 아직 진행 중이면 1학기 표시 우선
         if (today >= start && today < end1KST) {
@@ -413,8 +413,10 @@ function getCorrectionStatus(app) {
             const diff = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
             return { key: 'waiting', label: `D-${diff}`, color: '#3b82f6', icon: 'fa-hourglass-half' };
         }
-        // 1학기는 끝났고 연장 시작 전 → "시작 예정" (날짜는 첨삭 시작일 행에 표시되므로 뱃지엔 미포함)
-        return { key: 'ext_waiting', label: '13~24세션 시작 예정', adminLabel: '첨삭 연장예정', color: '#3b82f6', icon: 'fa-hourglass-half' };
+        // 1학기는 끝났고 연장 시작 전 → "시작 예정"
+        //   관리자 뱃지는 1학기 대기("첨삭 D-N")와 동일하게 D-day 표기("첨삭2 D-N")
+        const extDiff = Math.ceil((extStart - today) / (1000 * 60 * 60 * 24));
+        return { key: 'ext_waiting', label: '13~24세션 시작 예정', adminLabel: `첨삭2 D-${extDiff}`, color: '#3b82f6', icon: 'fa-hourglass-half' };
     }
 
     // ===== 연장 없음 (기존 로직) =====

@@ -594,8 +594,11 @@ function displayApplications() {
                     ${app.schedule_start 
                         ? `<div style="white-space:nowrap;">${app.correction_enabled ? '<span style="color:#7c3aed; font-weight:600;">내챌</span> ' : ''}${formatDateWithDay(app.schedule_start)} ${getDday(app.schedule_start)}</div>`
                         : '<span style="color:#94a3b8;">미정</span>'}
-                    ${app.correction_enabled && app.correction_start_date 
-                        ? `<div style="white-space:nowrap; margin-top:2px;"><span style="color:#2563eb; font-weight:600;">첨삭</span> ${formatDateWithDay(app.correction_start_date)} ${getDday(app.correction_start_date)}</div>`
+                    ${app.correction_enabled && app.correction_start_date
+                        ? `<div style="white-space:nowrap; margin-top:2px;"><span style="color:#2563eb; font-weight:600;">${app.extension_enabled && app.extension_start_date ? '첨삭1' : '첨삭'}</span> ${formatDateWithDay(app.correction_start_date)} ${getDday(app.correction_start_date)}</div>`
+                        : ''}
+                    ${app.extension_enabled && app.extension_start_date
+                        ? `<div style="white-space:nowrap; margin-top:2px;"><span style="color:#7c3aed; font-weight:600;">첨삭2</span> ${formatDateWithDay(app.extension_start_date)} ${getDday(app.extension_start_date)}</div>`
                         : ''}
                 </td>
                 <td>
