@@ -931,8 +931,14 @@ async function applyCorrectionExtension() {
         // 2) correction_schedules 원본 (테스트룸이 읽음)
         await upsertCorrectionExtensionSchedule(userId, enabled, extStart || null);
 
-        // TODO(알림톡): 템플릿 검수 통과 후 "첨삭 연장 완료" 알림톡 발송 연결
-        //   예) if (enabled) await sendKakaoAlimTalk('correction_extension', currentManageApp);
+        // 3) 첨삭 연장 완료 알림톡 — 켤 때 & 아직 미발송일 때만 1회 (실패해도 연장 적용은 유지)
+        if (enabled) {
+            try {
+                await maybeSendExtensionAlimTalk(userId, extStart);
+            } catch (e) {
+                console.warn('연장 알림톡 처리 실패(무시):', e);
+            }
+        }
 
         alert(enabled
             ? '✅ 연장 적용 완료 — 학생 화면에 13~24세션이 열렸습니다.'
@@ -976,6 +982,59 @@ async function upsertCorrectionExtensionSchedule(userId, enabled, extStartDate) 
         throw new Error(errBody.message || `correction_schedules 연장 UPSERT 실패: ${response.status}`);
     }
     return await response.json();
+}
+
+// ===== 첨삭 연장 완료 알림톡(50227) 발송 =====
+// correction_schedules.extension_notify_sent 플래그로 중복 발송 방지 — 학생당 1회.
+// 발송 성공 시에만 플래그를 set하므로, 실패하면 다음 연장 적용 때 재시도된다.
+async function maybeSendExtensionAlimTalk(userId, extStart) {
+    if (!currentManageApp || !currentManageApp.phone || !extStart) return;
+
+    // 1) 이미 발송했는지 확인 (correction_schedules)
+    const checkUrl = `${SUPABASE_URL}/rest/v1/correction_schedules?user_id=eq.${userId}&select=extension_notify_sent`;
+    const checkResp = await fetch(checkUrl, {
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    const rows = await checkResp.json();
+    if (Array.isArray(rows) && rows[0] && rows[0].extension_notify_sent === true) {
+        console.log('연장 알림톡 이미 발송됨 — 스킵');
+        return;
+    }
+
+    // 2) 일정 계산: 시작일 ~ +27일(연장 4주차 마지막 날)
+    const startD = new Date(extStart + 'T00:00:00');
+    const endD = new Date(startD.getTime() + 27 * 24 * 60 * 60 * 1000);
+    const fmt = (d) => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+    // 3) 발송 (회차: 첫 연장 = 1회차. 다회 연장 도입 시 회차 카운터로 교체)
+    const res = await sendKakaoAlimTalk('correction_extension_complete', {
+        name: currentManageApp.name,
+        phone: currentManageApp.phone,
+        app_id: currentManageApp.id,
+        round: '1',
+        start_date: fmt(startD),
+        end_date: fmt(endD)
+    });
+
+    // 4) 성공 시에만 플래그 set
+    if (res && res.success) {
+        const patchUrl = `${SUPABASE_URL}/rest/v1/correction_schedules?user_id=eq.${userId}`;
+        await fetch(patchUrl, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+                extension_notify_sent: true,
+                extension_notify_sent_at: new Date().toISOString()
+            })
+        });
+    } else {
+        console.warn('연장 알림톡 발송 실패 — 플래그 미설정(다음에 재시도):', res);
+    }
 }
 
 // 모달 내 가격 계산
