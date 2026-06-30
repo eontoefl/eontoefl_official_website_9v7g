@@ -1646,7 +1646,39 @@ function editAnalysis() {
         radios.forEach(radio => {
             radio.removeAttribute('disabled');
         });
-        
+
+        // 프로모션 유도 학생 토글 활성화 (체크박스는 위 selector에서 제외돼 있어 별도 처리)
+        //  - disabled 해제 + 박스의 클릭 차단(pointer-events) 해제
+        //  - 수정 모드에서도 토글 색/노브가 즉시 반영되도록 change 핸들러를 연결
+        const incentiveToggle = document.getElementById('incentiveToggle');
+        if (incentiveToggle) {
+            incentiveToggle.removeAttribute('disabled');
+            const incentiveBox = incentiveToggle.closest('.form-group');
+            if (incentiveBox) {
+                incentiveBox.style.pointerEvents = 'auto';
+                incentiveBox.style.opacity = '1';
+            }
+            if (!incentiveToggle.dataset.editBound) {
+                incentiveToggle.dataset.editBound = '1';
+                incentiveToggle.addEventListener('change', function() {
+                    const slider = this.parentElement.querySelectorAll('span');
+                    if (this.checked) {
+                        slider[0].style.background = '#f59e0b';
+                        slider[1].style.left = '25px';
+                        // 프로모션 ON → 입문서도 자동 ON
+                        const bookAccessToggle = document.getElementById('bookAccessToggle');
+                        if (bookAccessToggle && !bookAccessToggle.checked) {
+                            bookAccessToggle.checked = true;
+                            bookAccessToggle.dispatchEvent(new Event('change'));
+                        }
+                    } else {
+                        slider[0].style.background = '#cbd5e1';
+                        slider[1].style.left = '3px';
+                    }
+                });
+            }
+        }
+
         // 결과 선택 컨테이너 활성화
         const statusContainer = document.getElementById('statusOptionsContainer');
         if (statusContainer) {
