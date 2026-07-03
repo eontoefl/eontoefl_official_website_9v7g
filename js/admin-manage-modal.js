@@ -281,7 +281,7 @@ function loadModalInfoTab(app) {
         <!-- 1. 기본 정보 & 배송/환불 -->
         <div class="info-card">
             <h3 class="info-card-title"><i class="fas fa-user"></i> 기본 정보</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px;">
                 <div class="info-item"><label>이름</label><div>${app.name || '-'}</div></div>
                 <div class="info-item"><label>전화번호</label><div>${app.phone || '-'}</div></div>
                 <div class="info-item"><label>이메일</label><div>${app.email || '-'}</div></div>
@@ -355,7 +355,7 @@ function loadModalInfoTab(app) {
         <!-- 8. 프로그램 & 일정 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-clipboard"></i> 프로그램 및 일정</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px;">
                 <div class="info-item"><label>희망 프로그램</label><div>${app.preferred_program || '-'}</div></div>
                 <div class="info-item"><label>스라첨삭 신청</label><div style="color: ${app.preferred_correction === '신청희망' || app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight:600;">${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}</div></div>
                 <div class="info-item"><label>희망하는 챌린지 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
