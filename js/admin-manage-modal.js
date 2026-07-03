@@ -495,7 +495,7 @@ function loadModalAnalysisTab(app) {
                         아래 분석 내용을 검토하신 후, 결과 선택 및 프로그램 배정을 완료하고 발송해주세요.<br>
                         AI가 자동 생성한 내용이므로 반드시 검토 후 수정이 필요할 수 있습니다.
                     </div>
-                    <div style="display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap;">
+                    <div style="display: none; gap: 12px; margin-top: 10px; flex-wrap: wrap;"><!-- 프로모션 폐지: AI 판단/확신도 뱃지 숨김 (되살리려면 display:flex) -->
                         ${app.auto_analysis_type ? `
                         <div style="display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #c4b5fd; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #5b21b6; font-weight: 600;">
                             <i class="fas fa-tag"></i> AI 판단: ${app.auto_analysis_type === 'promotion' ? '프로모션 학생' : '일반 학생'}
@@ -535,8 +535,8 @@ function loadModalAnalysisTab(app) {
         </div>
 
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
-            <!-- 0. 프로모션 유도 학생 토글 -->
-            <div class="form-group" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #f59e0b; margin-bottom: 24px; ${pointerEvents}">
+            <!-- 0. 프로모션 유도 학생 토글 (프로모션 폐지: 숨김. 체크박스는 DOM에 남겨 저장 로직 유지 → 항상 false. 되살리려면 display:none 제거) -->
+            <div class="form-group" style="display: none; background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #f59e0b; margin-bottom: 24px; ${pointerEvents}">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <i class="fas fa-bullhorn" style="font-size: 18px; color: #d97706;"></i>
