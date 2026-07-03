@@ -240,24 +240,29 @@ function loadModalInfoTab(app) {
 
     // 목표 점수 (개정전/개정후 구분)
     let targetScoreHTML = '';
+    // 값이 입력된 항목만 렌더 (빈 칸은 표시하지 않음)
+    const buildScoreRows = (rows) => rows
+        .filter(([, v]) => v !== null && v !== undefined && v !== '')
+        .map(([l, v]) => `<div class="info-item"><label>${l}</label><div>${v}</div></div>`)
+        .join('');
     if (app.no_target_score) {
         targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>없음 (고고익선 🚀)</div></div>`;
     } else if (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) {
-        targetScoreHTML = `
-            <div class="info-item"><label>커트라인 (Total)</label><div>${app.target_cutoff_new || '-'}</div></div>
-            <div class="info-item"><label>Reading</label><div>${app.target_reading_new || '-'}</div></div>
-            <div class="info-item"><label>Listening</label><div>${app.target_listening_new || '-'}</div></div>
-            <div class="info-item"><label>Writing</label><div>${app.target_writing_new || '-'}</div></div>
-            <div class="info-item"><label>Speaking</label><div>${app.target_speaking_new || '-'}</div></div>
-        `;
+        targetScoreHTML = buildScoreRows([
+            ['커트라인', app.target_cutoff_new],
+            ['Reading', app.target_reading_new],
+            ['Listening', app.target_listening_new],
+            ['Writing', app.target_writing_new],
+            ['Speaking', app.target_speaking_new],
+        ]) || `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
     } else if (app.target_cutoff_old || app.target_reading_old) {
-        targetScoreHTML = `
-            <div class="info-item"><label>커트라인 (Total)</label><div>${app.target_cutoff_old || '-'}</div></div>
-            <div class="info-item"><label>Reading</label><div>${app.target_reading_old || '-'}</div></div>
-            <div class="info-item"><label>Listening</label><div>${app.target_listening_old || '-'}</div></div>
-            <div class="info-item"><label>Speaking</label><div>${app.target_speaking_old || '-'}</div></div>
-            <div class="info-item"><label>Writing</label><div>${app.target_writing_old || '-'}</div></div>
-        `;
+        targetScoreHTML = buildScoreRows([
+            ['커트라인', app.target_cutoff_old],
+            ['Reading', app.target_reading_old],
+            ['Listening', app.target_listening_old],
+            ['Speaking', app.target_speaking_old],
+            ['Writing', app.target_writing_old],
+        ]) || `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
     } else if (app.target_score) {
         // 입문서 신청자용 (단순 숫자 입력)
         targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>${app.target_score}점</div></div>`;
@@ -297,11 +302,11 @@ function loadModalInfoTab(app) {
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-chart-bar"></i> 현재 토플 점수</h3>
             ${app.has_toefl_score === 'yes' ? `
-                <div class="info-item"><label>TOEFL 응시 여부</label><div>있음 (${app.score_version === 'new' ? '개정후' : '개정전'})</div></div>
+                <div class="info-item"><label>응시 여부</label><div style="color:#2563eb; font-weight:700;">있음 (${app.score_version === 'new' ? '개정후' : '개정전'})</div></div>
                 ${currentScoreHTML}
-                ${app.score_history ? `<div class="info-item"><label>점수 관련 상세 설명</label><div>${app.score_history}</div></div>` : ''}
+                ${app.score_history ? `<div class="info-item"><label>점수 상세</label><div>${app.score_history}</div></div>` : ''}
             ` : `
-                <div class="info-item"><label>TOEFL 응시 여부</label><div>없음</div></div>
+                <div class="info-item"><label>응시 여부</label><div style="color:#dc2626; font-weight:700;">없음</div></div>
                 <div class="info-item">
                     <label>Q1: What are your hobbies or interests, and why do you enjoy them?</label>
                     <div>${app.writing_sample_1 || '-'}</div>
@@ -317,20 +322,20 @@ function loadModalInfoTab(app) {
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-book-reader"></i> 학습 현황</h3>
             <div class="info-item"><label>현재 공부 방법</label><div>${app.current_study_method || '-'}</div></div>
-            <div class="info-item"><label>하루 평균 공부 시간</label><div>${app.daily_study_time || '-'}</div></div>
+            <div class="info-item"><label>하루 공부시간</label><div>${app.daily_study_time || '-'}</div></div>
         </div>
 
         <!-- 4. 목표 점수 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(개정후)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(개정전)' : ''}</h3>
             ${targetScoreHTML}
-            ${app.target_note ? `<div class="info-item"><label>개인 희망 점수 및 추가 설명</label><div>${app.target_note}</div></div>` : ''}
+            ${app.target_note ? `<div class="info-item"><label>희망점수 설명</label><div>${app.target_note}</div></div>` : ''}
         </div>
 
         <!-- 5. 마감 기한 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-calendar-alt"></i> 마감 기한</h3>
-            <div class="info-item"><label>마지막 응시 가능일</label><div>${app.submission_deadline || '-'}</div></div>
+            <div class="info-item"><label>응시 가능일</label><div>${app.submission_deadline || '-'}</div></div>
             <div class="info-item"><label>희망 완료일</label><div>${app.preferred_completion || '-'}</div></div>
         </div>
 
@@ -340,7 +345,7 @@ function loadModalInfoTab(app) {
             <h3 class="info-card-title"><i class="fas fa-question-circle"></i> 토플이 필요한 이유</h3>
             <div class="info-item"><label>목적</label><div>${app.toefl_reason}</div></div>
             ${app.is_au_nz_direct_submit === 'yes' ? `
-            <div class="info-item"><label>호주/NZ 직접 제출</label><div><span style="display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:#fef3c7; color:#92400e; border-radius:5px; font-size:12px; font-weight:600;">AU/NZ 호주/뉴질랜드 기관 직접 제출</span></div></div>
+            <div class="info-item"><label>호주/NZ 제출</label><div><span style="display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:#fef3c7; color:#92400e; border-radius:5px; font-size:12px; font-weight:600;">AU/NZ 호주/뉴질랜드 기관 직접 제출</span></div></div>
             ` : ''}
             ${app.toefl_reason_detail ? `<div class="info-item"><label>상세 설명</label><div>${app.toefl_reason_detail}</div></div>` : ''}
         </div>
@@ -358,11 +363,11 @@ function loadModalInfoTab(app) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px;">
                 <div class="info-item"><label>희망 프로그램</label><div>${app.preferred_program || '-'}</div></div>
                 <div class="info-item"><label>스라첨삭 신청</label><div style="color: ${app.preferred_correction === '신청희망' || app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight:600;">${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}</div></div>
-                <div class="info-item"><label>희망하는 챌린지 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
+                <div class="info-item"><label>희망 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
             </div>
             ${app.give_up_plan ? `<div class="info-item"><label>포기/조절할 것</label><div>${app.give_up_plan}</div></div>` : ''}
-            ${app.tell_plan ? `<div class="info-item"><label>챌린지를 알린/알릴 사람</label><div>${app.tell_plan}</div></div>` : ''}
-            ${app.program_note ? `<div class="info-item"><label>노트북/데스크탑 보유 여부</label><div>${app.program_note}</div></div>` : ''}
+            ${app.tell_plan ? `<div class="info-item"><label>알릴 사람</label><div>${app.tell_plan}</div></div>` : ''}
+            ${app.program_note ? `<div class="info-item"><label>노트북 보유</label><div>${app.program_note}</div></div>` : ''}
         </div>
 
         <!-- 9. 유입 경로 -->
