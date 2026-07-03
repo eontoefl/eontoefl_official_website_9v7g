@@ -349,7 +349,7 @@ function loadModalInfoTab(app) {
         <!-- 7. 블로그 인상 깊은 내용 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-blog"></i> 기억에 남는 블로그 글</h3>
-            <div class="info-item"><div style="white-space:pre-wrap;">${app.memorable_blog_content || '-'}</div></div>
+            <div class="info-item"><div style="grid-column:1 / -1; white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.memorable_blog_content || '-'}</div></div>
         </div>
 
         <!-- 8. 프로그램 & 일정 -->
