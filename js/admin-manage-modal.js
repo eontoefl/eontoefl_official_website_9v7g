@@ -368,13 +368,13 @@ function loadModalInfoTab(app) {
         <!-- 9. 유입 경로 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-route"></i> 유입 경로</h3>
-            <div class="info-item"><div>${referralParts.length > 0 ? referralParts.join(' / ') : '-'}</div></div>
+            <div class="info-item"><div style="grid-column:1 / -1;">${referralParts.length > 0 ? referralParts.join(' / ') : '-'}</div></div>
         </div>
 
         <!-- 10. 추가 전달 사항 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-comment-dots"></i> 추가 전달 사항</h3>
-            <div class="info-item"><div style="white-space:pre-wrap;">${app.additional_notes || '-'}</div></div>
+            <div class="info-item"><div style="grid-column:1 / -1; white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.additional_notes || '-'}</div></div>
         </div>
 
         <!-- 수강 상태 관리 (세팅 완료된 학생만 표시) -->
