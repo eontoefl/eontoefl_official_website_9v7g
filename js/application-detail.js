@@ -2643,8 +2643,11 @@ async function loadPaymentTab(app) {
 
     // 학생이 입금 완료 버튼을 눌렀으면
     if (app.deposit_confirmed_by_student) {
+        // 카톡으로 보낼 인사 메시지 (프로그램 트랙명 " - Fast/Standard"은 제외)
+        const progBase = (app.assigned_program || app.program || '').split(' - ')[0].trim();
+        const kakaoMsg = `안녕하세요! ${progBase ? progBase + ' ' : ''}신청한 ${app.name || ''}입니다 :)`;
         paymentContent.innerHTML = `
-            <div style="background: linear-gradient(135deg, #fff4e6 0%, #fefce8 100%); padding: 32px; border-radius: 16px; border: 2px solid #f59e0b; margin-bottom: 32px;">
+            <div style="background: linear-gradient(135deg, #fff4e6 0%, #fefce8 100%); padding: 32px; border-radius: 16px; border: 2px solid #f59e0b; margin-bottom: 24px;">
                 <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
                     <i class="fas fa-clock" style="font-size: 26px; color: #f59e0b;"></i>
                     <div>
@@ -2659,7 +2662,24 @@ async function loadPaymentTab(app) {
                     확인 후 이용 방법 전달 및 챌린지 시작을 위한 준비가 진행됩니다.
                 </p>
             </div>
-            
+
+            <div style="background: #fffbea; padding: 24px; border-radius: 16px; border: 2px solid #FEE500; margin-bottom: 32px;">
+                <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;">📢 마지막 단계예요!</h3>
+                <p style="font-size: 14px; color: #475569; margin: 0 0 20px 0; line-height: 1.7;">
+                    이제 정식 수강생이 되셨어요 :)<br/>
+                    앞으로는 카카오톡 채널로 소통하게 되니, 아래 <strong style="color: #1e293b;">성함을 채널로 보내 인사를 남겨주세요.</strong><br/>
+                    이 과정까지 마쳐야 신청이 완료됩니다.
+                </p>
+                <div style="margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #64748b;">보낼 내용</div>
+                <div style="display: flex; align-items: stretch; gap: 8px; margin-bottom: 20px;">
+                    <div style="flex: 1; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; font-size: 14px; color: #1e293b; line-height: 1.5;">${kakaoMsg}</div>
+                    <button type="button" onclick="copyKakaoMsg(this)" data-msg="${kakaoMsg.replace(/"/g, '&quot;')}" style="flex-shrink: 0; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0 18px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; white-space: nowrap;">복사</button>
+                </div>
+                <a href="http://pf.kakao.com/_FWxcZC" target="_blank" rel="noopener" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; background: #FEE500; color: #3c1e1e; font-size: 15px; font-weight: 700; padding: 16px; border-radius: 12px; text-decoration: none;">
+                    <i class="fas fa-comment"></i> 카카오톡으로 성함 남기기
+                </a>
+            </div>
+
             ${paymentInfoHtml}
         `;
         return;
@@ -2976,8 +2996,8 @@ async function confirmDeposit() {
             });
         } catch (e) { console.warn('텔레그램 알림 실패:', e); }
 
-        alert('✅ 입금 완료 알림이 전송되었습니다!\n\n관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.');
-        
+        alert('✅ 입금 완료 알림이 전송되었습니다!\n\n📩 이제 정식 수강생이 되셨어요! 카카오톡 채널에 성함을 보내주시면 신청이 완료돼요.\n바로 이어서 도와드릴게요!');
+
         // 페이지 새로고침
         location.reload();
 
@@ -2985,6 +3005,32 @@ async function confirmDeposit() {
         console.error('Error:', error);
         alert('입금 완료 알림 전송 중 오류가 발생했습니다.');
     }
+}
+
+// 입금 대기 카드: 카톡 인사 메시지 복사
+function copyKakaoMsg(btn) {
+    const msg = btn.getAttribute('data-msg') || '';
+    const done = () => {
+        const orig = btn.textContent;
+        btn.textContent = '복사됨!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(msg).then(done).catch(() => fallbackCopy(msg, done));
+    } else {
+        fallbackCopy(msg, done);
+    }
+}
+
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done && done(); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
 }
 
 // 클립보드에 복사
