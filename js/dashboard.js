@@ -336,9 +336,12 @@ function renderActionItems(app) {
                     <p style="font-size: 14px; color: #64748b; margin: 0 0 12px 0;">
                         예시: <strong style="color: #1e293b;">"홍길동"</strong>
                     </p>
-                    <p style="font-size: 14px; line-height: 1.7; color: #ef4444; font-weight: 600; margin: 0 0 20px 0;">
+                    <p style="font-size: 14px; line-height: 1.7; color: #ef4444; font-weight: 600; margin: 0 0 8px 0;">
                         꼭 보내주셔야 원활하게 시작할 수 있어요<br>
                         제가 이용방법을 준비하는 동안 지금 해주세요!
+                    </p>
+                    <p style="font-size: 13px; color: #94a3b8; margin: 0 0 20px 0;">
+                        (입금하신 직후에 이미 성함을 보내셨다면 다시 안 하셔도 돼요!)
                     </p>
                     <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener noreferrer"
                        style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;
