@@ -644,6 +644,12 @@
     font-size: 14px;
     color: #1e293b;
     font-weight: 600;
+    background: #f8fafc;
+    padding: 10px 12px;
+    border-radius: 8px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* 버튼 크기 */

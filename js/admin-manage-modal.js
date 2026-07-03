@@ -299,16 +299,16 @@ function loadModalInfoTab(app) {
             ${app.has_toefl_score === 'yes' ? `
                 <div class="info-item"><label>TOEFL 응시 여부</label><div>있음 (${app.score_version === 'new' ? '개정후' : '개정전'})</div></div>
                 ${currentScoreHTML}
-                ${app.score_history ? `<div class="info-item"><label>점수 관련 상세 설명</label><div style="white-space:pre-wrap;">${app.score_history}</div></div>` : ''}
+                ${app.score_history ? `<div class="info-item"><label>점수 관련 상세 설명</label><div>${app.score_history}</div></div>` : ''}
             ` : `
                 <div class="info-item"><label>TOEFL 응시 여부</label><div>없음</div></div>
                 <div class="info-item">
                     <label>Q1: What are your hobbies or interests, and why do you enjoy them?</label>
-                    <div style="white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.writing_sample_1 || '-'}</div>
+                    <div>${app.writing_sample_1 || '-'}</div>
                 </div>
                 <div class="info-item">
                     <label>Q2: Describe a challenge you faced recently and how you dealt with it.</label>
-                    <div style="white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.writing_sample_2 || '-'}</div>
+                    <div>${app.writing_sample_2 || '-'}</div>
                 </div>
             `}
         </div>
@@ -316,7 +316,7 @@ function loadModalInfoTab(app) {
         <!-- 3. 학습 현황 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-book-reader"></i> 학습 현황</h3>
-            <div class="info-item"><label>현재 공부 방법</label><div style="white-space:pre-wrap;">${app.current_study_method || '-'}</div></div>
+            <div class="info-item"><label>현재 공부 방법</label><div>${app.current_study_method || '-'}</div></div>
             <div class="info-item"><label>하루 평균 공부 시간</label><div>${app.daily_study_time || '-'}</div></div>
         </div>
 
@@ -324,7 +324,7 @@ function loadModalInfoTab(app) {
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(개정후)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(개정전)' : ''}</h3>
             ${targetScoreHTML}
-            ${app.target_note ? `<div class="info-item"><label>개인 희망 점수 및 추가 설명</label><div style="white-space:pre-wrap;">${app.target_note}</div></div>` : ''}
+            ${app.target_note ? `<div class="info-item"><label>개인 희망 점수 및 추가 설명</label><div>${app.target_note}</div></div>` : ''}
         </div>
 
         <!-- 5. 마감 기한 -->
@@ -342,14 +342,14 @@ function loadModalInfoTab(app) {
             ${app.is_au_nz_direct_submit === 'yes' ? `
             <div class="info-item"><label>호주/NZ 직접 제출</label><div><span style="display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:#fef3c7; color:#92400e; border-radius:5px; font-size:12px; font-weight:600;">AU/NZ 호주/뉴질랜드 기관 직접 제출</span></div></div>
             ` : ''}
-            ${app.toefl_reason_detail ? `<div class="info-item"><label>상세 설명</label><div style="white-space:pre-wrap;">${app.toefl_reason_detail}</div></div>` : ''}
+            ${app.toefl_reason_detail ? `<div class="info-item"><label>상세 설명</label><div>${app.toefl_reason_detail}</div></div>` : ''}
         </div>
         ` : ''}
 
         <!-- 7. 블로그 인상 깊은 내용 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-blog"></i> 기억에 남는 블로그 글</h3>
-            <div class="info-item"><div style="grid-column:1 / -1; white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.memorable_blog_content || '-'}</div></div>
+            <div class="info-item"><div style="grid-column:1 / -1;">${app.memorable_blog_content || '-'}</div></div>
         </div>
 
         <!-- 8. 프로그램 & 일정 -->
@@ -360,9 +360,9 @@ function loadModalInfoTab(app) {
                 <div class="info-item"><label>스라첨삭 신청</label><div style="color: ${app.preferred_correction === '신청희망' || app.preferred_correction === '신청' ? '#2563eb' : '#64748b'}; font-weight:600;">${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction || '미선택'}</div></div>
                 <div class="info-item"><label>희망하는 챌린지 시작일</label><div>${app.preferred_start_date || '-'}</div></div>
             </div>
-            ${app.give_up_plan ? `<div class="info-item"><label>포기/조절할 것</label><div style="white-space:pre-wrap;">${app.give_up_plan}</div></div>` : ''}
-            ${app.tell_plan ? `<div class="info-item"><label>챌린지를 알린/알릴 사람</label><div style="white-space:pre-wrap;">${app.tell_plan}</div></div>` : ''}
-            ${app.program_note ? `<div class="info-item"><label>노트북/데스크탑 보유 여부</label><div style="white-space:pre-wrap;">${app.program_note}</div></div>` : ''}
+            ${app.give_up_plan ? `<div class="info-item"><label>포기/조절할 것</label><div>${app.give_up_plan}</div></div>` : ''}
+            ${app.tell_plan ? `<div class="info-item"><label>챌린지를 알린/알릴 사람</label><div>${app.tell_plan}</div></div>` : ''}
+            ${app.program_note ? `<div class="info-item"><label>노트북/데스크탑 보유 여부</label><div>${app.program_note}</div></div>` : ''}
         </div>
 
         <!-- 9. 유입 경로 -->
@@ -374,7 +374,7 @@ function loadModalInfoTab(app) {
         <!-- 10. 추가 전달 사항 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-comment-dots"></i> 추가 전달 사항</h3>
-            <div class="info-item"><div style="grid-column:1 / -1; white-space:pre-wrap; background:#f8fafc; padding:12px; border-radius:8px; font-size:13px; line-height:1.7;">${app.additional_notes || '-'}</div></div>
+            <div class="info-item"><div style="grid-column:1 / -1;">${app.additional_notes || '-'}</div></div>
         </div>
 
         <!-- 수강 상태 관리 (세팅 완료된 학생만 표시) -->
