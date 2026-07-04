@@ -189,6 +189,14 @@
     font-size: 13px;
 }
 
+/* 툴바 액션 버튼: 자리 덜 차지하는 컴팩트 스타일 */
+.admin-btn-compact {
+    padding: 8px 14px;
+    font-size: 13px;
+    gap: 6px;
+    white-space: nowrap;
+}
+
 /* 통계 카드 */
 .stats-grid {
     display: grid;
