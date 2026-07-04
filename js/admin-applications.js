@@ -213,7 +213,8 @@ function renderStatusBadge(color, text, opts = {}) {
     const glint = isLive
         ? `<span style="width:6px; height:6px; border-radius:50%; background:${color}; box-shadow:0 0 0 3px ${color}26; flex-shrink:0;"></span>`
         : '';
-    const iconHtml = icon ? `<i class="fas ${icon}" style="font-size:10px;"></i>` : '';
+    // live 상태는 glint 점으로 활성을 표시하므로 아이콘 생략 (점+아이콘 이중 방지)
+    const iconHtml = (icon && !isLive) ? `<i class="fas ${icon}" style="font-size:10px;"></i>` : '';
     return `<div style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; background:${bg}; color:${color}; letter-spacing:-0.01em;">${glint}${iconHtml}${text}</div>`;
 }
 
