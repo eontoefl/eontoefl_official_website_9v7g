@@ -172,8 +172,8 @@ function getAdminActionMessage(app) {
         if (liveStatus.key === 'ready') result = { text: `${nLabel}시작 대기`, color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
         else if (liveStatus.key === 'active') result = { text: `${nLabel}진행중`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true };
         else if (liveStatus.key === 'completed') result = { text: `${nLabel}종료`, color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
-        else if (liveStatus.key === 'refunded') result = { text: '환불완료', color: '#ef4444', bgColor: '#fef2f2', icon: 'fa-undo', isLive: true };
-        else if (liveStatus.key === 'dropped') result = { text: '중도포기', color: '#94a3b8', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
+        else if (liveStatus.key === 'refunded') result = { text: '환불완료', color: '#a53b22', bgColor: '#f7e7e1', icon: 'fa-undo', isLive: true };
+        else if (liveStatus.key === 'dropped') result = { text: '중도포기', color: '#64748b', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
         
         // 첨삭 상태 뱃지 추가 (환불/중도포기가 아닌 경우)
         if (result && hasCorrection && liveStatus.key !== 'refunded' && liveStatus.key !== 'dropped') {
@@ -186,7 +186,7 @@ function getAdminActionMessage(app) {
                     'ext_active': { color: '#7c3aed', icon: 'fa-pen-nib' },
                     'ext_waiting': { color: '#3b82f6', icon: 'fa-hourglass-half' },
                     'completed': { color: '#22c55e', icon: 'fa-check-circle' },
-                    'refunded': { color: '#ef4444', icon: 'fa-undo' }
+                    'refunded': { color: '#a53b22', icon: 'fa-undo' }
                 };
                 const corrStyle = corrColorMap[corrStatus.key] || { color: '#94a3b8', icon: 'fa-circle' };
                 // 연장 상태는 관리자용 짧은 라벨(adminLabel) 우선 사용
@@ -202,6 +202,19 @@ function getAdminActionMessage(app) {
         if (result) return result;
     }
     return { text: '세팅 완료', color: '#22c55e', bgColor: '#dcfce7' };
+}
+
+// DESIGN.md 톤 칩 스타일 상태 뱃지 렌더 (모든 상태 뱃지 공통)
+// - 배경: 지정 bgColor 또는 color의 12% 틴트 (톤 뎁스)
+// - live 상태: 앞에 Metric Glint(작은 점) 표시
+function renderStatusBadge(color, text, opts = {}) {
+    const { icon = '', isLive = false, bgColor = '' } = opts;
+    const bg = bgColor || (color + '1f');
+    const glint = isLive
+        ? `<span style="width:6px; height:6px; border-radius:50%; background:${color}; box-shadow:0 0 0 3px ${color}26; flex-shrink:0;"></span>`
+        : '';
+    const iconHtml = icon ? `<i class="fas ${icon}" style="font-size:10px;"></i>` : '';
+    return `<div style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; background:${bg}; color:${color}; letter-spacing:-0.01em;">${glint}${iconHtml}${text}</div>`;
 }
 
 // 앱 상태를 필터 카테고리로 분류
@@ -603,16 +616,13 @@ function displayApplications() {
                 </td>
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                        ${actionMessage.isLive 
-                            ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.icon}" style="font-size: 10px;"></i>${actionMessage.text}</div>`
-                            : `<div style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; background: ${actionMessage.bgColor}; color: ${actionMessage.color};">${actionMessage.icon ? `<i class="fas ${actionMessage.icon}" style="font-size: 10px;"></i> ` : ''}${actionMessage.text}</div>`
-                        }
-                        ${actionMessage.subText 
+                        ${renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, isLive: actionMessage.isLive, bgColor: actionMessage.bgColor })}
+                        ${actionMessage.subText
                             ? `<div style="font-size: 11px; color: #64748b; white-space: nowrap; padding-left: 4px;">${actionMessage.subText}</div>`
                             : ''
                         }
-                        ${actionMessage.correctionBadge 
-                            ? `<div style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: ${actionMessage.correctionBadge.color}; color: white; letter-spacing: 0.3px;"><i class="fas ${actionMessage.correctionBadge.icon}" style="font-size: 10px;"></i>${actionMessage.correctionBadge.text}</div>`
+                        ${actionMessage.correctionBadge
+                            ? renderStatusBadge(actionMessage.correctionBadge.color, actionMessage.correctionBadge.text, { icon: actionMessage.correctionBadge.icon, isLive: true })
                             : ''
                         }
                         ${getIncentiveDeadlineDisplay(app)}
