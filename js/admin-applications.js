@@ -662,13 +662,12 @@ function displayApplications() {
                 </td>
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                        ${renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, glint: actionMessage.glint, bgColor: actionMessage.bgColor })}
                         ${stall
                             ? (stall.type === 'warm'
                                 ? renderStatusBadge('#a53b22', `진행 중 이탈 · ${stall.days >= 1 ? stall.days + '일 지남' : '오늘 만료'}`, { icon: 'fa-hourglass-end', bgColor: '#f7e7e1' })
                                 : renderStatusBadge('#64748b', '미동의', { icon: 'fa-ban', bgColor: '#f1f5f9' }))
-                            : ''}
-                        ${actionMessage.subText
+                            : renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, glint: actionMessage.glint, bgColor: actionMessage.bgColor })}
+                        ${(!stall && actionMessage.subText)
                             ? `<div style="font-size: 11px; color: #64748b; white-space: nowrap; padding-left: 4px;">${actionMessage.subText}</div>`
                             : ''
                         }
