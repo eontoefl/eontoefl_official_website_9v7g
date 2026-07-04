@@ -170,7 +170,7 @@ function getAdminActionMessage(app) {
         const nLabel = hasCorrection ? '내챌 ' : '';
         let result;
         if (liveStatus.key === 'ready') result = { text: `${nLabel}시작 대기`, color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
-        else if (liveStatus.key === 'active') result = { text: `${nLabel}진행중`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true };
+        else if (liveStatus.key === 'active') result = { text: `${nLabel}진행중`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true, glint: true };
         else if (liveStatus.key === 'completed') result = { text: `${nLabel}종료`, color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
         else if (liveStatus.key === 'refunded') result = { text: '환불완료', color: '#a53b22', bgColor: '#f7e7e1', icon: 'fa-undo', isLive: true };
         else if (liveStatus.key === 'dropped') result = { text: '중도포기', color: '#64748b', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
@@ -208,14 +208,15 @@ function getAdminActionMessage(app) {
 // - 배경: 지정 bgColor 또는 color의 12% 틴트 (톤 뎁스)
 // - live 상태: 앞에 Metric Glint(작은 점) 표시
 function renderStatusBadge(color, text, opts = {}) {
-    const { icon = '', isLive = false, bgColor = '' } = opts;
+    const { icon = '', glint = false, bgColor = '' } = opts;
     const bg = bgColor || (color + '1f');
-    const glint = isLive
+    // glint: 실제 활성(진행중) 표시용 점. glint일 땐 아이콘 생략(이중 방지),
+    // 그 외 상태는 각자 고유 아이콘으로 구분.
+    const glintHtml = glint
         ? `<span style="width:6px; height:6px; border-radius:50%; background:${color}; box-shadow:0 0 0 3px ${color}26; flex-shrink:0;"></span>`
         : '';
-    // live 상태는 glint 점으로 활성을 표시하므로 아이콘 생략 (점+아이콘 이중 방지)
-    const iconHtml = (icon && !isLive) ? `<i class="fas ${icon}" style="font-size:10px;"></i>` : '';
-    return `<div style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; background:${bg}; color:${color}; letter-spacing:-0.01em;">${glint}${iconHtml}${text}</div>`;
+    const iconHtml = (icon && !glint) ? `<i class="fas ${icon}" style="font-size:10px;"></i>` : '';
+    return `<div style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; background:${bg}; color:${color}; letter-spacing:-0.01em;">${glintHtml}${iconHtml}${text}</div>`;
 }
 
 // 앱 상태를 필터 카테고리로 분류
@@ -617,13 +618,13 @@ function displayApplications() {
                 </td>
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                        ${renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, isLive: actionMessage.isLive, bgColor: actionMessage.bgColor })}
+                        ${renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, glint: actionMessage.glint, bgColor: actionMessage.bgColor })}
                         ${actionMessage.subText
                             ? `<div style="font-size: 11px; color: #64748b; white-space: nowrap; padding-left: 4px;">${actionMessage.subText}</div>`
                             : ''
                         }
                         ${actionMessage.correctionBadge
-                            ? renderStatusBadge(actionMessage.correctionBadge.color, actionMessage.correctionBadge.text, { icon: actionMessage.correctionBadge.icon, isLive: true })
+                            ? renderStatusBadge(actionMessage.correctionBadge.color, actionMessage.correctionBadge.text, { icon: actionMessage.correctionBadge.icon })
                             : ''
                         }
                         ${getIncentiveDeadlineDisplay(app)}
