@@ -70,9 +70,9 @@ function getIncentiveDeadlineDisplay(app) {
     const elapsed = Date.now() - new Date(analysisTs).getTime();
     const remaining = deadlineMs - elapsed;
     
-    // 만료 → 회색
+    // 만료 → 별도 '미동의' 이탈 뱃지(getStallStatus)가 대체 표시하므로 여기선 생략
     if (remaining <= 0) {
-        return '<div style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; background:#f1f5f9; color:#94a3b8; margin-top:4px; white-space:nowrap;"><i class="fas fa-ban" style="font-size:9px;"></i> 동의기한 만료</div>';
+        return '';
     }
     
     const totalSec = Math.floor(remaining / 1000);
@@ -217,6 +217,49 @@ function renderStatusBadge(color, text, opts = {}) {
         : '';
     const iconHtml = (icon && !glint) ? `<i class="fas ${icon}" style="font-size:10px;"></i>` : '';
     return `<div style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; background:${bg}; color:${color}; letter-spacing:-0.01em;">${glintHtml}${iconHtml}${text}</div>`;
+}
+
+// 중도 이탈 판정: 동의/계약/입금 기한 중 하나가 지났고 다음 단계를 안 한 상태
+//  - 'cold': 개별분석 동의조차 안 함 (미동의)
+//  - 'warm': 동의는 했으나 이후(계약/입금)에서 멈춤 (재연락 가치 있음)
+// 반환: { type, days } 또는 null
+function getStallStatus(app) {
+    if (app.application_type === 'book_only') return null;
+    if (app.deposit_confirmed_by_student) return null;      // 입금 눌렀으면 이탈 아님
+    if (app.analysis_status === '조건부승인') return null;   // 협의 단계는 제외
+
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysPast = (deadline) => Math.floor((now - deadline) / DAY);
+
+    // A. 개별분석 발송 + 동의 안 함 → 동의 기한 (일반 24h / 프로모 5일)
+    const analysisSent = app.analysis_status && app.analysis_content;
+    if (analysisSent && !app.student_agreed_at) {
+        const base = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
+        if (!base) return null;
+        const window = app.is_incentive_applicant ? 5 * DAY : DAY;
+        const deadline = new Date(base).getTime() + window;
+        return now > deadline ? { type: 'cold', days: daysPast(deadline) } : null;
+    }
+
+    // B. 동의는 함 → 이후 단계에서 기한 넘김
+    if (app.student_agreed_at) {
+        // 계약서 발송 + 계약 미동의
+        if (app.contract_sent && !app.contract_agreed) {
+            const deadline = app.contract_deadline_override
+                ? new Date(app.contract_deadline_override).getTime()
+                : new Date(app.contract_sent_at).getTime() + DAY;
+            return now > deadline ? { type: 'warm', days: daysPast(deadline) } : null;
+        }
+        // 계약 동의 + 입금 안 함
+        if (app.contract_agreed && !app.deposit_confirmed_by_student) {
+            const deadline = app.deposit_deadline_override
+                ? new Date(app.deposit_deadline_override).getTime()
+                : new Date(app.contract_agreed_at).getTime() + DAY;
+            return now > deadline ? { type: 'warm', days: daysPast(deadline) } : null;
+        }
+    }
+    return null;
 }
 
 // 앱 상태를 필터 카테고리로 분류
@@ -569,6 +612,7 @@ function displayApplications() {
     // 테이블 생성
     const tableHTML = pageApplications.map(app => {
         const actionMessage = getAdminActionMessage(app);
+        const stall = getStallStatus(app);
         const isSelected = selectedIds.has(app.id);
         const liveStatus = getAppLiveStatus(app);
         const isInactive = liveStatus && (liveStatus.key === 'refunded' || liveStatus.key === 'dropped');
@@ -619,6 +663,11 @@ function displayApplications() {
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
                         ${renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, glint: actionMessage.glint, bgColor: actionMessage.bgColor })}
+                        ${stall
+                            ? (stall.type === 'warm'
+                                ? renderStatusBadge('#a53b22', `진행 중 이탈 · ${stall.days >= 1 ? stall.days + '일 지남' : '오늘 만료'}`, { icon: 'fa-hourglass-end', bgColor: '#f7e7e1' })
+                                : renderStatusBadge('#64748b', '미동의', { icon: 'fa-ban', bgColor: '#f1f5f9' }))
+                            : ''}
                         ${actionMessage.subText
                             ? `<div style="font-size: 11px; color: #64748b; white-space: nowrap; padding-left: 4px;">${actionMessage.subText}</div>`
                             : ''
