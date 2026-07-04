@@ -206,6 +206,31 @@
     white-space: nowrap;
 }
 
+/* DESIGN.md 시그니처 버튼 (툴바 액션 전용) */
+.btn-ds-primary {
+    background: linear-gradient(135deg, #006688 0%, #50c9ff 100%);
+    color: #ffffff;
+    border: none;
+}
+.btn-ds-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(0, 102, 136, 0.26);
+    background: linear-gradient(135deg, #006688 0%, #50c9ff 100%);
+}
+.btn-ds-secondary {
+    background: #e8ecef;   /* surface-container-high */
+    color: #00344a;        /* on-primary-container */
+    border: none;
+}
+.btn-ds-secondary:hover {
+    background: #dde3e7;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(25, 28, 29, 0.06);
+}
+.btn-ds-secondary i {
+    color: #006688;        /* primary 액센트 */
+}
+
 /* 통계 카드 */
 .stats-grid {
     display: grid;
