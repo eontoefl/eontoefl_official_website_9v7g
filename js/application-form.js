@@ -305,6 +305,19 @@ function setupConditionalFields() {
             });
         });
     }
+
+    // 호주 직접제출 라디오 → 희망 프로그램 자동 연동 (자동 채움, 학생이 수정 가능)
+    const auNzRadios = document.querySelectorAll('input[name="is_au_nz_direct_submit"]');
+    const preferredProgramSelect = document.querySelector('select[name="preferred_program"]');
+    if (auNzRadios.length > 0 && preferredProgramSelect) {
+        auNzRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                preferredProgramSelect.value = (this.value === 'yes')
+                    ? '내벨업챌린지 Australia'
+                    : '내벨업챌린지';
+            });
+        });
+    }
 }
 
 // Setup Score Total Calculation (직접 기입 방식 - 자동계산 없음)
