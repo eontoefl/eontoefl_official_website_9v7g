@@ -37,6 +37,22 @@ async function updateApplication(appId: string, data: Record<string, unknown>) {
   }
 }
 
+// ===== 카카오 알림톡 발송 (kakaotalk-notify Edge Function 호출) =====
+async function sendKakaoAlimTalk(type: string, data: Record<string, unknown>) {
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type, data }),
+  });
+  const result = await resp.json();
+  console.log("KakaoTalk send result:", JSON.stringify(result));
+  return result;
+}
+
 // ===== 신청서 조회 =====
 async function getApplication(appId: string) {
   const resp = await fetch(
@@ -224,12 +240,24 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
           return new Response("OK", { headers: corsHeaders });
         }
 
-        // DB 업데이트: 입금 확인
+        // DB 업데이트: 입금 확인 (관리자 패널과 동일하게 current_step=5)
         await updateApplication(appId, {
           deposit_confirmed_by_admin: true,
           deposit_confirmed_by_admin_at: Date.now(),
-          current_step: 8,
+          current_step: 5,
         });
+
+        // 알림톡: 입금 확인 완료 (관리자 패널 확인과 동일 동작)
+        // 실패해도 입금 확인 처리/텔레그램 안내는 그대로 진행
+        try {
+          await sendKakaoAlimTalk("payment_confirmed", {
+            name: app.name,
+            phone: app.phone,
+            app_id: appId,
+          });
+        } catch (e) {
+          console.warn("payment_confirmed 알림톡 발송 실패:", e);
+        }
 
         // 기존 메시지 수정 (버튼 제거, 완료 표시)
         await sendTelegram("editMessageText", {

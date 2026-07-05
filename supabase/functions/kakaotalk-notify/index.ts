@@ -30,7 +30,15 @@ const TEMPLATE_IDS: Record<string, number> = {
   contract_deferred:           50221,  // 계약서 기한 유예 안내
   contract_deferral_reminder:  50222,  // 계약서 유예 만료 24시간 전 리마인더
   weekly_check_registered:     50225,  // 주간체크 등록 안내
+  analysis_agree_reminder:     50228,  // 개별분석 동의 마감 2시간 전 리마인드 (일반 학생)
+  contract_agree_reminder:     50229,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
+  deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
 };
+
+// ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
+const DEPOSIT_BANK = "국민은행";
+const DEPOSIT_ACCOUNT = "545601-01-233970";
+const DEPOSIT_HOLDER = "황경민(이온)";
 
 // ===== 택배사 코드 매핑 (LunaSoft carrier_code) =====
 const CARRIER_CODES: Record<string, string> = {
@@ -140,7 +148,9 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
 
     case "shipping_sent": {
-      const trackingUrl = `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
+      // 운송장번호에서 하이픈/공백 등 제거 (CJ 조회는 숫자만 인식). 표시용 줄은 원본 유지.
+      const trackingNoDigits = String(data.tracking_number ?? "").replace(/[^0-9]/g, "");
+      const trackingUrl = `https://trace.cjlogistics.com/next/tracking.html?wblNo=${trackingNoDigits}`;
       return [
         "이온토플 - 택배 발송 안내",
         "",
@@ -303,13 +313,55 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "아래 버튼을 눌러 이번 주 체크 내용을 확인해주세요 :)",
       ].join("\n");
 
+    case "analysis_agree_reminder":
+      return [
+        "이온토플 - 개별분석 동의 마감 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `요청하신 개별분석 동의 마감까지 ${data.time}시간 남았어요. (${data.deadline}까지)`,
+        "",
+        "아래 링크에서 분석 결과 확인하시고 동의 여부 결정해주세요.",
+        "기한이 지나면 이 분석 건은 만료되고, 이후 5일간은 재신청이 불가해요.",
+      ].join("\n");
+
+    case "contract_agree_reminder":
+      return [
+        "이온토플 - 계약서 동의 마감 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `${data.program} 계약서 동의 마감까지 ${data.time}시간 남았어요. (${data.deadline}까지)`,
+        "",
+        "아래 링크에서 계약 내용 확인하시고 동의해주세요.",
+        "기한이 지나면 지금까지 진행된 신청은 자동 취소되어, 처음부터 다시 접수하셔야 해요.",
+      ].join("\n");
+
+    case "deposit_reminder": {
+      const rawPrice = String(data.price ?? "0").replace(/[^\d.]/g, "");
+      const price = rawPrice ? Number(rawPrice).toLocaleString() : "0";
+      return [
+        "이온토플 - 입금 마감 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        `${data.program} 입금 마감까지 ${data.time}시간 남았어요. (${data.deadline}까지)`,
+        "",
+        `- ${DEPOSIT_BANK} ${DEPOSIT_ACCOUNT} (${DEPOSIT_HOLDER}) / ${price}원`,
+        "",
+        "기한이 지나면 지금까지 진행된 신청은 자동 취소되어, 처음부터 다시 접수하셔야 해요.",
+        "입금이 확인되면 바로 다음 단계 안내드릴게요!",
+        "",
+        "입금을 마치신 후, 아래 버튼을 눌러 입금 완료를 알려주세요.",
+      ].join("\n");
+    }
+
     default:
       return "";
   }
 }
 
 // ===== SMS 대체 문구 생성 =====
-function buildSmsContent(type: string): string {
+function buildSmsContent(type: string, data: Record<string, unknown> = {}): string {
   switch (type) {
     case "analysis_complete":
       return "[이온토플] 개별분석이 완료되었습니다. 24시간 이내에 확인해주세요.";
@@ -345,6 +397,12 @@ function buildSmsContent(type: string): string {
       return "[이온토플] 계약서 동의 마감이 내일까지입니다. 확인 부탁드려요.";
     case "weekly_check_registered":
       return "[이온토플] 주간체크가 등록되었습니다. 확인해주세요. https://testroom.eonfl.com";
+    case "analysis_agree_reminder":
+      return `[이온토플] 개별분석 동의 기한이 ${data.time}시간 남았어요. 만료 시 5일간 재신청이 불가해요.`;
+    case "contract_agree_reminder":
+      return `[이온토플] 계약서 동의 기한이 ${data.time}시간 남았어요. 미동의 시 신청이 자동취소돼요.`;
+    case "deposit_reminder":
+      return `[이온토플] 입금 기한 ${data.deadline}까지(${data.time}시간 남음). 미입금 시 신청이 자동취소돼요.`;
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -353,7 +411,8 @@ function buildSmsContent(type: string): string {
 // ===== 버튼 URL 결정 =====
 function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "shipping_sent") {
-    return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${data.tracking_number}`;
+    const trackingNoDigits = String(data.tracking_number ?? "").replace(/[^0-9]/g, "");
+    return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${trackingNoDigits}`;
   }
   if (type === "correction_start_reminder") {
     return `${SITE_URL}/my-dashboard.html`;
@@ -395,7 +454,7 @@ function buildMessageObject(
   if (templateId === TEMPLATE_IDS.shipping_sent) {
     const courierName = (data.courier as string) || "CJ대한통운";
     message.carrier_code = CARRIER_CODES[courierName] || "1";
-    message.invoice_number = (data.tracking_number as string) || "";
+    message.invoice_number = String(data.tracking_number ?? "").replace(/[^0-9]/g, "");
   }
 
   return message;
@@ -529,7 +588,7 @@ Deno.serve(async (req) => {
 
     // 메시지 본문 생성
     const msgContent = buildMsgContent(type, data);
-    const smsContent = buildSmsContent(type);
+    const smsContent = buildSmsContent(type, data);
     const btnUrl = getBtnUrl(type, data);
 
     // LunaSoft API 호출
@@ -602,7 +661,7 @@ async function handleBulkSend(
     if (!templateId || !data.phone) continue;
 
     const msgContent = buildMsgContent(type, data);
-    const smsContent = buildSmsContent(type);
+    const smsContent = buildSmsContent(type, data);
     const btnUrl = getBtnUrl(type, data);
 
     const message = buildMessageObject(
