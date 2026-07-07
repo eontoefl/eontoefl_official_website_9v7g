@@ -58,12 +58,12 @@ async function loadNotices() {
         let html = '<table style="width: 100%; border-collapse: collapse; font-size: 14px;">';
         html += `<thead>
             <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 50px;">순서</th>
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 120px;">타입</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 44px;">순서</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 100px;">타입</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600;">제목</th>
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 130px;">등록일시</th>
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 80px;">상태</th>
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 140px;">액션</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 96px;">등록일시</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 72px;">상태</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 104px;">액션</th>
             </tr>
         </thead><tbody>`;
 
@@ -74,7 +74,7 @@ async function loadNotices() {
             html += `<tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 12px 8px; color: #64748b; text-align: center;">${n.sort_order || 0}</td>
                 <td style="padding: 12px 8px;">
-                    <span style="background: ${style.bg}; color: ${style.titleColor}; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                    <span style="background: ${style.bg}; color: ${style.titleColor}; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap;">
                         ${style.emoji} ${style.label}
                     </span>
                 </td>
@@ -82,7 +82,10 @@ async function loadNotices() {
                     <div style="font-weight: 600; color: #1e293b;">${escapeHtml(n.title || '')}</div>
                     <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">${escapeHtml(contentPreview)}</div>
                 </td>
-                <td style="padding: 12px 8px; color: #64748b; font-size: 13px; white-space: nowrap;">${formatNoticeDate(n.created_at)}</td>
+                <td style="padding: 12px 8px; white-space: nowrap;">
+                    <div style="color: #64748b; font-size: 12px;">${(formatNoticeDate(n.created_at).split(' ')[0]) || ''}</div>
+                    <div style="color: #94a3b8; font-size: 12px; margin-top: 2px;">${(formatNoticeDate(n.created_at).split(' ')[1]) || ''}</div>
+                </td>
                 <td style="padding: 12px 8px; text-align: center;">
                     <label style="cursor: pointer; display: inline-flex; align-items: center;">
                         <input type="checkbox" ${n.is_active ? 'checked' : ''} onchange="toggleNoticeActive('${n.id}', this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
