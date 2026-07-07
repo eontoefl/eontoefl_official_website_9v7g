@@ -125,6 +125,15 @@
     margin-bottom: 24px;
 }
 
+/* 공지 관리 탭: style.css의 전역 .form-container(max-width:600px, margin:auto)
+   상속을 끊고 콘텐츠 영역 전체 폭을 사용 → 목록 표가 넓게 펼쳐지도록 */
+#tab-notices .form-container {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+}
+
 .form-group {
     margin-bottom: 24px;
 }
