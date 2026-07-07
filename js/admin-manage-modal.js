@@ -590,54 +590,88 @@ function loadModalAnalysisTab(app) {
                 </div>
             </div>
             
-            <!-- 2. 프로그램 배정 -->
+            <!-- 2. 프로그램 배정 (세그먼트: 기간·트랙 / 부가옵션 토글: 스라첨삭·자기주도) -->
             <div class="form-group" id="formGroup-program">
                 <label class="form-label">2. 프로그램 배정</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div>
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 프로그램 <span class="required">*</span></label>
-                        <select name="assigned_program" class="form-select" required ${readOnly} style="background-position: right 12px center;">
-                            <option value="">선택하세요</option>
-                            <optgroup label="일반 정규과정">
-                                <option value="내벨업챌린지 - Fast" ${fillProgram === '내벨업챌린지 - Fast' ? 'selected' : ''}>내벨업챌린지 - Fast (4주)</option>
-                                <option value="내벨업챌린지 - Standard" ${fillProgram === '내벨업챌린지 - Standard' ? 'selected' : ''}>내벨업챌린지 - Standard (8주)</option>
-                            </optgroup>
-                            <optgroup label="호주 과정 (Australia)">
-                                <option value="내벨업챌린지 Australia - Fast" ${fillProgram === '내벨업챌린지 Australia - Fast' ? 'selected' : ''}>내벨업챌린지 Australia - Fast (4주)</option>
-                                <option value="내벨업챌린지 Australia - Standard" ${fillProgram === '내벨업챌린지 Australia - Standard' ? 'selected' : ''}>내벨업챌린지 Australia - Standard (8주)</option>
-                            </optgroup>
-                            <optgroup label="기타">
-                                <option value="상담 후 결정" ${fillProgram === '상담 후 결정' ? 'selected' : ''}>상담 후 결정</option>
-                            </optgroup>
-                        </select>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                            학생 희망: <strong>${app.preferred_program || '-'}</strong>
+
+                <div id="programSegments" style="${pointerEvents}">
+                    <!-- 저장 시 assigned_program 문자열로 재조립하는 소스(기간×트랙) -->
+                    <input type="hidden" name="program_duration" id="program_duration" value="${fillProgram.includes('Fast') ? 'fast' : fillProgram.includes('Standard') ? 'standard' : ''}">
+                    <input type="hidden" name="program_track" id="program_track" value="${fillProgram.includes('Australia') ? 'australia' : 'regular'}">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">기간 <span class="required">*</span></label>
+                            <div style="display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 4px;">
+                                <button type="button" id="seg_duration_fast" onclick="setProgramSegment('duration','fast')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillProgram.includes('Fast') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">Fast · 4주</button>
+                                <button type="button" id="seg_duration_standard" onclick="setProgramSegment('duration','standard')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillProgram.includes('Standard') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">Standard · 8주</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">트랙</label>
+                            <div style="display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 4px;">
+                                <button type="button" id="seg_track_regular" onclick="setProgramSegment('track','regular')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${!fillProgram.includes('Australia') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">일반</button>
+                                <button type="button" id="seg_track_australia" onclick="setProgramSegment('track','australia')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillProgram.includes('Australia') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">호주</button>
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">스라첨삭</label>
-                        <select name="correction_enabled" id="correction_enabled" class="form-select" ${readOnly}
-                                onchange="toggleCorrectionStartDate(); calculateModalPrice();"
-                                style="background-position: right 12px center;">
-                            <option value="false" ${!fillCorrectionEnabled ? 'selected' : ''}>미포함</option>
-                            <option value="true" ${fillCorrectionEnabled ? 'selected' : ''}>포함 (+200,000원)</option>
-                        </select>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                            학생 희망: <strong>${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong>
-                        </div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
+                        학생 희망: <strong>${app.preferred_program || '-'}</strong>
                     </div>
                 </div>
-                <!-- 자기주도(Self-Paced) 토글 — 켜면 [3. 일정]에 완료 종료일이 나타난다 -->
-                <div style="margin-top: 16px;">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">자기주도 (Self-Paced)</label>
-                    <select name="self_paced" id="self_paced" class="form-select" ${readOnly}
-                            onchange="toggleSelfPaced();"
-                            style="background-position: right 12px center;">
-                        <option value="false" ${!fillSelfPaced ? 'selected' : ''}>미포함</option>
-                        <option value="true" ${fillSelfPaced ? 'selected' : ''}>포함 (압축 일정·매일 마감)</option>
-                    </select>
-                    <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
-                        켜면 시작일~완료 종료일 사이에 24세트가 자동 배분됩니다. 시작 요일 제약 없음.
+
+                <!-- 부가옵션 (토글 그룹) — ON 시 관련 입력이 바로 아래로 펼쳐진다 -->
+                <div id="optionToggles" style="margin-top: 20px; background: #f8fafc; border-radius: 12px; padding: 4px 16px; ${pointerEvents}">
+                    <!-- 스라첨삭 -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 12px;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #1e293b;">스라첨삭 <span style="font-size: 12px; color: #3b82f6; font-weight: 500;">+200,000원</span></div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">학생 희망: <strong>${app.preferred_correction === '신청희망' ? '신청희망' : app.preferred_correction === '신청' ? '신청희망' : app.preferred_correction === '미신청' ? '미신청' : '미선택'}</strong></div>
+                        </div>
+                        <input type="hidden" name="correction_enabled" id="correction_enabled" value="${fillCorrectionEnabled ? 'true' : 'false'}">
+                        <label onclick="toggleOptionSwitch('correction_enabled')" style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer; flex-shrink: 0;">
+                            <span id="correction_enabled_track" style="position: absolute; inset: 0; background: ${fillCorrectionEnabled ? '#3b82f6' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                            <span id="correction_enabled_knob" style="position: absolute; top: 3px; left: ${fillCorrectionEnabled ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                        </label>
+                    </div>
+                    <!-- 첨삭 시작일 (아코디언) -->
+                    <div id="correctionStartDateWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일·월요일만) <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span></label>
+                        <input type="date" name="correction_start_date" id="correction_start_date"
+                               value="${fillCorrectionStartDate}"
+                               ${readOnly}
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; font-family: 'Pretendard', -apple-system, sans-serif;">
+                    </div>
+                    <!-- 첨삭 연장 (13~24세션) — 개별분석 발행과 무관한 독립 액션. 발행 후(읽기전용)에도 동작 -->
+                    <div id="correctionExtensionWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 연장 (13~24세션) <span style="color:#7c3aed; font-size:11px;">결제 확인 후 적용</span></label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="date" id="extension_start_date" value="${fillExtensionStartDate}"
+                                   style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; font-family: 'Pretendard', -apple-system, sans-serif;">
+                            <button type="button" id="applyExtensionBtn" onclick="applyCorrectionExtension()"
+                                    style="padding: 10px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">연장 적용</button>
+                        </div>
+                        <div style="font-size: 12px; color: #94a3b8; margin-top: 6px;">13~24세션 시작일을 넣고 [연장 적용]. 날짜를 비우고 적용하면 연장이 해제됩니다.</div>
+                    </div>
+
+                    <!-- 자기주도(Self-Paced) -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 12px;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #1e293b;">자기주도 <span style="font-size: 12px; color: #0e7490; font-weight: 500;">Self-Paced</span></div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">시작일~완료 종료일 사이 24세트 자동 배분 · 시작 요일 제약 없음</div>
+                        </div>
+                        <input type="hidden" name="self_paced" id="self_paced" value="${fillSelfPaced ? 'true' : 'false'}">
+                        <label onclick="toggleOptionSwitch('self_paced')" style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer; flex-shrink: 0;">
+                            <span id="self_paced_track" style="position: absolute; inset: 0; background: ${fillSelfPaced ? '#0e7490' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                            <span id="self_paced_knob" style="position: absolute; top: 3px; left: ${fillSelfPaced ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
+                        </label>
+                    </div>
+                    <!-- 자기주도 완료 종료일 (아코디언) -->
+                    <div id="selfPacedEndDateWrapper" style="padding: 0 0 12px; ${fillSelfPaced ? '' : 'display: none;'}">
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">자기주도 완료 종료일 <span style="color:#0e7490; font-size:11px;">(24세트 배분 마지막 날)</span></label>
+                        <input type="date" name="self_paced_end_date" id="self_paced_end_date"
+                               value="${fillSelfPacedEndDate}"
+                               ${readOnly}
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; font-family: 'Pretendard', -apple-system, sans-serif;">
                     </div>
                 </div>
             </div>
@@ -647,49 +681,26 @@ function loadModalAnalysisTab(app) {
                 <label class="form-label">3. 일정</label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 시작일 (일요일만) <span class="required">*</span></label>
-                        <input type="date" name="schedule_start" id="schedule_start" 
-                               value="${fillScheduleStart}" 
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 시작일 <span id="scheduleStartWeekdayHint" style="color:#94a3b8; font-size:11px;">${fillSelfPaced ? '(요일 제약 없음)' : '(일요일만)'}</span> <span class="required">*</span></label>
+                        <input type="date" name="schedule_start" id="schedule_start"
+                               value="${fillScheduleStart}"
                                required
                                ${readOnly}
                                style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
                     </div>
-                    <div>
+                    <div id="scheduleEndWrapper" style="${fillSelfPaced ? 'display: none;' : ''}">
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">챌린지 종료일 (자동계산)</label>
-                        <input type="date" name="schedule_end" id="schedule_end" 
-                               value="${fillScheduleEnd}" 
+                        <input type="date" name="schedule_end" id="schedule_end"
+                               value="${fillScheduleEnd}"
                                readonly
                                style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-family: 'Pretendard', -apple-system, sans-serif;">
+                    </div>
+                    <div id="selfPacedScheduleNote" style="${fillSelfPaced ? '' : 'display: none;'} align-self: end;">
+                        <div style="font-size: 12px; color: #0e7490; background: #ecfeff; padding: 10px 12px; border-radius: 8px;">자기주도 모드 — 완료 종료일은 위 <strong>부가옵션</strong>에서 설정합니다.</div>
                     </div>
                 </div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                     학생이 희망한 챌린지 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
-                </div>
-                <!-- 자기주도 완료 종료일 — 자기주도 ON일 때만 표시. 24세트가 시작일~이 날짜 사이에 배분된다 -->
-                <div id="selfPacedEndDateWrapper" style="margin-top: 12px; ${fillSelfPaced ? '' : 'display: none;'}">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">자기주도 완료 종료일 <span style="color:#0e7490; font-size:11px;">(24세트 배분 마지막 날)</span></label>
-                    <input type="date" name="self_paced_end_date" id="self_paced_end_date"
-                           value="${fillSelfPacedEndDate}"
-                           ${readOnly}
-                           style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
-                </div>
-                <div id="correctionStartDateWrapper" style="margin-top: 12px; ${fillCorrectionEnabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일·월요일만)${fillCorrectionEnabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
-                    <input type="date" name="correction_start_date" id="correction_start_date"
-                           value="${fillCorrectionStartDate}"
-                           ${readOnly}
-                           style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
-                </div>
-                <!-- 첨삭 연장 (13~24세션) — 개별분석 발행과 무관한 독립 액션. 발행 후(읽기전용)에도 동작 -->
-                <div id="correctionExtensionWrapper" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; ${fillCorrectionEnabled ? '' : 'display: none;'}">
-                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 연장 (13~24세션) <span style="color:#7c3aed; font-size:11px;">결제 확인 후 적용</span></label>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="date" id="extension_start_date" value="${fillExtensionStartDate}"
-                               style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
-                        <button type="button" id="applyExtensionBtn" onclick="applyCorrectionExtension()"
-                                style="padding: 10px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">연장 적용</button>
-                    </div>
-                    <div style="font-size: 12px; color: #94a3b8; margin-top: 6px;">13~24세션 시작일을 넣고 [연장 적용]. 날짜를 비우고 적용하면 연장이 해제됩니다.</div>
                 </div>
             </div>
             
@@ -837,12 +848,10 @@ function loadModalAnalysisTab(app) {
         });
     }
     
-    // 일정 계산 이벤트
+    // 일정 계산 이벤트 (기간 세그먼트 변경은 setProgramSegment 내부에서 직접 호출)
     const scheduleStart = document.getElementById('schedule_start');
-    const programSelect = document.querySelector('[name="assigned_program"]');
-    if (scheduleStart && programSelect) {
+    if (scheduleStart) {
         scheduleStart.addEventListener('change', calculateModalEndDate);
-        programSelect.addEventListener('change', calculateModalEndDate);
     }
     
     // 첨삭 시작일 일·월요일 검증 이벤트
@@ -920,8 +929,7 @@ function toggleCorrectionStartDate() {
     const priceRow = document.getElementById('correctionPriceRow');
     const extWrapper = document.getElementById('correctionExtensionWrapper');
     if (wrapper) {
-        wrapper.style.opacity = enabled ? '1' : '0.4';
-        wrapper.style.pointerEvents = enabled ? 'auto' : 'none';
+        wrapper.style.display = enabled ? '' : 'none';
     }
     if (priceRow) {
         priceRow.style.display = enabled ? '' : 'none';
@@ -932,21 +940,60 @@ function toggleCorrectionStartDate() {
     }
 }
 
-// 자기주도(Self-Paced) 토글 — 완료 종료일 입력칸을 보이거나 숨긴다.
+// 자기주도(Self-Paced) 토글 — 완료 종료일 아코디언 표시 + 일정 섹션 종료일 안내 전환.
 // 자기주도는 시작 요일 제약이 없으므로 종료일 자동계산(일요일 강제)을 건너뛴다.
 function toggleSelfPaced() {
-    const sel = document.getElementById('self_paced');
-    const enabled = sel && sel.value === 'true';
+    const enabled = isSelfPacedOn();
     const wrapper = document.getElementById('selfPacedEndDateWrapper');
-    if (wrapper) {
-        wrapper.style.display = enabled ? '' : 'none';
-    }
+    if (wrapper) wrapper.style.display = enabled ? '' : 'none';
+    // 일정 섹션: 자기주도면 챌린지 자동 종료일 숨기고 안내 문구로 대체
+    const endWrap = document.getElementById('scheduleEndWrapper');
+    const endNote = document.getElementById('selfPacedScheduleNote');
+    if (endWrap) endWrap.style.display = enabled ? 'none' : '';
+    if (endNote) endNote.style.display = enabled ? '' : 'none';
+    // 시작일 요일 안내 갱신
+    const startHint = document.getElementById('scheduleStartWeekdayHint');
+    if (startHint) startHint.textContent = enabled ? '(요일 제약 없음)' : '(일요일만)';
 }
 
 // 자기주도 여부 조회 헬퍼
 function isSelfPacedOn() {
     const sel = document.getElementById('self_paced');
     return !!(sel && sel.value === 'true');
+}
+
+// 프로그램 세그먼트(기간 fast/standard · 트랙 regular/australia) 선택.
+// 저장 시 assigned_program 문자열로 재조립되며, 기간 변경 시 챌린지 종료일을 다시 계산한다.
+function setProgramSegment(group, val) {
+    const input = document.getElementById('program_' + group);
+    if (input) input.value = val;
+    const opts = group === 'duration' ? ['fast', 'standard'] : ['regular', 'australia'];
+    opts.forEach(function(opt) {
+        const btn = document.getElementById('seg_' + group + '_' + opt);
+        if (!btn) return;
+        const on = (opt === val);
+        btn.style.background = on ? '#ffffff' : 'transparent';
+        btn.style.color = on ? '#4c1d95' : '#64748b';
+        btn.style.fontWeight = on ? '700' : '500';
+        btn.style.boxShadow = on ? '0 1px 3px rgba(25,28,29,0.12)' : 'none';
+    });
+    if (group === 'duration') calculateModalEndDate();
+}
+
+// 부가옵션 스위치 토글(스라첨삭 / 자기주도) — 숨은 input(value 'true'/'false')을 갱신하고
+// 스위치 색·노브 위치 + 의존 UI(가격표·아코디언)를 함께 반영한다.
+function toggleOptionSwitch(name) {
+    const input = document.getElementById(name);
+    if (!input) return;
+    const on = input.value !== 'true';
+    input.value = on ? 'true' : 'false';
+    const onColor = name === 'self_paced' ? '#0e7490' : '#3b82f6';
+    const track = document.getElementById(name + '_track');
+    const knob = document.getElementById(name + '_knob');
+    if (track) track.style.background = on ? onColor : '#cbd5e1';
+    if (knob) knob.style.left = on ? '25px' : '3px';
+    if (name === 'correction_enabled') { toggleCorrectionStartDate(); calculateModalPrice(); }
+    if (name === 'self_paced') { toggleSelfPaced(); }
 }
 
 // ===== 첨삭 연장(13~24세션) 적용/해제 — 개별분석 저장과 분리된 즉시 액션 =====
@@ -1148,12 +1195,10 @@ function selectStatus(value, event) {
 // 거부·조건부승인 선택 시 프로그램 배정/일정/가격 정보 섹션 비활성화 처리
 // (조건부승인은 아직 학생과 협의 전 단계라 프로그램·가격·일정을 미정으로 둔다)
 function setRejectionUIState(isRejected) {
+    // 실제 입력 필드(날짜/숫자/텍스트)는 disabled 처리
     const fieldNames = [
-        'assigned_program',
-        'correction_enabled',
         'schedule_start',
         'correction_start_date',
-        'self_paced',
         'self_paced_end_date',
         'additional_discount',
         'discount_reason'
@@ -1163,13 +1208,14 @@ function setRejectionUIState(isRejected) {
         if (el) el.disabled = isRejected;
     });
 
-    // required 토글
-    const programEl = document.querySelector('[name="assigned_program"]');
+    // 세그먼트(기간·트랙) / 부가옵션 토글은 커스텀 컨트롤 → 컨테이너 클릭 차단으로 비활성화
+    ['programSegments', 'optionToggles'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) c.style.pointerEvents = isRejected ? 'none' : 'auto';
+    });
+
+    // required 토글 (시작일만 — 프로그램은 커스텀 세그먼트라 저장 시 JS로 검증)
     const startEl = document.querySelector('[name="schedule_start"]');
-    if (programEl) {
-        if (isRejected) programEl.removeAttribute('required');
-        else programEl.setAttribute('required', '');
-    }
     if (startEl) {
         if (isRejected) startEl.removeAttribute('required');
         else startEl.setAttribute('required', '');
@@ -1182,16 +1228,18 @@ function setRejectionUIState(isRejected) {
     });
 }
 
-// 모달 내 종료일 계산
+// 모달 내 종료일 계산 (기간 세그먼트 program_duration 기준)
 function calculateModalEndDate() {
     const startInput = document.getElementById('schedule_start');
     const endInput = document.getElementById('schedule_end');
-    const programSelect = document.querySelector('[name="assigned_program"]');
-    
-    if (!startInput.value || !programSelect.value) {
+    if (!startInput || !endInput) return;
+    const durationEl = document.getElementById('program_duration');
+    const duration = durationEl ? durationEl.value : '';
+
+    if (!startInput.value || !duration) {
         return;
     }
-    
+
     // 자기주도(Self-Paced)는 시작 요일 제약이 없다. 종료일도 관리자가 직접 입력하므로
     // 여기서 챌린지 종료일 자동계산을 하지 않는다.
     if (typeof isSelfPacedOn === 'function' && isSelfPacedOn()) {
@@ -1208,22 +1256,14 @@ function calculateModalEndDate() {
         endInput.value = '';
         return;
     }
-    
-    // 프로그램에 따라 주수 결정
-    let weeks = 0;
-    if (programSelect.value === '내벨업챌린지 - Fast' || programSelect.value === '내벨업챌린지 Australia - Fast') {
-        weeks = 4;
-    } else if (programSelect.value === '내벨업챌린지 - Standard' || programSelect.value === '내벨업챌린지 Australia - Standard') {
-        weeks = 8;
-    } else {
-        endInput.value = '';
-        return;
-    }
-    
+
+    // 기간에 따라 주수 결정 (fast=4주 / standard=8주)
+    const weeks = duration === 'fast' ? 4 : 8;
+
     // 종료일 계산: 시작일 + weeks주 후 토요일
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + (weeks * 7) - 1);
-    
+
     // ISO 형식으로 변환
     const endDateString = endDate.toISOString().split('T')[0];
     endInput.value = endDateString;
@@ -1313,6 +1353,19 @@ async function saveModalAnalysis(event) {
     const deposit = 100000;
     const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
 
+    // 프로그램: 기간(fast/standard) × 트랙(regular/australia) 세그먼트 → 기존 캐노니컬 문자열로 재조립.
+    // (저장값은 종전과 100% 동일 → 대시보드·계약·테스트룸 등 다운스트림 파싱 로직 무변경)
+    const programDuration = formData.get('program_duration') || '';
+    const programTrack = formData.get('program_track') || 'regular';
+    const reconstructedProgram = programDuration
+        ? ('내벨업챌린지' + (programTrack === 'australia' ? ' Australia' : '') + ' - ' + (programDuration === 'fast' ? 'Fast' : 'Standard'))
+        : null;
+    // 승인(프로그램을 채우는 상태)인데 기간 미선택이면 저장 불가
+    if (!blankProgramFields && !programDuration) {
+        alert('⚠️ 프로그램 기간(Fast / Standard)을 선택해주세요.');
+        return;
+    }
+
     // 자기주도(Self-Paced): 시작일~완료 종료일 사이에 24세트를 자동 배분. 첨삭과 병행 가능.
     const selfPacedEnabled = formData.get('self_paced') === 'true';
     const selfPacedEndDate = formData.get('self_paced_end_date') || null;
@@ -1335,7 +1388,7 @@ async function saveModalAnalysis(event) {
     // === 분기: 예약 발송 ===
     if (mode === 'scheduled' || mode === 'update-scheduled') {
         // pending 컬럼에 저장 (정식 컬럼은 건드리지 않음 → 학생에게 공개되지 않음)
-        const assignedProgramVal = blankProgramFields ? null : formData.get('assigned_program');
+        const assignedProgramVal = blankProgramFields ? null : reconstructedProgram;
         const pendingPayload = {
             assigned_program: assignedProgramVal,
             course_track: (assignedProgramVal && assignedProgramVal.includes('Australia')) ? 'australia' : 'regular',
@@ -1387,7 +1440,7 @@ async function saveModalAnalysis(event) {
     }
 
     // === 분기: 즉시 저장 + 발송 (기존 동작) ===
-    const immediateProgram = blankProgramFields ? null : formData.get('assigned_program');
+    const immediateProgram = blankProgramFields ? null : reconstructedProgram;
     const updateData = {
         analysis_status: formData.get('analysis_status'),
         assigned_program: immediateProgram,
@@ -1722,6 +1775,15 @@ function editAnalysis() {
         const radios = form.querySelectorAll('input[type="radio"]');
         radios.forEach(radio => {
             radio.removeAttribute('disabled');
+        });
+
+        // 프로그램 세그먼트 / 부가옵션 토글 컨테이너 클릭 차단 해제 (커스텀 컨트롤)
+        ['programSegments', 'optionToggles'].forEach(id => {
+            const c = document.getElementById(id);
+            if (c) {
+                c.style.pointerEvents = 'auto';
+                c.style.opacity = '1';
+            }
         });
 
         // 프로모션 유도 학생 토글 활성화 (체크박스는 위 selector에서 제외돼 있어 별도 처리)
