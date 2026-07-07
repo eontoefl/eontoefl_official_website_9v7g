@@ -424,6 +424,12 @@ function loadModalAnalysisTab(app) {
         ? (pendingPayload.correction_enabled === true)
         : !!app.correction_enabled;
     const fillCorrectionStartDate = hasPendingDraft ? (pendingPayload.correction_start_date || '') : (app.correction_start_date || '');
+    // 자기주도(Self-Paced): 켜짐 여부 + 완료 종료일. 테스트룸이 self_paced/self_paced_end_date 컬럼을 읽어
+    // 시작일~종료일 사이에 24세트를 자동 배분(압축+매일마감)한다. 종료일은 관리자가 직접 입력.
+    const fillSelfPaced = hasPendingDraft
+        ? (pendingPayload.self_paced === true)
+        : !!app.self_paced;
+    const fillSelfPacedEndDate = hasPendingDraft ? (pendingPayload.self_paced_end_date || '') : (app.self_paced_end_date || '');
     // 연장(13~24세션)은 개별분석 발행과 무관한 별도 즉시 액션 → 항상 실제 app 값 사용(pending 미사용)
     const fillExtensionStartDate = app.extension_start_date || '';
     const fillAdditionalDiscount = hasPendingDraft
@@ -621,8 +627,21 @@ function loadModalAnalysisTab(app) {
                         </div>
                     </div>
                 </div>
+                <!-- 자기주도(Self-Paced) 토글 — 켜면 [3. 일정]에 완료 종료일이 나타난다 -->
+                <div style="margin-top: 16px;">
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">자기주도 (Self-Paced)</label>
+                    <select name="self_paced" id="self_paced" class="form-select" ${readOnly}
+                            onchange="toggleSelfPaced();"
+                            style="background-position: right 12px center;">
+                        <option value="false" ${!fillSelfPaced ? 'selected' : ''}>미포함</option>
+                        <option value="true" ${fillSelfPaced ? 'selected' : ''}>포함 (압축 일정·매일 마감)</option>
+                    </select>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                        켜면 시작일~완료 종료일 사이에 24세트가 자동 배분됩니다. 시작 요일 제약 없음.
+                    </div>
+                </div>
             </div>
-            
+
             <!-- 3. 일정 -->
             <div class="form-group" id="formGroup-schedule">
                 <label class="form-label">3. 일정</label>
@@ -645,6 +664,14 @@ function loadModalAnalysisTab(app) {
                 </div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                     학생이 희망한 챌린지 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
+                </div>
+                <!-- 자기주도 완료 종료일 — 자기주도 ON일 때만 표시. 24세트가 시작일~이 날짜 사이에 배분된다 -->
+                <div id="selfPacedEndDateWrapper" style="margin-top: 12px; ${fillSelfPaced ? '' : 'display: none;'}">
+                    <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">자기주도 완료 종료일 <span style="color:#0e7490; font-size:11px;">(24세트 배분 마지막 날)</span></label>
+                    <input type="date" name="self_paced_end_date" id="self_paced_end_date"
+                           value="${fillSelfPacedEndDate}"
+                           ${readOnly}
+                           style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
                 </div>
                 <div id="correctionStartDateWrapper" style="margin-top: 12px; ${fillCorrectionEnabled ? '' : 'opacity: 0.4; pointer-events: none;'}">
                     <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일·월요일만)${fillCorrectionEnabled ? ' <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span>' : ''}</label>
@@ -905,6 +932,23 @@ function toggleCorrectionStartDate() {
     }
 }
 
+// 자기주도(Self-Paced) 토글 — 완료 종료일 입력칸을 보이거나 숨긴다.
+// 자기주도는 시작 요일 제약이 없으므로 종료일 자동계산(일요일 강제)을 건너뛴다.
+function toggleSelfPaced() {
+    const sel = document.getElementById('self_paced');
+    const enabled = sel && sel.value === 'true';
+    const wrapper = document.getElementById('selfPacedEndDateWrapper');
+    if (wrapper) {
+        wrapper.style.display = enabled ? '' : 'none';
+    }
+}
+
+// 자기주도 여부 조회 헬퍼
+function isSelfPacedOn() {
+    const sel = document.getElementById('self_paced');
+    return !!(sel && sel.value === 'true');
+}
+
 // ===== 첨삭 연장(13~24세션) 적용/해제 — 개별분석 저장과 분리된 즉시 액션 =====
 // applications(대시보드용 미러) + correction_schedules(테스트룸 원본) 양쪽에 기록.
 async function applyCorrectionExtension() {
@@ -1109,6 +1153,8 @@ function setRejectionUIState(isRejected) {
         'correction_enabled',
         'schedule_start',
         'correction_start_date',
+        'self_paced',
+        'self_paced_end_date',
         'additional_discount',
         'discount_reason'
     ];
@@ -1146,9 +1192,15 @@ function calculateModalEndDate() {
         return;
     }
     
+    // 자기주도(Self-Paced)는 시작 요일 제약이 없다. 종료일도 관리자가 직접 입력하므로
+    // 여기서 챌린지 종료일 자동계산을 하지 않는다.
+    if (typeof isSelfPacedOn === 'function' && isSelfPacedOn()) {
+        return;
+    }
+
     const startDate = new Date(startInput.value);
     const dayOfWeek = startDate.getDay();
-    
+
     // 일요일(0)이 아니면 경고
     if (dayOfWeek !== 0) {
         alert('⚠️ 시작일은 일요일만 선택 가능합니다.\n가장 가까운 일요일을 선택해주세요.');
@@ -1261,6 +1313,22 @@ async function saveModalAnalysis(event) {
     const deposit = 100000;
     const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
 
+    // 자기주도(Self-Paced): 시작일~완료 종료일 사이에 24세트를 자동 배분. 첨삭과 병행 가능.
+    const selfPacedEnabled = formData.get('self_paced') === 'true';
+    const selfPacedEndDate = formData.get('self_paced_end_date') || null;
+    // 자기주도 ON(프로그램을 채우는 상태)이면 종료일 필수 + 시작일보다 뒤여야 함
+    if (selfPacedEnabled && !blankProgramFields) {
+        const spStart = formData.get('schedule_start');
+        if (!selfPacedEndDate) {
+            alert('⚠️ 자기주도를 켜면 완료 종료일을 입력해야 합니다.');
+            return;
+        }
+        if (spStart && new Date(selfPacedEndDate) <= new Date(spStart)) {
+            alert('⚠️ 자기주도 완료 종료일은 시작일보다 뒤여야 합니다.');
+            return;
+        }
+    }
+
     const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
     const nowMs = Date.now();
 
@@ -1281,6 +1349,8 @@ async function saveModalAnalysis(event) {
             final_price: blankProgramFields ? null : finalPrice,
             schedule_start: blankProgramFields ? null : formData.get('schedule_start'),
             schedule_end: blankProgramFields ? null : formData.get('schedule_end'),
+            self_paced: blankProgramFields ? false : selfPacedEnabled,
+            self_paced_end_date: (blankProgramFields || !selfPacedEnabled) ? null : selfPacedEndDate,
             is_incentive_applicant: isIncentive,
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
             is_analysis_update: !!currentManageApp.analysis_first_saved_at
@@ -1334,6 +1404,8 @@ async function saveModalAnalysis(event) {
         final_price: blankProgramFields ? null : finalPrice,
         schedule_start: blankProgramFields ? null : formData.get('schedule_start'),
         schedule_end: blankProgramFields ? null : formData.get('schedule_end'),
+        self_paced: blankProgramFields ? false : selfPacedEnabled,
+        self_paced_end_date: (blankProgramFields || !selfPacedEnabled) ? null : selfPacedEndDate,
         analysis_content: formData.get('analysis_content'),
         analysis_saved_at: nowMs,
         current_step: 2,
