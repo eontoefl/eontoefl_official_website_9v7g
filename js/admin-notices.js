@@ -14,6 +14,21 @@ const NOTICE_STYLES = {
 
 let allNotices = [];
 
+// ===== 등록 시각 → KST "2026.07.06 16:27" 포맷 =====
+function formatNoticeDate(iso) {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d)) return '';
+        const p = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        }).formatToParts(d);
+        const g = t => (p.find(x => x.type === t) || {}).value || '';
+        return `${g('year')}.${g('month')}.${g('day')} ${g('hour')}:${g('minute')}`;
+    } catch (e) { return ''; }
+}
+
 // ===== 공지 목록 로드 =====
 async function loadNotices() {
     const listEl = document.getElementById('noticeList');
@@ -46,6 +61,7 @@ async function loadNotices() {
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 50px;">순서</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 120px;">타입</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600;">제목</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 130px;">등록일시</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 80px;">상태</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 140px;">액션</th>
             </tr>
@@ -66,6 +82,7 @@ async function loadNotices() {
                     <div style="font-weight: 600; color: #1e293b;">${escapeHtml(n.title || '')}</div>
                     <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">${escapeHtml(contentPreview)}</div>
                 </td>
+                <td style="padding: 12px 8px; color: #64748b; font-size: 13px; white-space: nowrap;">${formatNoticeDate(n.created_at)}</td>
                 <td style="padding: 12px 8px; text-align: center;">
                     <label style="cursor: pointer; display: inline-flex; align-items: center;">
                         <input type="checkbox" ${n.is_active ? 'checked' : ''} onchange="toggleNoticeActive('${n.id}', this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
