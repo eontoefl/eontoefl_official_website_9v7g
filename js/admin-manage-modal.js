@@ -2831,11 +2831,13 @@ function loadModalShippingTab(app) {
     // 이용방법이 전달되지 않았으면
     if (!app.guide_sent) {
         html = `
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle" style="font-size: 24px; margin-right: 12px;"></i>
+            <div style="background: #f1f5f9; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
+                </div>
                 <div>
-                    <div style="font-weight: 700; font-size: 16px;">이용방법 전달 대기 중</div>
-                    <div style="font-size: 14px; margin-top: 4px;">
+                    <div style="font-weight: 600; font-size: 15px; color: #1e293b; letter-spacing: -0.01em;">이용방법 전달 대기 중</div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.6;">
                         이용방법을 먼저 전달해야 택배를 발송할 수 있습니다.
                     </div>
                 </div>
@@ -2892,113 +2894,113 @@ function loadModalShippingTab(app) {
     // 이미 발송 완료되었으면
     if (app.shipping_completed) {
         html = `
-            <div class="alert alert-success">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 32px;"></i>
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-check" style="font-size: 17px; color: #2f855a;"></i>
+                    </div>
                     <div>
-                        <div style="font-weight: 700; font-size: 18px;">✅ 택배 발송 완료</div>
-                        <div style="font-size: 14px; margin-top: 4px;">
-                            ${new Date(app.shipping_completed_at).toLocaleString('ko-KR')}에 발송 완료 처리되었습니다.
+                        <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">택배 발송 완료</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                            ${new Date(app.shipping_completed_at).toLocaleString('ko-KR')}
                         </div>
                     </div>
                 </div>
                 ${app.shipping_tracking_number ? `
-                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px;">
-                    <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;">택배사</div>
-                    <div style="font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 16px;">
-                        ${app.shipping_courier || 'CJ대한통운'}
+                <div style="background: #ffffff; padding: 16px 18px; border-radius: 12px; margin-top: 20px; display: flex; gap: 32px;">
+                    <div>
+                        <div style="font-size: 12px; color: #94a3b8; font-weight: 500; margin-bottom: 6px;">택배사</div>
+                        <div style="font-size: 15px; font-weight: 600; color: #1e293b;">
+                            ${app.shipping_courier || 'CJ대한통운'}
+                        </div>
                     </div>
-                    <div style="font-size: 14px; color: #64748b; margin-bottom: 4px;">운송장 번호</div>
-                    <div style="font-size: 18px; font-weight: 600; color: #1e293b; font-family: monospace;">
-                        ${app.shipping_tracking_number}
+                    <div>
+                        <div style="font-size: 12px; color: #94a3b8; font-weight: 500; margin-bottom: 6px;">운송장 번호</div>
+                        <div style="font-size: 15px; font-weight: 600; color: #1e293b; font-family: 'SF Mono', Menlo, monospace; letter-spacing: 0.02em;">
+                            ${app.shipping_tracking_number}
+                        </div>
                     </div>
                 </div>
                 ` : ''}
             </div>
-            
-
         `;
     } else {
-        // 발송 대기 중
+        // 발송 대기 중 — 테두리 없이 면 위에 흰 카드를 올려 층을 만든다 (DESIGN.md)
+        const infoRow = (label, value) => `
+            <div style="display: flex; gap: 16px; padding: 9px 0;">
+                <div style="font-size: 13px; color: #94a3b8; width: 76px; flex-shrink: 0;">${label}</div>
+                <div style="font-size: 14px; color: #1e293b; font-weight: 500;">${value}</div>
+            </div>
+        `;
+
         html = `
-            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fef9ef 100%); padding: 32px; border-radius: 16px; border: 2px solid #f59e0b; margin-bottom: 24px;">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
-                    <i class="fas fa-shipping-fast" style="font-size: 32px; color: #f59e0b;"></i>
+            <div style="background: #fdf8ef; padding: 24px; border-radius: 16px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-shipping-fast" style="font-size: 16px; color: #b45309;"></i>
+                    </div>
                     <div>
-                        <h3 style="font-size: 20px; font-weight: 700; color: #92400e; margin: 0;">📦 택배 발송 관리</h3>
-                        <p style="font-size: 14px; color: #78350f; margin: 4px 0 0 0;">
+                        <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 0; letter-spacing: -0.01em;">택배 발송 관리</h3>
+                        <p style="font-size: 12px; color: #64748b; margin: 3px 0 0 0;">
                             교재/자료를 발송하고 운송장 번호를 입력하세요.
                         </p>
                     </div>
                 </div>
-                
+
                 <!-- 배송 정보 -->
-                <div style="background: white; padding: 24px; border-radius: 12px; margin-bottom: 20px;">
-                    <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 16px 0;">📮 배송 정보</h4>
-                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b; width: 100px;">수령인</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.name}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">연락처</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.phone}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">배송지</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.address || '주소 미입력'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">프로그램</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.assigned_program || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b;">시작일</td>
-                            <td style="padding: 8px 0; color: #1e293b; font-weight: 600;">${app.schedule_start || '-'}</td>
-                        </tr>
-                    </table>
+                <div style="background: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 14px;">
+                    <h4 style="font-size: 12px; font-weight: 600; color: #94a3b8; margin: 0 0 8px 0; letter-spacing: 0.02em;">배송 정보</h4>
+                    ${infoRow('수령인', app.name)}
+                    ${infoRow('연락처', app.phone)}
+                    ${infoRow('배송지', app.address || '<span style="color:#cbd5e1;">주소 미입력</span>')}
+                    ${infoRow('프로그램', app.assigned_program || '-')}
+                    ${infoRow('시작일', app.schedule_start || '-')}
                 </div>
-                
+
                 <!-- 발송 품목 -->
-                <div style="background: white; padding: 24px; border-radius: 12px; margin-bottom: 20px;">
-                    <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 16px 0;">📦 발송 품목</h4>
-                    <ul style="margin: 0; padding-left: 24px; color: #78350f; font-size: 14px; line-height: 1.8;">
-                        <li><strong>빈 노트테이킹</strong> - 수기 작성용 노트</li>
-                        <li><strong>보카 실물책</strong> - 어휘 학습 교재</li>
-                        <li><strong>필기구 세트</strong> - 연필, 연필깎이</li>
-                    </ul>
+                <div style="background: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 14px;">
+                    <h4 style="font-size: 12px; font-weight: 600; color: #94a3b8; margin: 0 0 8px 0; letter-spacing: 0.02em;">발송 품목</h4>
+                    ${infoRow('노트', '빈 노트테이킹 <span style="color:#94a3b8; font-weight:400;">수기 작성용</span>')}
+                    ${infoRow('교재', '보카 실물책 <span style="color:#94a3b8; font-weight:400;">어휘 학습</span>')}
+                    ${infoRow('필기구', '연필, 연필깎이')}
                 </div>
-                
+
                 <!-- 운송장 입력 -->
-                <div style="background: white; padding: 24px; border-radius: 12px;">
-                    <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 12px 0;">🚚 운송장 정보</h4>
-                    
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-size: 14px; color: #64748b; margin-bottom: 8px;">
-                            택배사
-                        </label>
-                        <input type="text" 
-                               id="modalCourier" 
+                <div style="background: #ffffff; padding: 20px; border-radius: 12px;">
+                    <h4 style="font-size: 12px; font-weight: 600; color: #94a3b8; margin: 0 0 14px 0; letter-spacing: 0.02em;">운송장 정보</h4>
+
+                    <div style="margin-bottom: 14px;">
+                        <label style="display: block; font-size: 13px; color: #64748b; margin-bottom: 6px;">택배사</label>
+                        <input type="text"
+                               id="modalCourier"
                                value="CJ대한통운"
                                readonly
-                               style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; background: #f8fafc; color: #64748b;">
+                               style="width: 100%; box-sizing: border-box; padding: 11px 13px; border: none; border-radius: 8px;
+                                      background: #f1f5f9; font-size: 14px; color: #94a3b8; font-family: inherit; outline: none; cursor: default;">
                     </div>
-                    
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-size: 14px; color: #64748b; margin-bottom: 8px;">
-                            운송장 번호 (선택사항)
+
+                    <div style="margin-bottom: 18px;">
+                        <label style="display: block; font-size: 13px; color: #64748b; margin-bottom: 6px;">
+                            운송장 번호 <span style="font-size: 11px; color: #94a3b8;">선택</span>
                         </label>
-                        <input type="text" 
-                               id="modalTrackingNumber" 
+                        <input type="text"
+                               id="modalTrackingNumber"
                                placeholder="예: 123456789012"
-                               style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; font-family: monospace;">
+                               style="width: 100%; box-sizing: border-box; padding: 11px 13px; border: none; border-radius: 8px;
+                                      background: #f1f5f9; font-size: 14px; color: #1e293b; letter-spacing: 0.02em;
+                                      font-family: 'SF Mono', Menlo, monospace; outline: none; transition: 0.15s;"
+                               onfocus="this.style.boxShadow='0 0 0 2px #9480c5'; this.style.background='#ffffff';"
+                               onblur="this.style.boxShadow='none'; this.style.background='#f1f5f9';">
                     </div>
-                    
-                    <button onclick="markShippingCompletedFromModal('${app.id}')" 
-                            style="width: 100%; padding: 16px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
-                                   color: white; border: none; border-radius: 12px; font-size: 17px; font-weight: 600; 
-                                   cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
-                        <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
+
+                    <button onclick="markShippingCompletedFromModal('${app.id}')"
+                            style="width: 100%; padding: 14px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%);
+                                   color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+                                   cursor: pointer; font-family: inherit; transition: 0.15s;
+                                   box-shadow: 0 4px 16px rgba(25, 28, 29, 0.06);"
+                            onmouseover="this.style.transform='translateY(-1px)';"
+                            onmouseout="this.style.transform='none';">
+                        <i class="fas fa-check-circle" style="margin-right: 7px; font-size: 13px;"></i>
                         택배 발송 완료
                     </button>
                 </div>
