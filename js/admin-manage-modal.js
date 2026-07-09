@@ -2619,14 +2619,16 @@ function loadModalUsageTab(app) {
     
     let html = '';
     
-    // 입금이 확인되지 않았으면
+    // 입금이 확인되지 않았으면 (잠금 상태 — 회색 면)
     if (!app.deposit_confirmed_by_admin) {
         html = `
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle" style="font-size: 24px; margin-right: 12px;"></i>
+            <div style="background: #f1f5f9; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
+                </div>
                 <div>
-                    <div style="font-weight: 700; font-size: 16px;">입금 확인 대기 중</div>
-                    <div style="font-size: 14px; margin-top: 4px;">
+                    <div style="font-weight: 600; font-size: 15px; color: #1e293b; letter-spacing: -0.01em;">입금 확인 대기 중</div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.6;">
                         입금이 확인된 후 이용방법을 전달할 수 있습니다.
                     </div>
                 </div>
@@ -2635,38 +2637,50 @@ function loadModalUsageTab(app) {
         container.innerHTML = html;
         return;
     }
-    
+
     // 이용방법 전달 섹션
     if (!app.guide_sent) {
+        // 할 일이 남은 상태 — 연한 주황 면
         html += `
-            <div class="alert alert-warning">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-rocket" style="font-size: 32px;"></i>
+            <div style="background: #fdf8ef; border-radius: 16px; padding: 24px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-rocket" style="font-size: 16px; color: #b45309;"></i>
+                    </div>
                     <div>
-                        <div style="font-weight: 700; font-size: 18px;">🚀 이용방법 전달</div>
-                        <div style="font-size: 14px; margin-top: 4px;">
+                        <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">이용방법 전달</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
                             입금이 확인되었습니다. 이제 학생에게 이용방법을 전달하세요.
                         </div>
                     </div>
                 </div>
-                <button onclick="sendUsageGuideFromModal('${app.id}')" class="btn-primary btn-lg" style="width: 100%; margin-top: 16px;">
-                    <i class="fas fa-paper-plane"></i> 이용방법 전달하기
+
+                <button onclick="sendUsageGuideFromModal('${app.id}')"
+                        style="width: 100%; margin-top: 20px; padding: 14px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%);
+                               color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+                               cursor: pointer; font-family: inherit; transition: 0.15s;
+                               box-shadow: 0 4px 16px rgba(25, 28, 29, 0.06);"
+                        onmouseover="this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.transform='none';">
+                    <i class="fas fa-paper-plane" style="margin-right: 7px; font-size: 13px;"></i>
+                    이용방법 전달하기
                 </button>
-                <div style="font-size: 12px; color: #78350f; text-align: center; margin-top: 12px;">
+                <div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 12px;">
                     💡 클릭하면 자동으로 STEP 9 (이용방법전달)로 진행됩니다.
                 </div>
             </div>
         `;
     } else {
+        // 완료 상태 — 연한 초록 면
         html += `
-            <div class="alert alert-success">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 32px;"></i>
-                    <div>
-                        <div style="font-weight: 700; font-size: 18px;">✅ 이용방법 전달 완료</div>
-                        <div style="font-size: 14px; margin-top: 4px;">
-                            ${new Date(app.guide_sent_at).toLocaleString('ko-KR')}에 이용방법을 전달했습니다.
-                        </div>
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-check" style="font-size: 17px; color: #2f855a;"></i>
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">이용방법 전달 완료</div>
+                    <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                        ${new Date(app.guide_sent_at).toLocaleString('ko-KR')}
                     </div>
                 </div>
             </div>
