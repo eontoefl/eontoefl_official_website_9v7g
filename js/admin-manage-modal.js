@@ -496,38 +496,32 @@ function loadModalAnalysisTab(app) {
         </div>
     ` : '';
 
-    // AI 자동 분석 배너 (미발송 수정본이 보존된 상태에서는 표시하지 않음)
-    const aiAnalysisBanner = (hasAIAnalysis && !hasPendingDraft) ? `
-        <div style="background: #f6f4fb; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
-            <div style="display: flex; align-items: flex-start; gap: 14px;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: #e6e0f2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <i class="fas fa-robot" style="font-size: 16px; color: #6d28d9;"></i>
-                </div>
-                <div style="flex: 1;">
-                    <div style="font-weight: 700; font-size: 15px; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 5px;">AI가 자동 생성한 개별분석입니다</div>
-                    <div style="font-size: 13px; color: #64748b; line-height: 1.7;">
-                        아래 분석 내용을 검토하신 후, 결과 선택 및 프로그램 배정을 완료하고 발송해주세요.<br>
-                        AI가 자동 생성한 내용이므로 반드시 검토 후 수정이 필요할 수 있습니다.
-                    </div>
-                    <div style="display: none; gap: 8px; margin-top: 10px; flex-wrap: wrap;"><!-- 프로모션 폐지: AI 판단/확신도 뱃지 숨김 (되살리려면 display:flex) -->
-                        ${app.auto_analysis_type ? `
-                        <div style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;">
-                            <i class="fas fa-tag" style="font-size: 10px;"></i> AI 판단: ${app.auto_analysis_type === 'promotion' ? '프로모션 학생' : '일반 학생'}
-                        </div>` : ''}
-                        ${app.applicant_type_score !== null && app.applicant_type_score !== undefined ? `
-                        <div style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;">
-                            <i class="fas fa-chart-bar" style="font-size: 10px;"></i> AI 확신도: ${app.applicant_type_score}점
-                        </div>` : ''}
-                    </div>
-                </div>
-            </div>
+    // AI 자동 분석 표시 (미발송 수정본이 보존된 상태에서는 표시하지 않음)
+    // 큰 배너 대신, 정작 AI가 쓴 글이 있는 "5. 분석 내용" 라벨 옆에 칩으로 붙인다.
+    const aiAnalysisChip = (hasAIAnalysis && !hasPendingDraft) ? `
+        <span style="display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 4px 10px; border-radius: 999px;
+                     background: #ede9f5; color: #5b21b6; font-size: 11px; font-weight: 600; vertical-align: middle; letter-spacing: -0.01em;">
+            <i class="fas fa-robot" style="font-size: 9px;"></i> AI 초안 · 검토 필요
+        </span>
+    ` : '';
+
+    // 프로모션 폐지로 숨겨둔 AI 판단/확신도 뱃지 (되살리려면 display:flex)
+    const aiHiddenBadges = (hasAIAnalysis && !hasPendingDraft) ? `
+        <div style="display: none; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+            ${app.auto_analysis_type ? `
+            <div style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;">
+                <i class="fas fa-tag" style="font-size: 10px;"></i> AI 판단: ${app.auto_analysis_type === 'promotion' ? '프로모션 학생' : '일반 학생'}
+            </div>` : ''}
+            ${app.applicant_type_score !== null && app.applicant_type_score !== undefined ? `
+            <div style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;">
+                <i class="fas fa-chart-bar" style="font-size: 10px;"></i> AI 확신도: ${app.applicant_type_score}점
+            </div>` : ''}
         </div>
     ` : '';
 
     let html = `
         ${scheduledBanner}
         ${preservedDraftBanner}
-        ${aiAnalysisBanner}
         <!-- 입문서 제공 토글 (form 밖, 즉시 저장) -->
         <div class="form-group" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
             <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -775,7 +769,8 @@ function loadModalAnalysisTab(app) {
             
             <!-- 5. 분석 내용 -->
             <div class="form-group">
-                <label class="form-label">5. 분석 내용 <span class="required">*</span></label>
+                <label class="form-label">5. 분석 내용 <span class="required">*</span>${aiAnalysisChip}</label>
+                ${aiHiddenBadges}
                 <textarea name="analysis_content" id="analysis_content" rows="10" required
                           ${readOnly}
                           style="width: 100%; box-sizing: border-box; padding: 14px; border: none; border-radius: 12px; background: #ffffff; outline: none; font-family: inherit; line-height: 1.7;"
