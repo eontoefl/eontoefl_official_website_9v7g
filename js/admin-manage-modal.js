@@ -446,28 +446,32 @@ function loadModalAnalysisTab(app) {
     // 예약 발송 대기 배너 (예약 중일 때만)
     const scheduledAtKstStr = isScheduled ? formatScheduledAtKst(app.analysis_alimtalk_scheduled_at) : '';
     const scheduledBanner = isScheduled ? `
-        <div id="scheduledReleaseBanner" style="background: linear-gradient(135deg, #fff4e6 0%, #fefce8 100%); border: 2px solid #f59e0b; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+        <div id="scheduledReleaseBanner" style="background: #fdf8ef; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px;">
             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 320px;">
-                    <i class="fas fa-clock" style="font-size: 24px; color: #d97706; margin-top: 2px;"></i>
+                <div style="display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 320px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-clock" style="font-size: 16px; color: #b45309;"></i>
+                    </div>
                     <div>
-                        <div style="font-weight: 700; font-size: 15px; color: #92400e; margin-bottom: 4px;">🕐 예약 발송 대기 중</div>
-                        <div style="font-size: 13px; color: #92400e; line-height: 1.6;">
-                            <strong>${scheduledAtKstStr}</strong>에 학생에게 공개되며<br>알림톡(${fillIsIncentive ? '프로모션 학생 전용 템플릿' : '일반 학생 템플릿'})이 발송됩니다.
+                        <div style="font-weight: 700; font-size: 15px; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 5px;">예약 발송 대기 중</div>
+                        <div style="font-size: 13px; color: #64748b; line-height: 1.7;">
+                            <strong style="color: #1e293b;">${scheduledAtKstStr}</strong>에 학생에게 공개되며<br>알림톡(${fillIsIncentive ? '프로모션 학생 전용 템플릿' : '일반 학생 템플릿'})이 발송됩니다.
                         </div>
-                        <div style="font-size: 12px; color: #b45309; margin-top: 8px;">
-                            ⓘ 발송 전까지 분석 내용을 자유롭게 수정할 수 있습니다. 수정해도 예약 시각은 유지됩니다.
+                        <div style="font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                            발송 전까지 분석 내용을 자유롭게 수정할 수 있습니다. 수정해도 예약 시각은 유지됩니다.
                         </div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-shrink: 0;">
                     <button type="button" onclick="openChangeScheduleModal()"
-                            style="padding: 8px 14px; background: white; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                        <i class="fas fa-calendar-alt"></i> 예약 시각 변경
+                            style="padding: 9px 14px; background: #ffffff; color: #475569; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; transition: 0.15s;"
+                            onmouseover="this.style.background='#f8fafc';" onmouseout="this.style.background='#ffffff';">
+                        <i class="fas fa-calendar-alt" style="font-size: 11px;"></i> 예약 시각 변경
                     </button>
                     <button type="button" onclick="cancelScheduledRelease()"
-                            style="padding: 8px 14px; background: white; color: #991b1b; border: 1px solid #ef4444; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                        <i class="fas fa-times"></i> 예약 취소
+                            style="padding: 9px 14px; background: #fbeae6; color: #a53b22; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; transition: 0.15s;"
+                            onmouseover="this.style.background='#f6ded8';" onmouseout="this.style.background='#fbeae6';">
+                        <i class="fas fa-times" style="font-size: 11px;"></i> 예약 취소
                     </button>
                 </div>
             </div>
@@ -476,14 +480,16 @@ function loadModalAnalysisTab(app) {
 
     // 예약 취소 후 수정본 보존 배너 (예약은 풀렸지만 미발송 수정본이 남아있는 상태)
     const preservedDraftBanner = (hasPendingDraft && !isScheduled) ? `
-        <div style="background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 100%); border: 2px solid #06b6d4; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: flex-start; gap: 12px;">
-                <i class="fas fa-save" style="font-size: 24px; color: #0891b2; margin-top: 2px;"></i>
+        <div style="background: #f0f8fa; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: flex-start; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #d8eef2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-save" style="font-size: 16px; color: #0e7490;"></i>
+                </div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 700; font-size: 15px; color: #155e75; margin-bottom: 4px;">💾 작성하신 수정본이 보존되어 있습니다</div>
-                    <div style="font-size: 13px; color: #155e75; line-height: 1.6;">
+                    <div style="font-weight: 700; font-size: 15px; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 5px;">작성하신 수정본이 보존되어 있습니다</div>
+                    <div style="font-size: 13px; color: #64748b; line-height: 1.7;">
                         예약은 취소되었지만 수정 내용은 그대로 남아있습니다 (학생에게는 아직 공개되지 않았습니다).<br>
-                        검토 후 <strong>[즉시발송]</strong> 또는 <strong>[예약발송]</strong>을 선택해주세요.
+                        검토 후 <strong style="color: #1e293b;">[즉시발송]</strong> 또는 <strong style="color: #1e293b;">[예약발송]</strong>을 선택해주세요.
                     </div>
                 </div>
             </div>
@@ -492,23 +498,25 @@ function loadModalAnalysisTab(app) {
 
     // AI 자동 분석 배너 (미발송 수정본이 보존된 상태에서는 표시하지 않음)
     const aiAnalysisBanner = (hasAIAnalysis && !hasPendingDraft) ? `
-        <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: flex-start; gap: 12px;">
-                <i class="fas fa-robot" style="font-size: 24px; color: #8b5cf6; margin-top: 2px;"></i>
+        <div style="background: #f6f4fb; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: flex-start; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #e6e0f2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-robot" style="font-size: 16px; color: #6d28d9;"></i>
+                </div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 700; font-size: 15px; color: #5b21b6; margin-bottom: 6px;">🤖 AI가 자동 생성한 개별분석입니다</div>
-                    <div style="font-size: 13px; color: #6d28d9; line-height: 1.6;">
+                    <div style="font-weight: 700; font-size: 15px; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 5px;">AI가 자동 생성한 개별분석입니다</div>
+                    <div style="font-size: 13px; color: #64748b; line-height: 1.7;">
                         아래 분석 내용을 검토하신 후, 결과 선택 및 프로그램 배정을 완료하고 발송해주세요.<br>
                         AI가 자동 생성한 내용이므로 반드시 검토 후 수정이 필요할 수 있습니다.
                     </div>
-                    <div style="display: none; gap: 12px; margin-top: 10px; flex-wrap: wrap;"><!-- 프로모션 폐지: AI 판단/확신도 뱃지 숨김 (되살리려면 display:flex) -->
+                    <div style="display: none; gap: 8px; margin-top: 10px; flex-wrap: wrap;"><!-- 프로모션 폐지: AI 판단/확신도 뱃지 숨김 (되살리려면 display:flex) -->
                         ${app.auto_analysis_type ? `
-                        <div style="display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #c4b5fd; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #5b21b6; font-weight: 600;">
-                            <i class="fas fa-tag"></i> AI 판단: ${app.auto_analysis_type === 'promotion' ? '프로모션 학생' : '일반 학생'}
+                        <div style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;">
+                            <i class="fas fa-tag" style="font-size: 10px;"></i> AI 판단: ${app.auto_analysis_type === 'promotion' ? '프로모션 학생' : '일반 학생'}
                         </div>` : ''}
                         ${app.applicant_type_score !== null && app.applicant_type_score !== undefined ? `
-                        <div style="display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #c4b5fd; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #5b21b6; font-weight: 600;">
-                            <i class="fas fa-chart-bar"></i> AI 확신도: ${app.applicant_type_score}점
+                        <div style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;">
+                            <i class="fas fa-chart-bar" style="font-size: 10px;"></i> AI 확신도: ${app.applicant_type_score}점
                         </div>` : ''}
                     </div>
                 </div>
@@ -521,13 +529,15 @@ function loadModalAnalysisTab(app) {
         ${preservedDraftBanner}
         ${aiAnalysisBanner}
         <!-- 입문서 제공 토글 (form 밖, 즉시 저장) -->
-        <div class="form-group" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #38bdf8; margin-bottom: 24px;">
+        <div class="form-group" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fas fa-book-open" style="font-size: 18px; color: #0284c7;"></i>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: #e2eef5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-book-open" style="font-size: 14px; color: #0369a1;"></i>
+                    </div>
                     <div>
-                        <div style="font-weight: 600; font-size: 14px; color: #0c4a6e;">입문서 제공</div>
-                        <div style="font-size: 12px; color: #0369a1; margin-top: 2px;">ON 시 학생 대시보드에 입문서 열람 카드 표시</div>
+                        <div style="font-weight: 600; font-size: 14px; color: #1e293b;">입문서 제공</div>
+                        <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">ON 시 학생 대시보드에 입문서 열람 카드 표시</div>
                     </div>
                 </div>
                 <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
@@ -568,23 +578,23 @@ function loadModalAnalysisTab(app) {
                 <div id="statusOptionsContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; ${pointerEvents}">
                     <label style="${cursorStyle}">
                         <input type="radio" name="analysis_status" value="승인" ${fillStatus === '승인' ? 'checked' : ''} required ${readOnly} style="display: none;">
-                        <div class="status-option status-option-approval" data-value="승인" style="padding: 20px; border: 2px solid ${fillStatus === '승인' ? '#86efac' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${fillStatus === '승인' ? '#f0fdf4' : '#ffffff'}; transition: all 0.2s;">
-                            <i class="fas fa-check-circle" style="font-size: 32px; color: #86efac; margin-bottom: 8px;"></i>
-                            <div style="font-weight: 600; font-size: 15px; color: #166534;">승인</div>
+                        <div class="status-option status-option-approval" data-value="승인" style="padding: 20px; border: none; border-radius: 14px; text-align: center; background: ${fillStatus === '승인' ? '#e4f3e9' : '#ffffff'}; transition: 0.15s;">
+                            <i class="fas fa-check-circle" style="font-size: 26px; color: ${fillStatus === '승인' ? '#2f855a' : '#cbd5e1'}; margin-bottom: 8px; transition: 0.15s;"></i>
+                            <div style="font-weight: 600; font-size: 15px; color: ${fillStatus === '승인' ? '#1e293b' : '#94a3b8'};">승인</div>
                         </div>
                     </label>
                     <label style="${cursorStyle}">
                         <input type="radio" name="analysis_status" value="조건부승인" ${fillStatus === '조건부승인' ? 'checked' : ''} ${readOnly} style="display: none;">
-                        <div class="status-option status-option-conditional" data-value="조건부승인" style="padding: 20px; border: 2px solid ${fillStatus === '조건부승인' ? '#fcd34d' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${fillStatus === '조건부승인' ? '#fef3c7' : '#ffffff'}; transition: all 0.2s;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: #fcd34d; margin-bottom: 8px;"></i>
-                            <div style="font-weight: 600; font-size: 15px; color: #92400e;">조건부승인</div>
+                        <div class="status-option status-option-conditional" data-value="조건부승인" style="padding: 20px; border: none; border-radius: 14px; text-align: center; background: ${fillStatus === '조건부승인' ? '#fbecd2' : '#ffffff'}; transition: 0.15s;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 26px; color: ${fillStatus === '조건부승인' ? '#b45309' : '#cbd5e1'}; margin-bottom: 8px; transition: 0.15s;"></i>
+                            <div style="font-weight: 600; font-size: 15px; color: ${fillStatus === '조건부승인' ? '#1e293b' : '#94a3b8'};">조건부승인</div>
                         </div>
                     </label>
                     <label style="${cursorStyle}">
                         <input type="radio" name="analysis_status" value="거부" ${fillStatus === '거부' ? 'checked' : ''} ${readOnly} style="display: none;">
-                        <div class="status-option status-option-reject" data-value="거부" style="padding: 20px; border: 2px solid ${fillStatus === '거부' ? '#fca5a5' : '#e2e8f0'}; border-radius: 12px; text-align: center; background: ${fillStatus === '거부' ? '#fee2e2' : '#ffffff'}; transition: all 0.2s;">
-                            <i class="fas fa-times-circle" style="font-size: 32px; color: #fca5a5; margin-bottom: 8px;"></i>
-                            <div style="font-weight: 600; font-size: 15px; color: #991b1b;">거부</div>
+                        <div class="status-option status-option-reject" data-value="거부" style="padding: 20px; border: none; border-radius: 14px; text-align: center; background: ${fillStatus === '거부' ? '#fbeae6' : '#ffffff'}; transition: 0.15s;">
+                            <i class="fas fa-times-circle" style="font-size: 26px; color: ${fillStatus === '거부' ? '#a53b22' : '#cbd5e1'}; margin-bottom: 8px; transition: 0.15s;"></i>
+                            <div style="font-weight: 600; font-size: 15px; color: ${fillStatus === '거부' ? '#1e293b' : '#94a3b8'};">거부</div>
                         </div>
                     </label>
                 </div>
@@ -646,7 +656,7 @@ function loadModalAnalysisTab(app) {
                                    value="${fillScheduleStart}"
                                    required
                                    ${readOnly}
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                         </div>
                         <!-- 정규: 자동계산 종료일 -->
                         <div id="scheduleEndWrapper" style="${fillSelfPaced ? 'display: none;' : ''}">
@@ -654,7 +664,7 @@ function loadModalAnalysisTab(app) {
                             <input type="date" name="schedule_end" id="schedule_end"
                                    value="${fillScheduleEnd}"
                                    readonly
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; color: #94a3b8; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                         </div>
                         <!-- 자기주도: 완료 종료일(수동) — input 자체 disabled(${readOnly})로 잠금 처리 -->
                         <div id="selfPacedEndWrapper" style="${fillSelfPaced ? '' : 'display: none;'}">
@@ -662,7 +672,7 @@ function loadModalAnalysisTab(app) {
                             <input type="date" name="self_paced_end_date" id="self_paced_end_date"
                                    value="${fillSelfPacedEndDate}"
                                    ${readOnly}
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                         </div>
                     </div>
                     <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
@@ -674,7 +684,7 @@ function loadModalAnalysisTab(app) {
             <!-- 3. 추가 옵션 (스라첨삭) -->
             <div class="form-group" id="formGroup-options">
                 <label class="form-label">3. 추가 옵션</label>
-                <div id="optionToggles" style="background: #f8fafc; border-radius: 12px; padding: 4px 16px; ${pointerEvents}">
+                <div id="optionToggles" style="background: #ffffff; border-radius: 14px; padding: 4px 18px; ${pointerEvents}">
                     <!-- 스라첨삭 -->
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 12px;">
                         <div>
@@ -693,14 +703,14 @@ function loadModalAnalysisTab(app) {
                         <input type="date" name="correction_start_date" id="correction_start_date"
                                value="${fillCorrectionStartDate}"
                                ${readOnly}
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; font-family: 'Pretendard', -apple-system, sans-serif;">
+                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                     </div>
                     <!-- 첨삭 연장 (13~24세션) — 개별분석 발행과 무관한 독립 액션. 발행 후(읽기전용)에도 동작 -->
                     <div id="correctionExtensionWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 연장 (13~24세션) <span style="color:#7c3aed; font-size:11px;">결제 확인 후 적용</span></label>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="date" id="extension_start_date" value="${fillExtensionStartDate}"
-                                   style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="flex: 1; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                             <button type="button" id="applyExtensionBtn" onclick="applyCorrectionExtension()"
                                     style="padding: 10px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">연장 적용</button>
                         </div>
@@ -712,7 +722,7 @@ function loadModalAnalysisTab(app) {
             <!-- 4. 가격 정보 -->
             <div class="form-group" id="formGroup-price">
                 <label class="form-label">4. 가격 정보</label>
-                <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
                         <tbody>
                         <tr>
@@ -734,7 +744,7 @@ function loadModalAnalysisTab(app) {
                                        value="${fillAdditionalDiscount}" min="0" max="790000"
                                        ${readOnly}
                                        onchange="calculateModalPrice()"
-                                       style="width: 120px; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 4px; margin-left: 8px;">원
+                                       style="width: 120px; padding: 6px 10px; border: none; border-radius: 6px; background: #f4f6f9; outline: none; font-family: inherit; margin-left: 8px;">원
                             </td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #ef4444;" id="displayAdditionalDiscount">-0원</td>
                         </tr>
@@ -742,18 +752,18 @@ function loadModalAnalysisTab(app) {
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">보증금 (환불)</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600;">+100,000원</td>
                         </tr>
-                        <tr style="border-top: 1px solid #e2e8f0;">
-                            <td style="padding: 12px 0; font-weight: 700; color: #1e293b; text-align: left;">최종 금액</td>
-                            <td style="padding: 12px 0; text-align: right; font-weight: 700; font-size: 20px; color: #9480c5;" id="displayFinalPrice">890,000원</td>
+                        <tr>
+                            <td style="padding: 16px 12px 14px; font-weight: 700; color: #1e293b; text-align: left; background: #f4f6f9; border-radius: 10px 0 0 10px;">최종 금액</td>
+                            <td style="padding: 16px 12px 14px; text-align: right; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; color: #7c68a8; background: #f4f6f9; border-radius: 0 10px 10px 0;" id="displayFinalPrice">890,000원</td>
                         </tr>
                         </tbody>
                     </table>
                     <div id="discountReasonWrapper" style="margin-top: 12px; display: ${fillAdditionalDiscount && fillAdditionalDiscount > 0 ? 'block' : 'none'};">
                         <label style="font-size: 12px; color: #64748b; display: block; margin-bottom: 4px;">할인 사유</label>
-                        <input type="text" name="discount_reason" value="${fillDiscountReason}" 
+                        <input type="text" name="discount_reason" value="${fillDiscountReason}"
                                ${readOnly}
                                placeholder="할인 사유 입력"
-                               style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: inherit;">
                     </div>
                 </div>
             </div>
@@ -763,7 +773,7 @@ function loadModalAnalysisTab(app) {
                 <label class="form-label">5. 분석 내용 <span class="required">*</span></label>
                 <textarea name="analysis_content" id="analysis_content" rows="10" required
                           ${readOnly}
-                          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; line-height: 1.6;"
+                          style="width: 100%; box-sizing: border-box; padding: 14px; border: none; border-radius: 12px; background: #ffffff; outline: none; font-family: inherit; line-height: 1.7;"
                           placeholder="학생에게 보여질 분석 내용을 작성하세요.
 
 예시:
@@ -785,7 +795,7 @@ function loadModalAnalysisTab(app) {
             </div>
             
             <!-- 하단 버튼 -->
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 32px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 36px;">
                 <div style="display: flex; gap: 8px;">
                     ${hasAnalysis ? `
                     <button type="button" class="btn-secondary" onclick="previewAnalysis('${app.id}')">
@@ -813,7 +823,7 @@ function loadModalAnalysisTab(app) {
                             <i class="fas fa-paper-plane"></i> 즉시발송
                         </button>
                         <button type="button" class="btn-primary" id="scheduleAnalysisBtn" onclick="openScheduleModal()" disabled
-                                style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white; border-radius: 8px; font-weight: 600;">
+                                style="opacity: 0.5; cursor: not-allowed; padding: 12px 24px; background: #ebe6f4; border: none; color: #4c1d95; border-radius: 8px; font-weight: 600;">
                             <i class="fas fa-clock"></i> 예약발송
                         </button>
                     ` : `
@@ -822,7 +832,7 @@ function loadModalAnalysisTab(app) {
                             <i class="fas fa-paper-plane"></i> 즉시발송
                         </button>
                         <button type="button" class="btn-primary" onclick="openScheduleModal()"
-                                style="padding: 12px 24px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                                style="padding: 12px 24px; background: #ebe6f4; border: none; color: #4c1d95; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit;">
                             <i class="fas fa-clock"></i> 예약발송
                         </button>
                     `}
@@ -1190,10 +1200,20 @@ function selectStatus(value, event) {
         radio.checked = false;
     });
 
+    // 선택 표시는 테두리가 아니라 면 채움과 아이콘 색으로 한다 (DESIGN.md: No-Line Rule)
+    const TONE = {
+        '승인':       { bg: '#e4f3e9', icon: '#2f855a' },
+        '조건부승인': { bg: '#fbecd2', icon: '#b45309' },
+        '거부':       { bg: '#fbeae6', icon: '#a53b22' }
+    };
+
     // 모든 옵션 스타일 초기화
     document.querySelectorAll('.status-option').forEach(option => {
-        option.style.border = '2px solid #e2e8f0';
         option.style.background = '#ffffff';
+        const icon = option.querySelector('i');
+        const label = option.querySelector('div');
+        if (icon) icon.style.color = '#cbd5e1';
+        if (label) label.style.color = '#94a3b8';
     });
 
     // 선택된 라디오 버튼 체크
@@ -1204,17 +1224,13 @@ function selectStatus(value, event) {
 
     // 선택된 옵션 스타일 적용
     const selectedOption = document.querySelector(`.status-option[data-value="${value}"]`);
-    if (selectedOption) {
-        if (value === '승인') {
-            selectedOption.style.border = '2px solid #86efac';
-            selectedOption.style.background = '#f0fdf4';
-        } else if (value === '조건부승인') {
-            selectedOption.style.border = '2px solid #fcd34d';
-            selectedOption.style.background = '#fef3c7';
-        } else if (value === '거부') {
-            selectedOption.style.border = '2px solid #fca5a5';
-            selectedOption.style.background = '#fee2e2';
-        }
+    const tone = TONE[value];
+    if (selectedOption && tone) {
+        selectedOption.style.background = tone.bg;
+        const icon = selectedOption.querySelector('i');
+        const label = selectedOption.querySelector('div');
+        if (icon) icon.style.color = tone.icon;
+        if (label) label.style.color = '#1e293b';
     }
 
     // 거부·조건부승인 시 프로그램/일정/가격 섹션 비활성화 (조건부승인은 아직 협의 전이라 미정)
