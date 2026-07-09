@@ -621,9 +621,9 @@ function loadModalAnalysisTab(app) {
                     </div>
                     </div>
                     <!-- 자기주도 학습 카드 (자기주도 ON일 때만 표시. 내부적으로는 Fast·일반으로 저장) -->
-                    <div id="selfPacedProgramCard" style="${fillSelfPaced ? '' : 'display: none;'} background: #ecfeff; border-radius: 12px; padding: 16px;">
-                        <div style="font-weight: 700; font-size: 15px; color: #0e7490;">자기주도 학습 <span style="font-size: 13px; font-weight: 500;">· 24세트</span></div>
-                        <div style="font-size: 13px; color: #155e75; margin-top: 6px; line-height: 1.5;">시작일~완료 종료일 사이에 24세트가 자동 배분됩니다. 매일 마감·시작 요일 제약 없음.</div>
+                    <div id="selfPacedProgramCard" style="${fillSelfPaced ? '' : 'display: none;'} background: #ecfeff; border-radius: 12px; padding: 14px 16px;">
+                        <div style="font-weight: 600; font-size: 14px; color: #0e7490;">자기주도 학습 <span style="font-size: 12px; font-weight: 500;">· 24세트</span></div>
+                        <div style="font-size: 12px; color: #155e75; margin-top: 4px; line-height: 1.5;">시작일~완료 종료일 사이에 24세트가 자동 배분됩니다. 매일 마감·시작 요일 제약 없음.</div>
                     </div>
                 </div>
 
