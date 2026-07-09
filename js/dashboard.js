@@ -148,7 +148,7 @@ function renderProgressSection(app) {
         { id: 7, name: '입금\n대기', icon: 'fa-credit-card', completed: !!app.deposit_confirmed_by_student_at },
         { id: 8, name: '입금\n확인', icon: 'fa-check-double', completed: !!app.deposit_confirmed_by_admin_at },
         { id: 9, name: '이용방법\n전달', icon: 'fa-book-open', completed: !!app.guide_sent },
-        { id: 10, name: '교재\n전달', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
+        { id: 10, name: app.shipping_waived ? '교재\n전달' : '택배\n발송', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
     ];
 
     // 현재 단계 찾기
@@ -871,7 +871,7 @@ function renderProgress(app) {
         { id: 7, name: '입금 대기', completed: !!app.deposit_confirmed_by_student_at },
         { id: 8, name: '입금 확인 완료', completed: !!app.deposit_confirmed_by_admin_at },
         { id: 9, name: '이용방법 전달', completed: !!app.guide_sent },
-        { id: 10, name: '교재 전달', completed: !!app.shipping_completed || !!app.shipping_waived }
+        { id: 10, name: app.shipping_waived ? '교재 전달' : '실물 교재 발송', completed: !!app.shipping_completed || !!app.shipping_waived }
     ];
 
     // 현재 단계 찾기
