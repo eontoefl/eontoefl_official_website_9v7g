@@ -598,6 +598,8 @@ function loadModalAnalysisTab(app) {
                     <!-- 저장 시 assigned_program 문자열로 재조립하는 소스(기간×트랙) -->
                     <input type="hidden" name="program_duration" id="program_duration" value="${fillProgram.includes('Fast') ? 'fast' : fillProgram.includes('Standard') ? 'standard' : ''}">
                     <input type="hidden" name="program_track" id="program_track" value="${fillProgram.includes('Australia') ? 'australia' : 'regular'}">
+                    <!-- 정규 기간·트랙 세그먼트 (자기주도 ON이면 숨기고 아래 자기주도 카드로 대체) -->
+                    <div id="programSegmentControls" style="${fillSelfPaced ? 'display: none;' : ''}">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div>
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">기간 <span class="required">*</span></label>
@@ -617,8 +619,11 @@ function loadModalAnalysisTab(app) {
                     <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
                         학생 희망: <strong>${app.preferred_program || '-'}</strong>
                     </div>
-                    <div id="selfPacedProgramLockNote" style="${fillSelfPaced ? '' : 'display: none;'} font-size: 12px; color: #0e7490; background: #ecfeff; padding: 8px 12px; border-radius: 8px; margin-top: 8px;">
-                        ⓘ 자기주도는 <strong>일반 · Fast (24세트)</strong> 고정입니다.
+                    </div>
+                    <!-- 자기주도 학습 카드 (자기주도 ON일 때만 표시. 내부적으로는 Fast·일반으로 저장) -->
+                    <div id="selfPacedProgramCard" style="${fillSelfPaced ? '' : 'display: none;'} background: #ecfeff; border-radius: 12px; padding: 16px;">
+                        <div style="font-weight: 700; font-size: 15px; color: #0e7490;">자기주도 학습 <span style="font-size: 13px; font-weight: 500;">· 24세트</span></div>
+                        <div style="font-size: 13px; color: #155e75; margin-top: 6px; line-height: 1.5;">시작일~완료 종료일 사이에 24세트가 자동 배분됩니다. 매일 마감·시작 요일 제약 없음.</div>
                     </div>
                 </div>
 
@@ -949,16 +954,16 @@ function toggleCorrectionStartDate() {
 // 자기주도는 시작 요일 제약이 없으므로 종료일 자동계산(일요일 강제)을 건너뛴다.
 function toggleSelfPaced() {
     const enabled = isSelfPacedOn();
-    // 자기주도는 일반·Fast(24세트) 고정 (호주 자기주도는 테스트룸 미지원).
-    // 켜면 기간=Fast·트랙=일반 강제 + Standard/호주 세그먼트 잠금 + 안내 표시.
+    // 자기주도는 일반·Fast(24세트) 고정 (호주 자기주도는 테스트룸 미지원, Standard는 48세트라 불일치).
+    // 켜면 기간=Fast·트랙=일반 강제(저장 호환) + 기간·트랙 세그먼트를 숨기고 자기주도 카드로 대체.
     if (enabled) {
         setProgramSegment('duration', 'fast');
         setProgramSegment('track', 'regular');
     }
-    _lockSegmentBtn('seg_duration_standard', enabled);
-    _lockSegmentBtn('seg_track_australia', enabled);
-    const lockNote = document.getElementById('selfPacedProgramLockNote');
-    if (lockNote) lockNote.style.display = enabled ? '' : 'none';
+    const segControls = document.getElementById('programSegmentControls');
+    const spCard = document.getElementById('selfPacedProgramCard');
+    if (segControls) segControls.style.display = enabled ? 'none' : '';
+    if (spCard) spCard.style.display = enabled ? '' : 'none';
     const wrapper = document.getElementById('selfPacedEndDateWrapper');
     if (wrapper) wrapper.style.display = enabled ? '' : 'none';
     // 일정 섹션: 자기주도면 챌린지 자동 종료일 숨기고 안내 문구로 대체
@@ -975,15 +980,6 @@ function toggleSelfPaced() {
 function isSelfPacedOn() {
     const sel = document.getElementById('self_paced');
     return !!(sel && sel.value === 'true');
-}
-
-// 세그먼트 버튼 잠금(회색·클릭차단) 토글 — 자기주도 시 Standard/호주 비활성용
-function _lockSegmentBtn(id, locked) {
-    const btn = document.getElementById(id);
-    if (!btn) return;
-    btn.style.pointerEvents = locked ? 'none' : '';
-    btn.style.opacity = locked ? '0.35' : '';
-    btn.style.cursor = locked ? 'not-allowed' : 'pointer';
 }
 
 // 프로그램 세그먼트(기간 fast/standard · 트랙 regular/australia) 선택.
