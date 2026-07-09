@@ -1536,8 +1536,10 @@ function matchTrackingData(rows) {
 
     // "받는분" 과 그 바로 다음 "전화번호" 찾기
     // 엑셀에서 동일한 컬럼명이 있으면 뒤의 것은 "_1" 등이 붙음
+    // "받는분전화번호", "받는분주소" 같은 컬럼도 /^받는분/에 걸리므로 수령인 이름 후보에서 제외한다
+    const 이름칸이_아닌_것 = /전화|휴대|연락처|주소|우편|메세지|메시지/;
     for (let i = keys.length - 1; i >= 0; i--) {
-        if (!recipientKey && (keys[i] === '받는분' || keys[i].match(/^받는분/))) {
+        if (!recipientKey && keys[i].match(/^받는분/) && !keys[i].match(이름칸이_아닌_것)) {
             recipientKey = keys[i];
             // 바로 다음 키가 전화번호인지 확인
             if (i + 1 < keys.length && keys[i + 1].match(/전화번호/)) {
