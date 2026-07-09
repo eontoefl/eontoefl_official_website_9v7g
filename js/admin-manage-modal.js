@@ -617,6 +617,9 @@ function loadModalAnalysisTab(app) {
                     <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
                         학생 희망: <strong>${app.preferred_program || '-'}</strong>
                     </div>
+                    <div id="selfPacedProgramLockNote" style="${fillSelfPaced ? '' : 'display: none;'} font-size: 12px; color: #0e7490; background: #ecfeff; padding: 8px 12px; border-radius: 8px; margin-top: 8px;">
+                        ⓘ 자기주도는 <strong>일반 · Fast (24세트)</strong> 고정입니다.
+                    </div>
                 </div>
 
                 <!-- 부가옵션 (토글 그룹) — ON 시 관련 입력이 바로 아래로 펼쳐진다 -->
@@ -831,6 +834,8 @@ function loadModalAnalysisTab(app) {
     // 이벤트 리스너 추가
     calculateModalPrice();
     toggleCorrectionStartDate();
+    // 자기주도 상태에 맞춰 기간·트랙 잠금/안내 및 종료일 UI 초기 반영
+    toggleSelfPaced();
 
     // 거부·조건부승인으로 저장된 경우 프로그램/일정/가격 섹션 비활성화 적용
     if (fillStatus === '거부' || fillStatus === '조건부승인') {
@@ -944,6 +949,16 @@ function toggleCorrectionStartDate() {
 // 자기주도는 시작 요일 제약이 없으므로 종료일 자동계산(일요일 강제)을 건너뛴다.
 function toggleSelfPaced() {
     const enabled = isSelfPacedOn();
+    // 자기주도는 일반·Fast(24세트) 고정 (호주 자기주도는 테스트룸 미지원).
+    // 켜면 기간=Fast·트랙=일반 강제 + Standard/호주 세그먼트 잠금 + 안내 표시.
+    if (enabled) {
+        setProgramSegment('duration', 'fast');
+        setProgramSegment('track', 'regular');
+    }
+    _lockSegmentBtn('seg_duration_standard', enabled);
+    _lockSegmentBtn('seg_track_australia', enabled);
+    const lockNote = document.getElementById('selfPacedProgramLockNote');
+    if (lockNote) lockNote.style.display = enabled ? '' : 'none';
     const wrapper = document.getElementById('selfPacedEndDateWrapper');
     if (wrapper) wrapper.style.display = enabled ? '' : 'none';
     // 일정 섹션: 자기주도면 챌린지 자동 종료일 숨기고 안내 문구로 대체
@@ -960,6 +975,15 @@ function toggleSelfPaced() {
 function isSelfPacedOn() {
     const sel = document.getElementById('self_paced');
     return !!(sel && sel.value === 'true');
+}
+
+// 세그먼트 버튼 잠금(회색·클릭차단) 토글 — 자기주도 시 Standard/호주 비활성용
+function _lockSegmentBtn(id, locked) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.style.pointerEvents = locked ? 'none' : '';
+    btn.style.opacity = locked ? '0.35' : '';
+    btn.style.cursor = locked ? 'not-allowed' : 'pointer';
 }
 
 // 프로그램 세그먼트(기간 fast/standard · 트랙 regular/australia) 선택.
@@ -1355,8 +1379,13 @@ async function saveModalAnalysis(event) {
 
     // 프로그램: 기간(fast/standard) × 트랙(regular/australia) 세그먼트 → 기존 캐노니컬 문자열로 재조립.
     // (저장값은 종전과 100% 동일 → 대시보드·계약·테스트룸 등 다운스트림 파싱 로직 무변경)
-    const programDuration = formData.get('program_duration') || '';
-    const programTrack = formData.get('program_track') || 'regular';
+    let programDuration = formData.get('program_duration') || '';
+    let programTrack = formData.get('program_track') || 'regular';
+    // 자기주도는 일반·Fast(24세트) 고정 — 잘못된 조합이 저장되지 않도록 방어적으로 강제.
+    if (formData.get('self_paced') === 'true') {
+        programDuration = 'fast';
+        programTrack = 'regular';
+    }
     const reconstructedProgram = programDuration
         ? ('내벨업챌린지' + (programTrack === 'australia' ? ' Australia' : '') + ' - ' + (programDuration === 'fast' ? 'Fast' : 'Standard'))
         : null;
