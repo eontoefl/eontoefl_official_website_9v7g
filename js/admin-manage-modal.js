@@ -2847,35 +2847,41 @@ function loadModalShippingTab(app) {
     
     // 발송 생략 처리되었으면
     if (app.shipping_waived) {
+        // 테두리 없이 톤으로 구역을 나눈다 (DESIGN.md: No-Line Rule, Tonal Layering)
         html = `
-            <div class="alert alert-success">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-box-open" style="font-size: 32px;"></i>
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-box-open" style="font-size: 18px; color: #2f855a;"></i>
+                    </div>
                     <div>
-                        <div style="font-weight: 700; font-size: 18px;">📦 택배 발송 생략</div>
-                        <div style="font-size: 14px; margin-top: 4px;">
-                            ${new Date(app.shipping_waived_at).toLocaleString('ko-KR')}에 생략 처리되었습니다.
+                        <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">택배 발송 생략</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                            ${new Date(app.shipping_waived_at).toLocaleString('ko-KR')}
                         </div>
                     </div>
                 </div>
-                <!-- .alert는 align-items:flex-start라 자식이 내용 너비로 줄어든다 -->
-                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px; align-self: stretch; box-sizing: border-box;">
-                    <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;">사유</div>
-                    <div style="font-size: 15px; color: #1e293b;">
+
+                <div style="background: #ffffff; padding: 16px 18px; border-radius: 12px; margin-top: 20px;">
+                    <div style="font-size: 12px; color: #94a3b8; font-weight: 500; margin-bottom: 6px;">생략 사유</div>
+                    <div style="font-size: 15px; color: ${app.shipping_waived_reason ? '#1e293b' : '#94a3b8'};">
                         ${app.shipping_waived_reason || '기록된 사유 없음'}
                     </div>
                 </div>
-                <div style="font-size: 13px; color: #64748b; margin-top: 16px; line-height: 1.6;">
+
+                <div style="font-size: 12px; color: #94a3b8; margin-top: 18px; line-height: 1.7;">
                     실물 택배를 발송하지 않았으며, 알림톡도 발송되지 않았습니다.<br>
-                    송장 출력 및 운송장 일괄등록 대상에서도 제외됩니다.
+                    송장 출력·운송장 일괄등록 대상에서도 제외됩니다.
                 </div>
             </div>
 
             <button onclick="undoShippingWaivedFromModal('${app.id}')"
-                    style="width: 100%; padding: 14px; background: white; color: #64748b;
-                           border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-weight: 600;
-                           cursor: pointer; margin-top: 16px;">
-                <i class="fas fa-undo" style="margin-right: 8px;"></i>
+                    style="display: block; margin: 18px auto 0; padding: 10px 16px; background: transparent; color: #64748b;
+                           border: none; border-radius: 8px; font-size: 13px; font-weight: 500;
+                           cursor: pointer; font-family: inherit; transition: 0.15s;"
+                    onmouseover="this.style.background='#f1f5f9'; this.style.color='#475569';"
+                    onmouseout="this.style.background='transparent'; this.style.color='#64748b';">
+                <i class="fas fa-undo" style="margin-right: 6px; font-size: 11px;"></i>
                 생략 처리 취소하고 발송 대기로 되돌리기
             </button>
         `;
@@ -2998,31 +3004,37 @@ function loadModalShippingTab(app) {
                 </div>
             </div>
 
-            <!-- 발송 생략 -->
-            <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #475569; margin: 0 0 6px 0;">
-                    <i class="fas fa-box-open" style="margin-right: 6px;"></i> 택배를 발송하지 않는 경우
-                </h4>
-                <p style="font-size: 13px; color: #64748b; margin: 0 0 16px 0; line-height: 1.6;">
-                    해외 거주 등으로 실물 수령이 어려운 학생은 발송 없이 이 단계를 완료 처리할 수 있습니다.
+            <!-- 발송 생략: 테두리 대신 톤으로 구역을 나눈다 (DESIGN.md: No-Line Rule) -->
+            <div style="background: #f4f6f8; padding: 24px; border-radius: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-box-open" style="font-size: 14px; color: #94a3b8;"></i>
+                    <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0; letter-spacing: -0.01em;">
+                        택배를 발송하지 않는 경우
+                    </h4>
+                </div>
+                <p style="font-size: 12px; color: #64748b; margin: 8px 0 20px 0; line-height: 1.7;">
+                    해외 거주 등으로 실물 수령이 어려운 학생은 발송 없이 이 단계를 완료 처리할 수 있습니다.<br>
                     알림톡은 발송되지 않으며, 송장 출력·운송장 일괄등록 대상에서 제외됩니다.
                 </p>
 
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-size: 14px; color: #64748b; margin-bottom: 8px;">
-                        생략 사유 (선택사항, 관리자만 확인)
-                    </label>
-                    <input type="text"
-                           id="modalWaiveReason"
-                           placeholder="예: 해외 거주 / 학생 요청"
-                           style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px;">
-                </div>
+                <label style="display: block; font-size: 13px; color: #64748b; margin-bottom: 6px;">
+                    생략 사유 <span style="font-size: 11px; color: #94a3b8;">선택 · 관리자만 확인</span>
+                </label>
+                <input type="text"
+                       id="modalWaiveReason"
+                       placeholder="예: 해외 거주 / 학생 요청"
+                       style="width: 100%; box-sizing: border-box; padding: 11px 13px; border: none; border-radius: 8px;
+                              background: #ffffff; font-size: 14px; color: #1e293b; font-family: inherit; outline: none; transition: 0.15s;"
+                       onfocus="this.style.boxShadow='0 0 0 2px #9480c5';"
+                       onblur="this.style.boxShadow='none';">
 
                 <button onclick="markShippingWaivedFromModal('${app.id}')"
-                        style="width: 100%; padding: 14px; background: white; color: #475569;
-                               border: 2px solid #cbd5e1; border-radius: 12px; font-size: 15px; font-weight: 600;
-                               cursor: pointer;">
-                    <i class="fas fa-forward" style="margin-right: 8px;"></i>
+                        style="width: 100%; margin-top: 14px; padding: 12px; background: #ebe6f4; color: #4c1d95;
+                               border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
+                               cursor: pointer; font-family: inherit; transition: 0.15s;"
+                        onmouseover="this.style.background='#e0d8ef';"
+                        onmouseout="this.style.background='#ebe6f4';">
+                    <i class="fas fa-forward" style="margin-right: 7px; font-size: 12px;"></i>
                     발송 없이 완료 처리
                 </button>
             </div>
