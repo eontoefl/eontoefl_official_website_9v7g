@@ -609,10 +609,13 @@ function loadModalAnalysisTab(app) {
                 <input type="hidden" name="program_duration" id="program_duration" value="${fillProgram.includes('Fast') ? 'fast' : fillProgram.includes('Standard') ? 'standard' : ''}">
                 <input type="hidden" name="program_track" id="program_track" value="${fillProgram.includes('Australia') ? 'australia' : 'regular'}">
 
+                <!-- 회색 본문 위에 뜨는 흰 카드. 세그먼트·입력칸이 배경에 묻히지 않게 한다 -->
+                <div style="background: #ffffff; border-radius: 14px; padding: 20px 22px;">
+
                 <!-- 학습 방식 세그먼트 (정규 과정 / 자기주도) -->
                 <div id="modeSegmentWrap" style="${pointerEvents}">
                     <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">학습 방식</label>
-                    <div style="display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 4px; max-width: 340px;">
+                    <div style="display: flex; gap: 4px; background: #eef1f5; border-radius: 10px; padding: 4px; max-width: 340px;">
                         <button type="button" id="seg_mode_regular" onclick="setLearningMode('regular')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${!fillSelfPaced ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">정규 과정</button>
                         <button type="button" id="seg_mode_selfpaced" onclick="setLearningMode('selfpaced')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillSelfPaced ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">자기주도</button>
                     </div>
@@ -623,14 +626,14 @@ function loadModalAnalysisTab(app) {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div>
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">기간 <span class="required">*</span></label>
-                            <div style="display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 4px;">
+                            <div style="display: flex; gap: 4px; background: #eef1f5; border-radius: 10px; padding: 4px;">
                                 <button type="button" id="seg_duration_fast" onclick="setProgramSegment('duration','fast')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillProgram.includes('Fast') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">Fast · 4주</button>
                                 <button type="button" id="seg_duration_standard" onclick="setProgramSegment('duration','standard')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillProgram.includes('Standard') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">Standard · 8주</button>
                             </div>
                         </div>
                         <div>
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">트랙</label>
-                            <div style="display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 4px;">
+                            <div style="display: flex; gap: 4px; background: #eef1f5; border-radius: 10px; padding: 4px;">
                                 <button type="button" id="seg_track_regular" onclick="setProgramSegment('track','regular')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${!fillProgram.includes('Australia') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">일반</button>
                                 <button type="button" id="seg_track_australia" onclick="setProgramSegment('track','australia')" style="flex: 1; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: 0.15s; font-family: inherit; ${fillProgram.includes('Australia') ? 'background:#ffffff; color:#4c1d95; font-weight:700; box-shadow:0 1px 3px rgba(25,28,29,0.12);' : 'background:transparent; color:#64748b; font-weight:500;'}">호주</button>
                             </div>
@@ -656,7 +659,7 @@ function loadModalAnalysisTab(app) {
                                    value="${fillScheduleStart}"
                                    required
                                    ${readOnly}
-                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                         </div>
                         <!-- 정규: 자동계산 종료일 -->
                         <div id="scheduleEndWrapper" style="${fillSelfPaced ? 'display: none;' : ''}">
@@ -672,13 +675,15 @@ function loadModalAnalysisTab(app) {
                             <input type="date" name="self_paced_end_date" id="self_paced_end_date"
                                    value="${fillSelfPacedEndDate}"
                                    ${readOnly}
-                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                         </div>
                     </div>
                     <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
                         학생이 희망한 챌린지 시작일: <strong>${app.preferred_start_date || '미입력'}</strong>
                     </div>
                 </div>
+
+                </div><!-- /흰 카드 -->
             </div>
 
             <!-- 3. 추가 옵션 (스라첨삭) -->
@@ -703,14 +708,14 @@ function loadModalAnalysisTab(app) {
                         <input type="date" name="correction_start_date" id="correction_start_date"
                                value="${fillCorrectionStartDate}"
                                ${readOnly}
-                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
+                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                     </div>
                     <!-- 첨삭 연장 (13~24세션) — 개별분석 발행과 무관한 독립 액션. 발행 후(읽기전용)에도 동작 -->
                     <div id="correctionExtensionWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 연장 (13~24세션) <span style="color:#7c3aed; font-size:11px;">결제 확인 후 적용</span></label>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="date" id="extension_start_date" value="${fillExtensionStartDate}"
-                                   style="flex: 1; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
+                                   style="flex: 1; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                             <button type="button" id="applyExtensionBtn" onclick="applyCorrectionExtension()"
                                     style="padding: 10px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">연장 적용</button>
                         </div>
@@ -744,7 +749,7 @@ function loadModalAnalysisTab(app) {
                                        value="${fillAdditionalDiscount}" min="0" max="790000"
                                        ${readOnly}
                                        onchange="calculateModalPrice()"
-                                       style="width: 120px; padding: 6px 10px; border: none; border-radius: 6px; background: #f4f6f9; outline: none; font-family: inherit; margin-left: 8px;">원
+                                       style="width: 120px; padding: 6px 10px; border: none; border-radius: 6px; background: #eef1f5; outline: none; font-family: inherit; margin-left: 8px;">원
                             </td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #ef4444;" id="displayAdditionalDiscount">-0원</td>
                         </tr>
@@ -763,7 +768,7 @@ function loadModalAnalysisTab(app) {
                         <input type="text" name="discount_reason" value="${fillDiscountReason}"
                                ${readOnly}
                                placeholder="할인 사유 입력"
-                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-family: inherit;">
+                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: inherit;">
                     </div>
                 </div>
             </div>
