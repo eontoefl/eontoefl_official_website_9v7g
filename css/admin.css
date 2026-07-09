@@ -695,6 +695,99 @@
     word-break: break-word;
 }
 
+/* 신청서 관리 모달의 기본정보 탭 (DESIGN.md: 테두리·구분선 대신 톤 레이어)
+   .info-card / .info-item 은 학습 상세 페이지에서도 쓰므로 모달 안으로만 범위를 좁힌다 */
+#manageModal .info-card {
+    background: #f6f8fa;
+    border: none;
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 0; /* 카드 사이 간격은 각 카드의 인라인 margin-top이 담당 */
+}
+
+#manageModal .info-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+}
+
+#manageModal .info-card-title i {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+#manageModal .info-item {
+    grid-template-columns: 116px 1fr;
+    gap: 14px;
+    padding: 6px 0;
+    border-bottom: none;
+}
+
+#manageModal .info-item label {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+#manageModal .info-item div {
+    background: #ffffff;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e293b;
+    padding: 11px 13px;
+    border-radius: 10px;
+}
+
+/* 라벨이 문장인 항목(라이팅 샘플 질문)은 좁은 라벨 칸에 가두지 않고 값 위로 올린다 */
+#manageModal .info-item-stack {
+    display: block;
+}
+
+#manageModal .info-item-stack label {
+    display: block;
+    margin-bottom: 6px;
+    line-height: 1.6;
+    padding-left: 2px;
+}
+
+/* 점수는 한두 자리 숫자다. 가로 한 줄을 통째로 쓰지 않고 타일로 늘어놓는다. */
+#manageModal .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 10px;
+    margin-top: 6px;
+}
+
+#manageModal .score-grid .info-item {
+    display: block;
+    padding: 0;
+}
+
+#manageModal .score-grid .info-item label {
+    display: block;
+    margin-bottom: 5px;
+    padding-left: 2px;
+}
+
+#manageModal .score-grid .info-item div {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: -0.02em;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+/* 점수 대신 문장 하나만 들어오는 경우("없음", "미입력")는 타일로 키우지 않는다 */
+#manageModal .score-grid .info-item:only-child div {
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    padding: 11px 13px;
+}
+
 /* 버튼 크기 */
 .btn-lg {
     padding: 14px 28px;

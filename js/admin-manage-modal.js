@@ -279,7 +279,7 @@ function loadModalInfoTab(app) {
 
     container.innerHTML = `
         <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-            <button onclick="downloadInfoTxt()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:600; color:#475569; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f8fafc'">
+            <button onclick="downloadInfoTxt()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#f1f5f9; border:none; border-radius:8px; font-size:13px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; transition:0.15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
                 <i class="fas fa-download" style="font-size:12px;"></i> TXT 다운로드
             </button>
         </div>
@@ -303,15 +303,15 @@ function loadModalInfoTab(app) {
             <h3 class="info-card-title"><i class="fas fa-chart-bar"></i> 현재 토플 점수</h3>
             ${app.has_toefl_score === 'yes' ? `
                 <div class="info-item"><label>응시 여부</label><div style="color:#2563eb; font-weight:700;">있음 (${app.score_version === 'new' ? '개정후' : '개정전'})</div></div>
-                ${currentScoreHTML}
+                <div class="score-grid">${currentScoreHTML}</div>
                 ${app.score_history ? `<div class="info-item"><label>점수 상세</label><div>${app.score_history}</div></div>` : ''}
             ` : `
                 <div class="info-item"><label>응시 여부</label><div style="color:#dc2626; font-weight:700;">없음</div></div>
-                <div class="info-item">
+                <div class="info-item info-item-stack">
                     <label>Q1: What are your hobbies or interests, and why do you enjoy them?</label>
                     <div>${app.writing_sample_1 || '-'}</div>
                 </div>
-                <div class="info-item">
+                <div class="info-item info-item-stack">
                     <label>Q2: Describe a challenge you faced recently and how you dealt with it.</label>
                     <div>${app.writing_sample_2 || '-'}</div>
                 </div>
@@ -328,7 +328,7 @@ function loadModalInfoTab(app) {
         <!-- 4. 목표 점수 -->
         <div class="info-card" style="margin-top: 16px;">
             <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(개정후)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(개정전)' : ''}</h3>
-            ${targetScoreHTML}
+            <div class="score-grid">${targetScoreHTML}</div>
             ${app.target_note ? `<div class="info-item"><label>희망점수 설명</label><div>${app.target_note}</div></div>` : ''}
         </div>
 
