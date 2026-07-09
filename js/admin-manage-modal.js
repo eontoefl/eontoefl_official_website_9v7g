@@ -2622,8 +2622,8 @@ function loadModalUsageTab(app) {
     // 입금이 확인되지 않았으면 (잠금 상태 — 회색 면)
     if (!app.deposit_confirmed_by_admin) {
         html = `
-            <div style="background: #f1f5f9; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
                 </div>
                 <div>
@@ -2845,8 +2845,8 @@ function loadModalShippingTab(app) {
     // 이용방법이 전달되지 않았으면
     if (!app.guide_sent) {
         html = `
-            <div style="background: #f1f5f9; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
                 </div>
                 <div>
@@ -3021,7 +3021,7 @@ function loadModalShippingTab(app) {
             </div>
 
             <!-- 발송 생략: 테두리 대신 톤으로 구역을 나눈다 (DESIGN.md: No-Line Rule) -->
-            <div style="background: #f4f6f8; padding: 24px; border-radius: 16px;">
+            <div style="background: #ffffff; padding: 24px; border-radius: 16px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-box-open" style="font-size: 14px; color: #94a3b8;"></i>
                     <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0; letter-spacing: -0.01em;">
@@ -3040,9 +3040,9 @@ function loadModalShippingTab(app) {
                        id="modalWaiveReason"
                        placeholder="예: 해외 거주 / 학생 요청"
                        style="width: 100%; box-sizing: border-box; padding: 11px 13px; border: none; border-radius: 8px;
-                              background: #ffffff; font-size: 14px; color: #1e293b; font-family: inherit; outline: none; transition: 0.15s;"
-                       onfocus="this.style.boxShadow='0 0 0 2px #9480c5';"
-                       onblur="this.style.boxShadow='none';">
+                              background: #f4f6f9; font-size: 14px; color: #1e293b; font-family: inherit; outline: none; transition: 0.15s;"
+                       onfocus="this.style.boxShadow='0 0 0 2px #9480c5'; this.style.background='#ffffff';"
+                       onblur="this.style.boxShadow='none'; this.style.background='#f4f6f9';">
 
                 <button onclick="markShippingWaivedFromModal('${app.id}')"
                         style="width: 100%; margin-top: 14px; padding: 12px; background: #ebe6f4; color: #4c1d95;
