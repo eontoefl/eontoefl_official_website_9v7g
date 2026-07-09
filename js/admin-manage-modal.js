@@ -2858,7 +2858,8 @@ function loadModalShippingTab(app) {
                         </div>
                     </div>
                 </div>
-                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                <!-- .alert는 align-items:flex-start라 자식이 내용 너비로 줄어든다 -->
+                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px; align-self: stretch; box-sizing: border-box;">
                     <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;">사유</div>
                     <div style="font-size: 15px; color: #1e293b;">
                         ${app.shipping_waived_reason || '기록된 사유 없음'}
