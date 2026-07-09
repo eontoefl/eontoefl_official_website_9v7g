@@ -1944,11 +1944,13 @@ async function loadModalContractTab(app) {
     // 학생이 개별분석에 동의하지 않았으면
     if (!app.student_agreed_at) {
         html = `
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle" style="font-size: 24px; margin-right: 12px;"></i>
+            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
+                </div>
                 <div>
-                    <div style="font-weight: 700; font-size: 16px;">학생 동의 대기 중</div>
-                    <div style="font-size: 14px; margin-top: 4px;">
+                    <div style="font-weight: 600; font-size: 15px; color: #1e293b; letter-spacing: -0.01em;">학생 동의 대기 중</div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.6;">
                         학생이 개별분석에 동의한 후 계약서를 발송할 수 있습니다.
                     </div>
                 </div>
@@ -1964,19 +1966,24 @@ async function loadModalContractTab(app) {
         const contracts = await loadActiveContractsForDropdown();
         
         html += `
-            <div class="alert alert-warning">
-                <div style="margin-bottom: 10px;">
-                    <div style="font-weight: 700; font-size: 18px;">📋 계약서 선택 및 발송</div>
-                    <div style="font-size: 14px; margin-top: 4px;">
-                        학생이 ${new Date(app.student_agreed_at).toLocaleString('ko-KR')}에 개별분석에 동의했습니다.
+            <div style="background: #fdf8ef; border-radius: 16px; padding: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-file-signature" style="font-size: 16px; color: #b45309;"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">계약서 선택 및 발송</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
+                            학생이 ${new Date(app.student_agreed_at).toLocaleString('ko-KR')}에 개별분석에 동의했습니다.
+                        </div>
                     </div>
                 </div>
-                
-                <div style="background: white; padding: 20px; border-radius: 12px;">
-                    <label style="font-size: 14px; font-weight: 600; color: #1e293b; display: block; margin-bottom: 8px;">
+
+                <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
+                    <label style="font-size: 13px; font-weight: 500; color: #64748b; display: block; margin-bottom: 6px;">
                         발송할 계약서 선택
                     </label>
-                    <select id="contractSelectDropdown" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; margin-bottom: 12px;">
+                    <select id="contractSelectDropdown" style="width: 100%; box-sizing: border-box; padding: 11px 13px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-size: 14px; font-family: inherit; margin-bottom: 14px;">
                         <option value="">계약서를 선택하세요...</option>
                         ${contracts.map(c => {
                             const typeLabel = c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지';
@@ -1996,7 +2003,7 @@ async function loadModalContractTab(app) {
                     </div>
                 </div>
                 
-                <div style="font-size: 12px; color: #78350f; text-align: center; margin-top: 12px;">
+                <div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 12px;">
                     💡 발송하면 학생에게 계약서 탭이 활성화되고 24시간 내 동의를 받게 됩니다.
                 </div>
             </div>
@@ -2008,49 +2015,53 @@ async function loadModalContractTab(app) {
             '계약서';
         
         html += `
-            <div class="alert alert-success">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 32px;"></i>
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-check" style="font-size: 17px; color: #2f855a;"></i>
+                    </div>
                     <div style="flex: 1;">
-                        <div style="font-weight: 700; font-size: 18px;">✅ 계약서 발송 완료</div>
-                        <div style="font-size: 14px; margin-top: 4px;">
-                            발송 계약서: <strong>${contractInfo}</strong>
-                        </div>
-                        <div style="font-size: 13px; color: #166534; margin-top: 4px;">
-                            ${new Date(app.contract_sent_at).toLocaleString('ko-KR')}에 발송
+                        <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">계약서 발송 완료</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                            ${contractInfo} · ${new Date(app.contract_sent_at).toLocaleString('ko-KR')}
                         </div>
                     </div>
                 </div>
-                
+
                 ${app.contract_agreed ? `
-                    <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px; border-left: 4px solid #22c55e;">
-                        <div style="font-weight: 600; color: #166534;">
-                            <i class="fas fa-check-double"></i> 학생이 ${new Date(app.contract_agreed_at).toLocaleString('ko-KR')}에 계약에 동의했습니다.
+                    <div style="background: #ffffff; padding: 16px 18px; border-radius: 12px; margin-top: 20px;">
+                        <div style="font-weight: 600; font-size: 14px; color: #1e293b;">
+                            <i class="fas fa-check-double" style="color: #2f855a; margin-right: 6px; font-size: 12px;"></i>
+                            학생이 ${new Date(app.contract_agreed_at).toLocaleString('ko-KR')}에 계약에 동의했습니다.
                         </div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 8px; margin-top: 12px;">
-                        <button onclick="previewSentContract('${app.id}')" class="btn-outline" style="flex: 1; font-size: 13px;">
-                            <i class="fas fa-eye"></i> 미리보기
+                        <button onclick="previewSentContract('${app.id}')"
+                                style="flex: 1; padding: 11px; background: #ffffff; color: #475569; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">
+                            <i class="fas fa-eye" style="font-size: 11px;"></i> 미리보기
                         </button>
-                        <button onclick="changeContractAfterAgreed('${app.id}')" class="btn-outline" 
-                                style="flex: 1; font-size: 13px; border-color: #ef4444; color: #ef4444;">
-                            <i class="fas fa-lock"></i> 계약서 변경
+                        <button onclick="changeContractAfterAgreed('${app.id}')"
+                                style="flex: 1; padding: 11px; background: #fbeae6; color: #a53b22; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">
+                            <i class="fas fa-lock" style="font-size: 11px;"></i> 계약서 변경
                         </button>
                     </div>
                 ` : `
-                    <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px; border-left: 4px solid #f59e0b;">
-                        <div style="font-weight: 600; color: #92400e;">
-                            <i class="fas fa-clock"></i> 학생의 계약 동의를 기다리는 중입니다.
+                    <div style="background: #ffffff; padding: 16px 18px; border-radius: 12px; margin-top: 20px;">
+                        <div style="font-weight: 600; font-size: 14px; color: #1e293b;">
+                            <i class="fas fa-clock" style="color: #b45309; margin-right: 6px; font-size: 12px;"></i>
+                            학생의 계약 동의를 기다리는 중입니다.
                         </div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 8px; margin-top: 12px;">
-                        <button onclick="previewSentContract('${app.id}')" class="btn-outline" style="flex: 1; font-size: 13px;">
-                            <i class="fas fa-eye"></i> 미리보기
+                        <button onclick="previewSentContract('${app.id}')"
+                                style="flex: 1; padding: 11px; background: #ffffff; color: #475569; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">
+                            <i class="fas fa-eye" style="font-size: 11px;"></i> 미리보기
                         </button>
-                        <button onclick="changeContractBeforeAgreed('${app.id}')" class="btn-secondary" style="flex: 1; font-size: 13px;">
-                            <i class="fas fa-exchange-alt"></i> 다른 계약서로 변경
+                        <button onclick="changeContractBeforeAgreed('${app.id}')"
+                                style="flex: 1; padding: 11px; background: #ebe6f4; color: #4c1d95; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;">
+                            <i class="fas fa-exchange-alt" style="font-size: 11px;"></i> 다른 계약서로 변경
                         </button>
                     </div>
 
@@ -2058,21 +2069,21 @@ async function loadModalContractTab(app) {
                     ${(() => {
                         const contractDeadlineInfo = getContractDeadlineInfo(app);
                         return `
-                    <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 16px; border: 1px solid ${app.contract_deadline_override ? '#7c3aed' : '#e2e8f0'};">
+                    <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px; margin-top: 12px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                            <h4 style="font-size: 15px; font-weight: 600; margin: 0;">
-                                <i class="fas fa-calendar-plus" style="color: #7c3aed; margin-right: 6px;"></i>계약서 기한 유예
+                            <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0;">
+                                <i class="fas fa-calendar-plus" style="color: #94a3b8; margin-right: 6px; font-size: 12px;"></i>계약서 기한 유예
                             </h4>
-                            <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 600;
+                            <span style="font-size: 11px; padding: 4px 10px; border-radius: 999px; font-weight: 600;
                                 ${app.contract_deadline_override
-                                    ? 'background: #ede9fe; color: #7c3aed;'
-                                    : 'background: #f1f5f9; color: #64748b;'}">
+                                    ? 'background: #ede9f5; color: #5b21b6;'
+                                    : 'background: #eef1f5; color: #94a3b8;'}">
                                 ${app.contract_deadline_override ? '유예 적용 중' : '기본 (24시간)'}
                             </span>
                         </div>
-                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.6;">
+                        <div style="font-size: 13px; color: #64748b; margin-bottom: 14px; line-height: 1.6;">
                             현재 계약서 동의 기한: <strong style="color: #1e293b;">${contractDeadlineInfo.label}</strong><br/>
-                            <span style="font-size: 12px;">
+                            <span style="font-size: 12px; color: #94a3b8;">
                                 ${app.contract_deadline_override
                                     ? '관리자가 유예 설정한 기한입니다.'
                                     : '계약서 발송 시각 + 24시간 자동 계산입니다.'}
@@ -2080,23 +2091,23 @@ async function loadModalContractTab(app) {
                         </div>
                         <div style="display: flex; gap: 8px; align-items: flex-end;">
                             <div style="flex: 1;">
-                                <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">유예 기한 지정 (KST)</label>
+                                <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 5px;">유예 기한 지정 (KST)</label>
                                 <input type="datetime-local" id="contractDeadlineInput"
                                        value="${contractDeadlineInfo.inputValue}"
-                                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit;">
+                                       style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-size: 14px; font-family: inherit;">
                             </div>
                             <button type="button" onclick="saveContractDeadlineOverride('${app.id}')"
-                                    style="padding: 10px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                                <i class="fas fa-save"></i> 저장
+                                    style="padding: 10px 16px; background: #ebe6f4; color: #4c1d95; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;">
+                                <i class="fas fa-save" style="font-size: 11px;"></i> 저장
                             </button>
                             ${app.contract_deadline_override ? `
                             <button type="button" onclick="clearContractDeadlineOverride('${app.id}')"
-                                    style="padding: 10px 16px; background: white; color: #ef4444; border: 1px solid #ef4444; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                                <i class="fas fa-undo"></i> 초기화
+                                    style="padding: 10px 16px; background: #fbeae6; color: #a53b22; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;">
+                                <i class="fas fa-undo" style="font-size: 11px;"></i> 초기화
                             </button>
                             ` : ''}
                         </div>
-                        <div style="font-size: 11px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 10px; line-height: 1.7;">
                             💡 학생이 계약서 동의 기한 연장을 요청한 경우, 유예 날짜를 지정하세요.<br/>
                             💡 저장하면 학생에게 기한 연장 안내 알림톡이 발송됩니다.<br/>
                             💡 초기화하면 기본 24시간 로직으로 돌아갑니다.
@@ -2116,70 +2127,73 @@ async function loadModalContractTab(app) {
 
         if (!app.deposit_confirmed_by_student) {
             html += `
-                <div class="alert alert-info" style="margin-top: 24px;">
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <i class="fas fa-clock" style="font-size: 32px;"></i>
+                <div style="background: #ffffff; border-radius: 16px; padding: 24px; margin-top: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-clock" style="font-size: 16px; color: #64748b;"></i>
+                        </div>
                         <div>
-                            <div style="font-weight: 700; font-size: 18px;">입금 대기 중</div>
-                            <div style="font-size: 14px; margin-top: 4px;">
+                            <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">입금 대기 중</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.6;">
                                 학생이 계약에 동의했습니다. 학생이 입금 완료 알림을 보내면 여기에서 확인하실 수 있습니다.
                             </div>
                         </div>
                     </div>
-                    <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 16px;">
-                        <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;">입금 정보</h4>
+
+                    <div style="background: #f6f8fa; padding: 18px 20px; border-radius: 12px; margin-top: 20px;">
+                        <h4 style="font-size: 12px; font-weight: 600; color: #94a3b8; margin: 0 0 10px 0; letter-spacing: 0.02em;">입금 정보</h4>
                         <table style="width: 100%; font-size: 14px;">
                             <tr>
-                                <td style="padding: 8px 0; color: #64748b;">계좌번호</td>
-                                <td style="padding: 8px 0; text-align: right; font-weight: 600;">${accountInfo}</td>
+                                <td style="padding: 7px 0; color: #64748b;">계좌번호</td>
+                                <td style="padding: 7px 0; text-align: right; font-weight: 600; color: #1e293b;">${accountInfo}</td>
                             </tr>
                             <tr>
-                                <td style="padding: 8px 0; color: #64748b;">입금 금액</td>
-                                <td style="padding: 8px 0; text-align: right; font-weight: 700; font-size: 18px; color: #9480c5;">${(app.final_price || 0).toLocaleString()}원</td>
+                                <td style="padding: 7px 0; color: #64748b;">입금 금액</td>
+                                <td style="padding: 7px 0; text-align: right; font-weight: 700; font-size: 18px; letter-spacing: -0.02em; color: #7c68a8;">${(app.final_price || 0).toLocaleString()}원</td>
                             </tr>
                         </table>
                     </div>
 
                     <!-- 입금 기한 관리 -->
-                    <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 16px; border: 1px solid ${app.deposit_deadline_override ? '#7c3aed' : '#e2e8f0'};">
+                    <div style="background: #f6f8fa; padding: 18px 20px; border-radius: 12px; margin-top: 12px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                            <h4 style="font-size: 15px; font-weight: 600; margin: 0;">
-                                <i class="fas fa-calendar-check" style="color: #7c3aed; margin-right: 6px;"></i>입금 기한 관리
+                            <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0;">
+                                <i class="fas fa-calendar-check" style="color: #94a3b8; margin-right: 6px; font-size: 12px;"></i>입금 기한 관리
                             </h4>
-                            <span style="font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 600;
-                                ${app.deposit_deadline_override 
-                                    ? 'background: #ede9fe; color: #7c3aed;'
-                                    : 'background: #f1f5f9; color: #64748b;'}">
+                            <span style="font-size: 11px; padding: 4px 10px; border-radius: 999px; font-weight: 600;
+                                ${app.deposit_deadline_override
+                                    ? 'background: #ede9f5; color: #5b21b6;'
+                                    : 'background: #eef1f5; color: #94a3b8;'}">
                                 ${app.deposit_deadline_override ? '관리자 지정' : '기본 (24시간)'}
                             </span>
                         </div>
-                        <div style="font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.6;">
+                        <div style="font-size: 13px; color: #64748b; margin-bottom: 14px; line-height: 1.6;">
                             현재 입금 기한: <strong style="color: #1e293b;">${depositDeadlineInfo.label}</strong><br/>
-                            <span style="font-size: 12px;">
-                                ${app.deposit_deadline_override 
-                                    ? '관리자가 직접 지정한 기한입니다.' 
+                            <span style="font-size: 12px; color: #94a3b8;">
+                                ${app.deposit_deadline_override
+                                    ? '관리자가 직접 지정한 기한입니다.'
                                     : '계약 동의 시각 + 24시간 자동 계산입니다.'}
                             </span>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: flex-end;">
                             <div style="flex: 1;">
-                                <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">입금 기한 지정 (KST)</label>
+                                <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 5px;">입금 기한 지정 (KST)</label>
                                 <input type="datetime-local" id="depositDeadlineInput"
                                        value="${depositDeadlineInfo.inputValue}"
-                                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit;">
+                                       style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #ffffff; outline: none; font-size: 14px; font-family: inherit;">
                             </div>
                             <button type="button" onclick="saveDepositDeadlineOverride('${app.id}')"
-                                    style="padding: 10px 16px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                                <i class="fas fa-save"></i> 저장
+                                    style="padding: 10px 16px; background: #ebe6f4; color: #4c1d95; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;">
+                                <i class="fas fa-save" style="font-size: 11px;"></i> 저장
                             </button>
                             ${app.deposit_deadline_override ? `
                             <button type="button" onclick="clearDepositDeadlineOverride('${app.id}')"
-                                    style="padding: 10px 16px; background: white; color: #ef4444; border: 1px solid #ef4444; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">
-                                <i class="fas fa-undo"></i> 초기화
+                                    style="padding: 10px 16px; background: #fbeae6; color: #a53b22; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap;">
+                                <i class="fas fa-undo" style="font-size: 11px;"></i> 초기화
                             </button>
                             ` : ''}
                         </div>
-                        <div style="font-size: 11px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 10px; line-height: 1.7;">
                             💡 시작일이 먼 학생에게 입금 기한을 넉넉하게 지정할 수 있습니다.<br/>
                             💡 초기화하면 기본 24시간 로직으로 돌아갑니다.
                         </div>
@@ -2188,57 +2202,66 @@ async function loadModalContractTab(app) {
             `;
         } else if (!app.deposit_confirmed_by_admin) {
             html += `
-                <div class="alert alert-warning" style="margin-top: 24px;">
-                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                        <i class="fas fa-bell" style="font-size: 32px;"></i>
+                <div style="background: #fdf8ef; border-radius: 16px; padding: 24px; margin-top: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-bell" style="font-size: 16px; color: #b45309;"></i>
+                        </div>
                         <div>
-                            <div style="font-weight: 700; font-size: 18px;">🔔 입금 확인 요청</div>
-                            <div style="font-size: 14px; margin-top: 4px;">
+                            <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">입금 확인 요청</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
                                 ${new Date(app.deposit_confirmed_by_student_at).toLocaleString('ko-KR')}에 학생이 입금 완료를 알렸습니다.
                             </div>
                         </div>
                     </div>
-                    <div style="background: white; padding: 20px; border-radius: 12px;">
+                    <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
                         <div style="margin-bottom: 16px;">
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">입금자명</label>
                             <input type="text" id="modalDepositorName" value="${app.depositor_name || app.name}" readonly
-                                   style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 16px; background: #f8fafc;">
-                            <p style="font-size: 12px; color: #64748b; margin: 6px 0 0 0;">
+                                   style="width: 100%; box-sizing: border-box; padding: 12px 13px; border: none; border-radius: 8px; background: #eef1f5; color: #94a3b8; outline: none; font-size: 15px; font-family: inherit;">
+                            <p style="font-size: 12px; color: #94a3b8; margin: 6px 0 0 0;">
                                 💡 학생이 입력한 실제 입금자명입니다.
                             </p>
                         </div>
-                        <div style="margin-bottom: 16px;">
+                        <div style="margin-bottom: 18px;">
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">입금 금액 확인</label>
-                            <input type="number" id="modalDepositAmount" value="${app.final_price || 0}" 
-                                   style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 16px;">
+                            <input type="number" id="modalDepositAmount" value="${app.final_price || 0}"
+                                   style="width: 100%; box-sizing: border-box; padding: 12px 13px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-size: 15px; font-family: inherit;">
                         </div>
-                        <button onclick="confirmDepositFromModal('${app.id}')" class="btn-primary btn-lg" style="width: 100%;">
-                            <i class="fas fa-check-circle"></i> 입금 확인 완료
+                        <button onclick="confirmDepositFromModal('${app.id}')"
+                                style="width: 100%; padding: 14px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%);
+                                       color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+                                       cursor: pointer; font-family: inherit; transition: 0.15s; box-shadow: 0 4px 16px rgba(25, 28, 29, 0.06);"
+                                onmouseover="this.style.transform='translateY(-1px)';"
+                                onmouseout="this.style.transform='none';">
+                            <i class="fas fa-check-circle" style="margin-right: 7px; font-size: 13px;"></i> 입금 확인 완료
                         </button>
                     </div>
                 </div>
             `;
         } else {
             html += `
-                <div class="alert alert-success" style="margin-top: 24px;">
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <i class="fas fa-check-circle" style="font-size: 32px;"></i>
+                <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; margin-top: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-check" style="font-size: 17px; color: #2f855a;"></i>
+                        </div>
                         <div>
-                            <div style="font-weight: 700; font-size: 18px;">✅ 입금 확인 완료</div>
-                            <div style="font-size: 14px; margin-top: 4px;">
-                                ${new Date(app.deposit_confirmed_by_admin_at).toLocaleString('ko-KR')}에 입금을 확인했습니다.
+                            <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">입금 확인 완료</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                                ${new Date(app.deposit_confirmed_by_admin_at).toLocaleString('ko-KR')}
                             </div>
                         </div>
                     </div>
-                    <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                    <div style="background: #ffffff; padding: 16px 18px; border-radius: 12px; margin-top: 20px;">
                         <table style="width: 100%; font-size: 14px;">
                             <tr>
-                                <td style="padding: 8px 0; color: #64748b;">입금자명</td>
-                                <td style="padding: 8px 0; text-align: right; font-weight: 600;">${app.depositor_name || app.name}</td>
+                                <td style="padding: 7px 0; color: #64748b;">입금자명</td>
+                                <td style="padding: 7px 0; text-align: right; font-weight: 600; color: #1e293b;">${app.depositor_name || app.name}</td>
                             </tr>
                             <tr>
-                                <td style="padding: 8px 0; color: #64748b;">확인 금액</td>
-                                <td style="padding: 8px 0; text-align: right; font-weight: 600;">${(app.final_price || 0).toLocaleString()}원</td>
+                                <td style="padding: 7px 0; color: #64748b;">확인 금액</td>
+                                <td style="padding: 7px 0; text-align: right; font-weight: 600; color: #1e293b;">${(app.final_price || 0).toLocaleString()}원</td>
                             </tr>
                         </table>
                     </div>
