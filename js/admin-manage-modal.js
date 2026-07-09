@@ -446,7 +446,7 @@ function loadModalAnalysisTab(app) {
     // 예약 발송 대기 배너 (예약 중일 때만)
     const scheduledAtKstStr = isScheduled ? formatScheduledAtKst(app.analysis_alimtalk_scheduled_at) : '';
     const scheduledBanner = isScheduled ? `
-        <div id="scheduledReleaseBanner" style="background: #fdf8ef; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px;">
+        <div id="scheduledReleaseBanner" style="background: #fdf8ef; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 320px;">
                     <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -480,7 +480,7 @@ function loadModalAnalysisTab(app) {
 
     // 예약 취소 후 수정본 보존 배너 (예약은 풀렸지만 미발송 수정본이 남아있는 상태)
     const preservedDraftBanner = (hasPendingDraft && !isScheduled) ? `
-        <div style="background: #f0f8fa; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px;">
+        <div style="background: #f0f8fa; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
             <div style="display: flex; align-items: flex-start; gap: 14px;">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: #d8eef2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-save" style="font-size: 16px; color: #0e7490;"></i>
@@ -498,7 +498,7 @@ function loadModalAnalysisTab(app) {
 
     // AI 자동 분석 배너 (미발송 수정본이 보존된 상태에서는 표시하지 않음)
     const aiAnalysisBanner = (hasAIAnalysis && !hasPendingDraft) ? `
-        <div style="background: #f6f4fb; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px;">
+        <div style="background: #f6f4fb; padding: 22px 24px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
             <div style="display: flex; align-items: flex-start; gap: 14px;">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: #e6e0f2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-robot" style="font-size: 16px; color: #6d28d9;"></i>
@@ -529,7 +529,7 @@ function loadModalAnalysisTab(app) {
         ${preservedDraftBanner}
         ${aiAnalysisBanner}
         <!-- 입문서 제공 토글 (form 밖, 즉시 저장) -->
-        <div class="form-group" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 20px;">
+        <div class="form-group" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 38px; height: 38px; border-radius: 10px; background: #e2eef5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -610,7 +610,7 @@ function loadModalAnalysisTab(app) {
                 <input type="hidden" name="program_track" id="program_track" value="${fillProgram.includes('Australia') ? 'australia' : 'regular'}">
 
                 <!-- 회색 본문 위에 뜨는 흰 카드. 세그먼트·입력칸이 배경에 묻히지 않게 한다 -->
-                <div style="background: #ffffff; border-radius: 14px; padding: 20px 22px;">
+                <div style="background: #ffffff; border-radius: 14px; padding: 20px 22px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
 
                 <!-- 학습 방식 세그먼트 (정규 과정 / 자기주도) -->
                 <div id="modeSegmentWrap" style="${pointerEvents}">
@@ -689,7 +689,7 @@ function loadModalAnalysisTab(app) {
             <!-- 3. 추가 옵션 (스라첨삭) -->
             <div class="form-group" id="formGroup-options">
                 <label class="form-label">3. 추가 옵션</label>
-                <div id="optionToggles" style="background: #ffffff; border-radius: 14px; padding: 4px 18px; ${pointerEvents}">
+                <div id="optionToggles" style="background: #ffffff; border-radius: 14px; padding: 4px 18px; ${pointerEvents}; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                     <!-- 스라첨삭 -->
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 12px;">
                         <div>
@@ -727,7 +727,7 @@ function loadModalAnalysisTab(app) {
             <!-- 4. 가격 정보 -->
             <div class="form-group" id="formGroup-price">
                 <label class="form-label">4. 가격 정보</label>
-                <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
+                <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
                         <tbody>
                         <tr>
@@ -2643,7 +2643,7 @@ function loadModalUsageTab(app) {
     // 입금이 확인되지 않았으면 (잠금 상태 — 회색 면)
     if (!app.deposit_confirmed_by_admin) {
         html = `
-            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
                 </div>
@@ -2663,7 +2663,7 @@ function loadModalUsageTab(app) {
     if (!app.guide_sent) {
         // 할 일이 남은 상태 — 연한 주황 면
         html += `
-            <div style="background: #fdf8ef; border-radius: 16px; padding: 24px;">
+            <div style="background: #fdf8ef; border-radius: 16px; padding: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="display: flex; align-items: center; gap: 14px;">
                     <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                         <i class="fas fa-rocket" style="font-size: 16px; color: #b45309;"></i>
@@ -2694,7 +2694,7 @@ function loadModalUsageTab(app) {
     } else {
         // 완료 상태 — 연한 초록 면
         html += `
-            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-check" style="font-size: 17px; color: #2f855a;"></i>
                 </div>
@@ -2866,7 +2866,7 @@ function loadModalShippingTab(app) {
     // 이용방법이 전달되지 않았으면
     if (!app.guide_sent) {
         html = `
-            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px;">
+            <div style="background: #ffffff; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="fas fa-lock" style="font-size: 16px; color: #64748b;"></i>
                 </div>
@@ -2886,7 +2886,7 @@ function loadModalShippingTab(app) {
     if (app.shipping_waived) {
         // 테두리 없이 톤으로 구역을 나눈다 (DESIGN.md: No-Line Rule, Tonal Layering)
         html = `
-            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px;">
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="display: flex; align-items: center; gap: 14px;">
                     <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                         <i class="fas fa-box-open" style="font-size: 18px; color: #2f855a;"></i>
@@ -2929,7 +2929,7 @@ function loadModalShippingTab(app) {
     // 이미 발송 완료되었으면
     if (app.shipping_completed) {
         html = `
-            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px;">
+            <div style="background: #f2f8f4; border-radius: 16px; padding: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="display: flex; align-items: center; gap: 14px;">
                     <div style="width: 44px; height: 44px; border-radius: 12px; background: #dcf0e3; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                         <i class="fas fa-check" style="font-size: 17px; color: #2f855a;"></i>
@@ -2969,7 +2969,7 @@ function loadModalShippingTab(app) {
         `;
 
         html = `
-            <div style="background: #fdf8ef; padding: 24px; border-radius: 16px; margin-bottom: 20px;">
+            <div style="background: #fdf8ef; padding: 24px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
                     <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                         <i class="fas fa-shipping-fast" style="font-size: 16px; color: #b45309;"></i>
@@ -3042,7 +3042,7 @@ function loadModalShippingTab(app) {
             </div>
 
             <!-- 발송 생략: 테두리 대신 톤으로 구역을 나눈다 (DESIGN.md: No-Line Rule) -->
-            <div style="background: #ffffff; padding: 24px; border-radius: 16px;">
+            <div style="background: #ffffff; padding: 24px; border-radius: 16px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-box-open" style="font-size: 14px; color: #94a3b8;"></i>
                     <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0; letter-spacing: -0.01em;">
