@@ -148,7 +148,7 @@ function renderProgressSection(app) {
         { id: 7, name: '입금\n대기', icon: 'fa-credit-card', completed: !!app.deposit_confirmed_by_student_at },
         { id: 8, name: '입금\n확인', icon: 'fa-check-double', completed: !!app.deposit_confirmed_by_admin_at },
         { id: 9, name: '이용방법\n전달', icon: 'fa-book-open', completed: !!app.guide_sent },
-        { id: 10, name: '택배\n발송', icon: 'fa-shipping-fast', completed: !!app.shipping_completed }
+        { id: 10, name: '교재\n전달', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
     ];
 
     // 현재 단계 찾기
@@ -371,7 +371,7 @@ function renderActionItems(app) {
     }
     
     // 8️⃣ 이용방법 업로드 직후 ~ 택배 발송 등록 직전 (또는 이용방법을 읽지 않은 경우)
-    else if (app.guide_sent && !app.shipping_completed) {
+    else if (app.guide_sent && !app.shipping_completed && !app.shipping_waived) {
         actionItems.push({
             icon: 'fa-book-open',
             iconColor: '#9480c5',
@@ -383,13 +383,16 @@ function renderActionItems(app) {
         });
     }
     
-    // 9️⃣ 택배 발송 등록 직후 (완전 완료)
-    if (actionItems.length === 0 && app.shipping_completed) {
+    // 9️⃣ 택배 발송 등록(또는 발송 생략) 직후 (완전 완료)
+    if (actionItems.length === 0 && (app.shipping_completed || app.shipping_waived)) {
+        const shippingNote = app.shipping_waived
+            ? `교재 전달 정보는 아래 '배송 정보'에서 확인하실 수 있어요.`
+            : `택배 발송 정보는 아래 '배송 정보'에서 확인하실 수 있어요.`;
         actionItemsContent.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #64748b;">
                 <i class="fas fa-check-circle" style="font-size: 48px; margin-bottom: 16px; color: #77bf7e;"></i>
                 <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">모든 할 일을 완료했어요! 🎉</h3>
-                <p style="font-size: 14px;">프로그램 시작일까지 편안히 기다려주세요.<br>택배 발송 정보는 아래 '배송 정보'에서 확인하실 수 있어요.</p>
+                <p style="font-size: 14px;">프로그램 시작일까지 편안히 기다려주세요.<br>${shippingNote}</p>
             </div>
         `;
         return;
@@ -546,7 +549,15 @@ function renderTimeline(app) {
         });
     }
     
-    if (app.shipping_completed) {
+    if (app.shipping_waived) {
+        events.push({
+            date: new Date(app.shipping_waived_at || Date.now()),
+            icon: 'fa-box-open',
+            iconColor: '#77bf7e',
+            title: '교재 전달 완료',
+            description: '수강생 요청에 따른 실물 택배 미발송 (교재 PDF 전달 완료)'
+        });
+    } else if (app.shipping_completed) {
         events.push({
             date: new Date(app.shipping_completed_at || Date.now()),
             icon: 'fa-shipping-fast',
@@ -742,16 +753,17 @@ function renderQuickLinks(app) {
             link: `application-detail.html?id=${app.id}#step5`,
             available: !!app.guide_sent
         },
-        {
+        // 발송 생략 학생에게는 조회할 택배가 없으므로 카드 자체를 노출하지 않는다
+        ...(app.shipping_waived ? [] : [{
             icon: 'fa-box',
             iconColor: '#f59e0b',
             title: '배송 조회',
             description: '교재 배송 현황 확인',
-            link: app.shipping_tracking_number ? 
+            link: app.shipping_tracking_number ?
                 `https://trace.cjlogistics.com/next/tracking.html?wblNo=${app.shipping_tracking_number}` : '#',
             available: !!app.shipping_completed,
             external: !!app.shipping_tracking_number
-        }
+        }])
     ];
 
     quickLinksContent.innerHTML = links.map(link => {
@@ -859,7 +871,7 @@ function renderProgress(app) {
         { id: 7, name: '입금 대기', completed: !!app.deposit_confirmed_by_student_at },
         { id: 8, name: '입금 확인 완료', completed: !!app.deposit_confirmed_by_admin_at },
         { id: 9, name: '이용방법 전달', completed: !!app.guide_sent },
-        { id: 10, name: '실물 교재 발송', completed: !!app.shipping_completed }
+        { id: 10, name: '교재 전달', completed: !!app.shipping_completed || !!app.shipping_waived }
     ];
 
     // 현재 단계 찾기
@@ -921,6 +933,24 @@ function renderShipping(app) {
         return;
     }
     
+    // 실물 발송을 생략한 학생 — 운송장·배송조회가 없으므로 별도 화면으로 대체
+    if (app.shipping_waived) {
+        shippingContent.innerHTML = `
+            <div class="shipping-status delivered">
+                <div class="shipping-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>교재 전달 완료</h3>
+            </div>
+
+            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6; color: #0c4a6e;">
+                <i class="fas fa-info-circle" style="color: #0284c7; margin-right: 6px;"></i>
+                수강생 요청에 따른 실물 택배 미발송 (교재 PDF 전달 완료)
+            </div>
+        `;
+        return;
+    }
+
     let statusClass = 'preparing';
     let statusIcon = 'fa-box';
     let statusText = '준비 중';

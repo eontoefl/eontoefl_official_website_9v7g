@@ -2767,12 +2767,67 @@ async function markShippingCompletedFromModal(appId) {
     }
 }
 
+// 택배 발송 생략 처리 (해외 거주 등으로 실물 수령이 불가한 경우)
+// - 알림톡을 보내지 않는다. 운송장이 없으므로 안내할 내용이 없다.
+async function markShippingWaivedFromModal(appId) {
+    const reason = document.getElementById('modalWaiveReason')?.value?.trim() || '';
+
+    if (!confirm('택배 발송을 생략 처리하시겠습니까?\n\n실물 택배를 발송하지 않고 이 단계를 완료 처리합니다.\n학생에게 알림톡은 발송되지 않습니다.')) {
+        return;
+    }
+
+    try {
+        const app = await supabaseAPI.patch('applications', appId, {
+            shipping_waived: true,
+            shipping_waived_at: Date.now(),
+            shipping_waived_reason: reason || null
+        });
+
+        if (app) {
+            alert('✅ 택배 발송이 생략 처리되었습니다.');
+            currentManageApp = app;
+            loadModalTab('shipping');
+        } else {
+            alert('❌ 처리에 실패했습니다.');
+        }
+    } catch (error) {
+        console.error('Mark shipping waived error:', error);
+        alert('❌ 오류가 발생했습니다.');
+    }
+}
+
+// 택배 발송 생략 취소 (실제로 발송하기로 바뀐 경우)
+async function undoShippingWaivedFromModal(appId) {
+    if (!confirm('생략 처리를 취소하시겠습니까?\n\n다시 택배 발송 대기 상태로 돌아갑니다.')) {
+        return;
+    }
+
+    try {
+        const app = await supabaseAPI.patch('applications', appId, {
+            shipping_waived: false,
+            shipping_waived_at: null,
+            shipping_waived_reason: null
+        });
+
+        if (app) {
+            alert('✅ 생략 처리가 취소되었습니다.');
+            currentManageApp = app;
+            loadModalTab('shipping');
+        } else {
+            alert('❌ 처리에 실패했습니다.');
+        }
+    } catch (error) {
+        console.error('Undo shipping waived error:', error);
+        alert('❌ 오류가 발생했습니다.');
+    }
+}
+
 // ===== 택배발송 탭 =====
 function loadModalShippingTab(app) {
     const container = document.getElementById('modalTabShipping');
-    
+
     let html = '';
-    
+
     // 이용방법이 전달되지 않았으면
     if (!app.guide_sent) {
         html = `
@@ -2790,6 +2845,43 @@ function loadModalShippingTab(app) {
         return;
     }
     
+    // 발송 생략 처리되었으면
+    if (app.shipping_waived) {
+        html = `
+            <div class="alert alert-success">
+                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                    <i class="fas fa-box-open" style="font-size: 32px;"></i>
+                    <div>
+                        <div style="font-weight: 700; font-size: 18px;">📦 택배 발송 생략</div>
+                        <div style="font-size: 14px; margin-top: 4px;">
+                            ${new Date(app.shipping_waived_at).toLocaleString('ko-KR')}에 생략 처리되었습니다.
+                        </div>
+                    </div>
+                </div>
+                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                    <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;">사유</div>
+                    <div style="font-size: 15px; color: #1e293b;">
+                        ${app.shipping_waived_reason || '기록된 사유 없음'}
+                    </div>
+                </div>
+                <div style="font-size: 13px; color: #64748b; margin-top: 16px; line-height: 1.6;">
+                    실물 택배를 발송하지 않았으며, 알림톡도 발송되지 않았습니다.<br>
+                    송장 출력 및 운송장 일괄등록 대상에서도 제외됩니다.
+                </div>
+            </div>
+
+            <button onclick="undoShippingWaivedFromModal('${app.id}')"
+                    style="width: 100%; padding: 14px; background: white; color: #64748b;
+                           border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-weight: 600;
+                           cursor: pointer; margin-top: 16px;">
+                <i class="fas fa-undo" style="margin-right: 8px;"></i>
+                생략 처리 취소하고 발송 대기로 되돌리기
+            </button>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+
     // 이미 발송 완료되었으면
     if (app.shipping_completed) {
         html = `
@@ -2904,9 +2996,38 @@ function loadModalShippingTab(app) {
                     </button>
                 </div>
             </div>
+
+            <!-- 발송 생략 -->
+            <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h4 style="font-size: 16px; font-weight: 600; color: #475569; margin: 0 0 6px 0;">
+                    <i class="fas fa-box-open" style="margin-right: 6px;"></i> 택배를 발송하지 않는 경우
+                </h4>
+                <p style="font-size: 13px; color: #64748b; margin: 0 0 16px 0; line-height: 1.6;">
+                    해외 거주 등으로 실물 수령이 어려운 학생은 발송 없이 이 단계를 완료 처리할 수 있습니다.
+                    알림톡은 발송되지 않으며, 송장 출력·운송장 일괄등록 대상에서 제외됩니다.
+                </p>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 14px; color: #64748b; margin-bottom: 8px;">
+                        생략 사유 (선택사항, 관리자만 확인)
+                    </label>
+                    <input type="text"
+                           id="modalWaiveReason"
+                           placeholder="예: 해외 거주 / 학생 요청"
+                           style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px;">
+                </div>
+
+                <button onclick="markShippingWaivedFromModal('${app.id}')"
+                        style="width: 100%; padding: 14px; background: white; color: #475569;
+                               border: 2px solid #cbd5e1; border-radius: 12px; font-size: 15px; font-weight: 600;
+                               cursor: pointer;">
+                    <i class="fas fa-forward" style="margin-right: 8px;"></i>
+                    발송 없이 완료 처리
+                </button>
+            </div>
         `;
     }
-    
+
     container.innerHTML = html;
 }
 

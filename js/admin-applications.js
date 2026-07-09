@@ -157,8 +157,8 @@ function getAdminActionMessage(app) {
         return { text: '이용방법을 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
     
-    // 8. 관리자 이용방법 업로드 ~ 택배 발송 등록 전
-    if (!app.shipping_completed) {
+    // 8. 관리자 이용방법 업로드 ~ 택배 발송 등록 전 (생략 처리된 학생은 통과)
+    if (!app.shipping_completed && !app.shipping_waived) {
         return { text: '택배를 발송해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
     
@@ -284,8 +284,8 @@ function getAppStageFilter(app) {
     if (!app.deposit_confirmed_by_admin) return 'need_deposit';
     // 7. 이용방법 전달 필요
     if (!app.guide_sent) return 'need_guide';
-    // 8. 택배 발송 필요
-    if (!app.shipping_completed) return 'need_shipping';
+    // 8. 택배 발송 필요 (생략 처리된 학생은 통과)
+    if (!app.shipping_completed && !app.shipping_waived) return 'need_shipping';
     // 9. 세팅 완료 → 운영 상태 세분화
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {
@@ -1302,14 +1302,20 @@ async function bulkExportShipping() {
 
     try {
         const ids = Array.from(selectedIds);
-        const apps = [];
+        const fetched = [];
         for (const id of ids) {
             const app = await supabaseAPI.getById('applications', id);
-            if (app) apps.push(app);
+            if (app) fetched.push(app);
         }
 
+        // 발송 생략 처리된 학생은 송장을 뽑지 않는다
+        const waivedCount = fetched.filter(app => app.shipping_waived).length;
+        const apps = fetched.filter(app => !app.shipping_waived);
+
         if (apps.length === 0) {
-            alert('선택된 신청서 정보를 불러올 수 없습니다.');
+            alert(waivedCount > 0
+                ? `선택된 ${waivedCount}명 모두 발송 생략 처리된 학생입니다.\n출력할 송장이 없습니다.`
+                : '선택된 신청서 정보를 불러올 수 없습니다.');
             return;
         }
 
@@ -1345,7 +1351,8 @@ async function bulkExportShipping() {
 
         const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         XLSX.writeFile(wb, `택배송장_${today}_${apps.length}건.xlsx`);
-        alert(`✅ ${apps.length}건의 택배송장이 다운로드되었습니다.`);
+        alert(`✅ ${apps.length}건의 택배송장이 다운로드되었습니다.` +
+            (waivedCount > 0 ? `\n(발송 생략 ${waivedCount}명 제외)` : ''));
     } catch (error) {
         console.error('Shipping export error:', error);
         alert('택배송장 출력 중 오류가 발생했습니다.');
@@ -1586,8 +1593,17 @@ function matchTrackingData(rows) {
         });
 
         if (matched.length === 1) {
+            // 발송 생략 처리된 학생은 운송장을 등록하지 않는다
+            if (matched[0].shipping_waived) {
+                trackingMatchResults.push({
+                    name, phone, tracking,
+                    status: 'skip',
+                    message: '발송 생략 처리됨',
+                    appId: null
+                });
+            }
             // 이미 운송장이 등록된 경우 체크
-            if (matched[0].shipping_tracking_number) {
+            else if (matched[0].shipping_tracking_number) {
                 trackingMatchResults.push({
                     name, phone, tracking,
                     status: 'skip',

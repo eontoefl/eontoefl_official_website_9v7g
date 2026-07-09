@@ -1713,8 +1713,8 @@ function loadStudentTabs(app) {
             return '입금이 확인됐어요! 이용 방법을 곧 안내드릴게요 🚀';
         }
         
-        // 8. 관리자 이용방법 업로드 ~ 택배 발송 등록 전
-        if (!app.shipping_completed) {
+        // 8. 관리자 이용방법 업로드 ~ 택배 발송 등록 전 (발송 생략 학생은 통과)
+        if (!app.shipping_completed && !app.shipping_waived) {
             return '마이페이지에 이용 방법이 업로드 됐어요! 꼼꼼히 확인해주세요 📌';
         }
         
@@ -3241,8 +3241,8 @@ async function loadUsageTab(app) {
                 </a>
             </div>
             
-            <!-- 다음 단계 안내 (배송 완료 전에만 표시) -->
-            ${!globalApplication.shipping_completed ? `
+            <!-- 다음 단계 안내 (배송 완료 전에만 표시. 발송 생략 학생은 안내할 배송이 없음) -->
+            ${(!globalApplication.shipping_completed && !globalApplication.shipping_waived) ? `
             <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #9480c5; margin-top: 24px;">
                 <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0 0 8px 0;">
                     <i class="fas fa-arrow-right" style="color: #9480c5;"></i> 다음 단계
