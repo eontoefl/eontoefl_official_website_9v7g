@@ -2131,18 +2131,167 @@ function switchStudentTab(tabName) {
 // ==================== Phase 2: 계약 & 입금 관련 함수 ====================
 
 // 학생용 계약서 탭 로드
+// 학생 계약서 화면 전용 색 보정: 공유 스타일(contract-utils.js)은 파랑·노랑을 쓴다.
+// 관리자 미리보기를 건드리지 않으려고, 학생 페이지에서 그린 뒤 색만 라벤더로 갈아입힌다.
+// - 노란 '따라쓰기' 배경은 인라인이라 JS로 교체 / 파란 포커스색은 override CSS로 누른다.
+function applyStudentContractTheme(readonly = false) {
+    // 기한 초과·계약 완료 상태에서는 입력칸을 잠근다 (제출이 불가능하므로 입력도 막는다)
+    if (readonly) {
+        document.querySelectorAll('#tabContract .contract-input').forEach(el => {
+            el.disabled = true;
+            el.style.cursor = 'not-allowed';
+            el.style.opacity = '0.55';
+        });
+        document.querySelectorAll('#tabContract .copywrite-container').forEach(el => {
+            el.style.opacity = '0.55';
+        });
+    }
+    // override CSS 한 번만 주입
+    if (!document.getElementById('s3-contract-theme')) {
+        const st = document.createElement('style');
+        st.id = 's3-contract-theme';
+        st.textContent = `
+            #tabContract .contract-content { box-shadow: 0 2px 20px rgba(25,28,29,0.05) !important; border-radius: 16px !important; }
+            #tabContract .contract-input-free:focus { border-bottom-color: #9480c5 !important; background: #f3f0ff !important; }
+            #tabContract .auto-fill { color: #4c1d95 !important; background: #ece4f2 !important; }
+        `;
+        document.head.appendChild(st);
+    }
+    // 따라쓰기 칸: 자유입력칸과 같은 라벤더 라운드 박스로. 배경은 컨테이너가,
+    // input은 밑줄을 지우고 투명하게 둔다(뒤에 깔린 '정답 힌트'가 가려지지 않도록).
+    document.querySelectorAll('#tabContract .copywrite-container').forEach(el => {
+        el.style.background = '#f6f4fb';
+        el.style.borderRadius = '9px';
+        el.style.border = '1.5px dashed #b3a0d8';  // 점선 = "따라 채우는 칸"이라는 신호
+        el.style.padding = '1px 10px';             // 성명칸(31px)과 높이를 맞춘다
+        el.style.margin = '4px 4px';               // 뒤따르는 텍스트와 한 칸 띄운다
+        el.style.verticalAlign = 'middle';
+        el.style.maxWidth = '100%';                // 모바일에서 화면 밖으로 넘치지 않게
+        el.style.boxSizing = 'border-box';
+    });
+    // 뒤에 깔린 정답 힌트: 너무 흐려서(#d1d5db) 안 보였다. 진한 라벤더 + 기울임으로
+    // "이 글자를 그대로 따라 쓴다"가 읽히게 한다.
+    document.querySelectorAll('#tabContract .copywrite-hint').forEach(el => {
+        el.style.color = '#b0a2cc';
+        el.style.fontStyle = 'italic';
+        el.style.fontSize = '13px';      // 입력 글씨와 같은 크기로 (겹쳐 있으므로)
+    });
+    document.querySelectorAll('#tabContract .contract-input-copy').forEach(el => {
+        el.style.border = 'none';
+        el.style.borderBottom = 'none';
+        el.style.background = 'transparent';
+        el.style.color = '#3b2d5c';
+        el.style.paddingTop = '0';       // 컨테이너가 이미 세로 여백을 가지므로 안쪽 input은 0
+        el.style.paddingBottom = '0';
+        el.style.fontSize = '13px';      // 본문보다 살짝 작게
+        el.style.maxWidth = '100%';      // 인라인 width(정답 길이 비례)가 화면을 넘지 않게
+        el.style.boxSizing = 'border-box';
+    });
+    // 자유입력칸: 날카로운 밑줄형 → 부드러운 둥근 박스형 (인라인 스타일 통째 교체)
+    document.querySelectorAll('#tabContract .contract-input-free').forEach(el => {
+        el.style.border = 'none';
+        el.style.borderBottom = 'none';
+        el.style.background = '#f1edf8';
+        el.style.borderRadius = '9px';
+        el.style.padding = '5px 13px';
+        el.style.margin = '4px 0';       // 문단 줄 간격이 좁아 칸이 겹치므로 세로 여백을 준다
+        el.style.verticalAlign = 'middle';
+        el.style.minWidth = '220px';
+        el.style.color = '#3b2d5c';
+        el.style.outline = 'none';
+        el.style.transition = '0.15s';
+        el.addEventListener('focus', () => { el.style.boxShadow = '0 0 0 2px #9480c5'; el.style.background = '#ffffff'; });
+        el.addEventListener('blur', () => { el.style.boxShadow = 'none'; el.style.background = '#f1edf8'; });
+    });
+
+    // 따라쓰기 검증(validateCopywrite, 공유 함수)은 입력 중 노란/빨강으로 색을 되돌린다.
+    // 학생 페이지에서만 한 번 래핑해, 정답 아닐 때 라벤더/코랄로 후처리한다.
+    if (typeof window.validateCopywrite === 'function' && !window.__vcWrapped) {
+        const orig = window.validateCopywrite;
+        window.validateCopywrite = function(input) {
+            orig(input);
+            // 학생 계약서 안의 칸만 톤 보정
+            if (!input.closest || !input.closest('#tabContract')) return;
+            const container = input.closest('.copywrite-container');
+            const valid = input.dataset.valid === 'true';
+            const value = (input.value || '');
+            const answer = input.dataset.answer || '';
+            input.style.border = 'none';
+            input.style.borderBottom = 'none';
+            input.style.background = 'transparent';
+            if (valid) { if (container) container.style.background = '#e4f3e9'; return; } // 정답=연초록 박스
+            if (value.length && !answer.startsWith(value)) {
+                if (container) container.style.background = '#fbeae6'; // 완전 오답=연코랄
+            } else {
+                if (container) container.style.background = '#f1edf8'; // 입력 중/미입력=라벤더
+            }
+        };
+        window.__vcWrapped = true;
+    }
+}
+
 async function loadContractTab(app) {
     const contractContent = document.getElementById('tabContract');
     if (!contractContent) return;
 
-    // 계약서가 발송되지 않았으면
+    // STEP 2와 같은 라벤더 카드 언어. 계약서 본문(getContractDisplay)·스타일은 건드리지 않는다.
+    const s3style = `
+        <style>
+            .s3-lock {
+                background: #ffffff; border-radius: 16px;
+                box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+                padding: 64px 24px; text-align: center;
+            }
+            .s3-lock-tile {
+                width: 60px; height: 60px; border-radius: 16px; background: #f0e9ef;
+                display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
+            }
+            .s3-banner {
+                background: #ffffff; border-radius: 16px;
+                box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+                padding: 20px 24px; margin-bottom: 20px;
+                display: flex; align-items: center;
+                gap: 14px; flex-wrap: wrap;
+            }
+            .s3-banner-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+            .s3-banner-tile {
+                width: 46px; height: 46px; border-radius: 13px;
+                display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            }
+            .s3-banner-title { font-size: 16px; font-weight: 700; color: #1e293b; letter-spacing: -0.01em; }
+            .s3-banner-sub { font-size: 13px; color: #64748b; margin-top: 3px; }
+            .s3-timer-chip {
+                display: inline-flex; align-items: center; gap: 6px;
+                padding: 5px 12px; border-radius: 999px; flex-shrink: 0;
+            }
+            .s3-timer-num { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+            .s3-timer-unit { font-size: 11px; font-weight: 600; }
+            .s3-agree {
+                background: #ffffff; border-radius: 16px;
+                box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+                padding: 24px 28px; margin-top: 20px;
+            }
+            .s3-agree-title { font-size: 15px; font-weight: 700; color: #1e293b; letter-spacing: -0.01em; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }
+            .s3-agree-title i { font-size: 13px; color: #9c8ea0; }
+            .s3-agree-btn {
+                width: 100%; padding: 15px; background: #9480c5; color: #ffffff;
+                border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+                font-family: inherit; letter-spacing: -0.01em; cursor: pointer; transition: 0.15s;
+            }
+            .s3-agree-btn:hover { filter: brightness(1.06); }
+            .s3-agree-hint { font-size: 13px; color: #94a3b8; text-align: center; margin: 14px 0 0 0; line-height: 1.6; }
+        </style>
+    `;
+
+    // 1. 계약서 미발송 → 잠금 대기
     if (!app.contract_sent) {
         contractContent.innerHTML = `
-            <div style="text-align: center; padding: 80px 40px; color: #94a3b8;">
-                <i class="fas fa-lock" style="font-size: 64px; margin-bottom: 24px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #64748b;">계약서 대기 중</h3>
-                <p style="font-size: 15px; line-height: 1.6;">
-                    관리자가 계약서를 발송하면 이곳에 표시됩니다.<br/>
+            ${s3style}
+            <div class="s3-lock">
+                <div class="s3-lock-tile"><i class="fas fa-lock" style="font-size: 26px; color: #b3a0b8;"></i></div>
+                <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 10px;">계약서 대기 중</h3>
+                <p style="font-size: 14px; color: #64748b; line-height: 1.8;">
+                    관리자가 계약서를 발송하면 이곳에 표시됩니다.<br>
                     개별분석에 동의하신 후 24시간 이내에 계약서가 발송됩니다.
                 </p>
             </div>
@@ -2150,31 +2299,29 @@ async function loadContractTab(app) {
         return;
     }
 
-    // 계약서 이미 동의했으면
+    // 2. 계약 완료 → 초록 배너 + 계약서 본문(읽기)
     if (app.contract_agreed) {
         const contractHTML = await getContractDisplay(app);
         contractContent.innerHTML = `
-            <div style="background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%); padding: 32px; border-radius: 16px; border: 2px solid #22c55e; margin-bottom: 32px;">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 32px; color: #22c55e;"></i>
+            ${s3style}
+            <div class="s3-banner" style="background: #f2f8f4;">
+                <div class="s3-banner-left">
+                    <div class="s3-banner-tile" style="background: #dcf0e3;"><i class="fas fa-circle-check" style="color: #2f855a; font-size: 20px;"></i></div>
                     <div>
-                        <h3 style="font-size: 20px; font-weight: 700; color: #166534; margin: 0;">✅ 계약 완료</h3>
-                        <p style="font-size: 14px; color: #15803d; margin: 8px 0 0 0;">
-                            ${new Date(app.contract_agreed_at).toLocaleString('ko-KR')}에 계약에 동의하셨습니다.
-                        </p>
+                        <div class="s3-banner-title">계약 완료</div>
+                        <div class="s3-banner-sub">${new Date(app.contract_agreed_at).toLocaleString('ko-KR')}에 동의하셨습니다 · 다음 단계로 입금 안내가 발송됩니다.</div>
                     </div>
                 </div>
-                <p style="font-size: 15px; color: #166534; margin: 0; line-height: 1.6;">
-                    다음 단계로 입금 안내가 발송됩니다.
-                </p>
             </div>
             ${contractHTML}
         `;
-        setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
+        // 완료 상태: 서명한 값을 보여주되 입력칸은 잠근다.
+        // 값 채우기(fillContractInputs)가 100ms 뒤이므로 잠금은 그 후에 건다.
+        setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); applyStudentContractTheme(true); }, 150);
         return;
     }
 
-    // 타이머 계산: contract_deadline_override가 있으면 해당 값, 없으면 contract_sent_at + 24시간
+    // 타이머 계산 (기존 로직 유지)
     const sentTime = new Date(app.contract_sent_at).getTime();
     const isContractDeferred = !!app.contract_deadline_override;
     const contractDeadlineMs = isContractDeferred
@@ -2183,44 +2330,43 @@ async function loadContractTab(app) {
     const now = Date.now();
     const remaining = contractDeadlineMs - now;
 
-    // 기한 초과
+    // 3. 기한 초과 → 코랄 배너 + 계약서 본문
     if (remaining <= 0) {
         const contractHTML = await getContractDisplay(app);
         contractContent.innerHTML = `
-            <div style="background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%); padding: 32px; border-radius: 16px; border: 2px solid #ef4444; margin-bottom: 32px;">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: #dc2626;"></i>
+            ${s3style}
+            <div class="s3-banner" style="background: #f9edea;">
+                <div class="s3-banner-left">
+                    <div class="s3-banner-tile" style="background: #f6ddd6;"><i class="fas fa-triangle-exclamation" style="color: #a53b22; font-size: 18px;"></i></div>
                     <div>
-                        <h3 style="font-size: 20px; font-weight: 700; color: #991b1b; margin: 0;">⚠️ 동의 기한 초과</h3>
-                        <p style="font-size: 14px; color: #b91c1c; margin: 8px 0 0 0;">
-                            계약 동의 기한이 초과되었습니다.
-                        </p>
+                        <div class="s3-banner-title">동의 기한 초과</div>
+                        <div class="s3-banner-sub">계약 동의 기한이 초과되었습니다. 관리자에게 문의하여 기한을 연장해 주세요.</div>
                     </div>
                 </div>
-                <p style="font-size: 15px; color: #991b1b; margin: 16px 0 0 0; line-height: 1.6;">
-                    관리자에게 문의하여 계약 기한을 연장해 주세요.
-                </p>
             </div>
             ${contractHTML}
         `;
-        setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
+        setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); applyStudentContractTheme(true); }, 50);
         return;
     }
 
-    // 계약 동의 대기 중 (타이머 표시)
+    // 4. 동의 대기 → 타이머 배너 + 계약서 본문 + 동의 버튼
     const hours = Math.floor(remaining / (60 * 60 * 1000));
     const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
 
-    const timerColor = hours < 6 ? '#dc2626' : '#9480c5';
-    const timerBg = hours < 6 ? '#fee2e2' : '#f8f4ff';
+    // 6시간 미만이면 임박(주황), 그 외 평상시(라벤더)
+    const urgent = hours < 6;
+    const chipBg = urgent ? '#fbecd2' : '#ece4f2';
+    const chipColor = urgent ? '#b45309' : '#5b4a7d';
+    const tileBg = urgent ? '#fbecd2' : '#ece4f2';
+    const tileColor = urgent ? '#b45309' : '#5b4a7d';
 
-    // 기한 안내 문구: 유예 시 날짜 표시, 기본 시 24시간 표현
+    // 기한 안내 문구 (기존 로직 유지)
     let deadlineSubText;
     if (isContractDeferred) {
         const deadlineDate = new Date(app.contract_deadline_override);
         const deadlineDateLabel = deadlineDate.toLocaleString('ko-KR', {
-            timeZone: 'Asia/Seoul',
-            month: 'long', day: 'numeric', weekday: 'short',
+            timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short',
             hour: '2-digit', minute: '2-digit', hour12: false
         });
         deadlineSubText = `${deadlineDateLabel}까지`;
@@ -2231,54 +2377,35 @@ async function loadContractTab(app) {
     const contractHTML = await getContractDisplay(app);
 
     contractContent.innerHTML = `
-        <div style="background: ${timerBg}; padding: 24px; border-radius: 12px; border: 2px solid ${timerColor}; margin-bottom: 32px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <i class="fas fa-clock" style="font-size: 24px; color: ${timerColor};"></i>
-                    <div>
-                        <h4 style="font-size: 16px; font-weight: 600; color: ${timerColor}; margin: 0;">계약 동의 기한</h4>
-                        <p style="font-size: 13px; color: ${timerColor}; opacity: 0.8; margin: 4px 0 0 0;">
-                            ${deadlineSubText}
-                        </p>
+        ${s3style}
+        <div class="s3-banner">
+            <div class="s3-banner-tile" style="background: ${tileBg};"><i class="fas fa-clock" style="color: ${tileColor}; font-size: 17px;"></i></div>
+            <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div class="s3-banner-title">계약 동의 기한</div>
+                    <div class="s3-timer-chip" style="background: ${chipBg};">
+                        <span id="contractTimer" class="s3-timer-num" style="color: ${chipColor};">${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}</span>
+                        <span class="s3-timer-unit" style="color: ${chipColor};">남음</span>
                     </div>
                 </div>
-                <div style="background: white; padding: 12px 24px; border-radius: 8px; border: 2px solid ${timerColor};">
-                    <span id="contractTimer" style="font-size: 24px; font-weight: 700; color: ${timerColor};">
-                        ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}
-                    </span>
-                    <span style="font-size: 14px; color: ${timerColor}; margin-left: 8px; position: relative; top: -5px;">남음</span>
-                </div>
+                <div class="s3-banner-sub" style="margin-top: 4px;">${deadlineSubText}</div>
             </div>
         </div>
-        
+
         ${contractHTML}
-        
-        <div style="background: #f8fafc; padding: 32px; border-radius: 16px; margin-top: 32px;">
-            <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 24px 0;">
-                <i class="fas fa-check-square" style="color: #9480c5; margin-right: 8px;"></i>
-                계약 동의
-            </h3>
-            
-            <button onclick="submitContractAgreement()" 
-                    id="submitContractBtn"
-                    style="width: 100%; padding: 18px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
-                           color: white; border: none; border-radius: 12px; font-size: 17px; font-weight: 600; 
-                           cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
-                <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
-                계약에 동의하고 제출합니다
+
+        <div class="s3-agree">
+            <div class="s3-agree-title"><i class="fas fa-square-check"></i> 계약 동의</div>
+            <button onclick="submitContractAgreement()" id="submitContractBtn" class="s3-agree-btn">
+                <i class="fas fa-circle-check" style="margin-right: 7px;"></i> 계약에 동의하고 제출합니다
             </button>
-            
-            <p style="font-size: 13px; color: #64748b; text-align: center; margin: 16px 0 0 0; line-height: 1.6;">
-                모든 빈칸을 작성하고 버튼을 클릭하면 다음 단계로 진행됩니다.
-            </p>
+            <p class="s3-agree-hint">모든 빈칸을 작성하고 버튼을 클릭하면 다음 단계로 진행됩니다.</p>
         </div>
     `;
 
-    // 타이머 업데이트 (유예 시 deadline 기준, 기본 시 sentTime + 24h 기준)
+    // 타이머 시작 (기존 로직 유지)
     startContractTimer(sentTime, contractDeadlineMs);
-    
-    // 렌더링 후 넘치는 입력 필드 보정
-    setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); }, 50);
+    setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); applyStudentContractTheme(); }, 50);
 }
 
 /**
@@ -2635,24 +2762,28 @@ function startContractTimer(sentTime, deadlineMs) {
     const timerInterval = setInterval(() => {
         const now = Date.now();
         const remaining = targetMs - now;
+        const timerElem = document.getElementById('contractTimer');
+        if (!timerElem) { clearInterval(timerInterval); return; }
+        const chip = timerElem.closest('.s3-timer-chip');
 
         if (remaining <= 0) {
             clearInterval(timerInterval);
-            const timerElem = document.getElementById('contractTimer');
-            if (timerElem) {
-                timerElem.textContent = '00:00:00';
-                timerElem.style.color = '#dc2626';
-            }
+            timerElem.textContent = '00:00';
+            timerElem.style.color = '#a53b22';
+            if (chip) { chip.style.background = '#f6ddd6'; chip.querySelector('.s3-timer-unit')?.style.setProperty('color', '#a53b22'); }
             return;
         }
 
         const hours = Math.floor(remaining / (60 * 60 * 1000));
         const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-        const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+        // 배너 초기값과 같은 HH:MM 포맷 유지
+        timerElem.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 
-        const timerElem = document.getElementById('contractTimer');
-        if (timerElem) {
-            timerElem.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        // 6시간 미만이면 임박(주황)으로 칩 전환
+        if (hours < 6 && chip) {
+            timerElem.style.color = '#b45309';
+            chip.style.background = '#fbecd2';
+            chip.querySelector('.s3-timer-unit')?.style.setProperty('color', '#b45309');
         }
     }, 1000);
 }
