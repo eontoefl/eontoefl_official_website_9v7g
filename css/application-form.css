@@ -1,8 +1,8 @@
 /* Application Form Styles — DESIGN.md 톤 (라벤더 톤레이어, 선 없음, 톤다운 입력·버튼) */
 
-/* 이 페이지에서만 톤 배경을 깔아 흰 카드가 떠 보이게 */
+/* 뉴트럴 배경 위에 흰 지면이 떠 보이게 (브랜드색은 액센트로만) */
 body {
-    background: #faf7fa;
+    background: #f6f7f9;
 }
 
 /* Reset checkbox and radio default styles */
@@ -15,18 +15,36 @@ input[type="radio"] {
 .form-container {
     max-width: 940px;
     margin: 0 auto;
-    padding: 5rem 1.5rem 3rem;
+    padding: 5.5rem 1.5rem 5.5rem;
+}
+
+/* #2 상단 진행 표시 — 폼 스크롤 진행도 (필드·로직 무관, 순수 UI) */
+.form-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(148, 128, 197, 0.12);
+    z-index: 9999;
+}
+
+.form-progress-fill {
+    height: 100%;
+    width: 0;
+    background: #9480c5;
+    transition: width 0.12s ease-out;
 }
 
 .form-header {
     text-align: center;
-    margin-bottom: 1.75rem;
+    margin-bottom: 2.5rem;
     padding-bottom: 0.5rem;
 }
 
 .form-header h1 {
     font-size: 1.75rem;
-    color: #3b2d5c;
+    color: #1e293b;
     margin-bottom: 0.75rem;
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -38,25 +56,41 @@ input[type="radio"] {
     line-height: 1.6;
 }
 
-/* Form Sections — 선 없는 흰 카드 + 은은한 그림자 */
-.form-section {
+/* 한 장의 흰 지면 위에 섹션을 여백으로 나눈다 — 섹션별 카드·그림자 없음 (DESIGN.md: 정적 요소엔 그림자 X, 톤·여백으로 구분) */
+.application-form {
     background: #ffffff;
+    border-radius: 20px;
+    padding: 2.5rem 2.75rem;
+    box-shadow: 0 2px 24px rgba(25, 28, 29, 0.05);
+}
+
+/* Form Sections — 카드가 아니라 여백으로 구분되는 구역 */
+.form-section {
+    background: transparent;
     border: none;
-    border-radius: 16px;
-    padding: 1.5rem 1.75rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 2.5rem;
+    box-shadow: none;
+}
+
+.form-section:last-of-type {
+    margin-bottom: 1.25rem;
 }
 
 .form-section.highlight-section {
-    background: #f6f4fb;
+    background: #f3f5f7;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
 }
 
-/* 개인정보 동의 — dashed 대신 톤 카드 */
+/* 개인정보 동의 — 뉴트럴 인셋 */
 .form-section.privacy-section {
-    background: #f6f4fb;
+    background: #f3f5f7;
     border: none;
     padding: 0.75rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
 }
 
 .form-section.privacy-section .form-group {
@@ -74,7 +108,7 @@ input[type="radio"] {
 }
 
 .form-section.privacy-section .checkbox-label:hover {
-    background: #efeaf7;
+    background: #eaedf1;
 }
 
 .form-section.privacy-section .checkbox-label span {
@@ -115,20 +149,45 @@ input[type="radio"] {
     letter-spacing: -0.01em;
 }
 
+/* 섹션 인트로 — 채운 박스 대신 담백한 안내 텍스트 */
 .section-description {
     color: #64748b;
     line-height: 1.7;
     margin-bottom: 1rem;
-    padding: 0.85rem 1rem;
-    background: #f6f4fb;
-    border-radius: 10px;
+    padding: 0;
+    background: transparent;
     font-size: 0.85rem;
+}
+
+/* ③ 그룹 라벨 (오버라인) — 섹션보다 한 단계 위 구분. 앞의 라벤더 틱만 액센트 */
+.group-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    margin: 3.75rem 0 1.1rem;
+}
+
+.group-label::before {
+    content: "";
+    width: 16px;
+    height: 2px;
+    background: #b9a9dc;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.application-form > .group-label:first-child {
+    margin-top: 0.25rem;
 }
 
 .subsection-title {
     font-size: 0.9rem;
     font-weight: 700;
-    color: #5b4a7d;
+    color: #334155;
     margin: 1.1rem 0 0.75rem;
     padding-bottom: 0;
 }
@@ -141,12 +200,12 @@ input[type="radio"] {
 .form-group label {
     display: block;
     font-weight: 600;
-    color: #3b2d5c;
+    color: #334155;
     margin-bottom: 0.45rem;
     font-size: 0.85rem;
 }
 
-/* 입력 — DESIGN.md: 톤 배경 + 테두리 없음, 포커스 시 링 */
+/* 입력 — 뉴트럴 그레이 채움(테두리 없음), 포커스 시 라벤더 링 = 채울 곳이 또렷 */
 .form-group input[type="text"],
 .form-group input[type="email"],
 .form-group input[type="tel"],
@@ -160,8 +219,9 @@ input[type="radio"] {
     border-radius: 10px;
     font-size: 0.9rem;
     font-family: 'Noto Sans KR', sans-serif;
-    transition: box-shadow 0.15s ease, background 0.15s ease;
-    background: #f4f1fa;
+    transition: box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    background: #f6f8fa;
+    border: 1px solid #e2e6ec;
     color: #1e293b;
     vertical-align: top;
     resize: vertical;
@@ -169,14 +229,14 @@ input[type="radio"] {
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-    color: #b0a8c4;
+    color: #98a2b0;
 }
 
 /* Select dropdown styling */
 .form-group select {
     padding-right: 2.5rem;
     appearance: none;
-    background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"%3E%3Cpath fill="%235b4a7d" d="M6 9L1 4h10z"/%3E%3C/svg%3E');
+    background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"%3E%3Cpath fill="%23647587" d="M6 9L1 4h10z"/%3E%3C/svg%3E');
     background-repeat: no-repeat;
     background-position: right 0.9rem center;
     background-size: 12px;
@@ -187,7 +247,8 @@ input[type="radio"] {
 .form-group textarea:focus {
     outline: none;
     background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.25);
+    border-color: #b9a9dc;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.22);
 }
 
 .form-group textarea {
@@ -247,7 +308,7 @@ input[type="radio"] {
 
 .checkbox-label:hover,
 .radio-label:hover {
-    background: #f4f1fa;
+    background: #eef1f5;
 }
 
 .checkbox-label input[type="checkbox"],
@@ -264,7 +325,7 @@ input[type="radio"] {
 .checkbox-label span,
 .radio-label span {
     font-size: 0.9rem;
-    color: #3b2d5c;
+    color: #334155;
     line-height: 1.5;
     flex: 1;
     padding-top: 0;
@@ -273,9 +334,9 @@ input[type="radio"] {
     top: -4.5px;
 }
 
-/* Writing Prompts — 초록 2px 테두리 대신 톤 카드 */
+/* Writing Prompts — 뉴트럴 톤 카드 */
 .writing-prompt {
-    background: #f6f4fb;
+    background: #f3f5f7;
     border: none;
     border-radius: 12px;
     padding: 1.1rem 1.25rem;
@@ -306,14 +367,13 @@ input[type="radio"] {
     background: #ffffff;
 }
 
-/* Info Text — 노랑 좌측선 대신 톤 */
+/* Info Text — 채운 박스 대신 좌측 악센트 바 */
 .info-text {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.85rem 1rem;
-    background: #fbf6ec;
-    border-radius: 10px;
+    padding: 0.15rem 0 0.15rem 0.9rem;
+    border-left: 3px solid #e0c079;
     color: #8a6d1f;
     font-size: 0.85rem;
     margin-top: 0.75rem;
@@ -548,7 +608,7 @@ input[type="radio"] {
 /* Responsive Design */
 @media (max-width: 768px) {
     .form-container {
-        padding: 4.5rem 1rem 2rem;
+        padding: 4.5rem 1rem 3.5rem;
     }
 
     .form-header h1 {
@@ -559,9 +619,21 @@ input[type="radio"] {
         font-size: 0.85rem;
     }
 
+    .application-form {
+        padding: 1.5rem 1.35rem;
+        border-radius: 16px;
+    }
+
     .form-section {
-        padding: 1.25rem 1.15rem;
-        border-radius: 14px;
+        margin-bottom: 2rem;
+    }
+
+    .group-label {
+        margin-top: 3rem;
+    }
+
+    .application-form > .group-label:first-child {
+        margin-top: 0.25rem;
     }
 
     .section-header {
@@ -617,8 +689,8 @@ input[type="radio"] {
         font-size: 1.35rem;
     }
 
-    .form-section {
-        padding: 1.1rem 1rem;
+    .application-form {
+        padding: 1.25rem 1.1rem;
     }
 
     .section-header h2 {
@@ -692,7 +764,7 @@ label:has(+ textarea[required])::after,
     display: flex;
     gap: 4px;
     margin-bottom: 1.25rem;
-    background: #f1edf8;
+    background: #eef1f5;
     border-radius: 12px;
     padding: 4px;
 }
@@ -733,7 +805,7 @@ label:has(+ textarea[required])::after,
 .total-score-display {
     margin-top: 1.25rem;
     padding: 1rem 1.25rem;
-    background: #f6f4fb;
+    background: #f3f5f7;
     border: none;
     border-radius: 12px;
     display: flex;
@@ -780,19 +852,19 @@ label:has(+ textarea[required])::after,
     opacity: 0.7;
 }
 
-/* Clean writing section */
+/* Clean writing section — 지면과 동일(별도 흰 박스 아님) */
 .writing-section-clean {
-    background: #ffffff !important;
+    background: transparent !important;
 }
 
 .writing-section-clean .section-description {
-    background: #f6f4fb;
+    background: transparent;
     border-left: none;
     font-size: inherit;
 }
 
 .writing-section-clean .writing-prompt {
-    background: #f6f4fb;
+    background: #f3f5f7;
     border: none;
 }
 

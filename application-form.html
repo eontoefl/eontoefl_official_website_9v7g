@@ -23,9 +23,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
-    <link rel="stylesheet" href="css/application-form.css?v=2">
+    <link rel="stylesheet" href="css/application-form.css?v=7">
 </head>
 <body>
+    <!-- 상단 진행 표시 (폼 스크롤 진행도) -->
+    <div class="form-progress"><div class="form-progress-fill" id="formProgressFill"></div></div>
+
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
@@ -95,12 +98,14 @@
     <!-- Form Container -->
     <div class="form-container">
         <div class="form-header">
-            <h1>이온토플 신청서</h1>
+            <h1>이온토플 수강 신청서</h1>
             <p class="form-description">모든 항목을 정확히 작성해주세요. 상세한 정보는 승인률을 상승시킵니다 : )</p>
         </div>
 
         <form id="applicationForm" class="application-form">
             
+            <div class="group-label">신청자 정보</div>
+
             <!-- 신청서 제목 -->
             <div class="form-section">
                 <div class="form-group">
@@ -158,6 +163,8 @@
                     <small>토플 종사자가 아닌지 확인하기 위한 항목입니다. 편하신 곳까지만 작성해주세요.</small>
                 </div>
             </div>
+
+            <div class="group-label">영어 실력</div>
 
             <!-- Section 3: 현재 토플 점수 -->
             <div class="form-section">
@@ -263,8 +270,8 @@
                     아래 두 질문에 대해 <strong>영어로</strong> 각각 5-7문장씩 작성해주세요. 문법, 철자가 완벽하지 않아도 괜찮습니다.
                 </p>
                 
-                <div style="background: #fbf6ec; padding: 1rem 1.15rem; margin-bottom: 1.5rem; border-radius: 12px;">
-                    <p style="margin: 0 0 0.75rem 0; font-weight: 700; color: #8a6d1f;">중요한 안내</p>
+                <div style="border-left: 3px solid #e0c079; padding: 0.1rem 0 0.1rem 1.1rem; margin-bottom: 1.5rem;">
+                    <p style="margin: 0 0 0.6rem 0; font-weight: 700; color: #8a6d1f;">중요한 안내</p>
                     <p style="margin: 0 0 0.5rem 0; line-height: 1.7; color: #8a6d1f;">
                         <strong>잘 쓸려고 할수록, 문법 단어를 안 틀리려고 수정하고 검색하고 사전 찾아보고 할수록</strong> 저는 여러분의 영어실력을 <strong>'잘못'파악</strong>하게 됩니다. 그러면 모든 방향은 틀어지게 됩니다. <strong>솔직하게 나의 영어 밑낯을 보여주세요.</strong>
                     </p>
@@ -318,6 +325,8 @@
                 </div>
             </div>
 
+            <div class="group-label">목표와 기한</div>
+
             <!-- Section 6: 목표 점수 -->
             <div class="form-section">
                 <div class="section-header">
@@ -368,7 +377,7 @@
 
                 <!-- 개정전 목표 점수 -->
                 <div id="oldTargetSection" class="version-content">
-                    <div class="notice-box" style="background: #fbf6ec; padding: 16px 18px; margin-bottom: 20px; border-radius: 12px;">
+                    <div class="notice-box" style="border-left: 3px solid #e0c079; padding: 0.15rem 0 0.15rem 14px; margin-bottom: 20px;">
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
                             <i class="fas fa-circle-exclamation" style="color: #b45309; font-size: 18px; margin-top: 2px;"></i>
                             <div style="flex: 1;">
@@ -493,6 +502,8 @@
                 </div>
             </div>
 
+            <div class="group-label">지원 동기</div>
+
             <!-- Section 8: 토플 필요 이유 -->
             <div class="form-section">
                 <div class="section-header">
@@ -586,6 +597,8 @@
                     <small>⚠️ 이온토플 블로그의 글을 충분히 읽어보신 후 신청해주세요. 가장 인상 깊었던 글과 그 이유, 그리고 수강을 결정하게 된 계기가 된 글이 있다면 함께 적어주세요. 구체적으로 작성해주셔야 하며, 블로그를 읽지 않고 신청하시면 승인이 어려울 수 있습니다.</small>
                 </div>
             </div>
+
+            <div class="group-label">프로그램과 마무리</div>
 
             <!-- Section 10: 프로그램 및 일정 (통합) -->
             <div class="form-section">
@@ -781,6 +794,26 @@
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script src="js/application-form.js?v=3"></script>
+
+    <!-- 진행 표시: 폼 영역 스크롤 진행도만 계산 (폼 로직·필드와 무관) -->
+    <script>
+    (function () {
+        var fill = document.getElementById('formProgressFill');
+        var form = document.getElementById('applicationForm');
+        if (!fill || !form) return;
+        function update() {
+            var top = form.getBoundingClientRect().top + window.scrollY;
+            var start = top - 140;
+            var end = top + form.offsetHeight - window.innerHeight + 40;
+            var p = (window.scrollY - start) / Math.max(1, end - start);
+            p = Math.max(0, Math.min(1, p));
+            fill.style.width = (p * 100).toFixed(1) + '%';
+        }
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        update();
+    })();
+    </script>
 
     <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
