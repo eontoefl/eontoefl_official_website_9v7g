@@ -3374,175 +3374,179 @@ async function loadUsageTab(app) {
         }
     };
 
-    // 입금이 확인되지 않았으면
+    // 입금이 확인되지 않았으면 → 잠금 대기 (STEP 3·4와 같은 흰 카드 잠금 언어)
     if (!app.deposit_confirmed_by_admin) {
         usageContent.innerHTML = `
-            <div class="step5-wrap" style="text-align: center; padding: 80px 40px; color: #94a3b8;">
-                <i class="fas fa-lock" style="font-size: 64px; margin-bottom: 24px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #64748b;">🔒 이용 방법은 입금 확인 후 제공됩니다</h3>
-                <p style="font-size: 15px; line-height: 1.6;">
-                    기다려 주셔서 감사합니다 ⏳
+            <style>
+                .s5-lock { background:#ffffff; border-radius:16px; box-shadow:0 2px 20px rgba(25,28,29,0.05); padding:64px 24px; text-align:center; }
+                .s5-lock-tile { width:60px; height:60px; border-radius:16px; background:#f0e9ef; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; }
+                @media (max-width:768px) { .s5-lock { padding:48px 20px; border-radius:14px; } }
+            </style>
+            <div class="s5-lock">
+                <div class="s5-lock-tile"><i class="fas fa-lock" style="font-size:26px; color:#b3a0b8;"></i></div>
+                <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:10px;">이용 방법 대기 중</h3>
+                <p style="font-size:14px; color:#64748b; line-height:1.8;">
+                    입금이 확인되면 이용 방법이 이곳에 표시됩니다.<br>
+                    조금만 기다려 주세요.
                 </p>
             </div>
         `;
         return;
     }
 
-    // 이용방법이 전달되지 않았으면 (관리자가 아직 안 보냄)
+    // 이용방법이 전달되지 않았으면 (관리자가 아직 안 보냄) → 준비 중 대기
+    // 입금은 확인된 긍정 마일스톤이라 잠금(회색)과 구분되게 라벤더 톤 타일 사용
     if (!app.guide_sent) {
         usageContent.innerHTML = `
-            <div class="step5-wrap" style="text-align: center; padding: 80px 40px; color: #94a3b8;">
-                <i class="fas fa-hourglass-half" style="font-size: 64px; margin-bottom: 24px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: #64748b;">⏳ 이용 방법 준비 중</h3>
-                <p style="font-size: 15px; line-height: 1.6;">
-                    입금이 확인되었습니다!<br>
-                    관리자가 이용 방법을 준비하고 있습니다.<br>
-                    곧 안내드릴게요 😊
+            <style>
+                .s5-wait { background:#ffffff; border-radius:16px; box-shadow:0 2px 20px rgba(25,28,29,0.05); padding:64px 24px; text-align:center; }
+                .s5-wait-tile { width:60px; height:60px; border-radius:16px; background:#ece4f2; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; }
+                @media (max-width:768px) { .s5-wait { padding:48px 20px; border-radius:14px; } }
+            </style>
+            <div class="s5-wait">
+                <div class="s5-wait-tile"><i class="fas fa-hourglass-half" style="font-size:24px; color:#5b4a7d;"></i></div>
+                <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:10px;">이용 방법 준비 중</h3>
+                <p style="font-size:14px; color:#64748b; line-height:1.8;">
+                    입금이 확인되었습니다. 관리자가 이용 방법을 준비하고 있어요.<br>
+                    준비되는 대로 이곳에 안내드릴게요.
                 </p>
             </div>
         `;
         return;
     }
 
-    // 이용방법 (STEP 9)
+    // 이용방법 (STEP 9) — STEP 2·3·4와 같은 라벤더 카드 언어. 무지개색·2px 테두리·그라데이션 제거.
+    const showShippingNext = !globalApplication.shipping_completed && !globalApplication.shipping_waived;
     usageContent.innerHTML = `
-        <div class="step5-wrap" style="background: white; padding: 40px; border-radius: 16px; border: 2px solid #e2e8f0;">
-            <!-- 개인화 정보 -->
-            <div style="background: linear-gradient(135deg, #f8f4ff 0%, #faf5ff 100%); padding: 24px; border-radius: 12px; border: 2px solid #9480c5; margin-bottom: 32px;">
-                <h2 style="text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; color: #6d28d9;">
-                    📚 ${guideLabel} 이용방법
-                </h2>
-                <div style="text-align: center; font-size: 16px; color: #6d28d9; line-height: 1.8;">
-                    <p style="margin: 0;"><strong>✔️ 성함:</strong> ${app.name}님</p>
-                    <p style="margin: 8px 0 0 0;"><strong>✔️ 내벨업챌린지:</strong> ${app.assigned_program || '-'} / ${formatDateWithDay(app.schedule_start)} 시작</p>
-                    ${app.correction_enabled ? `
-                    <p style="margin: 8px 0 0 0;"><strong>✔️ 스라첨삭:</strong> ${formatDateWithDay(app.correction_start_date)} 시작</p>
-                    ` : ''}
-                </div>
+        <style>
+            .s5-card { background:#ffffff; border-radius:16px; padding:24px 28px; box-shadow:0 2px 20px rgba(25,28,29,0.05); margin-bottom:14px; }
+            .s5-card-title { font-size:15px; font-weight:700; color:#1e293b; letter-spacing:-0.01em; margin:0 0 16px 0; display:flex; align-items:center; gap:8px; }
+            .s5-card-title i { font-size:13px; color:#9c8ea0; }
+            .s5-row { display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:8px 0; }
+            .s5-row-label { font-size:14px; color:#64748b; flex-shrink:0; }
+            .s5-row-value { font-size:15px; font-weight:600; color:#1e293b; text-align:right; }
+            .s5-field { background:#f6f4fb; border-radius:12px; padding:16px 18px; }
+            .s5-field-label { font-size:12px; color:#94a3b8; margin:0 0 6px 0; }
+            .s5-field-value { font-size:15px; font-weight:600; color:#1e293b; margin:0; word-break:break-all; }
+            .s5-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+            /* DESIGN.md: 채도 높은 solid·꽉찬 폭 금지. 톤다운 배경 + 라벤더 텍스트, 콘텐츠 폭. */
+            .s5-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px 22px; border-radius:10px; font-size:14px; font-weight:600; font-family:inherit; letter-spacing:-0.01em; text-decoration:none; cursor:pointer; transition:0.15s; border:none; background:#efeaf7; color:#5b4a7d; }
+            .s5-btn i { font-size:13px; }
+            .s5-btn:hover { background:#e5ddf3; }
+            .s5-guide { background:#ffffff; border-radius:16px; box-shadow:0 2px 20px rgba(25,28,29,0.05); padding:8px; margin-bottom:14px; }
+            .s5-guide-row { display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:12px; text-decoration:none; transition:0.15s; }
+            .s5-guide-row:hover { background:#f6f4fb; }
+            .s5-guide-tile { width:38px; height:38px; border-radius:10px; background:#ece4f2; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+            .s5-guide-tile i { color:#5b4a7d; font-size:15px; }
+            .s5-guide-label { flex:1; font-size:14.5px; font-weight:600; color:#3b2d5c; word-break:keep-all; }
+            .s5-guide-label span { font-weight:500; color:#94a3b8; font-size:13px; }
+            .s5-guide-row .s5-guide-chev { color:#b3a0d8; font-size:12px; flex-shrink:0; }
+            .s5-pre { font-family:'Pretendard', sans-serif; font-size:14px; color:#3b2d5c; line-height:1.85; margin:0; white-space:pre-wrap; word-wrap:break-word; }
+            @media (max-width:768px) {
+                .s5-card { padding:20px 18px; border-radius:14px; }
+                .s5-grid2 { grid-template-columns:1fr; }
+                .s5-row { flex-direction:column; align-items:flex-start; gap:3px; }
+                .s5-row-value { text-align:left; }
+            }
+        </style>
+
+        <!-- 1. 개인화: 프로그램·시작일 요약 (이름은 인사로 흡수) -->
+        <div class="s5-card">
+            <div class="s5-card-title"><i class="fas fa-book-open"></i> ${guideLabel} 이용 방법</div>
+            <p style="font-size:14px; color:#64748b; margin:-4px 0 14px 0; line-height:1.6;">${app.name}님,<br>아래 순서대로 확인하고 시작해주세요.</p>
+            <div class="s5-row">
+                <span class="s5-row-label">${guideLabel}</span>
+                <span class="s5-row-value" style="color:#5b4a7d;">${app.assigned_program || '-'} · ${formatDateWithDay(app.schedule_start)} 시작</span>
             </div>
-            
-            <!-- 플랫폼 접속 정보 -->
-            <div style="background: #f8fafc; padding: 32px; border-radius: 16px; margin-bottom: 24px;">
-                <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 24px 0;">
-                    🌐 플랫폼 접속 정보
-                </h3>
-                <div style="background: white; padding: 24px; border-radius: 12px; border: 2px solid #e2e8f0; margin-bottom: 16px;">
-                    <p style="margin: 0 0 12px 0; font-size: 15px; color: #64748b;">접속 URL</p>
-                    <a href="${platformUrl}" target="_blank" 
-                       style="display: inline-block; margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #9480c5; text-decoration: none; word-break: break-all;">
-                        ${platformUrl}
-                    </a>
-                    ${app.challenge_access_granted ? `
-                    <div style="background: #dcfce7; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #22c55e; margin-top: 12px;">
-                        <p style="margin: 0; font-size: 14px; color: #166534; font-weight: 600;">
-                            ✅ 테스트룸 액세스 완료! 지금 바로 로그인하실 수 있습니다.
-                        </p>
-                    </div>
-                    ` : ''}
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div style="background: white; padding: 20px; border-radius: 12px; border: 2px solid #e2e8f0;">
-                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">로그인 ID</p>
-                        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${app.email}</p>
-                    </div>
-                    <div style="background: white; padding: 20px; border-radius: 12px; border: 2px solid #e2e8f0;">
-                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">비밀번호</p>
-                        <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${platformLoginGuide}</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 상세 가이드 링크 -->
-            <div style="text-align: center; margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-                ${usageGuideUrl ? `
-                <a href="usage-guide.html?type=${guideType}" target="_blank" 
-                   style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
-                          color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 700; 
-                          box-shadow: 0 4px 16px rgba(148, 128, 197, 0.3); transition: all 0.3s;">
-                    📖 ${guideLabel} 이용방법 자세히 보기
-                </a>
-                ` : ''}
-                ${app.correction_enabled ? `
-                <a href="usage-guide.html?type=correction" target="_blank" 
-                   style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
-                          color: white; text-decoration: none; border-radius: 12px; font-size: 16px; font-weight: 700; 
-                          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3); transition: all 0.3s;">
-                    📖 첨삭 이용방법 자세히 보기
-                </a>
-                ` : ''}
-            </div>
-            
-            <!-- Necessities -->
-            ${necessitiesText ? `
-            <div style="background: #fef9ef; padding: 24px; border-radius: 12px; border: 1px solid #fcd34d; margin-bottom: 24px;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #92400e; margin: 0 0 16px 0;">
-                    ✅ ${guideLabel} Necessities
-                </h4>
-                <pre style="font-family: 'Pretendard', sans-serif; font-size: 14px; color: #78350f; line-height: 1.8; margin: 0; white-space: pre-wrap; word-wrap: break-word;">${replaceVars(necessitiesText)}</pre>
-            </div>
-            ` : ''}
-            
-            <!-- 환불 불가 조건 -->
-            ${refundWarning ? `
-            <div style="background: #fef2f2; padding: 24px; border-radius: 12px; border: 1px solid #fca5a5; margin-bottom: 24px;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #991b1b; margin: 0 0 16px 0;">
-                    ⚠️ 환불 불가 조건
-                </h4>
-                <pre style="font-family: 'Pretendard', sans-serif; font-size: 14px; color: #7f1d1d; line-height: 1.8; margin: 0; white-space: pre-wrap; word-wrap: break-word;">${replaceVars(refundWarning)}</pre>
-            </div>
-            ` : ''}
-            
-            <!-- 다음 액션 -->
-            ${nextActions ? `
-            <div style="background: #eff6ff; padding: 24px; border-radius: 12px; border: 1px solid #93c5fd; margin-bottom: 24px;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #1e3a8a; margin: 0 0 16px 0;">
-                    🎯 이제 뭘하면 되나요?
-                </h4>
-                <pre style="font-family: 'Pretendard', sans-serif; font-size: 14px; color: #1e40af; line-height: 1.8; margin: 0; white-space: pre-wrap; word-wrap: break-word;">${replaceVars(nextActions)}</pre>
-            </div>
-            ` : ''}
-            
-            <!-- 소통 채널 -->
-            ${communicationGuide ? `
-            <div style="background: #f0fdf4; padding: 24px; border-radius: 12px; border: 1px solid #86efac; margin-bottom: 24px;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #14532d; margin: 0 0 16px 0;">
-                    💬 앞으로의 소통
-                </h4>
-                <pre style="font-family: 'Pretendard', sans-serif; font-size: 14px; color: #166534; line-height: 1.8; margin: 0; white-space: pre-wrap; word-wrap: break-word;">${replaceVars(communicationGuide)}</pre>
-            </div>
-            ` : ''}
-            
-            <!-- 대시보드 이동 -->
-            <div style="background: linear-gradient(135deg, #f8f4ff 0%, #f0ebff 100%); padding: 24px; border-radius: 12px; border: 1px solid #d4c8ef; margin-bottom: 32px; text-align: center;">
-                <h4 style="font-size: 16px; font-weight: 600; color: #5e4a8b; margin: 0 0 8px 0;">
-                    모든 준비가 완료됐어요! 🎉
-                </h4>
-                <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
-                    진행 상황과 프로그램 정보를 대시보드에서 한눈에 확인하세요.
-                </p>
-                <a href="my-dashboard.html" 
-                   style="display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
-                          color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; 
-                          box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
-                    📋 대시보드로 이동
-                </a>
-            </div>
-            
-            <!-- 다음 단계 안내 (배송 완료 전에만 표시. 발송 생략 학생은 안내할 배송이 없음) -->
-            ${(!globalApplication.shipping_completed && !globalApplication.shipping_waived) ? `
-            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #9480c5; margin-top: 24px;">
-                <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0 0 8px 0;">
-                    <i class="fas fa-arrow-right" style="color: #9480c5;"></i> 다음 단계
-                </h4>
-                <p style="font-size: 14px; color: #64748b; margin: 0 0 12px 0;">
-                    📦 실물 교재 배송이 진행됩니다. 배송 상태와 운송장 번호는 대시보드에서 확인하세요.
-                </p>
-                <a href="my-dashboard.html" style="display: inline-flex; align-items: center; gap: 6px; color: #9480c5; font-size: 14px; font-weight: 600; text-decoration: none; transition: gap 0.2s;" onmouseover="this.style.gap='10px'" onmouseout="this.style.gap='6px'">
-                    대시보드로 이동 <i class="fas fa-chevron-right"></i>
-                </a>
-            </div>
-            ` : ''}
+            ${app.correction_enabled ? `
+            <div class="s5-row">
+                <span class="s5-row-label">스라첨삭</span>
+                <span class="s5-row-value" style="color:#5b4a7d;">${formatDateWithDay(app.correction_start_date)} 시작</span>
+            </div>` : ''}
         </div>
+
+        <!-- 2. 이제 할 일 (가장 중요 → 상단으로) -->
+        ${nextActions ? `
+        <div class="s5-card">
+            <div class="s5-card-title"><i class="fas fa-bullseye"></i> 이제 무엇을 하면 되나요?</div>
+            <pre class="s5-pre">${replaceVars(nextActions)}</pre>
+        </div>` : ''}
+
+        <!-- 3. 플랫폼 접속 + 지금 로그인 (진짜 주 행동 → 버튼으로 강조) -->
+        <div class="s5-card">
+            <div class="s5-card-title"><i class="fas fa-globe"></i> 플랫폼 접속 정보</div>
+            <div class="s5-field" style="margin-bottom:12px;">
+                <p class="s5-field-label">접속 URL</p>
+                <a href="${platformUrl}" target="_blank" style="font-size:15px; font-weight:700; color:#5b4a7d; text-decoration:none; word-break:break-all;">${platformUrl}</a>
+                ${app.challenge_access_granted ? `
+                <div style="display:flex; align-items:center; gap:8px; background:#eaf5ee; border-radius:9px; padding:10px 12px; margin-top:12px;">
+                    <i class="fas fa-circle-check" style="color:#2f855a; font-size:13px; flex-shrink:0;"></i>
+                    <span style="font-size:13px; color:#2f855a; font-weight:600;">테스트룸 액세스 완료 · 지금 바로 로그인할 수 있어요.</span>
+                </div>` : ''}
+                <div style="margin-top:12px;">
+                    <a href="${platformUrl}" target="_blank" class="s5-btn" style="background:#ffffff;">
+                        <i class="fas fa-arrow-right-to-bracket"></i> 지금 로그인하기
+                    </a>
+                </div>
+            </div>
+            <div class="s5-grid2">
+                <div class="s5-field">
+                    <p class="s5-field-label">로그인 ID</p>
+                    <p class="s5-field-value">${app.email}</p>
+                </div>
+                <div class="s5-field">
+                    <p class="s5-field-label">비밀번호</p>
+                    <p class="s5-field-value">${platformLoginGuide}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 상세 가이드 링크 (차분한 메뉴 행) -->
+        ${(usageGuideUrl || app.correction_enabled) ? `
+        <div class="s5-guide">
+            ${usageGuideUrl ? `
+            <a href="usage-guide.html?type=${guideType}" target="_blank" class="s5-guide-row">
+                <span class="s5-guide-tile"><i class="fas fa-book"></i></span>
+                <span class="s5-guide-label">${guideLabel} 이용방법 <span>자세히 보기</span></span>
+                <i class="fas fa-chevron-right s5-guide-chev"></i>
+            </a>` : ''}
+            ${app.correction_enabled ? `
+            <a href="usage-guide.html?type=correction" target="_blank" class="s5-guide-row">
+                <span class="s5-guide-tile"><i class="fas fa-pen"></i></span>
+                <span class="s5-guide-label">첨삭 이용방법 <span>자세히 보기</span></span>
+                <i class="fas fa-chevron-right s5-guide-chev"></i>
+            </a>` : ''}
+        </div>` : ''}
+
+        <!-- 5. 준비물 -->
+        ${necessitiesText ? `
+        <div class="s5-card">
+            <div class="s5-card-title"><i class="fas fa-clipboard-check"></i> 이용 전 준비물 (Necessities)</div>
+            <pre class="s5-pre">${replaceVars(necessitiesText)}</pre>
+        </div>` : ''}
+
+        <!-- 6. 앞으로의 소통 -->
+        ${communicationGuide ? `
+        <div class="s5-card">
+            <div class="s5-card-title"><i class="fas fa-comments"></i> 앞으로의 소통</div>
+            <pre class="s5-pre">${replaceVars(communicationGuide)}</pre>
+        </div>` : ''}
+
+        <!-- 7. 대시보드 이동 (배송 안내 통합 send-off) -->
+        <div class="s5-card" style="text-align:center;">
+            <div style="font-size:16px; font-weight:700; color:#3b2d5c; margin-bottom:6px;">모든 준비가 완료됐어요</div>
+            <p style="font-size:13px; color:#64748b; line-height:1.7; margin:0 0 16px 0;">진행 상황과 프로그램 정보를 대시보드에서 한눈에 확인하세요.${showShippingNext ? '<br>실물 교재 배송 상태·운송장 번호도 대시보드에서 볼 수 있어요.' : ''}</p>
+            <a href="my-dashboard.html" class="s5-btn">
+                <i class="fas fa-gauge-high"></i> 대시보드로 이동
+            </a>
+        </div>
+
+        <!-- 8. 참고: 환불 불가 조건 (이미 계약서에서 동의 → 맨 아래 차분한 참고) -->
+        ${refundWarning ? `
+        <div class="s5-card" style="margin-bottom:0;">
+            <div class="s5-card-title" style="color:#a53b22;"><i class="fas fa-circle-info" style="color:#a53b22;"></i> 참고 · 환불 불가 조건</div>
+            <pre class="s5-pre" style="color:#64748b;">${replaceVars(refundWarning)}</pre>
+        </div>` : ''}
     `;
 }
 
