@@ -2936,14 +2936,55 @@ async function loadPaymentTab(app) {
     // 입금 정보 HTML 미리 생성
     const paymentInfoHtml = await getPaymentInfo(app);
 
-    // 계약이 완료되지 않았으면
+    // STEP 2·3와 같은 라벤더 카드/배너/타이머 언어. 선·큰 그라데이션·2px 테두리 없음.
+    const s4style = `
+        <style>
+            .s4-card { background:#ffffff; border-radius:16px; padding:24px 28px; box-shadow:0 2px 20px rgba(25,28,29,0.05); margin-bottom:14px; }
+            .s4-card-title { font-size:15px; font-weight:700; color:#1e293b; letter-spacing:-0.01em; margin:0 0 16px 0; display:flex; align-items:center; gap:8px; }
+            .s4-card-title i { font-size:13px; color:#9c8ea0; }
+            .s4-lock { background:#ffffff; border-radius:16px; box-shadow:0 2px 20px rgba(25,28,29,0.05); padding:64px 24px; text-align:center; }
+            .s4-lock-tile { width:60px; height:60px; border-radius:16px; background:#f0e9ef; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; }
+            .s4-banner { background:#ffffff; border-radius:16px; box-shadow:0 2px 20px rgba(25,28,29,0.05); padding:20px 24px; margin-bottom:14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+            .s4-banner-left { display:flex; align-items:center; gap:14px; flex:1; min-width:0; }
+            .s4-banner-tile { width:46px; height:46px; border-radius:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+            .s4-banner-title { font-size:16px; font-weight:700; color:#1e293b; letter-spacing:-0.01em; }
+            .s4-banner-sub { font-size:13px; color:#64748b; margin-top:3px; line-height:1.6; }
+            .s4-timer-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; flex-shrink:0; }
+            .s4-timer-num { font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+            .s4-timer-unit { font-size:11px; font-weight:600; }
+            .s4-acct-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 2px; }
+            .s4-acct-label { font-size:13px; color:#64748b; flex-shrink:0; }
+            .s4-acct-value { font-size:15px; font-weight:700; color:#1e293b; text-align:right; }
+            .s4-amount-box { text-align:center; padding:22px; background:#f6f4fb; border-radius:12px; }
+            .s4-amount-num { font-size:28px; font-weight:700; color:#5b4a7d; letter-spacing:-0.02em; }
+            .s4-input { width:100%; box-sizing:border-box; padding:12px 14px; border:none; background:#f1edf8; border-radius:10px; font-size:14px; color:#1e293b; font-family:inherit; transition:0.15s; }
+            .s4-input:focus { outline:none; background:#ffffff; box-shadow:0 0 0 3px rgba(148,128,197,0.25); }
+            .s4-btn { width:100%; padding:15px; background:#9480c5; color:#ffffff; border:none; border-radius:12px; font-size:15px; font-weight:600; font-family:inherit; letter-spacing:-0.01em; cursor:pointer; transition:0.15s; }
+            .s4-btn:hover { filter:brightness(1.06); }
+            .s4-note { font-size:12px; color:#94a3b8; line-height:1.7; }
+            /* 펼침 영역 안의 공용 가격 카드(getPricingBox)를 이 컨테이너의 일부처럼: 카드 크롬 제거 */
+            #s4-breakdown > div { box-shadow:none !important; margin:0 !important; border-radius:0 !important; background:transparent !important; padding:0 !important; }
+            .s4-fold-head { display:flex; align-items:center; gap:14px; width:100%; border:none; background:transparent; text-align:left; cursor:pointer; font-family:inherit; padding:22px 26px; }
+            .s4-fold-body { display:none; padding:2px 26px 22px; }
+            @media (max-width:768px) {
+                .s4-fold-head { padding:18px; }
+                .s4-fold-body { padding:2px 18px 18px; }
+                .s4-card { padding:20px 18px; border-radius:14px; }
+                .s4-banner { padding:18px; }
+                .s4-amount-num { font-size:24px; }
+            }
+        </style>
+    `;
+
+    // 계약이 완료되지 않았으면 → 잠금 대기
     if (!app.contract_agreed) {
         paymentContent.innerHTML = `
-            <div style="text-align: center; padding: 80px 40px; color: #94a3b8;">
-                <i class="fas fa-lock" style="font-size: 48px; margin-bottom: 20px; color: #cbd5e1;"></i>
-                <h3 style="font-size: 17px; font-weight: 600; margin-bottom: 10px; color: #64748b;">입금 안내 대기 중</h3>
-                <p style="font-size: 13px; line-height: 1.6;">
-                    계약서에 동의하시면 입금 안내가 표시됩니다.<br/>
+            ${s4style}
+            <div class="s4-lock">
+                <div class="s4-lock-tile"><i class="fas fa-lock" style="font-size:26px; color:#b3a0b8;"></i></div>
+                <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:10px;">입금 안내 대기 중</h3>
+                <p style="font-size:14px; color:#64748b; line-height:1.8;">
+                    계약서에 동의하시면 입금 안내가 표시됩니다.<br>
                     먼저 계약서 탭에서 계약에 동의해 주세요.
                 </p>
             </div>
@@ -2951,25 +2992,20 @@ async function loadPaymentTab(app) {
         return;
     }
 
-    // 입금 완료 확인되었으면
+    // 입금 완료 확인되었으면 → 초록 배너
     if (app.deposit_confirmed_by_admin) {
         paymentContent.innerHTML = `
-            <div style="background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%); padding: 32px; border-radius: 16px; border: 2px solid #22c55e; margin-bottom: 32px;">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-check-circle" style="font-size: 26px; color: #22c55e;"></i>
+            ${s4style}
+            <div class="s4-banner" style="background:#f2f8f4;">
+                <div class="s4-banner-left">
+                    <div class="s4-banner-tile" style="background:#dcf0e3;"><i class="fas fa-circle-check" style="color:#2f855a; font-size:20px;"></i></div>
                     <div>
-                        <h3 style="font-size: 17px; font-weight: 700; color: #166534; margin: 0;">✅ 입금 확인 완료</h3>
-                        <p style="font-size: 12px; color: #15803d; margin: 6px 0 0 0;">
-                            ${new Date(app.deposit_confirmed_by_admin_at).toLocaleString('ko-KR')}에 입금이 확인되었습니다.
-                        </p>
+                        <div class="s4-banner-title">입금 확인 완료</div>
+                        <div class="s4-banner-sub">${new Date(app.deposit_confirmed_by_admin_at).toLocaleString('ko-KR')}에 입금이 확인되었습니다 · 곧 이용 방법 안내가 발송됩니다.</div>
                     </div>
                 </div>
-                <p style="font-size: 13px; color: #166534; margin: 0; line-height: 1.6;">
-                    입금액: <strong>${(app.final_price || 0).toLocaleString()}원</strong><br/>
-                    곧 이용 방법 안내가 발송됩니다.
-                </p>
             </div>
-            
+
             ${getPricingBox(app, false)}
         `;
         return;
@@ -2981,35 +3017,28 @@ async function loadPaymentTab(app) {
         const progBase = (app.assigned_program || app.program || '').split(' - ')[0].trim();
         const kakaoMsg = `안녕하세요! ${progBase ? progBase + ' ' : ''}신청한 ${app.name || ''}입니다 :)`;
         paymentContent.innerHTML = `
-            <div style="background: linear-gradient(135deg, #fff4e6 0%, #fefce8 100%); padding: 32px; border-radius: 16px; border: 2px solid #f59e0b; margin-bottom: 24px;">
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                    <i class="fas fa-clock" style="font-size: 26px; color: #f59e0b;"></i>
+            ${s4style}
+            <div class="s4-banner" style="background:#fbf6ec;">
+                <div class="s4-banner-left">
+                    <div class="s4-banner-tile" style="background:#fbecd2;"><i class="fas fa-clock" style="color:#b45309; font-size:18px;"></i></div>
                     <div>
-                        <h3 style="font-size: 17px; font-weight: 700; color: #92400e; margin: 0;">⏳ 입금 확인 대기 중</h3>
-                        <p style="font-size: 12px; color: #a16207; margin: 6px 0 0 0;">
-                            ${new Date(app.deposit_confirmed_by_student_at).toLocaleString('ko-KR')}에 입금 완료 알림을 보내셨습니다.
-                        </p>
+                        <div class="s4-banner-title">입금 확인 대기 중</div>
+                        <div class="s4-banner-sub">${new Date(app.deposit_confirmed_by_student_at).toLocaleString('ko-KR')}에 입금 완료 알림을 보내셨습니다 · 관리자가 확인 후 이용 방법을 안내드립니다.</div>
                     </div>
                 </div>
-                <p style="font-size: 15px; color: #92400e; margin: 0; line-height: 1.6;">
-                    관리자가 입금을 확인 중입니다.<br/>
-                    확인 후 이용 방법 전달 및 챌린지 시작을 위한 준비가 진행됩니다.
-                </p>
             </div>
 
-            <div style="background: #fffbea; padding: 24px; border-radius: 16px; border: 2px solid #FEE500; margin-bottom: 32px;">
-                <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;">📢 마지막 단계예요!</h3>
-                <p style="font-size: 14px; color: #475569; margin: 0 0 20px 0; line-height: 1.7;">
-                    이제 정식 수강생이 되셨어요 :)<br/>
-                    앞으로는 카카오톡 채널로 소통하게 되니, 아래 <strong style="color: #1e293b;">성함을 채널로 보내 인사를 남겨주세요.</strong><br/>
-                    이 과정까지 마쳐야 신청이 완료됩니다.
+            <div class="s4-card">
+                <div class="s4-card-title"><i class="fas fa-comment"></i> 마지막 단계예요!</div>
+                <p style="font-size:14px; color:#64748b; margin:0 0 18px 0; line-height:1.75;">
+                    이제 정식 수강생이 되셨어요. 앞으로는 카카오톡 채널로 소통하게 되니, 아래 <strong style="color:#1e293b;">성함을 채널로 보내 인사를 남겨주세요.</strong> 이 과정까지 마쳐야 신청이 완료됩니다.
                 </p>
-                <div style="margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #64748b;">보낼 내용</div>
-                <div style="display: flex; align-items: stretch; gap: 8px; margin-bottom: 20px;">
-                    <div style="flex: 1; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; font-size: 14px; color: #1e293b; line-height: 1.5;">${kakaoMsg}</div>
-                    <button type="button" onclick="copyKakaoMsg(this)" data-msg="${kakaoMsg.replace(/"/g, '&quot;')}" style="flex-shrink: 0; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0 18px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; white-space: nowrap;">복사</button>
+                <div style="font-size:12px; font-weight:600; color:#64748b; margin-bottom:8px;">보낼 내용</div>
+                <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:18px;">
+                    <div style="flex:1; background:#f6f4fb; border-radius:10px; padding:14px 16px; font-size:14px; color:#1e293b; line-height:1.5;">${kakaoMsg}</div>
+                    <button type="button" onclick="copyKakaoMsg(this)" data-msg="${kakaoMsg.replace(/"/g, '&quot;')}" style="flex-shrink:0; background:#efeaf7; border:none; border-radius:10px; padding:0 18px; font-size:13px; font-weight:600; color:#5b4a7d; cursor:pointer; white-space:nowrap; font-family:inherit;">복사</button>
                 </div>
-                <a href="http://pf.kakao.com/_FWxcZC" target="_blank" rel="noopener" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; background: #FEE500; color: #3c1e1e; font-size: 15px; font-weight: 700; padding: 16px; border-radius: 12px; text-decoration: none;">
+                <a href="http://pf.kakao.com/_FWxcZC" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; box-sizing:border-box; background:#FEE500; color:#3c1e1e; font-size:15px; font-weight:700; padding:15px; border-radius:12px; text-decoration:none;">
                     <i class="fas fa-comment"></i> 카카오톡으로 성함 남기기
                 </a>
             </div>
@@ -3043,100 +3072,74 @@ async function loadPaymentTab(app) {
 
         const now = Date.now();
         const remaining = deadlineMs - now;
-        
+
         const hours = Math.floor(remaining / (60 * 60 * 1000));
         const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
         const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
-        
-        let timerColor = '#dc2626'; // 레드
-        let timerBg = '#fee2e2';
-        let timerBorder = '#fca5a5';
-        let timerIcon = 'fa-clock';
-        let timerTextColor = '#991b1b';
-        
-        if (remaining <= 0) {
-            timerColor = '#dc2626';
-            timerBg = '#fef2f2';
-            timerBorder = '#f87171';
-            timerIcon = 'fa-exclamation-triangle';
-            timerTextColor = '#7f1d1d';
-        } else if (hours <= 6) {
-            timerColor = '#dc2626';
-            timerBg = '#fee2e2';
-            timerBorder = '#f87171';
-            timerTextColor = '#991b1b';
-        }
 
-        // 기한 안내 텍스트: override가 있으면 날짜 표시, 없으면 24시간 표현
-        const deadlineNotice = remaining > 0
-            ? (deadlineLabel
-                ? `<strong style="color: ${timerColor}; font-size: 14px;">${deadlineLabel}</strong>까지 입금을 완료해주세요.`
-                : `계약 동의 후 <strong style="color: ${timerColor}; font-size: 14px;">24시간 이내</strong>에 입금을 완료해주세요.`)
-            : `<strong style="color: ${timerColor}; font-size: 14px;">입금 기한이 초과되었습니다.</strong> 빠른 입금 부탁드립니다.`;
-        
-        deadlineHTML = `
-            <div style="background: linear-gradient(135deg, ${timerBg} 0%, #fef2f2 100%); padding: 20px; border-radius: 14px; border: 2px solid ${timerBorder}; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);">
-                <div class="payment-deadline-flex" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                    <div style="background: white; padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);">
-                        <i class="fas ${timerIcon}" style="font-size: 24px; color: ${timerColor};"></i>
-                    </div>
-                    <div style="flex: 1; min-width: 130px;">
-                        <h3 style="font-size: 17px; font-weight: 700; color: ${timerColor}; margin: 0 0 6px 0;">
-                            ⏰ 입금 기한 안내
-                        </h3>
-                        <p style="font-size: 13px; color: ${timerTextColor}; margin: 0; line-height: 1.6;">
-                            ${deadlineNotice}
-                        </p>
-                    </div>
-                    <div class="payment-timer-box" style="text-align: center; padding: 16px; background: white; border-radius: 14px; min-width: 150px; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);">
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 600;">남은 시간</div>
-                        <div id="paymentTimer" class="payment-timer-text" style="font-size: 30px; font-weight: 700; color: ${timerColor}; line-height: 1; font-family: 'Courier New', monospace;">
-                            ${remaining > 0 
-                                ? `${String(Math.max(0, hours)).padStart(2, '0')}:${String(Math.max(0, minutes)).padStart(2, '0')}:${String(Math.max(0, seconds)).padStart(2, '0')}`
-                                : '00:00:00'
-                            }
+        // 만료=코랄 / 임박(6h 이하)=주황 / 평상시=라벤더 (STEP 3와 동일 톤)
+        const isExpired = remaining <= 0;
+        const isUrgent = !isExpired && hours < 6;
+        const chipColor = isExpired ? '#a53b22' : (isUrgent ? '#b45309' : '#5b4a7d');
+        const chipBg = isExpired ? '#f6ddd6' : (isUrgent ? '#fbecd2' : '#ece4f2');
+        const tileBg = chipBg;
+
+        if (isExpired) {
+            // 만료 → 코랄 배너, 타이머 칩 없음
+            deadlineHTML = `
+                <div class="s4-banner" style="background:#f9edea;">
+                    <div class="s4-banner-left">
+                        <div class="s4-banner-tile" style="background:#f6ddd6;"><i class="fas fa-triangle-exclamation" style="color:#a53b22; font-size:18px;"></i></div>
+                        <div>
+                            <div class="s4-banner-title">입금 기한 초과</div>
+                            <div class="s4-banner-sub">입금 기한이 지났습니다. 빠른 입금 부탁드립니다.</div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            // 기한 안내 텍스트: override가 있으면 날짜 표시, 없으면 24시간 표현
+            const deadlineNotice = deadlineLabel
+                ? `<strong style="color:${chipColor};">${deadlineLabel}</strong>까지 입금을 완료해주세요.`
+                : `계약 동의 후 <strong style="color:${chipColor};">24시간 이내</strong>에 입금을 완료해주세요.`;
+            // 계약서 탭(STEP 3 동의 기한 배너)과 동일 구조: 타일 + [제목+칩 한 줄] + 하단 안내
+            deadlineHTML = `
+                <div class="s4-banner">
+                    <div class="s4-banner-tile" style="background:${tileBg};"><i class="fas fa-clock" style="color:${chipColor}; font-size:17px;"></i></div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <div class="s4-banner-title">입금 기한</div>
+                            <div class="s4-timer-chip" style="background:${chipBg};">
+                                <span id="paymentTimer" class="s4-timer-num" style="color:${chipColor};">${String(Math.max(0, hours)).padStart(2, '0')}:${String(Math.max(0, minutes)).padStart(2, '0')}</span>
+                                <span class="s4-timer-unit" style="color:${chipColor};">남음</span>
+                            </div>
+                        </div>
+                        <div class="s4-banner-sub" style="margin-top:4px;">${deadlineNotice}</div>
+                    </div>
+                </div>
+            `;
+        }
     }
-    
-    paymentContent.innerHTML = paymentInfoHtml + deadlineHTML + `
-        <div style="background: #f8fafc; padding: 24px; border-radius: 14px; margin-top: 24px;">
-            <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;">
-                <i class="fas fa-credit-card" style="color: #9480c5; margin-right: 6px;"></i>
-                입금 완료 확인
-            </h3>
-            <p style="font-size: 13px; color: #64748b; margin: 0 0 20px 0; line-height: 1.6;">
-                위 계좌로 입금을 완료하셨다면 아래 정보를 입력하고 버튼을 눌러 주세요.<br/>
-                관리자가 입금을 확인한 후 이용 방법 안내를 보내드립니다.
+
+    paymentContent.innerHTML = s4style + deadlineHTML + paymentInfoHtml + `
+        <div class="s4-card">
+            <div class="s4-card-title"><i class="fas fa-circle-check"></i> 입금 완료 확인</div>
+            <p style="font-size:13px; color:#64748b; margin:0 0 18px 0; line-height:1.7;">
+                위 계좌로 입금을 완료하셨다면 입금자명을 확인하고 버튼을 눌러 주세요. 관리자가 입금을 확인한 후 이용 방법 안내를 보내드립니다.
             </p>
-            
-            <div style="margin-bottom: 16px;">
-                <label for="depositorName" style="display: block; font-size: 12px; font-weight: 600; color: #1e293b; margin-bottom: 6px;">
-                    <i class="fas fa-user" style="color: #9480c5; margin-right: 5px;"></i>
-                    입금자명 <span style="color: #ef4444;">*</span>
-                </label>
-                <input type="text" id="depositorName" value="${app.name || ''}" placeholder="실제 입금하신 분의 성함을 입력해주세요"
-                       style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
-                              font-size: 13px; transition: all 0.3s;"
-                       onfocus="this.style.borderColor='#9480c5'"
-                       onblur="this.style.borderColor='#e2e8f0'">
-                <p style="font-size: 11px; color: #64748b; margin: 6px 0 0 0;">
-                    💡 본인이 직접 입금하신 경우 그대로 두시고, 다른 분(부모님, 배우자 등)이 입금하신 경우 실제 입금자명으로 수정해주세요.
-                </p>
-            </div>
-            
-            <button onclick="confirmDeposit()" 
-                    style="width: 100%; padding: 14px; background: linear-gradient(135deg, #9480c5 0%, #7c68a8 100%); 
-                           color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; 
-                           cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
-                <i class="fas fa-check-circle" style="margin-right: 6px;"></i>
-                입금 완료했습니다
+            <label for="depositorName" style="display:block; font-size:13px; font-weight:600; color:#1e293b; margin-bottom:8px;">
+                입금자명 <span style="color:#a53b22;">*</span>
+            </label>
+            <input type="text" id="depositorName" value="${app.name || ''}" placeholder="실제 입금하신 분의 성함" class="s4-input">
+            <p class="s4-note" style="margin:8px 0 18px 0;">
+                본인이 직접 입금하셨으면 그대로 두시고, 다른 분(부모님·배우자 등)이 입금하셨으면 실제 입금자명으로 수정해 주세요.
+            </p>
+            <button onclick="confirmDeposit()" class="s4-btn">
+                <i class="fas fa-circle-check" style="margin-right:7px;"></i> 입금 완료했습니다
             </button>
-            <p style="font-size: 11px; color: #64748b; text-align: center; margin: 12px 0 0 0; line-height: 1.6;">
-                입금 확인 후 자동으로 다음 단계로 진행됩니다.
+            <p class="s4-note" style="text-align:center; margin:14px 0 0 0;">
+                관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.<br>
+                입금 관련 문의는 <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener" style="color:#5b4a7d; font-weight:600; text-decoration:underline;">카카오톡</a>으로 해주세요.
             </p>
         </div>
     `;
@@ -3156,18 +3159,17 @@ async function loadPaymentTab(app) {
             if (!timerEl) return;
             
             if (remaining <= 0) {
-                timerEl.textContent = '00:00:00';
+                timerEl.textContent = '00:00';
                 return;
             }
-            
+
             const hours = Math.floor(remaining / (60 * 60 * 1000));
             const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-            const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
-            
-            timerEl.textContent = 
-                String(Math.max(0, hours)).padStart(2, '0') + ':' + 
-                String(Math.max(0, minutes)).padStart(2, '0') + ':' + 
-                String(Math.max(0, seconds)).padStart(2, '0');
+
+            // 계약서 탭과 동일하게 HH:MM 표기
+            timerEl.textContent =
+                String(Math.max(0, hours)).padStart(2, '0') + ':' +
+                String(Math.max(0, minutes)).padStart(2, '0');
         };
         
         // 즉시 한 번 실행
@@ -3187,106 +3189,57 @@ async function getPaymentInfo(app) {
     const accountHolder = settings?.account_holder || '김민서';
     
     return `
-        <!-- 입금탭 모바일 반응형 스타일 -->
-        <style>
-            @media (max-width: 768px) {
-                .payment-wrap { padding: 16px !important; }
-                .payment-wrap h2 { font-size: 17px !important; margin-bottom: 16px !important; }
-                .payment-wrap h2 svg { width: 20px !important; height: 20px !important; }
-                .payment-wrap h3 { font-size: 14px !important; }
-                .payment-wrap h4 { font-size: 12px !important; }
-                .payment-account-section { padding: 14px !important; margin-bottom: 16px !important; }
-                .payment-account-section h3 { margin-bottom: 12px !important; }
-                .payment-account-table { font-size: 12px !important; }
-                .payment-account-table td { padding: 8px 10px !important; }
-                .payment-account-number { font-size: 13px !important; letter-spacing: 0 !important; word-break: break-all; }
-                .payment-account-value { font-size: 13px !important; }
-                .payment-amount-big { font-size: 22px !important; }
-                .payment-amount-section { padding: 14px !important; margin-bottom: 16px !important; }
-                .payment-info-section { padding: 14px !important; }
-                .payment-deadline-flex { gap: 10px !important; }
-                .payment-deadline-flex h3 { font-size: 14px !important; }
-                .payment-deadline-flex p { font-size: 11px !important; }
-                .payment-timer-box { min-width: 0 !important; width: 100% !important; padding: 10px !important; }
-                .payment-timer-text { font-size: 24px !important; }
-            }
-        </style>
-
-        <!-- 이용가 및 할인 내역 -->
-        ${getPricingBox(app, false)}
-        
-        <div class="payment-wrap" style="background: white; padding: 32px; border-radius: 16px; border: 2px solid #e2e8f0; margin-bottom: 24px;">
-            <h2 style="text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 24px 0; color: #1e293b;">
-                <svg width="28" height="28" viewBox="0 0 24 24" style="display: inline-block; vertical-align: middle; margin-right: 10px;">
-                    <rect x="2" y="4" width="20" height="14" rx="2" fill="none" stroke="#9480c5" stroke-width="1.5"/>
-                    <rect x="2" y="8" width="20" height="3" fill="#9480c5"/>
-                    <line x1="5" y1="15" x2="10" y2="15" stroke="#9480c5" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                입금 안내
-            </h2>
-            
-            <div class="payment-account-section" style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
-                <h3 style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 0 0 20px 0; text-align: center;">
-                    입금 계좌 정보
-                </h3>
-                <table class="payment-account-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr>
-                        <td style="padding: 12px; background: white; border-radius: 12px 12px 0 0; font-weight: 600; white-space: nowrap;">은행</td>
-                        <td class="payment-account-value" style="padding: 12px; background: white; border-radius: 12px 12px 0 0; font-size: 15px; font-weight: 700; color: #1e293b;">${bankName}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; background: white; font-weight: 600; white-space: nowrap;">계좌번호</td>
-                        <td style="padding: 12px; background: white;">
-                            <span class="payment-account-number" style="font-size: 19px; font-weight: 700; color: #1e293b; letter-spacing: 0.5px;">${accountNumber}</span>
-                            <i class="fas fa-copy" onclick="copyToClipboard('${accountNumber}', '계좌번호')" 
-                               style="margin-left: 6px; font-size: 12px; color: #9480c5; cursor: pointer; vertical-align: middle;" 
-                               title="계좌번호 복사"></i>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; background: white; border-radius: 0 0 12px 12px; font-weight: 600; white-space: nowrap;">예금주</td>
-                        <td class="payment-account-value" style="padding: 12px; background: white; border-radius: 0 0 12px 12px; font-size: 15px; font-weight: 600;">${accountHolder}</td>
-                    </tr>
-                </table>
+        <!-- 입금 정보: 어디로 + 얼마를 한 카드로 -->
+        <div class="s4-card">
+            <div class="s4-card-title"><i class="fas fa-building-columns"></i> 입금 정보</div>
+            <div class="s4-acct-row">
+                <span class="s4-acct-label">은행</span>
+                <span class="s4-acct-value">${bankName}</span>
             </div>
-            
-            <div class="payment-amount-section" style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
-                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;">
-                    <i class="fas fa-won-sign" style="margin-right: 8px; color: #9480c5;"></i>
-                    입금 금액
-                </h3>
-                <div style="text-align: center; padding: 14px; background: white; border-radius: 12px;">
-                    <p style="margin: 0 0 6px 0; font-size: 14px; color: #64748b;">최종 입금 금액</p>
-                    <p class="payment-amount-big" style="margin: 0; font-size: 30px; font-weight: 700; color: #9480c5;">
-                        ${(app.final_price || 0).toLocaleString()}원
-                    </p>
-                </div>
-                <div style="background: #fffbeb; padding: 12px; border-radius: 8px; margin-top: 12px; border: 1px solid #fde68a;">
-                    <p style="font-size: 12px; color: #78716c; margin: 0; text-align: center; line-height: 1.7; font-weight: 600;">
-                        ⚠️ <strong>위 금액과 동일하게 입금해주세요</strong><br/>
-                        <span style="font-size: 11px; font-weight: 400;">
-                            (입금액이 다를 경우 확인이 지연될 수 있습니다)
-                        </span>
-                    </p>
-                </div>
-                <p style="font-size: 11px; color: #64748b; margin: 12px 0 0 0; text-align: center; line-height: 1.7;">
-                    * 보증금 100,000원 포함<br/>
-                    <span style="font-size: 10px;">
-                        (과제인증률에 따라 최소 0원 ~ 최대 100,000원 환급)<br/>
-                        - 70% 미만: 0원 / 70~94%: 부분 환급 / 95% 이상: 전액 환급
-                    </span>
+            <div class="s4-acct-row">
+                <span class="s4-acct-label">계좌번호</span>
+                <span class="s4-acct-value">
+                    <span style="letter-spacing:0.3px; word-break:break-all;">${accountNumber}</span>
+                    <i class="fas fa-copy" onclick="copyToClipboard('${accountNumber}', '계좌번호')"
+                       style="margin-left:8px; font-size:13px; color:#9480c5; cursor:pointer; vertical-align:middle;"
+                       title="계좌번호 복사"></i>
+                </span>
+            </div>
+            <div class="s4-acct-row" style="border-bottom:0;">
+                <span class="s4-acct-label">예금주</span>
+                <span class="s4-acct-value">${accountHolder}</span>
+            </div>
+
+            <div class="s4-amount-box" style="margin-top:14px;">
+                <p style="margin:0 0 8px 0; font-size:13px; color:#64748b;">최종 입금 금액</p>
+                <p class="s4-amount-num" style="margin:0;">${(app.final_price || 0).toLocaleString()}원</p>
+            </div>
+            <div style="background:#fbf6ec; padding:12px 16px; border-radius:10px; margin-top:12px;">
+                <p style="font-size:12px; color:#8a6d1f; margin:0; text-align:center; line-height:1.7; font-weight:600;">
+                    위 금액과 <strong>동일하게</strong> 입금해 주세요
+                    <span style="display:block; font-size:11px; font-weight:400; color:#a08a4a; margin-top:2px;">입금액이 다를 경우 확인이 지연될 수 있습니다</span>
                 </p>
             </div>
-            
-            <div class="payment-info-section" style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 10px 0;">
-                    <i class="fas fa-info-circle" style="margin-right: 6px; color: #9480c5;"></i>
-                    입금 안내
-                </h4>
-                <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #64748b; line-height: 1.8;">
-                    <li>관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.</li>
-                    <li>입금 관련 문의는 카카오톡으로 해주세요.</li>
-                </ul>
+            <p class="s4-note" style="margin:12px 0 0 0; text-align:center;">
+                보증금 100,000원 포함 · 과제 인증률에 따라 최대 100,000원 환급<br>
+                <span style="font-size:11px;">(70% 미만 0원 / 70~94% 부분 환급 / 95% 이상 전액 환급)</span>
+            </p>
+        </div>
+
+        <!-- 금액 산정 내역: 헤더(토글) + 펼침 영역이 하나의 카드. 입금 정보 다음 순서, 기본 접힘 -->
+        <div class="s4-card" style="padding:0; overflow:hidden;">
+            <button type="button" class="s4-fold-head" onclick="var d=document.getElementById('s4-breakdown'); var open=getComputedStyle(d).display==='none'; d.style.display=open?'block':'none'; this.querySelector('.s4-bd-chev').style.transform=open?'rotate(180deg)':'';">
+                <span style="width:40px; height:40px; border-radius:11px; background:#ece4f2; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <i class="fas fa-receipt" style="color:#5b4a7d; font-size:16px;"></i>
+                </span>
+                <span style="flex:1;">
+                    <span style="display:block; font-size:15px; font-weight:700; color:#3b2d5c; word-break:keep-all;">이 금액은 어떻게 산정되었나요?</span>
+                    <span style="display:block; font-size:12px; color:#94a3b8; margin-top:3px;">정가 · 시험료 지원 · 첨삭 · 보증금 내역 보기</span>
+                </span>
+                <i class="fas fa-chevron-down s4-bd-chev" style="color:#9480c5; font-size:14px; transition:0.2s; flex-shrink:0;"></i>
+            </button>
+            <div id="s4-breakdown" class="s4-fold-body">
+                ${getPricingBox(app, false)}
             </div>
         </div>
     `;
