@@ -273,29 +273,60 @@ function displayApplicationDetail(app) {
     }
     
     console.log('Status:', statusText, statusClass);
-    
+
+    // 상태 이름만으로는 "그래서 내가 뭘 기다려야 하나"를 알 수 없다. 한 줄로 답해준다.
+    // 승인 이후에는 실제 진행 위치(동의 → 계약 → 입금 → 시작)에 따라 안내가 달라진다.
+    let statusHint = '';
+    if (statusText === '검토중') {
+        statusHint = '이온쌤이 분석 내용을 검토하고 있어요.';
+    } else if (statusText === '승인 검토중') {
+        statusHint = '이온쌤이 신청서를 살펴보고 있어요. 조금만 기다려 주세요.';
+    } else if (statusText === '조건부승인') {
+        statusHint = '함께 이야기 나눌 부분이 있어요. STEP 2에서 확인해 주세요.';
+    } else if (statusText === '승인불가') {
+        statusHint = '이번 기수는 함께하기 어려워요. 자세한 내용은 STEP 2에 있어요.';
+    } else if (statusText === '승인') {
+        if (!app.student_agreed_at) {
+            statusHint = '개별분석이 도착했어요. STEP 2에서 확인하고 동의해 주세요.';
+        } else if (!app.contract_sent) {
+            statusHint = '계약서를 준비하고 있어요.';
+        } else if (!app.contract_agreed) {
+            statusHint = '계약서가 도착했어요. STEP 3에서 확인하고 동의해 주세요.';
+        } else if (!app.deposit_confirmed_by_student) {
+            statusHint = '입금 후 STEP 4에서 완료 버튼을 눌러 주세요.';
+        } else if (!app.deposit_confirmed_by_admin) {
+            statusHint = '입금을 확인하고 있어요.';
+        } else {
+            statusHint = '모든 준비가 끝났어요. STEP 5에서 이용 방법을 확인해 주세요.';
+        }
+    }
+
     // 상태 배지 + 수정/삭제 버튼 표시 (신청서 상세 제목 오른쪽)
     const hasAnalysisRegistered = app.analysis_status && app.analysis_content;
     const canEdit = isOwner(app) && !hasAnalysisRegistered && !app.deleted;
     
-    let editDeleteButtons = '';
-    if (canEdit) {
-        editDeleteButtons = `
-            <button onclick="window.location.href='application-form.html?edit=${app.id}'" style="display:inline-flex; align-items:center; gap:6px; padding:7px 16px; border:1.5px solid rgba(255,255,255,0.6); background:rgba(255,255,255,0.15); color:white; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; transition:all 0.2s; backdrop-filter:blur(4px);" onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.borderColor='white'" onmouseout="this.style.background='rgba(255,255,255,0.15)'; this.style.borderColor='rgba(255,255,255,0.6)'">
-                <i class="fas fa-pen" style="font-size:11px;"></i> 수정하기
-            </button>
-            <button onclick="openDetailDeleteModal()" style="display:inline-flex; align-items:center; gap:6px; padding:7px 16px; border:1.5px solid rgba(239,68,68,0.5); background:rgba(239,68,68,0.15); color:#fecaca; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; transition:all 0.2s; backdrop-filter:blur(4px);" onmouseover="this.style.background='rgba(239,68,68,0.3)'; this.style.borderColor='rgba(239,68,68,0.8)'; this.style.color='white'" onmouseout="this.style.background='rgba(239,68,68,0.15)'; this.style.borderColor='rgba(239,68,68,0.5)'; this.style.color='#fecaca'">
-                <i class="fas fa-trash-alt" style="font-size:11px;"></i> 삭제
-            </button>
-        `;
-    }
-    
+    // 수정·삭제는 신청서(STEP 1)에만 해당하는 동작이라 헤더가 아니라 본문 맨 아래에 둔다.
+    // 삭제는 되돌릴 수 없으므로 내용을 다 읽은 뒤에 만나게 한다.
+    const applicationActions = canEdit ? `
+        <div class="s1-actions">
+            <div class="s1-actions-hint">개별분석이 등록되기 전까지 신청서를 고칠 수 있어요.</div>
+            <div class="s1-actions-btns">
+                <button class="s1-btn s1-btn-edit" onclick="window.location.href='application-form.html?edit=${app.id}'">
+                    <i class="fas fa-pen"></i> 수정하기
+                </button>
+                <button class="s1-btn s1-btn-delete" onclick="openDetailDeleteModal()">
+                    <i class="fas fa-trash-alt"></i> 신청서 삭제
+                </button>
+            </div>
+        </div>
+    ` : '';
+
     document.getElementById('detailStatus').innerHTML = `
-        <span class="status-badge ${statusClass}" style="font-size: 13px; padding: 7px 14px;">
-            <i class="fas ${statusIcon}" style="margin-right: 5px; font-size: 12px;"></i>
+        <span class="status-badge ${statusClass}">
+            <i class="fas ${statusIcon}" style="margin-right: 6px; font-size: 11px;"></i>
             ${statusText}
         </span>
-        ${editDeleteButtons}
+        ${statusHint ? `<span class="detail-header-hint">${statusHint}</span>` : ''}
     `;
     
     console.log('Status badge set');
@@ -306,122 +337,6 @@ function displayApplicationDetail(app) {
         return Number(score).toFixed(1);
     }
     
-    // 목표 점수 표시
-    let targetDisplay = '';
-    if (app.no_target_score) {
-        targetDisplay = '없음 (고고익선 🚀)';
-    } else if (app.target_cutoff_old) {
-        targetDisplay = `${app.target_cutoff_old}점`;
-    } else if (app.target_cutoff_new) {
-        targetDisplay = `${formatNewScore(app.target_cutoff_new)} 레벨`;
-    } else if (app.target_score) {
-        // 입문서 신청자용 (단순 숫자 입력)
-        targetDisplay = `${app.target_score}점`;
-    } else {
-        targetDisplay = '미설정';
-    }
-    
-    console.log('Target display:', targetDisplay);
-    
-    // 현재 점수 표시
-    let currentScoreDisplay = '';
-    if (app.has_toefl_score === 'yes') {
-        // 버전 표시(score_version)가 비어도 실제 입력된 점수로 판단 (관리자 화면과 동일 기준)
-        const isNewVersion = app.score_version === 'new' || app.score_total_new || app.score_reading_new;
-        const displayTotalNew = app.score_total_new || app.total_score;
-        const displayTotalOld = app.score_total_old || app.total_score;
-        if (isNewVersion) {
-            currentScoreDisplay = `
-                <div class="detail-row">
-                    <div class="detail-label">현재 토플 점수 (개정후)</div>
-                    <div class="detail-value">
-                        <div style="font-size: 19px; font-weight: 700; color: #9480c5; margin-bottom: 8px;">
-                            Total: ${formatNewScore(displayTotalNew)} 레벨
-                        </div>
-                        <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Reading</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${formatNewScore(app.score_reading_new)}</div>
-                            </div>
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Listening</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${formatNewScore(app.score_listening_new)}</div>
-                            </div>
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Speaking</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${formatNewScore(app.score_speaking_new)}</div>
-                            </div>
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Writing</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${formatNewScore(app.score_writing_new)}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-        } else {
-            currentScoreDisplay = `
-                <div class="detail-row">
-                    <div class="detail-label">현재 토플 점수 (개정전)</div>
-                    <div class="detail-value">
-                        <div style="font-size: 19px; font-weight: 700; color: #9480c5; margin-bottom: 8px;">
-                            Total: ${displayTotalOld || '-'}점
-                        </div>
-                        <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px;">
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Reading</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${app.score_reading_old || '-'}</div>
-                            </div>
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Listening</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${app.score_listening_old || '-'}</div>
-                            </div>
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Speaking</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${app.score_speaking_old || '-'}</div>
-                            </div>
-                            <div style="padding: 12px; background: #f8fafc; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Writing</div>
-                                <div style="font-size: 17px; font-weight: 600; color: #1e293b;">${app.score_writing_old || '-'}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                ${app.score_date ? `
-                <div class="detail-row" style="margin-top: 12px;">
-                    <div class="detail-label">점수 응시일</div>
-                    <div class="detail-value">${escapeHtml(app.score_date)}</div>
-                </div>
-                ` : ''}
-                ${app.score_history ? `
-                <div class="detail-row" style="margin-top: 12px;">
-                    <div class="detail-label">점수 이력 메모</div>
-                    <div class="detail-value" style="white-space: pre-wrap; line-height: 1.6; color: #64748b; font-size: 13px;">
-${escapeHtml(app.score_history)}
-                    </div>
-                </div>
-                ` : ''}
-            `;
-        }
-    } else {
-        currentScoreDisplay = `
-            <div class="detail-row">
-                <div class="detail-label">현재 토플 점수</div>
-                <div class="detail-value">점수 없음 (영작 평가 제출)</div>
-            </div>
-            ${app.writing_sample_1 ? `
-            <div class="detail-row">
-                <div class="detail-label">Question 1<br><span style="font-size: 12px; color: #64748b; font-weight: 400;">What are your hobbies or interests, and why do you enjoy them?</span></div>
-                <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.writing_sample_1)}</div>
-            </div>
-            ` : ''}
-            ${app.writing_sample_2 ? `
-            <div class="detail-row">
-                <div class="detail-label">Question 2<br><span style="font-size: 12px; color: #64748b; font-weight: 400;">Describe a challenge you faced recently and how you dealt with it.</span></div>
-                <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.writing_sample_2)}</div>
-            </div>
-            ` : ''}
-        `;
-    }
     
     // Detail content - tabInfo에 표시
     const tabInfoElement = document.getElementById('tabInfo');
@@ -430,299 +345,486 @@ ${escapeHtml(app.score_history)}
         return;
     }
     
+    // ── 표시용 준비 ──────────────────────────────────────────
+    // 이 화면은 "내가 제출한 신청서"다. 값을 가공하지 않고, 신청 폼에 입력한 순서 그대로 보여준다.
+    const hasScore = app.has_toefl_score === 'yes';
+    const scoreIsNew = app.score_version === 'new' || !!app.score_total_new || !!app.score_reading_new;
+    const targetIsNew = app.target_version === 'new' || !!app.target_cutoff_new || !!app.target_reading_new;
+
+    const fmtCur = (v) => scoreIsNew ? formatNewScore(v) : (v || v === 0 ? String(v) : '-');
+    const fmtTgt = (v) => targetIsNew ? formatNewScore(v) : (v || v === 0 ? String(v) : '-');
+
+    const curTotal = scoreIsNew ? (app.score_total_new || app.total_score) : (app.score_total_old || app.total_score);
+    const tgtTotal = targetIsNew ? app.target_cutoff_new : (app.target_cutoff_old || app.target_score);
+
+    const curSections = [
+        ['Reading',   scoreIsNew ? app.score_reading_new   : app.score_reading_old],
+        ['Listening', scoreIsNew ? app.score_listening_new : app.score_listening_old],
+        ['Speaking',  scoreIsNew ? app.score_speaking_new  : app.score_speaking_old],
+        ['Writing',   scoreIsNew ? app.score_writing_new   : app.score_writing_old]
+    ];
+    const tgtSections = [
+        ['Reading',   targetIsNew ? app.target_reading_new   : app.target_reading_old],
+        ['Listening', targetIsNew ? app.target_listening_new : app.target_listening_old],
+        ['Speaking',  targetIsNew ? app.target_speaking_new  : app.target_speaking_old],
+        ['Writing',   targetIsNew ? app.target_writing_new   : app.target_writing_old]
+    ];
+    const hasTargetSections = tgtSections.some(([, v]) => v || v === 0);
+
+    const referrals = [
+        app.referral_search_keyword ? ['검색 키워드', app.referral_search_keyword] : null,
+        app.referral_social_media ? ['SNS', app.referral_social_media] : null,
+        (app.referral_friend === 'yes' && app.referral_friend_name) ? ['지인 추천', `${app.referral_friend_name}님`] : null,
+        app.referral_other ? ['기타', app.referral_other] : null
+    ].filter(Boolean);
+
+    // 기한까지 남은 날짜 뱃지. 오늘 자정과 마감일 자정의 차이로 센다.
+    const dDayChip = (dateStr) => {
+        if (!dateStr) return '';
+        const target = new Date(dateStr);
+        if (isNaN(target.getTime())) return '';
+        const today = new Date();
+        target.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        const days = Math.round((target - today) / 86400000);
+        let text, bg, color;
+        if (days > 0) {
+            text = `${days}일 남음`;
+            // 2주 안쪽이면 주의를 끈다
+            if (days <= 14) { bg = '#fbecd2'; color = '#b45309'; }
+            else { bg = '#eef1f5'; color = '#64748b'; }
+        } else if (days === 0) {
+            text = '오늘';
+            bg = '#fbeae6'; color = '#a53b22';
+        } else {
+            text = `${Math.abs(days)}일 지남`;
+            bg = '#f1f5f9'; color = '#94a3b8';
+        }
+        return `<span class="s1-chip" style="background: ${bg}; color: ${color}; margin-left: 10px;">${text}</span>`;
+    };
+
     tabInfoElement.innerHTML = `
         <style>
-            .detail-row {
-                display: grid;
-                grid-template-columns: 180px 1fr;
-                gap: 16px;
-                padding: 16px 0;
-                border-bottom: 1px solid #f1f5f9;
-                align-items: start;
+            /* 선 대신 카드와 여백으로 구역을 나눈다 (DESIGN.md: No-Line Rule) */
+            .s1-card {
+                background: #ffffff;
+                border-radius: 16px;
+                padding: 24px 28px;
+                box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+                margin-bottom: 14px;
             }
-            .detail-label {
+            .s1-card-title {
                 font-size: 15px;
+                font-weight: 700;
+                color: #1e293b;
+                letter-spacing: -0.01em;
+                margin: 0 0 18px 0;
+            }
+            /* 학생이 붙인 제목: 표제이므로 다른 카드와 다르게 보여야 한다.
+               바탕(#faf7fa)보다 확실히 진해야 카드가 녹지 않는다. */
+            .s1-title-card {
+                background: linear-gradient(135deg, #e3d5e1 0%, #eee3ec 100%);
+                padding: 26px 28px;
+                box-shadow: 0 2px 20px rgba(59, 45, 92, 0.08);
+            }
+            .s1-title-cap {
+                font-size: 12px;
                 font-weight: 600;
-                color: #64748b;
+                color: #7a6690;
+                letter-spacing: 0.02em;
+                margin-bottom: 8px;
             }
-            .detail-value {
-                font-size: 15px;
+            .s1-title-text {
+                font-size: 21px;
+                font-weight: 700;
+                color: #3b2d5c;
+                letter-spacing: -0.02em;
+                line-height: 1.4;
+            }
+            /* 값이 한 줄뿐인 카드: 제목 옆에 붙인다 (오른쪽 끝으로 밀지 않는다) */
+            .s1-inline-card {
+                display: flex;
+                align-items: baseline;
+                gap: 16px;
+            }
+            .s1-inline-card .s1-card-title { width: 150px; flex-shrink: 0; }
+            .s1-row {
+                display: grid;
+                grid-template-columns: 150px 1fr;
+                gap: 16px;
+                padding: 7px 0;
+                align-items: center;
+            }
+            .s1-label { font-size: 13px; color: #64748b; font-weight: 500; }
+            .s1-value { font-size: 15px; color: #1e293b; }
+            .s1-note {
+                white-space: pre-wrap;
+                line-height: 1.75;
+                padding: 14px 16px;
+                background: #f5f2f6;
+                border-radius: 12px;
+                font-size: 14px;
                 color: #1e293b;
             }
+            /* 소제목: 회색으로는 눈에 안 들어와 진하게 세운다 */
+            .s1-note-label {
+                font-size: 13px;
+                color: #334155;
+                font-weight: 600;
+                letter-spacing: -0.01em;
+                margin: 18px 0 8px 0;
+            }
+            .s1-note-label:first-child { margin-top: 0; }
+            /* 총점 강조 */
+            .s1-total {
+                font-size: 26px;
+                font-weight: 700;
+                letter-spacing: -0.02em;
+                line-height: 1.2;
+            }
+            .s1-total-unit { font-size: 14px; font-weight: 500; color: #94a3b8; margin-left: 4px; }
+            /* 영역별 점수 타일 */
+            .s1-tiles {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+                margin-top: 14px;
+            }
+            .s1-tile {
+                border-radius: 12px;
+                padding: 13px 10px;
+                text-align: center;
+            }
+            .s1-tile-name { font-size: 11px; font-weight: 500; margin-bottom: 6px; }
+            .s1-tile-num { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+            .s1-chip {
+                display: inline-block;
+                padding: 5px 12px;
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            /* 신청서 수정·삭제: 내용을 다 읽은 뒤 만나는 자리.
+               삭제는 되돌릴 수 없으므로 수정보다 한 단계 낮춰 고스트로 둔다. */
+            .s1-actions {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+                flex-wrap: wrap;
+                margin-top: 8px;
+                padding: 4px 6px 8px;
+            }
+            .s1-actions-hint {
+                font-size: 12px;
+                color: #9c8ea0;
+                line-height: 1.6;
+            }
+            .s1-actions-btns {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .s1-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                padding: 10px 18px;
+                border: none;
+                border-radius: 10px;
+                font-size: 13px;
+                font-weight: 600;
+                font-family: inherit;
+                cursor: pointer;
+                transition: 0.15s;
+            }
+            .s1-btn i { font-size: 11px; }
+            .s1-btn-edit {
+                background: #eadfe8;
+                color: #3b2d5c;
+            }
+            .s1-btn-edit:hover { background: #e0d2de; }
+            .s1-btn-delete {
+                background: transparent;
+                color: #a08b9e;
+            }
+            .s1-btn-delete:hover {
+                background: rgba(165, 59, 34, 0.08);
+                color: #a53b22;
+            }
+
             @media (max-width: 768px) {
-                .detail-row {
-                    grid-template-columns: 90px 1fr;
-                    gap: 8px;
-                    padding: 12px 0;
+                .s1-card { padding: 20px 18px; border-radius: 14px; }
+                .s1-title-card { padding: 20px 18px; }
+                /* 좁은 화면: 안내문 위, 버튼은 아래에 나란히 */
+                .s1-actions {
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: 12px;
                 }
-                .detail-label {
-                    font-size: 13px;
-                }
-                .detail-value {
-                    font-size: 13px;
-                }
-                .step1-container {
-                    padding: 16px !important;
-                }
-                .step1-container h3 {
-                    font-size: 16px !important;
-                    margin-bottom: 16px !important;
-                }
-                .section-score-grid {
-                    grid-template-columns: repeat(2, 1fr) !important;
-                }
+                .s1-actions-hint { text-align: center; }
+                .s1-actions-btns { flex-direction: column-reverse; }
+                .s1-btn { width: 100%; padding: 13px; font-size: 14px; }
+                .s1-title-text { font-size: 17px; line-height: 1.45; }
+                .s1-title-cap { font-size: 11px; margin-bottom: 6px; }
+                /* 라벨을 값 위로 올려 좁은 칸에서 두 줄로 접히지 않게 */
+                .s1-row { display: block; padding: 8px 0; }
+                .s1-label { margin-bottom: 5px; }
+                .s1-value { font-size: 14px; }
+                .s1-tiles { grid-template-columns: repeat(2, 1fr); }
+                .s1-total { font-size: 22px; }
             }
         </style>
-        <div class="step1-container" style="background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <h3 style="font-size: 19px; font-weight: 700; color: #1e293b; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid #9480c5;">📋 신청서 정보</h3>
-            
-            <div class="detail-row">
-                <div class="detail-label">이름</div>
-                <div class="detail-value" style="font-size: 17px; font-weight: 600;">${escapeHtml(app.name)}</div>
-            </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">이메일</div>
-            <div class="detail-value">${escapeHtml(app.email || '-')}</div>
-        </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">전화번호</div>
-            <div class="detail-value">${escapeHtml(app.phone || '-')}</div>
-        </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">주소</div>
-            <div class="detail-value">${escapeHtml(app.address || '-')}</div>
-        </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">직업</div>
-            <div class="detail-value">${escapeHtml(app.occupation || '-')}</div>
-        </div>
-        
-        ${app.bank_name || app.account_number ? `
-        <div class="detail-row">
-            <div class="detail-label">환불 계좌</div>
-            <div class="detail-value">
-                ${app.bank_name ? escapeHtml(app.bank_name) : '-'} / 
-                ${app.account_number ? escapeHtml(app.account_number) : '-'} / 
-                ${app.account_holder ? escapeHtml(app.account_holder) : '-'}
-            </div>
-        </div>
-        ` : ''}
-        
-        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e2e8f0;">
-        
-        ${currentScoreDisplay}
-        
-        ${app.daily_study_time ? `
-        <div class="detail-row">
-            <div class="detail-label">하루 평균 공부 시간</div>
-            <div class="detail-value">${escapeHtml(app.daily_study_time)}</div>
-        </div>
-        ` : ''}
-        
-        <div class="detail-row">
-            <div class="detail-label">목표 점수</div>
-            <div class="detail-value" style="font-size: 19px; font-weight: 700; color: #77bf7e;">
-                ${targetDisplay}
-            </div>
-        </div>
-        
-        ${app.target_reading_old || app.target_listening_old || app.target_speaking_old || app.target_writing_old || 
-          app.target_reading_new || app.target_listening_new || app.target_speaking_new || app.target_writing_new ? `
-        <div class="detail-row" style="margin-top: 12px;">
-            <div class="detail-label">섹션별 목표</div>
-            <div class="detail-value">
-                <div class="section-score-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-                    ${app.target_version === 'old' ? `
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Reading</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${app.target_reading_old || '-'}</div>
-                        </div>
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Listening</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${app.target_listening_old || '-'}</div>
-                        </div>
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Speaking</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${app.target_speaking_old || '-'}</div>
-                        </div>
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Writing</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${app.target_writing_old || '-'}</div>
-                        </div>
-                    ` : `
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Reading</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${formatNewScore(app.target_reading_new)}</div>
-                        </div>
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Listening</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${formatNewScore(app.target_listening_new)}</div>
-                        </div>
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Speaking</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${formatNewScore(app.target_speaking_new)}</div>
-                        </div>
-                        <div style="padding: 12px; background: #f0fdf4; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">Writing</div>
-                            <div style="font-size: 17px; font-weight: 600; color: #166534;">${formatNewScore(app.target_writing_new)}</div>
-                        </div>
-                    `}
-                </div>
-            </div>
-        </div>
-        ` : ''}
-        
-        ${app.target_notes ? `
-        <div class="detail-row" style="margin-top: 12px;">
-            <div class="detail-label">목표 점수 메모</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.6; color: #64748b; font-size: 13px;">
-${escapeHtml(app.target_notes)}
-            </div>
-        </div>
-        ` : ''}
-        
-        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e2e8f0;">
-        
-        <div class="detail-row">
-            <div class="detail-label">희망 프로그램</div>
-            <div class="detail-value" style="font-size: 16px; font-weight: 600; color: #9480c5;">
-                ${escapeHtml(app.preferred_program || app.program || '-')}
-            </div>
-        </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">희망 시작일</div>
-            <div class="detail-value">${escapeHtml(app.preferred_start_date || '-')}</div>
-        </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">스라첨삭 신청</div>
-            <div class="detail-value" style="color: ${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '#2563eb' : '#64748b'}; font-weight: 600;">
-                ${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '✅ 신청희망' : '미신청'}
-            </div>
-        </div>
-        
-        <div class="detail-row">
-            <div class="detail-label">제출 데드라인</div>
-            <div class="detail-value">${escapeHtml(app.submission_deadline || '-')}</div>
-        </div>
-        
-        ${app.preferred_completion ? `
-        <div class="detail-row">
-            <div class="detail-label">희망 목표 달성 시점</div>
-            <div class="detail-value">${escapeHtml(app.preferred_completion)}</div>
-        </div>
-        ` : ''}
-        
-        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e2e8f0;">
-        
-        ${app.current_study_method ? `
-        <div class="detail-row">
-            <div class="detail-label">현재 토플 공부 방법</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.current_study_method)}</div>
-        </div>
-        ` : ''}
-        
-        ${app.toefl_reason ? `
-        <div class="detail-row">
-            <div class="detail-label">토플이 필요한 이유</div>
-            <div class="detail-value">
-                <div style="font-weight: 600; color: #9480c5; margin-bottom: 8px;">${escapeHtml(app.toefl_reason)}</div>
-                ${app.is_au_nz_direct_submit === 'yes' ? `
-                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 13px; font-weight: 600; margin-bottom: 8px;">
-                    <span>AU/NZ</span> 호주/뉴질랜드 기관 직접 제출
-                </div>
-                ` : ''}
-                ${app.toefl_reason_detail ? `
-                <div style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; align-self: start;">${escapeHtml(app.toefl_reason_detail)}</div>
-                ` : ''}
-            </div>
-        </div>
-        ` : app.toefl_reason_detail ? `
-        <div class="detail-row">
-            <div class="detail-label">토플이 필요한 이유</div>
-            <div class="detail-value">
-                ${app.is_au_nz_direct_submit === 'yes' ? `
-                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #fef3c7; color: #92400e; border-radius: 6px; font-size: 13px; font-weight: 600; margin-bottom: 8px;">
-                    <span>AU/NZ</span> 호주/뉴질랜드 기관 직접 제출
-                </div>
-                ` : ''}
-                <div style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.toefl_reason_detail)}</div>
-            </div>
-        </div>
-        ` : ''}
-        
-        ${app.give_up_plan ? `
-        <div class="detail-row">
-            <div class="detail-label">포기/조절할 것</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.give_up_plan)}</div>
+
+        ${app.application_title ? `
+        <!-- 학생이 직접 붙인 제목. 나머지 카드와 달리 이건 '내용'이 아니라 '표제'다. -->
+        <div class="s1-card s1-title-card">
+            <div class="s1-title-cap">신청서 제목</div>
+            <div class="s1-title-text">${escapeHtml(app.application_title)}</div>
         </div>
         ` : ''}
 
-        ${app.tell_plan ? `
-        <div class="detail-row">
-            <div class="detail-label">챌린지를 알린/알릴 사람</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.tell_plan)}</div>
+        <!-- 1. 기본 정보 -->
+        <div class="s1-card">
+            <div class="s1-card-title">기본 정보</div>
+            <div class="s1-row">
+                <div class="s1-label">성함</div>
+                <div class="s1-value" style="font-weight: 600;">${escapeHtml(app.name)}</div>
+            </div>
+            <div class="s1-row">
+                <div class="s1-label">전화번호</div>
+                <div class="s1-value">${escapeHtml(app.phone)}</div>
+            </div>
+            <div class="s1-row">
+                <div class="s1-label">이메일</div>
+                <div class="s1-value">${escapeHtml(app.email)}</div>
+            </div>
+            ${app.address ? `
+            <div class="s1-row">
+                <div class="s1-label">주소</div>
+                <div class="s1-value">${escapeHtml(app.address)}</div>
+            </div>` : ''}
+            ${app.bank_account ? `
+            <div class="s1-row">
+                <div class="s1-label">환불 계좌</div>
+                <div class="s1-value">${escapeHtml(app.bank_account)}</div>
+            </div>` : ''}
+        </div>
+
+        <!-- 2. 직업 정보 (한 줄이라 제목 옆에 바로 값을 붙인다) -->
+        ${app.occupation ? `
+        <div class="s1-card s1-inline-card">
+            <div class="s1-card-title" style="margin: 0;">직업 정보</div>
+            <div class="s1-value">${escapeHtml(app.occupation)}</div>
         </div>
         ` : ''}
 
-        ${app.program_note ? `
-        <div class="detail-row">
-            <div class="detail-label">노트북/데스크탑 보유 여부</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.program_note)}</div>
+        <!-- 3. 현재 토플 점수 -->
+        <div class="s1-card">
+            <div class="s1-card-title">현재 토플 점수</div>
+            ${hasScore ? `
+                <div class="s1-row">
+                    <div class="s1-label">응시 여부</div>
+                    <div class="s1-value"><span style="color: #2f855a; font-weight: 600;">있음</span> <span style="color: #94a3b8;">· ${scoreIsNew ? '개정 후' : '개정 전'}</span></div>
+                </div>
+                <div class="s1-row">
+                    <div class="s1-label">총점</div>
+                    <div class="s1-total" style="color: #5b4a7d;">${fmtCur(curTotal)}<span class="s1-total-unit">${scoreIsNew ? '레벨' : '점'}</span></div>
+                </div>
+                <div class="s1-tiles">
+                    ${curSections.map(([name, v]) => `
+                    <div class="s1-tile" style="background: #f3eef3;">
+                        <div class="s1-tile-name" style="color: #8b7a92;">${name}</div>
+                        <div class="s1-tile-num" style="color: #3b2d5c;">${fmtCur(v)}</div>
+                    </div>`).join('')}
+                </div>
+                ${app.score_history ? `
+                    <div class="s1-note-label" style="margin-top: 20px;">점수 관련 상세 설명</div>
+                    <div class="s1-note">${escapeHtml(app.score_history)}</div>
+                ` : ''}
+            ` : `
+                <div class="s1-value" style="color: #a53b22; font-weight: 600;">없음</div>
+            `}
+        </div>
+
+        <!-- 4. 영어 실력 평가 (점수가 없는 경우만) -->
+        ${!hasScore && (app.writing_sample_1 || app.writing_sample_2) ? `
+        <div class="s1-card">
+            <div class="s1-card-title">영어 실력 평가</div>
+            ${app.writing_sample_1 ? `
+                <div class="s1-note-label">Q1. What are your hobbies or interests, and why do you enjoy them?</div>
+                <div class="s1-note">${escapeHtml(app.writing_sample_1)}</div>
+            ` : ''}
+            ${app.writing_sample_2 ? `
+                <div class="s1-note-label">Q2. Describe a challenge you faced recently and how you dealt with it.</div>
+                <div class="s1-note">${escapeHtml(app.writing_sample_2)}</div>
+            ` : ''}
         </div>
         ` : ''}
-        
-        ${app.referral_search_keyword || app.referral_social_media || app.referral_friend || app.referral_friend_name || app.referral_other ? `
-        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e2e8f0;">
-        <div class="detail-row">
-            <div class="detail-label">이온토플을 알게 된 경로</div>
-            <div class="detail-value">
-                ${app.referral_search_keyword ? `<div style="margin-bottom: 8px;"><span style="font-weight: 600; color: #9480c5;">검색 키워드:</span> ${escapeHtml(app.referral_search_keyword)}</div>` : ''}
-                ${app.referral_social_media ? `<div style="margin-bottom: 8px;"><span style="font-weight: 600; color: #9480c5;">SNS:</span> ${escapeHtml(app.referral_social_media)}</div>` : ''}
-                ${app.referral_friend === 'yes' && app.referral_friend_name ? `<div style="margin-bottom: 8px;"><span style="font-weight: 600; color: #9480c5;">지인 추천:</span> ${escapeHtml(app.referral_friend_name)}님 추천</div>` : ''}
-                ${app.referral_other ? `<div style="margin-bottom: 8px;"><span style="font-weight: 600; color: #9480c5;">기타:</span> ${escapeHtml(app.referral_other)}</div>` : ''}
+
+        <!-- 5. 학습 현황 -->
+        ${app.current_study_method || app.daily_study_time ? `
+        <div class="s1-card">
+            <div class="s1-card-title">학습 현황</div>
+            ${app.current_study_method ? `
+                <div class="s1-note-label">현재 토플 공부 방법</div>
+                <div class="s1-note">${escapeHtml(app.current_study_method)}</div>
+            ` : ''}
+            ${app.daily_study_time ? `
+            <div class="s1-row" style="margin-top: 14px;">
+                <div class="s1-label">하루 평균 공부 시간</div>
+                <div class="s1-value">${escapeHtml(app.daily_study_time)}</div>
+            </div>` : ''}
+        </div>
+        ` : ''}
+
+        <!-- 6. 목표 점수 -->
+        <div class="s1-card">
+            <div class="s1-card-title">목표 점수</div>
+            ${app.no_target_score ? `
+                <div class="s1-value" style="font-weight: 600; color: #2f855a;">없음 · 고고익선 🚀</div>
+            ` : `
+                <div class="s1-row">
+                    <div class="s1-label">커트라인</div>
+                    <div class="s1-total" style="color: #2f855a;">${fmtTgt(tgtTotal)}<span class="s1-total-unit">${targetIsNew ? '레벨' : '점'}</span></div>
+                </div>
+                ${hasTargetSections ? `
+                <div class="s1-tiles">
+                    ${tgtSections.map(([name, v]) => `
+                    <div class="s1-tile" style="background: #eef6f0;">
+                        <div class="s1-tile-name" style="color: #6b9c7d;">${name}</div>
+                        <div class="s1-tile-num" style="color: #2f855a;">${fmtTgt(v)}</div>
+                    </div>`).join('')}
+                </div>
+                <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">영역별 최소 요구 점수</div>
+                ` : ''}
+            `}
+            ${app.target_note || app.target_notes ? `
+                <div class="s1-note-label" style="margin-top: 20px;">개인 희망 점수 및 추가 설명</div>
+                <div class="s1-note">${escapeHtml(app.target_note || app.target_notes)}</div>
+            ` : ''}
+        </div>
+
+        <!-- 7. 마감 기한 -->
+        ${app.submission_deadline || app.preferred_completion ? `
+        <div class="s1-card">
+            <div class="s1-card-title">마감 기한</div>
+            ${app.submission_deadline ? `
+            <div class="s1-row">
+                <div class="s1-label">마지막 응시 가능일</div>
+                <div class="s1-value">${escapeHtml(app.submission_deadline)}${dDayChip(app.submission_deadline)}</div>
+            </div>` : ''}
+            ${app.preferred_completion ? `
+            <div class="s1-row">
+                <div class="s1-label">희망 목표 달성 시점</div>
+                <div class="s1-value">${escapeHtml(app.preferred_completion)}${dDayChip(app.preferred_completion)}</div>
+            </div>` : ''}
+        </div>
+        ` : ''}
+
+        <!-- 8. 토플 점수가 필요한 이유 -->
+        ${app.toefl_reason || app.toefl_reason_detail ? `
+        <div class="s1-card">
+            <div class="s1-card-title">토플 점수가 필요한 이유</div>
+            ${app.toefl_reason ? `
+            <div class="s1-row">
+                <div class="s1-label">목적</div>
+                <div class="s1-value" style="font-weight: 600; color: #3b2d5c;">${escapeHtml(app.toefl_reason)}</div>
+            </div>` : ''}
+            ${app.is_au_nz_direct_submit === 'yes' ? `
+            <div class="s1-row">
+                <div class="s1-label">기관 직접 제출</div>
+                <div class="s1-value"><span class="s1-chip" style="background: #fbecd2; color: #b45309;">호주 · 뉴질랜드</span></div>
+            </div>` : ''}
+            ${app.toefl_reason_detail ? `
+                <div class="s1-note-label">상세 설명</div>
+                <div class="s1-note">${escapeHtml(app.toefl_reason_detail)}</div>
+            ` : ''}
+        </div>
+        ` : ''}
+
+        <!-- 9. 가장 기억에 남는 블로그 글 -->
+        ${app.memorable_blog_content ? `
+        <div class="s1-card">
+            <div class="s1-card-title">가장 기억에 남는 블로그 글</div>
+            <div class="s1-note">${escapeHtml(app.memorable_blog_content)}</div>
+        </div>
+        ` : ''}
+
+        <!-- 10. 프로그램 및 일정 -->
+        <div class="s1-card">
+            <div class="s1-card-title">프로그램 및 일정</div>
+            <div class="s1-row">
+                <div class="s1-label">희망 프로그램</div>
+                <div class="s1-value" style="font-weight: 600; color: #3b2d5c;">${escapeHtml(app.preferred_program || app.program || '-')}</div>
             </div>
+            <div class="s1-row">
+                <div class="s1-label">스라첨삭 신청</div>
+                <div class="s1-value">${(app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? '<span style="color:#2f855a; font-weight:600;">신청 희망</span>' : '<span style="color:#94a3b8;">미신청</span>'}</div>
+            </div>
+            <div class="s1-row">
+                <div class="s1-label">희망 시작일</div>
+                <div class="s1-value">${escapeHtml(app.preferred_start_date || '-')}</div>
+            </div>
+            ${app.give_up_plan ? `
+                <div class="s1-note-label" style="margin-top: 14px;">포기 · 조절할 것</div>
+                <div class="s1-note">${escapeHtml(app.give_up_plan)}</div>
+            ` : ''}
+            ${app.tell_plan ? `
+                <div class="s1-note-label">챌린지를 알린 · 알릴 사람</div>
+                <div class="s1-note">${escapeHtml(app.tell_plan)}</div>
+            ` : ''}
+            ${app.program_note ? `
+                <div class="s1-note-label">노트북 또는 데스크탑 준비 여부</div>
+                <div class="s1-note">${escapeHtml(app.program_note)}</div>
+            ` : ''}
+        </div>
+
+        <!-- 11. 이온토플을 알게 된 경로 -->
+        ${referrals.length ? `
+        <div class="s1-card">
+            <div class="s1-card-title">이온토플을 알게 된 경로</div>
+            ${referrals.map(([label, value]) => `
+            <div class="s1-row">
+                <div class="s1-label">${label}</div>
+                <div class="s1-value">${escapeHtml(value)}</div>
+            </div>`).join('')}
         </div>
         ` : ''}
-        
+
+        <!-- 12. 추가 전달 사항 -->
         ${app.additional_notes ? `
-        <div class="detail-row">
-            <div class="detail-label">추가 전달사항</div>
-            <div class="detail-value" style="white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #f8fafc; border-radius: 8px; font-size: 15px; align-self: start;">${escapeHtml(app.additional_notes)}</div>
+        <div class="s1-card">
+            <div class="s1-card-title">추가 전달 사항</div>
+            <div class="s1-note">${escapeHtml(app.additional_notes)}</div>
         </div>
         ` : ''}
-        
-        ${/* 개별분석은 별도 탭에서 표시 */ ''}
-        
+
+        <!-- 이온쌤의 답변 -->
         ${app.admin_comment ? `
-            <hr style="margin: 24px 0; border: none; border-top: 1px solid #e2e8f0;">
-            <div style="padding: 20px; background: linear-gradient(135deg, #e8e0f5 0%, #f3e8f3 100%); border-radius: 12px; border-left: 4px solid #9480c5;">
-                <div style="font-size: 13px; font-weight: 700; color: #5e4a8b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-comment-dots"></i> 이온쌤의 답변
-                </div>
-                <div style="font-size: 15px; color: #1e293b; line-height: 1.8; white-space: pre-wrap; align-self: start;">
-${escapeHtml(app.admin_comment)}
-                </div>
+        <div class="s1-card" style="background: #f6f4fb;">
+            <div class="s1-card-title" style="color: #3b2d5c;">이온쌤의 답변</div>
+            <div style="font-size: 15px; color: #1e293b; line-height: 1.8; white-space: pre-wrap;">${escapeHtml(app.admin_comment)}</div>
+        </div>
+        ` : ''}
+
+        <!-- 신청 정보 -->
+        <div class="s1-card">
+            <div class="s1-row">
+                <div class="s1-label">신청일시</div>
+                <div class="s1-value" style="color: #64748b;">${formatDate(app.created_at)}</div>
             </div>
-        ` : ''}
-        
-        <div style="margin-top: 24px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 13px; color: #64748b; text-align: center;">
-            신청일시: ${formatDate(app.created_at)}
+            ${app.confirm_materials || app.confirm_kakao ? `
+            <div class="s1-row">
+                <div class="s1-label">확인 사항</div>
+                <div class="s1-value" style="font-size: 13px; color: #64748b;">
+                    ${app.confirm_materials ? '필독 공지사항 확인 완료' : ''}${app.confirm_materials && app.confirm_kakao ? ' · ' : ''}${app.confirm_kakao ? '카카오톡 본인 인증 동의' : ''}
+                </div>
+            </div>` : ''}
         </div>
-        
-        ${app.confirm_materials || app.confirm_kakao ? `
-        <div style="margin-top: 12px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 13px; color: #0369a1;">
-            <div style="font-weight: 600; margin-bottom: 6px;">✓ 확인 사항</div>
-            ${app.confirm_materials ? '<div>• 필독 공지사항 확인 완료</div>' : ''}
-            ${app.confirm_kakao ? '<div>• 카카오톡 본인 인증 동의</div>' : ''}
-        </div>
-        ` : ''}
-        </div>
+
+        ${applicationActions}
     `;
     
     console.log('Detail content rendered successfully');
@@ -1804,11 +1906,19 @@ function loadStudentTabs(app) {
     }
     
     // 사이드바 네비게이션 활성화
+    // 아직 도달하지 않은 단계는 흐리게 표시한다(클릭은 계속 허용 — 눌러보면 잠금 안내가 뜬다)
+    const stepTabOrder = ['tabInfo', 'tabStudentAnalysis', 'tabContract', 'tabPayment', 'tabUsage'];
     document.querySelectorAll('.step-nav-link').forEach(link => {
         link.classList.remove('active');
         if (link.getAttribute('data-tab') === activeTab) {
             link.classList.add('active');
         }
+        const stepIndex = stepTabOrder.indexOf(link.getAttribute('data-tab'));
+        const stepNo = stepIndex + 1;
+        // 지나온 단계 / 지금 단계 / 아직 못 간 단계를 나눈다
+        link.classList.toggle('step-done', stepIndex >= 0 && stepNo < step);
+        link.classList.toggle('step-current', stepIndex >= 0 && stepNo === step);
+        link.classList.toggle('step-locked', stepIndex >= 0 && stepNo > step);
     });
     
     // ========================================

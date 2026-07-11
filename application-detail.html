@@ -87,20 +87,16 @@
         </div>
     </nav>
 
-    <!-- Page Header -->
-    <section class="page-header" style="padding: 60px 0 40px 0;">
+    <!-- Page Header (이 페이지 전용: .detail-header 로 범위를 좁힌다) -->
+    <section class="page-header detail-header">
         <div class="container">
-            <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 16px;">
-                <a href="application.html" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fas fa-arrow-left"></i> 목록으로 돌아가기
-                </a>
-                <span style="color: rgba(255,255,255,0.4);">|</span>
-                <a href="my-dashboard.html" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fas fa-tachometer-alt"></i> 내 대시보드로
-                </a>
-            </div>
+            <nav class="detail-header-nav">
+                <a href="application.html"><i class="fas fa-arrow-left"></i> 목록으로 돌아가기</a>
+                <span class="detail-header-sep">·</span>
+                <a href="my-dashboard.html"><i class="fas fa-tachometer-alt"></i> 내 대시보드로</a>
+            </nav>
             <h1 id="detailTitle">신청서 상세</h1>
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
+            <div class="detail-header-meta">
                 <div id="detailStatus"></div>
             </div>
         </div>
@@ -113,7 +109,7 @@
     </div>
 
     <!-- Page Layout (Sidebar + Content) -->
-    <div class="page-layout" id="detailCard" style="display: none;">
+    <div class="page-layout detail-layout" id="detailCard" style="display: none;">
         <div class="container">
             <div class="layout-wrapper">
                 <!-- Sidebar (STEP Navigation) -->
@@ -169,19 +165,13 @@
             </div>
         </div>
     </div>
-                        <i class="fas fa-list"></i> 목록으로
-                    </a>
-                </div>
-            </div>
 
-            <!-- Error Message -->
-            <div id="errorMessage" style="display: none; text-align: center; padding: 80px 20px;">
-                <i class="fas fa-exclamation-circle" style="font-size: 64px; color: #ef4444; margin-bottom: 20px;"></i>
-                <p style="font-size: 18px; color: #1e293b; font-weight: 600; margin-bottom: 8px;">신청서를 찾을 수 없습니다</p>
-                <p id="errorDetail" style="font-size: 14px; color: #64748b; margin-bottom: 32px;">존재하지 않거나 삭제된 신청서입니다.</p>
-            </div>
-        </div>
-    </section>
+    <!-- Error Message -->
+    <div id="errorMessage" style="display: none; text-align: center; padding: 80px 20px;">
+        <i class="fas fa-exclamation-circle" style="font-size: 64px; color: #ef4444; margin-bottom: 20px;"></i>
+        <p style="font-size: 18px; color: #1e293b; font-weight: 600; margin-bottom: 8px;">신청서를 찾을 수 없습니다</p>
+        <p id="errorDetail" style="font-size: 14px; color: #64748b; margin-bottom: 32px;">존재하지 않거나 삭제된 신청서입니다.</p>
+    </div>
 
     <!-- Admin Dashboard Button (관리자만 표시) -->
     <a href="admin-dashboard.html" id="adminDashboardBtn" 
