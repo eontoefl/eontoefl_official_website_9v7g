@@ -1017,141 +1017,228 @@ function getAnalysisSection(app) {
     if (!app.analysis_status || !app.analysis_content) {
         return '';
     }
-    
-    // 상태 텍스트 및 색상
+
+    // 상태별 표제 (톤: 합격=초록, 조건부=주황, 불합격=코랄. 선/큰 배너 대신 아이콘 타일 + 한 줄)
     const statusInfo = {
-        '승인': { text: '<svg width="24" height="24" viewBox="0 0 24 24" style="display: inline-block; vertical-align: middle; margin-right: 8px;"><circle cx="12" cy="12" r="10" fill="#22c55e"/><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>합격 - 승인되었습니다!', color: '#22c55e', bg: '#dcfce7', border: '#22c55e' },
-        '조건부승인': { text: '⚠️ 조건부 합격', color: '#f59e0b', bg: '#fef3c7', border: '#eab308' },
-        '거부': { text: '❌ 불합격', color: '#ef4444', bg: '#fee2e2', border: '#ef4444' }
+        '승인':       { title: '합격 · 승인되었습니다', icon: 'fa-circle-check', accent: '#2f855a', tile: '#dcf0e3' },
+        '조건부승인': { title: '조건부 합격',           icon: 'fa-circle-exclamation', accent: '#b45309', tile: '#fbecd2' },
+        '거부':       { title: '불합격',               icon: 'fa-circle-xmark', accent: '#a53b22', tile: '#f6ddd6' }
     };
-    
     const status = statusInfo[app.analysis_status] || statusInfo['승인'];
-    
-    // 동의가 필요한지 확인 (동의 체크박스+타이머는 '승인'일 때만 노출)
+
     const isConditional = app.analysis_status === '조건부승인';
+    const isRejected = app.analysis_status === '거부';
+    // 프로그램·가격은 승인 케이스에만 보여준다.
+    // 조건부승인은 협의 전이라, 불합격은 진행이 없으므로 숨긴다.
+    const showProgramAndPrice = !isConditional && !isRejected;
     const needsAgreement = app.analysis_status === '승인' && !app.student_program_agreed;
     // 조건부승인은 아직 협의 단계 → 동의 폼 대신 카톡 문의 안내를 표시
     const showConditionalContact = isConditional && !app.student_program_agreed;
-    
+
     return `
-        <hr style="margin: 32px 0; border: none; border-top: 2px solid #e2e8f0;">
-        
-        <!-- 개별분석 결과 상태 -->
-        <div style="padding: 24px; background: ${status.bg}; border: 2px solid ${status.border}; border-radius: 12px; margin-bottom: 24px; text-align: center;">
-            <div style="font-size: 20px; font-weight: 700; color: ${status.color};">
-                ${status.text}
+        <style>
+            /* STEP 1과 같은 카드/여백 언어. 선·2px 컬러 테두리·hr 없음. */
+            .s2-card {
+                background: #ffffff;
+                border-radius: 16px;
+                padding: 24px 28px;
+                box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+                margin-bottom: 14px;
+            }
+            .s2-card-title {
+                font-size: 15px;
+                font-weight: 700;
+                color: #1e293b;
+                letter-spacing: -0.01em;
+                margin: 0 0 16px 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .s2-card-title i { font-size: 13px; color: #9c8ea0; }
+            /* 합격/불합격 표제 */
+            .s2-verdict {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+            }
+            .s2-verdict-tile {
+                width: 46px; height: 46px;
+                border-radius: 13px;
+                display: flex; align-items: center; justify-content: center;
+                flex-shrink: 0;
+            }
+            .s2-verdict-tile i { font-size: 20px; }
+            .s2-verdict-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #1e293b; }
+            /* 분석 본문 */
+            .s2-analysis {
+                line-height: 1.85;
+                color: #1e293b;
+                white-space: pre-wrap;
+                font-size: 15px;
+            }
+            /* 라벨-값 행 */
+            .s2-row {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 16px;
+                padding: 8px 0;
+            }
+            .s2-row-label { font-size: 14px; color: #64748b; flex-shrink: 0; }
+            .s2-row-value { font-size: 15px; font-weight: 600; color: #1e293b; text-align: right; }
+            /* 체크 항목 */
+            .s2-check {
+                display: flex; align-items: flex-start; gap: 12px;
+                padding: 16px 18px;
+                background: #f6f4fb;
+                border-radius: 12px;
+                margin-bottom: 10px;
+                cursor: pointer;
+                transition: 0.15s;
+            }
+            .s2-check:hover { background: #efeaf7; }
+            .s2-check input { width: 20px; height: 20px; margin-top: 2px; cursor: pointer; accent-color: #7c68a8; flex-shrink: 0; }
+            .s2-check label { flex: 1; cursor: pointer; line-height: 1.6; color: #1e293b; }
+            .s2-check label span { font-size: 13px; color: #94a3b8; }
+            /* 주 동의 버튼: 시그니처 그라데이션(주색→밝은 톤). 그림자 대신 색으로 존재감.
+               비활성일 땐 채움을 걷고 눌린 톤으로 — 아직 못 누른다는 걸 색으로 알린다. */
+            .s2-agree-btn {
+                width: 100%;
+                padding: 15px;
+                background: #9480c5;
+                color: #ffffff;
+                border: none;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 600;
+                font-family: inherit;
+                letter-spacing: -0.01em;
+                cursor: pointer;
+                transition: 0.15s;
+            }
+            .s2-agree-btn:disabled {
+                background: #ece7f2;
+                color: #b3a6c9;
+                cursor: not-allowed;
+            }
+            .s2-agree-btn:not(:disabled):hover { filter: brightness(1.06); }
+            @media (max-width: 768px) {
+                .s2-card { padding: 20px 18px; border-radius: 14px; }
+                .s2-row { flex-direction: column; align-items: flex-start; gap: 3px; }
+                .s2-row-value { text-align: left; }
+            }
+        </style>
+
+        <!-- 표제: 큰 배너 대신 아이콘 타일 + 한 줄 -->
+        <div class="s2-card">
+            <div class="s2-verdict">
+                <div class="s2-verdict-tile" style="background: ${status.tile};">
+                    <i class="fas ${status.icon}" style="color: ${status.accent};"></i>
+                </div>
+                <div class="s2-verdict-title">${status.title}</div>
             </div>
         </div>
-        
+
         <!-- 1. 개별 분석 내용 -->
         ${app.analysis_content ? `
-        <div style="padding: 24px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px;">
-            <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-file-alt" style="color: #9480c5;"></i> 개별 분석 내용
-            </div>
-            <div style="line-height: 1.8; color: #1e293b; white-space: pre-wrap; font-size: 15px; align-self: start;">
-                ${escapeHtml(app.analysis_content)}
-            </div>
+        <div class="s2-card">
+            <div class="s2-card-title"><i class="fas fa-file-lines"></i> 개별 분석 내용</div>
+            <div class="s2-analysis">${escapeHtml(app.analysis_content)}</div>
         </div>
         ` : ''}
-        
+
         <!-- 2. 배정 프로그램 정보 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
-        ${!isConditional && app.assigned_program ? `
-        <div style="padding: 24px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px;">
-            <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-graduation-cap" style="color: #9480c5;"></i> 배정 프로그램 정보
+        ${showProgramAndPrice && app.assigned_program ? `
+        <div class="s2-card">
+            <div class="s2-card-title"><i class="fas fa-graduation-cap"></i> 배정 프로그램 정보</div>
+            <div class="s2-row">
+                <span class="s2-row-label">프로그램명</span>
+                <span class="s2-row-value" style="color: #5b4a7d;">${escapeHtml(app.assigned_program)}</span>
             </div>
-            
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">프로그램명</span>
-                <span style="font-weight: 600; color: #9480c5; font-size: 16px;">${escapeHtml(app.assigned_program)}</span>
-            </div>
-            
             ${app.schedule_start ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">시작일</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.schedule_start}</span>
-            </div>
-            ` : ''}
-            
+            <div class="s2-row">
+                <span class="s2-row-label">시작일</span>
+                <span class="s2-row-value">${app.schedule_start}</span>
+            </div>` : ''}
             ${app.schedule_end ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">종료일</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.schedule_end}</span>
-            </div>
-            ` : ''}
+            <div class="s2-row">
+                <span class="s2-row-label">종료일</span>
+                <span class="s2-row-value">${app.schedule_end}</span>
+            </div>` : ''}
             ${app.correction_enabled ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span style="color: #64748b; font-size: 15px;">스라첨삭</span>
-                <span style="font-weight: 600; color: #2563eb; font-size: 15px;">포함</span>
+            <div class="s2-row">
+                <span class="s2-row-label">스라첨삭</span>
+                <span class="s2-row-value" style="color: #2f855a;">포함</span>
             </div>
             ${app.correction_start_date ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0;">
-                <span style="color: #64748b; font-size: 15px;">첨삭 시작일</span>
-                <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${app.correction_start_date}</span>
-            </div>
-            ` : ''}
+            <div class="s2-row">
+                <span class="s2-row-label">첨삭 시작일</span>
+                <span class="s2-row-value">${app.correction_start_date}</span>
+            </div>` : ''}
             ${app.extension_enabled && app.extension_start_date ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0;">
-                <span style="color: #64748b; font-size: 15px;">13~24세션 시작일</span>
-                <span style="font-weight: 600; color: #7c3aed; font-size: 15px;">${app.extension_start_date}</span>
-            </div>
-            ` : ''}
+            <div class="s2-row">
+                <span class="s2-row-label">13~24세션 시작일</span>
+                <span class="s2-row-value" style="color: #5b4a7d;">${app.extension_start_date}</span>
+            </div>` : ''}
             ` : ''}
         </div>
         ` : ''}
-        
-        <!-- 3. 이용가 및 할인 내역 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
-        ${!isConditional ? getPricingBox(app) : ''}
 
-        <!-- 중요 안내사항 (가격 정보와 동의 섹션 사이) -->
-        ${app.analysis_content && !app.is_incentive_applicant && !isConditional ? `
-        <div style="padding: 20px; background: #fef2f2; border: 2px solid #fca5a5; border-radius: 12px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: flex-start; gap: 12px;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 24px; color: #dc2626; margin-top: 2px;"></i>
-                <div>
-                    <div style="font-size: 16px; font-weight: 700; color: #dc2626; margin-bottom: 8px;">⏰ 필독! 자동 승인불가 처리 안내</div>
-                    <div style="font-size: 14px; color: #991b1b; line-height: 1.7;">
-                        토플 일대일 진단서 업로드 시간으로부터 <strong>24시간 이내에 댓글이 없을 시</strong>, 알림 없이 자동으로 <strong style="text-decoration: underline;">승인불가 처리</strong>가 됩니다.
-                        토플이 최우선이고, 열심히 하실 마음, 절박함과 의지가 있으신 분들이라고 판단되지 않기 때문에 내린 결정입니다.
-                        또한, 이후 <strong>만 5일간 새로운 신청서를 업로드 하실 수 없으니</strong> 반드시 참고해주시기 바랍니다.
-                    </div>
+        <!-- 3. 이용가 및 할인 내역 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
+        ${showProgramAndPrice ? getPricingBox(app) : ''}
+
+        <!-- 동의 섹션 (승인일 때만) — 경고·타이머·동의폼이 여기서 한 덩어리가 된다 -->
+        ${needsAgreement ? getAgreementSection(app) : ''}
+
+        <!-- 불합격: 격려 카드 (다음 도전을 위한 마무리) -->
+        ${isRejected ? `
+        <div class="s2-card" style="background: linear-gradient(135deg, #e3d5e1 0%, #eee3ec 100%); box-shadow: 0 2px 20px rgba(59, 45, 92, 0.08); text-align: center; padding: 34px 28px;">
+            <div class="s2-verdict-tile" style="background: #ffffff; margin: 0 auto 16px;">
+                <i class="fas fa-seedling" style="color: #7c68a8; font-size: 20px;"></i>
+            </div>
+            <div style="font-size: 18px; font-weight: 700; color: #3b2d5c; letter-spacing: -0.01em; margin-bottom: 10px;">포기하지 마세요</div>
+            <p style="font-size: 14px; color: #5b4a72; line-height: 1.9; margin: 0 auto; max-width: 460px;">
+                지금은 아니지만, 토플은 준비된 만큼 반드시 오릅니다.<br>
+                분석에서 짚어드린 부분을 채우고 다시 도전해 주세요.<br>
+                언제든 응원하겠습니다.
+            </p>
+        </div>
+        ` : ''}
+
+        <!-- 조건부승인: 카톡 문의 안내 (동의 폼·타이머 대신) -->
+        ${showConditionalContact ? `
+        <div class="s2-card">
+            <div style="display: flex; align-items: flex-start; gap: 14px;">
+                <div class="s2-verdict-tile" style="background: #f3f0e2;">
+                    <i class="fas fa-comment-dots" style="color: #b58a2e; font-size: 18px;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: 16px; font-weight: 700; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 8px;">카톡 한 번 부탁드려요</div>
+                    <p style="font-size: 14px; color: #64748b; line-height: 1.8; margin: 0 0 18px 0;">
+                        위 개별분석을 보시면 아시겠지만, 함께 조금 더 이야기 나눠보면 좋을 부분이 있어요.<br>분석에서 제가 여쭤본 내용에 대해서 카카오톡으로 답변 주시면, 그 내용을 바탕으로 프로그램과 일정을 다시 상담하면서 맞춰보도록 해요!<br><span style="color: #94a3b8; font-size: 13px;">(카카오톡 채널 특성상 제가 먼저 카톡을 보낼 수 없어서ㅠ 꼭 카톡 부탁드려요!)</span>
+                    </p>
+                    <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener noreferrer"
+                       style="display: inline-flex; align-items: center; gap: 7px; padding: 11px 20px; background: #f3eccf; color: #7a5f1e; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none;">
+                        <i class="fas fa-comment" style="font-size: 14px;"></i> 카카오톡으로 답변 보내기
+                    </a>
                 </div>
             </div>
         </div>
         ` : ''}
 
-        
-        <!-- 동의 섹션 (승인일 때만) -->
-        ${needsAgreement ? getAgreementSection(app) : ''}
-
-        <!-- 조건부승인: 카톡 문의 안내 (동의 폼·타이머 대신) -->
-        ${showConditionalContact ? `
-        <div style="padding: 24px; background: #fffbeb; border: 2px solid #fcd34d; border-radius: 12px; margin-bottom: 24px; text-align: center;">
-            <div style="font-size: 17px; font-weight: 700; color: #92400e; margin-bottom: 10px;">
-                <i class="fas fa-comments"></i> 추가 확인이 필요해요
-            </div>
-            <p style="font-size: 14px; color: #92400e; line-height: 1.8; margin-bottom: 20px;">
-                위 분석 내용을 확인하신 뒤, 아래 버튼을 눌러 카카오톡으로 편하게 문의해주세요.<br>
-                선생님과 이야기 나눈 후 다음 단계를 안내해드릴게요.
-            </p>
-            <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener noreferrer"
-               style="display: inline-flex; align-items: center; gap: 8px; padding: 15px 36px; background: #FEE500; color: #3C1E1E; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 12px rgba(254, 229, 0, 0.4);">
-                <i class="fas fa-comment" style="font-size: 18px;"></i> 카카오톡으로 문의하기
-            </a>
-        </div>
-        ` : ''}
-
         <!-- 동의 완료 메시지 -->
         ${app.student_program_agreed ? `
-        <div style="padding: 24px; background: #dcfce7; border: 2px solid #22c55e; border-radius: 12px; text-align: center;">
-            <i class="fas fa-check-circle" style="font-size: 48px; color: #22c55e; margin-bottom: 16px;"></i>
-            <h3 style="font-size: 18px; font-weight: 700; color: #166534; margin-bottom: 8px;">동의 완료</h3>
-            <p style="font-size: 14px; color: #166534;">
+        <div class="s2-card" style="background: #f2f8f4; text-align: center;">
+            <div class="s2-verdict-tile" style="background: #dcf0e3; margin: 0 auto 14px;">
+                <i class="fas fa-circle-check" style="color: #2f855a; font-size: 20px;"></i>
+            </div>
+            <h3 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">동의 완료</h3>
+            <p style="font-size: 14px; color: #64748b; line-height: 1.7;">
                 프로그램 동의가 완료되었습니다.<br>
                 ${app.student_agreed_at ? `(동의일: ${formatDate(app.student_agreed_at)})` : ''}
             </p>
-            <p style="font-size: 13px; color: #166534; margin-top: 12px;">
+            <p style="font-size: 13px; color: #94a3b8; margin-top: 12px;">
                 다음 단계 진행을 위해 관리자가 연락드릴 예정입니다.
             </p>
         </div>
@@ -1198,27 +1285,35 @@ function startAnalysisCountdown(completedAt, isIncentive) {
         if (remaining <= 0) {
             clearInterval(analysisCountdownInterval);
             el.textContent = '00:00:00';
-            el.style.color = '#dc2626';
-            // 안내 컨테이너를 빨간색으로 전환
-            containerEl.style.background = '#fee2e2';
-            containerEl.style.borderColor = '#ef4444';
+            // 만료: 타이머 칩을 코랄로 (칩 배경은 부모 span)
+            el.style.color = '#a53b22';
+            const chip = el.parentElement;
+            if (chip) chip.style.background = '#f6ddd6';
             const msgEl = document.getElementById('analysisCountdownMsg');
             if (msgEl) {
-                msgEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.';
-                msgEl.style.color = '#dc2626';
+                msgEl.innerHTML = '<i class="fas fa-triangle-exclamation"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.';
+                msgEl.style.color = '#a53b22';
+                msgEl.style.fontSize = '13px';
+                msgEl.style.fontWeight = '600';
+                msgEl.style.marginTop = '4px';
             }
             return;
         }
-        
+
         el.textContent = formatCountdown(remaining, isIncentive);
-        
-        // 색상 전환: 긴급이면 타이머를 빨간색으로
+
+        // 임박: 타이머 칩을 주황으로
         if (remaining <= urgentThresholdMs) {
-            el.style.color = '#dc2626';
+            el.style.color = '#b45309';
+            const chip = el.parentElement;
+            if (chip) chip.style.background = '#fbecd2';
             const msgEl = document.getElementById('analysisCountdownMsg');
             if (msgEl) {
-                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!';
-                msgEl.style.color = '#dc2626';
+                msgEl.innerHTML = '<i class="fas fa-circle-exclamation"></i> 동의 기한이 얼마 남지 않았습니다!';
+                msgEl.style.color = '#b45309';
+                msgEl.style.fontSize = '13px';
+                msgEl.style.fontWeight = '600';
+                msgEl.style.marginTop = '4px';
             }
         }
     }
@@ -1281,67 +1376,104 @@ function getAgreementSection(app) {
         ? `<div style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
         : (isUrgent ? `<div id="analysisCountdownMsg" style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : '');
     
-    // 타이머를 안내 컨테이너 오른쪽에 통합
-    const inlineTimer = analysisTimestamp ? `
-        ${expiredMsg}
-    ` : '';
-    
-    // 타이머 박스 (안내 헤더 오른쪽에 배치)
-    const timerBox = analysisTimestamp ? `
-        <div style="background: white; padding: 8px 16px; border-radius: 8px; border: 2px solid ${timerBorderColor}; flex-shrink: 0; text-align: center;">
-            <span id="analysisCountdownTimer" style="font-size: 20px; font-weight: 700; color: ${timerColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
+    // 동의 대상 요약: 학생이 "무엇에 동의하는지"를 폼 바로 위에서 다시 보여준다.
+    // (프로그램·가격 카드가 한참 위에 있어 스크롤 없이 확인하도록)
+    const priceStr = app.final_price ? `${app.final_price.toLocaleString()}원` : '';
+    const agreeSummary = `
+        <div style="background: #f6f4fb; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px;">
+            ${app.assigned_program ? `
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
+                <span style="color: #64748b;">프로그램</span>
+                <span style="font-weight: 600; color: #5b4a7d; text-align: right;">${escapeHtml(app.assigned_program)}</span>
+            </div>` : ''}
+            ${app.schedule_start ? `
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
+                <span style="color: #64748b;">일정</span>
+                <span style="font-weight: 600; color: #1e293b; text-align: right;">${app.schedule_start}${app.schedule_end ? ' ~ ' + app.schedule_end : ''}</span>
+            </div>` : ''}
+            ${priceStr ? `
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
+                <span style="color: #64748b;">최종 입금금액</span>
+                <span style="font-weight: 700; color: #5b4a7d; text-align: right;">${priceStr}</span>
+            </div>` : ''}
+        </div>
+    `;
+
+    // 자동 승인불가 경고: 프로모션(유도) 학생이 아닐 때만. 문구는 정책이라 그대로 유지한다.
+    const autoRejectWarning = !isIncentive ? `
+        <div style="background: #f9edea; border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;">
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+                <i class="fas fa-triangle-exclamation" style="font-size: 15px; color: #a53b22; margin-top: 3px; flex-shrink: 0;"></i>
+                <div>
+                    <div style="font-size: 14px; font-weight: 700; color: #a53b22; margin-bottom: 6px;">⏰ 필독! 자동 승인불가 처리 안내</div>
+                    <div style="font-size: 13px; color: #7a3423; line-height: 1.7;">
+                        토플 일대일 진단서 업로드 시간으로부터 <strong>24시간 이내에 댓글이 없을 시</strong>, 알림 없이 자동으로 <strong style="text-decoration: underline;">승인불가 처리</strong>가 됩니다.
+                        토플이 최우선이고, 열심히 하실 마음, 절박함과 의지가 있으신 분들이라고 판단되지 않기 때문에 내린 결정입니다.
+                        또한, 이후 <strong>만 5일간 새로운 신청서를 업로드 하실 수 없으니</strong> 반드시 참고해주시기 바랍니다.
+                    </div>
+                </div>
+            </div>
         </div>
     ` : '';
-    
+
+    // 남은 시간 뱃지: 만료/임박이면 코랄, 평상시 라벤더. 큰 노란 박스 대신 폼 헤더 옆 작은 칩.
+    let timerChipBg, timerChipColor;
+    if (isExpired) { timerChipBg = '#f6ddd6'; timerChipColor = '#a53b22'; }
+    else if (isUrgent) { timerChipBg = '#fbecd2'; timerChipColor = '#b45309'; }
+    else { timerChipBg = '#ece4f2'; timerChipColor = '#5b4a7d'; }
+
+    const timerChip = analysisTimestamp ? `
+        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: ${timerChipBg}; flex-shrink: 0;">
+            <i class="fas fa-clock" style="font-size: 11px; color: ${timerChipColor};"></i>
+            <span id="analysisCountdownTimer" style="font-size: 15px; font-weight: 700; color: ${timerChipColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
+        </span>
+    ` : '';
+
+    // 만료/임박 안내 한 줄 (id 유지 — 카운트다운 로직이 갱신)
+    const deadlineMsg = isExpired
+        ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #a53b22; font-weight: 600; margin-top: 4px;"><i class="fas fa-triangle-exclamation"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
+        : (isUrgent ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #b45309; font-weight: 600; margin-top: 4px;"><i class="fas fa-circle-exclamation"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : `<div id="analysisCountdownMsg"></div>`);
+
+    // 경고·타이머·동의폼을 한 카드로 묶는다. (id: analysisCountdownContainer 유지)
     return `
-        <div id="analysisCountdownContainer" style="padding: 20px; background: ${infoBg}; border: 2px solid ${infoBorder}; border-radius: 12px; margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                <div style="font-size: 16px; font-weight: 700; color: #991b1b; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-clipboard-list" style="color: ${infoIconColor};"></i> 동의 안내
-                </div>
-                ${timerBox}
+        <div id="analysisCountdownContainer" class="s2-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px;">
+                <div class="s2-card-title" style="margin: 0;"><i class="fas fa-clipboard-check"></i> 프로그램 동의 (필수)</div>
+                ${timerChip}
             </div>
-            <div style="font-size: 14px; color: ${infoTextColor}; line-height: 1.7; margin-top: 10px;">
+            <div style="font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 4px;">
                 ${guideText}
             </div>
-            ${inlineTimer}
-        </div>
+            ${deadlineMsg}
 
-        <div style="padding: 24px; background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; margin-bottom: 24px;">
-            <div style="font-size: 16px; font-weight: 700; color: #991b1b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-exclamation-circle"></i> 프로그램 동의 (필수)
-            </div>
-            
-            <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; cursor: pointer;" onclick="toggleCheckbox(event, 'agreeProgram')">
-                <input type="checkbox" id="agreeProgram" onchange="updateAgreementButton()" style="width: 20px; height: 20px; margin-top: 4px; cursor: pointer;">
-                <label for="agreeProgram" style="flex: 1; cursor: pointer; line-height: 1.6; color: #1e293b;">
-                    <strong>프로그램명, 시작일, 가격에 동의합니다.</strong><br>
-                    <span style="font-size: 13px; color: #64748b;">
-                        배정된 프로그램 정보를 확인했으며, 해당 내용에 동의합니다.
-                    </span>
-                </label>
-            </div>
-            
-            <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; cursor: pointer;" onclick="toggleCheckbox(event, 'agreeSchedule')">
-                <input type="checkbox" id="agreeSchedule" onchange="updateAgreementButton()" style="width: 20px; height: 20px; margin-top: 4px; cursor: pointer;">
-                <label for="agreeSchedule" style="flex: 1; cursor: pointer; line-height: 1.6; color: #1e293b;">
-                    <strong>일정에 동의합니다.</strong><br>
-                    <span style="font-size: 13px; color: #64748b;">
-                        시작일과 종료일을 확인했으며, 해당 일정에 참여할 수 있습니다.
-                    </span>
-                </label>
-            </div>
-            
-            <div style="text-align: center; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.6;">
-                프로그램·일정·첨삭 등 변경을 원하시면 오른쪽 카카오톡 아이콘을 눌러주세요.
-            </div>
+            <div style="margin-top: 18px;">
+                ${agreeSummary}
+                ${autoRejectWarning}
 
-            <button id="submitAgreementBtn"
-                    onclick="submitStudentAgreement()"
-                    disabled
-                    style="width: 100%; padding: 16px; background: linear-gradient(135deg, #9480c5 0%, #b8a4d6 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(148, 128, 197, 0.3);">
-                <i class="fas fa-check-circle"></i> 동의하고 다음 단계로
-            </button>
+                <div class="s2-check" onclick="toggleCheckbox(event, 'agreeProgram')">
+                    <input type="checkbox" id="agreeProgram" onchange="updateAgreementButton()">
+                    <label for="agreeProgram">
+                        <strong>프로그램명, 시작일, 가격에 동의합니다.</strong><br>
+                        <span>배정된 프로그램 정보를 확인했으며, 해당 내용에 동의합니다.</span>
+                    </label>
+                </div>
+
+                <div class="s2-check" onclick="toggleCheckbox(event, 'agreeSchedule')">
+                    <input type="checkbox" id="agreeSchedule" onchange="updateAgreementButton()">
+                    <label for="agreeSchedule">
+                        <strong>일정에 동의합니다.</strong><br>
+                        <span>시작일과 종료일을 확인했으며, 해당 일정에 참여할 수 있습니다.</span>
+                    </label>
+                </div>
+
+                <div style="text-align: center; margin: 14px 0; font-size: 13px; color: #94a3b8; line-height: 1.6;">
+                    프로그램·일정·첨삭 등 변경을 원하시면 오른쪽 카카오톡 아이콘을 눌러주세요.
+                </div>
+
+                <button id="submitAgreementBtn" onclick="submitStudentAgreement()" disabled class="s2-agree-btn">
+                    <i class="fas fa-circle-check" style="margin-right: 7px;"></i> 동의하고 다음 단계로
+                </button>
+            </div>
         </div>
     `;
 }
@@ -1367,16 +1499,8 @@ function updateAgreementButton() {
     const submitBtn = document.getElementById('submitAgreementBtn');
     
     if (agreeProgram && agreeSchedule && submitBtn) {
-        const isEnabled = agreeProgram.checked && agreeSchedule.checked;
-        submitBtn.disabled = !isEnabled;
-        
-        if (isEnabled) {
-            submitBtn.style.opacity = '1';
-            submitBtn.style.cursor = 'pointer';
-        } else {
-            submitBtn.style.opacity = '0.5';
-            submitBtn.style.cursor = 'not-allowed';
-        }
+        // disabled 속성만 토글한다. 색·커서는 .s2-agree-btn:disabled CSS가 담당.
+        submitBtn.disabled = !(agreeProgram.checked && agreeSchedule.checked);
     }
 }
 
@@ -1849,10 +1973,12 @@ function loadStudentTabs(app) {
         const analysisTab = document.getElementById('tabStudentAnalysis');
         if (analysisTab) {
             analysisTab.innerHTML = `
-                <div style="padding: 80px 20px; text-align: center; color: #64748b;">
-                    <i class="fas fa-clock" style="font-size: 64px; margin-bottom: 20px; opacity: 0.3;"></i>
-                    <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">분석 대기 중</h3>
-                    <p style="font-size: 14px;">이온쌤이 신청서를 검토 중입니다. 곧 개별분석 결과를 보내드리겠습니다!</p>
+                <div style="background: #ffffff; border-radius: 16px; padding: 64px 24px; text-align: center; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                    <div style="width: 60px; height: 60px; border-radius: 16px; background: #f0e9ef; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                        <i class="fas fa-clock" style="font-size: 26px; color: #b3a0b8;"></i>
+                    </div>
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px; color: #1e293b;">분석 대기 중</h3>
+                    <p style="font-size: 14px; color: #64748b; line-height: 1.7;">이온쌤이 신청서를 검토 중입니다.<br>곧 개별분석 결과를 보내드리겠습니다!</p>
                 </div>
             `;
         }
@@ -2614,86 +2740,53 @@ async function submitContractAgreement() {
  */
 function getPricingBox(app, showPaymentNotice = true) {
     if (!app.assigned_program) return '';
-    
+
+    // 한 줄 항목: 라벨 좌 / 값 우. 선 없이 여백으로만 나눈다.
+    const row = (label, value, valueColor = '#1e293b', strong = false) => `
+        <div style="display: flex; justify-content: space-between; gap: 12px; padding: 8px 0;">
+            <span class="pb-label" style="color: #64748b; font-size: 13px;">${label}</span>
+            <span class="pb-value" style="font-weight: ${strong ? 700 : 600}; color: ${valueColor}; font-size: 13px; text-align: right;">${value}</span>
+        </div>
+    `;
+    const note = (text) => `
+        <div style="padding: 0 0 8px 0;">
+            <p class="pb-note" style="font-size: 10px; color: #94a3b8; line-height: 1.5; margin: 0;">${text}</p>
+        </div>
+    `;
+
+    const realPrice = (app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0);
+
     return `
         <style>
             @media (min-width: 768px) {
-                .pb-title { font-size: 17px !important; }
-                .pb-label { font-size: 15px !important; }
-                .pb-value { font-size: 15px !important; }
-                .pb-reason { font-size: 14px !important; }
-                .pb-note { font-size: 11.5px !important; }
-                .pb-final-label { font-size: 16px !important; }
+                .pb-title { font-size: 15px !important; }
+                .pb-label { font-size: 14px !important; }
+                .pb-value { font-size: 14px !important; }
+                .pb-note { font-size: 11px !important; }
+                .pb-final-label { font-size: 15px !important; }
                 .pb-final-value { font-size: 22px !important; }
                 .pb-info { font-size: 13px !important; }
             }
         </style>
-        <div style="padding: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px;">
-            <div class="pb-title" style="font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
-                <i class="fas fa-receipt" style="color: #9480c5;"></i> 이용가 및 할인 내역
-            </div>
-            
-            ${app.program_price ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">정가</span>
-                <span class="pb-value" style="font-weight: 600; color: #1e293b; font-size: 13px;">${app.program_price.toLocaleString()}원</span>
-            </div>
-            ` : ''}
-            
-            ${app.discount_amount ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">시험료 지원</span>
-                <span class="pb-value" style="font-weight: 600; color: #22c55e; font-size: 13px;">-${app.discount_amount.toLocaleString()}원</span>
-            </div>
-            <div style="padding: 8px 0 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <p class="pb-note" style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
-                    ※ 실제시험 2회 진행 및 점수 인증, 후기 1회 작성 조건이 포함되어있습니다.
-                </p>
-            </div>
-            ` : ''}
-            
-            ${app.correction_enabled && app.correction_fee ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">스라첨삭 (Speaking & Writing)</span>
-                <span class="pb-value" style="font-weight: 600; color: #3b82f6; font-size: 13px;">+${app.correction_fee.toLocaleString()}원</span>
-            </div>
-            ` : ''}
-            
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">실제 이용가</span>
-                <span class="pb-value" style="font-weight: 600; color: #1e293b; font-size: 13px;">${((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0)).toLocaleString()}원</span>
-            </div>
-            
-            ${app.additional_discount ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">추가 할인</span>
-                <span class="pb-value" style="font-weight: 600; color: #ef4444; font-size: 13px;">-${app.additional_discount.toLocaleString()}원</span>
-            </div>
-            ` : ''}
-            
-            ${app.discount_reason ? `
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">할인 사유</span>
-                <span class="pb-reason" style="font-weight: 600; color: #1e293b; font-size: 12px;">${escapeHtml(app.discount_reason)}</span>
-            </div>
-            ` : ''}
-            
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <span class="pb-label" style="color: #64748b; font-size: 13px;">보증금 (환불)</span>
-                <span class="pb-value" style="font-weight: 600; color: #3b82f6; font-size: 13px;">+100,000원</span>
-            </div>
-            <div style="padding: 8px 0 12px 0; border-bottom: 1px solid #f1f5f9;">
-                <p class="pb-note" style="font-size: 10px; color: #64748b; line-height: 1.5; margin: 0;">
-                    ※ 과제 인증률에 따라 환불되는 금액입니다.
-                </p>
-            </div>
-            
+        <div style="background:#ffffff; border-radius:16px; padding:24px 28px; box-shadow:0 2px 20px rgba(25,28,29,0.05); margin-bottom:14px;">
+            <div style="font-size:15px; font-weight:700; color:#1e293b; letter-spacing:-0.01em; margin:0 0 16px 0; display:flex; align-items:center; gap:8px;"><i class="fas fa-receipt" style="font-size:13px; color:#9c8ea0;"></i> 이용가 및 할인 내역</div>
+
+            ${app.program_price ? row('정가', `${app.program_price.toLocaleString()}원`) : ''}
+            ${app.discount_amount ? row('시험료 지원', `-${app.discount_amount.toLocaleString()}원`, '#2f855a') : ''}
+            ${app.discount_amount ? note('※ 실제시험 2회 진행 및 점수 인증, 후기 1회 작성 조건이 포함되어있습니다.') : ''}
+            ${app.correction_enabled && app.correction_fee ? row('스라첨삭 (Speaking &amp; Writing)', `+${app.correction_fee.toLocaleString()}원`, '#5b4a7d') : ''}
+            ${row('실제 이용가', `${realPrice.toLocaleString()}원`)}
+            ${app.additional_discount ? row('추가 할인', `-${app.additional_discount.toLocaleString()}원`, '#a53b22') : ''}
+            ${app.discount_reason ? row('할인 사유', escapeHtml(app.discount_reason)) : ''}
+            ${row('보증금 (환불)', '+100,000원', '#5b4a7d')}
+            ${note('※ 과제 인증률에 따라 환불되는 금액입니다.')}
+
             ${app.final_price ? `
-            <div style="display: flex; justify-content: space-between; padding: 16px 0; margin-top: 8px;">
+            <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 16px 18px; margin-top: 10px; background: #f3eef3; border-radius: 12px;">
                 <span class="pb-final-label" style="color: #1e293b; font-size: 14px; font-weight: 700;">최종 입금금액</span>
-                <span class="pb-final-value" style="font-weight: 700; color: #9480c5; font-size: 19px;">${app.final_price.toLocaleString()}원</span>
+                <span class="pb-final-value" style="font-weight: 700; color: #5b4a7d; font-size: 19px; letter-spacing: -0.02em;">${app.final_price.toLocaleString()}원</span>
             </div>
-            <div style="padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 12px;">
+            <div style="padding: 14px 16px; background: #f6f8fa; border-radius: 10px; margin-top: 12px;">
                 <p class="pb-info" style="font-size: 11px; color: #475569; line-height: 1.7; margin: 0;">
                     ✓ <strong>일절 추가 금액 없으며, 모든 것이 포함된 금액입니다.</strong><br>
                     ✓ 중간에 목표점수 달성 시, 아직 시작하지 않은 프로그램은 <strong>전액환불</strong>이 가능합니다.${showPaymentNotice ? '<br>✓ <strong>결제는 최종적으로 프로그램 및 가격, 계약서까지 동의 후 가장 마지막에 진행됩니다.</strong>' : ''}
