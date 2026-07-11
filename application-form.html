@@ -23,7 +23,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
-    <link rel="stylesheet" href="css/application-form.css">
+    <link rel="stylesheet" href="css/application-form.css?v=2">
 </head>
 <body>
     <!-- Navigation -->
@@ -139,7 +139,7 @@
                     </div>
                 </div>
 
-                <div class="subsection-title">환불 계좌 정보 <span style="color: #ff4444; font-weight: 700;">*</span></div>
+                <div class="subsection-title">환불 계좌 정보 <span style="color: #a53b22; font-weight: 700;">*</span></div>
                 <div class="form-group">
                     <input type="text" name="bank_account" placeholder="은행명 계좌번호 예금주 (예: 신한 110-123-456789 홍길동)" required>
                     <small>보증금 환급 및 환불 처리 시 사용됩니다. 정확한 정보를 입력해주세요.</small>
@@ -169,12 +169,12 @@
                     <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; padding: 0;">
                         <input type="radio" name="has_toefl_score" value="yes" required style="width: 16px; height: 16px; margin: 0;">
                         <span style="font-size: 0.9rem; color: #333; line-height: 1;">있음</span>
-                        <span style="color: #ff4444; font-weight: 700; font-size: 0.9rem; line-height: 1; margin-left: -6px;">*</span>
+                        <span style="color: #a53b22; font-weight: 700; font-size: 0.9rem; line-height: 1; margin-left: -6px;">*</span>
                     </label>
                     <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; padding: 0; margin-left: 24px;">
                         <input type="radio" name="has_toefl_score" value="no" required style="width: 16px; height: 16px; margin: 0;">
                         <span style="font-size: 0.9rem; color: #333; line-height: 1;">없음</span>
-                        <span style="color: #ff4444; font-weight: 700; font-size: 0.9rem; line-height: 1; margin-left: -6px;">*</span>
+                        <span style="color: #a53b22; font-weight: 700; font-size: 0.9rem; line-height: 1; margin-left: -6px;">*</span>
                     </label>
                 </div>
 
@@ -263,12 +263,12 @@
                     아래 두 질문에 대해 <strong>영어로</strong> 각각 5-7문장씩 작성해주세요. 문법, 철자가 완벽하지 않아도 괜찮습니다.
                 </p>
                 
-                <div style="background: #fff3cd; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
-                    <p style="margin: 0 0 0.75rem 0; font-weight: 600; color: #856404;">⚠️ 중요한 안내</p>
-                    <p style="margin: 0 0 0.5rem 0; line-height: 1.6; color: #856404;">
+                <div style="background: #fbf6ec; padding: 1rem 1.15rem; margin-bottom: 1.5rem; border-radius: 12px;">
+                    <p style="margin: 0 0 0.75rem 0; font-weight: 700; color: #8a6d1f;">중요한 안내</p>
+                    <p style="margin: 0 0 0.5rem 0; line-height: 1.7; color: #8a6d1f;">
                         <strong>잘 쓸려고 할수록, 문법 단어를 안 틀리려고 수정하고 검색하고 사전 찾아보고 할수록</strong> 저는 여러분의 영어실력을 <strong>'잘못'파악</strong>하게 됩니다. 그러면 모든 방향은 틀어지게 됩니다. <strong>솔직하게 나의 영어 밑낯을 보여주세요.</strong>
                     </p>
-                    <p style="margin: 0.5rem 0 0 0; line-height: 1.6; color: #856404;">
+                    <p style="margin: 0.5rem 0 0 0; line-height: 1.7; color: #8a6d1f;">
                         <strong>※ 위 내용을 번역/해석하는게 아니라</strong> 나의 <strong>"답변"을 작성</strong>하시는 겁니다. 잘못 이해하신 분들이 계셔서 말씀드려요.
                     </p>
                 </div>
@@ -340,7 +340,7 @@
                 <!-- 개정후 목표 점수 -->
                 <div id="newTargetSection" class="version-content active">
                     <div class="form-group">
-                        <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #ff4444; font-weight: 700;">*</span></label>
+                        <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #a53b22; font-weight: 700;">*</span></label>
                         <input type="number" name="target_cutoff_new" min="1" max="6" step="0.5" placeholder="예: 4.5">
                         <small>⚠️ 본인이 받고 싶은 희망 점수가 아닙니다. 지원하는 학교·기관이 공식적으로 요구하는 최소 지원 자격 점수를 입력해주세요. 희망 점수는 아래 '추가 설명'란에 따로 작성해주세요.</small>
                     </div>
@@ -368,28 +368,28 @@
 
                 <!-- 개정전 목표 점수 -->
                 <div id="oldTargetSection" class="version-content">
-                    <div class="notice-box" style="background: #fff3cd; padding: 16px; margin-bottom: 20px; border-radius: 8px;">
+                    <div class="notice-box" style="background: #fbf6ec; padding: 16px 18px; margin-bottom: 20px; border-radius: 12px;">
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <i class="fas fa-exclamation-triangle" style="color: #ff9800; font-size: 20px; margin-top: 2px;"></i>
+                            <i class="fas fa-circle-exclamation" style="color: #b45309; font-size: 18px; margin-top: 2px;"></i>
                             <div style="flex: 1;">
-                                <strong style="color: #e65100; display: block; margin-bottom: 8px;">0-120점 체계로 입력하시는 경우</strong>
-                                <p style="margin: 0 0 8px 0; line-height: 1.6; color: #666;">
+                                <strong style="color: #8a6d1f; display: block; margin-bottom: 8px;">0-120점 체계로 입력하시는 경우</strong>
+                                <p style="margin: 0 0 8px 0; line-height: 1.7; color: #64748b;">
                                     2026년 1월 21일부로 TOEFL 점수체계가 <strong>1-6 레벨</strong>로 변경되었으나, 아래와 같은 경우 기존 0-120점 체계로 목표 점수를 설정하시면 됩니다.
                                 </p>
-                                <ul style="margin: 0 0 8px 0; padding-left: 18px; line-height: 1.7; color: #666;">
+                                <ul style="margin: 0 0 8px 0; padding-left: 18px; line-height: 1.8; color: #64748b;">
                                     <li>지원 기관이 아직 <strong>0-120점 기준</strong>으로 점수를 요구하는 경우</li>
                                     <li><strong>TOEFL Australia</strong> 응시 대상인 경우 (TOEFL Australia는 개정 전 형식으로 출제되며, 0-120점 체계를 유지합니다)</li>
                                     <li>전환 기간(2년) 내 0-120점 성적표를 활용할 예정인 경우</li>
                                 </ul>
-                                <p style="margin: 0; line-height: 1.6; color: #666;">
-                                    <strong style="color: #e65100;">지원 기관의 요구 점수 체계가 1-6 레벨인 경우에는 '개정후' 탭에서 입력해 주세요.</strong>
+                                <p style="margin: 0; line-height: 1.7; color: #64748b;">
+                                    <strong style="color: #8a6d1f;">지원 기관의 요구 점수 체계가 1-6 레벨인 경우에는 '개정후' 탭에서 입력해 주세요.</strong>
                                 </p>
                             </div>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #ff4444; font-weight: 700;">*</span></label>
+                        <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #a53b22; font-weight: 700;">*</span></label>
                         <input type="number" name="target_cutoff_old" min="0" max="120" placeholder="예: 90">
                         <small>⚠️ 본인이 받고 싶은 희망 점수가 아닙니다. 지원하는 학교·기관이 공식적으로 요구하는 최소 지원 자격 점수를 입력해주세요. 희망 점수는 아래 '추가 설명'란에 따로 작성해주세요.</small>
                     </div>
@@ -421,12 +421,12 @@
                     <small>위 커트라인과 별도로 본인이 개인적으로 달성하고 싶은 점수가 있다면 반드시 적어주세요. 커트라인과 희망 점수가 다를 경우, 두 가지를 모두 파악해야 정확한 분석이 가능합니다.</small>
                 </div>
 
-                <div class="form-group" style="margin-top: 16px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; font-weight: 500;">
-                        <input type="checkbox" name="no_target_score" id="noTargetScore" onchange="toggleTargetScore(this.checked)" style="width: 18px; height: 18px; accent-color: #22c55e;">
+                <div class="form-group" style="margin-top: 16px; padding: 16px 18px; background: #eaf5ee; border: none; border-radius: 12px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; font-weight: 600; color: #2f855a;">
+                        <input type="checkbox" name="no_target_score" id="noTargetScore" onchange="toggleTargetScore(this.checked)" style="width: 18px; height: 18px; accent-color: #2f855a;">
                         <span>목표 점수가 따로 없습니다 (고고익선 🚀)</span>
                     </label>
-                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #6b7280;">체크하시면 위의 목표 점수를 입력하지 않아도 됩니다.</small>
+                    <small style="display: block; margin-top: 8px; margin-left: 28px; color: #6b8a76;">체크하시면 위의 목표 점수를 입력하지 않아도 됩니다.</small>
                 </div>
             </div>
 
@@ -517,10 +517,10 @@
                 </div>
 
                 <!-- 호주/뉴질랜드 직접 제출 여부 -->
-                <div class="form-group no-auto-required" style="margin-top: 4px; margin-bottom: 1rem; padding: 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;">
+                <div class="form-group no-auto-required" style="margin-top: 4px; margin-bottom: 1rem; padding: 16px 18px; background: #fbf6ec; border: none; border-radius: 12px;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
                         <label style="margin: 0; font-weight: 600; font-size: 0.85rem; color: #333;">호주/뉴질랜드 기관 직접 제출 여부</label>
-                        <span style="color: #ff4444; font-weight: 700; font-size: 0.85rem;">*</span>
+                        <span style="color: #a53b22; font-weight: 700; font-size: 0.85rem;">*</span>
                         <button type="button" class="au-nz-tooltip-btn" onclick="toggleAuNzTooltip()" title="자세히 보기">
                             <i class="fas fa-question-circle"></i>
                         </button>
@@ -530,21 +530,21 @@
                         <p style="margin: 0 0 10px 0; line-height: 1.7; color: #78350f; font-size: 0.82rem;">
                             호주/뉴질랜드 소재 기관에 <strong>직접</strong> 점수를 제출하려면, 일반 TOEFL iBT가 아닌 <strong>TOEFL Australia</strong>(ETS 등록 시 별도 구분)를 응시해야 하며, 일반 TOEFL iBT 점수는 인정되지 않습니다. TOEFL Australia는 <strong>개정 전 형식(2026년 1월 이전 버전)</strong>, 점수 체계 <strong>0~120점</strong> 동일합니다.
                         </p>
-                        <p style="margin: 0 0 10px 0; line-height: 1.6; color: #78350f; font-size: 0.82rem; background: #fef3c7; padding: 8px 10px; border-radius: 6px;">
+                        <p style="margin: 0 0 10px 0; line-height: 1.6; color: #8a6d1f; font-size: 0.82rem; background: #f5edda; padding: 8px 11px; border-radius: 8px;">
                             "예" 선택 시 <strong>내벨업챌린지 Australia</strong> 과정으로 진행됩니다.
                         </p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.8rem;">
-                            <div style="background: #fef2f2; padding: 10px; border-radius: 6px;">
-                                <div style="font-weight: 600; color: #991b1b; margin-bottom: 4px;">"예" 에 해당하는 경우</div>
-                                <ul style="margin: 0; padding-left: 16px; color: #7f1d1d; line-height: 1.6;">
+                            <div style="background: #f9edea; padding: 11px; border-radius: 9px;">
+                                <div style="font-weight: 700; color: #a53b22; margin-bottom: 4px;">"예" 에 해당하는 경우</div>
+                                <ul style="margin: 0; padding-left: 16px; color: #7a3423; line-height: 1.7;">
                                     <li>호주 대학교에 직접 지원 (입학/편입)</li>
                                     <li>뉴질랜드 이민국에 비자 신청용 제출</li>
                                     <li>호주/뉴질랜드 기관 채용 전형에 직접 제출</li>
                                 </ul>
                             </div>
-                            <div style="background: #f0fdf4; padding: 10px; border-radius: 6px;">
-                                <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">"아니오" 에 해당하는 경우</div>
-                                <ul style="margin: 0; padding-left: 16px; color: #14532d; line-height: 1.6;">
+                            <div style="background: #eaf5ee; padding: 11px; border-radius: 9px;">
+                                <div style="font-weight: 700; color: #2f855a; margin-bottom: 4px;">"아니오" 에 해당하는 경우</div>
+                                <ul style="margin: 0; padding-left: 16px; color: #3f6b50; line-height: 1.7;">
                                     <li>호주로 교환학생이지만, 점수 제출은 한국 소속 대학교에 하는 경우</li>
                                     <li>호주/뉴질랜드 관련이지만, 실제 제출처가 한국 기관인 경우</li>
                                 </ul>
@@ -579,7 +579,7 @@
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">9</span>
-                    <h2>가장 기억에 남는 블로그 글 <span style="color: #ff4444; font-weight: 700;">*</span></h2>
+                    <h2>가장 기억에 남는 블로그 글 <span style="color: #a53b22; font-weight: 700;">*</span></h2>
                 </div>
                 <div class="form-group">
                     <textarea name="memorable_blog_content" rows="4" placeholder='예: "토플 점수가 안 오르는 진짜 이유" 글에서 방향 없이 공부하면 시간만 낭비된다는 내용이 와닿았고, 이 글을 읽고 수강을 결정하게 되었습니다...' required></textarea>
@@ -645,7 +645,7 @@
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">11</span>
-                    <h2>이온토플을 알게 된 경로 <span style="color: #ff4444; font-weight: 700;">*</span></h2>
+                    <h2>이온토플을 알게 된 경로 <span style="color: #a53b22; font-weight: 700;">*</span></h2>
                 </div>
                 <p class="section-description">검색 키워드, 소셜 미디어, 지인 추천, 기타 경로 중 최소 하나는 작성해주세요.</p>
                 
@@ -681,7 +681,7 @@
                 </div>
 
                 <div class="form-group" id="referralFriendNameGroup" style="display: none;">
-                    <label>추천인 성함 <span id="referralFriendNameStar" style="color: #ff4444; font-weight: 700; display: none;">*</span></label>
+                    <label>추천인 성함 <span id="referralFriendNameStar" style="color: #a53b22; font-weight: 700; display: none;">*</span></label>
                     <input type="text" name="referral_friend_name" placeholder="추천인 성함 (선택)">
                 </div>
 
