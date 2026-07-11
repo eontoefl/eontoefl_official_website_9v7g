@@ -1106,8 +1106,8 @@ function getAnalysisSection(app) {
             .s2-agree-btn {
                 width: 100%;
                 padding: 15px;
-                background: #9480c5;
-                color: #ffffff;
+                background: #efeaf7;
+                color: #5b4a7d;
                 border: none;
                 border-radius: 12px;
                 font-size: 15px;
@@ -1118,11 +1118,11 @@ function getAnalysisSection(app) {
                 transition: 0.15s;
             }
             .s2-agree-btn:disabled {
-                background: #ece7f2;
+                background: #f1eef7;
                 color: #b3a6c9;
                 cursor: not-allowed;
             }
-            .s2-agree-btn:not(:disabled):hover { filter: brightness(1.06); }
+            .s2-agree-btn:not(:disabled):hover { background: #e5ddf3; }
             @media (max-width: 768px) {
                 .s2-card { padding: 20px 18px; border-radius: 14px; }
                 .s2-row { flex-direction: column; align-items: flex-start; gap: 3px; }
@@ -2274,11 +2274,11 @@ async function loadContractTab(app) {
             .s3-agree-title { font-size: 15px; font-weight: 700; color: #1e293b; letter-spacing: -0.01em; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }
             .s3-agree-title i { font-size: 13px; color: #9c8ea0; }
             .s3-agree-btn {
-                width: 100%; padding: 15px; background: #9480c5; color: #ffffff;
+                width: 100%; padding: 15px; background: #efeaf7; color: #5b4a7d;
                 border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
                 font-family: inherit; letter-spacing: -0.01em; cursor: pointer; transition: 0.15s;
             }
-            .s3-agree-btn:hover { filter: brightness(1.06); }
+            .s3-agree-btn:hover { background: #e5ddf3; }
             .s3-agree-hint { font-size: 13px; color: #94a3b8; text-align: center; margin: 14px 0 0 0; line-height: 1.6; }
         </style>
     `;
@@ -2959,8 +2959,8 @@ async function loadPaymentTab(app) {
             .s4-amount-num { font-size:28px; font-weight:700; color:#5b4a7d; letter-spacing:-0.02em; }
             .s4-input { width:100%; box-sizing:border-box; padding:12px 14px; border:none; background:#f1edf8; border-radius:10px; font-size:14px; color:#1e293b; font-family:inherit; transition:0.15s; }
             .s4-input:focus { outline:none; background:#ffffff; box-shadow:0 0 0 3px rgba(148,128,197,0.25); }
-            .s4-btn { width:100%; padding:15px; background:#9480c5; color:#ffffff; border:none; border-radius:12px; font-size:15px; font-weight:600; font-family:inherit; letter-spacing:-0.01em; cursor:pointer; transition:0.15s; }
-            .s4-btn:hover { filter:brightness(1.06); }
+            .s4-btn { width:100%; padding:15px; background:#efeaf7; color:#5b4a7d; border:none; border-radius:12px; font-size:15px; font-weight:600; font-family:inherit; letter-spacing:-0.01em; cursor:pointer; transition:0.15s; }
+            .s4-btn:hover { background:#e5ddf3; }
             .s4-note { font-size:12px; color:#94a3b8; line-height:1.7; }
             /* 펼침 영역 안의 공용 가격 카드(getPricingBox)를 이 컨테이너의 일부처럼: 카드 크롬 제거 */
             #s4-breakdown > div { box-shadow:none !important; margin:0 !important; border-radius:0 !important; background:transparent !important; padding:0 !important; }
