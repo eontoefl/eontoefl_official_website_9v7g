@@ -585,13 +585,22 @@
                     <!-- 스라첨삭 -->
                     <div id="sra" class="content-section">
                         <h2>스라첨삭</h2>
-                        <div class="program-card" style="text-align: center; padding: 60px 40px;">
-                            <div style="font-size: 48px; margin-bottom: 20px;"><i class="fas fa-pen-nib" style="color: #7a6690;"></i></div>
-                            <h3 class="program-title" style="font-size: 24px; margin-bottom: 16px;">준비중입니다</h3>
-                            <p class="program-desc" style="font-size: 16px; color: var(--text-light); margin-bottom: 24px;">Speaking & Writing 첨삭 프로그램</p>
-                            <div class="highlight-box" style="display: inline-block; margin: 0 auto;">
-                                <p><strong>4월중 오픈 예정</strong></p>
+                        <div class="program-card">
+                            <div class="sra-icon"><i class="fas fa-pen-nib"></i></div>
+                            <span class="sra-badge">준비중</span>
+                            <h3 class="sra-title">상세페이지 준비중입니다</h3>
+                            <p class="sra-sub">Speaking &amp; Writing 첨삭 프로그램</p>
+                            <div class="sra-info">
+                                <div class="sra-info-row">
+                                    <span class="sra-info-label"><i class="fas fa-user-check"></i> 이용 대상</span>
+                                    <span class="sra-info-value">내벨업챌린지 수강생 전용</span>
+                                </div>
+                                <div class="sra-info-row">
+                                    <span class="sra-info-label"><i class="fas fa-won-sign"></i> 추가 수강료</span>
+                                    <span class="sra-info-value">내벨업챌린지 + 20만원</span>
+                                </div>
                             </div>
+                            <p class="sra-notice"><i class="fas fa-circle-info"></i> 8월부터 가격 인상 예정입니다.</p>
                         </div>
                     </div>
                 </main>
@@ -623,10 +632,37 @@
         }
         html, body { overflow-x: clip; }
 
-        /* 스라첨삭(준비중): 흰 카드는 본문 라인(780px)에 맞추고, '오픈 예정' 박스는 좌측보더 제거 + 브랜드 모브 */
-        #sra .program-card { max-width: 780px; margin: 0 auto; border: none; box-shadow: 0 1px 12px rgba(25, 28, 29, 0.06); }
-        #sra .highlight-box { background: #f3eef3; border-left: none; border-radius: 10px; }
-        #sra .highlight-box p, #sra .highlight-box strong { color: #5b4a72; }
+        /* 스라첨삭(준비중) 카드: 라일락 위 흰 강조 카드 + 모브 액센트 (좌측보더 없음) */
+        #sra > h2 { max-width: 620px; margin: 8px auto 22px; }
+        #sra .program-card {
+            max-width: 620px; margin: 0 auto;
+            border: none; border-radius: 16px;
+            box-shadow: 0 1px 14px rgba(25, 28, 29, 0.06);
+            padding: 46px 44px; text-align: center;
+        }
+        #sra .sra-icon { font-size: 38px; color: #7a6690; margin-bottom: 16px; }
+        #sra .sra-badge {
+            display: inline-block; background: #e7dce7; color: #5b4a72;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+            padding: 5px 13px; border-radius: 999px; margin-bottom: 14px;
+        }
+        #sra .sra-title { font-size: 21px; font-weight: 700; color: #1e293b; margin: 0 0 6px; }
+        #sra .sra-sub { font-size: 14px; color: #64748b; margin: 0 0 28px; }
+        #sra .sra-info {
+            background: #f3eef3; border-radius: 12px;
+            padding: 4px 20px; margin-bottom: 16px; text-align: left;
+        }
+        #sra .sra-info-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 0; }
+        #sra .sra-info-row + .sra-info-row { border-top: 1px solid #e7dce7; }
+        #sra .sra-info-label { font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+        #sra .sra-info-label i { color: #7a6690; font-size: 12px; }
+        #sra .sra-info-value { font-size: 14px; font-weight: 600; color: #1e293b; text-align: right; }
+        #sra .sra-notice {
+            font-size: 13px; color: #8a6d1f; background: #fbf6ec;
+            border-radius: 10px; padding: 12px 16px; margin: 0;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        #sra .sra-notice i { font-size: 12px; }
     </style>
 
     <!-- Footer -->
