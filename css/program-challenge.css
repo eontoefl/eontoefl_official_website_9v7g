@@ -134,9 +134,8 @@
 .cl .opening-highlight {
     font-weight: 500;
     color: #1e293b;
-    padding: 1.4rem 1.6rem 1.4rem 1.8rem;
+    padding: 1.4rem 1.6rem;
     background: #f3eef3;
-    border-left: 3px solid #7a6690;
     border-radius: 10px;
     margin: 2rem 0;
     line-height: 1.85;
@@ -237,9 +236,8 @@
 .cl .builder-echo {
     font-weight: 500;
     color: #1e293b;
-    padding: 1.4rem 1.6rem 1.4rem 1.8rem;
+    padding: 1.4rem 1.6rem;
     background: #f3eef3;
-    border-left: 3px solid #7a6690;
     border-radius: 10px;
     margin: 2rem 0;
     line-height: 1.85;
