@@ -153,7 +153,7 @@
    SECTION 2: 이온쌤 소개
    ═══════════════════════════════════════════ */
 .cl .section-instructor {
-    background: #f3eef3;
+    background: #ffffff;
 }
 
 .cl .instructor-layout {
@@ -290,7 +290,7 @@
    SECTION 3: 프로그램 설명
    ═══════════════════════════════════════════ */
 .cl .section-program {
-    background: #f3eef3;
+    background: #ffffff;
 }
 
 .cl .program-body p {
@@ -302,11 +302,10 @@
 
 .cl .program-body .program-note {
     font-weight: 600;
-    color: #5b4a72;
+    color: #3b2d5c;
     padding: 0.8rem 1.2rem;
-    background: #ffffff;
+    background: #e7dce7;
     border-radius: 8px;
-    box-shadow: 0 1px 8px rgba(25, 28, 29, 0.05);
     display: inline-block;
     margin-top: 0.5rem;
     font-size: 0.95rem;
@@ -602,7 +601,7 @@
    SECTION 5: 해설과 오답노트
    ═══════════════════════════════════════════ */
 .cl .section-explanation {
-    background: #f3eef3;
+    background: #ffffff;
 }
 
 .cl .explanation-body p {
@@ -738,7 +737,7 @@
    SECTION 7: 후기 + 선별 + 진단서
    ═══════════════════════════════════════════ */
 .cl .section-reviews {
-    background: #f3eef3;
+    background: #ffffff;
     padding-bottom: 3rem;
 }
 
