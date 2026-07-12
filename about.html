@@ -105,20 +105,34 @@
 
     <!-- About Content -->
     <style>
+        /* 헤더: application.html과 동일 — 채도 높은 보라 → 뉴트럴 흰 hero + 진한 글자 */
+        body { background: #f4f5f7; }
+        .page-header {
+            background: #ffffff;
+            color: #1e293b;
+            padding: 64px 0 52px 0;
+        }
+        .page-header h1 { color: #1e293b; }
+        .page-header p { color: #64748b; }
+
         .about-container {
             max-width: 1080px;
             margin: 0 auto;
-            padding: 60px 40px 100px;
+            padding: 48px 40px 100px;
             font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         }
+        /* 섹션: 구분선(border) → 회색 지면 위 선 없는 흰 카드 */
         .about-section {
             display: flex;
-            gap: 60px;
-            padding: 48px 0;
-            border-top: 1px solid #e2e8f0;
+            gap: 56px;
+            padding: 40px 44px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+            margin-bottom: 20px;
         }
         .about-section:last-child {
-            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 0;
         }
         .about-left {
             flex: 0 0 280px;
@@ -134,7 +148,7 @@
         }
         .about-left .about-label {
             font-size: 14px;
-            color: #7c3aed;
+            color: #5b4a7d;
             font-weight: 600;
             line-height: 1.6;
         }
@@ -157,8 +171,9 @@
             }
             .about-section {
                 flex-direction: column;
-                gap: 24px;
-                padding: 32px 0;
+                gap: 20px;
+                padding: 26px 22px;
+                border-radius: 14px;
             }
             .about-left {
                 flex: none;
