@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
+    <link rel="stylesheet" href="css/notice.css">
 </head>
 <body>
     <!-- Navigation -->
@@ -118,10 +119,10 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
                             <div>
                                 <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">공지사항</h2>
-                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #9480c5; font-weight: 600;">0</span>건의 공지사항이 있습니다</p>
+                                <p style="font-size: 14px; color: #64748b;">총 <span id="totalCount" style="color: #7a6690; font-weight: 600;">0</span>건의 공지사항이 있습니다</p>
                             </div>
                             <div id="writeBtn" style="display:none;">
-                                <a href="write.html?board=notice" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; text-decoration:none; border-radius:8px; font-size:14px; font-weight:600; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(148,128,197,0.4)'" onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                                <a href="write.html?board=notice" style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; background:#e7dce7; color:#5b4a72; text-decoration:none; border-radius:10px; font-size:14px; font-weight:600; transition:background 0.2s;" onmouseover="this.style.background='#ddcfdc'" onmouseout="this.style.background='#e7dce7'">
                                     <i class="fas fa-pen"></i> 글쓰기
                                 </a>
                             </div>
@@ -155,7 +156,7 @@
                     <!-- 상세 뷰 -->
                     <section id="detailView" style="display:none;">
                         <div style="margin-bottom: 24px;">
-                            <a href="notice.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                            <a href="notice.html" style="display:inline-flex; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:14px; font-weight:500; padding:8px 0; transition:color 0.2s;" onmouseover="this.style.color='#7a6690'" onmouseout="this.style.color='#64748b'">
                                 <i class="fas fa-arrow-left"></i> 목록으로
                             </a>
                         </div>
@@ -174,15 +175,15 @@
                                 <span style="color:#e2e8f0;">|</span>
                                 <span id="detailHit" style="font-size:14px; color:#94a3b8;"></span>
                                 <!-- 공유 버튼 -->
-                                <button id="shareBtn" onclick="copyShareLink()" title="공유 링크 복사" style="display:none; width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
+                                <button id="shareBtn" onclick="copyShareLink()" title="공유 링크 복사" style="display:none; width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#7a6690'; this.style.color='#7a6690'; this.style.background='#f3eef3'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
                                     <i class="fas fa-share-alt" style="font-size:13px;"></i>
                                 </button>
                                 <!-- 관리자 수정/삭제 버튼 -->
                                 <div id="adminActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
-                                    <button onclick="editPost()" title="수정" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
+                                    <button onclick="editPost()" title="수정" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#7a6690'; this.style.color='#7a6690'; this.style.background='#f3eef3'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
                                         <i class="fas fa-pen" style="font-size:13px;"></i>
                                     </button>
-                                    <button onclick="deletePost()" title="삭제" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'; this.style.background='#fef2f2'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
+                                    <button onclick="deletePost()" title="삭제" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#a53b22'; this.style.color='#a53b22'; this.style.background='#f9edea'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
                                         <i class="fas fa-trash-alt" style="font-size:13px;"></i>
                                     </button>
                                 </div>
@@ -193,10 +194,10 @@
 
                         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; display:none;" id="detailNav">
                             <div style="display:flex; justify-content:space-between;">
-                                <a id="prevPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                <a id="prevPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px;" onmouseover="this.style.color='#7a6690'" onmouseout="this.style.color='#64748b'">
                                     <i class="fas fa-chevron-left"></i> <span>이전 글</span>
                                 </a>
-                                <a id="nextPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px; margin-left:auto;" onmouseover="this.style.color='#9480c5'" onmouseout="this.style.color='#64748b'">
+                                <a id="nextPost" href="#" style="display:none; align-items:center; gap:6px; color:#64748b; text-decoration:none; font-size:13px; margin-left:auto;" onmouseover="this.style.color='#7a6690'" onmouseout="this.style.color='#64748b'">
                                     <span>다음 글</span> <i class="fas fa-chevron-right"></i>
                                 </a>
                             </div>
@@ -347,7 +348,7 @@
                     <tr onclick="location.href='notice.html?id=${notice.id}'" style="cursor:pointer;">
                         <td style="text-align:center; color:#64748b;">${no}</td>
                         <td style="font-weight:600; color:#1e293b;">
-                            <span style="background:#9480c5; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px;">공지</span>
+                            <span style="background:#e7dce7; color:#5b4a72; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; margin-right:8px;">공지</span>
                             ${notice.subject || ''}
                         </td>
                         <td style="text-align:center; color:#64748b;">${notice.author || notice.author_name || '관리자'}</td>
@@ -378,7 +379,7 @@
             }
             for (let i = startPage; i <= endPage; i++) {
                 const isActive = i === page;
-                html += `<button onclick="renderPage(${i})" style="padding:8px 12px; border:1px solid ${isActive ? '#9480c5' : '#e2e8f0'}; background:${isActive ? '#9480c5' : 'white'}; color:${isActive ? 'white' : '#64748b'}; border-radius:6px; cursor:pointer; font-size:13px; font-weight:${isActive ? '600' : '400'};">${i}</button>`;
+                html += `<button onclick="renderPage(${i})" style="padding:8px 12px; border:1px solid ${isActive ? '#e7dce7' : '#e2e8f0'}; background:${isActive ? '#e7dce7' : 'white'}; color:${isActive ? '#5b4a72' : '#64748b'}; border-radius:6px; cursor:pointer; font-size:13px; font-weight:${isActive ? '600' : '400'};">${i}</button>`;
             }
             if (page < totalPages) {
                 html += `<button onclick="renderPage(${page + 1})" style="padding:8px 12px; border:1px solid #e2e8f0; background:white; border-radius:6px; cursor:pointer; font-size:13px; color:#64748b;"><i class="fas fa-angle-right"></i></button>`;
@@ -413,7 +414,7 @@
 
                 if (!notice) {
                     document.getElementById('detailLoading').innerHTML = `
-                        <div style="text-align:center; color:#ef4444;">
+                        <div style="text-align:center; color:#a53b22;">
                             <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
                             <p>존재하지 않는 게시글입니다.</p>
                         </div>`;
@@ -473,7 +474,7 @@
                     document.getElementById('detailArticle').style.display = 'block';
                 } else {
                     document.getElementById('detailLoading').innerHTML = `
-                        <div style="text-align:center; color:#ef4444;">
+                        <div style="text-align:center; color:#a53b22;">
                             <i class="fas fa-exclamation-circle" style="font-size:32px; margin-bottom:12px;"></i>
                             <p>게시글을 불러오는데 실패했습니다.</p>
                         </div>`;

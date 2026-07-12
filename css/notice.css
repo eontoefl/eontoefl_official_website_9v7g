@@ -1,0 +1,49 @@
+/* reviews.html 전용 — 흰 헤더 + 라일락(#f3eef3) 지면 + 흰 강조 카드 (웜 브랜드 모브) */
+
+/* ── Hero: 순백 + 진한 글자 ── */
+.page-header { background: #ffffff; color: #1e293b; padding: 64px 0 52px 0; }
+.page-header h1 { color: #1e293b; }
+.page-header p { color: #64748b; }
+
+/* ── 지면: 라일락 ── */
+.page-layout { background: #f3eef3; }
+
+/* ── 사이드바: 둥근 흰 카드 + 활성 모브 ── */
+.sidebar-nav { border-radius: 16px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); }
+.sidebar-nav a.active { background: #f3eef3; color: #5b4a72; }
+.sidebar-nav a.active i { color: #7a6690; }
+
+/* ── 본문: 좌측보더 제거 + 둥근 흰 카드 ── */
+.main-content { border-left: none; border-radius: 16px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); }
+
+/* ── 후기 목록 테이블: 둥근 흰 카드 ── */
+.applications-table { background: #ffffff; border: none; border-radius: 14px; box-shadow: 0 2px 16px rgba(25, 28, 29, 0.06); overflow: hidden; }
+.applications-table .table-wrapper { border-radius: 14px; overflow: hidden; }
+.applications-table thead { background: #f6f2f6; }
+.applications-table th { color: #64748b; }
+.applications-table td { color: #334155; border-top: 1px solid #efe8ef; }
+.applications-table tbody tr { transition: background 0.15s ease; }
+.applications-table tbody tr:hover { background: #faf7fa; }
+
+/* ── 상세 뷰: 좌측보더 쓰는 블록 요소를 웜 배경 강조로 대체(좌측보더 금지) ── */
+.review-detail-content blockquote { border-left: none; background: #f3eef3; border-radius: 10px; padding: 14px 20px; margin: 16px 0; color: #334155; }
+.review-detail-content .highlight-box { border-left: none; background: #f3eef3; border-radius: 10px; }
+
+@media (max-width: 768px) {
+    .applications-table .table-wrapper { overflow-x: auto; }
+
+    /* 사이드바(수강 후기/입문서 후기): 가로 스크롤 방지 → 2등분 한 줄 */
+    .sidebar-nav { overflow-x: hidden; gap: 6px; padding: 8px; }
+    .sidebar-nav a { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; font-size: 12.5px; padding: 10px 4px; }
+    .sidebar-nav a i { font-size: 12px; }
+
+    /* 테이블: NO·작성자·조회 숨기고 제목이 폭 차지, 작성일시 유지 */
+    .applications-table table { table-layout: fixed; width: 100%; }
+    .applications-table th:nth-child(1), .applications-table td:nth-child(1),
+    .applications-table th:nth-child(3), .applications-table td:nth-child(3),
+    .applications-table th:nth-child(5), .applications-table td:nth-child(5) { display: none !important; }
+    .applications-table th:nth-child(2), .applications-table td:nth-child(2) { width: auto; }
+    .applications-table th:nth-child(4), .applications-table td:nth-child(4) { width: 96px !important; text-align: center; }
+    .applications-table th, .applications-table td { padding: 12px 10px; }
+    .applications-table td:nth-child(2) { font-size: 13px; line-height: 1.45; word-break: break-word; }
+}

@@ -35,8 +35,8 @@
             transition: all 0.3s;
         }
         .faq-item:hover {
-            border-color: #9480c5;
-            box-shadow: 0 4px 12px rgba(148, 128, 197, 0.15);
+            border-color: #d8c7d6;
+            box-shadow: 0 4px 16px rgba(122,102,144, 0.10);
         }
         .faq-question {
             display: flex;
@@ -47,7 +47,7 @@
             user-select: none;
         }
         .faq-question:hover {
-            background: #f8f9fa;
+            background: #faf7fa;
         }
         .faq-q-text {
             font-size: 16px;
@@ -61,8 +61,8 @@
         .faq-q-icon {
             width: 32px;
             height: 32px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #e7dce7;
+            color: #5b4a72;
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -74,7 +74,7 @@
         .faq-toggle {
             width: 32px;
             height: 32px;
-            background: #f1f5f9;
+            background: #f3eef3;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -83,7 +83,7 @@
             flex-shrink: 0;
         }
         .faq-item.active .faq-toggle {
-            background: #9480c5;
+            background: #7a6690;
             transform: rotate(180deg);
         }
         .faq-toggle i {
@@ -107,14 +107,31 @@
         .faq-link {
             display: inline-block;
             margin-top: 12px;
-            color: #667eea;
+            color: #7a6690;
             font-weight: 600;
             text-decoration: none;
             transition: color 0.2s;
         }
         .faq-link:hover {
-            color: #764ba2;
+            color: #5b4a72;
             text-decoration: underline;
+        }
+
+        /* ── 구조: 흰 헤더 + 라일락(#f3eef3) 지면 + 둥근 흰 카드 (다른 페이지와 통일) ── */
+        .page-header { background: #ffffff; color: #1e293b; padding: 64px 0 52px 0; }
+        .page-header h1 { color: #1e293b; }
+        .page-header p { color: #64748b; }
+        .page-layout { background: #f3eef3; }
+        .sidebar-nav { border-radius: 16px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); }
+        .sidebar-nav a.active { background: #f3eef3; color: #5b4a72; }
+        .sidebar-nav a.active i { color: #7a6690; }
+        .main-content { border-left: none; border-radius: 16px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); }
+
+        @media (max-width: 768px) {
+            /* 카테고리 사이드바: 가로 스크롤 → 3등분 한 줄(아이콘 숨김) */
+            .sidebar-nav { overflow-x: hidden; gap: 6px; padding: 8px; }
+            .sidebar-nav a { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-size: 12px; padding: 10px 6px; }
+            .sidebar-nav a i { display: none; }
         }
     </style>
 </head>
@@ -221,7 +238,7 @@
                 <main class="main-content">
                     <!-- 등록/신청 -->
                     <section id="registration" class="content-section">
-                        <h2><i class="fas fa-pen" style="color: #9480c5; margin-right: 12px;"></i>등록/신청</h2>
+                        <h2><i class="fas fa-pen" style="color: #7a6690; margin-right: 12px;"></i>등록/신청</h2>
                         
                         <div class="faq-item">
                             <div class="faq-question" onclick="toggleFaq(this)">
@@ -300,7 +317,7 @@
 
                     <!-- 내벨업챌린지 -->
                     <section id="program" class="content-section">
-                        <h2><i class="fas fa-book-open" style="color: #9480c5; margin-right: 12px;"></i>내벨업챌린지</h2>
+                        <h2><i class="fas fa-book-open" style="color: #7a6690; margin-right: 12px;"></i>내벨업챌린지</h2>
                         
                         <div class="faq-item">
                             <div class="faq-question" onclick="toggleFaq(this)">
@@ -454,7 +471,7 @@
 
                     <!-- 결제/환불 -->
                     <section id="payment" class="content-section">
-                        <h2><i class="fas fa-credit-card" style="color: #9480c5; margin-right: 12px;"></i>결제/환불</h2>
+                        <h2><i class="fas fa-credit-card" style="color: #7a6690; margin-right: 12px;"></i>결제/환불</h2>
                         
                         <div class="faq-item">
                             <div class="faq-question" onclick="toggleFaq(this)">
@@ -553,13 +570,13 @@
                     </section>
 
                     <!-- 추가 문의 -->
-                    <div style="text-align: center; margin-top: 48px; padding: 24px 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
+                    <div style="text-align: center; margin-top: 48px; padding: 28px 20px; background: #f3eef3; border-radius: 12px;">
                         <p style="color: #64748b; font-size: 14px; margin-bottom: 16px;">궁금한 점이 더 있으신가요?</p>
                         <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                            <a href="http://pf.kakao.com/_FWxcZC" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background: #9480c5; color: white; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                            <a href="http://pf.kakao.com/_FWxcZC" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background: #7a6690; color: white; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">
                                 <i class="fas fa-comment"></i> 카카오톡 문의
                             </a>
-                            <a href="application-form.html" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background: white; color: #9480c5; border: 1px solid #9480c5; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                            <a href="application-form.html" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background: white; color: #7a6690; border: 1px solid #7a6690; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">
                                 <i class="fas fa-pen"></i> 신청서 작성하기
                             </a>
                         </div>
