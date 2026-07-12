@@ -607,7 +607,9 @@
         .page-header h1 { color: #1e293b; }
         .page-header p { color: #64748b; }
         /* 섹션 배경 밴드가 좌우 끝까지 가도록: main-content의 overflow-x: hidden이 풀블리드를 잘라서 해제 */
-        .cl-page-main { overflow-x: visible; }
+        /* 제목 영역을 라일락으로 → 회색 밑줄 제거 + 첫 밴드(라일락)와 이어지게 (흰→라일락 점프 해소) */
+        .cl-page-main { overflow-x: visible; background: #f3eef3; }
+        .cl-page-main .content-section > h2 { border-bottom: none; padding-bottom: 0; margin-bottom: 8px; }
         html, body { overflow-x: clip; }
     </style>
 
