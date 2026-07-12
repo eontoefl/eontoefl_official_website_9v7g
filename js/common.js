@@ -137,7 +137,7 @@ function _bodyTarget(seg) {
     if (seg === 'guest' || seg === 'member_nobook') return { href: 'book-request.html', label: '입문서 무료 신청하기' };
     // 입문서 받은 사람은 다음 단계가 챌린지 신청 → 폼을 직접 열어준다.
     // 단, '진단 후 승인 여부 결정' 안내(.cta-note)는 숨기지 않고 살려 둔다(거절 마케팅 톤 유지).
-    if (seg === 'member_book') return { href: 'application-form.html', label: '내벨업챌린지 신청하기', keepNote: true };
+    if (seg === 'member_book') return { href: 'application-form.html', label: '신청하기', keepNote: true };
     return { href: 'my-dashboard.html', label: '내 신청 현황 보기' }; // challenge
 }
 

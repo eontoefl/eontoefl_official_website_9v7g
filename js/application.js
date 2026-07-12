@@ -249,12 +249,9 @@ function renderNoticeRows(notices) {
             : '';
         return `
             <tr style="cursor:pointer; background:#faf8ff;" onclick="openNoticeDetail(event, '${notice.id}')">
-                <td style="text-align:center;">
-                    <span style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #9480c5 0%, #7d6aad 100%); color:white; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:0.5px;">공지</span>
-                </td>
                 <td>
                     <div style="font-size:14px; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px;">
-                        <i class="fas fa-bullhorn" style="color:#9480c5; font-size:12px;"></i>
+                        <span style="display:inline-flex; align-items:center; justify-content:center; background:#ece4f2; color:#5b4a7d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; letter-spacing:0.5px; flex-shrink:0;">공지</span>
                         ${escapeHtml(notice.subject)}
                     </div>
                 </td>
@@ -338,12 +335,12 @@ async function loadApplicationsList() {
             if (allAppNotices.length > 0) {
                 html += renderNoticeRows(allAppNotices);
             }
-            html += '<tr><td colspan="5" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
+            html += '<tr><td colspan="4" style="text-align:center;padding:60px;color:#64748b;">아직 신청서가 없습니다.<br>첫 번째 신청자가 되어보세요!</td></tr>';
             tbody.innerHTML = html;
         }
     } catch (error) {
         console.error('Failed to load applications:', error);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:60px;color:#ef4444;">목록을 불러오는데 실패했습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:60px;color:#ef4444;">목록을 불러오는데 실패했습니다.</td></tr>';
     } finally {
         listLoading.classList.remove('show');
     }
@@ -422,7 +419,6 @@ function displayApplications() {
         
         return `
             <tr style="cursor: pointer;" onclick="window.location.href='application-detail.html?id=${app.id}'">
-                <td style="text-align: center; font-weight: 600; color: #64748b;">${rowNumber}</td>
                 <td>
                     <div style="font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-lock" style="color: #94a3b8; font-size: 12px;"></i>

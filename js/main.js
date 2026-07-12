@@ -225,12 +225,12 @@ function updateNavigation() {
         const dashboardUrl = user.role === 'admin' ? 'admin-dashboard.html' : 'my-dashboard.html';
         
         authMenu.innerHTML = `
-            <a href="${dashboardUrl}" target="_blank" style="text-decoration: none; color: #1e293b; font-size: 14px; font-weight: 500 !important; transition: all 0.2s; padding: 6px 12px; border-radius: 6px; background: rgba(148, 128, 197, 0.1);">
-                <i class="fas fa-user-circle" style="margin-right: 6px; color: #9480c5; font-size: 16px; position: relative; top: 1.5px;"></i>
+            <a href="${dashboardUrl}" target="_blank" style="text-decoration: none; color: #3b2d5c; font-size: 14px; font-weight: 600; transition: background 0.15s; padding: 7px 14px; border-radius: 999px; background: #f1edf8; display: inline-flex; align-items: center; gap: 7px;" onmouseover="this.style.background='#e9e2f5'" onmouseout="this.style.background='#f1edf8'">
+                <i class="fas fa-user" style="color: #7c68a8; font-size: 13px;"></i>
                 ${escapeHtml(user.name)}
             </a>
-            <span style="color: #cbd5e1; margin: 0 10px; font-size: 14px; font-weight: 200;">|</span>
-            <a href="#" onclick="logout(); return false;" style="text-decoration: none; color: #94a3b8; font-size: 14px; font-weight: 200; transition: opacity 0.2s;">
+            <span style="color: #d8dce3; margin: 0 12px; font-size: 13px; font-weight: 300;">|</span>
+            <a href="#" onclick="logout(); return false;" style="text-decoration: none; color: #94a3b8; font-size: 13.5px; font-weight: 500; transition: color 0.15s;" onmouseover="this.style.color='#5b4a7d'" onmouseout="this.style.color='#94a3b8'">
                 LOGOUT
             </a>
         `;
