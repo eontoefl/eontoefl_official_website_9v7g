@@ -116,21 +116,19 @@
         .page-header p { color: #64748b; }
 
         .about-container {
-            max-width: 1080px;
-            margin: 0 auto;
-            padding: 48px 40px 100px;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
             font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         }
-        /* 섹션: 감싸는 흰 카드 없이 라일락 지면 위에 바로 (컨테이너 미사용) */
+        /* 챕터를 배너식 전체폭 밴드로 교차: 홀수 라일락 / 짝수 흰색 (콘텐츠는 중앙 1000px) */
         .about-section {
             display: flex;
             gap: 56px;
-            padding: 36px 0;
-            margin-bottom: 28px;
+            padding: 56px max(24px, calc((100% - 1000px) / 2));
         }
-        .about-section:last-child {
-            margin-bottom: 0;
-        }
+        .about-section:nth-child(odd) { background: #f3eef3; }
+        .about-section:nth-child(even) { background: #ffffff; }
         .about-left {
             flex: 0 0 280px;
             min-width: 280px;
@@ -164,12 +162,12 @@
         }
         @media (max-width: 768px) {
             .about-container {
-                padding: 40px 20px 60px;
+                padding: 0;
             }
             .about-section {
                 flex-direction: column;
                 gap: 14px;
-                padding: 22px 0;
+                padding: 40px 22px;
             }
             .about-left {
                 flex: none;
