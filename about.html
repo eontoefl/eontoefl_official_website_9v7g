@@ -105,20 +105,34 @@
 
     <!-- About Content -->
     <style>
+        /* 헤더: application.html과 동일 — 채도 높은 보라 → 뉴트럴 흰 hero + 진한 글자 */
+        body { background: #f4f5f7; }
+        .page-header {
+            background: #ffffff;
+            color: #1e293b;
+            padding: 64px 0 52px 0;
+        }
+        .page-header h1 { color: #1e293b; }
+        .page-header p { color: #64748b; }
+
         .about-container {
             max-width: 1080px;
             margin: 0 auto;
-            padding: 60px 40px 100px;
+            padding: 48px 40px 100px;
             font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         }
+        /* 섹션: 구분선(border) → 회색 지면 위 선 없는 흰 카드 */
         .about-section {
             display: flex;
-            gap: 60px;
-            padding: 48px 0;
-            border-top: 1px solid #e2e8f0;
+            gap: 56px;
+            padding: 40px 44px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
+            margin-bottom: 20px;
         }
         .about-section:last-child {
-            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 0;
         }
         .about-left {
             flex: 0 0 280px;
@@ -134,7 +148,7 @@
         }
         .about-left .about-label {
             font-size: 14px;
-            color: #7c3aed;
+            color: #5b4a7d;
             font-weight: 600;
             line-height: 1.6;
         }
@@ -157,8 +171,9 @@
             }
             .about-section {
                 flex-direction: column;
-                gap: 24px;
-                padding: 32px 0;
+                gap: 20px;
+                padding: 26px 22px;
+                border-radius: 14px;
             }
             .about-left {
                 flex: none;
@@ -197,7 +212,7 @@
         <div class="about-section">
             <div class="about-left">
                 <h2>100% 독학으로 6.0 달성</h2>
-                <span class="about-label">당시 120점 만점이 119점</span>
+                <span class="about-label">당시 120점 만점에 119점</span>
             </div>
             <div class="about-right">
                 <p>이후부터는 광기였는지, 강박이었는지, 집착이었는지 모르겠습니다.<br>학원도 과외도 믿을수가 없었던 저는<br>선생님이 알려주는 정보에 안주하지 않고<br>ETS에서 직접 공개한 채점기준, 기출문제, 모범답안 등을 분석하기 시작했고,<br>당시 토플 시험을 활발하게 보던 중국, 인도, 아랍사이트들까지 뒤져가며 정보들을 수집하기 시작했습니다.</p>
@@ -208,7 +223,7 @@
         <!-- 섹션 4: 이온토플을 만들다 -->
         <div class="about-section">
             <div class="about-left">
-                <h2>사교육과 독학을 모두 해본 시행착오로<br>이온토플을 만들었습니다.</h2>
+                <h2>사교육과 독학을 <br>모두 해본 시행착오로<br>이온토플을 만들었습니다.</h2>
             </div>
             <div class="about-right">
                 <p>처음 시작은 용돈을 벌기위한 토플과외였지만,<br>모든 시행착오를 겪고 난 후 액기스 노하우로만 지도하니<br>목표점수 달성도 정말 빠르고, 영어실력도 쭉쭉 오르는 것이 신기해 당시 입소문이 나기 시작했습니다.</p>
@@ -219,7 +234,7 @@
         <!-- 섹션 5: 신청 안내 -->
         <div class="about-section">
             <div class="about-left">
-                <h2>항상 말씀드리지만, 이온토플을<br>신청하실 필요는 없습니다.</h2>
+                <h2>항상 말씀드리지만, <br>이온토플을<br>신청하실 필요는 없습니다.</h2>
             </div>
             <div class="about-right">
                 <p>처음 이온토플에 들어왔는데 바로 신청을 원하신다면 솔직히 말리고 싶어요.<br>실제로 아무 글도 읽어보지 않으시고 신청하신 분들은 거부합니다.<br>많은 글과 후기들을 읽어보며 자신의 공부방법을 되돌아보세요. 그것만으로도 점수가 크게 바뀔거예요</p>
