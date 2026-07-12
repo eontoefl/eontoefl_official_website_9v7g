@@ -586,7 +586,7 @@
                     <div id="sra" class="content-section">
                         <h2>스라첨삭</h2>
                         <div class="program-card" style="text-align: center; padding: 60px 40px;">
-                            <div style="font-size: 48px; margin-bottom: 20px;"><i class="fas fa-pen-nib" style="color: var(--primary-color);"></i></div>
+                            <div style="font-size: 48px; margin-bottom: 20px;"><i class="fas fa-pen-nib" style="color: #7a6690;"></i></div>
                             <h3 class="program-title" style="font-size: 24px; margin-bottom: 16px;">준비중입니다</h3>
                             <p class="program-desc" style="font-size: 16px; color: var(--text-light); margin-bottom: 24px;">Speaking & Writing 첨삭 프로그램</p>
                             <div class="highlight-box" style="display: inline-block; margin: 0 auto;">
@@ -622,6 +622,11 @@
             letter-spacing: 0.02em;
         }
         html, body { overflow-x: clip; }
+
+        /* 스라첨삭(준비중): 흰 카드는 본문 라인(780px)에 맞추고, '오픈 예정' 박스는 좌측보더 제거 + 브랜드 모브 */
+        #sra .program-card { max-width: 780px; margin: 0 auto; border: none; box-shadow: 0 1px 12px rgba(25, 28, 29, 0.06); }
+        #sra .highlight-box { background: #f3eef3; border-left: none; border-radius: 10px; }
+        #sra .highlight-box p, #sra .highlight-box strong { color: #5b4a72; }
     </style>
 
     <!-- Footer -->
