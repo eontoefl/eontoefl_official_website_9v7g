@@ -106,28 +106,42 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .nav-menu a:hover {
-    color: var(--primary-color);
+    color: #5b4a72;
 }
 
 /* Active page indicator */
 .nav-menu a.active {
-    color: var(--primary-color);
+    color: #5b4a72;
 }
 
-.nav-menu a.active::before {
+/* 활성/hover 밑줄 — 웜 브랜드 모브, 좌→우 슬라이드 인 (상위 메뉴 항목 한정) */
+.nav-menu > .nav-item > a::after {
     content: '';
     position: absolute;
     bottom: -8px;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
-    border-radius: 2px;
+    height: 2px;
+    background: #7a6690;
+    border-radius: 999px;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.22s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.nav-menu > .nav-item > a:hover::after,
+.nav-menu > .nav-item > a.active::after {
+    transform: scaleX(1);
 }
 
 /* ==================== Dropdown Menu ==================== */
 .nav-item {
     position: relative;
+}
+
+@keyframes navDropIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .dropdown-menu {
@@ -136,12 +150,11 @@ h1, h2, h3, h4, h5, h6,
     top: 100%;
     left: 0;
     background: white;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    border-radius: 12px;
-    padding: 16px 0;
-    min-width: 220px;
+    box-shadow: 0 14px 34px rgba(45, 35, 60, 0.13);
+    border-radius: 14px;
+    padding: 8px;
+    min-width: 224px;
     margin-top: 20px;
-    padding-top: 20px;
     z-index: 1000;
 }
 
@@ -158,21 +171,23 @@ h1, h2, h3, h4, h5, h6,
 
 .nav-item.has-dropdown:hover .dropdown-menu {
     display: block;
+    animation: navDropIn 0.18s ease;
 }
 
 .dropdown-menu a {
     display: block;
-    padding: 10px 24px;
-    color: #64748b;
+    padding: 10px 16px;
+    border-radius: 9px;
+    color: #475569;
     text-decoration: none;
     font-size: 14px;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
 .dropdown-menu a:hover {
-    background: #f8f4ff;
-    color: #9480c5;
+    background: #f3eef3;
+    color: #5b4a72;
 }
 
 .dropdown-menu a i {
@@ -180,7 +195,7 @@ h1, h2, h3, h4, h5, h6,
     font-size: 13px;
     width: 16px;
     text-align: center;
-    color: #9480c5;
+    color: #7a6690;
 }
 
 /* ==================== Auth Menu ==================== */
@@ -1514,7 +1529,7 @@ td:nth-child(5) {
         font-size: 15px;
     }
 
-    .nav-menu a.active::before {
+    .nav-menu > .nav-item > a::after {
         display: none;
     }
 
