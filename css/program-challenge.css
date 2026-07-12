@@ -95,7 +95,7 @@
 .cl .section-opening {
     padding-top: 3rem;
     padding-bottom: 4rem;
-    background: #f1f2f5;
+    background: #ffffff;
 }
 
 .cl .opening-headline {
@@ -224,7 +224,7 @@
    SECTION 2.5: 이 사이트를 만든 사람
    ═══════════════════════════════════════════ */
 .cl .section-builder {
-    background: #f1f2f5;
+    background: #ffffff;
 }
 
 .cl .builder-body p {
@@ -569,7 +569,7 @@
    SECTION 4: 실전 환경
    ═══════════════════════════════════════════ */
 .cl .section-environment {
-    background: #f1f2f5;
+    background: #ffffff;
 }
 
 .cl .environment-body p {
@@ -670,7 +670,7 @@
    SECTION 6: 강제성 시스템
    ═══════════════════════════════════════════ */
 .cl .section-accountability {
-    background: #f1f2f5;
+    background: #ffffff;
 }
 
 .cl .accountability-cards {
@@ -884,7 +884,7 @@
    SECTION 8: 클로징
    ═══════════════════════════════════════════ */
 .cl .section-closing {
-    background: #f1f2f5;
+    background: #ffffff;
     padding: 4rem 0 3rem;
 }
 
