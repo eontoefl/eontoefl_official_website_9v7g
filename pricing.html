@@ -168,10 +168,17 @@
         .pr-include-item i { color: #7a6690; font-size: 10px; flex-shrink: 0; }
 
         /* Coming Soon */
-        .pr-coming { border: 1px dashed #cbd5e1; border-radius: 16px; padding: 40px; text-align: center; margin-top: 24px; }
-        .pr-coming h3 { font-size: 17px; font-weight: 700; color: #94a3b8; margin: 0 0 6px 0; }
-        .pr-coming p { font-size: 13px; color: #cbd5e1; margin: 0; }
-        .pr-coming .badge { display: inline-block; background: #f3eef3; color: #64748b; font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 20px; margin-top: 12px; }
+        .pr-coming { background: #f3eef3; border-radius: 14px; padding: 28px 28px 24px; text-align: center; margin-top: 24px; }
+        .pr-coming-badge { display: inline-block; background: #e7dce7; color: #5b4a72; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; padding: 5px 13px; border-radius: 999px; margin-bottom: 12px; }
+        .pr-coming h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 4px 0; }
+        .pr-coming p { font-size: 13px; color: #64748b; margin: 0 0 18px 0; }
+        .pr-coming-info { background: #ffffff; border-radius: 10px; padding: 4px 18px; text-align: left; margin-bottom: 14px; }
+        .pr-coming-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; }
+        .pr-coming-row + .pr-coming-row { border-top: 1px solid #eee7ee; }
+        .pr-coming-row > span { font-size: 13px; color: #64748b; white-space: nowrap; }
+        .pr-coming-row > strong { font-size: 13px; font-weight: 600; color: #1e293b; text-align: right; }
+        .pr-coming-note { font-size: 12.5px; color: #8a6d1f; background: #fbf6ec; border-radius: 8px; padding: 10px 14px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 7px; }
+        .pr-coming-note i { font-size: 11px; }
 
         /* Block card */
         .pr-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 28px 32px; margin-bottom: 16px; }
@@ -204,9 +211,32 @@
         /* 좌측 보더 제거 + 둥근 흰 카드 */
         .pr.main-content { border-left: none; border-radius: 16px; box-shadow: 0 2px 20px rgba(25,28,29,0.05); }
 
+        .pr-nowrap { white-space: nowrap; }
+        .pr-br-m { display: none; }
+
         @media (max-width: 768px) {
             .pr-price-table, .pr-program-header, .pr-price-total { padding-left: 24px; padding-right: 24px; }
             .pr-include-list, .pr-compare { grid-template-columns: 1fr; }
+
+            /* 사이드바 탭: 가로 스크롤 → 3등분 한 줄(스크롤 제거) */
+            .sidebar-nav { overflow-x: hidden; gap: 6px; padding: 8px; }
+            .sidebar-nav a { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; font-size: 12.5px; padding: 10px 4px; }
+            .sidebar-nav a i { font-size: 12px; }
+
+            /* 내벨업챌린지 헤더: 이름·가격 줄바꿈 → 이름/개정 세로 배치 + 글자 축소 */
+            .pr-program-header h3 { font-size: 16px; flex-direction: column; align-items: flex-start; gap: 2px; }
+            .pr-program-header h3 .pr-revised { font-size: 11px; }
+            .pr-header-price { font-size: 17px; white-space: nowrap; }
+
+            /* 할인/환불 블록 제목: 줄바꿈 완화 (아이콘 상단 정렬) */
+            .pr-block { padding: 22px 22px; }
+            .pr-block-title { font-size: 14px; align-items: flex-start; line-height: 1.5; }
+            .pr-block-title i { margin-top: 3px; flex-shrink: 0; }
+
+            /* CTA: 모바일에서 콤마 뒤 깔끔하게 개행 */
+            .pr-br-m { display: inline; }
+            .pr-cta { padding: 36px 24px; }
+            .pr-cta-desc { font-size: 13.5px; }
         }
     </style>
 
@@ -309,9 +339,14 @@
 
                         <!-- 스라 첨삭 (준비중) -->
                         <div class="pr-coming">
-                            <h3>스라 첨삭</h3>
-                            <p>Speaking & Writing 전문 첨삭 프로그램</p>
-                            <span class="badge">준비중 · 4월 중 오픈 예정</span>
+                            <span class="pr-coming-badge">준비중</span>
+                            <h3>스라 첨삭 · 상세페이지 준비중</h3>
+                            <p>Speaking &amp; Writing 전문 첨삭 프로그램</p>
+                            <div class="pr-coming-info">
+                                <div class="pr-coming-row"><span>이용 대상</span><strong>내벨업챌린지 수강생 전용</strong></div>
+                                <div class="pr-coming-row"><span>추가 수강료</span><strong>내벨업챌린지 + 20만원</strong></div>
+                            </div>
+                            <div class="pr-coming-note"><i class="fas fa-circle-info"></i> 8월부터 가격 인상 예정입니다.</div>
                         </div>
                     </section>
 
@@ -322,7 +357,7 @@
                         <p>이온토플에서 제공하는 혜택 안내입니다.</p>
 
                         <div class="pr-block" style="margin-top: 28px;">
-                            <p class="pr-block-title"><i class="fas fa-receipt"></i> 시험료지원금 210,000원 (결제 시 선반영)</p>
+                            <p class="pr-block-title"><i class="fas fa-receipt"></i> <span>시험료지원금 210,000원 <span class="pr-nowrap">(결제 시 선반영)</span></span></p>
                             <p>내벨업챌린지 등록 시 필수 적용되는 유일한 할인 항목입니다. 별도의 추가 할인은 제공하지 않습니다.</p>
                             <p>조건: 실제 토플 시험 2회 이상 응시 및 점수 인증 + 점수 후기 1회 작성</p>
                         </div>
@@ -353,7 +388,7 @@
                     <!-- 하단 신청 유도 CTA -->
                     <div class="pr-cta">
                         <h3 class="pr-cta-title">이제 시작할 차례입니다</h3>
-                        <p class="pr-cta-desc">궁금한 점이 풀리셨다면, 지금 바로 신청하세요.</p>
+                        <p class="pr-cta-desc">궁금한 점이 풀리셨다면,<br class="pr-br-m"> 지금 바로 신청하세요.</p>
                         <a href="application-form.html" class="pr-cta-btn">
                             <span class="cta-text">신청하기</span>
                         </a>
