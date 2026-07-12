@@ -602,10 +602,13 @@
     <style>
         .content-section { display: none; }
         .content-section.active { display: block; }
-        /* 헤더: 채도 높은 보라 그라데이션 → 뉴트럴 흰 hero (application.html 등과 통일) */
-        .page-header { background: #ffffff; color: #1e293b; padding: 64px 0 52px 0; }
+        /* 헤더: 채도 높은 보라 그라데이션 → 소프트 라벤더 밴드 (아래 흰 섹션과 교차 구별) */
+        .page-header { background: #f2eef8; color: #1e293b; padding: 64px 0 52px 0; }
         .page-header h1 { color: #1e293b; }
-        .page-header p { color: #64748b; }
+        .page-header p { color: #5b4a7d; }
+        /* 섹션 배경 밴드가 좌우 끝까지 가도록: main-content의 overflow-x: hidden이 풀블리드를 잘라서 해제 */
+        .cl-page-main { overflow-x: visible; }
+        html, body { overflow-x: clip; }
     </style>
 
     <!-- Footer -->
