@@ -106,7 +106,7 @@
     <!-- About Content -->
     <style>
         /* 헤더: application.html과 동일 — 채도 높은 보라 → 뉴트럴 흰 hero + 진한 글자 */
-        body { background: #f4f5f7; }
+        body { background: #faf7fa; }
         .page-header {
             background: #ffffff;
             color: #1e293b;
@@ -121,15 +121,12 @@
             padding: 48px 40px 100px;
             font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
         }
-        /* 섹션: 구분선(border) → 회색 지면 위 선 없는 흰 카드 */
+        /* 섹션: 감싸는 흰 카드 없이 라일락 지면 위에 바로 (컨테이너 미사용) */
         .about-section {
             display: flex;
             gap: 56px;
-            padding: 40px 44px;
-            background: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);
-            margin-bottom: 20px;
+            padding: 36px 0;
+            margin-bottom: 28px;
         }
         .about-section:last-child {
             margin-bottom: 0;
@@ -148,7 +145,7 @@
         }
         .about-left .about-label {
             font-size: 14px;
-            color: #5b4a7d;
+            color: #5b4a72;
             font-weight: 600;
             line-height: 1.6;
         }
@@ -171,9 +168,8 @@
             }
             .about-section {
                 flex-direction: column;
-                gap: 20px;
-                padding: 26px 22px;
-                border-radius: 14px;
+                gap: 14px;
+                padding: 22px 0;
             }
             .about-left {
                 flex: none;

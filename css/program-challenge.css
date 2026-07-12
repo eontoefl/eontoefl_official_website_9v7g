@@ -95,7 +95,7 @@
 .cl .section-opening {
     padding-top: 3rem;
     padding-bottom: 4rem;
-    background: #ffffff;
+    background: #faf7fa;
 }
 
 .cl .opening-headline {
@@ -135,8 +135,9 @@
     font-weight: 500;
     color: #1e293b;
     padding: 1.4rem 1.6rem;
-    background: #f3eef3;
+    background: #ffffff;
     border-radius: 10px;
+    box-shadow: 0 1px 10px rgba(25, 28, 29, 0.05);
     margin: 2rem 0;
     line-height: 1.85;
     font-size: 1.05rem;
@@ -223,7 +224,7 @@
    SECTION 2.5: 이 사이트를 만든 사람
    ═══════════════════════════════════════════ */
 .cl .section-builder {
-    background: #ffffff;
+    background: #faf7fa;
 }
 
 .cl .builder-body p {
@@ -237,8 +238,9 @@
     font-weight: 500;
     color: #1e293b;
     padding: 1.4rem 1.6rem;
-    background: #f3eef3;
+    background: #ffffff;
     border-radius: 10px;
+    box-shadow: 0 1px 10px rgba(25, 28, 29, 0.05);
     margin: 2rem 0;
     line-height: 1.85;
     font-size: 1.05rem;
@@ -567,7 +569,7 @@
    SECTION 4: 실전 환경
    ═══════════════════════════════════════════ */
 .cl .section-environment {
-    background: #ffffff;
+    background: #faf7fa;
 }
 
 .cl .environment-body p {
@@ -668,7 +670,7 @@
    SECTION 6: 강제성 시스템
    ═══════════════════════════════════════════ */
 .cl .section-accountability {
-    background: #ffffff;
+    background: #faf7fa;
 }
 
 .cl .accountability-cards {
@@ -882,7 +884,7 @@
    SECTION 8: 클로징
    ═══════════════════════════════════════════ */
 .cl .section-closing {
-    background: #ffffff;
+    background: #faf7fa;
     padding: 4rem 0 3rem;
 }
 
@@ -908,7 +910,8 @@
     padding: 2rem 1.2rem;
     border: none;
     border-radius: 12px;
-    background: #f3eef3;
+    background: #ffffff;
+    box-shadow: 0 1px 10px rgba(25, 28, 29, 0.05);
     transition: background 0.2s ease;
     text-align: center;
 }
@@ -938,7 +941,7 @@
 }
 
 .cl .cta-apply {
-    background: #f3eef3;
+    background: #ffffff;
 }
 
 /* ═══════════════════════════════════════════
