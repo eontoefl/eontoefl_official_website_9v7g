@@ -95,7 +95,7 @@
 .cl .section-opening {
     padding-top: 3rem;
     padding-bottom: 4rem;
-    background: #fff;
+    background: #f1f2f5;
 }
 
 .cl .opening-headline {
@@ -135,8 +135,9 @@
     font-weight: 500;
     color: #1e293b;
     padding: 1.4rem 1.6rem;
-    background: #f7f5fb;
-    border-radius: 6px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 8px rgba(25, 28, 29, 0.05);
     margin: 2rem 0;
     line-height: 1.85;
     font-size: 1.05rem;
@@ -152,7 +153,7 @@
    SECTION 2: 이온쌤 소개
    ═══════════════════════════════════════════ */
 .cl .section-instructor {
-    background: #f2eef8;
+    background: #ece4f2;
 }
 
 .cl .instructor-layout {
@@ -223,7 +224,7 @@
    SECTION 2.5: 이 사이트를 만든 사람
    ═══════════════════════════════════════════ */
 .cl .section-builder {
-    background: #fff;
+    background: #f1f2f5;
 }
 
 .cl .builder-body p {
@@ -237,8 +238,9 @@
     font-weight: 500;
     color: #1e293b;
     padding: 1.4rem 1.6rem;
-    background: #f7f5fb;
-    border-radius: 6px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 8px rgba(25, 28, 29, 0.05);
     margin: 2rem 0;
     line-height: 1.85;
     font-size: 1.05rem;
@@ -288,7 +290,7 @@
    SECTION 3: 프로그램 설명
    ═══════════════════════════════════════════ */
 .cl .section-program {
-    background: #f2eef8;
+    background: #ece4f2;
 }
 
 .cl .program-body p {
@@ -298,12 +300,13 @@
     color: #333;
 }
 
-.cl .program-note {
+.cl .program-body .program-note {
     font-weight: 600;
     color: #5b4a7d;
     padding: 0.8rem 1.2rem;
-    background: #e6ddf5;
+    background: #ffffff;
     border-radius: 8px;
+    box-shadow: 0 1px 8px rgba(25, 28, 29, 0.05);
     display: inline-block;
     margin-top: 0.5rem;
     font-size: 0.95rem;
@@ -531,8 +534,8 @@
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: #f7f5fb;
-    border: 2px solid #e0dce8;
+    background: #ffffff;
+    border: 2px solid #e0dbec;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -566,7 +569,7 @@
    SECTION 4: 실전 환경
    ═══════════════════════════════════════════ */
 .cl .section-environment {
-    background: #fff;
+    background: #f1f2f5;
 }
 
 .cl .environment-body p {
@@ -599,7 +602,7 @@
    SECTION 5: 해설과 오답노트
    ═══════════════════════════════════════════ */
 .cl .section-explanation {
-    background: #f2eef8;
+    background: #ece4f2;
 }
 
 .cl .explanation-body p {
@@ -667,7 +670,7 @@
    SECTION 6: 강제성 시스템
    ═══════════════════════════════════════════ */
 .cl .section-accountability {
-    background: #fff;
+    background: #f1f2f5;
 }
 
 .cl .accountability-cards {
@@ -678,9 +681,10 @@
 }
 
 .cl .acc-card {
-    background: #faf9fc;
-    border: 1px solid rgba(0,0,0,0.06);
-    border-radius: 10px;
+    background: #ffffff;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 1px 8px rgba(25, 28, 29, 0.05);
     padding: 1.8rem;
     transition: box-shadow 0.3s ease;
 }
@@ -734,7 +738,7 @@
    SECTION 7: 후기 + 선별 + 진단서
    ═══════════════════════════════════════════ */
 .cl .section-reviews {
-    background: #f2eef8;
+    background: #ece4f2;
     padding-bottom: 3rem;
 }
 
@@ -880,7 +884,7 @@
    SECTION 8: 클로징
    ═══════════════════════════════════════════ */
 .cl .section-closing {
-    background: #fff;
+    background: #f1f2f5;
     padding: 4rem 0 3rem;
 }
 
