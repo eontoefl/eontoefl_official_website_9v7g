@@ -67,6 +67,8 @@ function initCLCarousel() {
         const visibleCards = getVisibleCards();
         const gap = 16;
         const trackWidth = track.parentElement.offsetWidth;
+        // 레이아웃 전(섹션 display:none 등)이라 폭이 0이면 카드 flex를 0px로 잘못 굳히지 않도록 중단
+        if (trackWidth <= 0) return;
         const cardWidth = (trackWidth - (visibleCards - 1) * gap) / visibleCards;
 
         cards.forEach(function(card) {
@@ -155,6 +157,16 @@ function initCLCarousel() {
     });
 
     updateCarousel(false);
+
+    // 초기화 시 섹션이 숨겨져(폭 0) 정상 계산이 안 됐을 수 있으므로,
+    // 캐러셀이 화면에 보이는 시점(레이아웃 완료)과 load 시점에 다시 계산한다.
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function(entries) {
+            if (entries[0].isIntersecting) updateCarousel(false);
+        }, { threshold: 0.01 });
+        io.observe(track.parentElement);
+    }
+    window.addEventListener('load', function() { updateCarousel(false); });
 }
 
 // Auto-init when DOM ready
