@@ -607,9 +607,20 @@
         .page-header h1 { color: #1e293b; }
         .page-header p { color: #64748b; }
         /* 섹션 배경 밴드가 좌우 끝까지 가도록: main-content의 overflow-x: hidden이 풀블리드를 잘라서 해제 */
-        /* 제목 영역을 라일락으로 → 회색 밑줄 제거 + 첫 밴드(라일락)와 이어지게 (흰→라일락 점프 해소) */
+        /* 헤더 아래 콘텐츠 영역 전체를 라일락으로 → 흰 여백 없이 헤더에서 바로 이어짐(색종이 블록 방지) */
+        .page-layout { background: #f3eef3; padding-top: 40px; }
         .cl-page-main { overflow-x: visible; background: #f3eef3; }
-        .cl-page-main .content-section > h2 { border-bottom: none; padding-bottom: 0; margin-bottom: 8px; }
+        /* 프로그램 제목: 회색 밑줄 제거 + 본문 밴드와 같은 라인(780px 중앙)으로 정렬 */
+        .cl-page-main .content-section > h2 {
+            border-bottom: none;
+            padding: 0 24px;
+            margin: 8px auto 0;
+            max-width: 780px;
+            color: #7a6690;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
         html, body { overflow-x: clip; }
     </style>
 
