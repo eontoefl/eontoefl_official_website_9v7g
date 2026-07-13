@@ -172,6 +172,27 @@ function isAusTaskType(taskType) {
 }
 
 /**
+ * 스피킹 첨삭에서 그릴 문항(탭·패널) 개수.
+ *   일반 Interview — 4문항. per_question이 모자라도 4칸을 유지한다(기존 동작 보존).
+ *   호주첨삭       — 답변 1개. 4칸을 그리면 빈 Q2·Q3·Q4 탭이 뜬다.
+ */
+function getSpeakingQCount(perQuestionLength) {
+    const taskType = currentModalItem ? currentModalItem.task_type : null;
+    const base = getTaskAnswerCount(taskType);   // 호주 1 / 일반 4
+    return Math.max(perQuestionLength || 0, base);
+}
+
+/**
+ * 점수 드롭다운의 최저값.
+ *   호주첨삭 — 0점이 실제 채점 결과로 나온다(무응답·주제이탈·복사).
+ *              0이 없으면 0점짜리를 저장할 때 자동으로 1점이 되어 점수가 왜곡된다.
+ *   일반첨삭 — 기존 동작(1부터)을 그대로 둔다.
+ */
+function getTaskScoreMin(taskType) {
+    return isAusTaskType(taskType) ? 0 : 1;
+}
+
+/**
  * 트랙 배지 — 이 건이 호주첨삭인지 일반첨삭인지 한눈에 구분한다.
  * 채점 기준·만점·유형이 전부 다르므로 목록에서 섞이면 오판하기 쉽다.
  */
@@ -1516,19 +1537,25 @@ function renderWritingModal(container, feedback) {
 function renderSpeakingModal(container, feedback) {
     // Per-question data
     const questions = feedback.per_question || [];
-    
+
+    // 답변 개수 — 일반 Interview는 4문항, 호주첨삭(독스·통스)은 1문항.
+    // 그대로 4개를 그리면 호주에서 빈 Q2·Q3·Q4 탭이 뜬다.
+    const qCount = getSpeakingQCount(questions.length);
+
     let html = '';
 
-    // Tab navigation
-    html += '<div class="corr-spk-tabs" id="spkTabs">';
-    for (let i = 0; i < Math.max(questions.length, 4); i++) {
-        html += `<button class="corr-spk-tab ${i === 0 ? 'active' : ''}" data-q="${i}" onclick="switchSpeakingTab(${i})">Q${i + 1}</button>`;
+    // Tab navigation — 답변이 1개뿐이면 탭 자체가 의미 없다
+    if (qCount > 1) {
+        html += '<div class="corr-spk-tabs" id="spkTabs">';
+        for (let i = 0; i < qCount; i++) {
+            html += `<button class="corr-spk-tab ${i === 0 ? 'active' : ''}" data-q="${i}" onclick="switchSpeakingTab(${i})">Q${i + 1}</button>`;
+        }
+        html += '</div>';
     }
-    html += '</div>';
 
     // Tab panels — split layout for each Q
     html += '<div class="corr-fb-split-wrap" data-fb-scope="admin-spk">';
-    for (let i = 0; i < Math.max(questions.length, 4); i++) {
+    for (let i = 0; i < qCount; i++) {
         const pq = questions[i] || {};
         html += `<div class="corr-spk-q-panel ${i === 0 ? 'active' : ''}" data-q="${i}">`;
         html += '  <div class="corr-fb-split">';
@@ -1550,7 +1577,7 @@ function renderSpeakingModal(container, feedback) {
     container.innerHTML = html;
 
     // Render annotated HTML for each Q
-    for (let i = 0; i < Math.max(questions.length, 4); i++) {
+    for (let i = 0; i < qCount; i++) {
         const pq = questions[i] || {};
         const el = document.getElementById(`adminSpkFb_${i}`);
         if (el && pq.annotated_html) {
@@ -2214,10 +2241,13 @@ function makeSummaryEditable() {
     html += `<div class="corr-feedback-hint">교정 포인트: <strong id="editHintCount">${feedback.hint_count || 0}</strong>개 (저장 시 자동 계산)</div>`;
 
     // Level dropdown — 만점이 유형마다 다르다 (라이팅 5 / 호주 스피킹 4)
-    const editScoreMax = getTaskScoreMax(currentModalItem && currentModalItem.task_type);
+    // 호주는 0점이 실제로 나오므로 0부터 고를 수 있어야 한다 (일반은 기존대로 1부터)
+    const editTaskType = currentModalItem && currentModalItem.task_type;
+    const editScoreMax = getTaskScoreMax(editTaskType);
+    const editScoreMin = getTaskScoreMin(editTaskType);
     html += `<div class="corr-feedback-level-card">
         <select class="corr-editable-select" id="editLevel">`;
-    for (let v = 1; v <= editScoreMax; v += 1) {
+    for (let v = editScoreMin; v <= editScoreMax; v += 1) {
         const selected = (feedback.level !== undefined && feedback.level !== null && Math.round(Number(feedback.level)) === v) ? 'selected' : '';
         html += `<option value="${v}" ${selected}>${v}</option>`;
     }
@@ -2263,7 +2293,8 @@ function makeSpeakingCommentsEditable() {
     const feedback = parseFeedback(item[fbKey]);
     if (!feedback || !feedback.per_question) return;
 
-    const qCount = Math.max(feedback.per_question.length, 4);
+    // 호주첨삭은 답변 1개 → 패널도 1개만 존재한다
+    const qCount = getSpeakingQCount(feedback.per_question.length);
     for (let i = 0; i < qCount; i++) {
         const pq = feedback.per_question[i] || {};
         const panel = document.querySelector(`.corr-spk-q-panel[data-q="${i}"]`);
@@ -2540,8 +2571,9 @@ function collectFeedbackFromDOM() {
         }
     } else {
         // Speaking: rebuild per_question array
+        // 호주첨삭은 답변 1개다. 4개로 만들면 빈 문항 3개가 DB에 영구 저장된다.
         const questions = result.per_question || [];
-        const qCount = Math.max(questions.length, 4);
+        const qCount = getSpeakingQCount(questions.length);
         const newPerQuestion = [];
 
         for (let i = 0; i < qCount; i++) {
