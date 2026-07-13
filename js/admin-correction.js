@@ -117,13 +117,68 @@ function populateSessionFilter() {
     }
 }
 
+// ===== Task Type 메타 (일반 + 호주) =====
+// 유형별 분기를 여기 한 곳에 모은다. 새 유형이 생기면 이 표만 고친다.
+//
+// answers  — 학생 답변 개수. 일반 Interview는 4문항, 호주 스피킹은 1문항.
+// scoreMax — 만점. ETS 공식 기준: 라이팅 0~5, 스피킹 0~4.
+//            (일반첨삭은 Interview까지 0~5를 써왔으므로 기존 값을 유지한다)
+const CORR_TASK_META = {
+    writing_email:      { label: 'Email',      css: 'task-type-email',      answers: 1, scoreMax: 5, aus: false },
+    writing_discussion: { label: 'Discussion', css: 'task-type-discussion', answers: 1, scoreMax: 5, aus: false },
+    speaking_interview: { label: 'Interview',  css: 'task-type-interview',  answers: 4, scoreMax: 5, aus: false },
+
+    // 호주첨삭 — 학원에서 쓰는 용어 그대로 노출한다 (알림톡 문구에도 이 라벨이 들어감)
+    writing_aus_discussion:   { label: '토라',   css: 'task-type-discussion', answers: 1, scoreMax: 5, aus: true },
+    writing_aus_integrated:   { label: '통라',   css: 'task-type-email',      answers: 1, scoreMax: 5, aus: true },
+    speaking_aus_independent: { label: '독스',   css: 'task-type-interview',  answers: 1, scoreMax: 4, aus: true },
+    speaking_aus_int2:        { label: '통스2',  css: 'task-type-interview',  answers: 1, scoreMax: 4, aus: true },
+    speaking_aus_int3:        { label: '통스3',  css: 'task-type-interview',  answers: 1, scoreMax: 4, aus: true },
+    speaking_aus_int4:        { label: '통스4',  css: 'task-type-interview',  answers: 1, scoreMax: 4, aus: true }
+};
+
+function getTaskMeta(taskType) {
+    return CORR_TASK_META[(taskType || '').toLowerCase()] || null;
+}
+
 // ===== Helper: Task Type Label =====
 function getTaskTypeLabel(taskType) {
-    const t = (taskType || '').toLowerCase();
-    if (t === 'writing_email') return 'Email';
-    if (t === 'writing_discussion') return 'Discussion';
-    if (t === 'speaking_interview') return 'Interview';
-    return taskType || '';
+    const meta = getTaskMeta(taskType);
+    return meta ? meta.label : (taskType || '');
+}
+
+/** 유형 배지 CSS 클래스 */
+function getTaskTypeCss(taskType) {
+    const meta = getTaskMeta(taskType);
+    return meta ? meta.css : '';
+}
+
+/** 학생 답변 개수 (스피킹 오디오/STT를 몇 칸 그릴지) */
+function getTaskAnswerCount(taskType) {
+    const meta = getTaskMeta(taskType);
+    return meta ? meta.answers : 4;
+}
+
+/** 점수 만점 */
+function getTaskScoreMax(taskType) {
+    const meta = getTaskMeta(taskType);
+    return meta ? meta.scoreMax : 5;
+}
+
+/** 호주첨삭 여부 */
+function isAusTaskType(taskType) {
+    const meta = getTaskMeta(taskType);
+    return !!(meta && meta.aus);
+}
+
+/**
+ * 트랙 배지 — 이 건이 호주첨삭인지 일반첨삭인지 한눈에 구분한다.
+ * 채점 기준·만점·유형이 전부 다르므로 목록에서 섞이면 오판하기 쉽다.
+ */
+function renderTrackBadge(taskType) {
+    return isAusTaskType(taskType)
+        ? '<span class="corr-track-badge corr-track-aus">호주</span>'
+        : '<span class="corr-track-badge corr-track-gen">일반</span>';
 }
 
 // ===== Status Logic =====
@@ -458,11 +513,8 @@ function displayCorrections() {
 
         // Task type display
         const taskType = (item.task_type || '').toLowerCase();
-        let taskTypeLabel = item.task_type || '-';
-        let taskTypeCss = '';
-        if (taskType === 'writing_email') { taskTypeLabel = 'Email'; taskTypeCss = 'task-type-email'; }
-        else if (taskType === 'writing_discussion') { taskTypeLabel = 'Discussion'; taskTypeCss = 'task-type-discussion'; }
-        else if (taskType === 'speaking_interview') { taskTypeLabel = 'Interview'; taskTypeCss = 'task-type-interview'; }
+        const taskTypeLabel = getTaskTypeLabel(item.task_type) || (item.task_type || '-');
+        const taskTypeCss = getTaskTypeCss(item.task_type);
 
         return `
             <tr style="${isSelected ? 'background: #f0f9ff;' : ''}">
@@ -474,7 +526,10 @@ function displayCorrections() {
                            onchange="toggleSelection('${item.id}')">
                 </td>
                 <td>
-                    <div style="font-weight: 600;">${escapeHtml(user.name)}</div>
+                    <div style="font-weight: 600; display:flex; align-items:center; gap:6px;">
+                        ${renderTrackBadge(item.task_type)}
+                        <span>${escapeHtml(user.name)}</span>
+                    </div>
                     <div style="font-size: 12px; color: #94a3b8;">${escapeHtml(user.email)}</div>
                 </td>
                 <td style="font-size: 13px; color: #64748b;">
@@ -796,12 +851,11 @@ function populateModalHeader(item) {
 
     // Task type label
     const taskType = (item.task_type || '').toLowerCase();
-    let taskTypeLabel = item.task_type || '-';
-    if (taskType === 'writing_email') taskTypeLabel = 'Email';
-    else if (taskType === 'writing_discussion') taskTypeLabel = 'Discussion';
-    else if (taskType === 'speaking_interview') taskTypeLabel = 'Interview';
+    const taskTypeLabel = getTaskTypeLabel(item.task_type) || (item.task_type || '-');
 
-    document.getElementById('modalStudentName').textContent = user.name;
+    // 모달에서도 호주/일반을 먼저 보이게 한다 (채점 기준이 달라 혼동하면 안 됨)
+    const nameEl = document.getElementById('modalStudentName');
+    nameEl.innerHTML = `${renderTrackBadge(item.task_type)} <span>${escapeHtml(user.name)}</span>`;
     document.getElementById('modalSession').textContent = item.session_number ? `S${item.session_number}` : '-';
     document.getElementById('modalTaskType').textContent = taskTypeLabel;
     document.getElementById('modalDraftRound').textContent = `${round}차`;
@@ -1403,12 +1457,14 @@ function toggleOriginalDraftPanel() {
             html = '<div style="padding:10px; color:#888; text-align:center;">원문 데이터가 없습니다.</div>';
         }
     } else {
-        // Speaking: show audio paths
+        // Speaking: show audio paths (호주첨삭은 답변 1개, 일반 Interview는 4개)
         const prefix = round === '2' ? 'draft_2_audio_q' : 'draft_1_audio_q';
+        const qCount = getTaskAnswerCount(item.task_type);
         html = '<div style="display:flex; flex-direction:column; gap:6px;">';
-        for (let q = 1; q <= 4; q++) {
+        for (let q = 1; q <= qCount; q++) {
             const path = item[prefix + q] || '';
-            html += `<div class="corr-toggle-panel-audio-path"><strong>Q${q}:</strong> ${path ? escapeHtml(path) : '(파일 없음)'}</div>`;
+            const qLabel = qCount === 1 ? '답변' : `Q${q}`;
+            html += `<div class="corr-toggle-panel-audio-path"><strong>${qLabel}:</strong> ${path ? escapeHtml(path) : '(파일 없음)'}</div>`;
         }
         html += '</div>';
     }
@@ -1724,9 +1780,11 @@ function renderFeedbackSummary(container, feedback, round) {
     }
 
     if (feedback.level !== undefined && feedback.level !== null) {
+        // 만점이 유형마다 다르므로(라이팅 5 / 호주 스피킹 4) 반드시 함께 표기한다
+        const scoreMax = getTaskScoreMax(currentModalItem && currentModalItem.task_type);
         html += `<div class="corr-feedback-level-card">
             <div class="corr-feedback-level-badge">${Math.round(Number(feedback.level))}</div>
-            <div class="corr-feedback-level-label">Score</div>
+            <div class="corr-feedback-level-label">Score / ${scoreMax}</div>
         </div>`;
     }
 
@@ -2155,15 +2213,16 @@ function makeSummaryEditable() {
     // Hint count (read-only, auto-calculated)
     html += `<div class="corr-feedback-hint">교정 포인트: <strong id="editHintCount">${feedback.hint_count || 0}</strong>개 (저장 시 자동 계산)</div>`;
 
-    // Level dropdown
+    // Level dropdown — 만점이 유형마다 다르다 (라이팅 5 / 호주 스피킹 4)
+    const editScoreMax = getTaskScoreMax(currentModalItem && currentModalItem.task_type);
     html += `<div class="corr-feedback-level-card">
         <select class="corr-editable-select" id="editLevel">`;
-    for (let v = 1; v <= 5; v += 1) {
+    for (let v = 1; v <= editScoreMax; v += 1) {
         const selected = (feedback.level !== undefined && feedback.level !== null && Math.round(Number(feedback.level)) === v) ? 'selected' : '';
         html += `<option value="${v}" ${selected}>${v}</option>`;
     }
     html += `</select>
-        <div class="corr-feedback-level-label">Score</div>
+        <div class="corr-feedback-level-label">Score / ${editScoreMax}</div>
     </div>`;
 
     // Encouragement textarea (only for 2nd round)
@@ -2548,19 +2607,40 @@ async function retryWebhook(id, btnElement) {
     }
 
     // Determine webhook URL
+    //   일반첨삭 → 기존 워크플로우
+    //   호주첨삭 → 호주 전용 워크플로우 (주소 자체가 분리되어 있어 절대 섞이지 않음)
+    // 아직 워크플로우/프롬프트가 준비되지 않은 호주 유형은 빈 값 → 재실행을 막는다.
+    const AUS_RERUN_WEBHOOKS = {
+        writing_aus_discussion:   { draft1: 'https://eontoefl.app.n8n.cloud/webhook/correction-aus-writing-draft1', draft2: '' },
+        writing_aus_integrated:   { draft1: '', draft2: '' },   // 통라 — 프롬프트 대기
+        speaking_aus_independent: { draft1: '', draft2: '' },   // 독스 — 워크플로우 대기
+        speaking_aus_int2:        { draft1: '', draft2: '' },
+        speaking_aus_int3:        { draft1: '', draft2: '' },
+        speaking_aus_int4:        { draft1: '', draft2: '' }
+    };
+
+    const isDraft1 = (item.status === 'draft1_submitted');
     let webhookUrl = '';
-    if (taskType === 'writing_email' || taskType === 'writing_discussion') {
-        if (item.status === 'draft1_submitted') {
-            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-writing-draft1';
-        } else {
-            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-writing-draft2';
+
+    if (isAusTaskType(taskType)) {
+        const hooks = AUS_RERUN_WEBHOOKS[taskType] || {};
+        webhookUrl = isDraft1 ? hooks.draft1 : hooks.draft2;
+        if (!webhookUrl) {
+            alert(`${taskLabel} ${draftNum}차는 아직 채점 워크플로우가 준비되지 않았습니다.\n준비되면 이 버튼으로 소급 처리할 수 있습니다.`);
+            if (btnElement) {
+                btnElement.disabled = false;
+                btnElement.innerHTML = '<i class="fas fa-redo"></i> 재실행';
+            }
+            return;
         }
+    } else if (taskType === 'writing_email' || taskType === 'writing_discussion') {
+        webhookUrl = isDraft1
+            ? 'https://eontoefl.app.n8n.cloud/webhook/correction-writing-draft1'
+            : 'https://eontoefl.app.n8n.cloud/webhook/correction-writing-draft2';
     } else if (taskType === 'speaking_interview') {
-        if (item.status === 'draft1_submitted') {
-            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-speaking-draft1';
-        } else {
-            webhookUrl = 'https://eontoefl.app.n8n.cloud/webhook/correction-speaking-draft2';
-        }
+        webhookUrl = isDraft1
+            ? 'https://eontoefl.app.n8n.cloud/webhook/correction-speaking-draft1'
+            : 'https://eontoefl.app.n8n.cloud/webhook/correction-speaking-draft2';
     } else {
         alert('알 수 없는 과제 유형입니다.');
         if (btnElement) {
@@ -2766,10 +2846,7 @@ function downloadExcel() {
 
         // Task type label
         const taskType = (item.task_type || '').toLowerCase();
-        let taskTypeLabel = item.task_type || '-';
-        if (taskType === 'writing_email') taskTypeLabel = 'Email';
-        else if (taskType === 'writing_discussion') taskTypeLabel = 'Discussion';
-        else if (taskType === 'speaking_interview') taskTypeLabel = 'Interview';
+        const taskTypeLabel = getTaskTypeLabel(item.task_type) || (item.task_type || '-');
 
         // Format dates
         const submitDate = item.draft_1_submitted_at
@@ -2901,6 +2978,9 @@ async function fetchQuestionsForCorrections(items) {
     const emailIds = new Set();
     const discussionIds = new Set();
     const interviewIds = new Set();
+    const ausIntwrtIds = new Set();
+    const ausIndspkIds = new Set();
+    const ausIntspkIds = new Set();
 
     items.forEach(it => {
         const tt = (it.task_type || '').toLowerCase();
@@ -2910,13 +2990,22 @@ async function fetchQuestionsForCorrections(items) {
         if (tt === 'writing_email') emailIds.add(`email_set_${idStr}`);
         else if (tt === 'writing_discussion') discussionIds.add(`discussion_set_${idStr}`);
         else if (tt === 'speaking_interview') interviewIds.add(`interview_set_${idStr}`);
+        // 호주첨삭 — 토라는 일반 Discussion과 같은 테이블·같은 id 형식을 쓴다.
+        // 나머지는 aus_* 테이블이고 id가 숫자다 (예: 2001).
+        else if (tt === 'writing_aus_discussion') discussionIds.add(`discussion_set_${idStr}`);
+        else if (tt === 'writing_aus_integrated') ausIntwrtIds.add(Number(tn));
+        else if (tt === 'speaking_aus_independent') ausIndspkIds.add(Number(tn));
+        else if (tt === 'speaking_aus_int2' || tt === 'speaking_aus_int3' || tt === 'speaking_aus_int4') {
+            ausIntspkIds.add(Number(tn));
+        }
     });
 
     // Helper to batch-fetch by ids
-    async function fetchBatch(table, ids) {
+    //   quoted=true  → 문자열 id (email_set_0001)
+    //   quoted=false → 숫자 id (2001, aus_* 테이블)
+    async function fetchBatch(table, ids, quoted = true) {
         if (ids.size === 0) return [];
-        // Use 'in.(...)' filter — quote each id since they are strings like "email_set_0001"
-        const idList = [...ids].map(i => `"${i}"`).join(',');
+        const idList = [...ids].map(i => (quoted ? `"${i}"` : i)).join(',');
         try {
             const data = await supabaseAPI.query(table, {
                 'id': `in.(${idList})`,
@@ -2929,15 +3018,29 @@ async function fetchQuestionsForCorrections(items) {
         }
     }
 
-    const [emails, discussions, interviews] = await Promise.all([
+    const [emails, discussions, interviews, ausIntwrt, ausIndspk, ausIntspk] = await Promise.all([
         fetchBatch('tr_writing_email', emailIds),
         fetchBatch('tr_writing_discussion', discussionIds),
-        fetchBatch('tr_speaking_interview', interviewIds)
+        fetchBatch('tr_speaking_interview', interviewIds),
+        fetchBatch('aus_intwrt', ausIntwrtIds, false),
+        fetchBatch('aus_indspk', ausIndspkIds, false),
+        fetchBatch('aus_intspk', ausIntspkIds, false)
     ]);
 
     emails.forEach(q => { result[`writing_email|${q.id}`] = q; });
-    discussions.forEach(q => { result[`writing_discussion|${q.id}`] = q; });
+    discussions.forEach(q => {
+        result[`writing_discussion|${q.id}`] = q;
+        result[`writing_aus_discussion|${q.id}`] = q;   // 토라 — 같은 문제를 두 키로 꽂아둔다
+    });
     interviews.forEach(q => { result[`speaking_interview|${q.id}`] = q; });
+    ausIntwrt.forEach(q => { result[`writing_aus_integrated|${q.id}`] = q; });
+    ausIndspk.forEach(q => { result[`speaking_aus_independent|${q.id}`] = q; });
+    ausIntspk.forEach(q => {
+        // 통스2·3·4는 한 테이블을 공유한다 (유형은 번호대로 구분)
+        result[`speaking_aus_int2|${q.id}`] = q;
+        result[`speaking_aus_int3|${q.id}`] = q;
+        result[`speaking_aus_int4|${q.id}`] = q;
+    });
 
     return result;
 }
@@ -2983,7 +3086,7 @@ function buildTextBlockForItem(item, questionsMap) {
     lines.push('▶ 1차 첨삭');
     if (item.feedback_1) {
         const fb1 = parseFeedback(item.feedback_1);
-        lines.push(formatFeedback(fb1, isWriting, false));
+        lines.push(formatFeedback(fb1, isWriting, false, item.task_type));
     } else {
         lines.push('(1차 첨삭 데이터 없음)');
     }
@@ -3006,7 +3109,7 @@ function buildTextBlockForItem(item, questionsMap) {
         lines.push('▶ 최종 첨삭');
         if (item.feedback_2) {
             const fb2 = parseFeedback(item.feedback_2);
-            lines.push(formatFeedback(fb2, isWriting, true));
+            lines.push(formatFeedback(fb2, isWriting, true, item.task_type));
         } else {
             lines.push('(2차 첨삭 데이터 없음)');
         }
@@ -3038,6 +3141,9 @@ function formatQuestionPrompt(item, questionsMap) {
     if (taskType === 'writing_email') q = questionsMap[`writing_email|email_set_${idStr}`];
     else if (taskType === 'writing_discussion') q = questionsMap[`writing_discussion|discussion_set_${idStr}`];
     else if (taskType === 'speaking_interview') q = questionsMap[`speaking_interview|interview_set_${idStr}`];
+    // 호주첨삭 — 토라는 문자열 id, 나머지는 숫자 id
+    else if (taskType === 'writing_aus_discussion') q = questionsMap[`writing_aus_discussion|discussion_set_${idStr}`];
+    else if (isAusTaskType(taskType)) q = questionsMap[`${taskType}|${Number(item.task_number)}`];
 
     if (!q) return '(문제 정보를 찾을 수 없습니다)';
 
@@ -3048,11 +3154,23 @@ function formatQuestionPrompt(item, questionsMap) {
         if (q.to_recipient) out.push(`- 수신자: ${q.to_recipient}`);
         if (q.subject) out.push(`- 제목: ${q.subject}`);
         if (q.instruction) out.push(`- 지시사항: ${q.instruction}`);
-    } else if (taskType === 'writing_discussion') {
+    } else if (taskType === 'writing_discussion' || taskType === 'writing_aus_discussion') {
         if (q.class_context) out.push(`- 수업 맥락: ${q.class_context}`);
         if (q.topic) out.push(`- 토론 주제: ${q.topic}`);
         if (q.student1_opinion) out.push(`- 학생1 의견: ${q.student1_opinion}`);
         if (q.student2_opinion) out.push(`- 학생2 의견: ${q.student2_opinion}`);
+    } else if (taskType === 'writing_aus_integrated') {
+        // 통라 — 읽기 지문 + 강의 대본
+        if (q.passage) out.push(`- 읽기 지문: ${q.passage}`);
+        if (q.lecture_script) out.push(`- 강의 대본: ${q.lecture_script}`);
+    } else if (taskType === 'speaking_aus_independent') {
+        if (q.topic_text) out.push(`- 토픽: ${q.topic_text}`);
+    } else if (taskType === 'speaking_aus_int2' || taskType === 'speaking_aus_int3' || taskType === 'speaking_aus_int4') {
+        // 통스 — 통스4는 읽기 지문이 없는 유형이라 passage가 비어 있을 수 있다
+        if (q.title) out.push(`- 제목: ${q.title}`);
+        if (q.passage) out.push(`- 읽기 지문: ${q.passage}`);
+        if (q.dialog_script) out.push(`- 대화·강의 대본: ${q.dialog_script}`);
+        if (q.problem_text) out.push(`- 문제: ${q.problem_text}`);
     } else if (taskType === 'speaking_interview') {
         if (q.context_text) out.push(`- 상황 설명: ${q.context_text}`);
         for (let i = 1; i <= 4; i++) {
@@ -3080,10 +3198,11 @@ function formatStudentDraft(item, round, isWriting) {
             try { stt = JSON.parse(stt); } catch (e) { return sttRaw; }
         }
         const out = [];
-        for (let i = 1; i <= 4; i++) {
+        const qCount = getTaskAnswerCount(item.task_type);
+        for (let i = 1; i <= qCount; i++) {
             const qKey = `q${i}`;
             const txt = stt && stt[qKey] ? stt[qKey] : '(없음)';
-            out.push(`Q${i}: ${txt}`);
+            out.push(qCount === 1 ? txt : `Q${i}: ${txt}`);
         }
         return out.join('\n\n');
     }
@@ -3092,9 +3211,10 @@ function formatStudentDraft(item, round, isWriting) {
 /**
  * Format feedback (annotated marks + summary + level + extras for 2nd round).
  */
-function formatFeedback(feedback, isWriting, isFinal) {
+function formatFeedback(feedback, isWriting, isFinal, taskType) {
     if (!feedback) return '(첨삭 데이터 없음)';
 
+    const scoreMax = getTaskScoreMax(taskType);
     const lines = [];
 
     if (isWriting) {
@@ -3144,7 +3264,7 @@ function formatFeedback(feedback, isWriting, isFinal) {
     // Level (score)
     if (feedback.level !== undefined && feedback.level !== null) {
         lines.push('');
-        lines.push(`• 점수: ${feedback.level} / 5`);
+        lines.push(`• 점수: ${feedback.level} / ${scoreMax}`);
     }
 
     // 2nd round extras

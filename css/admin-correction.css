@@ -127,6 +127,29 @@
     color: #0891b2;
 }
 
+/* 트랙 배지 — 일반첨삭 / 호주첨삭 구분.
+   채점 기준·만점·유형이 서로 달라서 목록에서 섞이면 오판하기 쉽다. */
+.corr-track-badge {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.corr-track-gen {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.corr-track-aus {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
 /* Draft round badge */
 .draft-badge {
     display: inline-flex;
