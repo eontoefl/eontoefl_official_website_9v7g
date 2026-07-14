@@ -33,6 +33,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   analysis_agree_reminder:     50228,  // 개별분석 동의 마감 2시간 전 리마인드 (일반 학생)
   contract_agree_reminder:     50229,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
   deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
+  toefl_exam_day:              50231,  // 시험 당일 회신 안내 (심사 승인 후 실제 ID로 교체할 것)
 };
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
@@ -313,6 +314,29 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "아래 버튼을 눌러 이번 주 체크 내용을 확인해주세요 :)",
       ].join("\n");
 
+    case "toefl_exam_day":
+      return [
+        `이온토플 - ${data.exam_datetime} 시험 관련 안내`,
+        "",
+        `${data.name}님, 오늘 시험 보시느라 고생 많으셨습니다.`,
+        "",
+        "▶ [1단계] 오늘 안에 회신",
+        "1. 리딩·리스닝 unofficial 점수를 알려주세요.",
+        "2. 리딩·리스닝에 어떤 지문/문제가 몇 개씩 나왔는지 알려주세요. (기억나는 만큼만)",
+        "3. email, discussion, interview에서 어떤 주제가 나왔고 어떻게 답변하셨는지 알려주세요.",
+        "기억은 하루가 지나면 흐려집니다. 오늘이 가장 정확합니다.",
+        "4. 내벨업챌린지에서 연습한 것과 달라 당황스러웠던 점이 있다면 함께 알려주세요.",
+        "",
+        "회신해주시면 오늘 문제에 대한 피드백을 드립니다.",
+        "",
+        "▶ [2단계] 성적표 전송",
+        "성적표는 약 3일(72시간) 뒤 공개됩니다. 확인되면 캡처해서 보내주세요.",
+        "",
+        "1단계와 2단계가 모두 완료되면 시험료지원금 인증이 처리됩니다.",
+        "",
+        "※ 이 채팅방에 그대로 답장해주시면 됩니다.",
+      ].join("\n");
+
     case "analysis_agree_reminder":
       return [
         "이온토플 - 개별분석 동의 마감 안내",
@@ -403,6 +427,8 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return `[이온토플] 계약서 동의 기한이 ${data.time}시간 남았어요. 미동의 시 신청이 자동취소돼요.`;
     case "deposit_reminder":
       return `[이온토플] 입금 기한 ${data.deadline}까지(${data.time}시간 남음). 미입금 시 신청이 자동취소돼요.`;
+    case "toefl_exam_day":
+      return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -426,7 +452,9 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
 // ===== 버튼 없는 템플릿 여부 =====
 function hasNoButton(templateId: number): boolean {
   return templateId === TEMPLATE_IDS.payment_confirmed
-      || templateId === TEMPLATE_IDS.contract_deferred;
+      || templateId === TEMPLATE_IDS.contract_deferred
+      // 알림톡이 도착하는 곳이 곧 회신할 채팅방이라 버튼을 두지 않는다
+      || templateId === TEMPLATE_IDS.toefl_exam_day;
 }
 
 // ===== 단건 메시지 객체 생성 =====

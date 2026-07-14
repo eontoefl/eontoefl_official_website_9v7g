@@ -8,7 +8,10 @@ let studyResultsV3 = [];     // study_results_v3 해당 학생
 let deadlineExtensionsData = []; // tr_deadline_extensions 해당 학생
 let weeklyCheckDrafts = [];  // tr_weekly_check_drafts 해당 학생 (승인대기 초안)
 let toeflScoresAdmin = [];   // toefl_actual_scores 해당 학생
+let toeflExamsAdmin = [];    // toefl_exam_schedules 해당 학생 (학생이 마이페이지에 등록한 시험 일정)
 let toeflAdminChartInstance = null;
+let toeflEditingScoreId = null;   // 수정 중인 성적 id (null이면 신규)
+let toeflFormImageDataUri = null; // 새로 첨부한 성적표 (base64)
 
 // ===== 입문서 총 페이지 수 (추후 DB에서 자동 조회로 교체 예정) =====
 const INTRO_BOOK_TOTAL_PAGES = 300;
@@ -82,7 +85,7 @@ async function loadStudentDetail() {
         const studentUserId = studentData.user.id;
 
         // 병렬로 필요한 데이터 모두 로드
-        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult, toeflResult] = await Promise.all([
+        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult, toeflResult, examResult] = await Promise.all([
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
@@ -100,6 +103,12 @@ async function loadStudentDetail() {
                 'user_id': `eq.${studentUserId}`,
                 'order': 'test_date.asc',
                 'limit': '100'
+            }),
+            // 학생이 마이페이지에 등록한 시험 일정 (성적을 어느 시험 건에 붙일지 고를 때 쓴다)
+            supabaseAPI.query('toefl_exam_schedules', {
+                'user_id': `eq.${studentUserId}`,
+                'order': 'exam_datetime.asc',
+                'limit': '100'
             })
         ]);
 
@@ -108,6 +117,7 @@ async function loadStudentDetail() {
         deadlineExtensionsData = deadlineResult || [];
         weeklyCheckDrafts = draftsResult || [];
         toeflScoresAdmin = toeflResult || [];
+        toeflExamsAdmin = examResult || [];
 
         // 렌더링
         loading.style.display = 'none';
@@ -2575,8 +2585,56 @@ function renderToeflAdminSection() {
 
     section.style.display = 'block';
     renderToeflAdminBadge();
+    renderToeflAdminExams();
     renderToeflAdminTable();
     renderToeflAdminChart();
+}
+
+/** 학생이 마이페이지에 등록한 시험 일정 (알림톡 발송 여부까지 보여준다) */
+function renderToeflAdminExams() {
+    var el = document.getElementById('toeflAdminExams');
+    if (!el) return;
+
+    var live = toeflExamsAdmin.filter(function(e) { return e.status !== 'cancelled'; });
+    if (live.length === 0) {
+        el.innerHTML = '<div class="toefl-exam-strip toefl-exam-strip-empty">' +
+            '<i class="fas fa-calendar-xmark"></i> 학생이 등록한 시험 일정이 없습니다' +
+            '</div>';
+        return;
+    }
+
+    var days = ['일','월','화','수','목','금','토'];
+    var now = new Date();
+
+    var html = '<div class="toefl-exam-strip">';
+    live.forEach(function(e) {
+        var d = new Date(e.exam_datetime);
+        var label = (d.getMonth() + 1) + '/' + d.getDate() + '(' + days[d.getDay()] + ') ' +
+            String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+
+        var state, tone;
+        if (e.status === 'done') {
+            state = '성적 등록됨'; tone = 'done';
+        } else if (d > now) {
+            state = '응시 예정'; tone = 'upcoming';
+        } else if (e.alimtalk_sent) {
+            state = '알림톡 발송됨 · 성적 대기'; tone = 'waiting';
+        } else {
+            state = '응시함 · 알림톡 미발송'; tone = 'waiting';
+        }
+
+        var img = e.registration_image
+            ? '<button class="toefl-btn-ghost" onclick="openToeflViewer(\'' + e.registration_image + '\')">등록 캡처</button>'
+            : '';
+
+        html += '<div class="toefl-exam-chip toefl-exam-chip-' + tone + '">' +
+            '<strong>' + label + '</strong>' +
+            '<span>' + state + '</span>' +
+            img +
+            '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
 }
 
 function renderToeflAdminBadge() {
@@ -2614,7 +2672,7 @@ function renderToeflAdminTable() {
         '<th>회차</th><th>시험일</th>' +
         '<th>R</th><th>L</th><th>S</th><th>W</th>' +
         '<th>Overall</th><th>변화</th>' +
-        '<th>0-120</th><th>메모</th><th>성적표</th>' +
+        '<th>0-120</th><th>메모</th><th>성적표</th><th></th>' +
         '</tr></thead><tbody>';
 
     sorted.forEach(function(s, idx) {
@@ -2659,6 +2717,10 @@ function renderToeflAdminTable() {
             '<td style="color:#64748b; font-size:12px;">' + legacyStr + '</td>' +
             '<td style="font-size:12px; color:#64748b; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + memoStr + '">' + memoStr + '</td>' +
             '<td>' + imageBtn + '</td>' +
+            '<td class="toefl-row-actions">' +
+                '<button class="toefl-btn-ghost" onclick="openToeflScoreForm(\'' + s.id + '\')">수정</button>' +
+                '<button class="toefl-btn-ghost toefl-btn-ghost-danger" onclick="deleteToeflScoreAdmin(\'' + s.id + '\')">삭제</button>' +
+            '</td>' +
             '</tr>';
     });
 
@@ -2893,3 +2955,262 @@ function closeToeflViewer() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeToeflViewer();
 });
+
+
+// =====================================================================
+// 실제 TOEFL 성적 — 관리자 입력 폼
+//
+// 학생은 성적을 직접 등록하지 않는다. 카카오톡으로 성적표 캡처를 보내면
+// 관리자가 여기서 입력하고, 그 즉시 학생 마이페이지 그래프에 반영된다.
+// 메모에는 학생이 카톡으로 보내온 시험 후기를 그대로 붙여넣는다.
+// =====================================================================
+
+var TOEFL_LEVELS = ['1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0'];
+
+/** 시험 일정 선택지 (학생이 마이페이지에 등록한 것 중 취소되지 않은 것) */
+function buildToeflExamOptions(selectedId) {
+    var opts = '<option value="">— 연결 안 함 —</option>';
+    toeflExamsAdmin
+        .filter(function(e) { return e.status !== 'cancelled'; })
+        .forEach(function(e) {
+            var d = new Date(e.exam_datetime);
+            var days = ['일','월','화','수','목','금','토'];
+            var label = d.getFullYear() + '.' +
+                String(d.getMonth() + 1).padStart(2, '0') + '.' +
+                String(d.getDate()).padStart(2, '0') +
+                '(' + days[d.getDay()] + ') ' +
+                String(d.getHours()).padStart(2, '0') + ':' +
+                String(d.getMinutes()).padStart(2, '0');
+            // 이미 다른 성적에 연결된 일정은 표시해준다
+            var taken = e.score_id && e.score_id !== selectedId ? ' — 이미 연결됨' : '';
+            var sel = (e.score_id && e.score_id === selectedId) ? ' selected' : '';
+            opts += '<option value="' + e.id + '"' + sel + '>' + label + taken + '</option>';
+        });
+    return opts;
+}
+
+function buildToeflLevelOptions(value) {
+    var opts = '<option value="">-</option>';
+    TOEFL_LEVELS.forEach(function(v) {
+        var sel = (value !== null && value !== undefined && Number(v) === Number(value)) ? ' selected' : '';
+        opts += '<option value="' + v + '"' + sel + '>' + v + '</option>';
+    });
+    return opts;
+}
+
+function openToeflScoreForm(scoreId) {
+    toeflEditingScoreId = scoreId || null;
+    toeflFormImageDataUri = null;
+
+    var s = toeflEditingScoreId
+        ? toeflScoresAdmin.find(function(x) { return x.id === toeflEditingScoreId; })
+        : null;
+
+    var linkedExam = s
+        ? toeflExamsAdmin.find(function(e) { return e.score_id === s.id; })
+        : null;
+
+    document.getElementById('toeflFormTitle').textContent = s ? 'TOEFL 성적 수정' : 'TOEFL 성적 등록';
+    document.getElementById('toeflFormExam').innerHTML = buildToeflExamOptions(s ? s.id : null);
+    if (linkedExam) document.getElementById('toeflFormExam').value = linkedExam.id;
+
+    document.getElementById('toeflFormDate').value = s ? s.test_date : '';
+    document.getElementById('toeflFormReading').innerHTML   = buildToeflLevelOptions(s ? s.reading : null);
+    document.getElementById('toeflFormListening').innerHTML = buildToeflLevelOptions(s ? s.listening : null);
+    document.getElementById('toeflFormWriting').innerHTML   = buildToeflLevelOptions(s ? s.writing : null);
+    document.getElementById('toeflFormSpeaking').innerHTML  = buildToeflLevelOptions(s ? s.speaking : null);
+    document.getElementById('toeflFormLegacy').value = s && s.legacy_total ? s.legacy_total : '';
+    document.getElementById('toeflFormMemo').value = s && s.memo ? s.memo : '';
+    document.getElementById('toeflFormImage').value = '';
+
+    var preview = document.getElementById('toeflFormPreview');
+    if (s && s.score_image) {
+        preview.src = s.score_image;
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+
+    updateToeflFormOverall();
+    document.getElementById('toeflFormOverlay').classList.add('active');
+}
+
+function closeToeflScoreForm() {
+    document.getElementById('toeflFormOverlay').classList.remove('active');
+    toeflEditingScoreId = null;
+    toeflFormImageDataUri = null;
+}
+
+/** Overall = 4개 영역 평균을 0.5 단위로 반올림 (학생 화면과 같은 규칙) */
+function updateToeflFormOverall() {
+    var vals = ['toeflFormReading','toeflFormListening','toeflFormWriting','toeflFormSpeaking']
+        .map(function(id) { return parseFloat(document.getElementById(id).value); });
+
+    var el = document.getElementById('toeflFormOverall');
+    if (vals.some(function(v) { return isNaN(v); })) {
+        el.textContent = '—';
+        return;
+    }
+    var avg = vals.reduce(function(a, b) { return a + b; }, 0) / 4;
+    el.textContent = (Math.round(avg * 2) / 2).toFixed(1);
+}
+
+function previewToeflFormImage(input) {
+    var preview = document.getElementById('toeflFormPreview');
+    if (!input.files || !input.files[0]) { preview.style.display = 'none'; return; }
+
+    var file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        alert('이미지 파일 크기는 5MB 이하로 업로드해주세요.');
+        input.value = '';
+        preview.style.display = 'none';
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        toeflFormImageDataUri = e.target.result;
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function submitToeflScoreAdmin() {
+    var btn = document.getElementById('toeflFormSubmit');
+    var testDate = document.getElementById('toeflFormDate').value;
+    var reading   = parseFloat(document.getElementById('toeflFormReading').value);
+    var listening = parseFloat(document.getElementById('toeflFormListening').value);
+    var writing   = parseFloat(document.getElementById('toeflFormWriting').value);
+    var speaking  = parseFloat(document.getElementById('toeflFormSpeaking').value);
+    var legacyRaw = document.getElementById('toeflFormLegacy').value;
+    var memo      = document.getElementById('toeflFormMemo').value.trim();
+    var examId    = document.getElementById('toeflFormExam').value;
+
+    if (!testDate) { alert('시험 날짜를 입력해주세요.'); return; }
+    if ([reading, listening, writing, speaking].some(function(v) { return isNaN(v); })) {
+        alert('4개 영역 점수를 모두 선택해주세요.'); return;
+    }
+
+    var existing = toeflEditingScoreId
+        ? toeflScoresAdmin.find(function(x) { return x.id === toeflEditingScoreId; })
+        : null;
+
+    // 신규 등록은 성적표 캡처를 반드시 받는다 (인증 증빙)
+    if (!existing && !toeflFormImageDataUri) {
+        alert('성적표 캡처를 첨부해주세요.'); return;
+    }
+
+    var overall = Math.round(((reading + listening + writing + speaking) / 4) * 2) / 2;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+
+    try {
+        var imageUrl = existing ? existing.score_image : null;
+        if (toeflFormImageDataUri) {
+            var ext = (toeflFormImageDataUri.match(/^data:image\/(\w+);/) || [, 'png'])[1];
+            var path = studentData.user.id + '/' + Date.now() + '.' + ext;
+            imageUrl = await supabaseStorage.uploadBase64('toefl-score-images', path, toeflFormImageDataUri);
+        }
+
+        var payload = {
+            user_id: studentData.user.id,
+            user_email: studentData.user.email,
+            user_name: studentData.user.name,
+            reading: reading,
+            listening: listening,
+            writing: writing,
+            speaking: speaking,
+            overall: overall,
+            legacy_total: legacyRaw ? parseInt(legacyRaw, 10) : null,
+            test_date: testDate,
+            score_image: imageUrl,
+            memo: memo || null
+        };
+
+        var saved;
+        if (toeflEditingScoreId) {
+            saved = await supabaseAPI.patch('toefl_actual_scores', toeflEditingScoreId, payload);
+            saved = Array.isArray(saved) ? saved[0] : saved;
+        } else {
+            saved = await supabaseAPI.post('toefl_actual_scores', payload);
+            saved = Array.isArray(saved) ? saved[0] : saved;
+        }
+
+        var savedId = (saved && saved.id) || toeflEditingScoreId;
+
+        // 시험 일정 연결 — 이 성적이 어느 응시 건의 결과인지 묶는다
+        await linkToeflExamSchedule(examId, savedId);
+
+        closeToeflScoreForm();
+        await reloadToeflAdminData();
+        alert('저장되었습니다. 학생 마이페이지에 바로 반영됩니다.');
+
+    } catch (err) {
+        console.error('TOEFL 성적 저장 실패:', err);
+        alert('저장 중 오류가 발생했습니다: ' + (err.message || err));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> 저장';
+    }
+}
+
+/**
+ * 성적 ↔ 시험 일정 연결.
+ * 이 성적에 물려 있던 예전 일정은 풀어주고(응시 예정으로 되돌림),
+ * 새로 고른 일정에 붙이면서 응시 완료로 바꾼다.
+ */
+async function linkToeflExamSchedule(examId, scoreId) {
+    if (!scoreId) return;
+
+    var previous = toeflExamsAdmin.filter(function(e) {
+        return e.score_id === scoreId && e.id !== examId;
+    });
+    for (var i = 0; i < previous.length; i++) {
+        await supabaseAPI.patch('toefl_exam_schedules', previous[i].id, {
+            score_id: null,
+            status: 'scheduled'
+        });
+    }
+
+    if (examId) {
+        await supabaseAPI.patch('toefl_exam_schedules', examId, {
+            score_id: scoreId,
+            status: 'done'
+        });
+    }
+}
+
+async function deleteToeflScoreAdmin(scoreId) {
+    if (!confirm('이 성적을 삭제할까요?\n\n학생 마이페이지의 그래프에서도 사라집니다.')) return;
+    try {
+        // 이 성적에 물려 있던 시험 일정은 다시 "응시 예정"으로 되돌린다
+        var linked = toeflExamsAdmin.filter(function(e) { return e.score_id === scoreId; });
+        for (var i = 0; i < linked.length; i++) {
+            await supabaseAPI.patch('toefl_exam_schedules', linked[i].id, {
+                score_id: null,
+                status: 'scheduled'
+            });
+        }
+        await supabaseAPI.hardDelete('toefl_actual_scores', scoreId);
+        await reloadToeflAdminData();
+    } catch (err) {
+        console.error('TOEFL 성적 삭제 실패:', err);
+        alert('삭제 중 오류가 발생했습니다: ' + (err.message || err));
+    }
+}
+
+async function reloadToeflAdminData() {
+    var uid = studentData.user.id;
+    var results = await Promise.all([
+        supabaseAPI.query('toefl_actual_scores', {
+            'user_id': `eq.${uid}`, 'order': 'test_date.asc', 'limit': '100'
+        }),
+        supabaseAPI.query('toefl_exam_schedules', {
+            'user_id': `eq.${uid}`, 'order': 'exam_datetime.asc', 'limit': '100'
+        })
+    ]);
+    toeflScoresAdmin = results[0] || [];
+    toeflExamsAdmin = results[1] || [];
+    renderToeflAdminSection();
+}

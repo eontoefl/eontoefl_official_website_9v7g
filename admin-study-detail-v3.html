@@ -746,6 +746,179 @@
         }
         .btn-toefl-image:hover { background: #dbeafe; }
 
+        /* =====================================================================
+           TOEFL 성적 입력 (관리자)
+           DESIGN.md 준수:
+             - No-Line: 영역 구분에 테두리를 쓰지 않는다. 톤 차이로만 나눈다.
+             - Signature Gradient: 주요 CTA는 primary → primary-container (135deg).
+             - Tertiary(고스트): 배경도 테두리도 없는 저강도 액션.
+             - Ambient Shadow: 그림자는 떠 있는 것(모달)에만, 넓고 옅게.
+           ===================================================================== */
+        .toefl-admin-head-right {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        }
+
+        /* Primary = Signature Gradient */
+        .toefl-btn-primary {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 20px; border: none; border-radius: 12px;
+            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+            color: #fff; font-size: 13px; font-weight: 700; font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .toefl-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(124, 58, 237, 0.35);
+        }
+        .toefl-btn-primary:disabled {
+            opacity: 0.6; cursor: not-allowed; transform: none;
+        }
+
+        /* Tertiary = 고스트 */
+        .toefl-btn-ghost {
+            padding: 5px 11px; border: none; border-radius: 8px;
+            background: none; color: #7c3aed;
+            font-size: 11px; font-weight: 700; font-family: inherit;
+            cursor: pointer; white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .toefl-btn-ghost:hover { background: rgba(124, 58, 237, 0.10); }
+        .toefl-btn-ghost-danger { color: #dc2626; }
+        .toefl-btn-ghost-danger:hover { background: rgba(220, 38, 38, 0.08); }
+
+        .toefl-row-actions { white-space: nowrap; }
+
+        /* ── 시험 일정 스트립 ── 톤으로만 구분 */
+        .toefl-exam-strip {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px;
+        }
+        .toefl-exam-strip-empty {
+            padding: 12px 16px; border-radius: 12px;
+            background: #f8fafc; color: #94a3b8;
+            font-size: 12px; font-weight: 600;
+        }
+        .toefl-exam-chip {
+            display: inline-flex; align-items: center; gap: 10px;
+            padding: 9px 14px; border-radius: 12px;
+            font-size: 12px;
+        }
+        .toefl-exam-chip strong { font-weight: 700; }
+        .toefl-exam-chip span { font-weight: 600; opacity: 0.85; }
+        .toefl-exam-chip-upcoming { background: #f3f0ff; color: #6d28d9; }
+        .toefl-exam-chip-waiting  { background: #fff7ed; color: #b45309; }
+        .toefl-exam-chip-done     { background: #f0fdf4; color: #15803d; }
+
+        /* ── 성적 입력 폼 (모달) ── */
+        .toefl-form-overlay {
+            display: none; position: fixed; inset: 0; z-index: 900;
+            background: rgba(15, 20, 40, 0.5);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .toefl-form-overlay.active { display: flex; }
+
+        .toefl-form-modal {
+            background: #fff; border-radius: 20px;
+            width: 560px; max-width: 100%; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 24px 60px rgba(25, 28, 29, 0.15);
+        }
+        .toefl-form-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 22px 24px 14px;
+        }
+        .toefl-form-header h3 {
+            margin: 0; font-size: 17px; font-weight: 700; color: #1e293b;
+            letter-spacing: -0.02em;
+        }
+        .toefl-form-close {
+            width: 34px; height: 34px; border: none; border-radius: 10px;
+            background: #f1f5f9; color: #64748b;
+            cursor: pointer; font-size: 14px;
+            transition: background 0.15s;
+        }
+        .toefl-form-close:hover { background: #e2e8f0; }
+
+        .toefl-form-body { padding: 0 24px 24px; }
+
+        .toefl-form-notice {
+            margin: 0 0 20px; padding: 13px 15px;
+            background: #f3f0ff; border-radius: 12px;
+            font-size: 12.5px; line-height: 1.6; color: #5b21b6;
+        }
+
+        .toefl-form-field { margin-bottom: 18px; }
+        .toefl-form-field label {
+            display: block; margin-bottom: 7px;
+            font-size: 12.5px; font-weight: 700; color: #334155;
+        }
+        .toefl-form-sub { font-weight: 500; color: #94a3b8; font-size: 11.5px; }
+
+        .toefl-form-field input[type="date"],
+        .toefl-form-field input[type="number"],
+        .toefl-form-field input[type="file"],
+        .toefl-form-field select,
+        .toefl-form-field textarea {
+            width: 100%; box-sizing: border-box;
+            padding: 11px 14px;
+            background: #f8fafc;
+            border: 2px solid transparent; border-radius: 12px;
+            font-size: 13px; font-family: inherit; color: #1e293b;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .toefl-form-field input:focus,
+        .toefl-form-field select:focus,
+        .toefl-form-field textarea:focus {
+            outline: none; border-color: #a78bfa;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        }
+        .toefl-form-field textarea { resize: vertical; line-height: 1.6; }
+
+        .toefl-form-field input[type="file"] { padding: 9px 12px; cursor: pointer; font-size: 12px; }
+        .toefl-form-field input[type="file"]::file-selector-button {
+            margin-right: 12px; padding: 7px 15px;
+            border: none; border-radius: 9px;
+            background: rgba(124, 58, 237, 0.12); color: #7c3aed;
+            font-family: inherit; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .toefl-form-field input[type="file"]::file-selector-button:hover {
+            background: rgba(124, 58, 237, 0.22);
+        }
+
+        .toefl-form-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        }
+        .toefl-form-sec {
+            display: block; margin-bottom: 5px;
+            font-size: 11.5px; font-weight: 600; color: #64748b;
+        }
+
+        .toefl-form-overall {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 15px 18px; margin-bottom: 18px;
+            background: #f3f0ff; border-radius: 12px;
+        }
+        .toefl-form-overall span { font-size: 12.5px; font-weight: 700; color: #6d28d9; }
+        .toefl-form-overall strong {
+            font-size: 22px; font-weight: 800; color: #7c3aed;
+            letter-spacing: -0.02em;
+        }
+
+        .toefl-form-preview {
+            margin-top: 10px; width: 100%; border-radius: 12px;
+            max-height: 260px; object-fit: contain; background: #f8fafc;
+        }
+        .toefl-form-hint {
+            margin: 6px 0 0; font-size: 11.5px; color: #94a3b8; line-height: 1.5;
+        }
+        .toefl-form-submit { width: 100%; padding: 13px; font-size: 14px; }
+
+        @media (max-width: 600px) {
+            .toefl-form-grid { grid-template-columns: 1fr; }
+        }
+
         .toefl-chart-container {
             margin-top: 20px; padding: 20px;
             background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;
@@ -918,8 +1091,17 @@
                         <i class="fas fa-file-alt" style="color: #7c3aed;"></i>
                         실제 TOEFL 성적
                     </div>
-                    <div id="toeflAdminBadge"></div>
+                    <div class="toefl-admin-head-right">
+                        <div id="toeflAdminBadge"></div>
+                        <button class="toefl-btn-primary" onclick="openToeflScoreForm()">
+                            <i class="fas fa-plus"></i> 성적 등록
+                        </button>
+                    </div>
                 </div>
+
+                <!-- 학생이 마이페이지에 등록한 시험 일정 -->
+                <div id="toeflAdminExams"></div>
+
                 <div id="toeflAdminTableWrap"></div>
                 <div class="toefl-chart-container" id="toeflAdminChartContainer" style="display:none;">
                     <div class="toefl-chart-title">
@@ -934,6 +1116,85 @@
             <!-- 이미지 뷰어 -->
             <div class="toefl-viewer-overlay" id="toeflViewerOverlay" onclick="closeToeflViewer()">
                 <img id="toeflViewerImg" src="" alt="성적표" />
+            </div>
+
+            <!-- ===== TOEFL 성적 등록/수정 폼 ===== -->
+            <div class="toefl-form-overlay" id="toeflFormOverlay">
+                <div class="toefl-form-modal">
+                    <div class="toefl-form-header">
+                        <h3 id="toeflFormTitle">TOEFL 성적 등록</h3>
+                        <button class="toefl-form-close" onclick="closeToeflScoreForm()">
+                            <i class="fas fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div class="toefl-form-body">
+                        <p class="toefl-form-notice">
+                            학생이 <strong>카카오톡으로 보내온 성적표</strong>를 보고 입력합니다.
+                            저장하면 학생 마이페이지 그래프에 바로 반영됩니다.
+                        </p>
+
+                        <div class="toefl-form-field">
+                            <label for="toeflFormExam">시험 일정 연결</label>
+                            <select id="toeflFormExam"></select>
+                            <p class="toefl-form-hint">학생이 마이페이지에 등록한 시험 중 어느 회차의 결과인지 고르세요.</p>
+                        </div>
+
+                        <div class="toefl-form-field">
+                            <label for="toeflFormDate">시험 날짜</label>
+                            <input type="date" id="toeflFormDate" />
+                        </div>
+
+                        <div class="toefl-form-field">
+                            <label>영역별 점수 <span class="toefl-form-sub">1.0 ~ 6.0 (0.5 단위)</span></label>
+                            <div class="toefl-form-grid">
+                                <div>
+                                    <span class="toefl-form-sec">Reading</span>
+                                    <select id="toeflFormReading" onchange="updateToeflFormOverall()"></select>
+                                </div>
+                                <div>
+                                    <span class="toefl-form-sec">Listening</span>
+                                    <select id="toeflFormListening" onchange="updateToeflFormOverall()"></select>
+                                </div>
+                                <div>
+                                    <span class="toefl-form-sec">Writing</span>
+                                    <select id="toeflFormWriting" onchange="updateToeflFormOverall()"></select>
+                                </div>
+                                <div>
+                                    <span class="toefl-form-sec">Speaking</span>
+                                    <select id="toeflFormSpeaking" onchange="updateToeflFormOverall()"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="toefl-form-overall">
+                            <span>Overall (자동 계산)</span>
+                            <strong id="toeflFormOverall">—</strong>
+                        </div>
+
+                        <div class="toefl-form-field">
+                            <label for="toeflFormLegacy">0-120 환산 점수 <span class="toefl-form-sub">선택</span></label>
+                            <input type="number" id="toeflFormLegacy" min="0" max="120" placeholder="성적표에 표기된 경우 입력" />
+                        </div>
+
+                        <div class="toefl-form-field">
+                            <label for="toeflFormImage">성적표 캡처</label>
+                            <input type="file" id="toeflFormImage" accept="image/*" onchange="previewToeflFormImage(this)" />
+                            <img id="toeflFormPreview" class="toefl-form-preview" style="display:none;" alt="성적표" />
+                        </div>
+
+                        <div class="toefl-form-field">
+                            <label for="toeflFormMemo">시험 메모</label>
+                            <textarea id="toeflFormMemo" rows="6"
+                                placeholder="학생이 카톡으로 보내온 시험 후기를 그대로 붙여넣으세요.&#10;&#10;- 리딩/리스닝 unofficial 점수&#10;- 지문·문제 구성 (upper/lower 판별용)&#10;- email / discussion / interview 주제와 답변&#10;- 챌린지 연습과 달랐던 점"></textarea>
+                            <p class="toefl-form-hint">여기 쌓인 내용이 개정 시험 콘텐츠의 원본 데이터가 됩니다.</p>
+                        </div>
+
+                        <button class="toefl-btn-primary toefl-form-submit" id="toeflFormSubmit" onclick="submitToeflScoreAdmin()">
+                            <i class="fas fa-check"></i> 저장
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- 📅 데드라인 연장 관리 -->
