@@ -1640,6 +1640,51 @@
     transition: border-color 0.2s;
 }
 
+/* 연장할 과제 — 그 세션에 실제로 있는 과제만 뜬다 (라이팅 1 + 스피킹 1) */
+.corr-extend-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.corr-extend-task-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1e293b;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.corr-extend-task-option:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.corr-extend-task-option input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.corr-extend-task-option:has(input:checked) {
+    border-color: #6366f1;
+    background: #eef2ff;
+}
+
+.corr-extend-hint {
+    margin: 0;
+    padding: 11px 13px;
+    font-size: 13px;
+    color: #94a3b8;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
 /* 학생 검색 — 학생이 많아져 드롭다운만으로는 못 찾는다 */
 .corr-extend-search {
     width: 100%;

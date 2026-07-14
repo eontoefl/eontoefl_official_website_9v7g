@@ -379,16 +379,16 @@
                 <!-- Session Selector -->
                 <div class="corr-extend-field">
                     <label class="corr-extend-label">세션</label>
-                    <select id="extModalSession" class="corr-extend-select">
+                    <select id="extModalSession" class="corr-extend-select" onchange="onExtModalSessionChange()">
                         <option value="">세션을 선택하세요</option>
                     </select>
                 </div>
-                <!-- Task Type Selector — 학생 트랙(일반/호주)에 따라 JS가 채운다 -->
+                <!-- Task — 해당 세션의 과제 2개만 (JS가 채운다). 둘 다 / 하나만 선택 가능 -->
                 <div class="corr-extend-field">
-                    <label class="corr-extend-label">과제 유형</label>
-                    <select id="extModalTaskType" class="corr-extend-select">
-                        <option value="">학생을 먼저 선택하세요</option>
-                    </select>
+                    <label class="corr-extend-label">연장할 과제</label>
+                    <div id="extModalTaskList" class="corr-extend-task-list">
+                        <p class="corr-extend-hint">학생과 세션을 먼저 선택하세요.</p>
+                    </div>
                 </div>
                 <!-- Draft Round Selector -->
                 <div class="corr-extend-field">

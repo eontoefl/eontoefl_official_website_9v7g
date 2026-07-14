@@ -1061,7 +1061,8 @@ async function openDeadlineExtendModal() {
 
     // Reset form
     document.getElementById('extModalSession').innerHTML = '<option value="">세션을 선택하세요</option>';
-    document.getElementById('extModalTaskType').innerHTML = '<option value="">학생을 먼저 선택하세요</option>';
+    document.getElementById('extModalTaskList').innerHTML =
+        '<p class="corr-extend-hint">학생과 세션을 먼저 선택하세요.</p>';
     const searchEl = document.getElementById('extModalStudentSearch');
     if (searchEl) searchEl.value = '';
     document.getElementById('extModalDraft').value = '1';
@@ -1240,6 +1241,9 @@ function onExtModalStudentChange() {
         totalSessions = 24;
     }
 
+    // 호주첨삭은 12세션까지만 운영한다 (연장 13~24세션 미도입)
+    if (ausStudents.has(userId)) totalSessions = Math.min(totalSessions, 12);
+
     for (let i = 1; i <= totalSessions; i++) {
         const opt = document.createElement('option');
         opt.value = i;
@@ -1247,32 +1251,61 @@ function onExtModalStudentChange() {
         sessionSelect.appendChild(opt);
     }
 
-    // 과제 유형 — 호주 학생과 일반 학생은 유형이 완전히 다르다
-    populateExtModalTaskTypes(ausStudents.has(userId));
+    // 세션을 골라야 과제가 정해진다
+    populateExtModalTaskTypes(null, ausStudents.has(userId));
+}
+
+/** 세션이 바뀌면 그 세션의 과제 2개를 다시 그린다 */
+function onExtModalSessionChange() {
+    const userId = document.getElementById('extModalStudent').value;
+    const session = document.getElementById('extModalSession').value;
+    populateExtModalTaskTypes(session, ausStudents.has(userId));
 }
 
 /**
- * 마감 연장 모달의 과제 유형 목록.
- *   일반 — Email / Discussion / Interview
- *   호주 — 토라 / 통라 / 독스 / 통스2 / 통스3 / 통스4
- * 일반 유형을 호주 학생에게 걸면 존재하지 않는 과제에 연장이 붙어 아무 효과가 없다.
+ * 세션에 실제로 배정된 과제 2개를 돌려준다 (라이팅 1 + 스피킹 1).
+ * 세션마다 과제가 정해져 있으므로, 전체 유형을 나열하고 고르게 하면 안 된다.
+ * 존재하지 않는 과제에 연장을 걸면 조용히 아무 효과가 없다.
+ *
+ * 일반 (1~24세션): 라이팅 홀수=Email / 짝수=Discussion, 스피킹은 항상 Interview
+ * 호주 (1~12세션): 라이팅 홀수=토라 / 짝수=통라, 스피킹은 독스→통스2→통스3→통스4 순환
  */
-function populateExtModalTaskTypes(isAus) {
-    const sel = document.getElementById('extModalTaskType');
-    if (!sel) return;
+function getSessionTasks(sessionNumber, isAus) {
+    const s = Number(sessionNumber);
+    if (!s) return [];
 
-    const types = isAus
-        ? ['writing_aus_discussion', 'writing_aus_integrated', 'speaking_aus_independent',
-           'speaking_aus_int2', 'speaking_aus_int3', 'speaking_aus_int4']
-        : ['writing_email', 'writing_discussion', 'speaking_interview'];
+    if (isAus) {
+        const writing = (s % 2 === 1) ? 'writing_aus_discussion' : 'writing_aus_integrated';
+        const speakingCycle = ['speaking_aus_independent', 'speaking_aus_int2',
+                               'speaking_aus_int3', 'speaking_aus_int4'];
+        const speaking = speakingCycle[(s - 1) % 4];
+        return [speaking, writing];   // 호주는 스피킹이 앞 (학생 화면 순서와 동일)
+    }
 
-    sel.innerHTML = '<option value="">유형을 선택하세요</option>';
-    types.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = getTaskTypeLabel(t) || t;
-        sel.appendChild(opt);
-    });
+    const writing = (s % 2 === 1) ? 'writing_email' : 'writing_discussion';
+    return [writing, 'speaking_interview'];
+}
+
+/**
+ * 마감 연장 모달의 과제 목록 — 해당 세션의 과제 2개만 체크박스로.
+ * 둘 다 연장할지, 하나만 할지 고를 수 있다.
+ */
+function populateExtModalTaskTypes(sessionNumber, isAus) {
+    const box = document.getElementById('extModalTaskList');
+    if (!box) return;
+
+    const tasks = getSessionTasks(sessionNumber, isAus);
+    if (tasks.length === 0) {
+        box.innerHTML = '<p class="corr-extend-hint">세션을 먼저 선택하세요.</p>';
+        return;
+    }
+
+    box.innerHTML = tasks.map(t => (
+        '<label class="corr-extend-task-option">' +
+            '<input type="checkbox" name="extModalTask" value="' + t + '">' +
+            '<span>' + (getTaskTypeLabel(t) || t) + '</span>' +
+        '</label>'
+    )).join('');
 }
 
 /**
@@ -1283,19 +1316,22 @@ function populateExtModalTaskTypes(isAus) {
 async function confirmStandaloneExtend() {
     const userId = document.getElementById('extModalStudent').value;
     const sessionNumber = document.getElementById('extModalSession').value;
-    const taskType = document.getElementById('extModalTaskType').value;
     const draftRound = document.getElementById('extModalDraft').value;
     const hoursRadio = document.querySelector('input[name="extModalHours"]:checked');
+
+    // 이 세션의 과제 중 체크한 것들 (둘 다 / 하나만 선택 가능)
+    const taskTypes = Array.from(document.querySelectorAll('input[name="extModalTask"]:checked'))
+        .map(el => el.value);
 
     // Validation
     if (!userId) { alert('학생을 선택하세요.'); return; }
     if (!sessionNumber) { alert('세션을 선택하세요.'); return; }
-    if (!taskType) { alert('과제 유형을 선택하세요.'); return; }
+    if (taskTypes.length === 0) { alert('연장할 과제를 하나 이상 선택하세요.'); return; }
     if (!hoursRadio) { alert('연장 시간을 선택하세요.'); return; }
 
     const hours = parseInt(hoursRadio.value, 10);
     const user = usersCache[userId] || { name: '(알수없음)' };
-    const taskLabel = getTaskTypeLabel(taskType);
+    const taskLabel = taskTypes.map(t => getTaskTypeLabel(t)).join(' · ');
     const draftLabel = draftRound === '2' ? '2차' : '1차';
 
     if (!confirm(`${user.name}님의 S${sessionNumber} ${taskLabel} ${draftLabel}에 마감을 +${hours}시간 연장하시겠습니까?`)) return;
@@ -1307,7 +1343,9 @@ async function confirmStandaloneExtend() {
     const statusInfo = document.getElementById('extModalStatusInfo');
 
     try {
-        await upsertDeadlineExtension(userId, sessionNumber, taskType, hours);
+        for (const taskType of taskTypes) {
+            await upsertDeadlineExtension(userId, sessionNumber, taskType, hours);
+        }
 
         statusInfo.className = 'corr-extend-status-info success';
         statusInfo.innerHTML = `<i class="fas fa-check-circle"></i> ${user.name} S${sessionNumber} ${taskLabel} +${hours}시간 연장 완료`;
