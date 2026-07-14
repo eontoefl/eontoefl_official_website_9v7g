@@ -2,6 +2,10 @@
 const SUPABASE_URL = 'https://qpqjevecjejvbeuogtbx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc';
 
+// 학생 학습 플랫폼(테스트룸) 주소.
+// 평소에는 site_settings.platform_url 을 쓰고, 조회 실패 시에만 이 값으로 폴백한다.
+const DEFAULT_PLATFORM_URL = 'https://testroom.eonfl.com';
+
 // Supabase REST API 헬퍼 함수
 const supabaseAPI = {
     // GET: 데이터 조회

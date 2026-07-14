@@ -624,7 +624,7 @@ async function renderQuickMenuGrid(app) {
 
     // 사이트 설정에서 플랫폼 URL 가져오기
     const settings = await getSiteSettings();
-    const platformUrl = settings?.platform_url || 'https://levelupchallenge.kr';
+    const platformUrl = settings?.platform_url || DEFAULT_PLATFORM_URL;
 
     const menuItems = [
         {
@@ -1138,7 +1138,7 @@ async function renderProgramInfo(app) {
     }
 
     // 플랫폼 로그인 가이드 가져오기
-    let platformUrl = 'https://study.iontoefl.com';
+    let platformUrl = DEFAULT_PLATFORM_URL;
     let loginGuide = '이메일로 발송된 비밀번호를 사용하세요';
     
     try {

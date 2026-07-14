@@ -103,7 +103,7 @@ async function createDefaultSettings() {
                 account_holder: '김민서',
                 email: 'messijessi@naver.com',
                 kakao_link: 'https://business.kakao.com/_FWxcZC/chats',
-                platform_url: 'https://study.iontoefl.com',
+                platform_url: DEFAULT_PLATFORM_URL,
                 platform_login_guide: '이메일로 발송된 비밀번호를 사용하세요',
                 necessities_text: '',
                 refund_warning: '',

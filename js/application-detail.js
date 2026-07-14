@@ -3337,7 +3337,7 @@ async function loadUsageTab(app) {
     
     // 사이트 설정 불러오기
     const settings = await getSiteSettings();
-    const platformUrl = settings?.platform_url || 'https://study.iontoefl.com';
+    const platformUrl = settings?.platform_url || DEFAULT_PLATFORM_URL;
     const platformLoginGuide = settings?.platform_login_guide || '이메일로 발송된 비밀번호를 사용하세요';
     const kakaoLink = settings?.kakao_link || 'https://business.kakao.com/_FWxcZC/chats';
     
