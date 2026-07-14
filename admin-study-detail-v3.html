@@ -881,13 +881,6 @@
         }
         .toefl-form-field textarea { resize: vertical; line-height: 1.6; }
 
-        /* 일정에서 자동으로 채워진 값 — 손댈 필요가 없다는 걸 톤으로 알린다 */
-        .toefl-form-locked {
-            background: #f1f5f9 !important;
-            color: #64748b !important;
-            cursor: not-allowed;
-        }
-
         .toefl-form-field input[type="file"] { padding: 9px 12px; cursor: pointer; font-size: 12px; }
         .toefl-form-field input[type="file"]::file-selector-button {
             margin-right: 12px; padding: 7px 15px;
@@ -1153,10 +1146,11 @@
                             <p class="toefl-form-hint">학생이 마이페이지에 등록한 시험 중 어느 회차의 결과인지 고르세요.</p>
                         </div>
 
-                        <div class="toefl-form-field">
+                        <!-- 일정을 연결하면 날짜는 그 일정에서 나온다. 그때는 이 칸을 감춘다. -->
+                        <div class="toefl-form-field" id="toeflFormDateField">
                             <label for="toeflFormDate">시험 날짜</label>
                             <input type="date" id="toeflFormDate" />
-                            <p class="toefl-form-hint" id="toeflFormDateHint"></p>
+                            <p class="toefl-form-hint">연결할 일정이 없으면 시험 날짜를 직접 입력하세요.</p>
                         </div>
 
                         <div class="toefl-form-field">
