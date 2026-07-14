@@ -1061,7 +1061,9 @@ async function openDeadlineExtendModal() {
 
     // Reset form
     document.getElementById('extModalSession').innerHTML = '<option value="">세션을 선택하세요</option>';
-    document.getElementById('extModalTaskType').value = '';
+    document.getElementById('extModalTaskType').innerHTML = '<option value="">학생을 먼저 선택하세요</option>';
+    const searchEl = document.getElementById('extModalStudentSearch');
+    if (searchEl) searchEl.value = '';
     document.getElementById('extModalDraft').value = '1';
     document.querySelector('input[name="extModalHours"][value="24"]').checked = true;
     const statusInfo = document.getElementById('extModalStatusInfo');
@@ -1108,6 +1110,10 @@ async function openDeadlineExtendModal() {
             await loadUsersInfo(missingUserIds);
         }
 
+        // 학생이 호주과정인지 판별할 정보를 가져온다.
+        // users 테이블에는 프로그램이 없다 — applications의 assigned_program(없으면 preferred_program)에 있다.
+        await loadAusStudentFlags(activeSchedules.map(s => s.user_id));
+
         // Populate student dropdown
         studentSelect.innerHTML = '<option value="">학생을 선택하세요</option>';
         // Deduplicate by user_id (a student might have multiple schedules)
@@ -1118,8 +1124,10 @@ async function openDeadlineExtendModal() {
             const user = usersCache[s.user_id] || { name: '(이름없음)' };
             const opt = document.createElement('option');
             opt.value = s.user_id;
-            opt.textContent = user.name;
+            // 호주 학생은 목록에서 바로 구분되게 (유형이 완전히 다르므로)
+            opt.textContent = (ausStudents.has(s.user_id) ? '[호주] ' : '') + user.name;
             opt.dataset.scheduleId = s.id;
+            opt.dataset.search = (user.name || '') + ' ' + (user.email || '');
             studentSelect.appendChild(opt);
         });
 
@@ -1129,6 +1137,68 @@ async function openDeadlineExtendModal() {
     } catch (err) {
         console.error('Failed to load correction schedules:', err);
         studentSelect.innerHTML = '<option value="">학생 목록 로드 실패</option>';
+    }
+}
+
+// ===== 호주 학생 판별 =====
+// admin의 usersCache에는 프로그램 정보가 없다. applications에서 가져온다.
+let ausStudents = new Set();
+
+async function loadAusStudentFlags(userIds) {
+    ausStudents = new Set();
+    const emails = userIds
+        .map(uid => (usersCache[uid] || {}).email)
+        .filter(Boolean);
+    if (emails.length === 0) return;
+
+    try {
+        const list = emails.map(e => `"${e}"`).join(',');
+        const apps = await supabaseAPI.query('applications', {
+            'select': 'email,assigned_program,preferred_program',
+            'email': `in.(${list})`,
+            'limit': '1000'
+        });
+        if (!apps) return;
+
+        // email → 호주 여부
+        const ausEmails = new Set();
+        apps.forEach(a => {
+            const program = a.assigned_program || a.preferred_program || '';
+            if (program.includes('Australia')) ausEmails.add(a.email);
+        });
+
+        userIds.forEach(uid => {
+            const email = (usersCache[uid] || {}).email;
+            if (email && ausEmails.has(email)) ausStudents.add(uid);
+        });
+    } catch (e) {
+        console.warn('호주 학생 판별 실패 (일반 유형으로 표시됩니다):', e);
+    }
+}
+
+// ===== 학생 검색 =====
+// 학생이 많아져서 드롭다운만으로는 못 찾는다. 이름·이메일로 거른다.
+function filterExtModalStudents() {
+    const q = (document.getElementById('extModalStudentSearch').value || '').trim().toLowerCase();
+    const select = document.getElementById('extModalStudent');
+    let visible = 0;
+    let lastVisible = null;
+
+    Array.from(select.options).forEach(opt => {
+        if (!opt.value) return;   // 안내 항목
+        const hay = (opt.dataset.search || opt.textContent || '').toLowerCase();
+        const hit = !q || hay.includes(q);
+        opt.hidden = !hit;
+        if (hit) {
+            visible++;
+            lastVisible = opt;
+        }
+    });
+
+    // 딱 하나 남으면 자동 선택 (타이핑만으로 끝난다)
+    if (visible === 1 && lastVisible) {
+        select.value = lastVisible.value;
+        onExtModalStudentChange();
     }
 }
 
@@ -1176,6 +1246,33 @@ function onExtModalStudentChange() {
         opt.textContent = `S${i}`;
         sessionSelect.appendChild(opt);
     }
+
+    // 과제 유형 — 호주 학생과 일반 학생은 유형이 완전히 다르다
+    populateExtModalTaskTypes(ausStudents.has(userId));
+}
+
+/**
+ * 마감 연장 모달의 과제 유형 목록.
+ *   일반 — Email / Discussion / Interview
+ *   호주 — 토라 / 통라 / 독스 / 통스2 / 통스3 / 통스4
+ * 일반 유형을 호주 학생에게 걸면 존재하지 않는 과제에 연장이 붙어 아무 효과가 없다.
+ */
+function populateExtModalTaskTypes(isAus) {
+    const sel = document.getElementById('extModalTaskType');
+    if (!sel) return;
+
+    const types = isAus
+        ? ['writing_aus_discussion', 'writing_aus_integrated', 'speaking_aus_independent',
+           'speaking_aus_int2', 'speaking_aus_int3', 'speaking_aus_int4']
+        : ['writing_email', 'writing_discussion', 'speaking_interview'];
+
+    sel.innerHTML = '<option value="">유형을 선택하세요</option>';
+    types.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = getTaskTypeLabel(t) || t;
+        sel.appendChild(opt);
+    });
 }
 
 /**

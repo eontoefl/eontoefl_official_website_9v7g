@@ -1640,6 +1640,28 @@
     transition: border-color 0.2s;
 }
 
+/* 학생 검색 — 학생이 많아져 드롭다운만으로는 못 찾는다 */
+.corr-extend-search {
+    width: 100%;
+    cursor: text;
+}
+
+.corr-extend-search::placeholder {
+    color: #94a3b8;
+}
+
+/* 검색 결과 목록 — 여러 개를 한 번에 보고 고른다 */
+#extModalStudent[size] {
+    width: 100%;
+    cursor: pointer;
+    padding: 4px;
+}
+
+#extModalStudent[size] option {
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
 .corr-extend-select:focus {
     border-color: #2563eb;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);

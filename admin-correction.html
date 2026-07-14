@@ -369,7 +369,10 @@
                 <!-- Student Selector -->
                 <div class="corr-extend-field">
                     <label class="corr-extend-label">학생 선택</label>
-                    <select id="extModalStudent" class="corr-extend-select" onchange="onExtModalStudentChange()">
+                    <input type="text" id="extModalStudentSearch" class="corr-extend-select corr-extend-search"
+                           placeholder="이름으로 검색 (예: 김규림)" oninput="filterExtModalStudents()" autocomplete="off">
+                    <select id="extModalStudent" class="corr-extend-select" size="6"
+                            onchange="onExtModalStudentChange()" style="margin-top:8px;">
                         <option value="">학생을 선택하세요</option>
                     </select>
                 </div>
@@ -380,14 +383,11 @@
                         <option value="">세션을 선택하세요</option>
                     </select>
                 </div>
-                <!-- Task Type Selector -->
+                <!-- Task Type Selector — 학생 트랙(일반/호주)에 따라 JS가 채운다 -->
                 <div class="corr-extend-field">
                     <label class="corr-extend-label">과제 유형</label>
                     <select id="extModalTaskType" class="corr-extend-select">
-                        <option value="">유형을 선택하세요</option>
-                        <option value="writing_email">Writing (Email)</option>
-                        <option value="writing_discussion">Writing (Discussion)</option>
-                        <option value="speaking_interview">Speaking (Interview)</option>
+                        <option value="">학생을 먼저 선택하세요</option>
                     </select>
                 </div>
                 <!-- Draft Round Selector -->
