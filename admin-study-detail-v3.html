@@ -811,8 +811,14 @@
         .toefl-exam-chip-done     { background: #f0fdf4; color: #15803d; }
 
         /* ── 성적 입력 폼 (모달) ── */
+        /*
+         * .admin-nav 가 z-index:1000 인 sticky 헤더(높이 115px)라,
+         * 오버레이가 그보다 낮으면 모달 윗부분이 네비바에 덮여 잘린다.
+         * 이 페이지의 다른 모달들처럼 9999대로 올린다.
+         * (성적표 뷰어 9999보다는 아래에 둬서 뷰어가 항상 위로 온다)
+         */
         .toefl-form-overlay {
-            display: none; position: fixed; inset: 0; z-index: 900;
+            display: none; position: fixed; inset: 0; z-index: 9990;
             background: rgba(15, 20, 40, 0.5);
             backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
             align-items: center; justify-content: center; padding: 20px;
