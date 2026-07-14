@@ -3032,6 +3032,7 @@ function openToeflScoreForm(scoreId) {
     }
 
     updateToeflFormOverall();
+    onToeflFormExamChange();   // 일정이 연결돼 있으면 날짜를 그 일정 것으로 채우고 잠근다
     document.getElementById('toeflFormOverlay').classList.add('active');
 }
 
@@ -3039,6 +3040,34 @@ function closeToeflScoreForm() {
     document.getElementById('toeflFormOverlay').classList.remove('active');
     toeflEditingScoreId = null;
     toeflFormImageDataUri = null;
+}
+
+/**
+ * 시험 일정을 고르면 그 일정의 날짜가 곧 시험 날짜다. 두 번 입력할 이유가 없다.
+ * 자동으로 채우고 잠근다. 연결하지 않으면(카톡으로만 인증한 옛 건 등) 직접 입력한다.
+ */
+function onToeflFormExamChange() {
+    var examId = document.getElementById('toeflFormExam').value;
+    var dateEl = document.getElementById('toeflFormDate');
+    var hintEl = document.getElementById('toeflFormDateHint');
+
+    if (!examId) {
+        dateEl.disabled = false;
+        dateEl.classList.remove('toefl-form-locked');
+        if (hintEl) hintEl.textContent = '연결할 일정이 없으면 시험 날짜를 직접 입력하세요.';
+        return;
+    }
+
+    var exam = toeflExamsAdmin.find(function(e) { return e.id === examId; });
+    if (!exam) return;
+
+    var d = new Date(exam.exam_datetime);
+    dateEl.value = d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    dateEl.disabled = true;
+    dateEl.classList.add('toefl-form-locked');
+    if (hintEl) hintEl.textContent = '연결한 시험 일정의 날짜입니다. 바꾸려면 일정 연결을 해제하세요.';
 }
 
 /** Overall = 4개 영역 평균을 0.5 단위로 반올림 (학생 화면과 같은 규칙) */
