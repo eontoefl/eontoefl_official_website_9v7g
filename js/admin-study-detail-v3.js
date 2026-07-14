@@ -225,6 +225,54 @@ function renderProfileHeader() {
 
 // ===== 연습코스 관리 =====
 
+// 자기주도 완료 종료일이 따로 있으면 늦은 쪽을 실제 종료일로 본다 (크론의 GREATEST와 동일)
+function getPracticeEndDate(app) {
+    const dates = [app.schedule_end, app.self_paced_end_date]
+        .filter(Boolean)
+        .map(d => new Date(d))
+        .filter(d => !isNaN(d));
+    if (dates.length === 0) return null;
+    return new Date(Math.max(...dates));
+}
+
+// 커리큘럼 최종일(Fast 4주차 / Standard 8주차 금요일)의 실전 과제를 전부 완료했는지.
+// 보카·입문서는 학생들이 몇 주씩 미리 몰아서 하므로 완주 신호로 쓰지 않는다.
+// 크론(auto_enable_practice_mode)의 판정과 동일하게 유지할 것.
+const FINAL_TASK_TYPES = ['reading', 'listening', 'writing', 'speaking'];
+
+function getFinalTaskCompletion(app) {
+    const prog = getProgram(app).toLowerCase();
+    const lastWeek = getTotalWeeks(app);
+
+    const sched = scheduleData.find(s =>
+        (s.program || '').toLowerCase() === prog && s.week === lastWeek && s.day === 'friday'
+    );
+    if (!sched) return null;
+
+    const required = [sched.section1, sched.section2, sched.section3, sched.section4]
+        .map(parseScheduleSection)
+        .filter(p => p && FINAL_TASK_TYPES.includes(p.taskType));
+    if (required.length === 0) return null;
+
+    const dates = [];
+    for (const t of required) {
+        const rec = studyResultsV3.find(r =>
+            r.section_type === t.taskType &&
+            r.module_number === t.moduleNumber &&
+            r.week === String(lastWeek) &&
+            r.day === '금' &&
+            r.completed_at
+        );
+        if (!rec) return null;   // 하나라도 미완료면 완주 아님
+        dates.push(new Date(rec.completed_at));
+    }
+    return new Date(Math.max(...dates));
+}
+
+function isPracticeExcluded(app) {
+    return app.app_status === 'refunded' || app.app_status === 'dropped';
+}
+
 function renderPracticeSection() {
     const { app } = studentData;
     const section = document.getElementById('practiceSection');
@@ -235,9 +283,12 @@ function renderPracticeSection() {
 
     const practiceEnabled = app.practice_enabled === true;
     const disabledManually = app.practice_disabled_manually === true;
-    const scheduleEnd = app.schedule_end ? new Date(app.schedule_end) : null;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const isEnded = scheduleEnd && scheduleEnd < today;
+    const source = app.practice_enabled_source || null;
+    const endDate = getPracticeEndDate(app);
+    const today = getEffectiveToday();   // schedule_end와 동일 기준(KST 날짜의 UTC 자정)
+    const isEnded = endDate && endDate <= today;
+    const finalTaskDate = getFinalTaskCompletion(app);
+    const excluded = isPracticeExcluded(app);
 
     // 세그먼트 버튼 상태 반영
     updatePracticeSegment(practiceEnabled);
@@ -248,26 +299,36 @@ function renderPracticeSection() {
 
     // 상태 텍스트 결정
     let statusText, statusIcon, statusColor;
-    if (practiceEnabled && !disabledManually && isEnded) {
-        statusText = '활성화됨 (자동)'; statusIcon = 'fa-check-circle'; statusColor = '#22c55e';
-    } else if (practiceEnabled && !isEnded) {
-        statusText = '활성화됨 (수동)'; statusIcon = 'fa-check-circle'; statusColor = '#3b82f6';
-    } else if (practiceEnabled) {
-        statusText = '활성화됨'; statusIcon = 'fa-check-circle'; statusColor = '#22c55e';
-    } else if (!practiceEnabled && disabledManually) {
-        statusText = '비활성화 (수동 OFF)'; statusIcon = 'fa-times-circle'; statusColor = '#ef4444';
-    } else if (!practiceEnabled && !isEnded) {
-        statusText = '대기 중 (정규과정 종료 시 자동 활성화)'; statusIcon = 'fa-clock'; statusColor = '#f59e0b';
+    if (practiceEnabled) {
+        statusIcon = 'fa-check-circle';
+        if (source === 'manual') {
+            statusText = '활성화됨 (수동)'; statusColor = '#3b82f6';
+        } else if (source === 'auto') {
+            statusText = '활성화됨 (자동)'; statusColor = '#22c55e';
+        } else {
+            statusText = '활성화됨'; statusColor = '#22c55e';
+        }
+    } else if (disabledManually) {
+        statusText = '비활성화 (수동 OFF · 자동 활성화 대상에서 제외됨)';
+        statusIcon = 'fa-times-circle'; statusColor = '#ef4444';
+    } else if (excluded) {
+        statusText = `자동 활성화 제외 (${app.app_status === 'refunded' ? '환불완료' : '중도포기'})`;
+        statusIcon = 'fa-ban'; statusColor = '#94a3b8';
+    } else if (isEnded || finalTaskDate) {
+        // 조건은 충족했는데 아직 꺼져 있음 → 다음 크론(매일 00:05)에서 켜짐
+        statusText = '대기 중 (조건 충족 · 다음 자동 실행 시 활성화)';
+        statusIcon = 'fa-clock'; statusColor = '#f59e0b';
     } else {
-        statusText = '비활성화'; statusIcon = 'fa-times-circle'; statusColor = '#ef4444';
+        statusText = '대기 중 (정규과정 종료 또는 전과정 완료 시 자동 활성화)';
+        statusIcon = 'fa-clock'; statusColor = '#f59e0b';
     }
 
     // 종료일 / D-day
     let endDateText = '-';
     let ddayText = '';
-    if (scheduleEnd) {
-        endDateText = formatKSTDate(app.schedule_end);
-        const diffDays = Math.ceil((scheduleEnd - today) / (1000 * 60 * 60 * 24));
+    if (endDate) {
+        endDateText = formatKSTDate(endDate.toISOString());
+        const diffDays = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
         if (diffDays > 0) {
             ddayText = `D-${diffDays}`;
         } else if (diffDays === 0) {
@@ -277,6 +338,10 @@ function renderPracticeSection() {
         }
     }
 
+    const finalTaskText = finalTaskDate
+        ? `<span style="color:#22c55e;"><i class="fas fa-check"></i> ${formatKSTDate(finalTaskDate.toISOString())} 완료</span>`
+        : `<span style="color:#94a3b8;">미완료</span>`;
+
     infoEl.innerHTML = `
         <div class="practice-info-item">
             현재 상태: <span style="color:${statusColor};"><i class="fas ${statusIcon}"></i> ${statusText}</span>
@@ -284,6 +349,9 @@ function renderPracticeSection() {
         <div class="practice-info-item">
             정규과정 종료일: <span>${endDateText}</span>
             ${ddayText ? `<span style="margin-left:4px; padding:2px 8px; border-radius:4px; font-size:11px; background:${isEnded ? '#fef2f2' : '#f0f9ff'}; color:${isEnded ? '#ef4444' : '#3b82f6'};">${ddayText}</span>` : ''}
+        </div>
+        <div class="practice-info-item">
+            최종 과제(${getTotalWeeks(app)}주차 금): ${finalTaskText}
         </div>
     `;
 }
@@ -307,7 +375,14 @@ async function togglePracticeMode(enable) {
     const actionText = enable ? '활성화' : '비활성화';
     const studentName = studentData.user.name || '학생';
 
-    if (!confirm(`"${studentName}"의 연습코스를 ${actionText}하시겠습니까?`)) return;
+    // OFF는 단순히 끄는 게 아니라 자동 활성화 대상에서 영구 제외시킨다 — 반드시 알리고 누르게 한다
+    const confirmMsg = enable
+        ? `"${studentName}"의 연습코스를 활성화하시겠습니까?`
+        : `"${studentName}"의 연습코스를 비활성화하시겠습니까?\n\n` +
+          `⚠️ OFF로 두면 정규과정이 종료되거나 전과정을 완료해도 자동으로 활성화되지 않습니다.\n` +
+          `(다시 열려면 관리자가 직접 ON을 눌러야 합니다)`;
+
+    if (!confirm(confirmMsg)) return;
 
     // 버튼 비활성화
     const btnOff = document.getElementById('practiceBtnOff');
@@ -317,14 +392,13 @@ async function togglePracticeMode(enable) {
 
     try {
         const updateData = enable
-            ? { practice_enabled: true, practice_disabled_manually: false }
-            : { practice_enabled: false, practice_disabled_manually: true };
+            ? { practice_enabled: true,  practice_disabled_manually: false, practice_enabled_source: 'manual', practice_enabled_at: new Date().toISOString() }
+            : { practice_enabled: false, practice_disabled_manually: true,  practice_enabled_source: null,     practice_enabled_at: null };
 
         await supabaseAPI.patch('applications', app.id, updateData);
 
         // 로컬 데이터 업데이트
-        app.practice_enabled = updateData.practice_enabled;
-        app.practice_disabled_manually = updateData.practice_disabled_manually;
+        Object.assign(app, updateData);
 
         // UI 갱신
         renderPracticeSection();
