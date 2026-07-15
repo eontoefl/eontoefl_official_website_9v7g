@@ -2243,6 +2243,11 @@ function renderDraftRows() {
         const authLabel = draft.auth_rate != null ? `${draft.auth_rate}%` : '-';
         const inactiveWeeks = draft.consecutive_inactive_weeks || 0;
 
+        // 자기주도 뱃지 (일반 초안과 구분)
+        const spBadge = draft.self_paced
+            ? '<span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:6px; vertical-align:middle;">자기주도</span>'
+            : '';
+
         // 제목 + 주차/프로그램 정보
         const titleDisplay = escapeHtml(draft.title || '-');
         const metaInfo = [weekLabel, programLabel, `인증률 ${authLabel}`].filter(Boolean).join(' · ');
@@ -2256,7 +2261,7 @@ function renderDraftRows() {
             html += `<tr style="background: #fef2f2; opacity: 0.7;">
                 <td style="font-size:12px; color:#94a3b8; white-space:nowrap;">${created}</td>
                 <td>
-                    <span style="font-weight:600;">${titleDisplay}</span>
+                    <span style="font-weight:600;">${titleDisplay}</span>${spBadge}
                     <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${metaInfo}</div>
                 </td>
                 <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${msgPreviewHtml}</td>
@@ -2278,7 +2283,7 @@ function renderDraftRows() {
             html += `<tr style="background: linear-gradient(90deg, #fffbeb 0%, #ffffff 100%); border-left: 3px solid #f59e0b;">
                 <td style="font-size:12px; color:#94a3b8; white-space:nowrap;">${created}</td>
                 <td>
-                    <span style="font-weight:600;">${titleDisplay}</span>
+                    <span style="font-weight:600;">${titleDisplay}</span>${spBadge}
                     <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${metaInfo}</div>
                 </td>
                 <td style="color:#64748b; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${msgPreviewHtml}</td>
@@ -2342,7 +2347,7 @@ function openDraftPreviewModal(draftId) {
     modal.innerHTML = `
         <div class="notif-edit-modal" style="width:600px;">
             <div class="notif-edit-header">
-                <h3><i class="fas fa-eye" style="color:#94a3b8;"></i> 주간체크 미리보기 (발송 중단)</h3>
+                <h3><i class="fas fa-eye" style="color:#94a3b8;"></i> 주간체크 미리보기 (발송 중단)${draft.self_paced ? ' <span style="background:#ede9fe; color:#7c3aed; font-size:11px; font-weight:700; padding:2px 8px; border-radius:5px; margin-left:6px; vertical-align:middle;">자기주도</span>' : ''}</h3>
                 <button class="notif-edit-close" onclick="closeDraftReviewModal()">&times;</button>
             </div>
             <div class="notif-edit-body">
@@ -2406,7 +2411,7 @@ function openDraftReviewModal(draftId) {
     modal.innerHTML = `
         <div class="notif-edit-modal" style="width:600px;">
             <div class="notif-edit-header">
-                <h3><i class="fas fa-clipboard-check" style="color:#f59e0b;"></i> 주간체크 검토 · 발송</h3>
+                <h3><i class="fas fa-clipboard-check" style="color:#f59e0b;"></i> 주간체크 검토 · 발송${draft.self_paced ? ' <span style="background:#ede9fe; color:#7c3aed; font-size:11px; font-weight:700; padding:2px 8px; border-radius:5px; margin-left:6px; vertical-align:middle;">자기주도</span>' : ''}</h3>
                 <button class="notif-edit-close" onclick="closeDraftReviewModal()">&times;</button>
             </div>
             <div class="notif-edit-body">
@@ -2850,20 +2855,44 @@ function renderToeflAdminChart() {
         };
     });
 
-    // 가로선: 커트라인 (신규 척도 목표점수가 있을 때만)
+    // 가로선: 커트라인 (1차 목표, 관리자 입력)
     var cutoff = Number(app.target_cutoff_new);
-    if (!app.no_target_score && cutoff >= 1 && cutoff <= 6) {
+    var hasCutoff = !app.no_target_score && cutoff >= 1 && cutoff <= 6;
+    if (hasCutoff) {
         annotations.cutoff = {
             type: 'line',
             yMin: cutoff, yMax: cutoff,
-            borderColor: 'rgba(245, 158, 11, 0.8)',
+            borderColor: 'rgba(239, 68, 68, 0.55)',
             borderWidth: 2,
             borderDash: [4, 4],
             label: {
                 display: true,
                 content: '커트라인 ' + cutoff.toFixed(1),
                 position: 'start',
-                backgroundColor: 'rgba(245, 158, 11, 0.9)',
+                backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                color: '#fff',
+                font: { size: 11, weight: '600', family: 'Noto Sans KR' },
+                padding: { x: 8, y: 4 },
+                borderRadius: 6
+            }
+        };
+    }
+
+    // 가로선: 희망점수 (2차 목표, 학생이 설정 · 관리자는 읽기전용) -- 금색
+    var wish = Number(app.target_wish_new);
+    var hasWish = wish >= 1 && wish <= 6 && (!hasCutoff || wish > cutoff);
+    if (hasWish) {
+        annotations.wish = {
+            type: 'line',
+            yMin: wish, yMax: wish,
+            borderColor: 'rgba(217, 164, 65, 0.8)',
+            borderWidth: 2,
+            borderDash: [4, 4],
+            label: {
+                display: true,
+                content: '희망 ' + wish.toFixed(1),
+                position: 'end',
+                backgroundColor: 'rgba(217, 164, 65, 0.95)',
                 color: '#fff',
                 font: { size: 11, weight: '600', family: 'Noto Sans KR' },
                 padding: { x: 8, y: 4 },
@@ -2876,15 +2905,22 @@ function renderToeflAdminChart() {
         toeflAdminChartInstance.destroy();
     }
 
-    // 커트라인에 처음 도달한 Overall 점 인덱스 — 목표 달성 축하 대상
-    var celebrateIdx = -1;
-    if (!app.no_target_score && cutoff >= 1 && cutoff <= 6) {
-        for (var ci = 0; ci < overallData.length; ci++) {
-            if (overallData[ci] != null && Number(overallData[ci]) >= cutoff) { celebrateIdx = ci; break; }
+    // 도달한 가장 높은 목표의 Overall 점 인덱스 — 희망 도달하면 그쪽, 아니면 커트라인
+    var firstIdxReaching = function(goal) {
+        for (var i = 0; i < overallData.length; i++) {
+            if (overallData[i] != null && Number(overallData[i]) >= goal) return i;
         }
+        return -1;
+    };
+    var celebrateIdx = -1;
+    var celebrateText = '🎉 목표 달성';
+    if (hasWish && firstIdxReaching(wish) >= 0) {
+        celebrateIdx = firstIdxReaching(wish); celebrateText = '🎉 희망점수 달성';
+    } else if (hasCutoff && firstIdxReaching(cutoff) >= 0) {
+        celebrateIdx = firstIdxReaching(cutoff); celebrateText = '🎉 커트라인 달성';
     }
 
-    // 목표 도달 점 위에 폭죽 + "목표점수 달성" 말풍선 오버레이 (hover 없이 상시)
+    // 목표 도달 점 위에 폭죽 + 말풍선 오버레이 (hover 없이 상시)
     var celebratePlugin = {
         id: 'toeflCelebrate',
         afterDatasetsDraw: function(chart) {
@@ -2899,13 +2935,15 @@ function renderToeflAdminChart() {
                 overlay = document.createElement('div');
                 overlay.className = 'toefl-celebrate';
                 overlay.innerHTML =
-                    '<div class="toefl-celebrate-bubble">🎉 목표점수 달성</div>' +
+                    '<div class="toefl-celebrate-bubble">' + celebrateText + '</div>' +
                     '<span class="toefl-spark toefl-spark-ring"></span>' +
                     '<span class="toefl-spark s1"></span><span class="toefl-spark s2"></span>' +
                     '<span class="toefl-spark s3"></span><span class="toefl-spark s4"></span>' +
                     '<span class="toefl-spark s5"></span><span class="toefl-spark s6"></span>';
                 wrap.appendChild(overlay);
             }
+            var bubble = overlay.querySelector('.toefl-celebrate-bubble');
+            if (bubble && bubble.textContent !== celebrateText) bubble.textContent = celebrateText;
             overlay.style.left = (chart.canvas.offsetLeft + pt.x) + 'px';
             overlay.style.top = (chart.canvas.offsetTop + pt.y) + 'px';
         }
