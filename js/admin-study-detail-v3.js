@@ -2734,6 +2734,22 @@ function renderToeflAdminTable() {
     wrap.innerHTML = html;
 }
 
+/**
+ * 부분 날짜 문자열을 Date로 파싱한다.
+ * submission_deadline 은 'YYYY-MM-DD' / 'YYYY-MM' 등 형식이 섞여 있다.
+ * 일자가 없으면 1일로 본다.
+ */
+function parseToeflMarkerDate(str) {
+    if (!str) return null;
+    var p = String(str).split('-');
+    var y = parseInt(p[0], 10);
+    var mo = parseInt(p[1] || '1', 10);
+    var da = parseInt(p[2] || '1', 10);
+    if (!y || !mo) return null;
+    var d = new Date(y, mo - 1, da);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 function renderToeflAdminChart() {
     var container = document.getElementById('toeflAdminChartContainer');
     var canvas = document.getElementById('toeflAdminChart');
@@ -2746,57 +2762,90 @@ function renderToeflAdminChart() {
 
     container.style.display = 'block';
 
-    var sorted = toeflScoresAdmin.slice();
+    var app = (studentData && studentData.app) ? studentData.app : {};
+
+    // ── 세로 마커 수집 (챌린지 시작, 응시 마지노선) ──
+    var markers = [];
+    var mStart = parseToeflMarkerDate(app.schedule_start);
+    if (mStart) markers.push({
+        key: 'challengeStart', date: mStart, content: '챌린지 시작',
+        border: 'rgba(124, 58, 237, 0.5)', bg: 'rgba(124, 58, 237, 0.85)'
+    });
+    var mDeadline = parseToeflMarkerDate(app.submission_deadline);
+    if (mDeadline) markers.push({
+        key: 'deadline', date: mDeadline, content: '응시 마지노선',
+        border: 'rgba(239, 68, 68, 0.55)', bg: 'rgba(239, 68, 68, 0.9)'
+    });
+
+    // ── 시험 + 마커를 날짜순으로 한 번에 조립 ──
+    var points = toeflScoresAdmin.map(function(s) {
+        return { date: new Date(s.test_date + 'T00:00:00'), score: s };
+    });
+    markers.forEach(function(m) { points.push({ date: m.date, marker: m }); });
+    points.sort(function(a, b) { return a.date - b.date; });
+
     var labels = [];
     var readingData = [], listeningData = [], speakingData = [], writingData = [], overallData = [];
+    var markerLabel = {};   // key -> x축 라벨
 
-    sorted.forEach(function(s) {
-        var d = new Date(s.test_date + 'T00:00:00');
-        labels.push((d.getMonth() + 1) + '/' + d.getDate());
-        readingData.push(Number(s.reading));
-        listeningData.push(Number(s.listening));
-        speakingData.push(Number(s.speaking));
-        writingData.push(Number(s.writing));
-        overallData.push(Number(s.overall));
+    points.forEach(function(p) {
+        var lbl = (p.date.getMonth() + 1) + '/' + p.date.getDate();
+        labels.push(lbl);
+        if (p.score) {
+            readingData.push(Number(p.score.reading));
+            listeningData.push(Number(p.score.listening));
+            speakingData.push(Number(p.score.speaking));
+            writingData.push(Number(p.score.writing));
+            overallData.push(Number(p.score.overall));
+        } else {
+            readingData.push(null);
+            listeningData.push(null);
+            speakingData.push(null);
+            writingData.push(null);
+            overallData.push(null);
+            markerLabel[p.marker.key] = lbl;
+        }
     });
 
     var annotations = {};
-    if (studentData && studentData.app && studentData.app.schedule_start) {
-        var sd = new Date(studentData.app.schedule_start + 'T00:00:00');
-        var startLabel = (sd.getMonth() + 1) + '/' + sd.getDate();
 
-        var existingIdx = labels.indexOf(startLabel);
-        if (existingIdx === -1) {
-            var startTime = sd.getTime();
-            var insertIdx = 0;
-            for (var i = 0; i < sorted.length; i++) {
-                var td = new Date(sorted[i].test_date + 'T00:00:00');
-                if (td.getTime() < startTime) {
-                    insertIdx = i + 1;
-                } else {
-                    break;
-                }
-            }
-            labels.splice(insertIdx, 0, startLabel);
-            readingData.splice(insertIdx, 0, null);
-            listeningData.splice(insertIdx, 0, null);
-            speakingData.splice(insertIdx, 0, null);
-            writingData.splice(insertIdx, 0, null);
-            overallData.splice(insertIdx, 0, null);
-        }
-
-        annotations.challengeStart = {
+    // 세로선: 챌린지 시작 / 응시 마지노선
+    markers.forEach(function(m) {
+        var lbl = markerLabel[m.key];
+        if (!lbl) return;
+        annotations[m.key] = {
             type: 'line',
-            xMin: startLabel,
-            xMax: startLabel,
-            borderColor: 'rgba(124, 58, 237, 0.5)',
+            xMin: lbl, xMax: lbl,
+            borderColor: m.border,
             borderWidth: 2,
             borderDash: [6, 4],
             label: {
                 display: true,
-                content: '챌린지 시작',
+                content: m.content,
+                position: m.key === 'deadline' ? 'end' : 'start',
+                backgroundColor: m.bg,
+                color: '#fff',
+                font: { size: 11, weight: '600', family: 'Noto Sans KR' },
+                padding: { x: 8, y: 4 },
+                borderRadius: 6
+            }
+        };
+    });
+
+    // 가로선: 커트라인 (신규 척도 목표점수가 있을 때만)
+    var cutoff = Number(app.target_cutoff_new);
+    if (!app.no_target_score && cutoff >= 1 && cutoff <= 6) {
+        annotations.cutoff = {
+            type: 'line',
+            yMin: cutoff, yMax: cutoff,
+            borderColor: 'rgba(245, 158, 11, 0.8)',
+            borderWidth: 2,
+            borderDash: [4, 4],
+            label: {
+                display: true,
+                content: '커트라인 ' + cutoff.toFixed(1),
                 position: 'start',
-                backgroundColor: 'rgba(124, 58, 237, 0.85)',
+                backgroundColor: 'rgba(245, 158, 11, 0.9)',
                 color: '#fff',
                 font: { size: 11, weight: '600', family: 'Noto Sans KR' },
                 padding: { x: 8, y: 4 },
