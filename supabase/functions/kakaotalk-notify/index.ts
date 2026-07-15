@@ -33,6 +33,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   analysis_agree_reminder:     50228,  // 개별분석 동의 마감 2시간 전 리마인드 (일반 학생)
   contract_agree_reminder:     50229,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
   deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
+  practice_open:               50231,  // 연습코스 오픈 안내 (정규과정 종료 후 자동 활성화)
   toefl_exam_day:              50232,  // 시험 당일 회신 안내
 };
 
@@ -314,6 +315,21 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "아래 버튼을 눌러 이번 주 체크 내용을 확인해주세요 :)",
       ].join("\n");
 
+    case "practice_open":
+      return [
+        "이온토플 - 연습코스 오픈 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        "내벨업챌린지 일정이 마무리되어 연습코스가 활성화되었습니다.",
+        "",
+        "연습코스는 내벨업챌린지와 동일한 구조로 구성된 60세트이며, 문제는 모두 새로운 문항입니다.",
+        "",
+        "별도의 인증 절차는 없으며, 자유롭게 이용하실 수 있습니다.",
+        "",
+        "테스트룸 탭에서 확인해주세요.",
+      ].join("\n");
+
     case "toefl_exam_day":
       return [
         `이온토플 - ${data.exam_datetime} 시험 관련 안내`,
@@ -423,6 +439,8 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 계약서 동의 마감이 내일까지입니다. 확인 부탁드려요.";
     case "weekly_check_registered":
       return "[이온토플] 주간체크가 등록되었습니다. 확인해주세요. https://testroom.eonfl.com";
+    case "practice_open":
+      return "[이온토플] 연습코스가 활성화되었습니다. 테스트룸에서 자유롭게 이용해주세요. https://testroom.eonfl.com";
     case "analysis_agree_reminder":
       return `[이온토플] 개별분석 동의 기한이 ${data.time}시간 남았어요. 만료 시 5일간 재신청이 불가해요.`;
     case "contract_agree_reminder":
@@ -445,7 +463,7 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "correction_start_reminder") {
     return `${SITE_URL}/my-dashboard.html`;
   }
-  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered") {
+  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open") {
     return TESTROOM_URL;
   }
   return `${SITE_URL}/application-detail.html?id=${data.app_id}`;
