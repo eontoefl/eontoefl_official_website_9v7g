@@ -2777,6 +2777,22 @@ function renderToeflAdminChart() {
         border: 'rgba(239, 68, 68, 0.55)', bg: 'rgba(239, 68, 68, 0.9)'
     });
 
+    // 예정 시험(성적 미등록, 아직 응시 예정) 세로선 — 학생 그래프와 동일.
+    // 1개면 "예정 시험", 여러 개면 날짜로 구분("예정 8/1").
+    var upExams = toeflExamsAdmin.filter(function(e) {
+        return e.status === 'scheduled' && new Date(e.exam_datetime) > new Date();
+    });
+    upExams.forEach(function(e, i) {
+        var ed = new Date(e.exam_datetime);
+        var label = upExams.length > 1
+            ? '예정 ' + (ed.getMonth() + 1) + '/' + ed.getDate()
+            : '예정 시험';
+        markers.push({
+            key: 'upcoming' + i, date: ed, content: label,
+            border: 'rgba(59, 130, 246, 0.55)', bg: 'rgba(59, 130, 246, 0.9)'
+        });
+    });
+
     // ── 시험 + 마커를 날짜순으로 한 번에 조립 ──
     var points = toeflScoresAdmin.map(function(s) {
         return { date: new Date(s.test_date + 'T00:00:00'), score: s };
