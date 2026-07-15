@@ -288,6 +288,12 @@ function renderPracticeSection() {
     const section = document.getElementById('practiceSection');
     if (!section) return;
 
+    // 연습코스는 일반 정규과정 전용 — 호주 과정 학생에겐 섹션 자체를 숨긴다
+    if (isAustraliaTrack(app) || app.course_track === 'australia') {
+        section.style.display = 'none';
+        return;
+    }
+
     // 섹션 표시
     section.style.display = 'block';
 
