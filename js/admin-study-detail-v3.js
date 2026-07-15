@@ -2773,28 +2773,25 @@ function renderToeflAdminChart() {
     var markers = [];
     var mStart = parseToeflMarkerDate(app.schedule_start);
     if (mStart) markers.push({
-        key: 'challengeStart', date: mStart, content: '챌린지 시작',
-        border: 'rgba(124, 58, 237, 0.5)', bg: 'rgba(124, 58, 237, 0.85)'
+        key: 'challengeStart', date: mStart, name: '챌린지 시작',
+        border: 'rgba(124, 58, 237, 0.5)', fg: '#7c3aed', pill: 'rgba(124, 58, 237, 0.14)'
     });
     var mDeadline = parseToeflMarkerDate(app.submission_deadline);
     if (mDeadline) markers.push({
-        key: 'deadline', date: mDeadline, content: '응시 마지노선',
-        border: 'rgba(239, 68, 68, 0.55)', bg: 'rgba(239, 68, 68, 0.9)'
+        key: 'deadline', date: mDeadline, name: '응시 마지노선',
+        border: 'rgba(239, 68, 68, 0.55)', fg: '#dc2626', pill: 'rgba(239, 68, 68, 0.14)'
     });
 
     // 예정 시험(성적 미등록, 아직 응시 예정) 세로선 — 학생 그래프와 동일.
-    // 1개면 "예정 시험", 여러 개면 날짜로 구분("예정 8/1").
+    // 뱃지 텍스트가 "날짜 + 이름"이라, 여러 개면 '예정'만(날짜 중복 방지), 1개면 '예정 시험'.
     var upExams = toeflExamsAdmin.filter(function(e) {
         return e.status === 'scheduled' && new Date(e.exam_datetime) > new Date();
     });
     upExams.forEach(function(e, i) {
         var ed = new Date(e.exam_datetime);
-        var label = upExams.length > 1
-            ? '예정 ' + (ed.getMonth() + 1) + '/' + ed.getDate()
-            : '예정 시험';
         markers.push({
-            key: 'upcoming' + i, date: ed, content: label,
-            border: 'rgba(59, 130, 246, 0.55)', bg: 'rgba(59, 130, 246, 0.9)'
+            key: 'upcoming' + i, date: ed, name: (upExams.length > 1 ? '예정' : '예정 시험'),
+            border: 'rgba(59, 130, 246, 0.55)', fg: '#2563eb', pill: 'rgba(59, 130, 246, 0.14)'
         });
     });
 
@@ -2808,13 +2805,16 @@ function renderToeflAdminChart() {
     var labels = [];
     var readingData = [], listeningData = [], speakingData = [], writingData = [], overallData = [];
     var markerLabel = {};   // key -> x축 라벨
-    var examIndices = [];   // 성적이 찍힌 시험 날짜의 x축 인덱스 (배지로 표시)
+    var examIndices = [];   // 성적이 찍힌 시험 날짜의 x축 인덱스 (점 표시용)
+    // x축 알약 뱃지: 실제 시험 + 마커(챌린지 시작/응시 마지노선/예정) 모두 "날짜 + 이름"으로 통일
+    var badges = [];        // {index, text, fg, pill, line?}
 
     points.forEach(function(p, idx) {
         var lbl = (p.date.getMonth() + 1) + '/' + p.date.getDate();
         labels.push(lbl);
         if (p.score) {
             examIndices.push(idx);
+            badges.push({ index: idx, text: lbl + ' 시험', fg: '#7c3aed', pill: 'rgba(124, 58, 237, 0.14)' });
             readingData.push(Number(p.score.reading));
             listeningData.push(Number(p.score.listening));
             speakingData.push(Number(p.score.speaking));
@@ -2827,97 +2827,81 @@ function renderToeflAdminChart() {
             writingData.push(null);
             overallData.push(null);
             markerLabel[p.marker.key] = lbl;
+            // line: 세로 안내선이 딸린 마커 (선은 뱃지 중앙에 맞춰 플러그인이 직접 그림)
+            badges.push({ index: idx, text: lbl + ' ' + p.marker.name, fg: p.marker.fg, pill: p.marker.pill, line: p.marker.border });
         }
     });
+    var badgeIndices = badges.map(function(b) { return b.index; });
 
-    var annotations = {};
-
-    // 세로선: 챌린지 시작 / 응시 마지노선
-    markers.forEach(function(m) {
-        var lbl = markerLabel[m.key];
-        if (!lbl) return;
-        annotations[m.key] = {
-            type: 'line',
-            xMin: lbl, xMax: lbl,
-            borderColor: m.border,
-            borderWidth: 2,
-            borderDash: [6, 4],
-            label: {
-                display: true,
-                content: m.content,
-                position: m.key === 'deadline' ? 'end' : 'start',
-                backgroundColor: m.bg,
-                color: '#fff',
-                font: { size: 11, weight: '600', family: 'Noto Sans KR' },
-                padding: { x: 8, y: 4 },
-                borderRadius: 6
-            }
-        };
-    });
-
-    // 가로선: 커트라인 (1차 목표, 관리자 입력)
+    // ── 그룹 판정 먼저 (커트라인 subtle 여부·축하에 쓰인다) ──
     var cutoff = Number(app.target_cutoff_new);
     var hasCutoff = !app.no_target_score && cutoff >= 1 && cutoff <= 6;
-    if (hasCutoff) {
-        annotations.cutoff = {
-            type: 'line',
-            yMin: cutoff, yMax: cutoff,
-            borderColor: 'rgba(239, 68, 68, 0.55)',
-            borderWidth: 2,
-            borderDash: [4, 4],
-            label: {
-                display: true,
-                content: '커트라인 ' + cutoff.toFixed(1),
-                position: 'start',
-                backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                color: '#fff',
-                font: { size: 11, weight: '600', family: 'Noto Sans KR' },
-                padding: { x: 8, y: 4 },
-                borderRadius: 6
-            }
-        };
-    }
-
-    // 가로선: 희망점수 (2차 목표, 학생이 설정 · 관리자는 읽기전용) -- 금색
     var wish = Number(app.target_wish_new);
     var hasWish = wish >= 1 && wish <= 6 && (!hasCutoff || wish > cutoff);
-    if (hasWish) {
-        annotations.wish = {
-            type: 'line',
-            yMin: wish, yMax: wish,
-            borderColor: 'rgba(217, 164, 65, 0.8)',
-            borderWidth: 2,
-            borderDash: [4, 4],
+
+    // 목표 = Overall + 섹션 0~4개. 학생 화면과 동일하게 "최근 성적"이 그룹 전부 충족인지로 판정.
+    var secData = { reading: readingData, listening: listeningData, writing: writingData, speaking: speakingData };
+    var goalSecTargets = function(kind) {
+        var out = {};
+        ['reading', 'listening', 'writing', 'speaking'].forEach(function(k) {
+            var col = (kind === 'cutoff') ? ('target_' + k + '_new') : ('target_wish_' + k);
+            var v = Number(app[col]);
+            if (v >= 1 && v <= 6) out[k] = v;
+        });
+        return out;
+    };
+    var lastIdx = -1;
+    for (var li = overallData.length - 1; li >= 0; li--) {
+        if (overallData[li] != null) { lastIdx = li; break; }
+    }
+    var groupMetAt = function(idx, overallTarget, secTargets) {
+        if (idx < 0 || overallData[idx] == null || Number(overallData[idx]) < overallTarget) return false;
+        for (var k in secTargets) {
+            if (secData[k][idx] == null || Number(secData[k][idx]) < secTargets[k]) return false;
+        }
+        return true;
+    };
+    var cutoffCleared = hasCutoff && groupMetAt(lastIdx, cutoff, goalSecTargets('cutoff'));
+
+    // ── 가로 목표선: 라벨은 알약 뱃지가 아니라 "선 끝에 볼드 제목"처럼(흰 배경으로 선을 살짝 끊음). ──
+    // 마커 세로선은 뱃지 중앙에 맞춰 플러그인이 직접 그린다(여긴 가로 목표선만 담는다).
+    var annotations = {};
+    var hlineFn = function(value, lineColor, textColor, label, pos, opts) {
+        opts = opts || {};
+        return {
+            type: 'line', yMin: value, yMax: value,
+            borderColor: lineColor, borderWidth: opts.borderWidth || 2, borderDash: [4, 4],
             label: {
-                display: true,
-                content: '희망 ' + wish.toFixed(1),
-                position: 'end',
-                backgroundColor: 'rgba(217, 164, 65, 0.95)',
-                color: '#fff',
-                font: { size: 11, weight: '600', family: 'Noto Sans KR' },
-                padding: { x: 8, y: 4 },
-                borderRadius: 6
+                display: true, content: label, position: pos,
+                backgroundColor: '#ffffff', color: textColor,
+                font: { size: 12, weight: '700', family: 'Noto Sans KR' },
+                padding: { x: 5, y: 1 }, borderRadius: 0
             }
         };
+    };
+    if (hasCutoff) {
+        annotations.cutoff = cutoffCleared
+            ? hlineFn(cutoff, 'rgba(239, 68, 68, 0.22)', 'rgba(220, 38, 38, 0.5)',
+                '커트라인 ' + cutoff.toFixed(1), 'end', { borderWidth: 1 })
+            : hlineFn(cutoff, 'rgba(239, 68, 68, 0.55)', '#dc2626',
+                '커트라인 ' + cutoff.toFixed(1), 'end');
+    }
+    if (hasWish) {
+        annotations.wish = hlineFn(wish, 'rgba(217, 164, 65, 0.8)', '#c1962f',
+            '다음 목표 ' + wish.toFixed(1), 'end');
     }
 
     if (toeflAdminChartInstance) {
         toeflAdminChartInstance.destroy();
     }
 
-    // 도달한 가장 높은 목표의 Overall 점 인덱스 — 희망 도달하면 그쪽, 아니면 커트라인
-    var firstIdxReaching = function(goal) {
-        for (var i = 0; i < overallData.length; i++) {
-            if (overallData[i] != null && Number(overallData[i]) >= goal) return i;
-        }
-        return -1;
-    };
+    // 축하: "지금 활성 목표"만. 다음 목표를 이미 세웠으면 커트라인 폭죽은 띄우지 않는다(선을 물러나게 한 것과 일관).
     var celebrateIdx = -1;
     var celebrateText = '🎉 목표 달성';
-    if (hasWish && firstIdxReaching(wish) >= 0) {
-        celebrateIdx = firstIdxReaching(wish); celebrateText = '🎉 희망점수 달성';
-    } else if (hasCutoff && firstIdxReaching(cutoff) >= 0) {
-        celebrateIdx = firstIdxReaching(cutoff); celebrateText = '🎉 커트라인 달성';
+    if (hasWish && groupMetAt(lastIdx, wish, goalSecTargets('wish'))) {
+        celebrateIdx = lastIdx; celebrateText = '🎉 다음목표 달성';
+    } else if (!hasWish && hasCutoff && groupMetAt(lastIdx, cutoff, goalSecTargets('cutoff'))) {
+        celebrateIdx = lastIdx; celebrateText = '🎉 커트라인 달성';
     }
 
     // 목표 도달 점 위에 폭죽 + 말풍선 오버레이 (hover 없이 상시)
@@ -2949,24 +2933,49 @@ function renderToeflAdminChart() {
         }
     };
 
-    // 본 시험 날짜(x축)를 알약 배지로 그린다. 기본 축 텍스트는 숨기고 그 자리에 그린다.
+    // 뱃지의 클램프된 박스(x/너비/중앙). 양 끝 뱃지는 플롯 밖으로 안 나가게 안쪽으로 붙인다.
+    var toeflBadgeBox = function(chart, b) {
+        var g = chart.ctx, ca = chart.chartArea;
+        g.save();
+        g.font = '600 11px "Noto Sans KR", sans-serif';
+        var w = g.measureText(b.text).width + 18;
+        g.restore();
+        var cx = chart.scales.x.getPixelForTick(b.index);
+        var x = Math.max(ca.left, Math.min(cx - w / 2, ca.right - w));
+        return { x: x, w: w, center: x + w / 2 };
+    };
+
+    // x축의 날짜 알약 뱃지(시험 + 마커)와 마커 세로 안내선. 세로선은 뱃지 중앙에 맞춰 그린다.
     var examBadgePlugin = {
         id: 'toeflExamBadges',
+        beforeDatasetsDraw: function(chart) {
+            if (!chart.scales.x) return;
+            var g = chart.ctx, ca = chart.chartArea;
+            g.save();
+            g.setLineDash([6, 4]);
+            g.lineWidth = 2;
+            badges.forEach(function(b) {
+                if (!b.line) return;
+                var cxx = toeflBadgeBox(chart, b).center;
+                g.strokeStyle = b.line;
+                g.beginPath();
+                g.moveTo(cxx, ca.top);
+                g.lineTo(cxx, ca.bottom);
+                g.stroke();
+            });
+            g.restore();
+        },
         afterDatasetsDraw: function(chart) {
-            var xs = chart.scales.x;
-            if (!xs) return;
-            var g = chart.ctx;
+            if (!chart.scales.x) return;
+            var g = chart.ctx, ca = chart.chartArea;
             g.save();
             g.font = '600 11px "Noto Sans KR", sans-serif';
             g.textAlign = 'center';
             g.textBaseline = 'middle';
-            var top = chart.chartArea.bottom + 6;
-            examIndices.forEach(function(i) {
-                var cx = xs.getPixelForTick(i);
-                var text = labels[i] + ' 시험';
-                var tw = g.measureText(text).width;
-                var h = 19, padX = 9, w = tw + padX * 2;
-                var x = cx - w / 2, y = top, r = h / 2;
+            var y = ca.bottom + 6, h = 19, r = h / 2;
+            badges.forEach(function(b) {
+                var box = toeflBadgeBox(chart, b);
+                var x = box.x, w = box.w;
                 g.beginPath();
                 if (g.roundRect) { g.roundRect(x, y, w, h, r); }
                 else {
@@ -2976,10 +2985,10 @@ function renderToeflAdminChart() {
                     g.arcTo(x, y + h, x, y, r);
                     g.arcTo(x, y, x + w, y, r);
                 }
-                g.fillStyle = 'rgba(124, 58, 237, 0.14)';
+                g.fillStyle = b.pill;
                 g.fill();
-                g.fillStyle = '#7c3aed';
-                g.fillText(text, cx, y + h / 2 + 0.5);
+                g.fillStyle = b.fg;
+                g.fillText(b.text, box.center, y + h / 2 + 0.5);
             });
             g.restore();
         }
@@ -3112,9 +3121,9 @@ function renderToeflAdminChart() {
                     ticks: {
                         font: { size: 12, weight: '600', family: 'Noto Sans KR' },
                         color: '#64748b',
-                        // 본 시험 날짜는 배지로 그리므로 기본 텍스트를 숨긴다 (마커 날짜는 유지)
+                        // 시험·마커 날짜는 모두 알약 뱃지로 그리므로 기본 축 텍스트는 숨긴다.
                         callback: function(val, index) {
-                            return examIndices.indexOf(index) !== -1 ? '' : labels[index];
+                            return badgeIndices.indexOf(index) !== -1 ? '' : labels[index];
                         }
                     },
                     grid: { display: false },
