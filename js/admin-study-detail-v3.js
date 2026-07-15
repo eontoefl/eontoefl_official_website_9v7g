@@ -2876,6 +2876,41 @@ function renderToeflAdminChart() {
         toeflAdminChartInstance.destroy();
     }
 
+    // 커트라인에 처음 도달한 Overall 점 인덱스 — 목표 달성 축하 대상
+    var celebrateIdx = -1;
+    if (!app.no_target_score && cutoff >= 1 && cutoff <= 6) {
+        for (var ci = 0; ci < overallData.length; ci++) {
+            if (overallData[ci] != null && Number(overallData[ci]) >= cutoff) { celebrateIdx = ci; break; }
+        }
+    }
+
+    // 목표 도달 점 위에 폭죽 + "목표점수 달성" 말풍선 오버레이 (hover 없이 상시)
+    var celebratePlugin = {
+        id: 'toeflCelebrate',
+        afterDatasetsDraw: function(chart) {
+            var wrap = chart.canvas.parentNode;
+            if (!wrap) return;
+            var overlay = wrap.querySelector('.toefl-celebrate');
+            if (celebrateIdx < 0) { if (overlay) overlay.remove(); return; }
+            var meta = chart.getDatasetMeta(0);   // Overall
+            var pt = meta && meta.data && meta.data[celebrateIdx];
+            if (!pt) return;
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'toefl-celebrate';
+                overlay.innerHTML =
+                    '<div class="toefl-celebrate-bubble">🎉 목표점수 달성</div>' +
+                    '<span class="toefl-spark toefl-spark-ring"></span>' +
+                    '<span class="toefl-spark s1"></span><span class="toefl-spark s2"></span>' +
+                    '<span class="toefl-spark s3"></span><span class="toefl-spark s4"></span>' +
+                    '<span class="toefl-spark s5"></span><span class="toefl-spark s6"></span>';
+                wrap.appendChild(overlay);
+            }
+            overlay.style.left = (chart.canvas.offsetLeft + pt.x) + 'px';
+            overlay.style.top = (chart.canvas.offsetTop + pt.y) + 'px';
+        }
+    };
+
     // 본 시험 날짜(x축)를 알약 배지로 그린다. 기본 축 텍스트는 숨기고 그 자리에 그린다.
     var examBadgePlugin = {
         id: 'toeflExamBadges',
@@ -2914,7 +2949,7 @@ function renderToeflAdminChart() {
 
     toeflAdminChartInstance = new Chart(canvas, {
         type: 'line',
-        plugins: [examBadgePlugin],
+        plugins: [examBadgePlugin, celebratePlugin],
         data: {
             labels: labels,
             datasets: [
