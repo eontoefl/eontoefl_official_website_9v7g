@@ -33,7 +33,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   analysis_agree_reminder:     50228,  // 개별분석 동의 마감 2시간 전 리마인드 (일반 학생)
   contract_agree_reminder:     50229,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
   deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
-  toefl_exam_day:              50231,  // 시험 당일 회신 안내 (심사 승인 후 실제 ID로 교체할 것)
+  toefl_exam_day:              50232,  // 시험 당일 회신 안내
 };
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
@@ -322,7 +322,9 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "",
         "▶ [1단계] 오늘 안에 회신",
         "1. 리딩·리스닝 unofficial 점수를 알려주세요.",
-        "2. 리딩·리스닝에 어떤 지문/문제가 몇 개씩 나왔는지 알려주세요. (기억나는 만큼만)",
+        "2. 리딩·리스닝 구성을 알려주세요. (기억나는 만큼만)",
+        "  - 첫번째 모듈에 유형별로 몇 세트씩 나왔는지",
+        "  - 두번째 모듈에 학술 지문, 혹은 렉쳐가 있었는지",
         "3. email, discussion, interview에서 어떤 주제가 나왔고 어떻게 답변하셨는지 알려주세요.",
         "기억은 하루가 지나면 흐려집니다. 오늘이 가장 정확합니다.",
         "4. 내벨업챌린지에서 연습한 것과 달라 당황스러웠던 점이 있다면 함께 알려주세요.",
