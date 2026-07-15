@@ -3,6 +3,68 @@
 
 let currentManageApp = null;
 
+// ===== AI 피드백 재생성 (개별분석 다시 제작) =====
+const N8N_REGEN_WEBHOOK = 'https://eontoefl.app.n8n.cloud/webhook/eontoefl-application-webhook';
+
+async function regenerateAnalysis() {
+    if (!currentManageApp) return;
+    const fb = (document.getElementById('regenFeedback')?.value || '').trim();
+    if (!fb) { alert('피드백을 입력해주세요. (예: 코스를 Fast로 바꿔줘)'); return; }
+    const box = document.getElementById('analysis_content');
+    const prev = box ? box.value : (currentManageApp.analysis_content || '');
+    if (!confirm('입력한 피드백을 반영해서 개별분석을 다시 만들까요?\n\n1~2분 걸리고, 완료되면 위 분석칸이 새 내용으로 바뀝니다. (원본은 저장 전까지 안 바뀌어요)')) return;
+
+    const appId = currentManageApp.id;
+    showRegenOverlay(true);
+    try {
+        // 1) 결과 서랍 비우기
+        await supabaseAPI.patch('applications', appId, { analysis_regen_result: null });
+        // 2) 재생성 요청 (fire-and-forget: 응답은 안 기다림, 결과는 서랍으로 옴)
+        fetch(N8N_REGEN_WEBHOOK, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...currentManageApp, mode: 'regenerate', feedback: fb, prev_analysis: prev })
+        }).catch(() => {});
+        // 3) 서랍 폴링 (최대 8분)
+        const started = Date.now();
+        let result = null;
+        while (Date.now() - started < 8 * 60 * 1000) {
+            await new Promise(r => setTimeout(r, 5000));
+            const row = await supabaseAPI.getById('applications', appId);
+            const r = Array.isArray(row) ? row[0] : row;
+            if (r && r.analysis_regen_result) { result = r.analysis_regen_result; break; }
+        }
+        if (!result) throw new Error('시간 초과. 잠시 후 다시 시도해주세요.');
+        // 4) 분석칸에 채우고 서랍 정리
+        if (box) box.value = result;
+        const fbEl = document.getElementById('regenFeedback'); if (fbEl) fbEl.value = '';
+        await supabaseAPI.patch('applications', appId, { analysis_regen_result: null });
+        showRegenOverlay(false);
+        alert('✅ 다시 제작 완료! 분석칸을 확인하고, 맘에 들면 저장해주세요.');
+    } catch (e) {
+        showRegenOverlay(false);
+        alert('❌ 다시 제작 실패: ' + (e.message || e));
+    }
+}
+
+function showRegenOverlay(on) {
+    let ov = document.getElementById('regenOverlay');
+    if (on) {
+        if (!ov) {
+            ov = document.createElement('div');
+            ov.id = 'regenOverlay';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(30,20,50,0.6);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+            ov.innerHTML = '<div style="width:52px;height:52px;border:5px solid rgba(255,255,255,0.33);border-top-color:#fff;border-radius:50%;animation:regenSpin 0.9s linear infinite;"></div>'
+                + '<div style="color:#fff;font-size:15px;font-weight:600;">AI가 피드백 반영해서 다시 만드는 중… (1~2분)</div>'
+                + '<div style="color:rgba(255,255,255,0.8);font-size:12px;">이 창을 닫지 말고 잠시만 기다려주세요</div>';
+            const st = document.createElement('style');
+            st.textContent = '@keyframes regenSpin{to{transform:rotate(360deg)}}';
+            ov.appendChild(st);
+            document.body.appendChild(ov);
+        }
+        ov.style.display = 'flex';
+    } else if (ov) { ov.remove(); }
+}
+
 // 모달 열기
 async function openManageModal(appId) {
     try {
@@ -792,6 +854,22 @@ function loadModalAnalysisTab(app) {
 1주차: 기초 문법 다지기
 2-4주차: Reading 실전 연습
 5-8주차: Listening 강화 훈련">${fillContent || ''}</textarea>
+
+                <!-- AI 피드백 재생성 -->
+                <div id="regenWrap" style="display:${readOnly ? 'none' : 'block'}; margin-top:14px; background:#f6f4fb; border:1px solid #e5ddf2; border-radius:12px; padding:14px 16px;">
+                    <div style="font-size:13px; font-weight:700; color:#4c1d95; margin-bottom:8px;">
+                        <i class="fas fa-wand-magic-sparkles"></i> AI에게 피드백 주고 다시 제작
+                    </div>
+                    <textarea id="regenFeedback" rows="2" placeholder="예: 코스를 Fast로 바꿔줘 / 인사말을 더 짧게 / 첨삭 설득을 더 강하게"
+                              style="width:100%; box-sizing:border-box; padding:10px 12px; border:none; border-radius:8px; background:#ffffff; outline:none; font-family:inherit; line-height:1.6; resize:vertical;"></textarea>
+                    <div style="margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <button type="button" id="regenBtn" onclick="regenerateAnalysis()"
+                                style="padding:9px 16px; background:#7c3aed; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">
+                            <i class="fas fa-rotate"></i> 피드백 반영해 다시 제작
+                        </button>
+                        <span style="font-size:11px; color:#8b7fa8;">완성까지 1~2분 걸려요. 완료되면 위 분석칸이 자동으로 바뀝니다.</span>
+                    </div>
+                </div>
             </div>
             
             <!-- 하단 버튼 -->
@@ -1820,6 +1898,10 @@ function editAnalysis() {
             input.removeAttribute('readonly');
             input.removeAttribute('disabled');
         });
+
+        // 수정 모드 진입 시 'AI 피드백 재생성' 노출
+        const rw = document.getElementById('regenWrap');
+        if (rw) rw.style.display = 'block';
         
         // 라디오 버튼 활성화
         const radios = form.querySelectorAll('input[type="radio"]');
