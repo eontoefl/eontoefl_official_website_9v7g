@@ -2803,11 +2803,13 @@ function renderToeflAdminChart() {
     var labels = [];
     var readingData = [], listeningData = [], speakingData = [], writingData = [], overallData = [];
     var markerLabel = {};   // key -> x축 라벨
+    var examIndices = [];   // 성적이 찍힌 시험 날짜의 x축 인덱스 (배지로 표시)
 
-    points.forEach(function(p) {
+    points.forEach(function(p, idx) {
         var lbl = (p.date.getMonth() + 1) + '/' + p.date.getDate();
         labels.push(lbl);
         if (p.score) {
+            examIndices.push(idx);
             readingData.push(Number(p.score.reading));
             listeningData.push(Number(p.score.listening));
             speakingData.push(Number(p.score.speaking));
@@ -2874,8 +2876,45 @@ function renderToeflAdminChart() {
         toeflAdminChartInstance.destroy();
     }
 
+    // 본 시험 날짜(x축)를 알약 배지로 그린다. 기본 축 텍스트는 숨기고 그 자리에 그린다.
+    var examBadgePlugin = {
+        id: 'toeflExamBadges',
+        afterDatasetsDraw: function(chart) {
+            var xs = chart.scales.x;
+            if (!xs) return;
+            var g = chart.ctx;
+            g.save();
+            g.font = '600 11px "Noto Sans KR", sans-serif';
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            var top = chart.chartArea.bottom + 6;
+            examIndices.forEach(function(i) {
+                var cx = xs.getPixelForTick(i);
+                var text = labels[i];
+                var tw = g.measureText(text).width;
+                var h = 19, padX = 9, w = tw + padX * 2;
+                var x = cx - w / 2, y = top, r = h / 2;
+                g.beginPath();
+                if (g.roundRect) { g.roundRect(x, y, w, h, r); }
+                else {
+                    g.moveTo(x + r, y);
+                    g.arcTo(x + w, y, x + w, y + h, r);
+                    g.arcTo(x + w, y + h, x, y + h, r);
+                    g.arcTo(x, y + h, x, y, r);
+                    g.arcTo(x, y, x + w, y, r);
+                }
+                g.fillStyle = 'rgba(124, 58, 237, 0.14)';
+                g.fill();
+                g.fillStyle = '#7c3aed';
+                g.fillText(text, cx, y + h / 2 + 0.5);
+            });
+            g.restore();
+        }
+    };
+
     toeflAdminChartInstance = new Chart(canvas, {
         type: 'line',
+        plugins: [examBadgePlugin],
         data: {
             labels: labels,
             datasets: [
@@ -2999,7 +3038,11 @@ function renderToeflAdminChart() {
                 x: {
                     ticks: {
                         font: { size: 12, weight: '600', family: 'Noto Sans KR' },
-                        color: '#64748b'
+                        color: '#64748b',
+                        // 본 시험 날짜는 배지로 그리므로 기본 텍스트를 숨긴다 (마커 날짜는 유지)
+                        callback: function(val, index) {
+                            return examIndices.indexOf(index) !== -1 ? '' : labels[index];
+                        }
                     },
                     grid: { display: false },
                     border: { display: false }
