@@ -14,6 +14,13 @@ const NOTICE_STYLES = {
 
 let allNotices = [];
 
+// 공개 대상 라벨/스타일 맵
+const AUDIENCE_STYLES = {
+    all:       { label: '전체', icon: '🌐', color: '#475569', bg: '#f1f5f9' },
+    regular:   { label: '일반내챌', icon: '🇰🇷', color: '#1d4ed8', bg: '#eff6ff' },
+    australia: { label: '호주내챌', icon: '🇦🇺', color: '#c2410c', bg: '#fff7ed' }
+};
+
 // ===== 등록 시각 → KST "2026.07.06 16:27" 포맷 =====
 function formatNoticeDate(iso) {
     if (!iso) return '';
@@ -60,6 +67,7 @@ async function loadNotices() {
             <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 44px;">순서</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 100px;">타입</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 88px;">대상</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600;">제목</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 96px;">등록일시</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 72px;">상태</th>
@@ -69,13 +77,19 @@ async function loadNotices() {
 
         allNotices.forEach(n => {
             const style = NOTICE_STYLES[n.type] || NOTICE_STYLES.notice;
+            const aud = AUDIENCE_STYLES[n.audience] || AUDIENCE_STYLES.all;
             const contentPreview = (n.content || '').replace(/<[^>]*>/g, '').substring(0, 30) + ((n.content || '').length > 30 ? '...' : '');
-            
+
             html += `<tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 12px 8px; color: #64748b; text-align: center;">${n.sort_order || 0}</td>
                 <td style="padding: 12px 8px;">
                     <span style="background: ${style.bg}; color: ${style.titleColor}; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap;">
                         ${style.emoji} ${style.label}
+                    </span>
+                </td>
+                <td style="padding: 12px 8px;">
+                    <span style="background: ${aud.bg}; color: ${aud.color}; padding: 4px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap;">
+                        ${aud.icon} ${aud.label}
                     </span>
                 </td>
                 <td style="padding: 12px 8px;">
@@ -150,6 +164,7 @@ function showNoticeForm(editData) {
         titleEl.innerHTML = '<i class="fas fa-edit" style="color: #f59e0b;"></i> 공지 수정';
         document.getElementById('noticeEditId').value = editData.id;
         document.getElementById('noticeType').value = editData.type || 'notice';
+        document.getElementById('noticeAudience').value = editData.audience || 'all';
         document.getElementById('noticeTitle').value = editData.title || '';
         document.getElementById('noticeContent').value = editData.content || '';
         document.getElementById('noticeSortOrder').value = editData.sort_order || 0;
@@ -158,6 +173,7 @@ function showNoticeForm(editData) {
         titleEl.innerHTML = '<i class="fas fa-plus-circle" style="color: #3b82f6;"></i> 공지 등록';
         document.getElementById('noticeEditId').value = '';
         document.getElementById('noticeType').value = 'notice';
+        document.getElementById('noticeAudience').value = 'all';
         document.getElementById('noticeTitle').value = '';
         document.getElementById('noticeContent').value = '';
         document.getElementById('noticeSortOrder').value = allNotices.length;
@@ -177,6 +193,7 @@ function cancelNoticeForm() {
 async function saveNotice() {
     const editId = document.getElementById('noticeEditId').value;
     const type = document.getElementById('noticeType').value;
+    const audience = document.getElementById('noticeAudience').value || 'all';
     const title = document.getElementById('noticeTitle').value.trim();
     const content = document.getElementById('noticeContent').value.trim();
     const sortOrder = parseInt(document.getElementById('noticeSortOrder').value) || 0;
@@ -190,6 +207,7 @@ async function saveNotice() {
 
     const data = {
         type,
+        audience,
         title,
         content,
         sort_order: sortOrder,
