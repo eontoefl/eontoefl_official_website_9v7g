@@ -57,12 +57,18 @@ async function loadSurvey() {
         }
     } catch (e) { /* 일정 없어도 진행 (날짜 직접 선택) */ }
 
-    // 2. 활성 질문
+    // 2. 활성 질문 (관리자가 정한 순서대로 — sort_order 없으면 등록순으로 뒤에)
     const questions = await supabaseAPI.query('toefl_survey_questions', {
         'status': 'eq.active',
         'order': 'created_at.asc'
     });
     if (!questions || !questions.length) { showState('svEmpty'); return; }
+    questions.sort(function(a, b) {
+        var ao = (a.sort_order == null) ? Infinity : a.sort_order;
+        var bo = (b.sort_order == null) ? Infinity : b.sort_order;
+        if (ao !== bo) return ao - bo;
+        return a.created_at < b.created_at ? -1 : 1;
+    });
 
     // 3. 질문별 응답 수 → 목표 찬 질문은 제외 (자동 수집 종료)
     const ids = questions.map(function(q) { return q.id; }).join(',');

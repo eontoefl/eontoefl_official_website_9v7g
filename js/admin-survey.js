@@ -126,8 +126,16 @@ function distinctDates(resps) {
     return Object.keys(set).length;
 }
 
+/** 노출 순서: sort_order 오름차순, 없으면 등록순으로 뒤에 (학생 설문과 동일 규칙) */
+function byDisplayOrder(a, b) {
+    const ao = (a.sort_order == null) ? Infinity : a.sort_order;
+    const bo = (b.sort_order == null) ? Infinity : b.sort_order;
+    if (ao !== bo) return ao - bo;
+    return a.created_at < b.created_at ? -1 : 1;
+}
+
 function renderActive() {
-    const active = asvQuestions.filter(function(q) { return q.status === 'active'; });
+    const active = asvQuestions.filter(function(q) { return q.status === 'active'; }).sort(byDisplayOrder);
     const el = document.getElementById('activeList');
     if (!active.length) {
         el.innerHTML = '<div class="asv-empty">진행 중인 질문이 없습니다. 위에서 새 질문을 만들어보세요.</div>';
@@ -161,9 +169,10 @@ function renderActive() {
                         '<i class="fas fa-trash"></i> 삭제</button>' +
                 '</div>' +
             '</div>';
-        return '<div class="asv-q' + (q.hidden ? ' asv-q-hidden' : '') + '">' +
+        return '<div class="asv-q' + (q.hidden ? ' asv-q-hidden' : '') + '" data-qid="' + q.id + '">' +
             '<div class="asv-q-head">' +
-                '<div>' +
+                '<span class="asv-drag" title="드래그로 순서 이동"><i class="fas fa-grip-vertical"></i></span>' +
+                '<div class="asv-q-body">' +
                     '<div class="asv-q-text">' + escapeHtml(q.question_text) + '</div>' +
                     '<div class="asv-q-meta">' +
                         '<span>' + (q.question_type === 'choice' ? '객관식' : '서술형') + '</span>' +
@@ -181,6 +190,71 @@ function renderActive() {
             buildEditHtml(q) +
         '</div>';
     }).join('');
+    initDragHandles();
+}
+
+// ── 드래그 정렬: 핸들바를 잡고 끌어서 순서 이동, 놓으면 sort_order 저장 ──
+let asvDragEl = null;
+
+function initDragHandles() {
+    const list = document.getElementById('activeList');
+    list.querySelectorAll('.asv-drag').forEach(function(h) {
+        h.addEventListener('mousedown', function() { h.closest('.asv-q').draggable = true; });
+        h.addEventListener('mouseup', function() { h.closest('.asv-q').draggable = false; });
+    });
+    list.querySelectorAll('.asv-q').forEach(function(el) {
+        el.addEventListener('dragstart', function(e) {
+            asvDragEl = el;
+            el.classList.add('asv-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', async function() {
+            el.classList.remove('asv-dragging');
+            el.draggable = false;
+            asvDragEl = null;
+            await persistOrder();
+        });
+    });
+    // 컨테이너 리스너는 한 번만
+    if (!list.dataset.dragBound) {
+        list.dataset.dragBound = '1';
+        list.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (!asvDragEl) return;
+            const after = getDragAfterElement(list, e.clientY);
+            if (after == null) list.appendChild(asvDragEl);
+            else if (after !== asvDragEl) list.insertBefore(asvDragEl, after);
+        });
+    }
+}
+
+function getDragAfterElement(container, y) {
+    const els = Array.from(container.querySelectorAll('.asv-q:not(.asv-dragging)'));
+    let closest = { offset: -Infinity, element: null };
+    els.forEach(function(child) {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) closest = { offset: offset, element: child };
+    });
+    return closest.element;
+}
+
+/** 현재 DOM 순서를 sort_order로 저장 (학생 설문도 이 순서로 노출) */
+async function persistOrder() {
+    const ids = Array.from(document.querySelectorAll('#activeList .asv-q'))
+        .map(function(el) { return el.dataset.qid; });
+    try {
+        for (let i = 0; i < ids.length; i++) {
+            await supabaseAPI.patch('toefl_survey_questions', ids[i], { sort_order: i + 1 });
+        }
+        ids.forEach(function(id, i) {
+            const q = asvQuestions.find(function(x) { return x.id === id; });
+            if (q) q.sort_order = i + 1;
+        });
+    } catch (err) {
+        alert('순서 저장 실패: ' + err.message + '\n(sort_order 마이그레이션이 실행됐는지 확인하세요)');
+        await loadAll();
+    }
 }
 
 // ── 수정 패널 ──
