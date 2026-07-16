@@ -302,14 +302,18 @@ function displayApplicationDetail(app) {
     }
 
     // 상태 배지 + 수정/삭제 버튼 표시 (신청서 상세 제목 오른쪽)
+    // 관리자는 개별분석 등록·삭제 여부와 무관하게 항상 수정/삭제 가능
     const hasAnalysisRegistered = app.analysis_status && app.analysis_content;
-    const canEdit = isOwner(app) && !hasAnalysisRegistered && !app.deleted;
-    
+    const canEdit = isAdmin() || (isOwner(app) && !hasAnalysisRegistered && !app.deleted);
+
     // 수정·삭제는 신청서(STEP 1)에만 해당하는 동작이라 헤더가 아니라 본문 맨 아래에 둔다.
     // 삭제는 되돌릴 수 없으므로 내용을 다 읽은 뒤에 만나게 한다.
+    const actionsHint = isAdmin()
+        ? '관리자는 개별분석 등록 후에도 신청서를 고칠 수 있어요.'
+        : '개별분석이 등록되기 전까지 신청서를 고칠 수 있어요.';
     const applicationActions = canEdit ? `
         <div class="s1-actions">
-            <div class="s1-actions-hint">개별분석이 등록되기 전까지 신청서를 고칠 수 있어요.</div>
+            <div class="s1-actions-hint">${actionsHint}</div>
             <div class="s1-actions-btns">
                 <button class="s1-btn s1-btn-edit" onclick="window.location.href='application-form.html?edit=${app.id}'">
                     <i class="fas fa-pen"></i> 수정하기
