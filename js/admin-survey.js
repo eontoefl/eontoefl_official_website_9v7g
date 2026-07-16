@@ -153,6 +153,8 @@ function renderActive() {
                         (q.hidden
                             ? '<i class="fas fa-eye"></i> 다시 보이기'
                             : '<i class="fas fa-eye-slash"></i> 숨기기') + '</button>' +
+                    '<button class="asv-menu-item" onclick="toggleEdit(\'' + q.id + '\'); closeQMenus();">' +
+                        '<i class="fas fa-pen"></i> 수정</button>' +
                     '<button class="asv-menu-item" onclick="toggleVerdict(\'' + q.id + '\'); closeQMenus();">' +
                         '<i class="fas fa-gavel"></i> 마감·판정</button>' +
                     '<button class="asv-menu-item asv-menu-danger" onclick="deleteQuestion(\'' + q.id + '\')">' +
@@ -176,8 +178,104 @@ function renderActive() {
             '</div>' +
             buildAnswersHtml(q, resps) +
             buildVerdictHtml(q) +
+            buildEditHtml(q) +
         '</div>';
     }).join('');
+}
+
+// ── 수정 패널 ──
+// 수정은 "의미가 유지되는 손질"만을 위한 것. 의미가 바뀌면 기존 응답과 어긋나므로
+// 패널 상단에 경고를 상시 표시하고, 응답이 있으면 저장 전에 한 번 더 확인받는다.
+function editOptRow(value) {
+    return '<div class="asv-opt-row">' +
+        '<input type="text" placeholder="보기" value="' + escapeHtml(value || '') + '">' +
+        '<button type="button" class="asv-opt-del" onclick="this.parentNode.remove()"><i class="fas fa-times"></i></button>' +
+    '</div>';
+}
+
+function buildEditHtml(q) {
+    var optsHtml = '';
+    if (q.question_type === 'choice') {
+        var rows = (Array.isArray(q.options) ? q.options : []).map(function(opt) {
+            return editOptRow(opt);
+        }).join('');
+        optsHtml =
+            '<div class="asv-field"><label>보기</label>' +
+                '<div id="editOpts_' + q.id + '">' + rows + '</div>' +
+                '<button type="button" class="asv-add-opt" onclick="addEditOption(\'' + q.id + '\')">' +
+                    '<i class="fas fa-plus"></i> 보기 추가</button>' +
+            '</div>';
+    }
+    var inf = (q.target_count == null);
+    return '<div class="asv-edit" id="edit_' + q.id + '">' +
+        '<div class="asv-edit-warn"><i class="fas fa-triangle-exclamation"></i> ' +
+            '<strong>내용(의미)은 바꾸면 안 돼요!</strong> 이미 모인 응답과 어긋납니다. ' +
+            '오타 교정처럼 의미가 그대로인 수정만 하세요. 내용을 바꾸려면 삭제 후 새로 등록.</div>' +
+        '<div class="asv-field"><label>질문</label>' +
+            '<input type="text" id="editQText_' + q.id + '" value="' + escapeHtml(q.question_text) + '"></div>' +
+        '<div class="asv-field"><label>가설 메모</label>' +
+            '<input type="text" id="editQHyp_' + q.id + '" value="' + escapeHtml(q.hypothesis || '') + '"></div>' +
+        optsHtml +
+        '<div class="asv-field"><label>목표 응답 수</label><div class="asv-target-row">' +
+            '<input type="number" id="editQTarget_' + q.id + '" value="' + (inf ? 5 : q.target_count) + '" min="1" max="100"' + (inf ? ' disabled' : '') + '>' +
+            '<label class="asv-inline"><input type="checkbox" id="editQInf_' + q.id + '"' + (inf ? ' checked' : '') +
+                ' onchange="document.getElementById(\'editQTarget_' + q.id + '\').disabled = this.checked;"> 계속 수집</label>' +
+        '</div></div>' +
+        '<div class="asv-edit-actions">' +
+            '<button class="asv-btn-verdict" onclick="saveQuestionEdit(\'' + q.id + '\')"><i class="fas fa-check"></i> 저장</button>' +
+            '<button class="asv-btn-ghost" onclick="toggleEdit(\'' + q.id + '\')">취소</button>' +
+        '</div>' +
+    '</div>';
+}
+
+function addEditOption(qid) {
+    var list = document.getElementById('editOpts_' + qid);
+    var tmp = document.createElement('div');
+    tmp.innerHTML = editOptRow('');
+    list.appendChild(tmp.firstChild);
+}
+
+function toggleEdit(qid) {
+    var el = document.getElementById('edit_' + qid);
+    if (el) el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+}
+
+async function saveQuestionEdit(qid) {
+    var q = asvQuestions.find(function(x) { return x.id === qid; });
+    if (!q) return;
+
+    var text = document.getElementById('editQText_' + qid).value.trim();
+    if (!text) { alert('질문을 입력해주세요.'); return; }
+
+    var patch = {
+        question_text: text,
+        hypothesis: document.getElementById('editQHyp_' + qid).value.trim() || null
+    };
+    if (q.question_type === 'choice') {
+        var options = Array.from(document.querySelectorAll('#editOpts_' + qid + ' input'))
+            .map(function(i) { return i.value.trim(); })
+            .filter(Boolean);
+        if (options.length < 2) { alert('객관식은 보기를 2개 이상 입력해주세요.'); return; }
+        patch.options = options;
+    }
+    if (document.getElementById('editQInf_' + qid).checked) {
+        patch.target_count = null;
+    } else {
+        var target = parseInt(document.getElementById('editQTarget_' + qid).value, 10);
+        if (!target || target < 1) { alert('목표 응답 수를 확인해주세요.'); return; }
+        patch.target_count = target;
+    }
+
+    var respCount = respsOf(qid).length;
+    if (respCount > 0 &&
+        !confirm('이미 응답이 ' + respCount + '건 모인 질문입니다.\n질문의 의미가 바뀌지 않는 수정이 맞나요?\n(의미가 바뀌면 기존 응답과 어긋납니다)')) return;
+
+    try {
+        await supabaseAPI.patch('toefl_survey_questions', qid, patch);
+        await loadAll();
+    } catch (err) {
+        alert('저장 실패: ' + err.message);
+    }
 }
 
 // ── ⋯ 메뉴 열고 닫기 ──

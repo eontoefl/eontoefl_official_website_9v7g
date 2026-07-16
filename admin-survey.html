@@ -163,6 +163,25 @@
         .asv-menu-item i { width: 15px; font-size: 0.78rem; text-align: center; }
         .asv-menu-danger { color: #a53b22; }
         .asv-menu-danger:hover { background: rgba(255, 126, 95, 0.12); color: #a53b22; }
+
+        /* 수정 패널 — 가라앉은 블록 안의 흰 내부 카드 */
+        .asv-edit {
+            margin-top: 16px; display: none;
+            background: var(--es-card); border-radius: 14px; padding: 18px;
+        }
+        .asv-edit-warn {
+            background: rgba(245, 158, 11, 0.1); color: #92400e;
+            border-radius: 10px; padding: 12px 15px;
+            font-size: 0.8rem; font-weight: 600; line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .asv-edit-actions { display: flex; gap: 8px; margin-top: 4px; }
+        .asv-btn-ghost {
+            padding: 9px 16px; border: none; border-radius: 9999px;
+            background: var(--es-low); color: var(--es-onvar);
+            font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .asv-btn-ghost:hover { background: var(--es-high); }
         .asv-btn-sm {
             padding: 8px 14px; border: none; border-radius: 9999px;
             background: var(--es-card); font-size: 0.78rem; font-weight: 700;
