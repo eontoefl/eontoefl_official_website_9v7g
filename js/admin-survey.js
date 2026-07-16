@@ -141,7 +141,25 @@ function renderActive() {
             : '<span class="asv-badge ' + (full ? 'asv-badge-full' : 'asv-badge-collect') + '">' +
                   resps.length + ' / ' + q.target_count + (full ? ' · 판정 대기' : '') +
               '</span>';
-        return '<div class="asv-q">' +
+        // 액션은 ⋯ 메뉴 하나로 모은다 (응답 보기 / 숨기기·보이기 / 마감·판정 / 삭제)
+        var menu =
+            '<div class="asv-menu-wrap">' +
+                '<button class="asv-kebab" onclick="toggleQMenu(event, \'' + q.id + '\')">' +
+                    '<i class="fas fa-ellipsis-vertical"></i></button>' +
+                '<div class="asv-menu" id="menu_' + q.id + '">' +
+                    '<button class="asv-menu-item" onclick="toggleAnswers(\'' + q.id + '\'); closeQMenus();">' +
+                        '<i class="fas fa-list"></i> 응답 보기</button>' +
+                    '<button class="asv-menu-item" onclick="setQuestionHidden(\'' + q.id + '\', ' + (q.hidden ? 'false' : 'true') + ')">' +
+                        (q.hidden
+                            ? '<i class="fas fa-eye"></i> 다시 보이기'
+                            : '<i class="fas fa-eye-slash"></i> 숨기기') + '</button>' +
+                    '<button class="asv-menu-item" onclick="toggleVerdict(\'' + q.id + '\'); closeQMenus();">' +
+                        '<i class="fas fa-gavel"></i> 마감·판정</button>' +
+                    '<button class="asv-menu-item asv-menu-danger" onclick="deleteQuestion(\'' + q.id + '\')">' +
+                        '<i class="fas fa-trash"></i> 삭제</button>' +
+                '</div>' +
+            '</div>';
+        return '<div class="asv-q' + (q.hidden ? ' asv-q-hidden' : '') + '">' +
             '<div class="asv-q-head">' +
                 '<div>' +
                     '<div class="asv-q-text">' + escapeHtml(q.question_text) + '</div>' +
@@ -152,14 +170,52 @@ function renderActive() {
                     '</div>' +
                 '</div>' +
                 '<div class="asv-q-actions">' + targetStr +
-                    '<button class="asv-btn-sm" onclick="toggleAnswers(\'' + q.id + '\')">응답 보기</button>' +
-                    '<button class="asv-btn-sm" onclick="toggleVerdict(\'' + q.id + '\')">마감·판정</button>' +
+                    (q.hidden ? '<span class="asv-badge asv-badge-hidden">숨김</span>' : '') +
+                    menu +
                 '</div>' +
             '</div>' +
             buildAnswersHtml(q, resps) +
             buildVerdictHtml(q) +
         '</div>';
     }).join('');
+}
+
+// ── ⋯ 메뉴 열고 닫기 ──
+function toggleQMenu(event, qid) {
+    event.stopPropagation();
+    var menu = document.getElementById('menu_' + qid);
+    var wasOpen = menu.classList.contains('open');
+    closeQMenus();
+    if (!wasOpen) menu.classList.add('open');
+}
+function closeQMenus() {
+    document.querySelectorAll('.asv-menu.open').forEach(function(m) { m.classList.remove('open'); });
+}
+document.addEventListener('click', closeQMenus);
+
+/** 숨기기/보이기: 마감하지 않고 학생에게만 잠시 안 보이게 */
+async function setQuestionHidden(qid, hide) {
+    try {
+        await supabaseAPI.patch('toefl_survey_questions', qid, { hidden: hide });
+        await loadAll();
+    } catch (err) {
+        alert('변경 실패: ' + err.message + '\n(hidden 컬럼 마이그레이션이 실행됐는지 확인하세요)');
+    }
+}
+
+/** 삭제: 질문과 그 응답을 완전히 삭제 (수정 대신 삭제 후 재등록하는 운영 방식) */
+async function deleteQuestion(qid) {
+    var resps = respsOf(qid);
+    var msg = '이 질문을 완전히 삭제할까요?';
+    if (resps.length > 0) msg += '\n지금까지 모인 응답 ' + resps.length + '건도 함께 삭제됩니다.';
+    msg += '\n(내용을 바꾸려면 삭제 후 새로 등록하세요)';
+    if (!confirm(msg)) return;
+    try {
+        await supabaseAPI.hardDelete('toefl_survey_questions', qid);
+        await loadAll();
+    } catch (err) {
+        alert('삭제 실패: ' + err.message);
+    }
 }
 
 function buildAnswersHtml(q, resps) {

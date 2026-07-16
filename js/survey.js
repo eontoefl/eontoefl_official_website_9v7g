@@ -75,6 +75,7 @@ async function loadSurvey() {
         countBy[r.question_id] = (countBy[r.question_id] || 0) + 1;
     });
     svQuestions = questions.filter(function(q) {
+        if (q.hidden === true) return false;   // 관리자가 잠시 숨긴 질문
         return q.target_count == null || (countBy[q.id] || 0) < q.target_count;
     });
     if (!svQuestions.length) { showState('svEmpty'); return; }

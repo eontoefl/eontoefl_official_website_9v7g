@@ -131,8 +131,38 @@
         .asv-badge-true { background: rgba(34, 197, 94, 0.12); color: #15803d; }
         .asv-badge-false { background: rgba(255, 126, 95, 0.14); color: #a53b22; }
         .asv-badge-infinite { background: var(--es-primary-soft); color: var(--es-primary); }
+        .asv-badge-hidden { background: rgba(139, 147, 154, 0.16); color: #5c666d; }
+        .asv-q-hidden { opacity: 0.55; }
 
         .asv-q-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+
+        /* ⋯ 메뉴 — 떠 있는 요소이므로 글래스 + 은은한 그림자 (DESIGN.md) */
+        .asv-menu-wrap { position: relative; }
+        .asv-kebab {
+            width: 34px; height: 34px; border: none; border-radius: 9999px;
+            background: var(--es-card); color: var(--es-onvar); cursor: pointer;
+            font-size: 0.85rem; transition: all 0.15s;
+        }
+        .asv-kebab:hover { color: var(--es-primary); background: var(--es-primary-soft); }
+        .asv-menu {
+            display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
+            min-width: 156px; padding: 6px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(25, 28, 29, 0.1), 0 2px 8px rgba(25, 28, 29, 0.05);
+        }
+        .asv-menu.open { display: block; }
+        .asv-menu-item {
+            display: flex; align-items: center; gap: 9px; width: 100%;
+            padding: 9px 12px; border: none; border-radius: 9px; background: transparent;
+            font-size: 0.82rem; font-weight: 600; color: var(--es-onvar);
+            cursor: pointer; font-family: inherit; text-align: left; white-space: nowrap;
+        }
+        .asv-menu-item:hover { background: var(--es-primary-soft); color: var(--es-primary); }
+        .asv-menu-item i { width: 15px; font-size: 0.78rem; text-align: center; }
+        .asv-menu-danger { color: #a53b22; }
+        .asv-menu-danger:hover { background: rgba(255, 126, 95, 0.12); color: #a53b22; }
         .asv-btn-sm {
             padding: 8px 14px; border: none; border-radius: 9999px;
             background: var(--es-card); font-size: 0.78rem; font-weight: 700;

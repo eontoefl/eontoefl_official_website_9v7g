@@ -2015,10 +2015,9 @@ async function loadSurveyTeaser() {
         });
         if (mine && mine.length) return;
 
-        // 3. 답할 수 있는 진행 중 질문이 남아 있는지 (목표 안 찬 것)
+        // 3. 답할 수 있는 진행 중 질문이 남아 있는지 (목표 안 찬 것 + 숨김 아님)
         const questions = await supabaseAPI.query('toefl_survey_questions', {
-            'status': 'eq.active',
-            'select': 'id,target_count'
+            'status': 'eq.active'
         });
         if (!questions || !questions.length) return;
         const ids = questions.map(function(q) { return q.id; }).join(',');
@@ -2029,6 +2028,7 @@ async function loadSurveyTeaser() {
         const countBy = {};
         (resps || []).forEach(function(r) { countBy[r.question_id] = (countBy[r.question_id] || 0) + 1; });
         const open = questions.some(function(q) {
+            if (q.hidden === true) return false;
             return q.target_count == null || (countBy[q.id] || 0) < q.target_count;
         });
         if (!open) return;
