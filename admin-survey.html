@@ -351,7 +351,12 @@
 
         <!-- 응답자 명단 (기프티콘 발송용) -->
         <div class="asv-card">
-            <h2><i class="fas fa-gift" style="color:#d97706;"></i> 응답자 명단</h2>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px;">
+                <h2 style="margin-bottom:0;"><i class="fas fa-gift" style="color:#d97706;"></i> 응답자 명단</h2>
+                <button class="asv-btn-verdict" onclick="downloadGiftyExcel()">
+                    <i class="fas fa-file-excel"></i> 기프티콘 엑셀 다운로드
+                </button>
+            </div>
             <div id="respondersList"><div class="asv-empty">불러오는 중...</div></div>
         </div>
 
@@ -362,6 +367,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-utils.js"></script>
     <script src="js/admin-survey.js"></script>

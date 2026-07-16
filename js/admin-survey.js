@@ -521,3 +521,101 @@ function renderArchive() {
         '</div>';
     }).join('');
 }
+
+// ================================================
+// 기프티콘 엑셀 다운로드 (GiftyShowBiz 업로드 양식)
+//
+// "양식 변경 시 발송 불가"라서 새로 만들지 않고, 업체 원본 템플릿
+// (assets/giftyshowbiz_template.xlsx)의 8행 이후 데이터만 갈아끼운다.
+// 전화번호는 회원 DB에서 자동 매칭: 로그인 제출은 user_id로,
+// 이름만 쓴 제출은 이름으로. 못 찾으면 제외하고 이름을 알려준다.
+// ================================================
+async function downloadGiftyExcel() {
+    // 1. 응답자 그룹 (명단과 동일: 학생+시험날짜 = 한 줄)
+    const groups = {};
+    asvResponses.forEach(function(r) {
+        const key = (r.user_id || r.user_name || '?') + '|' + r.exam_date;
+        if (!groups[key]) {
+            groups[key] = { user_id: r.user_id, name: r.user_name || '', at: r.created_at };
+        }
+        if (r.created_at > groups[key].at) groups[key].at = r.created_at;
+    });
+    const list = Object.values(groups).sort(function(a, b) { return a.at < b.at ? 1 : -1; });
+    if (!list.length) { alert('응답자가 없습니다.'); return; }
+
+    // 2. 전화번호 매칭 (user_id 우선, 없으면 이름으로)
+    const phoneById = {};
+    const ids = Array.from(new Set(list.map(function(g) { return g.user_id; }).filter(Boolean)));
+    if (ids.length) {
+        try {
+            const us = await supabaseAPI.query('users', { 'id': 'in.(' + ids.join(',') + ')', 'select': 'id,phone' });
+            (us || []).forEach(function(u) { phoneById[u.id] = u.phone; });
+        } catch (e) { /* 계속 진행 */ }
+    }
+    const phoneByName = {};
+    const names = Array.from(new Set(list.filter(function(g) { return !g.user_id && g.name; }).map(function(g) { return g.name; })));
+    if (names.length) {
+        try {
+            const us2 = await supabaseAPI.query('users', {
+                'name': 'in.(' + names.map(function(n) { return '"' + n.replace(/"/g, '') + '"'; }).join(',') + ')',
+                'select': 'name,phone'
+            });
+            (us2 || []).forEach(function(u) { if (!(u.name in phoneByName)) phoneByName[u.name] = u.phone; });
+        } catch (e) { /* 계속 진행 */ }
+    }
+
+    const excelRows = [];
+    const missing = [];
+    list.forEach(function(g) {
+        let phone = g.user_id ? phoneById[g.user_id] : phoneByName[g.name];
+        phone = String(phone || '').replace(/[^0-9]/g, '');
+        if (!phone) { missing.push(g.name || '(이름 없음)'); return; }
+        excelRows.push({ phone: phone, name: g.name });
+    });
+    if (!excelRows.length) {
+        alert('전화번호를 찾은 응답자가 없습니다.\n(회원 DB의 이름과 응답 이름이 일치하는지 확인하세요)');
+        return;
+    }
+
+    // 3. 템플릿 로드 → 예시 데이터 행(8행~) 제거 → 우리 데이터로 교체
+    try {
+        const buf = await (await fetch('assets/giftyshowbiz_template.xlsx')).arrayBuffer();
+        const zip = await JSZip.loadAsync(buf);
+        let xml = await zip.file('xl/worksheets/sheet1.xml').async('string');
+
+        // 8행 이후(예시 행) 제거 — 1~7행(안내문+헤더)은 원본 그대로 보존
+        xml = xml.replace(/<row r="(?:[89]|[1-9][0-9]+)"[\s\S]*?<\/row>/g, '');
+
+        const esc = function(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        };
+        const newRows = excelRows.map(function(r, i) {
+            const rn = 8 + i;
+            return '<row r="' + rn + '" spans="1:7">' +
+                '<c r="A' + rn + '" s="2" t="inlineStr"><is><t>' + esc(r.phone) + '</t></is></c>' +
+                '<c r="B' + rn + '" s="1" t="inlineStr"><is><t>' + esc(r.name) + '</t></is></c>' +
+                ['C', 'D', 'E', 'F', 'G'].map(function(col) { return '<c r="' + col + rn + '" s="1"/>'; }).join('') +
+            '</row>';
+        }).join('');
+        xml = xml.replace('</sheetData>', newRows + '</sheetData>');
+        xml = xml.replace(/<dimension ref="[^"]*"\/>/, '<dimension ref="A1:G' + (7 + excelRows.length) + '"/>');
+
+        zip.file('xl/worksheets/sheet1.xml', xml);
+        const blob = await zip.generateAsync({
+            type: 'blob',
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = '기프티콘발송_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (err) {
+        alert('엑셀 생성 실패: ' + err.message);
+        return;
+    }
+
+    if (missing.length) {
+        alert('전화번호를 찾지 못해 엑셀에서 제외된 응답자:\n' + missing.join(', ') + '\n\n엑셀 파일에 직접 추가해주세요.');
+    }
+}
