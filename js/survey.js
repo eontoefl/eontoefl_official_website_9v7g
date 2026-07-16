@@ -100,6 +100,18 @@ async function loadSurvey() {
     renderForm();
 }
 
+var SV_DAY_KR = ['일', '월', '화', '수', '목', '금', '토'];
+function svDayKr(dateStr) {
+    return SV_DAY_KR[new Date(dateStr + 'T00:00:00').getDay()];
+}
+
+/** 날짜 선택 시 옆의 요일 칩 갱신 */
+function updateSvDay() {
+    var input = document.getElementById('svDate');
+    var chip = document.getElementById('svDayChip');
+    if (input && chip) chip.textContent = input.value ? '(' + svDayKr(input.value) + ')' : '';
+}
+
 function renderForm() {
     // 시험 날짜: 자동 인식 배지 또는 직접 선택
     var examInfo = document.getElementById('svExamInfo');
@@ -107,7 +119,7 @@ function renderForm() {
         var d = new Date(svExamDate + 'T00:00:00');
         examInfo.innerHTML =
             '<span class="sv-exam-badge"><i class="fas fa-calendar-check"></i> ' +
-            (d.getMonth() + 1) + '월 ' + d.getDate() + '일 시험에 대한 리포트</span>';
+            (d.getMonth() + 1) + '월 ' + d.getDate() + '일(' + svDayKr(svExamDate) + ') 시험에 대한 리포트</span>';
     } else {
         var today = new Date().toISOString().slice(0, 10);
         // 오늘을 기본값으로: iOS는 빈 date 인풋에 아무것도 안 보여줘서, 값을 채워야 보인다.
@@ -115,7 +127,10 @@ function renderForm() {
         examInfo.innerHTML =
             '<div class="sv-date-row">' +
                 '<label>시험 본 날짜</label>' +
-                '<input type="date" id="svDate" value="' + today + '" max="' + today + '">' +
+                '<div class="sv-date-flex">' +
+                    '<input type="date" id="svDate" value="' + today + '" max="' + today + '" onchange="updateSvDay()">' +
+                    '<span class="sv-day-chip" id="svDayChip">(' + svDayKr(today) + ')</span>' +
+                '</div>' +
             '</div>';
     }
 
