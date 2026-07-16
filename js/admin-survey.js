@@ -483,17 +483,26 @@ function normPhone(p) {
     return p;
 }
 
-/** 회원 DB에서 전화번호 매칭해 그룹에 붙인다 (user_id 우선, 이름 fallback) */
+/** 회원 DB에서 전화번호 매칭해 그룹에 붙인다.
+ *  user_id 우선이되, 그 계정의 이름이 입력된 이름과 다르면(묵은 테스트 세션 등)
+ *  계정 번호를 버리고 입력한 이름으로 다시 찾는다 — 엉뚱한 번호 발송 방지. */
 async function attachPhones(groups) {
-    const phoneById = {}, phoneByName = {};
+    const userById = {}, phoneByName = {};
     const ids = Array.from(new Set(groups.map(function(g) { return g.user_id; }).filter(Boolean)));
     if (ids.length) {
         try {
-            (await supabaseAPI.query('users', { 'id': 'in.(' + ids.join(',') + ')', 'select': 'id,phone' }) || [])
-                .forEach(function(u) { phoneById[u.id] = u.phone; });
+            (await supabaseAPI.query('users', { 'id': 'in.(' + ids.join(',') + ')', 'select': 'id,name,phone' }) || [])
+                .forEach(function(u) { userById[u.id] = u; });
         } catch (e) { /* 계속 */ }
     }
-    const names = Array.from(new Set(groups.filter(function(g) { return !g.user_id && g.name; }).map(function(g) { return g.name; })));
+    // 이름 조회 대상: 비로그인 그룹 + "계정 이름 ≠ 입력 이름"인 그룹
+    const needName = groups.filter(function(g) {
+        if (!g.name) return false;
+        if (!g.user_id) return true;
+        const u = userById[g.user_id];
+        return !u || u.name !== g.name;
+    });
+    const names = Array.from(new Set(needName.map(function(g) { return g.name; })));
     if (names.length) {
         try {
             (await supabaseAPI.query('users', {
@@ -503,7 +512,12 @@ async function attachPhones(groups) {
         } catch (e) { /* 계속 */ }
     }
     groups.forEach(function(g) {
-        g.phone = normPhone(g.user_id ? phoneById[g.user_id] : phoneByName[g.name]);
+        const u = g.user_id ? userById[g.user_id] : null;
+        if (u && u.name === g.name) {
+            g.phone = normPhone(u.phone);          // 계정과 입력 이름 일치 → 계정 번호
+        } else {
+            g.phone = normPhone(phoneByName[g.name]);   // 불일치/비로그인 → 이름으로 찾은 번호
+        }
     });
 }
 
