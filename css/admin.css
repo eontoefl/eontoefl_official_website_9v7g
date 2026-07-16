@@ -38,6 +38,9 @@
     color: white;
     font-size: 18px;
     font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-right: 16px;
 }
 
 .admin-nav-brand i {
@@ -47,21 +50,27 @@
 
 .admin-nav-menu {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     align-items: center;
+    /* 메뉴가 많아 좁은 화면에선 세로로 꺾이는 대신 가로 스크롤 */
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.admin-nav-menu::-webkit-scrollbar { display: none; }
 
 .admin-nav-link {
     color: rgba(255, 255, 255, 0.8);
     text-decoration: none;
-    padding: 8px 16px;
+    padding: 8px 10px;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     transition: all 0.2s;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
+    white-space: nowrap;   /* 라벨 두 줄 꺾임 방지 */
+    flex-shrink: 0;
 }
 
 .admin-nav-link:hover {
