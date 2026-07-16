@@ -131,7 +131,7 @@ function renderForm() {
                 '</label>';
             }).join('');
         } else {
-            body = '<textarea id="q_' + q.id + '" placeholder="천천히 떠올려서 최대한 정확하게 적어주세요. 이 답변 그대로 연습 자료에 반영돼요!&#10;확실하지 않은 부분은 &#39;아마&#39;, &#39;확실하지 않음&#39;처럼 표시해주시면 큰 도움이 됩니다."></textarea>';
+            body = '<textarea id="q_' + q.id + '" placeholder="천천히 떠올려서 최대한 정확하게 적어주세요."></textarea>';
         }
         html += '<div class="sv-card sv-q" id="qcard_' + q.id + '">' +
             '<div class="sv-q-text"><span class="sv-q-num">' + (i + 1) + '</span>' +
