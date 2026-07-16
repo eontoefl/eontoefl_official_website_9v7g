@@ -11,108 +11,180 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/admin.css">
     <style>
-        .asv-container { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
-        .asv-h1 { font-size: 1.4rem; font-weight: 800; color: #1e293b; margin: 8px 0 4px; }
-        .asv-desc { font-size: 0.87rem; color: #64748b; margin-bottom: 24px; line-height: 1.6; }
-
-        .asv-card {
-            background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
-            padding: 22px 24px; margin-bottom: 18px;
+        /* ================================================================
+           DESIGN.md (Ethereal Dashboard) 적용
+           - No-Line: 경계는 테두리가 아니라 표면 톤 변화로
+           - Layering: 흰 카드(surface-container-lowest)를 surface 위에,
+             그 안의 항목은 surface-container-low로 한 단계 가라앉힘
+           - 구분선 금지: 목록은 여백으로 분리
+           - CTA는 시그니처 그라디언트, 인풋은 무테 톤 배경 + 포커스 아웃라인
+           - primary는 관리자 기존 보라(#7c3aed) 유지 (형제 페이지와 일관)
+        ================================================================ */
+        :root {
+            --es-surface: #f8f9fa;
+            --es-card: #ffffff;
+            --es-low: #f3f4f5;
+            --es-high: #edeff2;
+            --es-on: #191c1d;
+            --es-onvar: #3e484f;
+            --es-muted: #8b939a;
+            --es-primary: #7c3aed;
+            --es-primary-soft: rgba(124, 58, 237, 0.08);
+            --es-focus: #c4b5fd;
         }
-        .asv-card h2 { font-size: 1.02rem; font-weight: 800; color: #1e293b; margin-bottom: 16px; }
+        body { background: var(--es-surface); }
+
+        .asv-container { max-width: 1080px; margin: 0 auto; padding: 40px 20px 96px; }
+        .asv-h1 {
+            font-size: 1.55rem; font-weight: 800; color: var(--es-on);
+            letter-spacing: -0.02em; margin: 8px 0 6px;
+        }
+        .asv-desc { font-size: 0.88rem; color: var(--es-onvar); margin-bottom: 30px; line-height: 1.7; }
+        .asv-desc code { background: var(--es-low); padding: 1px 7px; border-radius: 6px; font-size: 0.8rem; }
+
+        /* 카드: 무테 흰 표면 (톤 리프트) */
+        .asv-card {
+            background: var(--es-card);
+            border: none;
+            border-radius: 20px;
+            padding: 28px 30px;
+            margin-bottom: 22px;
+        }
+        .asv-card h2 {
+            font-size: 1.04rem; font-weight: 800; color: var(--es-on);
+            letter-spacing: -0.02em; margin-bottom: 20px;
+        }
 
         /* ── 질문 만들기 폼 ── */
-        .asv-field { margin-bottom: 14px; }
-        .asv-field label { display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
-        .asv-field input[type="text"], .asv-field input[type="number"], .asv-field textarea {
-            width: 100%; padding: 10px 13px; border: 1.5px solid #e2e8f0; border-radius: 10px;
-            font-size: 0.9rem; font-family: inherit; box-sizing: border-box;
+        .asv-field { margin-bottom: 18px; }
+        .asv-field label {
+            display: block; font-size: 0.8rem; font-weight: 600;
+            color: var(--es-onvar); margin-bottom: 7px;
         }
-        .asv-field input:focus, .asv-field textarea:focus { outline: none; border-color: #7c3aed; }
+        .asv-field input[type="text"], .asv-field input[type="number"], .asv-field textarea {
+            width: 100%; padding: 12px 15px;
+            background: var(--es-high); border: none; border-radius: 12px;
+            font-size: 0.9rem; font-family: inherit; color: var(--es-on);
+            box-sizing: border-box; transition: outline-color 0.15s;
+            outline: 2px solid transparent;
+        }
+        .asv-field input:focus, .asv-field textarea:focus { outline: 2px solid var(--es-focus); }
+        .asv-field input::placeholder { color: var(--es-muted); }
+
         .asv-type-row { display: flex; gap: 10px; }
         .asv-type-btn {
-            flex: 1; padding: 11px; border: 1.5px solid #e2e8f0; border-radius: 10px;
-            background: #fff; font-size: 0.88rem; font-weight: 700; color: #64748b;
+            flex: 1; padding: 12px; border: none; border-radius: 12px;
+            background: var(--es-low); font-size: 0.88rem; font-weight: 600; color: var(--es-onvar);
             cursor: pointer; font-family: inherit; transition: all 0.15s;
         }
-        .asv-type-btn.on { border-color: #7c3aed; background: rgba(124, 58, 237, 0.06); color: #7c3aed; }
+        .asv-type-btn.on { background: var(--es-primary-soft); color: var(--es-primary); font-weight: 800; }
 
-        .asv-opt-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .asv-opt-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
         .asv-opt-row input { flex: 1; }
         .asv-opt-del {
-            width: 38px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff;
-            color: #94a3b8; cursor: pointer; font-size: 0.85rem;
+            width: 38px; height: 38px; border: none; border-radius: 10px;
+            background: transparent; color: var(--es-muted); cursor: pointer; font-size: 0.85rem;
         }
-        .asv-opt-del:hover { color: #ef4444; border-color: #fecaca; }
+        .asv-opt-del:hover { color: #a53b22; background: rgba(255, 126, 95, 0.1); }
         .asv-add-opt {
-            padding: 9px 14px; border: 1.5px dashed #cbd5e1; border-radius: 10px; background: #fff;
-            color: #64748b; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: inherit;
+            padding: 10px 16px; border: none; border-radius: 10px;
+            background: var(--es-low); color: var(--es-primary);
+            font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: inherit;
+            transition: background 0.15s;
         }
-        .asv-add-opt:hover { border-color: #7c3aed; color: #7c3aed; }
+        .asv-add-opt:hover { background: var(--es-primary-soft); }
 
-        .asv-target-row { display: flex; align-items: center; gap: 12px; }
-        .asv-target-row input[type="number"] { width: 90px; }
-        .asv-target-row label.asv-inline { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #374151; font-weight: 600; margin: 0; cursor: pointer; }
+        .asv-target-row { display: flex; align-items: center; gap: 14px; }
+        .asv-target-row input[type="number"] { width: 92px; }
+        .asv-target-row label.asv-inline {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.85rem; color: var(--es-onvar); font-weight: 600; margin: 0; cursor: pointer;
+        }
+        .asv-target-row input[type="checkbox"] { accent-color: var(--es-primary); width: 16px; height: 16px; }
 
+        /* CTA: 시그니처 그라디언트 */
         .asv-create-btn {
-            padding: 12px 22px; background: linear-gradient(135deg, #7c3aed, #9f67f5);
-            color: #fff; border: none; border-radius: 11px; font-size: 0.92rem; font-weight: 800;
-            font-family: inherit; cursor: pointer;
+            padding: 13px 26px;
+            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+            color: #fff; border: none; border-radius: 12px;
+            font-size: 0.92rem; font-weight: 800; font-family: inherit; cursor: pointer;
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.22);
+            transition: transform 0.15s;
         }
-        .asv-create-btn:hover { opacity: 0.92; }
+        .asv-create-btn:hover { transform: translateY(-2px); }
 
-        /* ── 질문 목록 ── */
+        /* ── 질문 목록: 카드 속 한 단계 가라앉은 표면 ── */
         .asv-q {
-            border: 1px solid #eef1f6; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px;
+            background: var(--es-low);
+            border: none; border-radius: 16px;
+            padding: 20px 22px; margin-bottom: 14px;
         }
-        .asv-q-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-        .asv-q-text { font-size: 0.95rem; font-weight: 700; color: #1e293b; line-height: 1.5; }
-        .asv-q-meta { font-size: 0.78rem; color: #64748b; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .asv-q-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+        .asv-q-text { font-size: 0.96rem; font-weight: 700; color: var(--es-on); line-height: 1.5; letter-spacing: -0.01em; }
+        .asv-q-meta { font-size: 0.78rem; color: var(--es-muted); margin-top: 7px; display: flex; flex-wrap: wrap; gap: 12px; }
         .asv-badge {
-            display: inline-block; padding: 2px 9px; border-radius: 9999px;
-            font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+            display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 9999px;
+            font-size: 0.73rem; font-weight: 700; white-space: nowrap;
         }
-        .asv-badge-collect { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
-        .asv-badge-full { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+        .asv-badge-collect { background: rgba(0, 102, 136, 0.09); color: #006688; }
+        .asv-badge-full { background: rgba(245, 158, 11, 0.13); color: #b45309; }
         .asv-badge-true { background: rgba(34, 197, 94, 0.12); color: #15803d; }
-        .asv-badge-false { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
-        .asv-badge-infinite { background: rgba(124, 58, 237, 0.08); color: #7c3aed; }
+        .asv-badge-false { background: rgba(255, 126, 95, 0.14); color: #a53b22; }
+        .asv-badge-infinite { background: var(--es-primary-soft); color: var(--es-primary); }
 
-        .asv-q-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .asv-q-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
         .asv-btn-sm {
-            padding: 7px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: #fff;
-            font-size: 0.78rem; font-weight: 700; color: #475569; cursor: pointer; font-family: inherit;
+            padding: 8px 14px; border: none; border-radius: 9999px;
+            background: var(--es-card); font-size: 0.78rem; font-weight: 700;
+            color: var(--es-onvar); cursor: pointer; font-family: inherit;
+            white-space: nowrap; transition: all 0.15s;
+        }
+        .asv-btn-sm:hover { color: var(--es-primary); background: var(--es-primary-soft); }
+
+        /* 응답 목록: 구분선 없이 여백으로 */
+        .asv-answers { margin-top: 16px; display: none; }
+        .asv-answer-row {
+            display: flex; gap: 12px; align-items: baseline;
+            padding: 8px 2px; font-size: 0.86rem; color: var(--es-onvar);
+        }
+        .asv-answer-who { color: var(--es-muted); font-size: 0.76rem; white-space: nowrap; }
+        .asv-answer-val { font-weight: 600; color: var(--es-on); }
+        .asv-dist { font-size: 0.79rem; color: var(--es-primary); margin-top: 10px; font-weight: 700; }
+
+        /* 판정: 가라앉은 블록 안의 흰 내부 카드 (레이어 중첩) */
+        .asv-verdict { margin-top: 16px; display: none; }
+        .asv-verdict-row {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            background: var(--es-card); border-radius: 12px; padding: 12px 14px;
+        }
+        .asv-verdict-row select, .asv-verdict-row input[type="text"] {
+            padding: 10px 13px; background: var(--es-high); border: none; border-radius: 10px;
+            font-size: 0.85rem; font-family: inherit; color: var(--es-on);
+            outline: 2px solid transparent;
+        }
+        .asv-verdict-row select:focus, .asv-verdict-row input:focus { outline: 2px solid var(--es-focus); }
+        .asv-verdict-row input[type="text"] { flex: 1; min-width: 180px; }
+        .asv-btn-verdict {
+            padding: 9px 16px; border: none; border-radius: 9999px;
+            background: var(--es-primary-soft); color: var(--es-primary);
+            font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: inherit;
             white-space: nowrap;
         }
-        .asv-btn-sm:hover { border-color: #7c3aed; color: #7c3aed; }
+        .asv-btn-verdict:hover { background: rgba(124, 58, 237, 0.14); }
 
-        .asv-answers { margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 12px; display: none; }
-        .asv-answer-row {
-            display: flex; gap: 10px; align-items: baseline; padding: 7px 4px;
-            font-size: 0.85rem; color: #334155; border-bottom: 1px solid #f8fafc;
-        }
-        .asv-answer-who { color: #94a3b8; font-size: 0.76rem; white-space: nowrap; }
-        .asv-answer-val { font-weight: 600; }
-        .asv-dist { font-size: 0.78rem; color: #7c3aed; margin-top: 8px; font-weight: 600; }
-
-        /* 판정 영역 */
-        .asv-verdict { margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 14px; display: none; }
-        .asv-verdict-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .asv-verdict-row select, .asv-verdict-row input[type="text"] {
-            padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px;
-            font-size: 0.85rem; font-family: inherit;
-        }
-        .asv-verdict-row input[type="text"] { flex: 1; min-width: 180px; }
-
-        /* 응답자 명단 */
-        .asv-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        /* 응답자 명단: 선 없는 테이블 — 여백과 톤으로 */
+        .asv-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.86rem; }
         .asv-table th {
-            text-align: left; padding: 9px 10px; color: #64748b; font-size: 0.76rem;
-            font-weight: 700; border-bottom: 2px solid #f1f5f9;
+            text-align: left; padding: 10px 14px;
+            color: var(--es-muted); font-size: 0.74rem; font-weight: 700;
+            background: var(--es-low);
         }
-        .asv-table td { padding: 10px; border-bottom: 1px solid #f8fafc; color: #334155; }
+        .asv-table th:first-child { border-radius: 10px 0 0 10px; }
+        .asv-table th:last-child { border-radius: 0 10px 10px 0; }
+        .asv-table td { padding: 13px 14px; color: var(--es-onvar); }
+        .asv-table td strong { color: var(--es-on); }
 
-        .asv-empty { text-align: center; padding: 28px; color: #94a3b8; font-size: 0.86rem; }
+        .asv-empty { text-align: center; padding: 32px; color: var(--es-muted); font-size: 0.87rem; }
     </style>
 </head>
 <body>

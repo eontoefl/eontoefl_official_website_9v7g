@@ -193,7 +193,7 @@ function buildVerdictHtml(q) {
                 '<option value="거짓">❌ 거짓 (기각)</option>' +
             '</select>' +
             '<input type="text" id="vdNote_' + q.id + '" placeholder="판정 메모 (예: 4문단 4명/5명 → 자료에 4문단 지문 추가)">' +
-            '<button class="asv-btn-sm" onclick="closeQuestion(\'' + q.id + '\')" style="border-color:#7c3aed;color:#7c3aed;">판정하고 마감</button>' +
+            '<button class="asv-btn-verdict" onclick="closeQuestion(\'' + q.id + '\')">판정하고 마감</button>' +
         '</div>' +
     '</div>';
 }
