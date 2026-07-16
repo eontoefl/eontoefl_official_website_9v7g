@@ -85,6 +85,16 @@
             text-align: left;
             margin: 0;
         }
+        /* 이름 등 텍스트 인풋 — 날짜 인풋과 동일 룩 */
+        .sv-text-input {
+            width: 100%; padding: 12px 15px; min-height: 48px;
+            background: var(--sv-high); border: none; border-radius: 12px;
+            font-size: 0.95rem; font-family: inherit; color: var(--sv-on);
+            box-sizing: border-box; outline: 2px solid transparent;
+            transition: outline-color 0.15s;
+        }
+        .sv-text-input:focus { outline: 2px solid var(--sv-focus); }
+        .sv-text-input::placeholder { color: var(--sv-muted); }
         .sv-date-row input[type="date"]:focus { outline: 2px solid var(--sv-focus); }
         /* 날짜 옆 요일 칩 — 선택할 때마다 자동 갱신 */
         .sv-date-flex { display: flex; align-items: stretch; gap: 10px; }

@@ -16,11 +16,9 @@ let svExamDate = null;     // 'YYYY-MM-DD' | null(직접 선택)
 let svQuestions = [];      // 학생에게 보여줄 질문들
 
 document.addEventListener('DOMContentLoaded', async function() {
+    // 로그인 강제하지 않음 (카톡 인앱 브라우저의 로그인 마찰 제거).
+    // 로그인돼 있으면 이름·시험날짜를 자동으로 채워주는 편의만 취한다.
     svUser = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-    if (!svUser || !svUser.id) {
-        window.location.href = 'login.html?redirect=survey.html';
-        return;
-    }
     try {
         await loadSurvey();
     } catch (err) {
@@ -43,19 +41,21 @@ function svEsc(str) {
 }
 
 async function loadSurvey() {
-    // 1. 최근 응시한 시험 (등록된 일정 중 가장 최근의 지난 시험)
-    try {
-        const exams = await supabaseAPI.query('toefl_exam_schedules', {
-            'user_id': 'eq.' + svUser.id,
-            'exam_datetime': 'lte.' + new Date().toISOString(),
-            'status': 'neq.cancelled',
-            'order': 'exam_datetime.desc',
-            'limit': '1'
-        });
-        if (exams && exams.length) {
-            svExamDate = exams[0].exam_datetime.slice(0, 10);
-        }
-    } catch (e) { /* 일정 없어도 진행 (날짜 직접 선택) */ }
+    // 1. (로그인된 경우만) 최근 응시한 시험 → 날짜 미리 채움용
+    if (svUser && svUser.id) {
+        try {
+            const exams = await supabaseAPI.query('toefl_exam_schedules', {
+                'user_id': 'eq.' + svUser.id,
+                'exam_datetime': 'lte.' + new Date().toISOString(),
+                'status': 'neq.cancelled',
+                'order': 'exam_datetime.desc',
+                'limit': '1'
+            });
+            if (exams && exams.length) {
+                svExamDate = exams[0].exam_datetime.slice(0, 10);
+            }
+        } catch (e) { /* 일정 없어도 진행 */ }
+    }
 
     // 2. 활성 질문 (관리자가 정한 순서대로 — sort_order 없으면 등록순으로 뒤에)
     const questions = await supabaseAPI.query('toefl_survey_questions', {
@@ -86,8 +86,8 @@ async function loadSurvey() {
     });
     if (!svQuestions.length) { showState('svEmpty'); return; }
 
-    // 4. 이 시험에 대해 이미 제출했는지 (시험당 1회)
-    if (svExamDate) {
+    // 4. (로그인된 경우만) 이 시험에 대해 이미 제출했는지 (시험당 1회)
+    if (svUser && svUser.id && svExamDate) {
         const mine = await supabaseAPI.query('toefl_survey_responses', {
             'user_id': 'eq.' + svUser.id,
             'exam_date': 'eq.' + svExamDate,
@@ -113,26 +113,25 @@ function updateSvDay() {
 }
 
 function renderForm() {
-    // 시험 날짜: 자동 인식 배지 또는 직접 선택
+    // 이름 + 시험 날짜 (로그인돼 있으면 자동으로 채워짐)
     var examInfo = document.getElementById('svExamInfo');
-    if (svExamDate) {
-        var d = new Date(svExamDate + 'T00:00:00');
-        examInfo.innerHTML =
-            '<span class="sv-exam-badge"><i class="fas fa-calendar-check"></i> ' +
-            (d.getMonth() + 1) + '월 ' + d.getDate() + '일(' + svDayKr(svExamDate) + ') 시험에 대한 리포트</span>';
-    } else {
-        var today = new Date().toISOString().slice(0, 10);
-        // 오늘을 기본값으로: iOS는 빈 date 인풋에 아무것도 안 보여줘서, 값을 채워야 보인다.
-        // (시험 직후 여는 설문이라 오늘이 최선의 기본값 — 다른 날이면 학생이 바꾼다)
-        examInfo.innerHTML =
-            '<div class="sv-date-row">' +
-                '<label>시험 본 날짜</label>' +
-                '<div class="sv-date-flex">' +
-                    '<input type="date" id="svDate" value="' + today + '" max="' + today + '" onchange="updateSvDay()">' +
-                    '<span class="sv-day-chip" id="svDayChip">(' + svDayKr(today) + ')</span>' +
-                '</div>' +
-            '</div>';
-    }
+    var today = new Date().toISOString().slice(0, 10);
+    // 날짜 기본값: 등록된 최근 시험이 있으면 그 날짜, 없으면 오늘
+    // (iOS는 빈 date 인풋에 아무것도 안 보여줘서 반드시 값을 채운다)
+    var initDate = svExamDate || today;
+    var initName = (svUser && svUser.name) ? svUser.name : '';
+    examInfo.innerHTML =
+        '<div class="sv-date-row">' +
+            '<label>이름</label>' +
+            '<input type="text" class="sv-text-input" id="svName" value="' + svEsc(initName) + '" placeholder="이름을 적어주세요">' +
+        '</div>' +
+        '<div class="sv-date-row">' +
+            '<label>시험 본 날짜</label>' +
+            '<div class="sv-date-flex">' +
+                '<input type="date" id="svDate" value="' + initDate + '" max="' + today + '" onchange="updateSvDay()">' +
+                '<span class="sv-day-chip" id="svDayChip">(' + svDayKr(initDate) + ')</span>' +
+            '</div>' +
+        '</div>';
 
     // 질문 카드들
     var html = '';
@@ -170,12 +169,16 @@ function markSelected(input) {
 }
 
 async function submitSurvey() {
-    var date = svExamDate;
-    if (!date) {
-        var dateInput = document.getElementById('svDate');
-        date = dateInput ? dateInput.value : '';
-        if (!date) { alert('시험 본 날짜를 선택해주세요.'); return; }
+    var nameInput = document.getElementById('svName');
+    var name = nameInput ? nameInput.value.trim() : '';
+    if (!name) {
+        alert('이름을 적어주세요.');
+        if (nameInput) { nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function() { nameInput.focus(); }, 350); }
+        return;
     }
+    var dateInput = document.getElementById('svDate');
+    var date = dateInput ? dateInput.value : '';
+    if (!date) { alert('시험 본 날짜를 선택해주세요.'); return; }
 
     // 모든 문항 필수 — 빈 문항이 있으면 안내하고 그 문항으로 데려간다
     var goToQuestion = function(q, idx, msg) {
@@ -203,9 +206,9 @@ async function submitSurvey() {
         }
         rows.push({
             question_id: q.id,
-            user_id: svUser.id,
-            user_name: svUser.name || '',
-            user_email: svUser.email || '',
+            user_id: (svUser && svUser.id) ? svUser.id : null,
+            user_name: name,
+            user_email: (svUser && svUser.email) ? svUser.email : '',
             exam_date: date,
             answer: answer
         });
