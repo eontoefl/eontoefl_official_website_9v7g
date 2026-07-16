@@ -952,6 +952,29 @@ function collectFormData() {
         data.target_speaking_old = null;
         data.target_writing_old = null;
         data.target_note = null;
+    } else {
+        // 탭 전환 시 비활성 탭에 남은 값이 함께 저장되는 것 방지:
+        // 한 버전만 남긴다. 양쪽 다 있으면 활성 탭(target_version) 기준,
+        // 한쪽만 있으면 값이 있는 쪽으로 target_version을 보정한다.
+        const hasNewCutoff = data.target_cutoff_new !== null && data.target_cutoff_new !== undefined;
+        const hasOldCutoff = data.target_cutoff_old !== null && data.target_cutoff_old !== undefined;
+        let keepVersion = data.target_version;
+        if (hasNewCutoff && !hasOldCutoff) keepVersion = 'new';
+        else if (hasOldCutoff && !hasNewCutoff) keepVersion = 'old';
+        data.target_version = keepVersion;
+        if (keepVersion === 'old') {
+            data.target_cutoff_new = null;
+            data.target_reading_new = null;
+            data.target_listening_new = null;
+            data.target_writing_new = null;
+            data.target_speaking_new = null;
+        } else {
+            data.target_cutoff_old = null;
+            data.target_reading_old = null;
+            data.target_listening_old = null;
+            data.target_speaking_old = null;
+            data.target_writing_old = null;
+        }
     }
 
     // Set status
