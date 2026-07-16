@@ -119,3 +119,44 @@ WHERE course_track = 'regular'
        OR target_listening_old IS NOT NULL
        OR target_speaking_old IS NOT NULL
        OR target_writing_old IS NOT NULL);
+
+-- =====================================================================
+-- [2차] 실행 후 확인에서 발견된 잔여 2명 (구점수 Overall 없이 섹션만 남은 케이스)
+--   - 김민정: 신점수 목표 완비. target_reading_old=1은 오입력 잔재 → 삭제만
+--   - 이선영: 신 Overall 5.0 있음. 구점수 섹션(전영역 21)을 규칙대로 변환
+--             R21→4.0(18-21), L21→4.5(20-21), W21→4.5(21-23), S21→4.0(20-22)
+-- =====================================================================
+
+BEGIN;
+
+-- 김민정: 오입력 잔재 삭제
+UPDATE applications SET
+    target_version     = 'new',
+    target_reading_old = NULL
+WHERE id = '159ecadf-9dbc-4fd9-8fe5-f014aebb5750';
+
+-- 이선영: 구점수 섹션 → 신점수 섹션 변환
+UPDATE applications SET
+    target_version       = 'new',
+    target_reading_new   = 4.0,
+    target_listening_new = 4.5,
+    target_writing_new   = 4.5,
+    target_speaking_new  = 4.0,
+    target_reading_old   = NULL,
+    target_listening_old = NULL,
+    target_speaking_old  = NULL,
+    target_writing_old   = NULL
+WHERE id = '6dec5f79-6a9d-40b2-a769-16e0b06c0275';
+
+COMMIT;
+
+-- [2차 실행 후 확인] 이제 진짜 0명이어야 함
+SELECT id, name, course_track, target_version, target_cutoff_old, target_cutoff_new
+FROM applications
+WHERE course_track = 'regular'
+  AND deleted IS NOT TRUE
+  AND (target_cutoff_old IS NOT NULL
+       OR target_reading_old IS NOT NULL
+       OR target_listening_old IS NOT NULL
+       OR target_speaking_old IS NOT NULL
+       OR target_writing_old IS NOT NULL);
