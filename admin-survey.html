@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실전 리포트 관리 - 이온토플 관리자</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        .asv-container { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
+        .asv-h1 { font-size: 1.4rem; font-weight: 800; color: #1e293b; margin: 8px 0 4px; }
+        .asv-desc { font-size: 0.87rem; color: #64748b; margin-bottom: 24px; line-height: 1.6; }
+
+        .asv-card {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+            padding: 22px 24px; margin-bottom: 18px;
+        }
+        .asv-card h2 { font-size: 1.02rem; font-weight: 800; color: #1e293b; margin-bottom: 16px; }
+
+        /* ── 질문 만들기 폼 ── */
+        .asv-field { margin-bottom: 14px; }
+        .asv-field label { display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
+        .asv-field input[type="text"], .asv-field input[type="number"], .asv-field textarea {
+            width: 100%; padding: 10px 13px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+            font-size: 0.9rem; font-family: inherit; box-sizing: border-box;
+        }
+        .asv-field input:focus, .asv-field textarea:focus { outline: none; border-color: #7c3aed; }
+        .asv-type-row { display: flex; gap: 10px; }
+        .asv-type-btn {
+            flex: 1; padding: 11px; border: 1.5px solid #e2e8f0; border-radius: 10px;
+            background: #fff; font-size: 0.88rem; font-weight: 700; color: #64748b;
+            cursor: pointer; font-family: inherit; transition: all 0.15s;
+        }
+        .asv-type-btn.on { border-color: #7c3aed; background: rgba(124, 58, 237, 0.06); color: #7c3aed; }
+
+        .asv-opt-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .asv-opt-row input { flex: 1; }
+        .asv-opt-del {
+            width: 38px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff;
+            color: #94a3b8; cursor: pointer; font-size: 0.85rem;
+        }
+        .asv-opt-del:hover { color: #ef4444; border-color: #fecaca; }
+        .asv-add-opt {
+            padding: 9px 14px; border: 1.5px dashed #cbd5e1; border-radius: 10px; background: #fff;
+            color: #64748b; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .asv-add-opt:hover { border-color: #7c3aed; color: #7c3aed; }
+
+        .asv-target-row { display: flex; align-items: center; gap: 12px; }
+        .asv-target-row input[type="number"] { width: 90px; }
+        .asv-target-row label.asv-inline { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #374151; font-weight: 600; margin: 0; cursor: pointer; }
+
+        .asv-create-btn {
+            padding: 12px 22px; background: linear-gradient(135deg, #7c3aed, #9f67f5);
+            color: #fff; border: none; border-radius: 11px; font-size: 0.92rem; font-weight: 800;
+            font-family: inherit; cursor: pointer;
+        }
+        .asv-create-btn:hover { opacity: 0.92; }
+
+        /* ── 질문 목록 ── */
+        .asv-q {
+            border: 1px solid #eef1f6; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px;
+        }
+        .asv-q-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .asv-q-text { font-size: 0.95rem; font-weight: 700; color: #1e293b; line-height: 1.5; }
+        .asv-q-meta { font-size: 0.78rem; color: #64748b; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .asv-badge {
+            display: inline-block; padding: 2px 9px; border-radius: 9999px;
+            font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+        }
+        .asv-badge-collect { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
+        .asv-badge-full { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+        .asv-badge-true { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+        .asv-badge-false { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+        .asv-badge-infinite { background: rgba(124, 58, 237, 0.08); color: #7c3aed; }
+
+        .asv-q-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .asv-btn-sm {
+            padding: 7px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: #fff;
+            font-size: 0.78rem; font-weight: 700; color: #475569; cursor: pointer; font-family: inherit;
+            white-space: nowrap;
+        }
+        .asv-btn-sm:hover { border-color: #7c3aed; color: #7c3aed; }
+
+        .asv-answers { margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 12px; display: none; }
+        .asv-answer-row {
+            display: flex; gap: 10px; align-items: baseline; padding: 7px 4px;
+            font-size: 0.85rem; color: #334155; border-bottom: 1px solid #f8fafc;
+        }
+        .asv-answer-who { color: #94a3b8; font-size: 0.76rem; white-space: nowrap; }
+        .asv-answer-val { font-weight: 600; }
+        .asv-dist { font-size: 0.78rem; color: #7c3aed; margin-top: 8px; font-weight: 600; }
+
+        /* 판정 영역 */
+        .asv-verdict { margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 14px; display: none; }
+        .asv-verdict-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .asv-verdict-row select, .asv-verdict-row input[type="text"] {
+            padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px;
+            font-size: 0.85rem; font-family: inherit;
+        }
+        .asv-verdict-row input[type="text"] { flex: 1; min-width: 180px; }
+
+        /* 응답자 명단 */
+        .asv-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .asv-table th {
+            text-align: left; padding: 9px 10px; color: #64748b; font-size: 0.76rem;
+            font-weight: 700; border-bottom: 2px solid #f1f5f9;
+        }
+        .asv-table td { padding: 10px; border-bottom: 1px solid #f8fafc; color: #334155; }
+
+        .asv-empty { text-align: center; padding: 28px; color: #94a3b8; font-size: 0.86rem; }
+    </style>
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-study.html" class="admin-nav-link">
+                    <i class="fas fa-book-reader"></i> 학습 관리
+                </a>
+                <a href="admin-study-v3.html" class="admin-nav-link">
+                    <i class="fas fa-flask"></i> 학습관리2
+                </a>
+                <a href="admin-correction.html" class="admin-nav-link">
+                    <i class="fas fa-pen-nib"></i> 첨삭 관리
+                </a>
+                <a href="admin-survey.html" class="admin-nav-link active">
+                    <i class="fas fa-clipboard-check"></i> 실전 리포트
+                </a>
+                <a href="admin-questions.html" class="admin-nav-link">
+                    <i class="fas fa-puzzle-piece"></i> 문제 관리
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="asv-container">
+        <h1 class="asv-h1">📋 실전 리포트 관리</h1>
+        <p class="asv-desc">
+            실제 시험을 본 학생에게서 시험 정보를 수집해 가설을 검증합니다.
+            질문을 만들면 학생 설문(<code>survey.html</code>)과 학생 대시보드에 자동으로 노출되고,
+            목표 인원이 차면 자동으로 수집이 종료됩니다. 판정(사실/거짓)은 여기서 직접 하세요.
+        </p>
+
+        <!-- 새 질문 만들기 -->
+        <div class="asv-card">
+            <h2><i class="fas fa-plus-circle" style="color:#7c3aed;"></i> 새 질문 만들기</h2>
+            <div class="asv-field">
+                <label>질문</label>
+                <input type="text" id="newQText" placeholder="예) 리딩에서 학술지문이 몇 문단이었나요?">
+            </div>
+            <div class="asv-field">
+                <label>검증하려는 가설 (관리용 메모, 학생에겐 안 보임)</label>
+                <input type="text" id="newQHypothesis" placeholder="예) 제보: 학술지문 4문단 등장 (내챌 자료는 2문단)">
+            </div>
+            <div class="asv-field">
+                <label>응답 방식</label>
+                <div class="asv-type-row">
+                    <button type="button" class="asv-type-btn on" id="typeChoice" onclick="setQType('choice')">
+                        <i class="fas fa-list-ul"></i> 객관식
+                    </button>
+                    <button type="button" class="asv-type-btn" id="typeText" onclick="setQType('text')">
+                        <i class="fas fa-pen"></i> 서술형
+                    </button>
+                </div>
+            </div>
+            <div class="asv-field" id="optionsField">
+                <label>보기</label>
+                <div id="optionsList"></div>
+                <button type="button" class="asv-add-opt" onclick="addOption()">
+                    <i class="fas fa-plus"></i> 보기 추가
+                </button>
+            </div>
+            <div class="asv-field">
+                <label>목표 응답 수 (차면 자동으로 수집 종료)</label>
+                <div class="asv-target-row">
+                    <input type="number" id="newQTarget" value="5" min="1" max="100">
+                    <label class="asv-inline">
+                        <input type="checkbox" id="newQInfinite" onchange="document.getElementById('newQTarget').disabled = this.checked;">
+                        계속 수집 (자동 종료 없음)
+                    </label>
+                </div>
+            </div>
+            <button class="asv-create-btn" onclick="createQuestion()">
+                <i class="fas fa-check"></i> 질문 등록
+            </button>
+        </div>
+
+        <!-- 진행 중 질문 -->
+        <div class="asv-card">
+            <h2><i class="fas fa-satellite-dish" style="color:#2563eb;"></i> 진행 중 질문</h2>
+            <div id="activeList"><div class="asv-empty">불러오는 중...</div></div>
+        </div>
+
+        <!-- 응답자 명단 (기프티콘 발송용) -->
+        <div class="asv-card">
+            <h2><i class="fas fa-gift" style="color:#d97706;"></i> 응답자 명단</h2>
+            <div id="respondersList"><div class="asv-empty">불러오는 중...</div></div>
+        </div>
+
+        <!-- 아카이브 -->
+        <div class="asv-card">
+            <h2><i class="fas fa-box-archive" style="color:#64748b;"></i> 판정 완료 (아카이브)</h2>
+            <div id="archiveList"><div class="asv-empty">불러오는 중...</div></div>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin-utils.js"></script>
+    <script src="js/admin-survey.js"></script>
+</body>
+</html>

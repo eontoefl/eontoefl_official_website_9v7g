@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateSidebarUserInfo();
     await loadDashboard();
     setupEventListeners();
+    loadSurveyTeaser();   // 실전 리포트 유도 배너 (조건 맞을 때만 표시, 실패해도 무해)
 });
 
 /**
@@ -1185,7 +1186,7 @@ async function renderProgramInfo(app) {
     programDetails.innerHTML = `
         <div class="program-row">
             <span class="program-label">프로그램</span>
-            <span class="program-value">${app.assigned_program || '-'}${app.correction_enabled ? ' <span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;">+ 스라첨삭</span>' : ''}</span>
+            <span class="program-value">${app.assigned_program || '-'}${app.self_paced ? ' <span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px;">자기주도</span>' : ''}${app.correction_enabled ? ' <span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;">+ 스라첨삭</span>' : ''}</span>
         </div>
         <div class="program-row">
             <span class="program-label">${app.correction_enabled ? '내챌 시작일' : '시작일'}</span>
@@ -1982,4 +1983,59 @@ function updateSidebarUserInfo() {
     const emailEl = document.getElementById('sidebarUserEmail');
     if (nameEl) nameEl.textContent = currentUser.name || '사용자';
     if (emailEl) emailEl.textContent = currentUser.email || '';
+}
+
+// =====================================================================
+// 실전 리포트 유도 배너 (대시보드 상단)
+// 조건: 응시한(지난) 시험이 있고 + 진행 중 질문이 남아 있고 + 그 시험에 아직 응답 안 함.
+// 테이블 미생성/오류 시 조용히 숨김 유지 (배포 순서 안전).
+// =====================================================================
+async function loadSurveyTeaser() {
+    try {
+        const user = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+        if (!user || !user.id) return;
+
+        // 1. 최근 응시한 시험
+        const exams = await supabaseAPI.query('toefl_exam_schedules', {
+            'user_id': 'eq.' + user.id,
+            'exam_datetime': 'lte.' + new Date().toISOString(),
+            'status': 'neq.cancelled',
+            'order': 'exam_datetime.desc',
+            'limit': '1'
+        });
+        if (!exams || !exams.length) return;
+        const examDate = exams[0].exam_datetime.slice(0, 10);
+
+        // 2. 이 시험에 이미 응답했으면 숨김 (시험당 1회)
+        const mine = await supabaseAPI.query('toefl_survey_responses', {
+            'user_id': 'eq.' + user.id,
+            'exam_date': 'eq.' + examDate,
+            'select': 'id',
+            'limit': '1'
+        });
+        if (mine && mine.length) return;
+
+        // 3. 답할 수 있는 진행 중 질문이 남아 있는지 (목표 안 찬 것)
+        const questions = await supabaseAPI.query('toefl_survey_questions', {
+            'status': 'eq.active',
+            'select': 'id,target_count'
+        });
+        if (!questions || !questions.length) return;
+        const ids = questions.map(function(q) { return q.id; }).join(',');
+        const resps = await supabaseAPI.query('toefl_survey_responses', {
+            'question_id': 'in.(' + ids + ')',
+            'select': 'question_id'
+        });
+        const countBy = {};
+        (resps || []).forEach(function(r) { countBy[r.question_id] = (countBy[r.question_id] || 0) + 1; });
+        const open = questions.some(function(q) {
+            return q.target_count == null || (countBy[q.id] || 0) < q.target_count;
+        });
+        if (!open) return;
+
+        const teaser = document.getElementById('surveyTeaser');
+        if (teaser) teaser.style.display = '';
+    } catch (e) {
+        // 테이블 미생성 등 — 배너는 그냥 안 보이면 됨
+    }
 }

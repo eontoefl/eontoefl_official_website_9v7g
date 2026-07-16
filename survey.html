@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실전 리포트 - 이온토플</title>
+    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body { background: #f7f6fb; font-family: 'Noto Sans KR', sans-serif; }
+
+        .sv-wrap {
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 32px 16px 64px;
+        }
+        .sv-logo { text-align: center; margin-bottom: 20px; }
+        .sv-logo img { height: 34px; }
+
+        .sv-card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 28px 26px;
+            box-shadow: 0 4px 24px rgba(90, 70, 150, 0.08);
+            margin-bottom: 14px;
+        }
+        .sv-title { font-size: 1.25rem; font-weight: 800; color: #2d2b3d; margin-bottom: 6px; }
+        .sv-sub { font-size: 0.88rem; color: #6b7280; line-height: 1.6; }
+
+        .sv-exam-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 14px; padding: 7px 14px;
+            background: rgba(148, 128, 197, 0.1); color: #6a5fa0;
+            border-radius: 9999px; font-size: 0.82rem; font-weight: 700;
+        }
+        .sv-date-row { margin-top: 14px; }
+        .sv-date-row label { font-size: 0.85rem; font-weight: 700; color: #374151; display: block; margin-bottom: 6px; }
+        .sv-date-row input[type="date"] {
+            width: 100%; padding: 11px 14px; border: 1.5px solid #e5e7eb;
+            border-radius: 11px; font-size: 0.95rem; font-family: inherit; box-sizing: border-box;
+        }
+
+        .sv-q { margin-bottom: 0; }
+        .sv-q-text { font-size: 1rem; font-weight: 700; color: #2d2b3d; margin-bottom: 14px; line-height: 1.5; }
+        .sv-q-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; margin-right: 8px;
+            background: linear-gradient(135deg, #9480c5, #b9ace2);
+            color: #fff; border-radius: 7px; font-size: 0.78rem; font-weight: 800;
+            vertical-align: middle;
+        }
+        .sv-opt {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px; margin-bottom: 8px;
+            border: 1.5px solid #eceaf4; border-radius: 12px;
+            cursor: pointer; transition: all 0.15s; font-size: 0.93rem; color: #374151;
+        }
+        .sv-opt:hover { border-color: #c9bce8; background: #faf9fe; }
+        .sv-opt input { accent-color: #9480c5; width: 17px; height: 17px; flex-shrink: 0; }
+        .sv-opt.sv-opt-on { border-color: #9480c5; background: rgba(148, 128, 197, 0.07); font-weight: 700; }
+        .sv-q textarea {
+            width: 100%; min-height: 96px; padding: 12px 14px;
+            border: 1.5px solid #eceaf4; border-radius: 12px;
+            font-size: 0.93rem; font-family: inherit; resize: vertical; box-sizing: border-box;
+        }
+        .sv-q textarea:focus, .sv-date-row input:focus { outline: none; border-color: #9480c5; }
+        .sv-optional { font-size: 0.76rem; color: #9ca3af; font-weight: 500; margin-left: 6px; }
+
+        .sv-submit {
+            width: 100%; padding: 15px;
+            background: linear-gradient(135deg, #9480c5 0%, #b9ace2 100%);
+            color: #fff; border: none; border-radius: 13px;
+            font-size: 1rem; font-weight: 800; font-family: inherit; cursor: pointer;
+            box-shadow: 0 6px 18px rgba(148, 128, 197, 0.3);
+            transition: transform 0.15s;
+        }
+        .sv-submit:hover { transform: translateY(-2px); }
+        .sv-submit:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+        .sv-state { text-align: center; padding: 56px 20px; }
+        .sv-state i { font-size: 2.6rem; color: #c9bce8; margin-bottom: 16px; display: block; }
+        .sv-state h2 { font-size: 1.15rem; font-weight: 800; color: #2d2b3d; margin-bottom: 8px; }
+        .sv-state p { font-size: 0.88rem; color: #6b7280; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="sv-wrap">
+        <div class="sv-logo">
+            <a href="index.html"><img src="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png" alt="이온토플"></a>
+        </div>
+
+        <!-- 로딩 -->
+        <div class="sv-card sv-state" id="svLoading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>불러오는 중...</p>
+        </div>
+
+        <!-- 진행 중인 리포트 없음 -->
+        <div class="sv-card sv-state" id="svEmpty" style="display:none;">
+            <i class="fas fa-mug-hot"></i>
+            <h2>지금은 진행 중인 리포트가 없어요</h2>
+            <p>다음 시험 후에 다시 열릴 예정이에요.<br>그때 또 부탁드릴게요!</p>
+        </div>
+
+        <!-- 제출 완료 -->
+        <div class="sv-card sv-state" id="svDone" style="display:none;">
+            <i class="fas fa-circle-check" style="color:#77bf7e;"></i>
+            <h2>리포트 감사합니다! 🙏</h2>
+            <p>보내주신 정보는 검증을 거쳐<br>다음 기수 연습 자료에 그대로 반영돼요.</p>
+        </div>
+
+        <!-- 설문 폼 -->
+        <div id="svForm" style="display:none;">
+            <div class="sv-card">
+                <div class="sv-title">📋 실전 리포트</div>
+                <div class="sv-sub">
+                    방금 본 시험, 기억이 생생할 때 남겨주세요.<br>
+                    보내주신 리포트는 다음 기수의 연습 자료를 실전에 더 가깝게 만드는 데 쓰여요.
+                </div>
+                <div id="svExamInfo"></div>
+            </div>
+            <div id="svQuestions"></div>
+            <button class="sv-submit" id="svSubmitBtn" onclick="submitSurvey()">
+                <i class="fas fa-paper-plane"></i> 리포트 보내기
+            </button>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/survey.js"></script>
+</body>
+</html>
