@@ -243,6 +243,21 @@
 
         .asv-empty { text-align: center; padding: 32px; color: var(--es-muted); font-size: 0.87rem; }
 
+        /* 수강생 명단에 없는 응답자: 빨간 이름 + 작은 말풍선 */
+        .asv-not-student { color: #dc2626; }
+        .asv-bubble {
+            position: relative; display: inline-block; margin-left: 10px;
+            background: #fdeaea; color: #dc2626;
+            padding: 3px 10px; border-radius: 8px;
+            font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+            vertical-align: middle;
+        }
+        .asv-bubble::before {
+            content: ''; position: absolute; left: -3px; top: 50%;
+            width: 7px; height: 7px; background: #fdeaea;
+            transform: translateY(-50%) rotate(45deg);
+        }
+
         /* 발송 결과 드롭존 — 고스트 대시 보더(업로드 어포던스 예외) */
         .asv-dropzone {
             display: flex; align-items: center; justify-content: center; gap: 10px;

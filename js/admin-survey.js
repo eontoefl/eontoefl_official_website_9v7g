@@ -9,6 +9,7 @@
 
 let asvQuestions = [];
 let asvResponses = [];
+let asvStudents = [];    // 입금 확인된 수강생 명단 (name, phone) — 응답자 대조용
 let asvQType = 'choice';
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -32,12 +33,15 @@ function checkAsvAdminAuth() {
 
 async function loadAll() {
     try {
-        const [questions, responses] = await Promise.all([
+        const [questions, responses, students] = await Promise.all([
             supabaseAPI.query('toefl_survey_questions', { 'order': 'created_at.desc' }),
-            supabaseAPI.query('toefl_survey_responses', { 'order': 'created_at.desc' })
+            supabaseAPI.query('toefl_survey_responses', { 'order': 'created_at.desc' }),
+            supabaseAPI.query('applications', { 'deposit_confirmed_by_admin': 'eq.true', 'select': 'name,phone' })
+                .catch(function() { return []; })   // 대조 실패해도 화면은 뜨게
         ]);
         asvQuestions = questions || [];
         asvResponses = responses || [];
+        asvStudents = students || [];
     } catch (err) {
         console.warn('실전 리포트 로드 실패 (테이블 미생성?):', err);
         document.getElementById('activeList').innerHTML =
@@ -543,6 +547,13 @@ function renderResponders() {
         const k = normPhone(g.resp_phone) + '|' + g.exam_date;
         phoneDateCount[k] = (phoneDateCount[k] || 0) + 1;
     });
+    // 수강생 명단(입금 확인 신청서) 대조 — 번호나 이름 둘 중 하나라도 맞으면 수강생으로 인정
+    const stuPhones = {}, stuNames = {};
+    asvStudents.forEach(function(s) {
+        if (s.phone) stuPhones[normPhone(s.phone)] = true;
+        if (s.name) stuNames[s.name.trim()] = true;
+    });
+    const canCheck = asvStudents.length > 0;   // 명단을 못 불러왔으면 오탐 방지 위해 대조 생략
     el.innerHTML = '<table class="asv-table">' +
         '<tr><th>이름</th><th>번호</th><th>시험 날짜</th><th>답변 수</th><th>제출 시각</th><th>기프티콘</th></tr>' +
         rows.map(function(g) {
@@ -551,8 +562,15 @@ function renderResponders() {
                 : '<span class="asv-badge asv-badge-hidden">미발송</span>';
             const dupWarn = (g.resp_phone && phoneDateCount[normPhone(g.resp_phone) + '|' + g.exam_date] > 1)
                 ? ' <span class="asv-badge asv-badge-full">중복 의심</span>' : '';
+            const enrolled = !canCheck ||
+                (g.resp_phone && stuPhones[normPhone(g.resp_phone)]) ||
+                (g.name && stuNames[g.name.trim()]);
+            const nameCell = enrolled
+                ? '<strong>' + escapeHtml(g.name || '-') + '</strong>'
+                : '<strong class="asv-not-student">' + escapeHtml(g.name || '-') + '</strong>' +
+                  '<span class="asv-bubble">수강생이 맞나요?</span>';
             return '<tr>' +
-                '<td><strong>' + escapeHtml(g.name || '-') + '</strong>' + dupWarn + '</td>' +
+                '<td>' + nameCell + dupWarn + '</td>' +
                 '<td>' + escapeHtml(g.resp_phone || '(DB 매칭)') + '</td>' +
                 '<td>' + escapeHtml(g.exam_date || '-') + '</td>' +
                 '<td>' + g.count + '</td>' +
