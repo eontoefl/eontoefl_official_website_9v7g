@@ -45,7 +45,7 @@
             background: var(--sv-card);
             border-radius: 20px;
             padding: 28px 26px;
-            margin-bottom: 14px;
+            margin-bottom: 22px;
         }
         .sv-title {
             font-size: 1.28rem; font-weight: 800; color: var(--sv-on);
@@ -107,7 +107,14 @@
         }
         .sv-q textarea:focus { outline: 2px solid var(--sv-focus); }
         .sv-q textarea::placeholder { color: var(--sv-muted); }
-        .sv-optional { font-size: 0.76rem; color: var(--sv-muted); font-weight: 500; margin-left: 6px; }
+
+        /* 필수 표시: 빨간 별 + 상단 안내 */
+        .sv-req { color: #ba1a1a; font-weight: 800; margin-left: 5px; }
+        .sv-required-note {
+            margin-top: 16px; padding: 12px 15px;
+            background: var(--sv-low); border-radius: 11px;
+            font-size: 0.82rem; color: var(--sv-onvar); font-weight: 600;
+        }
 
         /* CTA: 시그니처 그라디언트 — 인터랙티브 요소라 은은한 글로우 허용 */
         .sv-submit {
@@ -165,6 +172,7 @@
                     보내주신 리포트는 다음 기수의 연습 자료를 실전에 더 가깝게 만드는 데 쓰여요.
                 </div>
                 <div id="svExamInfo"></div>
+                <div class="sv-required-note"><span class="sv-req">*</span> 모든 항목이 필수예요. 전부 작성해야 보낼 수 있어요.</div>
             </div>
             <div id="svQuestions"></div>
             <button class="sv-submit" id="svSubmitBtn" onclick="submitSurvey()">

@@ -133,10 +133,10 @@ function renderForm() {
         } else {
             body = '<textarea id="q_' + q.id + '" placeholder="기억나는 만큼만 편하게 적어주세요"></textarea>';
         }
-        html += '<div class="sv-card sv-q">' +
+        html += '<div class="sv-card sv-q" id="qcard_' + q.id + '">' +
             '<div class="sv-q-text"><span class="sv-q-num">' + (i + 1) + '</span>' +
                 svEsc(q.question_text) +
-                (q.question_type === 'text' ? '<span class="sv-optional">(선택)</span>' : '') +
+                '<span class="sv-req">*</span>' +
             '</div>' + body +
         '</div>';
     });
@@ -160,18 +160,29 @@ async function submitSurvey() {
         if (!date) { alert('시험 본 날짜를 선택해주세요.'); return; }
     }
 
+    // 모든 문항 필수 — 빈 문항이 있으면 안내하고 그 문항으로 데려간다
+    var goToQuestion = function(q, idx, msg) {
+        alert(msg);
+        var card = document.getElementById('qcard_' + q.id);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (q.question_type === 'text') {
+            var ta = document.getElementById('q_' + q.id);
+            if (ta) setTimeout(function() { ta.focus(); }, 350);
+        }
+    };
+
     var rows = [];
     for (var i = 0; i < svQuestions.length; i++) {
         var q = svQuestions[i];
         var answer = '';
         if (q.question_type === 'choice') {
             var sel = document.querySelector('input[name="q_' + q.id + '"]:checked');
-            if (!sel) { alert((i + 1) + '번 문항에 답해주세요.'); return; }
+            if (!sel) { goToQuestion(q, i, (i + 1) + '번 문항에 답해주세요.\n모든 항목이 필수예요!'); return; }
             answer = sel.value;
         } else {
             var ta = document.getElementById('q_' + q.id);
             answer = ta ? ta.value.trim() : '';
-            if (!answer) continue;   // 서술형은 선택
+            if (!answer) { goToQuestion(q, i, (i + 1) + '번 문항을 작성해주세요.\n모든 항목이 필수예요!'); return; }
         }
         rows.push({
             question_id: q.id,
