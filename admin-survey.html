@@ -242,6 +242,21 @@
         .asv-table td strong { color: var(--es-on); }
 
         .asv-empty { text-align: center; padding: 32px; color: var(--es-muted); font-size: 0.87rem; }
+
+        /* 발송 결과 드롭존 — 고스트 대시 보더(업로드 어포던스 예외) */
+        .asv-dropzone {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding: 18px 16px; margin-bottom: 16px;
+            background: var(--es-low); border-radius: 12px;
+            border: 1.5px dashed rgba(139, 147, 154, 0.35);
+            color: var(--es-onvar); font-size: 0.84rem; font-weight: 600;
+            cursor: pointer; text-align: center; transition: all 0.15s;
+        }
+        .asv-dropzone i { color: var(--es-muted); font-size: 1rem; }
+        .asv-dropzone:hover, .asv-dropzone.asv-drop-on {
+            border-color: var(--es-primary); background: var(--es-primary-soft); color: var(--es-primary);
+        }
+        .asv-dropzone:hover i, .asv-dropzone.asv-drop-on i { color: var(--es-primary); }
     </style>
 </head>
 <body>
@@ -357,6 +372,11 @@
                     <i class="fas fa-file-excel"></i> 기프티콘 엑셀 다운로드
                 </button>
             </div>
+            <div class="asv-dropzone" id="giftyDrop">
+                <i class="fas fa-file-arrow-up"></i>
+                <span>기프티콘 <strong>발송 결과 파일</strong>(xlsx)을 여기에 끌어다 놓으면 발송 완료로 처리돼요 <span style="opacity:0.6;">(클릭해서 선택도 가능)</span></span>
+            </div>
+            <input type="file" id="giftyFile" accept=".xlsx" style="display:none;">
             <div id="respondersList"><div class="asv-empty">불러오는 중...</div></div>
         </div>
 

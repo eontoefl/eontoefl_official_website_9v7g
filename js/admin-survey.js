@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAsvAdminAuth();
     addOption();
     addOption();
+    initGiftyDrop();
     loadAll();
 });
 
@@ -456,32 +457,76 @@ async function closeQuestion(qid) {
 // ================================================
 // 응답자 명단 (기프티콘 발송용)
 // ================================================
+/** 응답자 그룹: 학생+시험날짜 = 한 줄 (응답 행 id들과 발송 상태 포함) */
+function buildResponderGroups() {
+    const groups = {};
+    asvResponses.forEach(function(r) {
+        const key = (r.user_id || r.user_name || '?') + '|' + r.exam_date;
+        if (!groups[key]) {
+            groups[key] = {
+                user_id: r.user_id, name: r.user_name || '', email: r.user_email || '',
+                exam_date: r.exam_date, count: 0, at: r.created_at, ids: [], sent_at: null
+            };
+        }
+        const g = groups[key];
+        g.count++;
+        g.ids.push(r.id);
+        if (r.created_at > g.at) g.at = r.created_at;
+        if (r.gifty_sent_at && (!g.sent_at || r.gifty_sent_at > g.sent_at)) g.sent_at = r.gifty_sent_at;
+    });
+    return Object.values(groups).sort(function(a, b) { return a.at < b.at ? 1 : -1; });
+}
+
+function normPhone(p) {
+    p = String(p || '').replace(/[^0-9]/g, '');
+    if (p.length === 10 && p.charAt(0) === '1') p = '0' + p;   // 업체는 첫 0 생략 허용
+    return p;
+}
+
+/** 회원 DB에서 전화번호 매칭해 그룹에 붙인다 (user_id 우선, 이름 fallback) */
+async function attachPhones(groups) {
+    const phoneById = {}, phoneByName = {};
+    const ids = Array.from(new Set(groups.map(function(g) { return g.user_id; }).filter(Boolean)));
+    if (ids.length) {
+        try {
+            (await supabaseAPI.query('users', { 'id': 'in.(' + ids.join(',') + ')', 'select': 'id,phone' }) || [])
+                .forEach(function(u) { phoneById[u.id] = u.phone; });
+        } catch (e) { /* 계속 */ }
+    }
+    const names = Array.from(new Set(groups.filter(function(g) { return !g.user_id && g.name; }).map(function(g) { return g.name; })));
+    if (names.length) {
+        try {
+            (await supabaseAPI.query('users', {
+                'name': 'in.(' + names.map(function(n) { return '"' + n.replace(/"/g, '') + '"'; }).join(',') + ')',
+                'select': 'name,phone'
+            }) || []).forEach(function(u) { if (!(u.name in phoneByName)) phoneByName[u.name] = u.phone; });
+        } catch (e) { /* 계속 */ }
+    }
+    groups.forEach(function(g) {
+        g.phone = normPhone(g.user_id ? phoneById[g.user_id] : phoneByName[g.name]);
+    });
+}
+
 function renderResponders() {
     const el = document.getElementById('respondersList');
     if (!asvResponses.length) {
         el.innerHTML = '<div class="asv-empty">아직 응답자가 없습니다.</div>';
         return;
     }
-    // 학생 + 시험날짜로 묶기 (한 제출 = 한 줄)
-    const groups = {};
-    asvResponses.forEach(function(r) {
-        const key = r.user_id + '|' + r.exam_date;
-        if (!groups[key]) {
-            groups[key] = { name: r.user_name, email: r.user_email, exam_date: r.exam_date, count: 0, at: r.created_at };
-        }
-        groups[key].count++;
-        if (r.created_at > groups[key].at) groups[key].at = r.created_at;
-    });
-    const rows = Object.values(groups).sort(function(a, b) { return a.at < b.at ? 1 : -1; });
+    const rows = buildResponderGroups();
     el.innerHTML = '<table class="asv-table">' +
-        '<tr><th>이름</th><th>이메일</th><th>시험 날짜</th><th>답변 수</th><th>제출 시각</th></tr>' +
+        '<tr><th>이름</th><th>이메일</th><th>시험 날짜</th><th>답변 수</th><th>제출 시각</th><th>기프티콘</th></tr>' +
         rows.map(function(g) {
+            const sent = g.sent_at
+                ? '<span class="asv-badge asv-badge-true">발송 완료</span>'
+                : '<span class="asv-badge asv-badge-hidden">미발송</span>';
             return '<tr>' +
                 '<td><strong>' + escapeHtml(g.name || '-') + '</strong></td>' +
                 '<td>' + escapeHtml(g.email || '-') + '</td>' +
                 '<td>' + escapeHtml(g.exam_date || '-') + '</td>' +
                 '<td>' + g.count + '</td>' +
                 '<td>' + formatDate(g.at) + '</td>' +
+                '<td>' + sent + '</td>' +
             '</tr>';
         }).join('') +
     '</table>';
@@ -531,46 +576,16 @@ function renderArchive() {
 // 이름만 쓴 제출은 이름으로. 못 찾으면 제외하고 이름을 알려준다.
 // ================================================
 async function downloadGiftyExcel() {
-    // 1. 응답자 그룹 (명단과 동일: 학생+시험날짜 = 한 줄)
-    const groups = {};
-    asvResponses.forEach(function(r) {
-        const key = (r.user_id || r.user_name || '?') + '|' + r.exam_date;
-        if (!groups[key]) {
-            groups[key] = { user_id: r.user_id, name: r.user_name || '', at: r.created_at };
-        }
-        if (r.created_at > groups[key].at) groups[key].at = r.created_at;
-    });
-    const list = Object.values(groups).sort(function(a, b) { return a.at < b.at ? 1 : -1; });
-    if (!list.length) { alert('응답자가 없습니다.'); return; }
-
-    // 2. 전화번호 매칭 (user_id 우선, 없으면 이름으로)
-    const phoneById = {};
-    const ids = Array.from(new Set(list.map(function(g) { return g.user_id; }).filter(Boolean)));
-    if (ids.length) {
-        try {
-            const us = await supabaseAPI.query('users', { 'id': 'in.(' + ids.join(',') + ')', 'select': 'id,phone' });
-            (us || []).forEach(function(u) { phoneById[u.id] = u.phone; });
-        } catch (e) { /* 계속 진행 */ }
-    }
-    const phoneByName = {};
-    const names = Array.from(new Set(list.filter(function(g) { return !g.user_id && g.name; }).map(function(g) { return g.name; })));
-    if (names.length) {
-        try {
-            const us2 = await supabaseAPI.query('users', {
-                'name': 'in.(' + names.map(function(n) { return '"' + n.replace(/"/g, '') + '"'; }).join(',') + ')',
-                'select': 'name,phone'
-            });
-            (us2 || []).forEach(function(u) { if (!(u.name in phoneByName)) phoneByName[u.name] = u.phone; });
-        } catch (e) { /* 계속 진행 */ }
-    }
+    // 미발송 응답자만 (발송 완료 처리된 사람은 자동 제외 — 중복 발송 방지)
+    const list = buildResponderGroups().filter(function(g) { return !g.sent_at; });
+    if (!list.length) { alert('발송할 대상이 없습니다. (전원 발송 완료 상태)'); return; }
+    await attachPhones(list);
 
     const excelRows = [];
     const missing = [];
     list.forEach(function(g) {
-        let phone = g.user_id ? phoneById[g.user_id] : phoneByName[g.name];
-        phone = String(phone || '').replace(/[^0-9]/g, '');
-        if (!phone) { missing.push(g.name || '(이름 없음)'); return; }
-        excelRows.push({ phone: phone, name: g.name });
+        if (!g.phone) { missing.push(g.name || '(이름 없음)'); return; }
+        excelRows.push({ phone: g.phone, name: g.name });
     });
     if (!excelRows.length) {
         alert('전화번호를 찾은 응답자가 없습니다.\n(회원 DB의 이름과 응답 이름이 일치하는지 확인하세요)');
@@ -617,5 +632,139 @@ async function downloadGiftyExcel() {
 
     if (missing.length) {
         alert('전화번호를 찾지 못해 엑셀에서 제외된 응답자:\n' + missing.join(', ') + '\n\n엑셀 파일에 직접 추가해주세요.');
+    }
+}
+
+// ================================================
+// 발송 결과 파일 드롭 → 발송 완료 처리
+//
+// GiftyShowBiz에서 발송 후 내려받는 결과 xlsx(H열 '업로드결과')를
+// 드롭하면, '성공' 행의 전화번호/이름을 미발송 응답자와 매칭해
+// gifty_sent_at을 기록한다. 완료된 응답자는 이후 엑셀 다운로드에서 제외.
+// ================================================
+function initGiftyDrop() {
+    const dz = document.getElementById('giftyDrop');
+    const fi = document.getElementById('giftyFile');
+    if (!dz || !fi) return;
+    dz.addEventListener('click', function() { fi.click(); });
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('asv-drop-on'); });
+    dz.addEventListener('dragleave', function() { dz.classList.remove('asv-drop-on'); });
+    dz.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dz.classList.remove('asv-drop-on');
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) handleGiftyResult(f);
+    });
+    fi.addEventListener('change', function() {
+        if (fi.files && fi.files[0]) handleGiftyResult(fi.files[0]);
+        fi.value = '';
+    });
+}
+
+function xmlUnesc(s) {
+    return String(s).replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+}
+
+/** 결과 xlsx 파싱: 8행부터 {phone(A), name(B), result(H)} 추출 (inlineStr/sharedStrings 모두 지원) */
+async function parseGiftyResult(file) {
+    const zip = await JSZip.loadAsync(file);
+    const sheetName = Object.keys(zip.files).find(function(p) { return /^xl\/worksheets\/sheet1\.xml$/i.test(p); });
+    if (!sheetName) throw new Error('워크시트를 찾을 수 없습니다.');
+    const xml = await zip.file(sheetName).async('string');
+
+    let shared = [];
+    const ssFile = zip.file('xl/sharedStrings.xml');
+    if (ssFile) {
+        const ss = await ssFile.async('string');
+        shared = Array.from(ss.matchAll(/<si>([\s\S]*?)<\/si>/g)).map(function(m) {
+            return Array.from(m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g))
+                .map(function(t) { return t[1]; }).join('');
+        });
+    }
+
+    const rows = [];
+    for (const rm of xml.matchAll(/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
+        if (parseInt(rm[1], 10) < 8) continue;   // 1~7행은 안내문+헤더
+        const cells = {};
+        for (const cm of rm[2].matchAll(/<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g)) {
+            const col = cm[1], attrs = cm[2], inner = cm[3];
+            let val = '';
+            const ism = inner.match(/<is>[\s\S]*?<t[^>]*>([\s\S]*?)<\/t>/);
+            const vm = inner.match(/<v>([\s\S]*?)<\/v>/);
+            if (ism) val = ism[1];
+            else if (vm) val = /t="s"/.test(attrs) ? (shared[parseInt(vm[1], 10)] || '') : vm[1];
+            if (val) cells[col] = xmlUnesc(val);
+        }
+        if (cells.A || cells.B) {
+            rows.push({ phone: cells.A || '', name: cells.B || '', result: cells.H || '' });
+        }
+    }
+    return rows;
+}
+
+/** 응답 행들에 발송 시각 기록 (id 일괄) */
+async function markGiftySent(ids) {
+    const url = SUPABASE_URL + '/rest/v1/toefl_survey_responses?id=in.(' + ids.join(',') + ')';
+    const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ gifty_sent_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error('API Error: ' + res.status);
+}
+
+async function handleGiftyResult(file) {
+    if (!/\.xlsx$/i.test(file.name)) { alert('xlsx 파일을 올려주세요.'); return; }
+
+    let rows;
+    try {
+        rows = await parseGiftyResult(file);
+    } catch (err) {
+        alert('파일을 읽지 못했습니다: ' + err.message);
+        return;
+    }
+    const success = rows.filter(function(r) { return (r.result || '').indexOf('성공') !== -1; });
+    if (!success.length) {
+        alert("'성공' 상태의 발송 행을 찾지 못했습니다.\n(H열에 '업로드결과'가 있는 발송 결과 파일이 맞는지 확인하세요)");
+        return;
+    }
+
+    const groups = buildResponderGroups().filter(function(g) { return !g.sent_at; });
+    if (!groups.length) { alert('미발송 상태의 응답자가 없습니다. (이미 전원 완료 처리됨)'); return; }
+    await attachPhones(groups);
+
+    const idSet = {};
+    const matchedNames = [];
+    const unmatched = [];
+    success.forEach(function(row) {
+        const p = normPhone(row.phone);
+        let hits = p ? groups.filter(function(g) { return g.phone && g.phone === p; }) : [];
+        if (!hits.length && row.name) hits = groups.filter(function(g) { return g.name === row.name; });
+        if (!hits.length) { unmatched.push(((row.name || '') + ' ' + (row.phone || '')).trim()); return; }
+        hits.forEach(function(g) {
+            if (!idSet[g.ids[0]]) matchedNames.push(g.name || '(이름 없음)');
+            g.ids.forEach(function(id) { idSet[id] = true; });
+        });
+    });
+
+    const ids = Object.keys(idSet);
+    if (!ids.length) {
+        alert('결과 파일과 매칭되는 미발송 응답자가 없습니다.\n매칭 실패: ' + unmatched.join(', '));
+        return;
+    }
+    if (!confirm(matchedNames.join(', ') + ' — ' + matchedNames.length + '명을 기프티콘 발송 완료로 처리할까요?')) return;
+    try {
+        await markGiftySent(ids);
+        await loadAll();
+        let msg = '✅ 발송 완료 처리됨: ' + matchedNames.join(', ');
+        if (unmatched.length) msg += '\n\n매칭 안 된 행(수동 확인): ' + unmatched.join(', ');
+        alert(msg);
+    } catch (err) {
+        alert('완료 처리 실패: ' + err.message + '\n(gifty_sent_at 마이그레이션이 실행됐는지 확인하세요)');
     }
 }
