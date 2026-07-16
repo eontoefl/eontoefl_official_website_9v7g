@@ -120,10 +120,15 @@ function renderForm() {
     // (iOS는 빈 date 인풋에 아무것도 안 보여줘서 반드시 값을 채운다)
     var initDate = svExamDate || today;
     var initName = (svUser && svUser.name) ? svUser.name : '';
+    var initPhone = (svUser && svUser.phone) ? String(svUser.phone).replace(/[^0-9]/g, '') : '';
     examInfo.innerHTML =
         '<div class="sv-date-row">' +
-            '<label>이름</label>' +
+            '<label>이름 (수강 신청하신 본명)</label>' +
             '<input type="text" class="sv-text-input" id="svName" value="' + svEsc(initName) + '" placeholder="이름을 적어주세요">' +
+        '</div>' +
+        '<div class="sv-date-row">' +
+            '<label>휴대폰 번호 (기프티콘 받으실 번호)</label>' +
+            '<input type="tel" class="sv-text-input" id="svPhone" inputmode="numeric" value="' + svEsc(initPhone) + '" placeholder="01012345678">' +
         '</div>' +
         '<div class="sv-date-row">' +
             '<label>시험 본 날짜</label>' +
@@ -176,6 +181,14 @@ async function submitSurvey() {
         if (nameInput) { nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function() { nameInput.focus(); }, 350); }
         return;
     }
+    var phoneInput = document.getElementById('svPhone');
+    var phone = phoneInput ? phoneInput.value.replace(/[^0-9]/g, '') : '';
+    if (phone.length === 10 && phone.charAt(0) === '1') phone = '0' + phone;
+    if (!/^01[016789][0-9]{7,8}$/.test(phone)) {
+        alert('휴대폰 번호를 확인해주세요. (예: 01012345678)');
+        if (phoneInput) { phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function() { phoneInput.focus(); }, 350); }
+        return;
+    }
     var dateInput = document.getElementById('svDate');
     var date = dateInput ? dateInput.value : '';
     if (!date) { alert('시험 본 날짜를 선택해주세요.'); return; }
@@ -208,6 +221,7 @@ async function submitSurvey() {
             question_id: q.id,
             user_id: (svUser && svUser.id) ? svUser.id : null,
             user_name: name,
+            user_phone: phone,
             user_email: (svUser && svUser.email) ? svUser.email : '',
             exam_date: date,
             answer: answer

@@ -473,6 +473,7 @@ function buildResponderGroups() {
         g.ids.push(r.id);
         if (r.created_at > g.at) g.at = r.created_at;
         if (r.gifty_sent_at && (!g.sent_at || r.gifty_sent_at > g.sent_at)) g.sent_at = r.gifty_sent_at;
+        if (r.user_phone && !g.resp_phone) g.resp_phone = r.user_phone;   // 학생이 직접 적은 번호
     });
     return Object.values(groups).sort(function(a, b) { return a.at < b.at ? 1 : -1; });
 }
@@ -483,10 +484,17 @@ function normPhone(p) {
     return p;
 }
 
-/** 회원 DB에서 전화번호 매칭해 그룹에 붙인다.
- *  user_id 우선이되, 그 계정의 이름이 입력된 이름과 다르면(묵은 테스트 세션 등)
+/** 전화번호 결정: ① 학생이 설문에 직접 적은 번호(최우선) ② 없으면 회원 DB 매칭(옛 응답 fallback).
+ *  DB 매칭은 user_id 우선이되, 그 계정의 이름이 입력된 이름과 다르면(묵은 테스트 세션 등)
  *  계정 번호를 버리고 입력한 이름으로 다시 찾는다 — 엉뚱한 번호 발송 방지. */
-async function attachPhones(groups) {
+async function attachPhones(allGroups) {
+    // 직접 적은 번호가 있으면 그걸로 확정
+    allGroups.forEach(function(g) {
+        if (g.resp_phone) g.phone = normPhone(g.resp_phone);
+    });
+    const groups = allGroups.filter(function(g) { return !g.phone; });
+    if (!groups.length) return;
+
     const userById = {}, phoneByName = {};
     const ids = Array.from(new Set(groups.map(function(g) { return g.user_id; }).filter(Boolean)));
     if (ids.length) {
@@ -529,14 +537,14 @@ function renderResponders() {
     }
     const rows = buildResponderGroups();
     el.innerHTML = '<table class="asv-table">' +
-        '<tr><th>이름</th><th>이메일</th><th>시험 날짜</th><th>답변 수</th><th>제출 시각</th><th>기프티콘</th></tr>' +
+        '<tr><th>이름</th><th>번호</th><th>시험 날짜</th><th>답변 수</th><th>제출 시각</th><th>기프티콘</th></tr>' +
         rows.map(function(g) {
             const sent = g.sent_at
                 ? '<span class="asv-badge asv-badge-true">발송 완료</span>'
                 : '<span class="asv-badge asv-badge-hidden">미발송</span>';
             return '<tr>' +
                 '<td><strong>' + escapeHtml(g.name || '-') + '</strong></td>' +
-                '<td>' + escapeHtml(g.email || '-') + '</td>' +
+                '<td>' + escapeHtml(g.resp_phone || '(DB 매칭)') + '</td>' +
                 '<td>' + escapeHtml(g.exam_date || '-') + '</td>' +
                 '<td>' + g.count + '</td>' +
                 '<td>' + formatDate(g.at) + '</td>' +
