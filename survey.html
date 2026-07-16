@@ -74,6 +74,16 @@
             font-size: 0.95rem; font-family: inherit; color: var(--sv-on);
             box-sizing: border-box; outline: 2px solid transparent;
             transition: outline-color 0.15s;
+            /* 모바일 웹킷: 기본 렌더러가 좌측 삐짐·내용 안 보임 → 직접 그리기 */
+            -webkit-appearance: none;
+            appearance: none;
+            display: block;
+            min-height: 48px;
+            text-align: left;
+        }
+        .sv-date-row input[type="date"]::-webkit-date-and-time-value {
+            text-align: left;
+            margin: 0;
         }
         .sv-date-row input[type="date"]:focus { outline: 2px solid var(--sv-focus); }
 

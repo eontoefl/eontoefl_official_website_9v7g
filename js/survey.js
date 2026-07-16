@@ -110,10 +110,12 @@ function renderForm() {
             (d.getMonth() + 1) + '월 ' + d.getDate() + '일 시험에 대한 리포트</span>';
     } else {
         var today = new Date().toISOString().slice(0, 10);
+        // 오늘을 기본값으로: iOS는 빈 date 인풋에 아무것도 안 보여줘서, 값을 채워야 보인다.
+        // (시험 직후 여는 설문이라 오늘이 최선의 기본값 — 다른 날이면 학생이 바꾼다)
         examInfo.innerHTML =
             '<div class="sv-date-row">' +
                 '<label>시험 본 날짜</label>' +
-                '<input type="date" id="svDate" max="' + today + '">' +
+                '<input type="date" id="svDate" value="' + today + '" max="' + today + '">' +
             '</div>';
     }
 
