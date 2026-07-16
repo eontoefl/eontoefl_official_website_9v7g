@@ -201,14 +201,14 @@ function downloadInfoTxt() {
     if (app.no_target_score) {
         lines.push('목표 점수 : 없음 (고고익선)');
     } else if (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) {
-        lines.push('버전 : 개정후');
+        lines.push('버전 : 일반 토플 (1-6 레벨)');
         lines.push(`커트라인 (Total) : ${app.target_cutoff_new || '-'}`);
         lines.push(`Reading : ${app.target_reading_new || '-'}`);
         lines.push(`Listening : ${app.target_listening_new || '-'}`);
         lines.push(`Writing : ${app.target_writing_new || '-'}`);
         lines.push(`Speaking : ${app.target_speaking_new || '-'}`);
     } else if (app.target_cutoff_old || app.target_reading_old) {
-        lines.push('버전 : 개정전');
+        lines.push('버전 : 호주 토플 (0-120점)');
         lines.push(`커트라인 (Total) : ${app.target_cutoff_old || '-'}`);
         lines.push(`Reading : ${app.target_reading_old || '-'}`);
         lines.push(`Listening : ${app.target_listening_old || '-'}`);
@@ -389,7 +389,7 @@ function loadModalInfoTab(app) {
 
         <!-- 4. 목표 점수 -->
         <div class="info-card" style="margin-top: 16px;">
-            <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(개정후)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(개정전)' : ''}</h3>
+            <h3 class="info-card-title"><i class="fas fa-bullseye"></i> 목표 점수 ${!app.no_target_score && (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) ? '(일반 토플)' : !app.no_target_score && (app.target_cutoff_old || app.target_reading_old) ? '(호주 토플)' : ''}</h3>
             <div class="score-grid">${targetScoreHTML}</div>
             ${app.target_note ? `<div class="info-item"><label>희망점수 설명</label><div>${app.target_note}</div></div>` : ''}
         </div>

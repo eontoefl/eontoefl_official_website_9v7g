@@ -337,61 +337,127 @@
                 <!-- Tab buttons -->
                 <div class="version-tabs">
                     <button type="button" class="version-tab active" data-tab="new-target">
-                        개정후 (1-6 레벨)
+                        일반 토플 (1-6 레벨)
                     </button>
                     <button type="button" class="version-tab" data-tab="old-target">
-                        개정전 (0-120점)
+                        호주 토플 (0-120점)
                     </button>
                 </div>
                 
                 <input type="hidden" name="target_version" value="new">
 
-                <!-- 개정후 목표 점수 -->
+                <!-- 일반 토플 목표 점수 (신점수 1-6 레벨) -->
                 <div id="newTargetSection" class="version-content active">
+                    <div class="notice-box" style="border-left: 3px solid #e0c079; padding: 0.15rem 0 0.15rem 14px; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <i class="fas fa-circle-info" style="color: #b45309; font-size: 18px; margin-top: 2px;"></i>
+                            <div style="flex: 1;">
+                                <p style="margin: 0; line-height: 1.7; color: #64748b;">
+                                    2026년 1월 21일부터 TOEFL은 <strong>1-6 레벨</strong>로만 채점됩니다. 성적표 하단에 작게 표시되는 0-120점은 별도 채점이 아니라 <strong>환산표에 따른 자동 표기</strong>입니다. 지원 기관이 아직 0-120점 기준으로 안내하더라도, 아래 괄호의 기존 점수를 참고해 선택해주세요.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label>지원 기관이 요구하는 최소 점수 (Total) <span style="color: #a53b22; font-weight: 700;">*</span></label>
-                        <input type="number" name="target_cutoff_new" min="1" max="6" step="0.5" placeholder="예: 4.5">
-                        <small>⚠️ 본인이 받고 싶은 희망 점수가 아닙니다. 지원하는 학교·기관이 공식적으로 요구하는 최소 지원 자격 점수를 입력해주세요. 희망 점수는 아래 '추가 설명'란에 따로 작성해주세요.</small>
+                        <select name="target_cutoff_new">
+                            <option value="">선택해주세요</option>
+                            <option value="2">2.0 (기존 28점)</option>
+                            <option value="2.5">2.5 (기존 38점)</option>
+                            <option value="3">3.0 (기존 51점)</option>
+                            <option value="3.5">3.5 (기존 65점)</option>
+                            <option value="4">4.0 (기존 80점)</option>
+                            <option value="4.5">4.5 (기존 90점)</option>
+                            <option value="5">5.0 (기존 100점)</option>
+                            <option value="5.5">5.5 (기존 110점)</option>
+                            <option value="6">6.0 (기존 118점)</option>
+                        </select>
+                        <small>⚠️ 본인이 받고 싶은 희망 점수가 아닙니다. 지원하는 학교·기관이 공식적으로 요구하는 최소 지원 자격 점수를 선택해주세요. 희망 점수는 아래 '추가 설명'란에 따로 작성해주세요.</small>
                     </div>
 
                     <div class="subsection-title">영역별 최소 요구 점수 (있는 경우)</div>
                     <div class="score-group">
                         <div class="form-group">
                             <label>Reading</label>
-                            <input type="number" name="target_reading_new" min="1" max="6" step="0.5" placeholder="선택">
+                            <select name="target_reading_new">
+                                <option value="">선택</option>
+                                <option value="1">1.0</option>
+                                <option value="1.5">1.5</option>
+                                <option value="2">2.0</option>
+                                <option value="2.5">2.5</option>
+                                <option value="3">3.0</option>
+                                <option value="3.5">3.5</option>
+                                <option value="4">4.0</option>
+                                <option value="4.5">4.5</option>
+                                <option value="5">5.0</option>
+                                <option value="5.5">5.5</option>
+                                <option value="6">6.0</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label>Listening</label>
-                            <input type="number" name="target_listening_new" min="1" max="6" step="0.5" placeholder="선택">
+                            <select name="target_listening_new">
+                                <option value="">선택</option>
+                                <option value="1">1.0</option>
+                                <option value="1.5">1.5</option>
+                                <option value="2">2.0</option>
+                                <option value="2.5">2.5</option>
+                                <option value="3">3.0</option>
+                                <option value="3.5">3.5</option>
+                                <option value="4">4.0</option>
+                                <option value="4.5">4.5</option>
+                                <option value="5">5.0</option>
+                                <option value="5.5">5.5</option>
+                                <option value="6">6.0</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label>Writing</label>
-                            <input type="number" name="target_writing_new" min="1" max="6" step="0.5" placeholder="선택">
+                            <select name="target_writing_new">
+                                <option value="">선택</option>
+                                <option value="1">1.0</option>
+                                <option value="1.5">1.5</option>
+                                <option value="2">2.0</option>
+                                <option value="2.5">2.5</option>
+                                <option value="3">3.0</option>
+                                <option value="3.5">3.5</option>
+                                <option value="4">4.0</option>
+                                <option value="4.5">4.5</option>
+                                <option value="5">5.0</option>
+                                <option value="5.5">5.5</option>
+                                <option value="6">6.0</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label>Speaking</label>
-                            <input type="number" name="target_speaking_new" min="1" max="6" step="0.5" placeholder="선택">
+                            <select name="target_speaking_new">
+                                <option value="">선택</option>
+                                <option value="1">1.0</option>
+                                <option value="1.5">1.5</option>
+                                <option value="2">2.0</option>
+                                <option value="2.5">2.5</option>
+                                <option value="3">3.0</option>
+                                <option value="3.5">3.5</option>
+                                <option value="4">4.0</option>
+                                <option value="4.5">4.5</option>
+                                <option value="5">5.0</option>
+                                <option value="5.5">5.5</option>
+                                <option value="6">6.0</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <!-- 개정전 목표 점수 -->
+                <!-- 호주 토플 목표 점수 (0-120점 유지) -->
                 <div id="oldTargetSection" class="version-content">
                     <div class="notice-box" style="border-left: 3px solid #e0c079; padding: 0.15rem 0 0.15rem 14px; margin-bottom: 20px;">
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
                             <i class="fas fa-circle-exclamation" style="color: #b45309; font-size: 18px; margin-top: 2px;"></i>
                             <div style="flex: 1;">
-                                <strong style="color: #8a6d1f; display: block; margin-bottom: 8px;">0-120점 체계로 입력하시는 경우</strong>
-                                <p style="margin: 0 0 8px 0; line-height: 1.7; color: #64748b;">
-                                    2026년 1월 21일부로 TOEFL 점수체계가 <strong>1-6 레벨</strong>로 변경되었으나, 아래와 같은 경우 기존 0-120점 체계로 목표 점수를 설정하시면 됩니다.
-                                </p>
-                                <ul style="margin: 0 0 8px 0; padding-left: 18px; line-height: 1.8; color: #64748b;">
-                                    <li>지원 기관이 아직 <strong>0-120점 기준</strong>으로 점수를 요구하는 경우</li>
-                                    <li><strong>TOEFL Australia</strong> 응시 대상인 경우 (TOEFL Australia는 개정 전 형식으로 출제되며, 0-120점 체계를 유지합니다)</li>
-                                    <li>전환 기간(2년) 내 0-120점 성적표를 활용할 예정인 경우</li>
-                                </ul>
+                                <strong style="color: #8a6d1f; display: block; margin-bottom: 8px;">TOEFL Australia 응시 대상 전용</strong>
                                 <p style="margin: 0; line-height: 1.7; color: #64748b;">
-                                    <strong style="color: #8a6d1f;">지원 기관의 요구 점수 체계가 1-6 레벨인 경우에는 '개정후' 탭에서 입력해 주세요.</strong>
+                                    TOEFL Australia는 개정 전 형식으로 출제되며 <strong>0-120점 체계를 유지</strong>합니다. TOEFL Australia 응시 대상인 경우에만 이 탭에서 목표 점수를 입력해주세요. 일반 TOEFL iBT 응시자는 <strong style="color: #8a6d1f;">'일반 토플' 탭</strong>에서 입력해 주세요.
                                 </p>
                             </div>
                         </div>

@@ -169,7 +169,7 @@ function displayResults(applications) {
                     <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
                         <div style="margin-bottom: 8px;">
                             <span style="font-size: 13px; color: #64748b;">버전: </span>
-                            <span style="font-weight: 600; color: #1e293b;">${app.target_version === 'old' ? '개정전 (0-120점)' : '개정후 (1-6 레벨)'}</span>
+                            <span style="font-weight: 600; color: #1e293b;">${app.target_version === 'old' ? '호주 토플 (0-120점)' : '일반 토플 (1-6 레벨)'}</span>
                         </div>
                         <div style="margin-bottom: 8px;">
                             <span style="font-size: 13px; color: #64748b;">목표 커트라인: </span>

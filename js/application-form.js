@@ -10,7 +10,7 @@ let editApplicationId = null;
 // 목표점수 없음 체크박스 토글
 function toggleTargetScore(checked) {
     const allTargetInputs = document.querySelectorAll(
-        '#newTargetSection input[type="number"], #oldTargetSection input[type="number"]'
+        '#newTargetSection input[type="number"], #newTargetSection select, #oldTargetSection input[type="number"], #oldTargetSection select'
     );
     const versionTabs = document.querySelectorAll('[data-tab="old-target"], [data-tab="new-target"]');
     const targetNote = document.querySelector('textarea[name="target_note"]');
@@ -244,15 +244,16 @@ function setupConditionalFields() {
             document.getElementById('newTargetSection').classList.toggle('active', !isOld);
             
             // 비활성 탭의 모든 required 해제
-            const oldTargetInputs = document.getElementById('oldTargetSection').querySelectorAll('input');
-            const newTargetInputs = document.getElementById('newTargetSection').querySelectorAll('input');
+            const oldTargetInputs = document.getElementById('oldTargetSection').querySelectorAll('input, select');
+            const newTargetInputs = document.getElementById('newTargetSection').querySelectorAll('input, select');
             oldTargetInputs.forEach(input => input.required = false);
             newTargetInputs.forEach(input => input.required = false);
         });
     });
 
     // Format new TOEFL score inputs to always show .0 for whole numbers
-    const newScoreInputs = document.querySelectorAll('input[name="target_cutoff_new"], input[name="target_reading_new"], input[name="target_listening_new"], input[name="target_writing_new"], input[name="target_speaking_new"], input[name="score_reading_new"], input[name="score_listening_new"], input[name="score_writing_new"], input[name="score_speaking_new"], input[name="score_total_new"]');
+    // (목표 점수 필드는 드롭다운으로 바뀌어 포맷팅 불필요 — 현재 점수 필드만)
+    const newScoreInputs = document.querySelectorAll('input[name="score_reading_new"], input[name="score_listening_new"], input[name="score_writing_new"], input[name="score_speaking_new"], input[name="score_total_new"]');
     
     newScoreInputs.forEach(input => {
         input.addEventListener('blur', function() {
@@ -331,7 +332,7 @@ function cleanupInactiveTabRequired() {
     sections.forEach(id => {
         const section = document.getElementById(id);
         if (section && !section.classList.contains('active')) {
-            section.querySelectorAll('input[required]').forEach(input => {
+            section.querySelectorAll('input[required], select[required]').forEach(input => {
                 input.required = false;
             });
         }
@@ -579,10 +580,10 @@ function populateFormData(app) {
         const oldTargetSection = document.getElementById('oldTargetSection');
         const newTargetSection = document.getElementById('newTargetSection');
         if (oldTargetSection && !oldTargetSection.classList.contains('active')) {
-            oldTargetSection.querySelectorAll('input').forEach(i => i.required = false);
+            oldTargetSection.querySelectorAll('input, select').forEach(i => i.required = false);
         }
         if (newTargetSection && !newTargetSection.classList.contains('active')) {
-            newTargetSection.querySelectorAll('input').forEach(i => i.required = false);
+            newTargetSection.querySelectorAll('input, select').forEach(i => i.required = false);
         }
 
         // 목표점수 없음 체크박스 복원 (탭 전환 후 disabled 처리)
@@ -794,15 +795,15 @@ function validateForm() {
     const isNoTargetScore = noTargetCb && noTargetCb.checked;
 
     if (!isNoTargetScore) {
-        const targetCutoffNew = document.querySelector('input[name="target_cutoff_new"]');
-        const targetCutoffOld = document.querySelector('input[name="target_cutoff_old"]');
+        const targetCutoffNew = document.querySelector('[name="target_cutoff_new"]');
+        const targetCutoffOld = document.querySelector('[name="target_cutoff_old"]');
         const hasNewTarget = targetCutoffNew && targetCutoffNew.value.trim() !== '';
         const hasOldTarget = targetCutoffOld && targetCutoffOld.value.trim() !== '';
 
         if (!hasNewTarget && !hasOldTarget) {
-            alert('목표 점수의 커트라인(Total)을 개정후 또는 개정전 중 하나는 입력해주세요.');
-            // 현재 활성 탭의 input에 포커스
-            const activeTarget = document.querySelector('.version-content.active input[name="target_cutoff_new"], .version-content.active input[name="target_cutoff_old"]');
+            alert('목표 점수의 커트라인(Total)을 일반 토플 또는 호주 토플 중 하나는 입력해주세요.');
+            // 현재 활성 탭의 커트라인 필드에 포커스
+            const activeTarget = document.querySelector('.version-content.active [name="target_cutoff_new"], .version-content.active [name="target_cutoff_old"]');
             if (activeTarget) activeTarget.focus();
             return false;
         }
