@@ -34,6 +34,21 @@ function showState(id) {
     });
 }
 
+/** 중복 제출 안내: 이미 이 시험(번호+날짜)으로 제출한 경우 */
+function showDuplicate(giftySent) {
+    var el = document.getElementById('svDone');
+    if (el) {
+        el.innerHTML =
+            '<i class="fas fa-circle-check" style="color:#77bf7e;"></i>' +
+            '<h2>이미 제출하셨어요</h2>' +
+            '<p>이 시험에 대한 리포트는 이미 잘 받았습니다.<br>한 시험당 한 번만 제출할 수 있어요.</p>' +
+            (giftySent
+                ? '<div class="sv-done-gift">☕ 기프티콘도 이미 발송되었습니다.</div>'
+                : '<div class="sv-done-gift">☕ 기프티콘은 3영업일 내에 도착합니다.</div>');
+    }
+    showState('svDone');
+}
+
 function svEsc(str) {
     return String(str == null ? '' : str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -193,6 +208,20 @@ async function submitSurvey() {
     var date = dateInput ? dateInput.value : '';
     if (!date) { alert('시험 본 날짜를 선택해주세요.'); return; }
 
+    // 같은 번호 + 같은 시험 날짜로 이미 제출했는지 (한 시험당 1회)
+    try {
+        var dup = await supabaseAPI.query('toefl_survey_responses', {
+            'user_phone': 'eq.' + phone,
+            'exam_date': 'eq.' + date,
+            'select': 'id,gifty_sent_at',
+            'limit': '5'
+        });
+        if (dup && dup.length) {
+            showDuplicate(dup.some(function(d) { return !!d.gifty_sent_at; }));
+            return;
+        }
+    } catch (e) { /* 조회 실패 시 제출 진행 — DB 유니크 제약이 최종 방어 */ }
+
     // 모든 문항 필수 — 빈 문항이 있으면 안내하고 그 문항으로 데려간다
     var goToQuestion = function(q, idx, msg) {
         alert(msg);
@@ -238,7 +267,7 @@ async function submitSurvey() {
     } catch (err) {
         console.error('리포트 제출 실패:', err);
         if (/duplicate|unique/i.test(err.message || '')) {
-            showState('svDone');   // 이미 제출된 시험 → 완료로 안내
+            showDuplicate(false);   // DB 제약에 걸림 = 이미 제출된 시험
         } else {
             alert('제출 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.');
             btn.disabled = false;

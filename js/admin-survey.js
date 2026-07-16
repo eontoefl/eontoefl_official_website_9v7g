@@ -536,14 +536,23 @@ function renderResponders() {
         return;
     }
     const rows = buildResponderGroups();
+    // 같은 번호 + 같은 시험 날짜가 여러 줄이면 중복 의심 (이름을 다르게 적는 등)
+    const phoneDateCount = {};
+    rows.forEach(function(g) {
+        if (!g.resp_phone) return;
+        const k = normPhone(g.resp_phone) + '|' + g.exam_date;
+        phoneDateCount[k] = (phoneDateCount[k] || 0) + 1;
+    });
     el.innerHTML = '<table class="asv-table">' +
         '<tr><th>이름</th><th>번호</th><th>시험 날짜</th><th>답변 수</th><th>제출 시각</th><th>기프티콘</th></tr>' +
         rows.map(function(g) {
             const sent = g.sent_at
                 ? '<span class="asv-badge asv-badge-true">발송 완료</span>'
                 : '<span class="asv-badge asv-badge-hidden">미발송</span>';
+            const dupWarn = (g.resp_phone && phoneDateCount[normPhone(g.resp_phone) + '|' + g.exam_date] > 1)
+                ? ' <span class="asv-badge asv-badge-full">중복 의심</span>' : '';
             return '<tr>' +
-                '<td><strong>' + escapeHtml(g.name || '-') + '</strong></td>' +
+                '<td><strong>' + escapeHtml(g.name || '-') + '</strong>' + dupWarn + '</td>' +
                 '<td>' + escapeHtml(g.resp_phone || '(DB 매칭)') + '</td>' +
                 '<td>' + escapeHtml(g.exam_date || '-') + '</td>' +
                 '<td>' + g.count + '</td>' +
