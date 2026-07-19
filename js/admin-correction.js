@@ -1014,15 +1014,20 @@ async function confirmExtendDeadline() {
 
 /**
  * Insert or update a deadline extension in correction_deadline_extensions.
- * If a row already exists for (user_id, session_number, task_type), update it.
+ * If a row already exists for (user_id, session_number, task_type, draft_round), update it.
  * Otherwise insert a new row.
+ *
+ * @param {number|null} draftRound - 1 = 1차만, 2 = 2차만, null = 둘 다
  */
-async function upsertDeadlineExtension(userId, sessionNumber, taskType, hours) {
-    // Check if extension already exists
+async function upsertDeadlineExtension(userId, sessionNumber, taskType, hours, draftRound) {
+    const round = (draftRound === 1 || draftRound === 2) ? draftRound : null;
+
+    // Check if extension already exists (차수까지 같아야 같은 행으로 본다)
     const existing = deadlineExtensionsCache.find(e =>
         e.user_id === userId &&
         String(e.session_number) === String(sessionNumber) &&
-        e.task_type === taskType
+        e.task_type === taskType &&
+        (e.draft_round ?? null) === round
     );
 
     if (existing) {
@@ -1037,7 +1042,8 @@ async function upsertDeadlineExtension(userId, sessionNumber, taskType, hours) {
             user_id: userId,
             session_number: parseInt(sessionNumber, 10),
             task_type: taskType,
-            extended_hours: hours
+            extended_hours: hours,
+            draft_round: round
         };
         const inserted = await supabaseAPI.post('correction_deadline_extensions', newRow);
         if (inserted) {
@@ -1344,7 +1350,7 @@ async function confirmStandaloneExtend() {
 
     try {
         for (const taskType of taskTypes) {
-            await upsertDeadlineExtension(userId, sessionNumber, taskType, hours);
+            await upsertDeadlineExtension(userId, sessionNumber, taskType, hours, parseInt(draftRound, 10));
         }
 
         statusInfo.className = 'corr-extend-status-info success';
