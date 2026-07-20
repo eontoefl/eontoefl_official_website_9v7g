@@ -34,7 +34,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   contract_agree_reminder:     50229,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
   deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
   practice_open:               50231,  // 연습코스 오픈 안내 (정규과정 종료 후 자동 활성화)
-  toefl_exam_day:              50232,  // 시험 당일 회신 안내
+  toefl_exam_day:              50233,  // 시험 당일 회신 안내 + 리포트 참여
 };
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
@@ -336,23 +336,13 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "",
         `${data.name}님, 오늘 시험 보시느라 고생 많으셨습니다.`,
         "",
-        "▶ [1단계] 오늘 안에 회신",
+        "▶ 오늘 시험에 대한 피드백을 위해 아래 내용을 지금 회신해주세요.",
         "1. 리딩·리스닝 unofficial 점수를 알려주세요.",
-        "2. 리딩·리스닝 구성을 알려주세요. (기억나는 만큼만)",
-        "  - 첫번째 모듈에 유형별로 몇 세트씩 나왔는지",
-        "  - 두번째 모듈에 학술 지문, 혹은 렉쳐가 있었는지",
-        "3. email, discussion, interview에서 어떤 주제가 나왔고 어떻게 답변하셨는지 알려주세요.",
+        "2. email, discussion, interview에서 어떤 주제가 나왔고 어떻게 답변하셨는지 알려주세요. ",
         "기억은 하루가 지나면 흐려집니다. 오늘이 가장 정확합니다.",
-        "4. 내벨업챌린지에서 연습한 것과 달라 당황스러웠던 점이 있다면 함께 알려주세요.",
-        "",
-        "회신해주시면 오늘 문제에 대한 피드백을 드립니다.",
-        "",
-        "▶ [2단계] 성적표 전송",
-        "성적표는 약 3일(72시간) 뒤 공개됩니다. 확인되면 캡처해서 보내주세요.",
-        "",
-        "1단계와 2단계가 모두 완료되면 시험료지원금 인증이 처리됩니다.",
-        "",
         "※ 이 채팅방에 그대로 답장해주시면 됩니다.",
+        "",
+        "또한, 오늘 응시한 시험에 대한 간단한 리포트(10초)에 참여해주세요.",
       ].join("\n");
 
     case "analysis_agree_reminder":
@@ -448,7 +438,7 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
     case "deposit_reminder":
       return `[이온토플] 입금 기한 ${data.deadline}까지(${data.time}시간 남음). 미입금 시 신청이 자동취소돼요.`;
     case "toefl_exam_day":
-      return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요.";
+      return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요. 시험 리포트도 참여 부탁드려요 https://eonfl.com/survey.html";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -466,15 +456,17 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open") {
     return TESTROOM_URL;
   }
+  // 시험 직후 리포트 설문 — 학생별 파라미터 없이 고정 링크
+  if (type === "toefl_exam_day") {
+    return `${SITE_URL}/survey.html`;
+  }
   return `${SITE_URL}/application-detail.html?id=${data.app_id}`;
 }
 
 // ===== 버튼 없는 템플릿 여부 =====
 function hasNoButton(templateId: number): boolean {
   return templateId === TEMPLATE_IDS.payment_confirmed
-      || templateId === TEMPLATE_IDS.contract_deferred
-      // 알림톡이 도착하는 곳이 곧 회신할 채팅방이라 버튼을 두지 않는다
-      || templateId === TEMPLATE_IDS.toefl_exam_day;
+      || templateId === TEMPLATE_IDS.contract_deferred;
 }
 
 // ===== 단건 메시지 객체 생성 =====
