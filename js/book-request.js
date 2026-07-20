@@ -158,7 +158,7 @@ function initForm(mode, userData) {
     }
 
     // 공통 설정
-    setupNoScoreCheckbox('noScoreCheck', 'currentScore', '예: 75');
+    setupNoScoreCheckbox('noScoreCheck', 'currentScore', '예: 75 혹은 4.0');
     setupReferralSelect();
     setupKakaoTracking();
     setupAgreements();
@@ -615,7 +615,7 @@ async function saveApplication(user) {
     const scoreInput = document.getElementById('currentScore');
     let currentScore = null;
     if (!noScoreCheck.checked && scoreInput.value.trim() !== '') {
-        currentScore = parseInt(scoreInput.value, 10);
+        currentScore = parseFloat(scoreInput.value);
         if (isNaN(currentScore)) currentScore = null;
     }
 
@@ -623,7 +623,7 @@ async function saveApplication(user) {
     const targetScoreInput = document.getElementById('targetScore');
     let targetScore = null;
     if (targetScoreInput.value.trim() !== '') {
-        targetScore = parseInt(targetScoreInput.value, 10);
+        targetScore = parseFloat(targetScoreInput.value);
         if (isNaN(targetScore)) targetScore = null;
     }
 
