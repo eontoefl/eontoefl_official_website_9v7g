@@ -159,7 +159,6 @@ function initForm(mode, userData) {
 
     // 공통 설정
     setupNoScoreCheckbox('noScoreCheck', 'currentScore', '예: 75');
-    setupNoScoreCheckbox('noTargetScoreCheck', 'targetScore', '예: 100');
     setupReferralSelect();
     setupKakaoTracking();
     setupAgreements();
@@ -621,11 +620,9 @@ async function saveApplication(user) {
     }
 
     // 목표 점수
-    const noTargetScoreCheck = document.getElementById('noTargetScoreCheck');
     const targetScoreInput = document.getElementById('targetScore');
     let targetScore = null;
-    const noTargetScore = noTargetScoreCheck.checked;
-    if (!noTargetScore && targetScoreInput.value.trim() !== '') {
+    if (targetScoreInput.value.trim() !== '') {
         targetScore = parseInt(targetScoreInput.value, 10);
         if (isNaN(targetScore)) targetScore = null;
     }
@@ -656,7 +653,7 @@ async function saveApplication(user) {
         confirmed: true,
         current_score: currentScore,
         target_score: targetScore,
-        no_target_score: noTargetScore,
+        no_target_score: false,
         referral_source: referralSource,
         referral_source_detail: referralSourceDetail,
         privacy_agreement: true,
@@ -693,16 +690,15 @@ function validateBookForm() {
     const noScoreCheck = document.getElementById('noScoreCheck');
     const currentScoreInput = document.getElementById('currentScore');
     if (!noScoreCheck.checked && currentScoreInput.value.trim() === '') {
-        showToast('현재 토플 점수를 입력하거나 "아직 없음"을 체크해주세요.', 'error');
+        showToast('현재 토플 점수를 입력하거나 "없음"을 체크해주세요.', 'error');
         currentScoreInput.focus();
         return false;
     }
 
     // 목표 점수
-    const noTargetScoreCheck = document.getElementById('noTargetScoreCheck');
     const targetScoreInput = document.getElementById('targetScore');
-    if (!noTargetScoreCheck.checked && targetScoreInput.value.trim() === '') {
-        showToast('목표 토플 점수를 입력하거나 "아직 정하지 않음"을 체크해주세요.', 'error');
+    if (targetScoreInput.value.trim() === '') {
+        showToast('목표 토플 점수를 입력해주세요.', 'error');
         targetScoreInput.focus();
         return false;
     }
