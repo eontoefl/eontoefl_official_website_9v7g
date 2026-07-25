@@ -217,7 +217,7 @@ function renderActive() {
                     '<button class="asv-menu-item" onclick="toggleEdit(\'' + q.id + '\'); closeQMenus();">' +
                         '<i class="fas fa-pen"></i> 수정</button>' +
                     '<button class="asv-menu-item" onclick="toggleVerdict(\'' + q.id + '\'); closeQMenus();">' +
-                        '<i class="fas fa-gavel"></i> 마감·판정</button>' +
+                        '<i class="fas fa-gavel"></i> 마감하기</button>' +
                     '<button class="asv-menu-item asv-menu-danger" onclick="deleteQuestion(\'' + q.id + '\')">' +
                         '<i class="fas fa-trash"></i> 삭제</button>' +
                 '</div>' +
@@ -467,12 +467,8 @@ function buildAnswersHtml(q, resps) {
 function buildVerdictHtml(q) {
     return '<div class="asv-verdict" id="vd_' + q.id + '">' +
         '<div class="asv-verdict-row">' +
-            '<select id="vdSel_' + q.id + '">' +
-                '<option value="사실">✅ 사실 (자료 반영 필요)</option>' +
-                '<option value="거짓">❌ 거짓 (기각)</option>' +
-            '</select>' +
             '<input type="text" id="vdNote_' + q.id + '" placeholder="판정 메모 (예: 4문단 4명/5명 → 자료에 4문단 지문 추가)">' +
-            '<button class="asv-btn-verdict" onclick="closeQuestion(\'' + q.id + '\')">판정하고 마감</button>' +
+            '<button class="asv-btn-verdict" onclick="closeQuestion(\'' + q.id + '\')">메모 남기고 마감</button>' +
         '</div>' +
     '</div>';
 }
@@ -488,13 +484,12 @@ function toggleVerdict(qid) {
 }
 
 async function closeQuestion(qid) {
-    const verdict = document.getElementById('vdSel_' + qid).value;
     const note = document.getElementById('vdNote_' + qid).value.trim();
-    if (!confirm('"' + verdict + '"(으)로 판정하고 마감할까요? 마감하면 학생에게 더 이상 보이지 않습니다.')) return;
+    if (!confirm('이 질문을 마감할까요? 마감하면 학생에게 더 이상 보이지 않습니다.')) return;
     try {
         await supabaseAPI.patch('toefl_survey_questions', qid, {
             status: 'closed',
-            verdict: verdict,
+            verdict: null,
             verdict_note: note || null,
             closed_at: new Date().toISOString()
         });
@@ -823,21 +818,17 @@ function renderArchive() {
     }
     el.innerHTML = closed.map(function(q) {
         const resps = respsOf(q.id);
-        const badge = q.verdict === '사실'
-            ? '<span class="asv-badge asv-badge-true">✅ 사실</span>'
-            : '<span class="asv-badge asv-badge-false">❌ 거짓</span>';
         return '<div class="asv-q">' +
             '<div class="asv-q-head">' +
                 '<div>' +
                     '<div class="asv-q-text">' + escapeHtml(q.question_text) + '</div>' +
                     '<div class="asv-q-meta">' +
-                        (q.hypothesis ? '<span>가설: ' + escapeHtml(q.hypothesis) + '</span>' : '') +
-                        '<span>응답 ' + resps.length + '명</span>' +
-                        (q.verdict_note ? '<span>메모: ' + escapeHtml(q.verdict_note) + '</span>' : '') +
-                        '<span>' + (q.closed_at ? formatDateOnly(q.closed_at) + ' 마감' : '') + '</span>' +
+                        (q.verdict_note
+                            ? '<span>' + escapeHtml(q.verdict_note) + '</span>'
+                            : '<span style="color:var(--es-muted);">판정 메모 없음</span>') +
                     '</div>' +
                 '</div>' +
-                '<div class="asv-q-actions">' + badge +
+                '<div class="asv-q-actions">' +
                     '<button class="asv-btn-sm" onclick="toggleAnswers(\'' + q.id + '\')">응답 보기</button>' +
                 '</div>' +
             '</div>' +
