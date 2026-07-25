@@ -267,19 +267,20 @@ body.bookedit-body {
 
 /* 종이 카드 — surface-lowest 가 surface 위에 떠 있는 톤 레이어 */
 .bookedit-paper {
-  max-width: 840px;
+  /* 학생 뷰어(book-v2-viewer.css)와 동일한 용지 폭 → 세로로 긴 '책 페이지' 비율 */
+  max-width: 760px;
   margin: 0 auto;
   background: var(--surface-lowest);
   border-radius: 14px;
   box-shadow: var(--amb);
-  min-height: calc(100vh - 220px);
-  /* 상하좌우 대칭 여백 (좌우는 아래 .bn-block-group 가운데 정렬과 함께 균형) */
+  min-height: calc(100vh - 200px); /* 뷰어와 동일 */
   padding: 8px;
 }
 
 /* ===== 편집 화면 = 학생 화면(뷰어)과 동일하게 (WYSIWYG) ===== */
 /* 뷰어(book-v2-viewer.css)의 본문 스타일과 맞춤 */
-.bn-editor { font-size: 17px; line-height: 1.85; color: #1f2937; }
+/* 폰트도 뷰어와 동일하게 Pretendard → 줄바꿈 위치까지 일치 */
+.bn-editor { font-size: 17px; line-height: 1.85; color: #1f2937; font-family: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif; word-break: keep-all; }
 .bn-editor h1.bn-inline-content { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; color: #111827; }
 .bn-editor h2.bn-inline-content { font-size: 23px; font-weight: 700; color: #111827; }
 .bn-editor h3.bn-inline-content { font-size: 19px; font-weight: 700; color: #4b5563; }
@@ -300,8 +301,8 @@ body.bookedit-body {
 }
 /* 표 헤더 행 강조 (뷰어와 동일) */
 .bn-editor table tr:first-child td { background: #f0f9ff; font-weight: 700; }
-/* 글 칸을 종이 안에서 '가운데 정렬' → 좌우 여백 대칭 (기존엔 왼쪽에 붙어 오른쪽만 비었음) */
-.bookedit-paper .bn-editor .bn-block-group { max-width: 700px; margin-left: auto; margin-right: auto; }
+/* 글 칸을 학생 뷰어와 '동일한 폭(640px)'으로 + 가운데 정렬 → 줄바꿈 위치 일치 */
+.bookedit-paper .bn-editor .bn-block-group { max-width: 640px; margin-left: auto; margin-right: auto; }
 /* 상하 여백 대칭 (위=아래) */
 .bookedit-paper .bn-editor { padding-top: 40px; padding-bottom: 40px; }
 /* 블럭 사이 간격을 한 값으로 통일 → 문단 간격이 들쭉날쭉하지 않게 */
