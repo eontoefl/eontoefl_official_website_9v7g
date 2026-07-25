@@ -327,6 +327,22 @@ body.bookedit-body {
 /* 페이지 항목 보강: 라벨 / 미발행 점 / 액션 */
 .bookedit-page-label { flex: 1; }
 
+/* 드래그 핸들 */
+.bookedit-page-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; margin: -4px -2px -4px -6px;
+  color: var(--on-surface-variant); opacity: .45;
+  cursor: grab; font-size: 12px;
+  transition: opacity .15s ease;
+}
+.bookedit-page-item:hover .bookedit-page-handle { opacity: .85; }
+.bookedit-page-handle:active { cursor: grabbing; }
+
+/* 드래그 중 / 드롭 위치 표시 */
+.bookedit-page-item.dragging { opacity: .45; }
+.bookedit-page-item.drop-before { box-shadow: inset 0 2px 0 0 var(--primary); }
+.bookedit-page-item.drop-after  { box-shadow: inset 0 -2px 0 0 var(--primary); }
+
 .bookedit-dirty-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: transparent;

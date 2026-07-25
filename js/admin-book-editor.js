@@ -331,6 +331,7 @@ function renderPageList() {
     item.dataset.id = p.id;
 
     item.innerHTML =
+      '<span class="bookedit-page-handle" title="드래그해서 순서 변경" data-act="handle"><i class="fas fa-grip-vertical"></i></span>' +
       '<span class="bookedit-page-num">' + (i + 1) + "</span>" +
       '<span class="bookedit-page-label">페이지 ' + (i + 1) + "</span>" +
       '<span class="bookedit-dirty-dot' + (State.dirty.has(p.id) ? " on" : "") + '" title="저장 안 한 변경"></span>' +
@@ -349,13 +350,89 @@ function renderPageList() {
         if (act === "up") movePage(p.id, -1);
         else if (act === "down") movePage(p.id, +1);
         else if (act === "del") deletePage(p.id);
-        return;
+        return; // handle 은 아무 것도 안 함(드래그 전용)
       }
       switchPage(p.id);
     });
 
+    // ── 드래그로 순서 변경 (핸들에서만 시작) ──
+    const handle = item.querySelector(".bookedit-page-handle");
+    handle.addEventListener("mousedown", () => { item.draggable = true; });
+    handle.addEventListener("mouseup", () => { item.draggable = false; });
+    item.addEventListener("dragstart", (e) => {
+      DnD.fromId = p.id;
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", p.id); } catch (_) {}
+    });
+    item.addEventListener("dragend", () => {
+      item.draggable = false;
+      item.classList.remove("dragging");
+      clearDropMarkers();
+    });
+    item.addEventListener("dragover", (e) => {
+      if (!DnD.fromId || DnD.fromId === p.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      showDropMarker(item, isBefore(item, e.clientY));
+    });
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      onDropReorder(DnD.fromId, p.id, isBefore(item, e.clientY));
+    });
+
     list.appendChild(item);
   });
+}
+
+// ── 드래그 정렬 헬퍼 ──
+const DnD = { fromId: null };
+
+function isBefore(item, y) {
+  const r = item.getBoundingClientRect();
+  return y < r.top + r.height / 2;
+}
+function clearDropMarkers() {
+  document.querySelectorAll(".bookedit-page-item.drop-before, .bookedit-page-item.drop-after")
+    .forEach((el) => el.classList.remove("drop-before", "drop-after"));
+}
+function showDropMarker(item, before) {
+  clearDropMarkers();
+  item.classList.add(before ? "drop-before" : "drop-after");
+}
+
+async function onDropReorder(fromId, toId, before) {
+  clearDropMarkers();
+  DnD.fromId = null;
+  if (!fromId || fromId === toId) return;
+
+  const from = State.pages.findIndex((p) => p.id === fromId);
+  if (from < 0) return;
+  const [moved] = State.pages.splice(from, 1);
+  let to = State.pages.findIndex((p) => p.id === toId);
+  if (to < 0) { State.pages.splice(from, 0, moved); return; } // 안전복구
+  State.pages.splice(before ? to : to + 1, 0, moved);
+
+  renderPageList();       // 즉시 화면 반영
+  await persistOrder();   // 서버에 새 순서 저장
+}
+
+// 현재 배열 순서대로 sort_order 를 1..N 로 다시 매기고, 바뀐 것만 저장
+async function persistOrder() {
+  const changed = [];
+  State.pages.forEach((p, i) => {
+    const so = i + 1;
+    if (p.sort_order !== so) { p.sort_order = so; changed.push(p); }
+  });
+  try {
+    for (const p of changed) {
+      await supabaseAPI.patch("tr_book_pages", p.id, { sort_order: p.sort_order });
+    }
+    if (changed.length) setStatus("saved", "순서 변경됨");
+  } catch (e) {
+    console.error(e);
+    alert("순서 저장 실패: " + e.message);
+  }
 }
 
 function markPageDirty(pageId, on) {
