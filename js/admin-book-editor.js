@@ -288,27 +288,6 @@ async function deletePage(pageId) {
   }
 }
 
-async function movePage(pageId, dir) {
-  const idx = State.pages.findIndex((p) => p.id === pageId);
-  const swapIdx = idx + dir;
-  if (swapIdx < 0 || swapIdx >= State.pages.length) return;
-
-  const a = State.pages[idx];
-  const b = State.pages[swapIdx];
-  const ao = a.sort_order, bo = b.sort_order;
-
-  try {
-    await supabaseAPI.patch("tr_book_pages", a.id, { sort_order: bo });
-    await supabaseAPI.patch("tr_book_pages", b.id, { sort_order: ao });
-    a.sort_order = bo; b.sort_order = ao;
-    State.pages.sort((x, y) => x.sort_order - y.sort_order);
-    renderPageList();
-  } catch (e) {
-    console.error(e);
-    alert("순서 변경 실패: " + e.message);
-  }
-}
-
 async function syncTotalPages() {
   try {
     await supabaseAPI.patch("tr_book_documents", State.book.id, {
@@ -336,8 +315,6 @@ function renderPageList() {
       '<span class="bookedit-page-label">페이지 ' + (i + 1) + "</span>" +
       '<span class="bookedit-dirty-dot' + (State.dirty.has(p.id) ? " on" : "") + '" title="저장 안 한 변경"></span>' +
       '<span class="bookedit-page-actions">' +
-        '<button class="bookedit-mini" title="위로" data-act="up"><i class="fas fa-chevron-up"></i></button>' +
-        '<button class="bookedit-mini" title="아래로" data-act="down"><i class="fas fa-chevron-down"></i></button>' +
         '<button class="bookedit-mini is-danger" title="삭제" data-act="del"><i class="fas fa-trash-can"></i></button>' +
       "</span>";
 
@@ -347,9 +324,7 @@ function renderPageList() {
       if (actBtn) {
         e.stopPropagation();
         const act = actBtn.dataset.act;
-        if (act === "up") movePage(p.id, -1);
-        else if (act === "down") movePage(p.id, +1);
-        else if (act === "del") deletePage(p.id);
+        if (act === "del") deletePage(p.id);
         return; // handle 은 아무 것도 안 함(드래그 전용)
       }
       switchPage(p.id);
