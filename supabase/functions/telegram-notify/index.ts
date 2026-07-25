@@ -74,6 +74,33 @@ function getKSTTimeString(): string {
   return new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+// ===== 기프티콘 미발송 인원 집계 =====
+// 관리자 응답자 명단과 동일 기준: (학생+시험날짜) 묶음 중 gifty_sent_at이 하나도 없는 그룹 수.
+async function countPendingGifty(): Promise<number> {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/toefl_survey_responses?select=user_id,user_name,exam_date,gifty_sent_at`,
+    {
+      headers: {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  if (!resp.ok) throw new Error(`pending query failed: ${resp.status}`);
+  const rows = await resp.json() as Array<Record<string, unknown>>;
+
+  // 그룹별로 "한 번이라도 발송됐는지" 표시
+  const sentByKey: Record<string, boolean> = {};
+  for (const r of rows) {
+    const key = `${r.user_id || r.user_name || "?"}|${r.exam_date}`;
+    if (!(key in sentByKey)) sentByKey[key] = false;
+    if (r.gifty_sent_at) sentByKey[key] = true;
+  }
+  let pending = 0;
+  for (const k in sentByKey) if (!sentByKey[k]) pending++;
+  return pending;
+}
+
 // ===== 메인 핸들러 =====
 Deno.serve(async (req) => {
   const corsHeaders = {
@@ -162,9 +189,16 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
       break;
     }
 
-    // ----- 실전 리포트(설문) 접수 알림 (한 줄) -----
+    // ----- 실전 리포트(설문) 접수 알림 -----
     case "survey_submitted": {
-      text = `📋 실전 리포트 접수 — ${data.name || "-"} · 시험일 ${data.exam_date || "-"}`;
+      let pendingLine = "";
+      try {
+        const pending = await countPendingGifty();   // 방금 접수분 포함 (survey.js가 저장 후 알림 호출)
+        pendingLine = `\n☕ 미발송 ${pending}명`;
+      } catch (e) {
+        console.warn("미발송 집계 실패(접수 알림은 발송):", e);
+      }
+      text = `📋 실전 리포트 접수 — ${data.name || "-"} · 시험일 ${data.exam_date || "-"}${pendingLine}`;
       break;
     }
 
