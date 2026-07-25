@@ -1,37 +1,34 @@
 // =====================================================================
-// 입문서 편집기 (BlockNote) — 페이지 로직  [5·6단계]
+// 입문서 편집기 (BlockNote) — 페이지 로직
 //
-// 5단계: 서버 저장/불러오기(tr_book_pages) + 버전 백업/되돌리기
-// 6단계: 페이지 추가/삭제/순서
-// 공통: 편집 중 localStorage 임시저장(크래시 복구) — "저장" 눌러야 서버 반영
+// 화면 구조: 왼쪽 목록 없이, 페이지(용지)들이 세로로 이어져 스크롤된다.
+//   - 용지 옆에 떠 있는 툴바로 페이지 조작 (이동/복제/추가/삭제)
+//   - 편집기는 화면에 가까워질 때만 켠다(지연 마운트) → 페이지 많아도 가벼움
+//   - 편집 중 localStorage 임시저장(크래시 복구). "저장" 눌러야 서버 반영
 //
 // 데이터:
-//   tr_book_documents (kind='pages', is_active=false 로 신규 생성 — 기존 PDF 뷰어와 분리)
+//   tr_book_documents (kind='pages')
 //   tr_book_pages (id=불변앵커, sort_order, blocks, html)
 //   tr_book_page_versions (저장마다 스냅샷)
 // =====================================================================
 
 const STORAGE_BUCKET = "guide-images"; // 기존 버킷 재사용, 'book/' prefix
 const BOOK_TITLE_DEFAULT = "입문서 (편집본)";
+const MOUNT_MARGIN = "1000px"; // 화면에서 이만큼 떨어져 있을 때 미리 편집기 켜기
 
 const State = {
-  books: [], // 모든 'pages' 종류 책
-  book: null, // 현재 편집 중 책 (tr_book_documents row)
-  pages: [], // tr_book_pages rows (sort_order asc)
-  currentId: null, // 현재 편집 중 페이지 id
-  editor: null, // BlockNote handle
-  dirty: new Set(), // 임시저장(미발행) 변경 있는 페이지 id
-  autosaveTimer: null,
-  suppress: false, // 내용을 프로그램적으로 불러넣는 중(=사람 입력 아님) 표시
+  books: [],              // 모든 'pages' 종류 책
+  book: null,             // 현재 편집 중 책
+  pages: [],              // tr_book_pages rows (표시 순서)
+  currentId: null,        // 지금 보고 있는 페이지 id
+  editors: new Map(),     // pageId -> BlockNote handle (마운트된 것만)
+  nodes: new Map(),       // pageId -> 페이지 DOM 요소 (재정렬 시 재사용)
+  dirty: new Set(),       // 저장 안 한 변경이 있는 페이지 id
+  timers: new Map(),      // pageId -> 임시저장 타이머
+  suppress: new Set(),    // 프로그램이 내용 넣는 중인 페이지 (사람 입력 아님)
+  io: null,               // 지연 마운트 감시자
+  rafPending: false,
 };
-
-// 내용을 에디터에 "조용히" 불러넣기 — 변경 감지가 이걸 수정으로 오해하지 않게
-function setEditorBlocksQuiet(blocks) {
-  if (!State.editor) return;
-  State.suppress = true;
-  State.editor.setBlocks(blocks);
-  setTimeout(() => { State.suppress = false; }, 60);
-}
 
 // ---------------------------------------------------------------------
 // 진입
@@ -54,24 +51,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   renderBookUI();
-  renderPageList();
-  mountEditor();
+  setupLazyMount();
+  renderStack();
+  bindSlideBar();
+  bindScrollTracking();
   setupPageHotkeys();
-});
 
-// Alt + ←/→ 로 이전/다음 페이지 이동 (편집 커서 이동과 충돌 없음)
-function setupPageHotkeys() {
-  document.addEventListener("keydown", (e) => {
-    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    const dir = e.key === "ArrowRight" ? +1 : -1;
-    const idx = State.pages.findIndex((p) => p.id === State.currentId);
-    const next = State.pages[idx + dir];
-    if (!next) return; // 처음/끝이면 무시
-    e.preventDefault();
-    switchPage(next.id);
-  });
-}
+  // 첫 페이지는 바로 켜 둔다
+  if (State.pages.length) ensureMounted(State.pages[0].id);
+  const loading = document.getElementById("editorLoading");
+  if (loading) loading.style.display = "none";
+  document.getElementById("slideBar").hidden = false;
+  setCurrent(State.pages.length ? State.pages[0].id : null);
+  setStatus("saved", "준비됨");
+});
 
 function checkAuth() {
   const params = new URLSearchParams(location.search);
@@ -95,7 +88,6 @@ function currentUserEmail() {
 // ---------------------------------------------------------------------
 const CURRENT_BOOK_KEY = "bookedit_current_book";
 
-// 'pages' 책들 로드 + 현재 책 결정 (?book=<id> 우선 → 마지막 책 → 첫 책)
 async function loadBooks() {
   let books = await supabaseAPI.query("tr_book_documents", { kind: "eq.pages", order: "sort_order.asc" });
   if (!books || books.length === 0) {
@@ -110,16 +102,15 @@ async function loadBooks() {
   try { localStorage.setItem(CURRENT_BOOK_KEY, State.book.id); } catch (_) {}
 }
 
-// 현재 책의 페이지 로드 (없으면 1페이지 생성)
 async function loadPages() {
   let pages = await supabaseAPI.query("tr_book_pages", { book_id: "eq." + State.book.id, order: "sort_order.asc" });
   if (!pages || pages.length === 0) {
     const p1 = await supabaseAPI.post("tr_book_pages", { book_id: State.book.id, sort_order: 1, blocks: [], html: "" });
     pages = [p1];
   }
-  State.pages = pages;          // ★ 총페이지 갱신 전에 먼저 채움 (0페이지 버그 수정)
+  State.pages = pages;
   State.currentId = pages[0].id;
-  await syncTotalPages();       // 항상 실제 개수로 맞춤 (기존에 어긋난 값도 self-heal)
+  await syncTotalPages();
 }
 
 function renderBookUI() {
@@ -127,24 +118,131 @@ function renderBookUI() {
 }
 
 // ---------------------------------------------------------------------
-// 에디터 마운트
+// 페이지 스택 렌더 (DOM 재사용 — 이미 켜진 편집기를 부수지 않는다)
 // ---------------------------------------------------------------------
-function mountEditor() {
-  const initial = blocksForPage(State.currentId);
+function renderStack() {
+  const stack = document.getElementById("pageStack");
 
-  State.editor = window.BookEditor.mount("#bookEditor", {
-    initialBlocks: initial && initial.length ? initial : undefined,
-    uploadFile: uploadFile, // base64 금지 → Storage
-    onReady: () => {
-      const loading = document.getElementById("editorLoading");
-      if (loading) loading.style.display = "none";
-      setStatus("saved", hasDraft(State.currentId) ? "임시저장본 복구됨" : "준비됨");
-    },
-    onChange: onEditorChange,
+  // 사라진 페이지 정리
+  Array.from(State.nodes.keys()).forEach((id) => {
+    if (!State.pages.some((p) => p.id === id)) {
+      const h = State.editors.get(id);
+      if (h && typeof h.unmount === "function") { try { h.unmount(); } catch (_) {} }
+      State.editors.delete(id);
+      const el = State.nodes.get(id);
+      if (el) el.remove();
+      State.nodes.delete(id);
+    }
   });
+
+  // 기존 삽입선 제거 (페이지 요소는 유지)
+  stack.querySelectorAll(".bookedit-insert-zone").forEach((z) => z.remove());
+
+  // 원하는 최종 순서 만들기
+  const desired = [];
+  State.pages.forEach((p, i) => {
+    desired.push(makeInsertZone(i));
+    let el = State.nodes.get(p.id);
+    if (!el) {
+      el = createPageSection(p);
+      State.nodes.set(p.id, el);
+      if (State.io) State.io.observe(el);
+    }
+    updatePageLabel(el, i);
+    desired.push(el);
+  });
+  desired.push(makeInsertZone(State.pages.length));
+
+  // 자리가 이미 맞는 노드는 건드리지 않는다 (켜져 있는 편집기 보호)
+  desired.forEach((node, i) => {
+    const cur = stack.childNodes[i];
+    if (cur !== node) stack.insertBefore(node, cur || null);
+  });
+  while (stack.childNodes.length > desired.length) stack.removeChild(stack.lastChild);
+
+  updateSlideBar();
 }
 
-// 현재 페이지에 보여줄 blocks (임시저장본 우선, 없으면 서버본)
+function createPageSection(p) {
+  const sec = document.createElement("section");
+  sec.className = "bookedit-page";
+  sec.dataset.id = p.id;
+  sec.innerHTML =
+    '<div class="bookedit-page-tag">' +
+      '<span class="bookedit-page-no"></span>' +
+      '<span class="bookedit-dirty-dot" title="저장 안 한 변경"></span>' +
+    "</div>" +
+    '<div class="bookedit-paper">' +
+      '<div class="bookedit-preview"></div>' +
+      '<div class="bookedit-mount"></div>' +
+    "</div>";
+
+  // 편집기 켜지기 전엔 저장된 내용을 그대로 보여준다(높이/모양 유지)
+  const prev = sec.querySelector(".bookedit-preview");
+  prev.innerHTML = p.html || "";
+
+  sec.addEventListener("mousedown", () => setCurrent(p.id));
+  return sec;
+}
+
+function updatePageLabel(el, i) {
+  const no = el.querySelector(".bookedit-page-no");
+  if (no) no.textContent = i + 1;
+  const dot = el.querySelector(".bookedit-dirty-dot");
+  if (dot) dot.classList.toggle("on", State.dirty.has(el.dataset.id));
+}
+
+// 페이지 사이 "여기에 추가" 삽입선
+function makeInsertZone(index) {
+  const z = document.createElement("div");
+  z.className = "bookedit-insert-zone";
+  z.title = "여기에 페이지 추가";
+  z.innerHTML =
+    '<span class="bookedit-insert-line"></span>' +
+    '<span class="bookedit-insert-plus"><i class="fas fa-plus"></i></span>';
+  z.addEventListener("click", () => insertPageAt(index));
+  return z;
+}
+
+// ---------------------------------------------------------------------
+// 지연 마운트 — 화면에 가까워지면 그 페이지 편집기를 켠다
+// ---------------------------------------------------------------------
+function setupLazyMount() {
+  if (!("IntersectionObserver" in window)) return; // 미지원이면 아래 fallback로 전부 마운트
+  State.io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (en.isIntersecting) ensureMounted(en.target.dataset.id);
+    });
+  }, { root: document.getElementById("canvas"), rootMargin: MOUNT_MARGIN });
+}
+
+function ensureMounted(pageId) {
+  if (!pageId) return null;
+  if (State.editors.has(pageId)) return State.editors.get(pageId);
+
+  const sec = State.nodes.get(pageId);
+  if (!sec) return null;
+  const host = sec.querySelector(".bookedit-mount");
+  if (!host) return null;
+
+  const initial = blocksForPage(pageId);
+  const handle = window.BookEditor.mount(host, {
+    initialBlocks: initial && initial.length ? initial : undefined,
+    uploadFile: uploadFile, // base64 금지 → Storage
+    onReady: () => { sec.classList.add("is-mounted"); },
+    onChange: () => onEditorChange(pageId),
+  });
+  State.editors.set(pageId, handle);
+  return handle;
+}
+
+// 아무 편집기 핸들 (blocks → html 변환용)
+function anyHandle() {
+  for (const h of State.editors.values()) return h;
+  return null;
+}
+
+// 페이지에 보여줄 blocks (임시저장본 우선, 없으면 서버본)
 function blocksForPage(pageId) {
   const draft = loadDraft(pageId);
   if (draft) return draft;
@@ -152,60 +250,282 @@ function blocksForPage(pageId) {
   return p && Array.isArray(p.blocks) ? p.blocks : [];
 }
 
-// ---------------------------------------------------------------------
-// 편집 변경 → 임시저장(브라우저) + dirty 표시
-// ---------------------------------------------------------------------
-function onEditorChange() {
-  if (!State.editor || !State.currentId) return;
-  if (State.suppress) return; // 프로그램이 내용 불러넣는 중 → 사람 수정 아님, 무시
-  State.dirty.add(State.currentId);
-  setStatus("editing", "편집 중…");
-  markPageDirty(State.currentId, true);
+// 지금 시점의 내용 (켜져 있으면 편집기에서, 아니면 저장본에서)
+function currentBlocksFor(pageId) {
+  const h = State.editors.get(pageId);
+  if (h) return h.getBlocks();
+  return blocksForPage(pageId);
+}
 
-  clearTimeout(State.autosaveTimer);
-  State.autosaveTimer = setTimeout(() => {
-    saveDraft(State.currentId, State.editor.getBlocks());
-    setStatus("saved", "임시 저장됨 (브라우저)");
-  }, 800);
+function setBlocksQuiet(pageId, blocks) {
+  const h = ensureMounted(pageId);
+  if (!h) return;
+  State.suppress.add(pageId);
+  h.setBlocks(blocks);
+  setTimeout(() => State.suppress.delete(pageId), 60);
 }
 
 // ---------------------------------------------------------------------
-// 페이지 전환
+// 편집 변경 → 임시저장(브라우저) + 표시
 // ---------------------------------------------------------------------
-function switchPage(pageId) {
-  if (pageId === State.currentId) return;
-  // 떠나는 페이지가 "미저장 상태"일 때만 임시저장 보존 (안 고친 페이지엔 헛 드래프트 안 만듦)
-  if (State.editor && State.dirty.has(State.currentId)) {
-    saveDraft(State.currentId, State.editor.getBlocks());
-  }
+function onEditorChange(pageId) {
+  if (State.suppress.has(pageId)) return;
+  State.dirty.add(pageId);
+  setCurrent(pageId);
+  setStatus("editing", "편집 중…");
+  markPageDirty(pageId, true);
 
+  clearTimeout(State.timers.get(pageId));
+  State.timers.set(pageId, setTimeout(() => {
+    const h = State.editors.get(pageId);
+    if (h) saveDraft(pageId, h.getBlocks());
+    setStatus("saved", "임시 저장됨 (브라우저)");
+  }, 800));
+}
+
+function markPageDirty(pageId, on) {
+  const el = State.nodes.get(pageId);
+  if (!el) return;
+  const dot = el.querySelector(".bookedit-dirty-dot");
+  if (dot) dot.classList.toggle("on", !!on);
+}
+
+// ---------------------------------------------------------------------
+// 현재 페이지 추적 (스크롤 위치 기준)
+// ---------------------------------------------------------------------
+function bindScrollTracking() {
+  const canvas = document.getElementById("canvas");
+  canvas.addEventListener("scroll", () => {
+    if (State.rafPending) return;
+    State.rafPending = true;
+    requestAnimationFrame(() => {
+      State.rafPending = false;
+      updateCurrentByScroll();
+    });
+  }, { passive: true });
+}
+
+function updateCurrentByScroll() {
+  const canvas = document.getElementById("canvas");
+  const box = canvas.getBoundingClientRect();
+  const mid = box.top + box.height / 2;
+
+  let hit = null, nearest = null, nearestDist = Infinity;
+  State.pages.forEach((p) => {
+    const el = State.nodes.get(p.id);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.top <= mid && r.bottom >= mid) hit = p.id;
+    const d = Math.abs(r.top + r.height / 2 - mid);
+    if (d < nearestDist) { nearestDist = d; nearest = p.id; }
+  });
+
+  const id = hit || nearest;
+  if (id && id !== State.currentId) setCurrent(id);
+}
+
+function setCurrent(pageId) {
+  if (!pageId || pageId === State.currentId) { updateSlideBar(); return; }
   State.currentId = pageId;
-  setEditorBlocksQuiet(blocksForPage(pageId));
-  renderPageList();
-  setStatus("saved", hasDraft(pageId) ? "임시저장본 (미발행)" : "불러옴");
+  State.nodes.forEach((el, id) => el.classList.toggle("is-current", id === pageId));
+  updateSlideBar();
+}
+
+function goToPage(pageId) {
+  if (!pageId) return;
+  setCurrent(pageId);
+  ensureMounted(pageId);
+  const el = State.nodes.get(pageId);
+  if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+// Alt + ←/→ (또는 ↑/↓) 로 이전/다음 페이지
+function setupPageHotkeys() {
+  document.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const back = e.key === "ArrowLeft" || e.key === "ArrowUp";
+    const fwd = e.key === "ArrowRight" || e.key === "ArrowDown";
+    if (!back && !fwd) return;
+    const idx = State.pages.findIndex((p) => p.id === State.currentId);
+    const next = State.pages[idx + (fwd ? 1 : -1)];
+    if (!next) return;
+    e.preventDefault();
+    goToPage(next.id);
+  });
+}
+
+// ---------------------------------------------------------------------
+// 용지 옆 툴바
+// ---------------------------------------------------------------------
+function bindSlideBar() {
+  document.getElementById("sbPrev").addEventListener("click", () => step(-1));
+  document.getElementById("sbNext").addEventListener("click", () => step(1));
+  document.getElementById("sbDup").addEventListener("click", duplicatePage);
+  document.getElementById("sbAdd").addEventListener("click", addPage);
+  document.getElementById("sbDel").addEventListener("click", () => deletePage(State.currentId));
+  document.getElementById("sbNum").addEventListener("click", togglePagePop);
+
+  document.addEventListener("click", (e) => {
+    const pop = document.getElementById("pagePop");
+    if (pop.hidden) return;
+    if (e.target.closest("#pagePop") || e.target.closest("#sbNum")) return;
+    pop.hidden = true;
+  });
+}
+
+function step(dir) {
+  const idx = State.pages.findIndex((p) => p.id === State.currentId);
+  const next = State.pages[idx + dir];
+  if (next) goToPage(next.id);
+}
+
+function updateSlideBar() {
+  const idx = State.pages.findIndex((p) => p.id === State.currentId);
+  const num = document.getElementById("sbNum");
+  if (num) num.textContent = idx >= 0 ? idx + 1 : 1;
+  const prev = document.getElementById("sbPrev");
+  const next = document.getElementById("sbNext");
+  if (prev) prev.disabled = idx <= 0;
+  if (next) next.disabled = idx < 0 || idx >= State.pages.length - 1;
+}
+
+// ---------------------------------------------------------------------
+// 페이지 목록 팝오버 (이동 + 드래그 순서변경)
+// ---------------------------------------------------------------------
+function togglePagePop() {
+  const pop = document.getElementById("pagePop");
+  if (!pop.hidden) { pop.hidden = true; return; }
+  renderPagePop();
+  pop.hidden = false;
+  positionPagePop();
+  const act = pop.querySelector(".bookedit-pop-item.active");
+  if (act) act.scrollIntoView({ block: "nearest" });
+}
+
+// 툴바 왼쪽에 띄우고, 자리 없으면 오른쪽 / 화면 밖으로 안 나가게
+function positionPagePop() {
+  const pop = document.getElementById("pagePop");
+  const anchor = document.getElementById("sbNum");
+  if (!pop || !anchor) return;
+  const a = anchor.getBoundingClientRect();
+  const w = pop.offsetWidth || 232;
+  const h = pop.offsetHeight || 300;
+
+  let left = a.left - w - 12;
+  if (left < 12) left = Math.min(a.right + 12, window.innerWidth - w - 12);
+  let top = a.top + a.height / 2 - h / 2;
+  top = Math.max(76, Math.min(top, window.innerHeight - h - 12));
+
+  pop.style.left = left + "px";
+  pop.style.top = top + "px";
+}
+
+function renderPagePop() {
+  const list = document.getElementById("pagePopList");
+  list.innerHTML = "";
+  State.pages.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "bookedit-pop-item" + (p.id === State.currentId ? " active" : "");
+    row.dataset.id = p.id;
+    row.innerHTML =
+      '<span class="bookedit-page-handle" title="드래그해서 순서 변경"><i class="fas fa-grip-vertical"></i></span>' +
+      '<span class="bookedit-pop-num">' + (i + 1) + "</span>" +
+      '<span class="bookedit-pop-label">페이지 ' + (i + 1) + "</span>" +
+      '<span class="bookedit-dirty-dot' + (State.dirty.has(p.id) ? " on" : "") + '"></span>';
+
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".bookedit-page-handle")) return;
+      goToPage(p.id);
+      document.getElementById("pagePop").hidden = true;
+    });
+
+    const handle = row.querySelector(".bookedit-page-handle");
+    handle.addEventListener("mousedown", () => { row.draggable = true; });
+    handle.addEventListener("mouseup", () => { row.draggable = false; });
+    row.addEventListener("dragstart", (e) => {
+      DnD.fromId = p.id;
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", p.id); } catch (_) {}
+    });
+    row.addEventListener("dragend", () => {
+      row.draggable = false;
+      row.classList.remove("dragging");
+      clearDropMarkers();
+    });
+    row.addEventListener("dragover", (e) => {
+      if (!DnD.fromId || DnD.fromId === p.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      showDropMarker(row, isBefore(row, e.clientY));
+    });
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      onDropReorder(DnD.fromId, p.id, isBefore(row, e.clientY));
+    });
+
+    list.appendChild(row);
+  });
+}
+
+// ── 드래그 정렬 헬퍼 ──
+const DnD = { fromId: null };
+
+function isBefore(item, y) {
+  const r = item.getBoundingClientRect();
+  return y < r.top + r.height / 2;
+}
+function clearDropMarkers() {
+  document.querySelectorAll(".bookedit-pop-item.drop-before, .bookedit-pop-item.drop-after")
+    .forEach((el) => el.classList.remove("drop-before", "drop-after"));
+}
+function showDropMarker(item, before) {
+  clearDropMarkers();
+  item.classList.add(before ? "drop-before" : "drop-after");
+}
+
+async function onDropReorder(fromId, toId, before) {
+  clearDropMarkers();
+  DnD.fromId = null;
+  if (!fromId || fromId === toId) return;
+
+  const from = State.pages.findIndex((p) => p.id === fromId);
+  if (from < 0) return;
+  const [moved] = State.pages.splice(from, 1);
+  const to = State.pages.findIndex((p) => p.id === toId);
+  if (to < 0) { State.pages.splice(from, 0, moved); return; }
+  State.pages.splice(before ? to : to + 1, 0, moved);
+
+  renderStack();
+  renderPagePop();
+  await persistOrder();
 }
 
 // ---------------------------------------------------------------------
 // 저장(발행) — 서버 tr_book_pages 에 반영 + 버전 백업
 // ---------------------------------------------------------------------
-// 저장 = "수정한 모든 페이지"를 한 번에 서버에 발행 (현재 페이지만 X)
 async function savePage() {
-  if (!State.editor || !State.currentId) return;
   const btn = document.getElementById("btnSave");
   btn.disabled = true;
   setStatus("editing", "저장 중…");
 
   try {
-    // 현재 페이지의 최신 내용을 임시저장에 반영(다른 페이지들은 이미 전환 시 저장됨)
-    saveDraft(State.currentId, State.editor.getBlocks());
+    // 켜져 있는 편집기의 최신 내용을 임시저장에 반영
+    State.dirty.forEach((id) => {
+      const h = State.editors.get(id);
+      if (h) saveDraft(id, h.getBlocks());
+    });
 
-    // 발행 대상 = 수정된(dirty) 모든 페이지. 없으면 현재 페이지만.
-    const targets = State.dirty.size ? Array.from(State.dirty) : [State.currentId];
+    const targets = State.dirty.size ? Array.from(State.dirty) : (State.currentId ? [State.currentId] : []);
+    if (!targets.length) { setStatus("saved", "변경 없음"); return; }
+
+    let conv = anyHandle() || ensureMounted(targets[0]);
+    if (!conv) throw new Error("편집기가 아직 준비되지 않았어요. 잠시 후 다시 눌러주세요.");
 
     for (const pageId of targets) {
-      const blocks = pageId === State.currentId ? State.editor.getBlocks() : loadDraft(pageId);
+      const blocks = currentBlocksFor(pageId);
       if (!blocks) continue;
-      const html = await State.editor.htmlOf(blocks);
+      const html = await conv.htmlOf(blocks);
 
       await supabaseAPI.patch("tr_book_pages", pageId, {
         blocks: blocks,
@@ -227,7 +547,7 @@ async function savePage() {
     }
     State.dirty.clear();
 
-    // 책 수정시각도 갱신 (관리 목록의 '수정일'이 안 바뀌던 문제)
+    // 책 수정시각도 갱신
     try {
       const now = new Date().toISOString();
       await supabaseAPI.patch("tr_book_documents", State.book.id, { updated_at: now });
@@ -245,50 +565,54 @@ async function savePage() {
 }
 
 // ---------------------------------------------------------------------
-// 페이지 추가 / 삭제 / 순서  [6단계]
+// 페이지 추가 / 복제 / 삭제 / 순서
 // ---------------------------------------------------------------------
-// 상단 + : 지금 보던 페이지 "다음"에 추가 (맨 아래가 아니라)
+// 현재 페이지 "다음"에 추가
 async function addPage() {
   const curIdx = State.pages.findIndex((p) => p.id === State.currentId);
   await insertPageAt(curIdx >= 0 ? curIdx + 1 : State.pages.length);
 }
 
-// 특정 위치(index)에 빈 페이지 삽입 → 즉시 열고 그 자리로 스크롤
-async function insertPageAt(index) {
+async function insertPageAt(index, seed) {
   try {
     const np = await supabaseAPI.post("tr_book_pages", {
-      book_id: State.book.id, sort_order: 0, blocks: [], html: "",
+      book_id: State.book.id,
+      sort_order: 0,
+      blocks: (seed && seed.blocks) || [],
+      html: (seed && seed.html) || "",
     });
     const at = Math.max(0, Math.min(index, State.pages.length));
     State.pages.splice(at, 0, np);
-    switchPage(np.id);            // 새 페이지 열기 + 목록 갱신
-    scrollPageIntoView(np.id);    // 보이는 곳으로
+    renderStack();
+    ensureMounted(np.id);
+    goToPage(np.id);
     await syncTotalPages();
-    await persistOrder();         // sort_order 1..N 재정렬 저장
+    await persistOrder();
   } catch (e) {
     console.error(e);
     alert("페이지 추가 실패: " + e.message);
   }
 }
 
-function scrollPageIntoView(pageId) {
-  const el = document.querySelector('.bookedit-page-item[data-id="' + pageId + '"]');
-  if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-}
-
-// 페이지 사이 "여기에 추가" 삽입선 (hover 시 선+플러스)
-function makeInsertZone(index) {
-  const z = document.createElement("div");
-  z.className = "bookedit-insert-zone";
-  z.title = "여기에 페이지 추가";
-  z.innerHTML =
-    '<span class="bookedit-insert-line"></span>' +
-    '<span class="bookedit-insert-plus"><i class="fas fa-plus"></i></span>';
-  z.addEventListener("click", () => insertPageAt(index));
-  return z;
+// 현재 페이지 복제 → 바로 아래에
+async function duplicatePage() {
+  const id = State.currentId;
+  const idx = State.pages.findIndex((p) => p.id === id);
+  if (idx < 0) return;
+  try {
+    const blocks = currentBlocksFor(id);
+    const h = anyHandle();
+    const html = h ? await h.htmlOf(blocks) : (State.pages[idx].html || "");
+    await insertPageAt(idx + 1, { blocks, html });
+    setStatus("saved", "페이지 복제됨");
+  } catch (e) {
+    console.error(e);
+    alert("복제 실패: " + e.message);
+  }
 }
 
 async function deletePage(pageId) {
+  if (!pageId) return;
   if (State.pages.length <= 1) {
     alert("최소 1페이지는 있어야 해요.");
     return;
@@ -298,128 +622,21 @@ async function deletePage(pageId) {
   try {
     await supabaseAPI.hardDelete("tr_book_pages", pageId);
     clearDraft(pageId);
+    State.dirty.delete(pageId);
     const idx = State.pages.findIndex((p) => p.id === pageId);
     State.pages = State.pages.filter((p) => p.id !== pageId);
-    await syncTotalPages();
 
-    // 삭제한 게 현재 페이지면 이웃으로 이동
-    if (State.currentId === pageId) {
-      const next = State.pages[Math.min(idx, State.pages.length - 1)];
-      State.currentId = next.id;
-      setEditorBlocksQuiet(blocksForPage(next.id));
-    }
-    renderPageList();
+    renderStack();
+    const next = State.pages[Math.min(idx, State.pages.length - 1)];
+    if (next) setCurrent(next.id);
+
+    await syncTotalPages();
+    await persistOrder();
     setStatus("saved", "페이지 삭제됨");
   } catch (e) {
     console.error(e);
     alert("삭제 실패: " + e.message);
   }
-}
-
-async function syncTotalPages() {
-  try {
-    await supabaseAPI.patch("tr_book_documents", State.book.id, {
-      total_pages: State.pages.length,
-    });
-    State.book.total_pages = State.pages.length;
-  } catch (e) { /* 표시용이라 실패해도 치명적이지 않음 */ }
-}
-
-// ---------------------------------------------------------------------
-// 사이드바 렌더
-// ---------------------------------------------------------------------
-function renderPageList() {
-  const list = document.getElementById("pageList");
-  list.innerHTML = "";
-
-  State.pages.forEach((p, i) => {
-    list.appendChild(makeInsertZone(i)); // 이 페이지 "위"에 추가하는 삽입선
-    const item = document.createElement("div");
-    item.className = "bookedit-page-item" + (p.id === State.currentId ? " active" : "");
-    item.dataset.id = p.id;
-
-    item.innerHTML =
-      '<span class="bookedit-page-handle" title="드래그해서 순서 변경" data-act="handle"><i class="fas fa-grip-vertical"></i></span>' +
-      '<span class="bookedit-page-num">' + (i + 1) + "</span>" +
-      '<span class="bookedit-page-label">페이지 ' + (i + 1) + "</span>" +
-      '<span class="bookedit-dirty-dot' + (State.dirty.has(p.id) ? " on" : "") + '" title="저장 안 한 변경"></span>' +
-      '<span class="bookedit-page-actions">' +
-        '<button class="bookedit-mini is-danger" title="삭제" data-act="del"><i class="fas fa-trash-can"></i></button>' +
-      "</span>";
-
-    // 클릭 → 전환 (액션 버튼 클릭은 제외)
-    item.addEventListener("click", (e) => {
-      const actBtn = e.target.closest("[data-act]");
-      if (actBtn) {
-        e.stopPropagation();
-        const act = actBtn.dataset.act;
-        if (act === "del") deletePage(p.id);
-        return; // handle 은 아무 것도 안 함(드래그 전용)
-      }
-      switchPage(p.id);
-    });
-
-    // ── 드래그로 순서 변경 (핸들에서만 시작) ──
-    const handle = item.querySelector(".bookedit-page-handle");
-    handle.addEventListener("mousedown", () => { item.draggable = true; });
-    handle.addEventListener("mouseup", () => { item.draggable = false; });
-    item.addEventListener("dragstart", (e) => {
-      DnD.fromId = p.id;
-      item.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      try { e.dataTransfer.setData("text/plain", p.id); } catch (_) {}
-    });
-    item.addEventListener("dragend", () => {
-      item.draggable = false;
-      item.classList.remove("dragging");
-      clearDropMarkers();
-    });
-    item.addEventListener("dragover", (e) => {
-      if (!DnD.fromId || DnD.fromId === p.id) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      showDropMarker(item, isBefore(item, e.clientY));
-    });
-    item.addEventListener("drop", (e) => {
-      e.preventDefault();
-      onDropReorder(DnD.fromId, p.id, isBefore(item, e.clientY));
-    });
-
-    list.appendChild(item);
-  });
-  list.appendChild(makeInsertZone(State.pages.length)); // 맨 아래 삽입선
-}
-
-// ── 드래그 정렬 헬퍼 ──
-const DnD = { fromId: null };
-
-function isBefore(item, y) {
-  const r = item.getBoundingClientRect();
-  return y < r.top + r.height / 2;
-}
-function clearDropMarkers() {
-  document.querySelectorAll(".bookedit-page-item.drop-before, .bookedit-page-item.drop-after")
-    .forEach((el) => el.classList.remove("drop-before", "drop-after"));
-}
-function showDropMarker(item, before) {
-  clearDropMarkers();
-  item.classList.add(before ? "drop-before" : "drop-after");
-}
-
-async function onDropReorder(fromId, toId, before) {
-  clearDropMarkers();
-  DnD.fromId = null;
-  if (!fromId || fromId === toId) return;
-
-  const from = State.pages.findIndex((p) => p.id === fromId);
-  if (from < 0) return;
-  const [moved] = State.pages.splice(from, 1);
-  let to = State.pages.findIndex((p) => p.id === toId);
-  if (to < 0) { State.pages.splice(from, 0, moved); return; } // 안전복구
-  State.pages.splice(before ? to : to + 1, 0, moved);
-
-  renderPageList();       // 즉시 화면 반영
-  await persistOrder();   // 서버에 새 순서 저장
 }
 
 // 현재 배열 순서대로 sort_order 를 1..N 로 다시 매기고, 바뀐 것만 저장
@@ -440,13 +657,15 @@ async function persistOrder() {
   }
 }
 
-function markPageDirty(pageId, on) {
-  const item = document.querySelector('.bookedit-page-item[data-id="' + pageId + '"] .bookedit-dirty-dot');
-  if (item) item.classList.toggle("on", !!on);
+async function syncTotalPages() {
+  try {
+    await supabaseAPI.patch("tr_book_documents", State.book.id, { total_pages: State.pages.length });
+    State.book.total_pages = State.pages.length;
+  } catch (e) { /* 표시용이라 실패해도 치명적이지 않음 */ }
 }
 
 // ---------------------------------------------------------------------
-// 버전 되돌리기  [5단계]
+// 버전 되돌리기
 // ---------------------------------------------------------------------
 async function showVersions() {
   const modal = document.getElementById("versionModal");
@@ -485,11 +704,11 @@ async function showVersions() {
 
 function restoreVersion(v) {
   if (!confirm("이 버전으로 되돌릴까요?\n(지금 편집 중인 내용은 사라져요. 저장해야 서버에 반영돼요.)")) return;
-  // 조용히 불러넣고(자동 점 켜짐 방지), 되돌리기는 "수정"이 맞으니 점은 직접 켜준다
-  setEditorBlocksQuiet(Array.isArray(v.blocks) ? v.blocks : []);
+  const id = State.currentId;
+  setBlocksQuiet(id, Array.isArray(v.blocks) ? v.blocks : []);
   closeVersions();
-  State.dirty.add(State.currentId);
-  markPageDirty(State.currentId, true);
+  State.dirty.add(id);
+  markPageDirty(id, true);
   setStatus("editing", "되돌림 — 저장해야 반영");
 }
 

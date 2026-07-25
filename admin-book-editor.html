@@ -45,36 +45,34 @@
         </div>
     </header>
 
-    <!-- ===== 본문 ===== -->
+    <!-- ===== 본문: 페이지들이 세로로 이어짐 (스크롤) ===== -->
     <div class="bookedit-main">
+        <main class="bookedit-canvas" id="canvas">
+            <div class="bookedit-stack" id="pageStack"></div>
 
-        <!-- 사이드바: 페이지 목록 -->
-        <aside class="bookedit-sidebar">
-            <div class="bookedit-sidebar-head">
-                <h2>페이지</h2>
-                <button class="btn-ghost" onclick="addPage()" title="페이지 추가" style="padding:6px 8px;">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-            <div class="bookedit-page-list" id="pageList">
-                <!-- JS에서 채움 (3·4단계는 임시로 1페이지) -->
-                <div class="bookedit-page-item active">
-                    <span class="bookedit-page-num">1</span>
-                    <span>페이지 1</span>
-                </div>
-            </div>
-        </aside>
-
-        <!-- 편집 캔버스 -->
-        <main class="bookedit-canvas">
-            <div class="bookedit-paper">
-                <div class="bookedit-loading" id="editorLoading">
-                    <div class="bookedit-spinner"></div>
-                    <p>편집기를 불러오는 중...</p>
-                </div>
-                <div id="bookEditor"></div>
+            <div class="bookedit-loading" id="editorLoading">
+                <div class="bookedit-spinner"></div>
+                <p>편집기를 불러오는 중...</p>
             </div>
         </main>
+    </div>
+
+    <!-- ===== 페이지 조작 툴바 (용지 옆에 떠 있음) ===== -->
+    <div class="bookedit-slidebar" id="slideBar" hidden>
+        <div class="bookedit-sb-group">
+            <button class="bookedit-sb-btn" id="sbPrev" title="이전 페이지"><i class="fas fa-arrow-up"></i></button>
+            <button class="bookedit-sb-num" id="sbNum" title="페이지 목록 (클릭)">1</button>
+            <button class="bookedit-sb-btn" id="sbNext" title="다음 페이지"><i class="fas fa-arrow-down"></i></button>
+        </div>
+        <button class="bookedit-sb-btn solo" id="sbDup" title="이 페이지 복제"><i class="far fa-clone"></i></button>
+        <button class="bookedit-sb-btn solo" id="sbAdd" title="아래에 새 페이지"><i class="far fa-square-plus"></i></button>
+        <button class="bookedit-sb-btn solo is-danger" id="sbDel" title="이 페이지 삭제"><i class="far fa-trash-can"></i></button>
+    </div>
+
+    <!-- ===== 페이지 목록 팝오버 (이동 / 드래그 순서변경) ===== -->
+    <div class="bookedit-pop" id="pagePop" hidden>
+        <div class="bookedit-pop-head">페이지 이동 · 순서 변경</div>
+        <div class="bookedit-pop-list" id="pagePopList"></div>
     </div>
 
     <!-- ===== 버전 되돌리기 모달 ===== -->
