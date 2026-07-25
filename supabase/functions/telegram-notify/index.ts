@@ -198,7 +198,7 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
       } catch (e) {
         console.warn("미발송 집계 실패(접수 알림은 발송):", e);
       }
-      text = `📋 실전 리포트 접수 — ${data.name || "-"} · 시험일 ${data.exam_date || "-"}${pendingLine}`;
+      text = `📋 실전 리포트 접수 — ${data.name || "-"}\n📅 시험일 ${data.exam_date || "-"}${pendingLine}`;
       break;
     }
 
