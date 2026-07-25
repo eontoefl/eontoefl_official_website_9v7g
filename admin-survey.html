@@ -272,6 +272,56 @@
             border-color: var(--es-primary); background: var(--es-primary-soft); color: var(--es-primary);
         }
         .asv-dropzone:hover i, .asv-dropzone.asv-drop-on i { color: var(--es-primary); }
+
+        /* ── 접이식 "새 질문 만들기" 바 (기본 접힘) ── */
+        .asv-collapse { padding-top: 0; padding-bottom: 0; }
+        .asv-collapse-bar {
+            width: 100%; display: flex; align-items: center; justify-content: space-between;
+            padding: 22px 0; background: transparent; border: none; cursor: pointer;
+            font-family: inherit; font-size: 1.04rem; font-weight: 800; color: var(--es-on);
+            letter-spacing: -0.02em;
+        }
+        .asv-collapse-bar > span { display: inline-flex; align-items: center; gap: 8px; }
+        .asv-chevron { color: var(--es-muted); font-size: 0.85rem; transition: transform 0.2s; }
+        .asv-chevron.open { transform: rotate(180deg); }
+        .asv-collapse.open { padding-bottom: 28px; }
+
+        /* ── 보기 행: 서술칸 토글 + 안내문 입력 ── */
+        .asv-opt-row { flex-wrap: wrap; }
+        .asv-opt-label { flex: 1; min-width: 150px; }
+        .asv-opt-detail {
+            display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+            font-size: 0.8rem; font-weight: 700; color: var(--es-onvar); cursor: pointer;
+        }
+        .asv-opt-detail input { accent-color: var(--es-primary); width: 15px; height: 15px; }
+        .asv-opt-ph { flex-basis: 100%; }
+
+        /* ── 결과 보기 (버튼 없이 상시 노출) ── */
+        .asv-result { background: var(--es-low); border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
+        .asv-result-q {
+            font-size: 0.95rem; font-weight: 700; color: var(--es-on); line-height: 1.5;
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .asv-result-n {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; background: var(--es-primary-soft); color: var(--es-primary);
+            border-radius: 7px; font-size: 0.78rem; font-weight: 800; flex-shrink: 0;
+        }
+        .asv-result-count { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--es-muted); }
+        .asv-tally { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+        .asv-tally-row { display: flex; align-items: center; gap: 10px; font-size: 0.84rem; }
+        .asv-tally-label {
+            flex: 0 0 28%; max-width: 28%; color: var(--es-on); font-weight: 600;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .asv-tally-bar { flex: 1; height: 10px; background: var(--es-high); border-radius: 9999px; overflow: hidden; }
+        .asv-tally-fill { display: block; height: 100%; background: linear-gradient(90deg, #7c3aed, #a78bfa); border-radius: 9999px; }
+        .asv-tally-num {
+            flex-shrink: 0; color: var(--es-onvar); font-weight: 700; font-size: 0.8rem;
+            white-space: nowrap; min-width: 78px; text-align: right;
+        }
+        .asv-detail-list { margin-top: 14px; background: var(--es-card); border-radius: 12px; padding: 12px 14px; }
+        .asv-detail-title { font-size: 0.78rem; font-weight: 800; color: var(--es-primary); margin-bottom: 6px; }
     </style>
 </head>
 <body>
@@ -329,9 +379,13 @@
             목표 인원이 차면 자동으로 수집이 종료됩니다. 판정(사실/거짓)은 여기서 직접 하세요.
         </p>
 
-        <!-- 새 질문 만들기 -->
-        <div class="asv-card">
-            <h2><i class="fas fa-plus-circle" style="color:#7c3aed;"></i> 새 질문 만들기</h2>
+        <!-- 새 질문 만들기 (기본 접힘 — 눌러서 펼침) -->
+        <div class="asv-card asv-collapse" id="newQCard">
+            <button type="button" class="asv-collapse-bar" onclick="toggleNewQ()">
+                <span><i class="fas fa-plus-circle" style="color:#7c3aed;"></i> 새 질문 만들기</span>
+                <i class="fas fa-chevron-down asv-chevron" id="newQChevron"></i>
+            </button>
+            <div id="newQBody" style="display:none;">
             <div class="asv-field">
                 <label>질문</label>
                 <input type="text" id="newQText" placeholder="예) 리딩에서 학술지문이 몇 문단이었나요?">
@@ -352,7 +406,7 @@
                 </div>
             </div>
             <div class="asv-field" id="optionsField">
-                <label>보기</label>
+                <label>보기 <span style="font-weight:500; color:var(--es-muted);">· '서술칸'을 켜면 그 보기를 고른 학생에게 추가 입력칸이 떠요 (예: 기타 → 직접 입력)</span></label>
                 <div id="optionsList"></div>
                 <button type="button" class="asv-add-opt" onclick="addOption()">
                     <i class="fas fa-plus"></i> 보기 추가
@@ -371,12 +425,19 @@
             <button class="asv-create-btn" onclick="createQuestion()">
                 <i class="fas fa-check"></i> 질문 등록
             </button>
+            </div><!-- /newQBody -->
         </div>
 
-        <!-- 진행 중 질문 -->
+        <!-- 진행 중 질문 (운영: 순서·수정·마감·목표현황) -->
         <div class="asv-card">
             <h2><i class="fas fa-satellite-dish" style="color:#2563eb;"></i> 진행 중 질문</h2>
             <div id="activeList"><div class="asv-empty">불러오는 중...</div></div>
+        </div>
+
+        <!-- 결과 보기 (버튼 없이 현재 응답 현황을 바로 표시) -->
+        <div class="asv-card">
+            <h2><i class="fas fa-chart-simple" style="color:#0891b2;"></i> 결과 보기</h2>
+            <div id="resultsList"><div class="asv-empty">불러오는 중...</div></div>
         </div>
 
         <!-- 응답자 명단 (기프티콘 발송용) -->

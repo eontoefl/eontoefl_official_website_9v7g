@@ -55,6 +55,11 @@ function svEsc(str) {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// 보기(option)는 문자열(단순 보기) 또는 객체({label, detail, ph})일 수 있다 — 하위호환.
+function svOptLabel(o) { return (o && typeof o === 'object') ? (o.label || '') : o; }
+function svOptDetail(o) { return !!(o && typeof o === 'object' && o.detail); }
+function svOptPh(o) { return (o && typeof o === 'object' && o.ph) ? o.ph : '구체적으로 적어주세요'; }
+
 async function loadSurvey() {
     // 1. (로그인된 경우만) 최근 응시한 시험 → 날짜 미리 채움용
     if (svUser && svUser.id) {
@@ -160,12 +165,19 @@ function renderForm() {
         if (q.question_type === 'choice') {
             var opts = Array.isArray(q.options) ? q.options : [];
             body = opts.map(function(opt) {
+                var label = svOptLabel(opt);
+                var detailAttr = svOptDetail(opt)
+                    ? 'data-detail="1" data-ph="' + svEsc(svOptPh(opt)) + '" ' : '';
                 return '<label class="sv-opt">' +
-                    '<input type="radio" name="q_' + q.id + '" value="' + svEsc(opt) + '" ' +
-                        'onchange="markSelected(this)">' +
-                    '<span>' + svEsc(opt) + '</span>' +
+                    '<input type="radio" name="q_' + q.id + '" value="' + svEsc(label) + '" ' +
+                        detailAttr + 'onchange="markSelected(this)">' +
+                    '<span>' + svEsc(label) + '</span>' +
                 '</label>';
             }).join('');
+            // 특정 보기(기타/아니오 등)를 고르면 그때 떠오르는 서술칸
+            body += '<div class="sv-detail" id="qd_' + q.id + '" style="display:none;">' +
+                '<textarea id="qdt_' + q.id + '" placeholder="구체적으로 적어주세요"></textarea>' +
+            '</div>';
         } else {
             body = '<textarea id="q_' + q.id + '" placeholder="천천히 떠올려서 최대한 정확하게 적어주세요."></textarea>';
         }
@@ -180,11 +192,24 @@ function renderForm() {
     showState('svForm');
 }
 
-/** 객관식 선택 시 보기 강조 */
+/** 객관식 선택 시 보기 강조 + 서술칸 보기를 골랐으면 추가 입력칸 노출 */
 function markSelected(input) {
     var group = document.getElementsByName(input.name);
     for (var i = 0; i < group.length; i++) {
         group[i].closest('.sv-opt').classList.toggle('sv-opt-on', group[i].checked);
+    }
+    // name = 'q_<질문id>' → 그 질문의 서술칸 컨테이너 토글
+    var qid = input.name.slice(2);
+    var box = document.getElementById('qd_' + qid);
+    if (!box) return;
+    var checked = document.querySelector('input[name="' + input.name + '"]:checked');
+    var ta = document.getElementById('qdt_' + qid);
+    if (checked && checked.getAttribute('data-detail') === '1') {
+        if (ta) ta.placeholder = checked.getAttribute('data-ph') || '구체적으로 적어주세요';
+        box.style.display = '';
+    } else {
+        box.style.display = 'none';
+        if (ta) ta.value = '';   // 다른 보기로 바꾸면 남은 서술 입력 비움
     }
 }
 
@@ -237,10 +262,23 @@ async function submitSurvey() {
     for (var i = 0; i < svQuestions.length; i++) {
         var q = svQuestions[i];
         var answer = '';
+        var detail = null;
         if (q.question_type === 'choice') {
             var sel = document.querySelector('input[name="q_' + q.id + '"]:checked');
             if (!sel) { goToQuestion(q, i, (i + 1) + '번 문항에 답해주세요.\n모든 항목이 필수예요!'); return; }
             answer = sel.value;
+            // 서술칸이 딸린 보기를 골랐으면 그 설명도 필수
+            if (sel.getAttribute('data-detail') === '1') {
+                var dt = document.getElementById('qdt_' + q.id);
+                detail = dt ? dt.value.trim() : '';
+                if (!detail) {
+                    alert((i + 1) + '번 문항: 고르신 항목에 대해 구체적으로 적어주세요.\n모든 항목이 필수예요!');
+                    var card = document.getElementById('qcard_' + q.id);
+                    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (dt) setTimeout(function() { dt.focus(); }, 350);
+                    return;
+                }
+            }
         } else {
             var ta = document.getElementById('q_' + q.id);
             answer = ta ? ta.value.trim() : '';
@@ -253,7 +291,8 @@ async function submitSurvey() {
             user_phone: phone,
             user_email: (svUser && svUser.email) ? svUser.email : '',
             exam_date: date,
-            answer: answer
+            answer: answer,
+            answer_detail: detail || null
         });
     }
     if (!rows.length) { alert('답변을 입력해주세요.'); return; }

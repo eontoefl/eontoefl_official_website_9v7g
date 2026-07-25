@@ -2,7 +2,8 @@
  * 실전 리포트 관리 (관리자)
  *
  * - 질문 생성: 질문 + 응답 방식(객관식/서술형) + 객관식 보기(+ 추가) + 목표 인원(기본 5, 계속 수집 가능)
- * - 진행 중 질문: 응답 현황(n/목표, 날짜 분포), 응답 보기, 마감·판정(사실/거짓)
+ * - 진행 중 질문: 응답 현황(n/목표, 날짜 분포), 순서·수정·숨김·마감·판정(사실/거짓)
+ * - 결과 보기: 진행 중 질문의 집계(막대)+서술 답변을 버튼 없이 상시 표시
  * - 응답자 명단: 기프티콘 수동 발송용 (학생·시험날짜별 묶음)
  * - 아카이브: 판정 완료된 질문 + 결론
  */
@@ -11,6 +12,48 @@ let asvQuestions = [];
 let asvResponses = [];
 let asvStudents = [];    // 입금 확인된 수강생 명단 (name, phone) — 응답자 대조용
 let asvQType = 'choice';
+
+// 보기(option)는 문자열(단순 보기) 또는 객체({label, detail, ph})일 수 있다 — 하위호환.
+function optLabel(o) { return (o && typeof o === 'object') ? (o.label || '') : o; }
+function optHasDetail(o) { return !!(o && typeof o === 'object' && o.detail); }
+function optPhRaw(o) { return (o && typeof o === 'object' && o.ph) ? o.ph : ''; }   // 저장된 안내문(없으면 빈값)
+
+/** 보기 입력 행들 → options 배열. 서술칸 켜진 보기만 객체로, 나머지는 문자열로 저장(형식 최소화). */
+function collectOptions(container) {
+    var opts = [];
+    container.querySelectorAll('.asv-opt-row').forEach(function(row) {
+        var labelInput = row.querySelector('.asv-opt-label');
+        var label = labelInput ? labelInput.value.trim() : '';
+        if (!label) return;
+        var cb = row.querySelector('.asv-opt-detail input');
+        if (cb && cb.checked) {
+            var phInput = row.querySelector('.asv-opt-ph');
+            var ph = phInput ? phInput.value.trim() : '';
+            opts.push({ label: label, detail: true, ph: ph || null });
+        } else {
+            opts.push(label);
+        }
+    });
+    return opts;
+}
+
+/** 서술칸 체크 토글 시 안내문 입력칸 보이기/숨기기 */
+function toggleOptDetail(cb) {
+    var row = cb.closest('.asv-opt-row');
+    var ph = row ? row.querySelector('.asv-opt-ph') : null;
+    if (ph) ph.style.display = cb.checked ? '' : 'none';
+}
+
+/** "새 질문 만들기" 접기/펼치기 */
+function toggleNewQ() {
+    var body = document.getElementById('newQBody');
+    var card = document.getElementById('newQCard');
+    var chev = document.getElementById('newQChevron');
+    var open = body.style.display === 'none';
+    body.style.display = open ? '' : 'none';
+    if (card) card.classList.toggle('open', open);
+    if (chev) chev.classList.toggle('open', open);
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     checkAsvAdminAuth();
@@ -51,6 +94,7 @@ async function loadAll() {
         return;
     }
     renderActive();
+    renderResults();
     renderResponders();
     renderArchive();
 }
@@ -65,14 +109,22 @@ function setQType(type) {
     document.getElementById('optionsField').style.display = (type === 'choice') ? '' : 'none';
 }
 
-function addOption(value) {
+function addOption(value, detail, ph) {
     const list = document.getElementById('optionsList');
     const row = document.createElement('div');
     row.className = 'asv-opt-row';
-    row.innerHTML =
-        '<input type="text" placeholder="보기 (예: 4문단)" value="' + (value ? escapeHtml(value) : '') + '">' +
-        '<button type="button" class="asv-opt-del" onclick="this.parentNode.remove()"><i class="fas fa-times"></i></button>';
+    row.innerHTML = optRowHtml(value, detail, ph, '보기 (예: 4문단)');
     list.appendChild(row);
+}
+
+/** 보기 입력 행 마크업 (생성 폼·수정 폼 공용) */
+function optRowHtml(value, detail, ph, placeholder) {
+    return '<input type="text" class="asv-opt-label" placeholder="' + placeholder + '" value="' + (value ? escapeHtml(value) : '') + '">' +
+        '<label class="asv-opt-detail"><input type="checkbox"' + (detail ? ' checked' : '') +
+            ' onchange="toggleOptDetail(this)"> 서술칸</label>' +
+        '<button type="button" class="asv-opt-del" onclick="this.parentNode.remove()"><i class="fas fa-times"></i></button>' +
+        '<input type="text" class="asv-opt-ph" placeholder="서술칸 안내문 (비우면: 구체적으로 적어주세요)" value="' +
+            (ph ? escapeHtml(ph) : '') + '"' + (detail ? '' : ' style="display:none;"') + '>';
 }
 
 async function createQuestion() {
@@ -81,9 +133,7 @@ async function createQuestion() {
 
     let options = null;
     if (asvQType === 'choice') {
-        options = Array.from(document.querySelectorAll('#optionsList input'))
-            .map(function(i) { return i.value.trim(); })
-            .filter(Boolean);
+        options = collectOptions(document.getElementById('optionsList'));
         if (options.length < 2) { alert('객관식은 보기를 2개 이상 입력해주세요.'); return; }
     }
 
@@ -154,14 +204,12 @@ function renderActive() {
             : '<span class="asv-badge ' + (full ? 'asv-badge-full' : 'asv-badge-collect') + '">' +
                   resps.length + ' / ' + q.target_count + (full ? ' · 판정 대기' : '') +
               '</span>';
-        // 액션은 ⋯ 메뉴 하나로 모은다 (응답 보기 / 숨기기·보이기 / 마감·판정 / 삭제)
+        // 액션은 ⋯ 메뉴 하나로 모은다 (숨기기·보이기 / 수정 / 마감·판정 / 삭제) — 응답 열람은 아래 '결과 보기'로 일원화
         var menu =
             '<div class="asv-menu-wrap">' +
                 '<button class="asv-kebab" onclick="toggleQMenu(event, \'' + q.id + '\')">' +
                     '<i class="fas fa-ellipsis-vertical"></i></button>' +
                 '<div class="asv-menu" id="menu_' + q.id + '">' +
-                    '<button class="asv-menu-item" onclick="toggleAnswers(\'' + q.id + '\'); closeQMenus();">' +
-                        '<i class="fas fa-list"></i> 응답 보기</button>' +
                     '<button class="asv-menu-item" onclick="setQuestionHidden(\'' + q.id + '\', ' + (q.hidden ? 'false' : 'true') + ')">' +
                         (q.hidden
                             ? '<i class="fas fa-eye"></i> 다시 보이기'
@@ -190,7 +238,6 @@ function renderActive() {
                     menu +
                 '</div>' +
             '</div>' +
-            buildAnswersHtml(q, resps) +
             buildVerdictHtml(q) +
             buildEditHtml(q) +
         '</div>';
@@ -265,10 +312,9 @@ async function persistOrder() {
 // ── 수정 패널 ──
 // 수정은 "의미가 유지되는 손질"만을 위한 것. 의미가 바뀌면 기존 응답과 어긋나므로
 // 패널 상단에 경고를 상시 표시하고, 응답이 있으면 저장 전에 한 번 더 확인받는다.
-function editOptRow(value) {
+function editOptRow(opt) {
     return '<div class="asv-opt-row">' +
-        '<input type="text" placeholder="보기" value="' + escapeHtml(value || '') + '">' +
-        '<button type="button" class="asv-opt-del" onclick="this.parentNode.remove()"><i class="fas fa-times"></i></button>' +
+        optRowHtml(optLabel(opt), optHasDetail(opt), optPhRaw(opt), '보기') +
     '</div>';
 }
 
@@ -331,9 +377,7 @@ async function saveQuestionEdit(qid) {
         hypothesis: document.getElementById('editQHyp_' + qid).value.trim() || null
     };
     if (q.question_type === 'choice') {
-        var options = Array.from(document.querySelectorAll('#editOpts_' + qid + ' input'))
-            .map(function(i) { return i.value.trim(); })
-            .filter(Boolean);
+        var options = collectOptions(document.getElementById('editOpts_' + qid));
         if (options.length < 2) { alert('객관식은 보기를 2개 이상 입력해주세요.'); return; }
         patch.options = options;
     }
@@ -401,9 +445,11 @@ function buildAnswersHtml(q, resps) {
         inner = '<div class="asv-empty">아직 응답이 없습니다.</div>';
     } else {
         inner = resps.map(function(r) {
+            var detail = (r.answer_detail && r.answer_detail.trim())
+                ? ' <span style="color:var(--es-onvar); font-weight:500;">— ' + escapeHtml(r.answer_detail) + '</span>' : '';
             return '<div class="asv-answer-row">' +
                 '<span class="asv-answer-who">' + escapeHtml(r.user_name || '-') + ' · ' + escapeHtml(r.exam_date || '') + '</span>' +
-                '<span class="asv-answer-val">' + escapeHtml(r.answer) + '</span>' +
+                '<span class="asv-answer-val">' + escapeHtml(r.answer) + detail + '</span>' +
             '</div>';
         }).join('');
         // 객관식이면 보기별 집계도
@@ -456,6 +502,85 @@ async function closeQuestion(qid) {
     } catch (err) {
         alert('마감 실패: ' + err.message);
     }
+}
+
+// ================================================
+// 결과 보기 (진행 중 질문의 응답 현황을 버튼 없이 바로 표시)
+// - 객관식: 보기별 집계 막대 + 서술칸 답변 목록
+// - 서술형: 답변 목록
+// ================================================
+function renderResults() {
+    const active = asvQuestions.filter(function(q) { return q.status === 'active'; }).sort(byDisplayOrder);
+    const el = document.getElementById('resultsList');
+    if (!el) return;
+    if (!active.length) {
+        el.innerHTML = '<div class="asv-empty">진행 중인 질문이 없습니다.</div>';
+        return;
+    }
+    el.innerHTML = active.map(function(q, i) {
+        const resps = respsOf(q.id);
+        let body;
+        if (!resps.length) {
+            body = '<div class="asv-empty" style="padding:16px;">아직 응답이 없습니다.</div>';
+        } else if (q.question_type === 'choice') {
+            body = buildTallyHtml(q, resps) + buildDetailListHtml(resps);
+        } else {
+            body = buildTextListHtml(resps);
+        }
+        return '<div class="asv-result">' +
+            '<div class="asv-result-q">' +
+                '<span class="asv-result-n">' + (i + 1) + '</span>' +
+                '<span>' + escapeHtml(q.question_text) + '</span>' +
+                '<span class="asv-result-count">' + resps.length + '명 응답</span>' +
+            '</div>' + body +
+        '</div>';
+    }).join('');
+}
+
+/** 객관식 집계 막대: 보기 순서대로(0표 보기도 노출), 목록에 없는 답은 뒤에 붙임 */
+function buildTallyHtml(q, resps) {
+    const tally = {};
+    resps.forEach(function(r) { tally[r.answer] = (tally[r.answer] || 0) + 1; });
+    const labels = (Array.isArray(q.options) ? q.options : []).map(optLabel);
+    Object.keys(tally).forEach(function(a) { if (labels.indexOf(a) === -1) labels.push(a); });
+    let max = 1;
+    labels.forEach(function(l) { if ((tally[l] || 0) > max) max = tally[l]; });
+    const total = resps.length;
+    return '<div class="asv-tally">' + labels.map(function(l) {
+        const c = tally[l] || 0;
+        const pct = total ? Math.round(c / total * 100) : 0;
+        const w = Math.round((c / max) * 100);
+        return '<div class="asv-tally-row">' +
+            '<span class="asv-tally-label" title="' + escapeHtml(l) + '">' + escapeHtml(l) + '</span>' +
+            '<span class="asv-tally-bar"><span class="asv-tally-fill" style="width:' + w + '%"></span></span>' +
+            '<span class="asv-tally-num">' + c + '명 · ' + pct + '%</span>' +
+        '</div>';
+    }).join('') + '</div>';
+}
+
+/** 서술칸 답변 목록 (객관식에서 '기타/아니오' 등을 고르고 적은 내용) */
+function buildDetailListHtml(resps) {
+    const withDetail = resps.filter(function(r) { return r.answer_detail && r.answer_detail.trim(); });
+    if (!withDetail.length) return '';
+    return '<div class="asv-detail-list">' +
+        '<div class="asv-detail-title">서술 답변 ' + withDetail.length + '건</div>' +
+        withDetail.map(function(r) {
+            return '<div class="asv-answer-row">' +
+                '<span class="asv-answer-who">' + escapeHtml((r.user_name || '-') + ' · ' + (r.exam_date || '')) + '</span>' +
+                '<span class="asv-answer-val"><b>' + escapeHtml(r.answer) + '</b> — ' + escapeHtml(r.answer_detail) + '</span>' +
+            '</div>';
+        }).join('') +
+    '</div>';
+}
+
+/** 서술형 문항 답변 목록 */
+function buildTextListHtml(resps) {
+    return '<div class="asv-detail-list">' + resps.map(function(r) {
+        return '<div class="asv-answer-row">' +
+            '<span class="asv-answer-who">' + escapeHtml((r.user_name || '-') + ' · ' + (r.exam_date || '')) + '</span>' +
+            '<span class="asv-answer-val">' + escapeHtml(r.answer) + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
 }
 
 // ================================================

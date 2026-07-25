@@ -140,6 +140,10 @@
         .sv-q textarea:focus { outline: 2px solid var(--sv-focus); }
         .sv-q textarea::placeholder { color: var(--sv-muted); }
 
+        /* 조건부 서술칸: 특정 보기를 고르면 그 밑에 떠오르는 추가 입력칸 */
+        .sv-detail { margin-top: -1px; margin-bottom: 8px; }
+        .sv-detail textarea { min-height: 68px; }
+
         /* 필수 표시: 빨간 별 + 상단 안내 */
         .sv-req { color: #ba1a1a; font-weight: 800; margin-left: 5px; }
         .sv-required-note {
