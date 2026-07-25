@@ -527,7 +527,7 @@ function renderResults() {
         } else {
             body = buildTextListHtml(resps);
         }
-        return '<div class="asv-result">' +
+        return '<div class="asv-result" onclick="openResultModal(\'' + q.id + '\')">' +
             '<div class="asv-result-q">' +
                 '<span class="asv-result-n">' + (i + 1) + '</span>' +
                 '<span>' + escapeHtml(q.question_text) + '</span>' +
@@ -581,6 +581,111 @@ function buildTextListHtml(resps) {
             '<span class="asv-answer-val">' + escapeHtml(r.answer) + '</span>' +
         '</div>';
     }).join('') + '</div>';
+}
+
+// ── 결과 상세 모달: 문항 클릭 → 보기별 응답자 명단 + 같은 시험 겹침 표시 ──
+function fmtMD(d) {
+    if (!d) return '';
+    var p = String(d).split('-');
+    return p.length === 3 ? (p[1] + '/' + p[2]) : d;
+}
+
+function openResultModal(qid) {
+    var q = asvQuestions.find(function(x) { return x.id === qid; });
+    if (!q) return;
+    var resps = respsOf(qid);
+    document.getElementById('resultModalBody').innerHTML = buildModalBody(q, resps);
+    document.getElementById('resultModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';   // 뒤 배경 스크롤 잠금
+}
+
+function closeResultModal() {
+    var m = document.getElementById('resultModal');
+    if (m) m.style.display = 'none';
+    document.body.style.overflow = '';
+}
+// ESC로 닫기
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeResultModal();
+});
+
+function buildModalBody(q, resps) {
+    var total = resps.length;
+    var meta =
+        '<div class="asv-modal-meta">' +
+            '<span class="asv-badge">총 ' + total + '명</span>' +
+            '<span class="asv-badge">서로 다른 시험 날짜 ' + distinctDates(resps) + '개</span>' +
+            (q.target_count == null
+                ? '<span class="asv-badge asv-badge-infinite">계속 수집</span>'
+                : '<span class="asv-badge">' + total + ' / ' + q.target_count + '</span>') +
+        '</div>' +
+        (q.hypothesis ? '<div class="asv-modal-hyp"><i class="fas fa-flask"></i>가설: ' + escapeHtml(q.hypothesis) + '</div>' : '');
+
+    var body;
+    if (!total) {
+        body = '<div class="asv-empty" style="padding:24px;">아직 응답이 없습니다.</div>';
+    } else if (q.question_type === 'choice') {
+        body = buildModalOptions(q, resps);
+    } else {
+        body = buildModalTextPeople(resps);
+    }
+    return '<div class="asv-modal-q">' + escapeHtml(q.question_text) + '</div>' + meta + body;
+}
+
+/** 객관식: 보기별 카드 — 고른 사람들 + 같은 시험 날짜가 2명 이상이면 배지 */
+function buildModalOptions(q, resps) {
+    var labels = (Array.isArray(q.options) ? q.options : []).map(optLabel);
+    var seen = {};
+    labels.forEach(function(l) { seen[l] = true; });
+    resps.forEach(function(r) { if (!seen[r.answer]) { seen[r.answer] = true; labels.push(r.answer); } });
+
+    return labels.map(function(l) {
+        var people = resps.filter(function(r) { return r.answer === l; });
+        var dateCount = {};
+        people.forEach(function(p) { dateCount[p.exam_date] = (dateCount[p.exam_date] || 0) + 1; });
+        var badges = Object.keys(dateCount).filter(function(d) { return dateCount[d] >= 2; })
+            .map(function(d) {
+                return '<span class="asv-badge asv-mopt-badge">🎯 같은 시험 ' + dateCount[d] + '명 · ' + escapeHtml(fmtMD(d)) + '</span>';
+            }).join('');
+        var pct = resps.length ? Math.round(people.length / resps.length * 100) : 0;
+        var peopleHtml = people.length
+            ? '<div class="asv-mopt-people">' + people.map(modalPersonCard).join('') + '</div>'
+            : '<div class="asv-mopt-empty">고른 사람이 없어요.</div>';
+        return '<div class="asv-mopt">' +
+            '<div class="asv-mopt-head">' +
+                '<span class="asv-mopt-label">' + escapeHtml(l) + '</span>' +
+                '<span class="asv-mopt-count">' + people.length + '명 · ' + pct + '%</span>' +
+                badges +
+            '</div>' + peopleHtml +
+        '</div>';
+    }).join('');
+}
+
+/** 한 사람 카드 (객관식: 이름·시험날짜·제출시각 + 서술칸 답변) */
+function modalPersonCard(r) {
+    var detail = (r.answer_detail && r.answer_detail.trim())
+        ? '<div class="asv-mperson-detail">' + escapeHtml(r.answer_detail) + '</div>' : '';
+    return '<div class="asv-mperson">' +
+        '<div class="asv-mperson-top">' +
+            '<span class="asv-mperson-name">' + escapeHtml(r.user_name || '-') + '</span>' +
+            '<span class="asv-mperson-date">' + escapeHtml(r.exam_date || '') +
+                (r.created_at ? ' · ' + formatDate(r.created_at) + ' 제출' : '') + '</span>' +
+        '</div>' + detail +
+    '</div>';
+}
+
+/** 서술형: 답변 전문을 사람별 카드로 */
+function buildModalTextPeople(resps) {
+    return '<div class="asv-mopt"><div class="asv-mopt-people">' + resps.map(function(r) {
+        return '<div class="asv-mperson">' +
+            '<div class="asv-mperson-top">' +
+                '<span class="asv-mperson-name">' + escapeHtml(r.user_name || '-') + '</span>' +
+                '<span class="asv-mperson-date">' + escapeHtml(r.exam_date || '') +
+                    (r.created_at ? ' · ' + formatDate(r.created_at) + ' 제출' : '') + '</span>' +
+            '</div>' +
+            '<div class="asv-mperson-detail">' + escapeHtml(r.answer) + '</div>' +
+        '</div>';
+    }).join('') + '</div></div>';
 }
 
 // ================================================

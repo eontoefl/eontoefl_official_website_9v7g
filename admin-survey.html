@@ -297,7 +297,15 @@
         .asv-opt-ph { flex-basis: 100%; }
 
         /* ── 결과 보기 (버튼 없이 상시 노출) ── */
-        .asv-result { background: var(--es-low); border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
+        .asv-result {
+            background: var(--es-low); border-radius: 16px; padding: 18px 20px; margin-bottom: 14px;
+            cursor: pointer; transition: background 0.15s, box-shadow 0.18s, transform 0.15s;
+        }
+        .asv-result:hover {
+            background: var(--es-high);
+            box-shadow: 0 10px 28px rgba(25, 28, 29, 0.09);
+            transform: translateY(-2px);
+        }
         .asv-result-q {
             font-size: 0.95rem; font-weight: 700; color: var(--es-on); line-height: 1.5;
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -322,6 +330,52 @@
         }
         .asv-detail-list { margin-top: 14px; background: var(--es-card); border-radius: 12px; padding: 12px 14px; }
         .asv-detail-title { font-size: 0.78rem; font-weight: 800; color: var(--es-primary); margin-bottom: 6px; }
+
+        /* ── 결과 상세 모달 (문항 클릭 시) ── */
+        .asv-modal-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(25, 28, 29, 0.42);
+            -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+            display: flex; align-items: flex-start; justify-content: center;
+            padding: 40px 16px; overflow-y: auto;
+        }
+        .asv-modal {
+            position: relative; width: 100%; max-width: 620px;
+            background: var(--es-card); border-radius: 22px; padding: 30px 30px 34px;
+            box-shadow: 0 24px 64px rgba(25, 28, 29, 0.24);
+        }
+        .asv-modal-close {
+            position: absolute; top: 18px; right: 18px;
+            width: 36px; height: 36px; border: none; border-radius: 9999px;
+            background: var(--es-low); color: var(--es-onvar); cursor: pointer; font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        .asv-modal-close:hover { background: var(--es-high); color: var(--es-on); }
+        .asv-modal-q {
+            font-size: 1.1rem; font-weight: 800; color: var(--es-on);
+            letter-spacing: -0.02em; line-height: 1.45; padding-right: 44px;
+        }
+        .asv-modal-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+        .asv-modal-meta .asv-badge { background: var(--es-low); color: var(--es-onvar); }
+        .asv-modal-hyp {
+            margin-top: 12px; padding: 11px 14px;
+            background: rgba(245, 158, 11, 0.08); border-radius: 10px;
+            font-size: 0.8rem; color: #92400e; font-weight: 600; line-height: 1.55;
+        }
+        .asv-modal-hyp i { margin-right: 6px; }
+
+        .asv-mopt { background: var(--es-low); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+        .asv-mopt-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .asv-mopt-label { font-size: 0.92rem; font-weight: 800; color: var(--es-on); }
+        .asv-mopt-count { font-size: 0.8rem; font-weight: 700; color: var(--es-primary); }
+        .asv-mopt-badge { background: rgba(34, 197, 94, 0.13); color: #15803d; }
+        .asv-mopt-people { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .asv-mopt-empty { margin-top: 8px; font-size: 0.8rem; color: var(--es-muted); }
+        .asv-mperson { background: var(--es-card); border-radius: 10px; padding: 9px 12px; font-size: 0.85rem; }
+        .asv-mperson-top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+        .asv-mperson-name { font-weight: 700; color: var(--es-on); }
+        .asv-mperson-date { font-size: 0.76rem; color: var(--es-muted); }
+        .asv-mperson-detail { margin-top: 5px; font-size: 0.84rem; color: var(--es-onvar); line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -460,6 +514,14 @@
         <div class="asv-card">
             <h2><i class="fas fa-box-archive" style="color:#64748b;"></i> 판정 완료 (아카이브)</h2>
             <div id="archiveList"><div class="asv-empty">불러오는 중...</div></div>
+        </div>
+    </div>
+
+    <!-- 결과 상세 모달 (결과 보기에서 문항 클릭 시) -->
+    <div class="asv-modal-overlay" id="resultModal" style="display:none;" onclick="closeResultModal()">
+        <div class="asv-modal" onclick="event.stopPropagation()">
+            <button class="asv-modal-close" onclick="closeResultModal()"><i class="fas fa-times"></i></button>
+            <div id="resultModalBody"></div>
         </div>
     </div>
 
