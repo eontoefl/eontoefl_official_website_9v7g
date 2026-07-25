@@ -247,17 +247,45 @@ async function savePage() {
 // ---------------------------------------------------------------------
 // 페이지 추가 / 삭제 / 순서  [6단계]
 // ---------------------------------------------------------------------
+// 상단 + : 지금 보던 페이지 "다음"에 추가 (맨 아래가 아니라)
 async function addPage() {
-  const maxOrder = State.pages.reduce((m, p) => Math.max(m, p.sort_order || 0), 0);
-  const np = await supabaseAPI.post("tr_book_pages", {
-    book_id: State.book.id,
-    sort_order: maxOrder + 1,
-    blocks: [],
-    html: "",
-  });
-  State.pages.push(np);
-  await syncTotalPages();
-  switchPage(np.id);
+  const curIdx = State.pages.findIndex((p) => p.id === State.currentId);
+  await insertPageAt(curIdx >= 0 ? curIdx + 1 : State.pages.length);
+}
+
+// 특정 위치(index)에 빈 페이지 삽입 → 즉시 열고 그 자리로 스크롤
+async function insertPageAt(index) {
+  try {
+    const np = await supabaseAPI.post("tr_book_pages", {
+      book_id: State.book.id, sort_order: 0, blocks: [], html: "",
+    });
+    const at = Math.max(0, Math.min(index, State.pages.length));
+    State.pages.splice(at, 0, np);
+    switchPage(np.id);            // 새 페이지 열기 + 목록 갱신
+    scrollPageIntoView(np.id);    // 보이는 곳으로
+    await syncTotalPages();
+    await persistOrder();         // sort_order 1..N 재정렬 저장
+  } catch (e) {
+    console.error(e);
+    alert("페이지 추가 실패: " + e.message);
+  }
+}
+
+function scrollPageIntoView(pageId) {
+  const el = document.querySelector('.bookedit-page-item[data-id="' + pageId + '"]');
+  if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+// 페이지 사이 "여기에 추가" 삽입선 (hover 시 선+플러스)
+function makeInsertZone(index) {
+  const z = document.createElement("div");
+  z.className = "bookedit-insert-zone";
+  z.title = "여기에 페이지 추가";
+  z.innerHTML =
+    '<span class="bookedit-insert-line"></span>' +
+    '<span class="bookedit-insert-plus"><i class="fas fa-plus"></i></span>';
+  z.addEventListener("click", () => insertPageAt(index));
+  return z;
 }
 
 async function deletePage(pageId) {
@@ -305,6 +333,7 @@ function renderPageList() {
   list.innerHTML = "";
 
   State.pages.forEach((p, i) => {
+    list.appendChild(makeInsertZone(i)); // 이 페이지 "위"에 추가하는 삽입선
     const item = document.createElement("div");
     item.className = "bookedit-page-item" + (p.id === State.currentId ? " active" : "");
     item.dataset.id = p.id;
@@ -358,6 +387,7 @@ function renderPageList() {
 
     list.appendChild(item);
   });
+  list.appendChild(makeInsertZone(State.pages.length)); // 맨 아래 삽입선
 }
 
 // ── 드래그 정렬 헬퍼 ──

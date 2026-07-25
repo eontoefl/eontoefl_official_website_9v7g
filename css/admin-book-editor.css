@@ -220,8 +220,31 @@ body.bookedit-body {
   margin: 0;
 }
 
-/* 페이지 목록 — 구분선 없음, 여백으로 분리 */
-.bookedit-page-list { display: flex; flex-direction: column; gap: 6px; }
+/* 페이지 목록 — 구분선 없음, 삽입선(insert-zone)이 간격을 담당 */
+.bookedit-page-list { display: flex; flex-direction: column; gap: 0; }
+
+/* 페이지 사이 "여기에 추가" 삽입선 */
+.bookedit-insert-zone {
+  position: relative; z-index: 2;
+  height: 12px; margin: -1px 0;
+  display: flex; align-items: center;
+  cursor: pointer;
+}
+.bookedit-insert-line {
+  flex: 1; height: 2px; border-radius: 2px;
+  background: var(--primary);
+  opacity: 0; transition: opacity .12s ease;
+}
+.bookedit-insert-plus {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--primary); color: #fff; font-size: 9px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .12s ease;
+  box-shadow: 0 2px 6px rgba(0,102,136,0.35);
+}
+.bookedit-insert-zone:hover .bookedit-insert-line,
+.bookedit-insert-zone:hover .bookedit-insert-plus { opacity: 1; }
 
 .bookedit-page-item {
   padding: 12px 14px;
