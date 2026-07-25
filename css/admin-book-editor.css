@@ -212,18 +212,6 @@ body.bookedit-body {
 /* 페이지 한 장 */
 .bookedit-page { position: relative; }
 
-/* 용지 위 작은 페이지 번호 */
-.bookedit-page-tag {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  margin: 0 0 7px;
-  font: 600 11px "Inter", sans-serif;
-  color: var(--on-surface-variant);
-  opacity: .45;
-  transition: opacity .15s ease, color .15s ease;
-  user-select: none;
-}
-.bookedit-page.is-current .bookedit-page-tag { opacity: 1; color: var(--primary); }
-
 /* 페이지 사이 "여기에 추가" 삽입선 */
 .bookedit-insert-zone {
   position: relative; z-index: 2;

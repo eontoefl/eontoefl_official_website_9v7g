@@ -28,6 +28,7 @@ const State = {
   suppress: new Set(),    // 프로그램이 내용 넣는 중인 페이지 (사람 입력 아님)
   io: null,               // 지연 마운트 감시자
   rafPending: false,
+  scrollLock: false,      // 프로그램이 스크롤 중 (현재 페이지 자동추적 잠시 멈춤)
 };
 
 // ---------------------------------------------------------------------
@@ -148,7 +149,6 @@ function renderStack() {
       State.nodes.set(p.id, el);
       if (State.io) State.io.observe(el);
     }
-    updatePageLabel(el, i);
     desired.push(el);
   });
   desired.push(makeInsertZone(State.pages.length));
@@ -168,10 +168,6 @@ function createPageSection(p) {
   sec.className = "bookedit-page";
   sec.dataset.id = p.id;
   sec.innerHTML =
-    '<div class="bookedit-page-tag">' +
-      '<span class="bookedit-page-no"></span>' +
-      '<span class="bookedit-dirty-dot" title="저장 안 한 변경"></span>' +
-    "</div>" +
     '<div class="bookedit-paper">' +
       '<div class="bookedit-preview"></div>' +
       '<div class="bookedit-mount"></div>' +
@@ -185,12 +181,6 @@ function createPageSection(p) {
   return sec;
 }
 
-function updatePageLabel(el, i) {
-  const no = el.querySelector(".bookedit-page-no");
-  if (no) no.textContent = i + 1;
-  const dot = el.querySelector(".bookedit-dirty-dot");
-  if (dot) dot.classList.toggle("on", State.dirty.has(el.dataset.id));
-}
 
 // 페이지 사이 "여기에 추가" 삽입선
 function makeInsertZone(index) {
@@ -283,10 +273,11 @@ function onEditorChange(pageId) {
   }, 800));
 }
 
+// 저장 안 한 표시는 페이지 목록 팝오버에 (열려 있을 때만 갱신)
 function markPageDirty(pageId, on) {
-  const el = State.nodes.get(pageId);
-  if (!el) return;
-  const dot = el.querySelector(".bookedit-dirty-dot");
+  const pop = document.getElementById("pagePop");
+  if (!pop || pop.hidden) return;
+  const dot = pop.querySelector('.bookedit-pop-item[data-id="' + pageId + '"] .bookedit-dirty-dot');
   if (dot) dot.classList.toggle("on", !!on);
 }
 
@@ -306,6 +297,7 @@ function bindScrollTracking() {
 }
 
 function updateCurrentByScroll() {
+  if (State.scrollLock) return; // 페이지 옮기는 중엔 번호가 튀지 않게
   const canvas = document.getElementById("canvas");
   const box = canvas.getBoundingClientRect();
   const mid = box.top + box.height / 2;
@@ -336,7 +328,10 @@ function goToPage(pageId) {
   setCurrent(pageId);
   ensureMounted(pageId);
   const el = State.nodes.get(pageId);
-  if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+  if (!el) return;
+  State.scrollLock = true;
+  el.scrollIntoView({ block: "start", behavior: "smooth" });
+  setTimeout(() => { State.scrollLock = false; }, 600);
 }
 
 // Alt + ←/→ (또는 ↑/↓) 로 이전/다음 페이지
@@ -358,8 +353,8 @@ function setupPageHotkeys() {
 // 용지 옆 툴바
 // ---------------------------------------------------------------------
 function bindSlideBar() {
-  document.getElementById("sbPrev").addEventListener("click", () => step(-1));
-  document.getElementById("sbNext").addEventListener("click", () => step(1));
+  document.getElementById("sbPrev").addEventListener("click", () => movePage(-1));
+  document.getElementById("sbNext").addEventListener("click", () => movePage(1));
   document.getElementById("sbDup").addEventListener("click", duplicatePage);
   document.getElementById("sbAdd").addEventListener("click", addPage);
   document.getElementById("sbDel").addEventListener("click", () => deletePage(State.currentId));
@@ -373,10 +368,26 @@ function bindSlideBar() {
   });
 }
 
-function step(dir) {
+// 현재 페이지를 앞/뒤로 한 칸 옮기기 (순서 변경)
+async function movePage(dir) {
   const idx = State.pages.findIndex((p) => p.id === State.currentId);
-  const next = State.pages[idx + dir];
-  if (next) goToPage(next.id);
+  const to = idx + dir;
+  if (idx < 0 || to < 0 || to >= State.pages.length) return;
+
+  const [moved] = State.pages.splice(idx, 1);
+  State.pages.splice(to, 0, moved);
+
+  renderStack();
+  const pop = document.getElementById("pagePop");
+  if (pop && !pop.hidden) renderPagePop();
+
+  // 옮긴 페이지를 계속 보고 있게
+  State.scrollLock = true;
+  const el = State.nodes.get(moved.id);
+  if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+  setTimeout(() => { State.scrollLock = false; }, 600);
+
+  await persistOrder();
 }
 
 function updateSlideBar() {
