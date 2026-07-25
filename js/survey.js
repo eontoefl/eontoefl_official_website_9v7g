@@ -213,6 +213,21 @@ function markSelected(input) {
     }
 }
 
+/** 리포트 접수 시 관리자 텔레그램 알림 (Edge Function 경유, 한 줄).
+ *  fire-and-forget — 알림 실패가 학생 제출을 막지 않도록 절대 throw하지 않음. */
+function notifySurveyTelegram(payload) {
+    try {
+        fetch(SUPABASE_URL + '/functions/v1/telegram-notify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ type: 'survey_submitted', data: payload })
+        }).catch(function() {});
+    } catch (e) { /* 무해 */ }
+}
+
 async function submitSurvey() {
     var nameInput = document.getElementById('svName');
     var name = nameInput ? nameInput.value.trim() : '';
@@ -302,6 +317,7 @@ async function submitSurvey() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 보내는 중...';
     try {
         await supabaseAPI.post('toefl_survey_responses', rows);
+        notifySurveyTelegram({ name: name, phone: phone, exam_date: date });   // 관리자 텔레그램 알림 (실패해도 무해)
         showState('svDone');
     } catch (err) {
         console.error('리포트 제출 실패:', err);
