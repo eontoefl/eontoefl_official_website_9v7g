@@ -56,7 +56,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderBookUI();
   renderPageList();
   mountEditor();
+  setupPageHotkeys();
 });
+
+// Alt + ←/→ 로 이전/다음 페이지 이동 (편집 커서 이동과 충돌 없음)
+function setupPageHotkeys() {
+  document.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const dir = e.key === "ArrowRight" ? +1 : -1;
+    const idx = State.pages.findIndex((p) => p.id === State.currentId);
+    const next = State.pages[idx + dir];
+    if (!next) return; // 처음/끝이면 무시
+    e.preventDefault();
+    switchPage(next.id);
+  });
+}
 
 function checkAuth() {
   const params = new URLSearchParams(location.search);

@@ -273,7 +273,8 @@ body.bookedit-body {
   border-radius: 14px;
   box-shadow: var(--amb);
   min-height: calc(100vh - 220px);
-  padding: 12px 8px;
+  /* 상하좌우 대칭 여백 (좌우는 아래 .bn-block-group 가운데 정렬과 함께 균형) */
+  padding: 8px;
 }
 
 /* ===== 편집 화면 = 학생 화면(뷰어)과 동일하게 (WYSIWYG) ===== */
@@ -284,15 +285,31 @@ body.bookedit-body {
 .bn-editor h3.bn-inline-content { font-size: 19px; font-weight: 700; color: #4b5563; }
 .bn-editor p.bn-inline-content { font-size: 17px; }
 .bn-editor a { color: #006688; text-decoration: underline; }
-/* 제목 장식(밑줄/좌측보더)을 글자가 아니라 '한 줄 전체'에 → 뷰어처럼 길게 */
+/* 제목1 장식(밑줄)을 글자가 아니라 '한 줄 전체'에 → 뷰어처럼 길게 */
 .bn-editor .bn-block-content:has(> h1.bn-inline-content) { border-bottom: 3px solid #50c9ff; padding-bottom: 8px; }
-.bn-editor .bn-block-content:has(> h2.bn-inline-content) { border-left: 5px solid #006688; padding-left: 10px; }
+/* 제목2 좌측 짝대기: 박스 높이가 아니라 '글자 줄 높이'에 세로 가운데로 그린다.
+   (border-left 는 블럭 박스 전체를 덮어 아래로 쏠려 보였음 → 배경 그라디언트로 교체) */
+.bn-editor .bn-block-content:has(> h2.bn-inline-content) {
+  padding-left: 12px;
+  background-image: linear-gradient(#006688, #006688);
+  background-repeat: no-repeat;
+  background-size: 5px 1.05em;      /* 짝대기 굵기 5px · 높이 = 글자 한 줄 정도 */
+  background-position: left center;  /* 세로 정중앙 */
+}
 /* 표 헤더 행 강조 (뷰어와 동일) */
 .bn-editor table tr:first-child td { background: #f0f9ff; font-weight: 700; }
-/* 글 칸 너비를 학생 화면(640px)과 동일하게 → 줄바꿈 위치 일치 */
-.bookedit-paper .bn-editor .bn-block-group { max-width: 640px; }
-/* 위쪽 여백을 학생 화면(약 56px)과 맞춤 */
-.bookedit-paper .bn-editor { padding-top: 44px; }
+/* 글 칸을 종이 안에서 '가운데 정렬' → 좌우 여백 대칭 (기존엔 왼쪽에 붙어 오른쪽만 비었음) */
+.bookedit-paper .bn-editor .bn-block-group { max-width: 700px; margin-left: auto; margin-right: auto; }
+/* 상하 여백 대칭 (위=아래) */
+.bookedit-paper .bn-editor { padding-top: 40px; padding-bottom: 40px; }
+/* 블럭 사이 간격을 한 값으로 통일 → 문단 간격이 들쭉날쭉하지 않게 */
+.bookedit-paper .bn-editor .bn-block-outer { margin-top: 14px; }
+.bookedit-paper .bn-editor .bn-block-outer:first-child { margin-top: 0; }
+/* 단, 연속된 리스트 항목끼리는 좁게 (불릿/번호가 문단처럼 벌어지지 않게) */
+.bookedit-paper .bn-editor .bn-block-outer[data-prev-type="bulletListItem"]:has(> .bn-block > .bn-block-content[data-content-type="bulletListItem"]),
+.bookedit-paper .bn-editor .bn-block-outer[data-prev-type="numberedListItem"]:has(> .bn-block > .bn-block-content[data-content-type="numberedListItem"]) {
+  margin-top: 4px;
+}
 
 /* ===== BlockNote 브랜드 톤 맞추기 ===== */
 .bookedit-paper .bn-container {
