@@ -287,14 +287,16 @@ body.bookedit-body {
 .bn-editor a { color: #006688; text-decoration: underline; }
 /* 제목1 장식(밑줄)을 글자가 아니라 '한 줄 전체'에 → 뷰어처럼 길게 */
 .bn-editor .bn-block-content:has(> h1.bn-inline-content) { border-bottom: 3px solid #50c9ff; padding-bottom: 8px; }
-/* 제목2 좌측 짝대기: 박스 높이가 아니라 '글자 줄 높이'에 세로 가운데로 그린다.
-   (border-left 는 블럭 박스 전체를 덮어 아래로 쏠려 보였음 → 배경 그라디언트로 교체) */
-.bn-editor .bn-block-content:has(> h2.bn-inline-content) {
-  padding-left: 12px;
-  background-image: linear-gradient(#006688, #006688);
-  background-repeat: no-repeat;
-  background-size: 5px 1.05em;      /* 짝대기 굵기 5px · 높이 = 글자 한 줄 정도 */
-  background-position: left center;  /* 세로 정중앙 */
+/* 제목2 좌측 짝대기: 박스 전체를 덮던 border-left(아래로 쏠림) 대신,
+   flex 자식(::before)으로 만들어 글자 기준 세로 정중앙에 둔다. */
+.bn-editor .bn-block-content:has(> h2.bn-inline-content)::before {
+  content: "";
+  flex: 0 0 5px;          /* 짝대기 굵기 */
+  align-self: center;     /* 글자 줄 기준 세로 가운데 */
+  height: 1.1em;          /* 글자 한 줄 정도 높이 */
+  margin-right: 12px;
+  background: #006688;
+  border-radius: 2px;
 }
 /* 표 헤더 행 강조 (뷰어와 동일) */
 .bn-editor table tr:first-child td { background: #f0f9ff; font-weight: 700; }
