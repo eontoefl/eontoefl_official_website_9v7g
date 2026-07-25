@@ -51,6 +51,35 @@
         </div>
     </main>
 
+    <!-- 공개 대상 관리 모달 -->
+    <div class="aud-overlay" id="audModal">
+      <div class="aud-box">
+        <div class="aud-head">
+          <h2><i class="fas fa-user-group"></i> 공개 대상 · <span id="audBookTitle"></span></h2>
+          <button class="book-mini" onclick="closeAudience()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="aud-modes">
+          <label class="aud-mode">
+            <input type="radio" name="audMode" value="all" onchange="onAudModeChange('all')">
+            <span class="aud-mode-body"><b>전체공개</b><small>결제한 학생 전원에게 보여요</small></span>
+          </label>
+          <label class="aud-mode">
+            <input type="radio" name="audMode" value="selected" onchange="onAudModeChange('selected')">
+            <span class="aud-mode-body"><b>특정 학생</b><small>아래에서 지정한 학생만 봐요</small></span>
+          </label>
+        </div>
+        <div class="aud-selected" id="audSelectedArea" style="display:none;">
+          <div class="aud-search">
+            <i class="fas fa-magnifying-glass"></i>
+            <input id="audSearch" placeholder="학생 이름 검색 (결제 완료 학생만)" oninput="onAudSearchInput(this.value)" autocomplete="off">
+          </div>
+          <div class="aud-results" id="audResults"></div>
+          <div class="aud-added-label">지정된 학생</div>
+          <div class="aud-added" id="audAdded"></div>
+        </div>
+      </div>
+    </div>
+
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-book-list.js"></script>
 </body>

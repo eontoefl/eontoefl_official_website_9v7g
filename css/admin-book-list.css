@@ -86,6 +86,47 @@
 .role-menu button:hover { background: var(--surface-low); }
 .role-menu button.active { color: var(--primary); font-weight: 700; }
 
+/* 공개 대상 배지 */
+.badge-aud { background: rgba(80,201,255,0.16); color: var(--primary); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.badge-aud:hover { background: rgba(80,201,255,0.28); }
+.badge-aud i { font-size: 10px; }
+
+/* 공개 대상 모달 */
+.aud-overlay { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(25,28,29,0.28); backdrop-filter: blur(2px); align-items: center; justify-content: center; padding: 20px; }
+.aud-overlay.open { display: flex; }
+.aud-box { width: 100%; max-width: 460px; max-height: 84vh; background: var(--surface-lowest); border-radius: 16px; box-shadow: 0 24px 60px rgba(25,28,29,0.18); display: flex; flex-direction: column; overflow: hidden; }
+.aud-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; }
+.aud-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--on-surface); display: flex; align-items: center; gap: 8px; }
+.aud-head h2 i { color: var(--primary); }
+
+.aud-modes { display: flex; flex-direction: column; gap: 8px; padding: 0 20px 4px; }
+.aud-mode { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface-low); cursor: pointer; transition: background .15s; }
+.aud-mode:hover { background: var(--surface-high); }
+.aud-mode input { width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0; }
+.aud-mode-body { display: flex; flex-direction: column; }
+.aud-mode-body b { font-size: 14px; color: var(--on-surface); font-weight: 700; }
+.aud-mode-body small { font-size: 12px; color: var(--on-surface-variant); margin-top: 2px; }
+
+.aud-selected { padding: 12px 20px 20px; overflow-y: auto; }
+.aud-search { position: relative; margin-bottom: 10px; }
+.aud-search i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--on-surface-variant); font-size: 13px; }
+.aud-search input { width: 100%; padding: 11px 13px 11px 36px; border: none; background: var(--surface-low); border-radius: 10px; font: 400 14px "Inter"; color: var(--on-surface); outline: none; }
+.aud-search input:focus { box-shadow: 0 0 0 2px var(--primary-container); }
+
+.aud-results:not(:empty) { margin-bottom: 14px; border-radius: 10px; overflow: hidden; }
+.aud-result { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 10px; transition: background .15s; }
+.aud-result:hover { background: var(--surface-low); }
+.aud-add-btn { border: none; background: rgba(0,102,136,0.1); color: var(--primary); font: 600 12px "Inter"; padding: 7px 12px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.aud-add-btn:hover { background: rgba(0,102,136,0.18); }
+
+.aud-added-label { font-size: 12px; font-weight: 600; color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: .03em; margin: 6px 0 8px; }
+.aud-added { display: flex; flex-direction: column; gap: 4px; }
+.aud-person { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: var(--surface-low); }
+.aud-person-info { display: flex; flex-direction: column; min-width: 0; }
+.aud-person-info b, .aud-result .aud-person-info b { font-size: 14px; font-weight: 600; color: var(--on-surface); }
+.aud-person-info span { font-size: 12px; color: var(--on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aud-hint { font-size: 13px; color: var(--on-surface-variant); padding: 12px 4px; text-align: center; }
+
 @media (max-width: 640px) {
   .book-card { flex-wrap: wrap; }
   .booklist-topbar { padding: 0 14px; }
