@@ -164,7 +164,7 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
 
     // ----- 실전 리포트(설문) 접수 알림 (한 줄) -----
     case "survey_submitted": {
-      text = `📋 실전 리포트 접수 — ${data.name || "-"}(${data.phone || "-"}) · 시험일 ${data.exam_date || "-"}`;
+      text = `📋 실전 리포트 접수 — ${data.name || "-"} · 시험일 ${data.exam_date || "-"}`;
       break;
     }
 
