@@ -789,6 +789,24 @@ function setStatus(type, text) {
   el.innerHTML = icon + text;
 }
 
+// ---------------------------------------------------------------------
+// 텍스트(.md) 다운로드 — 지금 편집 중인 내용(저장 안 한 것까지) 반영
+// ---------------------------------------------------------------------
+async function downloadBook() {
+  try {
+    if (!window.BookMarkdown) throw new Error("변환기 로드 실패 — 새로고침 해주세요");
+    const title = State.book && State.book.title ? State.book.title : "입문서";
+    // 페이지 순서대로, 각 페이지의 최신 blocks(편집기 켜져있으면 라이브, 아니면 임시저장/서버본)
+    const pages = State.pages.map((p) => ({ blocks: currentBlocksFor(p.id) || [] }));
+    const md = window.BookMarkdown.buildBookMarkdown(title, pages);
+    window.BookMarkdown.downloadMarkdown(window.BookMarkdown.filenameFor(title), md);
+    setStatus("saved", "텍스트로 다운로드됨");
+  } catch (e) {
+    console.error(e);
+    alert("다운로드 실패: " + e.message);
+  }
+}
+
 function goBack() {
   location.href = "admin-book-list.html";
 }

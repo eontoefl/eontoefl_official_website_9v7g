@@ -36,6 +36,9 @@
             </span>
         </div>
         <div class="bookedit-topbar-right">
+            <button class="btn-ghost" onclick="downloadBook()" title="이 책 전체를 텍스트(.md)로 다운로드">
+                <i class="fas fa-file-arrow-down"></i> 텍스트
+            </button>
             <button class="btn-ghost" onclick="showVersions()" title="이전 버전 되돌리기">
                 <i class="fas fa-clock-rotate-left"></i> 버전
             </button>
@@ -89,6 +92,7 @@
     <!-- ===== 스크립트 ===== -->
     <script src="js/supabase-config.js"></script>
     <script src="js/book-editor.bundle.js"></script>
+    <script src="js/book-markdown.js"></script>
     <script src="js/admin-book-editor.js"></script>
 </body>
 </html>

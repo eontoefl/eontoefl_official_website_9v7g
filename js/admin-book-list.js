@@ -87,6 +87,7 @@ function renderActive(books) {
       '<div class="book-card-actions">' +
         '<label class="toggle" title="공개/숨김"><input type="checkbox" data-act="pub"' + (pub ? " checked" : "") + "><span class=\"toggle-track\"></span><span class=\"toggle-thumb\"></span></label>" +
         '<button class="book-card-edit" data-act="edit"><i class="fas fa-pen-to-square"></i> 수정</button>' +
+        '<button class="book-mini" data-act="download" title="텍스트(.md)로 다운로드"><i class="fas fa-file-arrow-down"></i></button>' +
         '<button class="book-mini" data-act="rename" title="이름변경"><i class="fas fa-i-cursor"></i></button>' +
         '<button class="book-mini is-danger" data-act="del" title="삭제(휴지통)"><i class="fas fa-trash-can"></i></button>' +
       "</div>";
@@ -96,6 +97,7 @@ function renderActive(books) {
       if (!t) return;
       const act = t.dataset.act;
       if (act === "edit") editBook(b.id);
+      else if (act === "download") downloadBook(b, t);
       else if (act === "rename") renameBook(b);
       else if (act === "del") softDelete(b);
       else if (act === "pub") togglePublish(b, t.checked);
@@ -139,6 +141,28 @@ async function createBook() {
 }
 
 function editBook(id) { location.href = "admin-book-editor.html?book=" + id; }
+
+// 이 책의 저장된 페이지들을 순서대로 받아 → 마크다운(.md) 다운로드
+async function downloadBook(b, btn) {
+  if (!window.BookMarkdown) { alert("변환기 로드 실패 — 새로고침 해주세요."); return; }
+  const prev = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+  try {
+    const pages = await supabaseAPI.query("tr_book_pages", {
+      book_id: "eq." + b.id,
+      order: "sort_order.asc",
+      select: "sort_order,blocks",
+    });
+    if (!pages || !pages.length) { alert("이 책엔 아직 페이지가 없어요."); return; }
+    const md = window.BookMarkdown.buildBookMarkdown(b.title, pages);
+    window.BookMarkdown.downloadMarkdown(window.BookMarkdown.filenameFor(b.title), md);
+  } catch (e) {
+    console.error(e);
+    alert("다운로드 실패: " + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+  }
+}
 
 async function renameBook(b) {
   const name = prompt("책 이름 변경:", b.title);
