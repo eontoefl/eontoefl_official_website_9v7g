@@ -48,8 +48,27 @@
         </div>
     </header>
 
-    <!-- ===== 본문: 페이지들이 세로로 이어짐 (스크롤) ===== -->
+    <!-- ===== 본문: 왼쪽 목차 패널 + 페이지 스크롤 ===== -->
     <div class="bookedit-main">
+
+        <!-- 왼쪽 목차(아웃라인) 패널 — 제목1·제목2 실제 내용 표시, 클릭 시 이동 -->
+        <aside class="bookedit-outline" id="outline">
+            <div class="bookedit-outline-head">
+                <span class="bookedit-outline-title"><i class="fas fa-list-ul"></i> 목차</span>
+                <button class="bookedit-outline-collapse" id="outlineCollapse" title="목차 접기">
+                    <i class="fas fa-angles-left"></i>
+                </button>
+            </div>
+            <div class="bookedit-outline-list" id="outlineList"></div>
+            <!-- 오른쪽 가장자리: 드래그해서 너비 조절 -->
+            <div class="bookedit-outline-resizer" id="outlineResizer" title="드래그해서 너비 조절"></div>
+        </aside>
+
+        <!-- 접혔을 때 나타나는 '펼치기' 탭 -->
+        <button class="bookedit-outline-open" id="outlineOpen" title="목차 펼치기" hidden>
+            <i class="fas fa-list-ul"></i>
+        </button>
+
         <main class="bookedit-canvas" id="canvas">
             <div class="bookedit-stack" id="pageStack"></div>
 

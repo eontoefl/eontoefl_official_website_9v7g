@@ -37,6 +37,9 @@
   --amb-soft: 0 8px 28px rgba(25, 28, 29, 0.05);
 
   --radius: 0.5rem; /* 8px */
+
+  /* 왼쪽 목차 패널 너비 (JS가 드래그/접기에 따라 갱신) */
+  --outline-w: 260px;
 }
 
 * { box-sizing: border-box; }
@@ -189,14 +192,18 @@ body.bookedit-body {
 .btn-ghost.is-danger { color: var(--tertiary); }
 .btn-ghost.is-danger:hover { background: rgba(165, 59, 34, 0.08); }
 
-/* ===== Main Layout ===== (사이드바 없음 — 페이지들이 세로로 이어짐) */
+/* ===== Main Layout ===== (왼쪽 목차 패널 + 페이지 스크롤) */
 .bookedit-main {
   height: calc(100vh - 66px);
   margin-top: 66px;
+  display: flex;
+  align-items: stretch;
 }
 
 /* ===== Canvas (스크롤 컨테이너) ===== */
 .bookedit-canvas {
+  flex: 1 1 auto;
+  min-width: 0;
   height: 100%;
   overflow-y: auto;
   padding: 32px 32px 120px;
@@ -208,6 +215,97 @@ body.bookedit-body {
   max-width: 760px;
   margin: 0 auto;
 }
+
+/* ===== 왼쪽 목차(아웃라인) 패널 ===== */
+.bookedit-outline {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--outline-w, 260px);
+  min-width: 180px;
+  max-width: 460px;
+  height: 100%;
+  background: var(--surface-lowest);
+  box-shadow: var(--amb-soft);
+  display: flex;
+  flex-direction: column;
+  z-index: 400; /* 캔버스 위, 상단바(1000) 아래 */
+}
+.bookedit-outline[hidden] { display: none; }
+
+.bookedit-outline-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 14px 10px 18px;
+  flex-shrink: 0;
+}
+.bookedit-outline-title {
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--on-surface-variant);
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.bookedit-outline-title i { font-size: 11px; color: var(--primary); }
+.bookedit-outline-collapse {
+  width: 26px; height: 26px; border: none; background: transparent;
+  color: var(--on-surface-variant); border-radius: 7px; cursor: pointer; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s ease, color .15s ease;
+}
+.bookedit-outline-collapse:hover { background: var(--surface-low); color: var(--primary); }
+
+.bookedit-outline-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 8px 24px;
+}
+
+/* 목차 항목 */
+.bookedit-outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none; background: transparent; cursor: pointer;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--on-surface-variant);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13.5px; line-height: 1.45;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background .12s ease, color .12s ease;
+}
+.bookedit-outline-item:hover { background: var(--surface-low); color: var(--on-surface); }
+.bookedit-outline-item.lv1 { font-weight: 700; color: var(--on-surface); }
+.bookedit-outline-item.lv2 { padding-left: 26px; font-weight: 500; font-size: 13px; }
+.bookedit-outline-item.active { background: rgba(80, 201, 255, 0.16); color: var(--primary); }
+.bookedit-outline-item.is-empty { font-style: italic; opacity: .5; }
+
+.bookedit-outline-empty {
+  padding: 22px 16px; font-size: 13px; line-height: 1.7;
+  color: var(--on-surface-variant); text-align: center; opacity: .8;
+}
+
+/* 오른쪽 가장자리 너비 조절 핸들 */
+.bookedit-outline-resizer {
+  position: absolute; top: 0; right: -3px; bottom: 0;
+  width: 6px; cursor: col-resize;
+  z-index: 2;
+}
+.bookedit-outline-resizer::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 3px;
+  width: 2px; background: transparent; transition: background .15s ease;
+}
+.bookedit-outline-resizer:hover::after,
+.bookedit-outline-resizer.dragging::after { background: var(--primary-container); }
+
+/* 접혔을 때 나타나는 '펼치기' 탭 */
+.bookedit-outline-open {
+  position: fixed; left: 0; top: 82px; z-index: 400;
+  width: 30px; height: 40px; border: none; cursor: pointer;
+  background: var(--surface-lowest); color: var(--primary);
+  border-radius: 0 10px 10px 0; box-shadow: var(--amb-soft);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 13px;
+  transition: background .15s ease;
+}
+.bookedit-outline-open[hidden] { display: none; }
+.bookedit-outline-open:hover { background: var(--surface-low); }
 
 /* 페이지 한 장 */
 .bookedit-page { position: relative; }
@@ -277,7 +375,9 @@ body.bookedit-body {
 .bookedit-slidebar {
   position: fixed;
   top: 50%; transform: translateY(-50%);
-  left: calc(50% + 398px);
+  /* 용지는 (왼쪽 목차 패널을 뺀) 캔버스 가운데에 있으므로,
+     화면 중앙에서 패널 폭의 절반만큼 오른쪽으로 보정한다. */
+  left: calc(50% + (var(--outline-w, 0px) / 2) + 398px);
   display: flex; flex-direction: column; align-items: center; gap: 9px;
   /* BlockNote의 드래그(글자꾸미기)·링크 등 떠 있는 패널은 인라인 z-index 10~90 이다.
      세로 툴바를 그 아래(5)로 두어야 그 패널들이 '항상' 위로 뜬다.

@@ -58,6 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindScrollTracking();
   setupPageHotkeys();
   setupArrowHotkey();
+  setupOutline();
 
   // 첫 페이지는 바로 켜 둔다
   if (State.pages.length) ensureMounted(State.pages[0].id);
@@ -162,6 +163,7 @@ function renderStack() {
   while (stack.childNodes.length > desired.length) stack.removeChild(stack.lastChild);
 
   updateSlideBar();
+  buildOutline(); // 페이지 추가/삭제/순서변경도 목차에 반영
 }
 
 function createPageSection(p) {
@@ -265,6 +267,7 @@ function onEditorChange(pageId) {
   setCurrent(pageId);
   setStatus("editing", "편집 중…");
   markPageDirty(pageId, true);
+  scheduleOutline(); // 제목 편집이 목차에 반영되도록
 
   clearTimeout(State.timers.get(pageId));
   State.timers.set(pageId, setTimeout(() => {
@@ -293,6 +296,7 @@ function bindScrollTracking() {
     requestAnimationFrame(() => {
       State.rafPending = false;
       updateCurrentByScroll();
+      updateActiveHeading();
     });
   }, { passive: true });
 }
@@ -369,6 +373,191 @@ function setupArrowHotkey() {
     e.preventDefault();
     ed.insertInlineContent(ARROW_SNIPPET);             // 커서 위치에 삽입 + 커서는 뒤로
   });
+}
+
+// ---------------------------------------------------------------------
+// 왼쪽 목차(아웃라인) 패널 — 제목1·제목2 실제 내용 표시 / 클릭 이동 / 현재위치 강조
+//   - 안 켜진(먼) 페이지의 제목도 저장본/임시저장본에서 뽑아 표시한다
+// ---------------------------------------------------------------------
+const OUTLINE_PREF_KEY = "bookedit_outline";
+let outlineItems = [];      // [{pageId, blockId, level, text}]
+let outlineTimer = null;
+let activeBlockId = null;
+
+// 인라인 콘텐츠 → 순수 텍스트
+function inlineText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((n) => {
+    if (!n) return "";
+    if (typeof n === "string") return n;
+    if (n.type === "text") return n.text || "";
+    if (n.type === "link") return inlineText(n.content);
+    return n.text || "";
+  }).join("");
+}
+
+// 한 페이지의 blocks에서 제목1·2를 순서대로 추출(중첩도 훑음)
+function collectHeadingsFromBlocks(blocks, pageId, out) {
+  if (!Array.isArray(blocks)) return;
+  blocks.forEach((b) => {
+    if (b && b.type === "heading") {
+      const lvl = (b.props && b.props.level) || 1;
+      if (lvl === 1 || lvl === 2) {
+        out.push({ pageId: pageId, blockId: b.id, level: lvl, text: inlineText(b.content).trim() });
+      }
+    }
+    if (b && Array.isArray(b.children) && b.children.length) {
+      collectHeadingsFromBlocks(b.children, pageId, out);
+    }
+  });
+}
+
+function buildOutline() {
+  const listEl = document.getElementById("outlineList");
+  if (!listEl) return;
+
+  outlineItems = [];
+  State.pages.forEach((p) => {
+    collectHeadingsFromBlocks(currentBlocksFor(p.id) || [], p.id, outlineItems);
+  });
+
+  if (!outlineItems.length) {
+    listEl.innerHTML = '<div class="bookedit-outline-empty">제목1·제목2를 추가하면<br>여기에 목차가 생겨요.</div>';
+    return;
+  }
+
+  listEl.innerHTML = "";
+  outlineItems.forEach((it) => {
+    const btn = document.createElement("button");
+    btn.className = "bookedit-outline-item lv" + it.level + (it.text ? "" : " is-empty");
+    btn.dataset.blockId = it.blockId;
+    btn.textContent = it.text || "(제목 없음)";
+    btn.title = it.text || "(제목 없음)";
+    btn.addEventListener("click", () => jumpToHeading(it.pageId, it.blockId));
+    listEl.appendChild(btn);
+  });
+
+  updateActiveHeading();
+}
+
+// 타이핑 중엔 살짝 미뤄서 갱신(과한 재생성 방지)
+function scheduleOutline() {
+  clearTimeout(outlineTimer);
+  outlineTimer = setTimeout(buildOutline, 450);
+}
+
+// 목차 항목 클릭 → 해당 제목으로 이동(안 켜진 페이지면 켜고 나서 이동)
+function jumpToHeading(pageId, blockId) {
+  setCurrent(pageId);
+  ensureMounted(pageId);
+  State.scrollLock = true;
+
+  const tryScroll = (tries) => {
+    const el = document.querySelector('.bookedit-mount [data-id="' + blockId + '"]');
+    if (el) {
+      el.scrollIntoView({ block: "start", behavior: "smooth" });
+      setTimeout(() => { State.scrollLock = false; updateActiveHeading(); }, 600);
+      return;
+    }
+    if (tries > 0) { setTimeout(() => tryScroll(tries - 1), 80); return; }
+    // 못 찾으면 페이지 맨 위로라도
+    const pel = State.nodes.get(pageId);
+    if (pel) pel.scrollIntoView({ block: "start", behavior: "smooth" });
+    setTimeout(() => { State.scrollLock = false; }, 600);
+  };
+  tryScroll(12);
+}
+
+// 지금 보고 있는 위치의 제목을 목차에서 강조(스크롤 따라)
+function updateActiveHeading() {
+  const listEl = document.getElementById("outlineList");
+  if (!listEl || !outlineItems.length) return;
+  const canvas = document.getElementById("canvas");
+  const threshold = canvas.getBoundingClientRect().top + 12;
+
+  let current = null;
+  outlineItems.forEach((it) => {
+    const el = document.querySelector('.bookedit-mount [data-id="' + it.blockId + '"]');
+    if (!el) return;
+    if (el.getBoundingClientRect().top <= threshold) current = it.blockId;
+  });
+  if (current === null && outlineItems.length) current = outlineItems[0].blockId;
+  if (current === activeBlockId) return;
+
+  activeBlockId = current;
+  listEl.querySelectorAll(".bookedit-outline-item.active").forEach((el) => el.classList.remove("active"));
+  if (current) {
+    const act = listEl.querySelector('.bookedit-outline-item[data-block-id="' + current + '"]');
+    if (act) { act.classList.add("active"); act.scrollIntoView({ block: "nearest" }); }
+  }
+}
+
+// ── 패널 접기/펼치기 + 너비 조절 ──
+function loadOutlinePref() {
+  let pref = { w: 260, collapsed: false };
+  try {
+    const raw = localStorage.getItem(OUTLINE_PREF_KEY);
+    if (raw) { const o = JSON.parse(raw); if (o && typeof o === "object") pref = Object.assign(pref, o); }
+  } catch (_) {}
+  pref.w = Math.max(180, Math.min(460, pref.w || 260));
+  return pref;
+}
+function saveOutlinePref(w, collapsed) {
+  try { localStorage.setItem(OUTLINE_PREF_KEY, JSON.stringify({ w: w, collapsed: collapsed })); } catch (_) {}
+}
+
+function setupOutline() {
+  const panel = document.getElementById("outline");
+  const openTab = document.getElementById("outlineOpen");
+  const resizer = document.getElementById("outlineResizer");
+  if (!panel) return;
+
+  let pref = loadOutlinePref();
+  let width = pref.w;
+  let collapsed = !!pref.collapsed;
+
+  const applyWidth = (w) => { document.documentElement.style.setProperty("--outline-w", w + "px"); };
+  const applyCollapsed = (c) => {
+    panel.hidden = c;
+    openTab.hidden = !c;
+    applyWidth(c ? 0 : width);
+  };
+
+  applyCollapsed(collapsed);
+  if (!collapsed) applyWidth(width);
+
+  document.getElementById("outlineCollapse").addEventListener("click", () => {
+    collapsed = true; applyCollapsed(true); saveOutlinePref(width, true);
+  });
+  openTab.addEventListener("click", () => {
+    collapsed = false; applyCollapsed(false); saveOutlinePref(width, false);
+  });
+
+  // 너비 조절 드래그
+  let startX = 0, startW = 0;
+  const onMove = (e) => {
+    let w = startW + (e.clientX - startX);
+    w = Math.max(180, Math.min(460, w));
+    width = w; applyWidth(w);
+  };
+  const onUp = () => {
+    resizer.classList.remove("dragging");
+    document.body.style.userSelect = "";
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    saveOutlinePref(width, collapsed);
+  };
+  resizer.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    startX = e.clientX; startW = panel.offsetWidth;
+    resizer.classList.add("dragging");
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+
+  buildOutline();
 }
 
 // ---------------------------------------------------------------------
@@ -742,6 +931,7 @@ function restoreVersion(v) {
   closeVersions();
   State.dirty.add(id);
   markPageDirty(id, true);
+  scheduleOutline();
   setStatus("editing", "되돌림 — 저장해야 반영");
 }
 
