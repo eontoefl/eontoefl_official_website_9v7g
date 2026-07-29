@@ -279,7 +279,10 @@ body.bookedit-body {
   top: 50%; transform: translateY(-50%);
   left: calc(50% + 398px);
   display: flex; flex-direction: column; align-items: center; gap: 9px;
-  z-index: 900;
+  /* BlockNote의 드래그(글자꾸미기)·링크 등 떠 있는 패널은 인라인 z-index 10~90 이다.
+     세로 툴바를 그 아래(5)로 두어야 그 패널들이 '항상' 위로 뜬다.
+     (용지/삽입선(2)보다는 위 → 여전히 정상 표시. 상단바1000·목록1200·모달2000은 위 유지) */
+  z-index: 5;
 }
 .bookedit-slidebar[hidden] { display: none; }
 

@@ -57,6 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindSlideBar();
   bindScrollTracking();
   setupPageHotkeys();
+  setupArrowHotkey();
 
   // 첫 페이지는 바로 켜 둔다
   if (State.pages.length) ensureMounted(State.pages[0].id);
@@ -346,6 +347,27 @@ function setupPageHotkeys() {
     if (!next) return;
     e.preventDefault();
     goToPage(next.id);
+  });
+}
+
+// Ctrl + Q → 커서 위치에 "→ "(뒤 한 칸) 삽입. 편집기에 포커스가 있을 때만 동작.
+const ARROW_SNIPPET = "→ ";
+function setupArrowHotkey() {
+  document.addEventListener("keydown", (e) => {
+    if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+    if ((e.key || "").toLowerCase() !== "q") return;
+
+    // 지금 타이핑 중인(포커스가 들어있는) 페이지의 편집기를 찾는다
+    const active = document.activeElement;
+    const pageEl = active && active.closest ? active.closest(".bookedit-page") : null;
+    if (!pageEl || !pageEl.dataset.id) return;         // 편집기 밖이면 무시(브라우저 기본동작도 유지)
+    const handle = State.editors.get(pageEl.dataset.id);
+    if (!handle || typeof handle.getEditor !== "function") return;
+    const ed = handle.getEditor();
+    if (!ed || typeof ed.insertInlineContent !== "function") return;
+
+    e.preventDefault();
+    ed.insertInlineContent(ARROW_SNIPPET);             // 커서 위치에 삽입 + 커서는 뒤로
   });
 }
 
