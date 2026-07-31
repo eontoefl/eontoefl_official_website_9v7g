@@ -1,6 +1,44 @@
 // Admin Applications Management JavaScript
 let allApplications = [];
 let filteredApplications = [];
+
+// n8n 자동 개별분석 생성 웹훅 (신청서 제출 시 호출하는 것과 동일)
+const N8N_ANALYSIS_WEBHOOK = 'https://eontoefl.app.n8n.cloud/webhook/eontoefl-application-webhook';
+// 이 시간(분)이 지나도록 분석이 안 오면 '생성 멈춤'으로 보고 재실행 버튼을 띄운다.
+const ANALYSIS_STUCK_MINUTES = 10;
+
+// 개별분석 자동 생성 재실행 (n8n이 실패/멈춤일 때 관리자가 수동으로 다시 요청)
+async function retryAnalysis(appId, btnEl) {
+    const app = allApplications.find(a => a.id === appId);
+    if (!app) { alert('신청 건을 찾을 수 없습니다.'); return; }
+    if (!confirm(`${app.name || ''}님 개별분석 생성을 다시 실행할까요?\n\n1~2분 뒤 목록을 새로고침하면 '검토 대기'로 바뀝니다.`)) return;
+
+    const original = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:9px;"></i> 요청중';
+    }
+    try {
+        // 제출 때와 동일한 페이로드(신청서 데이터 + app_id). mode 없음 → 정상 생성 경로로 감.
+        const res = await fetch(N8N_ANALYSIS_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...app, app_id: appId })
+        });
+        if (res.ok) {
+            alert('✅ 재실행을 요청했어요.\n1~2분 뒤 새로고침하면 결과가 반영됩니다.');
+        } else {
+            alert(`재실행 요청이 접수되지 않았습니다. 잠시 후 다시 시도해주세요. (${res.status})`);
+        }
+    } catch (e) {
+        alert('재실행 요청 실패: ' + (e.message || e));
+    } finally {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = original || '<i class="fas fa-redo" style="font-size:9px;"></i> 재실행';
+        }
+    }
+}
 let selectedIds = new Set();
 const itemsPerPage = 20;
 let currentPage = 1;
@@ -124,7 +162,15 @@ function getAdminActionMessage(app) {
             const schedStr = !isNaN(schedDate.getTime()) ? schedDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
             return { text: `발송예약 ${schedStr}`, color: '#14b8a6', bgColor: '#f0fdfa', icon: 'fa-clock' };
         }
-        return { text: '개별 분석을 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
+        // n8n 자동 생성 대기/멈춤 구분: 제출 후 경과 시간 기준
+        const submittedMs = new Date(app.submitted_date || app.created_at).getTime();
+        const elapsedMin = isNaN(submittedMs) ? Infinity : (Date.now() - submittedMs) / 60000;
+        if (elapsedMin < ANALYSIS_STUCK_MINUTES) {
+            // 아직 n8n이 생성 중일 수 있는 정상 구간
+            return { text: 'AI 분석 생성 중', color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-spinner fa-spin' };
+        }
+        // 10분 넘도록 결과 없음 → 생성 멈춤(재실행 필요)
+        return { text: '분석 생성 멈춤', color: '#dc2626', bgColor: '#fee2e2', icon: 'fa-triangle-exclamation', needsRetry: true };
     }
     
     // 2. 관리자 분석 등록 완료 → ✅ 발송 완료 (학생 동의 대기)
@@ -667,6 +713,10 @@ function displayApplications() {
                                 ? renderStatusBadge('#a53b22', `진행 중 이탈 · ${stall.days >= 1 ? stall.days + '일 지남' : '오늘 만료'}`, { icon: 'fa-hourglass-end', bgColor: '#f7e7e1' })
                                 : renderStatusBadge('#64748b', '미동의', { icon: 'fa-ban', bgColor: '#f1f5f9' }))
                             : renderStatusBadge(actionMessage.color, actionMessage.text, { icon: actionMessage.icon, glint: actionMessage.glint, bgColor: actionMessage.bgColor })}
+                        ${(!stall && actionMessage.needsRetry)
+                            ? `<button onclick="retryAnalysis('${app.id}', this)" title="개별분석 자동 생성 재실행" style="display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border:none; border-radius:999px; background:#dc2626; color:#fff; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; line-height:1;"><i class="fas fa-redo" style="font-size:9px;"></i> 재실행</button>`
+                            : ''
+                        }
                         ${(!stall && actionMessage.subText)
                             ? `<div style="font-size: 11px; color: #64748b; white-space: nowrap; padding-left: 4px;">${actionMessage.subText}</div>`
                             : ''
