@@ -366,7 +366,90 @@ function loadModalInfoTab(app) {
     if (app.referral_from_friend === 'yes') referralParts.push(`지인 추천${app.referral_friend_name ? ' (' + app.referral_friend_name + ')' : ''}`);
     if (app.referral_other) referralParts.push(app.referral_other);
 
+    // ===== 상단 요약 카드 (한눈에 보기) =====
+    const _dash = (v) => (v === null || v === undefined || v === '') ? '-' : v;
+
+    // 현재 단계 = 직업/신분
+    const summaryStage = app.occupation || '-';
+
+    // 현재 토플 점수: R / L / S / W = Overall (개정후/개정전), 미응시면 '미응시'
+    let summaryScore = '미응시';
+    if (app.has_toefl_score === 'yes') {
+        const isNew = app.score_version === 'new' || app.score_total_new || app.score_reading_new;
+        const sr = isNew ? app.score_reading_new   : app.score_reading_old;
+        const sl = isNew ? app.score_listening_new : app.score_listening_old;
+        const ss = isNew ? app.score_speaking_new  : app.score_speaking_old;
+        const sw = isNew ? app.score_writing_new   : app.score_writing_old;
+        const so = isNew ? app.score_total_new     : app.score_total_old;
+        summaryScore = `${_dash(sr)} / ${_dash(sl)} / ${_dash(ss)} / ${_dash(sw)}`
+            + ((so !== null && so !== undefined && so !== '') ? ` = ${so}` : '');
+    }
+
+    // 하루 공부시간
+    const summaryStudy = app.daily_study_time || '-';
+
+    // 목표 점수(커트라인 단일값)
+    let summaryTarget;
+    if (app.no_target_score) {
+        summaryTarget = '없음 (고고익선 🚀)';
+    } else {
+        const cut = app.target_cutoff_new || app.target_cutoff_old || app.target_score;
+        summaryTarget = (cut !== null && cut !== undefined && cut !== '') ? String(cut) : '미입력';
+    }
+
+    // 마감기한: 희망 완료일 ~ 마지막 응시 가능일 + 오늘 기준 상대표기
+    const relFromToday = (ds) => {
+        if (!ds) return '';
+        const d = new Date(ds);
+        if (isNaN(d.getTime())) return '';
+        const t = new Date();
+        const a = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
+        const b = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+        const days = Math.round((b - a) / 86400000);
+        if (days < 0) return '지남';
+        if (days === 0) return '오늘';
+        if (days < 7) return `약 ${days}일 뒤`;
+        if (days < 30) return `약 ${Math.round(days / 7)}주 뒤`;
+        return `약 ${Math.round(days / 30.44)}개월 뒤`;
+    };
+    const dlStart = app.preferred_completion || '';
+    const dlEnd = app.submission_deadline || '';
+    let summaryDeadline = '-';
+    let summaryDeadlineRel = '';
+    if (dlStart && dlEnd) {
+        summaryDeadline = `${dlStart} ~ ${dlEnd}`;
+        const rs = relFromToday(dlStart), re = relFromToday(dlEnd);
+        if (rs || re) summaryDeadlineRel = `(${rs} ~ ${re})`;
+    } else if (dlStart || dlEnd) {
+        const only = dlStart || dlEnd;
+        summaryDeadline = only;
+        const ro = relFromToday(only);
+        if (ro) summaryDeadlineRel = `(${ro})`;
+    }
+
+    // 첨삭 희망
+    const summaryCorr = (app.preferred_correction === '신청희망' || app.preferred_correction === '신청') ? 'O' : 'X';
+
+    const _sRow = (label, valueHtml) =>
+        `<div style="color:#9b8a9b; font-weight:600;">${label}</div><div style="color:#1e293b; font-weight:600; word-break:break-word;">${valueHtml}</div>`;
+
+    const summaryCardHTML = `
+        <div style="background:#faf7fa; border:1px solid #ece2ec; border-radius:14px; padding:16px 18px; margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:7px; font-weight:700; font-size:13px; color:#7a5c7a; margin-bottom:12px; letter-spacing:-0.01em;">
+                <i class="fas fa-clipboard-list" style="font-size:12px;"></i> 한눈에 보기
+            </div>
+            <div style="display:grid; grid-template-columns:max-content 1fr; gap:9px 16px; font-size:14px; align-items:baseline;">
+                ${_sRow('현재 단계', summaryStage)}
+                ${_sRow('현재 토플 점수', summaryScore)}
+                ${_sRow('하루 공부시간', summaryStudy)}
+                ${_sRow('목표 점수', summaryTarget)}
+                ${_sRow('마감기한', summaryDeadline + (summaryDeadlineRel ? ` <span style="color:#94a3b8; font-weight:500; font-size:12px;">${summaryDeadlineRel}</span>` : ''))}
+                ${_sRow('첨삭 희망', `<span style="font-weight:700; color:${summaryCorr === 'O' ? '#2563eb' : '#94a3b8'};">${summaryCorr}</span>`)}
+            </div>
+        </div>`;
+
     container.innerHTML = `
+        ${summaryCardHTML}
         <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
             <button onclick="downloadInfoTxt()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#f1f5f9; border:none; border-radius:8px; font-size:13px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; transition:0.15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
                 <i class="fas fa-download" style="font-size:12px;"></i> TXT 다운로드
