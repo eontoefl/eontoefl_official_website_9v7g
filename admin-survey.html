@@ -426,7 +426,14 @@
     </nav>
 
     <div class="asv-container">
-        <h1 class="asv-h1">📋 실전 리포트 관리</h1>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <h1 class="asv-h1" style="margin:0;">📋 실전 리포트 관리</h1>
+            <button type="button" onclick="downloadSurveyReport()" title="이 페이지의 모든 질문·응답·응답자 내용을 문서(.md)로 저장"
+                    style="display:inline-flex; align-items:center; gap:8px; padding:10px 16px; background:#7c3aed; color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;"
+                    onmouseover="this.style.background='#6d28d9';" onmouseout="this.style.background='#7c3aed';">
+                <i class="fas fa-download"></i> 전체 내용 문서로 다운로드
+            </button>
+        </div>
         <p class="asv-desc">
             실제 시험을 본 학생에게서 시험 정보를 수집해 가설을 검증합니다.
             질문을 만들면 학생 설문(<code>survey.html</code>)과 학생 대시보드에 자동으로 노출되고,

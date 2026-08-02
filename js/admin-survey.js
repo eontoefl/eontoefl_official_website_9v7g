@@ -1038,3 +1038,136 @@ async function handleGiftyResult(file) {
         alert('완료 처리 실패: ' + err.message + '\n(gifty_sent_at 마이그레이션이 실행됐는지 확인하세요)');
     }
 }
+
+// ================================================
+// 전체 내용 문서 다운로드 (AI 전달용)
+//   이 페이지의 모든 질문 + 질문별 집계 + 개별 응답 + 응답자 명단을
+//   하나의 마크다운(.md) 문서로 저장한다. (화면 캡처가 아니라 실제 데이터 덤프)
+// ================================================
+function downloadSurveyReport() {
+    if (!asvQuestions.length && !asvResponses.length) {
+        alert('아직 데이터가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+        return;
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function fmt(v) {
+        if (!v) return '';
+        var d = new Date(v);
+        if (isNaN(d.getTime())) return String(v);
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    var now = new Date();
+    var stamp = fmt(now);
+    var fileStamp = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + '_' + pad(now.getHours()) + pad(now.getMinutes());
+
+    var nActive = asvQuestions.filter(function(q) { return q.status === 'active'; }).length;
+    var nClosed = asvQuestions.filter(function(q) { return q.status === 'closed'; }).length;
+
+    var L = [];
+    L.push('# 실전 리포트 전체 덤프');
+    L.push('');
+    L.push('- 생성 시각: ' + stamp);
+    L.push('- 질문 수: ' + asvQuestions.length + '개 (진행 중 ' + nActive + ' · 판정완료 ' + nClosed + ')');
+    L.push('- 총 응답 수: ' + asvResponses.length + '건');
+    L.push('- 대조용 수강생(입금확인) 명단: ' + asvStudents.length + '명');
+    L.push('');
+    L.push('> 관리자 "실전 리포트 관리" 페이지의 모든 데이터입니다. 각 질문은 실제 시험을 본 학생의 제보를 검증하기 위한 가설이며, 아래에 질문별 응답 집계와 개별 응답이 모두 포함됩니다.');
+    L.push('');
+
+    // 질문 정렬: 진행 중(표시순) → 판정완료 → 기타
+    var actives = asvQuestions.filter(function(q) { return q.status === 'active'; }).slice().sort(byDisplayOrder);
+    var closeds = asvQuestions.filter(function(q) { return q.status === 'closed'; }).slice();
+    var others = asvQuestions.filter(function(q) { return q.status !== 'active' && q.status !== 'closed'; });
+    var ordered = actives.concat(closeds, others);
+
+    ordered.forEach(function(q, idx) {
+        var resps = respsOf(q.id).slice().sort(function(a, b) { return (a.created_at < b.created_at) ? -1 : 1; });
+        var statusLabel = q.status === 'active' ? '진행 중'
+            : (q.status === 'closed' ? '판정 완료(아카이브)' : (q.status || '-'));
+
+        L.push('---');
+        L.push('');
+        L.push('## Q' + (idx + 1) + '. ' + (q.question_text || '(제목 없음)'));
+        L.push('');
+        L.push('- 상태: ' + statusLabel + (q.hidden ? ' · 학생에게 숨김' : ''));
+        L.push('- 유형: ' + (q.question_type === 'choice' ? '객관식' : '서술형'));
+        if (q.hypothesis) L.push('- 가설/제보: ' + q.hypothesis);
+        L.push('- 목표 인원: ' + (q.target_count == null ? '계속 수집(무제한)' : q.target_count + '명') + ' · 현재 응답 ' + resps.length + '건');
+        if (q.created_at) L.push('- 생성: ' + fmt(q.created_at));
+        if (q.status === 'closed') L.push('- 판정 메모: ' + (q.verdict_note || '(없음)'));
+
+        // 객관식 집계
+        if (q.question_type === 'choice' && Array.isArray(q.options) && q.options.length) {
+            L.push('');
+            L.push('**보기 및 집계:**');
+            L.push('');
+            var total = resps.length || 0;
+            var known = [];
+            q.options.forEach(function(o) {
+                var label = optLabel(o);
+                known.push(label);
+                var cnt = resps.filter(function(r) { return r.answer === label; }).length;
+                var pct = total ? Math.round(cnt / total * 100) : 0;
+                L.push('- ' + label + ' — ' + cnt + '건 (' + pct + '%)' + (optHasDetail(o) ? ' [서술 추가]' : ''));
+            });
+            var otherAns = resps.filter(function(r) { return r.answer && known.indexOf(r.answer) === -1; });
+            if (otherAns.length) L.push('- (기타/미분류 답변) — ' + otherAns.length + '건');
+        }
+
+        // 개별 응답 전체
+        L.push('');
+        L.push('**개별 응답 (' + resps.length + '건):**');
+        L.push('');
+        if (!resps.length) {
+            L.push('_응답 없음_');
+        } else {
+            resps.forEach(function(r, i) {
+                var who = (r.user_name || '-') + (r.exam_date ? ' · 시험일 ' + r.exam_date : '');
+                var ans = (r.answer != null && r.answer !== '') ? r.answer : '(무응답)';
+                L.push((i + 1) + '. [' + who + '] ' + ans + (r.created_at ? '  (' + fmt(r.created_at) + ')' : ''));
+                if (r.answer_detail) L.push('   ↳ ' + r.answer_detail);
+            });
+        }
+        L.push('');
+    });
+
+    // 응답자 명단 (고유 인원)
+    L.push('---');
+    L.push('');
+    L.push('## 응답자 명단 (고유 인원)');
+    L.push('');
+    var byPerson = {};
+    asvResponses.forEach(function(r) {
+        var key = (r.user_id || r.user_name || '?') + '|' + (r.user_phone || '');
+        if (!byPerson[key]) byPerson[key] = { name: r.user_name || '-', phone: r.user_phone || '', email: r.user_email || '', dates: {}, count: 0, sent: false };
+        byPerson[key].count++;
+        if (r.exam_date) byPerson[key].dates[r.exam_date] = true;
+        if (r.gifty_sent_at) byPerson[key].sent = true;
+    });
+    var persons = Object.keys(byPerson).map(function(k) { return byPerson[k]; });
+    L.push('- 고유 응답자: ' + persons.length + '명');
+    L.push('');
+    persons.forEach(function(p, i) {
+        var dates = Object.keys(p.dates).join(', ');
+        L.push((i + 1) + '. ' + p.name
+            + (p.phone ? ' / ' + p.phone : '')
+            + (p.email ? ' / ' + p.email : '')
+            + ' — 응답 ' + p.count + '건'
+            + (dates ? ' · 시험일: ' + dates : '')
+            + (p.sent ? ' · 기프티콘 발송됨' : ''));
+    });
+    L.push('');
+
+    var content = L.join('\n');
+    var blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = '실전리포트_전체_' + fileStamp + '.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
