@@ -301,72 +301,9 @@ function downloadInfoTxt() {
     URL.revokeObjectURL(url);
 }
 
-// ===== 기본정보 탭 =====
-function loadModalInfoTab(app) {
-    const container = document.getElementById('modalTabInfo');
-    
-    // 현재 점수 (개정전/개정후 구분)
-    let currentScoreHTML = '';
-    if (app.has_toefl_score === 'yes') {
-        if (app.score_version === 'new' || app.score_total_new || app.score_reading_new) {
-            currentScoreHTML = `
-                <div class="info-item"><label>Overall</label><div>${app.score_total_new || '-'}</div></div>
-                <div class="info-item"><label>Reading</label><div>${app.score_reading_new || '-'}</div></div>
-                <div class="info-item"><label>Listening</label><div>${app.score_listening_new || '-'}</div></div>
-                <div class="info-item"><label>Speaking</label><div>${app.score_speaking_new || '-'}</div></div>
-                <div class="info-item"><label>Writing</label><div>${app.score_writing_new || '-'}</div></div>
-            `;
-        } else {
-            currentScoreHTML = `
-                <div class="info-item"><label>Overall</label><div>${app.score_total_old || '-'}</div></div>
-                <div class="info-item"><label>Reading</label><div>${app.score_reading_old || '-'}</div></div>
-                <div class="info-item"><label>Listening</label><div>${app.score_listening_old || '-'}</div></div>
-                <div class="info-item"><label>Speaking</label><div>${app.score_speaking_old || '-'}</div></div>
-                <div class="info-item"><label>Writing</label><div>${app.score_writing_old || '-'}</div></div>
-            `;
-        }
-    }
-
-    // 목표 점수 (개정전/개정후 구분)
-    let targetScoreHTML = '';
-    // 값이 입력된 항목만 렌더 (빈 칸은 표시하지 않음)
-    const buildScoreRows = (rows) => rows
-        .filter(([, v]) => v !== null && v !== undefined && v !== '')
-        .map(([l, v]) => `<div class="info-item"><label>${l}</label><div>${v}</div></div>`)
-        .join('');
-    if (app.no_target_score) {
-        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>없음 (고고익선 🚀)</div></div>`;
-    } else if (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) {
-        targetScoreHTML = buildScoreRows([
-            ['커트라인', app.target_cutoff_new],
-            ['Reading', app.target_reading_new],
-            ['Listening', app.target_listening_new],
-            ['Writing', app.target_writing_new],
-            ['Speaking', app.target_speaking_new],
-        ]) || `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
-    } else if (app.target_cutoff_old || app.target_reading_old) {
-        targetScoreHTML = buildScoreRows([
-            ['커트라인', app.target_cutoff_old],
-            ['Reading', app.target_reading_old],
-            ['Listening', app.target_listening_old],
-            ['Speaking', app.target_speaking_old],
-            ['Writing', app.target_writing_old],
-        ]) || `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
-    } else if (app.target_score) {
-        // 입문서 신청자용 (단순 숫자 입력)
-        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>${app.target_score}점</div></div>`;
-    } else {
-        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
-    }
-
-    // 유입 경로 정리
-    let referralParts = [];
-    if (app.referral_search_keyword) referralParts.push(`검색: ${app.referral_search_keyword}`);
-    if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
-    if (app.referral_from_friend === 'yes') referralParts.push(`지인 추천${app.referral_friend_name ? ' (' + app.referral_friend_name + ')' : ''}`);
-    if (app.referral_other) referralParts.push(app.referral_other);
-
-    // ===== 상단 요약 카드 (한눈에 보기) =====
+// ===== 상단 요약 카드 "한눈에 보기" (기본정보 · 개별분석 탭 공용) =====
+// collapsible=true 이면 헤더 클릭으로 접기/펼치기(기본 접힘).
+function buildSummaryCard(app, collapsible) {
     const _dash = (v) => (v === null || v === undefined || v === '') ? '-' : v;
 
     // 현재 단계 = 직업/신분
@@ -433,20 +370,120 @@ function loadModalInfoTab(app) {
     const _sRow = (label, valueHtml) =>
         `<div style="color:#9b8a9b; font-weight:600;">${label}</div><div style="color:#1e293b; font-weight:600; word-break:break-word;">${valueHtml}</div>`;
 
-    const summaryCardHTML = `
+    const grid = `
+        <div style="display:grid; grid-template-columns:max-content 1fr; gap:9px 16px; font-size:14px; align-items:baseline;">
+            ${_sRow('현재 단계', summaryStage)}
+            ${_sRow('현재 토플 점수', summaryScore)}
+            ${_sRow('하루 공부시간', summaryStudy)}
+            ${_sRow('목표 점수', summaryTarget)}
+            ${_sRow('마감기한', summaryDeadline + (summaryDeadlineRel ? ` <span style="color:#94a3b8; font-weight:500; font-size:12px;">${summaryDeadlineRel}</span>` : ''))}
+            ${_sRow('첨삭 희망', `<span style="font-weight:700; color:${summaryCorr === 'O' ? '#2563eb' : '#94a3b8'};">${summaryCorr}</span>`)}
+        </div>`;
+
+    if (!collapsible) {
+        return `
         <div style="background:#faf7fa; border:1px solid #ece2ec; border-radius:14px; padding:16px 18px; margin-bottom:16px;">
             <div style="display:flex; align-items:center; gap:7px; font-weight:700; font-size:13px; color:#7a5c7a; margin-bottom:12px; letter-spacing:-0.01em;">
                 <i class="fas fa-clipboard-list" style="font-size:12px;"></i> 한눈에 보기
             </div>
-            <div style="display:grid; grid-template-columns:max-content 1fr; gap:9px 16px; font-size:14px; align-items:baseline;">
-                ${_sRow('현재 단계', summaryStage)}
-                ${_sRow('현재 토플 점수', summaryScore)}
-                ${_sRow('하루 공부시간', summaryStudy)}
-                ${_sRow('목표 점수', summaryTarget)}
-                ${_sRow('마감기한', summaryDeadline + (summaryDeadlineRel ? ` <span style="color:#94a3b8; font-weight:500; font-size:12px;">${summaryDeadlineRel}</span>` : ''))}
-                ${_sRow('첨삭 희망', `<span style="font-weight:700; color:${summaryCorr === 'O' ? '#2563eb' : '#94a3b8'};">${summaryCorr}</span>`)}
+            ${grid}
+        </div>`;
+    }
+
+    // 접기/펼치기 버전 (기본 접힘)
+    return `
+        <div style="background:#faf7fa; border:1px solid #ece2ec; border-radius:14px; padding:12px 18px; margin-bottom:16px;">
+            <button type="button" onclick="toggleSummaryCard(this)"
+                    style="display:flex; align-items:center; justify-content:space-between; width:100%; background:none; border:none; padding:0; cursor:pointer; font-family:inherit;">
+                <span style="display:flex; align-items:center; gap:7px; font-weight:700; font-size:13px; color:#7a5c7a; letter-spacing:-0.01em;">
+                    <i class="fas fa-clipboard-list" style="font-size:12px;"></i> 한눈에 보기
+                </span>
+                <i class="fas fa-chevron-down summary-chev" style="font-size:12px; color:#9b8a9b; transition:transform 0.2s; transform:rotate(-90deg);"></i>
+            </button>
+            <div class="summary-card-body" style="display:none; margin-top:12px;">
+                ${grid}
             </div>
         </div>`;
+}
+
+// 요약 카드 접기/펼치기 토글
+function toggleSummaryCard(btn) {
+    const wrap = btn.parentElement;
+    const body = wrap.querySelector('.summary-card-body');
+    const chev = btn.querySelector('.summary-chev');
+    if (!body) return;
+    const willOpen = body.style.display === 'none';
+    body.style.display = willOpen ? '' : 'none';
+    if (chev) chev.style.transform = willOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+}
+
+// ===== 기본정보 탭 =====
+function loadModalInfoTab(app) {
+    const container = document.getElementById('modalTabInfo');
+    
+    // 현재 점수 (개정전/개정후 구분)
+    let currentScoreHTML = '';
+    if (app.has_toefl_score === 'yes') {
+        if (app.score_version === 'new' || app.score_total_new || app.score_reading_new) {
+            currentScoreHTML = `
+                <div class="info-item"><label>Overall</label><div>${app.score_total_new || '-'}</div></div>
+                <div class="info-item"><label>Reading</label><div>${app.score_reading_new || '-'}</div></div>
+                <div class="info-item"><label>Listening</label><div>${app.score_listening_new || '-'}</div></div>
+                <div class="info-item"><label>Speaking</label><div>${app.score_speaking_new || '-'}</div></div>
+                <div class="info-item"><label>Writing</label><div>${app.score_writing_new || '-'}</div></div>
+            `;
+        } else {
+            currentScoreHTML = `
+                <div class="info-item"><label>Overall</label><div>${app.score_total_old || '-'}</div></div>
+                <div class="info-item"><label>Reading</label><div>${app.score_reading_old || '-'}</div></div>
+                <div class="info-item"><label>Listening</label><div>${app.score_listening_old || '-'}</div></div>
+                <div class="info-item"><label>Speaking</label><div>${app.score_speaking_old || '-'}</div></div>
+                <div class="info-item"><label>Writing</label><div>${app.score_writing_old || '-'}</div></div>
+            `;
+        }
+    }
+
+    // 목표 점수 (개정전/개정후 구분)
+    let targetScoreHTML = '';
+    // 값이 입력된 항목만 렌더 (빈 칸은 표시하지 않음)
+    const buildScoreRows = (rows) => rows
+        .filter(([, v]) => v !== null && v !== undefined && v !== '')
+        .map(([l, v]) => `<div class="info-item"><label>${l}</label><div>${v}</div></div>`)
+        .join('');
+    if (app.no_target_score) {
+        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>없음 (고고익선 🚀)</div></div>`;
+    } else if (app.target_version === 'new' || app.target_cutoff_new || app.target_reading_new) {
+        targetScoreHTML = buildScoreRows([
+            ['커트라인', app.target_cutoff_new],
+            ['Reading', app.target_reading_new],
+            ['Listening', app.target_listening_new],
+            ['Writing', app.target_writing_new],
+            ['Speaking', app.target_speaking_new],
+        ]) || `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
+    } else if (app.target_cutoff_old || app.target_reading_old) {
+        targetScoreHTML = buildScoreRows([
+            ['커트라인', app.target_cutoff_old],
+            ['Reading', app.target_reading_old],
+            ['Listening', app.target_listening_old],
+            ['Speaking', app.target_speaking_old],
+            ['Writing', app.target_writing_old],
+        ]) || `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
+    } else if (app.target_score) {
+        // 입문서 신청자용 (단순 숫자 입력)
+        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>${app.target_score}점</div></div>`;
+    } else {
+        targetScoreHTML = `<div class="info-item"><label>목표 점수</label><div>미입력</div></div>`;
+    }
+
+    // 유입 경로 정리
+    let referralParts = [];
+    if (app.referral_search_keyword) referralParts.push(`검색: ${app.referral_search_keyword}`);
+    if (app.referral_social_media) referralParts.push(`SNS: ${app.referral_social_media}`);
+    if (app.referral_from_friend === 'yes') referralParts.push(`지인 추천${app.referral_friend_name ? ' (' + app.referral_friend_name + ')' : ''}`);
+    if (app.referral_other) referralParts.push(app.referral_other);
+
+    // 상단 요약 카드 (기본정보 탭: 항상 펼침)
+    const summaryCardHTML = buildSummaryCard(app, false);
 
     container.innerHTML = `
         ${summaryCardHTML}
@@ -722,6 +759,7 @@ function loadModalAnalysisTab(app) {
     }
 
     let html = `
+        ${buildSummaryCard(app, true)}
         ${scheduledBanner}
         ${preservedDraftBanner}
         ${deadlineResetStrip}
