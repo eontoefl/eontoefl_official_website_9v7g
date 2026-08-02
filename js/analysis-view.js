@@ -166,13 +166,20 @@ function displayAnalysis(app) {
     }
     
     // 타이머 초기값 계산
-    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
+    // 데드라인: analysis_deadline_override(관리자 수동 리셋) 있으면 그 절대 시각을 우선.
+    //           없으면 최초 저장 시각(analysis_first_saved_at, 폴백) + 창(일반 24h/프로모 5일).
     const viewAnalysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-    const viewDeadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    const viewElapsedMs = viewAnalysisTs ? (Date.now() - new Date(viewAnalysisTs).getTime()) : 0;
-    const viewRemainingMs = viewDeadlineMs - viewElapsedMs;
-    const viewInitialCountdown = formatViewCountdown(viewRemainingMs, isIncentive);
-    const viewUrgentThreshold = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
+    const viewOverrideMs = app.analysis_deadline_override ? new Date(app.analysis_deadline_override).getTime() : NaN;
+    const viewHasOverride = !isNaN(viewOverrideMs);
+    // override(리셋) 시엔 프로모라도 "무조건 24시간" 플랫 표기로 계산
+    const viewEffInc = viewHasOverride ? false : isIncentive;
+    const viewDeadlineAbsMs = viewHasOverride
+        ? viewOverrideMs
+        : (viewAnalysisTs ? new Date(viewAnalysisTs).getTime() + (isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000)) : NaN);
+    const viewHasTimer = viewHasOverride || !!viewAnalysisTs;
+    const viewRemainingMs = !isNaN(viewDeadlineAbsMs) ? (viewDeadlineAbsMs - Date.now()) : (isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000));
+    const viewInitialCountdown = formatViewCountdown(viewRemainingMs, viewEffInc);
+    const viewUrgentThreshold = viewEffInc ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     const viewIsExpired = viewRemainingMs <= 0;
     const viewIsUrgent = !viewIsExpired && viewRemainingMs <= viewUrgentThreshold;
     
@@ -192,7 +199,7 @@ function displayAnalysis(app) {
         : (viewIsUrgent ? `<div id="viewCountdownMsg" style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : '');
     
     // 인라인 타이머 HTML
-    const viewInlineTimer = viewAnalysisTs ? `
+    const viewInlineTimer = viewHasTimer ? `
         <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
             <i class="fas fa-clock" style="font-size: 16px; color: ${viewTimerColor};"></i>
             <div style="background: white; padding: 6px 14px; border-radius: 8px; border: 2px solid ${viewTimerBorderColor};">
@@ -324,10 +331,16 @@ function displayAnalysis(app) {
         submitBtn.addEventListener('click', () => submitAgreement(app.id));
         
         // 실시간 카운트다운 시작
-        // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-        const viewAnalysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-        if (viewAnalysisTs) {
-            startViewCountdown(viewAnalysisTs, app.is_incentive_applicant === true);
+        // 데드라인: override(수동 리셋) 우선 → 절대 시각. 없으면 최초 저장 + 창.
+        const cdOverrideMs = app.analysis_deadline_override ? new Date(app.analysis_deadline_override).getTime() : NaN;
+        const cdAnalysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
+        const cdInc = app.is_incentive_applicant === true;
+        let cdDeadlineAbs = NaN;
+        if (!isNaN(cdOverrideMs)) cdDeadlineAbs = cdOverrideMs;
+        else if (cdAnalysisTs) cdDeadlineAbs = new Date(cdAnalysisTs).getTime() + (cdInc ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000));
+        if (!isNaN(cdDeadlineAbs)) {
+            // override면 프로모라도 플랫 24h 표기(isIncentive=false)
+            startViewCountdown(cdDeadlineAbs, !isNaN(cdOverrideMs) ? false : cdInc);
         }
     }
 }
@@ -352,15 +365,15 @@ function formatViewCountdown(remainingMs, isIncentive) {
 // 실시간 카운트다운 인터벌 관리
 let viewCountdownInterval = null;
 
-function startViewCountdown(completedAt, isIncentive) {
+function startViewCountdown(deadlineAbs, isIncentive) {
     if (viewCountdownInterval) clearInterval(viewCountdownInterval);
-    
-    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    const completedTime = new Date(completedAt).getTime();
+
+    // deadlineAbs: 마감 절대 시각(ms 또는 파싱 가능한 값). override든 아니든 절대 시각으로 통일.
+    const deadlineTime = typeof deadlineAbs === 'number' ? deadlineAbs : new Date(deadlineAbs).getTime();
     const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
-    
+
     function tick() {
-        const remaining = deadlineMs - (Date.now() - completedTime);
+        const remaining = deadlineTime - Date.now();
         const el = document.getElementById('viewCountdownTimer');
         const containerEl = document.getElementById('viewCountdownContainer');
         if (!el || !containerEl) { clearInterval(viewCountdownInterval); return; }

@@ -65,6 +65,33 @@ function showRegenOverlay(on) {
     } else if (ov) { ov.remove(); }
 }
 
+// ===== 개별분석 동의 기한 리셋 (지금부터 24시간 다시 시작) =====
+// 학생이 24시간을 놓쳐 화면이 잠긴 경우, 관리자가 기한을 다시 열어준다.
+// analysis_deadline_override(절대 시각)에 지금+24h를 기록하면
+// 관리자 목록·학생 화면·마감 알림톡이 모두 이 시각을 마감으로 사용한다. (일반/프로모 무관 무조건 24h)
+async function resetAnalysisDeadline() {
+    if (!currentManageApp) return;
+    const app = currentManageApp;
+    if (app.analysis_status !== '승인' || app.student_agreed_at) {
+        alert('지금은 기한을 리셋할 수 있는 상태가 아니에요.\n(개별분석 "승인" 발송 + 학생 미동의 상태에서만 가능합니다.)');
+        return;
+    }
+    if (!confirm(`${app.name || ''}님의 개별분석 동의 기한을 지금부터 24시간으로 다시 시작할까요?\n\n관리자 목록·학생 화면·마감 알림톡이 모두 새 기한으로 갱신됩니다.`)) return;
+
+    const newDeadlineIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    try {
+        await supabaseAPI.patch('applications', app.id, {
+            analysis_deadline_override: newDeadlineIso,
+            analysis_agree_reminder_sent_at: null   // 리마인드 재무장 → 새 마감 2시간 전에 다시 발송
+        });
+        alert('✅ 동의 기한을 지금부터 24시간으로 다시 시작했어요.');
+        await openManageModal(app.id);   // 최신 데이터로 모달 재로드
+        switchModalTab('analysis');
+    } catch (e) {
+        alert('기한 리셋 실패: ' + (e.message || e) + '\n\n(analysis_deadline_override 컬럼 마이그레이션이 적용됐는지 확인해주세요.)');
+    }
+}
+
 // 모달 열기
 async function openManageModal(appId) {
     try {
@@ -581,9 +608,40 @@ function loadModalAnalysisTab(app) {
         </div>
     ` : '';
 
+    // 동의 기한 리셋 스트립: 개별분석 '승인' 발송 + 학생 미동의일 때만 노출.
+    const canResetDeadline = app.analysis_status === '승인' && !!app.analysis_content && !app.student_agreed_at;
+    let deadlineResetStrip = '';
+    if (canResetDeadline) {
+        const _ovMs = app.analysis_deadline_override ? new Date(app.analysis_deadline_override).getTime() : NaN;
+        const _baseTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
+        const _dlMs = !isNaN(_ovMs)
+            ? _ovMs
+            : (_baseTs ? new Date(_baseTs).getTime() + (app.is_incentive_applicant ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000)) : NaN);
+        const _dlStr = isNaN(_dlMs) ? '-' : new Date(_dlMs).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+        const _expired = !isNaN(_dlMs) && _dlMs <= Date.now();
+        deadlineResetStrip = `
+        <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:14px; padding:14px 18px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:38px; height:38px; border-radius:10px; background:#ffedd5; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <i class="fas fa-hourglass-half" style="font-size:14px; color:#c2410c;"></i>
+                </div>
+                <div>
+                    <div style="font-weight:600; font-size:14px; color:#1e293b;">학생 동의 대기 중${_expired ? ' · <span style="color:#dc2626;">기한 만료됨</span>' : ''}</div>
+                    <div style="font-size:12px; color:#9a6a4a; margin-top:2px;">현재 마감 <strong>${_dlStr}</strong> · 놓친 학생에게 지금부터 24시간을 다시 줄 수 있어요</div>
+                </div>
+            </div>
+            <button type="button" onclick="resetAnalysisDeadline()"
+                    style="padding:9px 16px; background:#ea580c; color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;"
+                    onmouseover="this.style.background='#c2410c';" onmouseout="this.style.background='#ea580c';">
+                <i class="fas fa-redo" style="font-size:11px;"></i> 동의 기한 24시간 리셋
+            </button>
+        </div>`;
+    }
+
     let html = `
         ${scheduledBanner}
         ${preservedDraftBanner}
+        ${deadlineResetStrip}
         <!-- 입문서 제공 토글 (form 밖, 즉시 저장) -->
         <div class="form-group" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
             <div style="display: flex; align-items: center; justify-content: space-between;">

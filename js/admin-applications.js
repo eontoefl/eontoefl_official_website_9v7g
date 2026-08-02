@@ -47,6 +47,20 @@ let bookProgressCache = {};  // user_id → { book_id: progressRow } (책별)
 let bookMemoCountCache = {}; // user_id → { book_id: count } (책별)
 let introBookMeta = {};      // book_id → { track:'regular'|'australia', total_pages }
 
+// ===== 개별분석 동의 마감(절대 ms) 계산 =====
+// analysis_deadline_override(수동 리셋) 있으면 그 절대 시각을 우선 사용,
+// 없으면 최초 저장 시각 + 창(일반 24h / 프로모 5일). 없으면 NaN.
+function getAnalysisAgreeDeadlineMs(app) {
+    if (app.analysis_deadline_override) {
+        const o = new Date(app.analysis_deadline_override).getTime();
+        if (!isNaN(o)) return o;
+    }
+    const base = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
+    if (!base) return NaN;
+    const window = app.is_incentive_applicant ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+    return new Date(base).getTime() + window;
+}
+
 // ===== 유도학생 상태 판별 =====
 // 반환값: 'waiting' (동의 대기 또는 분석 전) | 'converted' (동의 완료=매출전환) | 'expired' (5일 만료) | null (유도학생 아님)
 function getIncentiveStatus(app) {
@@ -55,12 +69,10 @@ function getIncentiveStatus(app) {
     if (app.student_agreed_at) return 'converted';
     // 조건부승인은 아직 협의 단계 → 동의 마감 타이머 없음 (대기로 표시)
     if (app.analysis_status === '조건부승인') return 'waiting';
-    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-    const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-    if (!analysisTs) return 'waiting'; // 분석 전이어도 프로모션 상태 표시 (목록 일괄처리로 ON된 케이스)
-    const deadlineMs = 5 * 24 * 60 * 60 * 1000;
-    const remaining = deadlineMs - (Date.now() - new Date(analysisTs).getTime());
-    if (remaining <= 0) return 'expired';
+    // 데드라인: override(수동 리셋) 우선, 없으면 최초 저장 + 창
+    const deadlineTs = getAnalysisAgreeDeadlineMs(app);
+    if (isNaN(deadlineTs)) return 'waiting'; // 분석 전이어도 프로모션 상태 표시 (목록 일괄처리로 ON된 케이스)
+    if (deadlineTs - Date.now() <= 0) return 'expired';
     return 'waiting';
 }
 
@@ -100,14 +112,12 @@ function getIncentiveDeadlineDisplay(app) {
     if (!app.is_incentive_applicant) return '';
     if (app.student_agreed_at) return ''; // 동의 완료 → 타이머 불필요
     if (app.analysis_status === '조건부승인') return ''; // 조건부승인 단계엔 마감 타이머 미표시
-    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-    const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-    if (!analysisTs) return '';
-    
-    const deadlineMs = 5 * 24 * 60 * 60 * 1000;
-    const elapsed = Date.now() - new Date(analysisTs).getTime();
-    const remaining = deadlineMs - elapsed;
-    
+    // 데드라인: override(수동 리셋) 우선, 없으면 최초 저장 + 창
+    const deadlineTs = getAnalysisAgreeDeadlineMs(app);
+    if (isNaN(deadlineTs)) return '';
+
+    const remaining = deadlineTs - Date.now();
+
     // 만료 → 별도 '미동의' 이탈 뱃지(getStallStatus)가 대체 표시하므로 여기선 생략
     if (remaining <= 0) {
         return '';
@@ -278,13 +288,11 @@ function getStallStatus(app) {
     const DAY = 24 * 60 * 60 * 1000;
     const daysPast = (deadline) => Math.floor((now - deadline) / DAY);
 
-    // A. 개별분석 발송 + 동의 안 함 → 동의 기한 (일반 24h / 프로모 5일)
+    // A. 개별분석 발송 + 동의 안 함 → 동의 기한 (override 우선 / 일반 24h / 프로모 5일)
     const analysisSent = app.analysis_status && app.analysis_content;
     if (analysisSent && !app.student_agreed_at) {
-        const base = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-        if (!base) return null;
-        const window = app.is_incentive_applicant ? 5 * DAY : DAY;
-        const deadline = new Date(base).getTime() + window;
+        const deadline = getAnalysisAgreeDeadlineMs(app);
+        if (isNaN(deadline)) return null;
         return now > deadline ? { type: 'cold', days: daysPast(deadline) } : null;
     }
 
