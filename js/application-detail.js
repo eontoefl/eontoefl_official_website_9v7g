@@ -3,6 +3,19 @@ let currentApplication = null;
 let globalApplication = null; // Phase 2: 글로벌 변수
 let _studentInfo = { name: '', phone: '', id: '' }; // 알림톡용 학생 기본정보 (변하지 않음)
 
+// 자기주도는 내부 저장값이 'Fast'지만 학생에게는 'SELF PACED'로 보여준다(표시 전용, 저장값·파싱 무변경).
+function displayProgramName(app) {
+    const raw = app.assigned_program || '';
+    if (app.self_paced) {
+        return (raw || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED');
+    }
+    return raw;
+}
+// 자기주도 종료일은 전용 완료일(self_paced_end_date)에 저장되므로 그 값을 사용한다.
+function effectiveScheduleEnd(app) {
+    return app.self_paced ? app.self_paced_end_date : app.schedule_end;
+}
+
 // ===== 신청서 삭제 (상세 페이지용) =====
 function openDetailDeleteModal() {
     document.getElementById('detailDeleteModal').style.display = 'block';
@@ -1158,17 +1171,17 @@ function getAnalysisSection(app) {
             <div class="s2-card-title"><i class="fas fa-graduation-cap"></i> 배정 프로그램 정보</div>
             <div class="s2-row">
                 <span class="s2-row-label">프로그램명</span>
-                <span class="s2-row-value" style="color: #5b4a7d;">${escapeHtml(app.assigned_program)}</span>
+                <span class="s2-row-value" style="color: #5b4a7d;">${escapeHtml(displayProgramName(app))}</span>
             </div>
             ${app.schedule_start ? `
             <div class="s2-row">
                 <span class="s2-row-label">시작일</span>
                 <span class="s2-row-value">${app.schedule_start}</span>
             </div>` : ''}
-            ${app.schedule_end ? `
+            ${effectiveScheduleEnd(app) ? `
             <div class="s2-row">
                 <span class="s2-row-label">종료일</span>
-                <span class="s2-row-value">${app.schedule_end}</span>
+                <span class="s2-row-value">${effectiveScheduleEnd(app)}</span>
             </div>` : ''}
             ${app.correction_enabled ? `
             <div class="s2-row">
@@ -1388,12 +1401,12 @@ function getAgreementSection(app) {
             ${app.assigned_program ? `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
                 <span style="color: #64748b;">프로그램</span>
-                <span style="font-weight: 600; color: #5b4a7d; text-align: right;">${escapeHtml(app.assigned_program)}</span>
+                <span style="font-weight: 600; color: #5b4a7d; text-align: right;">${escapeHtml(displayProgramName(app))}</span>
             </div>` : ''}
             ${app.schedule_start ? `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
                 <span style="color: #64748b;">일정</span>
-                <span style="font-weight: 600; color: #1e293b; text-align: right;">${app.schedule_start}${app.schedule_end ? ' ~ ' + app.schedule_end : ''}</span>
+                <span style="font-weight: 600; color: #1e293b; text-align: right;">${app.schedule_start}${effectiveScheduleEnd(app) ? ' ~ ' + effectiveScheduleEnd(app) : ''}</span>
             </div>` : ''}
             ${priceStr ? `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
@@ -3460,7 +3473,7 @@ async function loadUsageTab(app) {
             <p style="font-size:14px; color:#64748b; margin:-4px 0 14px 0; line-height:1.6;">${app.name}님,<br>아래 순서대로 확인하고 시작해주세요.</p>
             <div class="s5-row">
                 <span class="s5-row-label">${guideLabel}</span>
-                <span class="s5-row-value" style="color:#5b4a7d;">${app.assigned_program || '-'} · ${formatDateWithDay(app.schedule_start)} 시작</span>
+                <span class="s5-row-value" style="color:#5b4a7d;">${displayProgramName(app) || '-'} · ${formatDateWithDay(app.schedule_start)} 시작</span>
             </div>
             ${app.correction_enabled ? `
             <div class="s5-row">
