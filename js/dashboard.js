@@ -1183,10 +1183,18 @@ async function renderProgramInfo(app) {
         }
     }
 
+    // 자기주도: 내부 저장값은 'Fast'지만 학생 화면에는 'SELF PACED'로 표기(테스트룸·계약 파싱은 저장값 그대로 사용).
+    // 이름 자체에 SELF PACED가 들어가므로 별도 '자기주도' 딱지는 붙이지 않는다.
+    const programDisplayName = app.self_paced
+        ? ((app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED'))
+        : (app.assigned_program || '-');
+    // 자기주도 종료일은 자기주도 전용 완료일(self_paced_end_date)에 저장되므로 그 값을 사용한다.
+    const programEndDate = app.self_paced ? app.self_paced_end_date : app.schedule_end;
+
     programDetails.innerHTML = `
         <div class="program-row">
             <span class="program-label">프로그램</span>
-            <span class="program-value">${app.assigned_program || '-'}${app.self_paced ? ' <span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px;">자기주도</span>' : ''}${app.correction_enabled ? ' <span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;">+ 스라첨삭</span>' : ''}</span>
+            <span class="program-value">${programDisplayName}${app.correction_enabled ? ' <span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px;">+ 스라첨삭</span>' : ''}</span>
         </div>
         <div class="program-row">
             <span class="program-label">${app.correction_enabled ? '내챌 시작일' : '시작일'}</span>
@@ -1194,7 +1202,7 @@ async function renderProgramInfo(app) {
         </div>
         <div class="program-row">
             <span class="program-label">${app.correction_enabled ? '내챌 종료일' : '종료일'}</span>
-            <span class="program-value">${formatDateWithDay(app.schedule_end)}</span>
+            <span class="program-value">${formatDateWithDay(programEndDate)}</span>
         </div>
         ${app.correction_enabled && app.correction_start_date ? `
         <div class="program-row">
