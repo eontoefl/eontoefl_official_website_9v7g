@@ -72,7 +72,7 @@ function displayAnalysis(app) {
             <div class="info-row">
                 <div class="info-label">프로그램명</div>
                 <div class="info-value" style="color: #9480c5; font-size: 16px;">
-                    ${escapeHtml(app.assigned_program)}
+                    ${escapeHtml(app.self_paced ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED') : app.assigned_program)}
                 </div>
             </div>
             ${app.schedule_start ? `
@@ -81,10 +81,10 @@ function displayAnalysis(app) {
                     <div class="info-value">${formatDateOnly(new Date(app.schedule_start).getTime())}</div>
                 </div>
             ` : ''}
-            ${app.schedule_end ? `
+            ${(app.self_paced ? app.self_paced_end_date : app.schedule_end) ? `
                 <div class="info-row">
                     <div class="info-label">종료일</div>
-                    <div class="info-value">${formatDateOnly(new Date(app.schedule_end).getTime())}</div>
+                    <div class="info-value">${formatDateOnly(new Date(app.self_paced ? app.self_paced_end_date : app.schedule_end).getTime())}</div>
                 </div>
             ` : ''}
             ${app.program_price ? `

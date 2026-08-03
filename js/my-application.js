@@ -73,7 +73,7 @@ function displayResults(applications) {
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
                     <div>
                         <h3 class="program-title" style="font-size: 16px; margin-bottom: 8px;">
-                            ${escapeHtml(app.assigned_program || app.preferred_program || '프로그램 미정')}
+                            ${escapeHtml(app.self_paced && app.assigned_program ? app.assigned_program.replace(/ - (Fast|Standard)$/, ' - SELF PACED') : (app.assigned_program || app.preferred_program || '프로그램 미정'))}
                             ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:6px;">+ 스라첨삭</span>' : ''}
                         </h3>
                         <p style="font-size: 12px; color: #64748b;">

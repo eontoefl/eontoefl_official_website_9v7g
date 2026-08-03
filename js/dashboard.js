@@ -167,8 +167,10 @@ function renderProgressSection(app) {
     
     const progressLabel = progress === 100 ? '준비 완료' : '현재 진행률';
 
-    // 프로그램 이름
-    const programName = app.assigned_program || '내벨업챌린지';
+    // 프로그램 이름 (자기주도는 'Fast' 대신 'SELF PACED'로 표시 — 표시 전용)
+    const programName = app.self_paced
+        ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED')
+        : (app.assigned_program || '내벨업챌린지');
 
     // HTML 생성
     progressSection.innerHTML = `
