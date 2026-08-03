@@ -939,7 +939,7 @@ function loadModalAnalysisTab(app) {
                     </div>
                     <!-- 첨삭 시작일 (아코디언) -->
                     <div id="correctionStartDateWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
-                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일·월요일만) <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span></label>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일 권장) <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span></label>
                         <input type="date" name="correction_start_date" id="correction_start_date"
                                value="${fillCorrectionStartDate}"
                                ${readOnly}
@@ -1181,7 +1181,7 @@ function loadModalAnalysisTab(app) {
     }
 }
 
-// 첨삭 시작일 일·월요일 검증
+// 첨삭 시작일 검증 — 일요일은 그대로 통과, 그 외 요일은 확인 후 진행 허용
 function validateCorrectionStartDate() {
     const input = document.getElementById('correction_start_date');
     if (!input || !input.value) return;
@@ -1189,9 +1189,16 @@ function validateCorrectionStartDate() {
     const selectedDate = new Date(input.value);
     const dayOfWeek = selectedDate.getDay();
 
-    // 일요일(0)·월요일(1)이 아니면 경고
-    if (dayOfWeek !== 0 && dayOfWeek !== 1) {
-        alert('⚠️ 첨삭 시작일은 일요일 또는 월요일만 선택 가능합니다.\n가장 가까운 일요일 또는 월요일을 선택해주세요.');
+    // 일요일(0)이면 아무 안내 없이 통과
+    if (dayOfWeek === 0) return;
+
+    // 일요일이 아니면 권장 안내 후 진행 여부를 확인 (개별 진행이라 다른 요일도 허용 가능)
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayName = dayNames[dayOfWeek];
+    const proceed = confirm(
+        `선택하신 날짜는 ${dayName}요일입니다.\n첨삭 시작일은 일요일을 권장드립니다.\n그래도 이 날짜로 진행하시겠어요?`
+    );
+    if (!proceed) {
         input.value = '';
     }
 }
