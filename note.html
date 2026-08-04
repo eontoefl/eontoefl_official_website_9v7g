@@ -1040,6 +1040,17 @@ function moneyBlock(title, rows) {
       '</span></div>').join("") + '</div>';
 }
 
+/* 돈 칸 막대 — 채워가는 것만 (빚 갚은 정도·카드값 방어). 회계팀이 bars로 채운다 */
+function moneyBars(bars) {
+  if (!Array.isArray(bars) || !bars.length) return "";
+  return '<div class="mbars">' + bars.map(b => {
+    const pct = Math.max(0, Math.min(100, +b.pct || 0));
+    return '<div class="gauge"><div class="lab"><span>' + esc(b.label || "") + '</span>' +
+      '<span>' + esc(b.text || "") + '</span></div>' +
+      '<div class="track"><div class="bar" style="width:' + pct + '%"></div></div></div>';
+  }).join("") + '</div>';
+}
+
 /* ───── 본문 ───── */
 function render() {
   const c = document.getElementById("content");
@@ -1071,6 +1082,7 @@ function render() {
         (DAY.expNote ? '<div class="exp-note">' + DAY.expNote + '</div>' : "") +
         '<div id="exps"></div><button id="addexp" type="button">＋ 내역 추가</button>' +
         '<div class="etotal">오늘 합계<b id="etotal">0원</b></div><div class="cardsum" id="cardsum"></div>' +
+        moneyBars(DAY.bars) +
         moneyBlock("계좌", DAY.accounts) +
         moneyBlock("카드값", DAY.cardbills) +
         moneyBlock("빚", DAY.debts) +
