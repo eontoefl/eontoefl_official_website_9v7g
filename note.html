@@ -1560,9 +1560,12 @@ function drawSend() {
         '<div class="res">' + (res ? esc(res) : (st.running ? "하는 중…" : wait)) + '</div></div>' +
         '<span class="mark">' + (res ? "✓" : (st.running ? "…" : "")) + '</span></div>';
     }).join("");
-    go.disabled = st.running;
-    go.textContent = st.running ? "닫는 중… (" + n + "/" + STEPS.length + ")"
-      : (n >= STEPS.length ? "다시 닫기" : "퇴근하기");
+    // 정상 완료된 날은 잠근다 — 실패 표시가 있을 때만 다시 돌릴 수 있다 (2026-08-05 대표님 지시)
+    const failed = Object.values(st.done).some(v => /실패|한도/.test(v));
+    if (st.running) { go.textContent = "닫는 중… (" + n + "/" + STEPS.length + ")"; go.disabled = true; }
+    else if (n >= STEPS.length && !failed) { go.textContent = "오늘 마감 끝 ✓"; go.disabled = true; }
+    else if (n >= STEPS.length) { go.textContent = "실패한 단계가 있습니다 — 다시 닫기"; go.disabled = false; }
+    else { go.textContent = "퇴근하기"; go.disabled = false; }
     return st;
   }
 
