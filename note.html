@@ -388,6 +388,14 @@
   .bubble { max-width: 86%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--grad); color: #fff; border-bottom-right-radius: .2rem; }
   .bubble.lead { align-self: flex-start; background: var(--surface-low); color: var(--on-surface-variant); border-bottom-left-radius: .2rem; }
+  /* /fix — 반드시 기록하라는 명령 */
+  .bubble .cmd { display: inline-block; background: rgba(255, 255, 255, .26); color: #fff;
+    font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 99px; margin-right: .15rem;
+    letter-spacing: .01em; }
+  .bubble.lead .cmd { background: #d7f0fb; color: var(--on-primary-container); }
+  .bubble .fixbody { font-weight: 700; }
+  .chat .composer textarea.fixing { outline: 2px solid var(--primary-fixed-dim);
+    background: #eaf6fc; }
   .bubble strong { font-weight: 700; }
   .bubble.lead strong { color: var(--on-surface); }
   .bubble .who { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; opacity: .55; margin-bottom: .2rem; }
@@ -529,7 +537,9 @@ const shift = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDa
 const won = n => (n || 0).toLocaleString("ko-KR") + "원";
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 /* 팀장이 쓰는 **굵게**를 실제 굵은 글씨로. 이스케이프 뒤에 하므로 안전하다 */
-const fmt = t => esc(t).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+const fmt = t => esc(t)
+  .replace(/^\/fix\b[ \t]*(.*)$/gm, '<span class="cmd">/fix</span> <b class="fixbody">$1</b>')
+  .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
 const plain = t => String(t == null ? "" : t).replace(/\*\*/g, "");
 function setDot(ok, msg) { const d = document.getElementById("savedot"); d.textContent = msg; d.className = ok ? "" : "bad"; }
 
@@ -1100,10 +1110,13 @@ function wireDock(key, el, ta, btn) {
 
   async function send() {
     const v = ta.value.trim(); if (!v) return;
-    btn.disabled = true; ta.value = ""; chatDrafts[key] = "";
+    btn.disabled = true; ta.value = ""; chatDrafts[key] = ""; ta.classList.remove("fixing");
     try { await chatSend(key, v); } finally { btn.disabled = false; ta.focus(); }
   }
-  ta.addEventListener("input", () => { chatDrafts[key] = ta.value; });
+  ta.addEventListener("input", () => {
+    chatDrafts[key] = ta.value;
+    ta.classList.toggle("fixing", /^\/fix\b/.test(ta.value));   // 쓰는 중에도 표시
+  });
   btn.addEventListener("click", send);
   ta.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
