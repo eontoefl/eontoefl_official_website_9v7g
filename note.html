@@ -67,10 +67,6 @@
   .topbar .inner { max-width: 1400px; margin: 0 auto; padding: 1rem 1.4rem;
     display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
   .brand { font-size: 10.5px; font-weight: 600; letter-spacing: .18em; color: var(--on-surface-variant); display: block; }
-  .dtitle { font-size: 27px; font-weight: 700; line-height: 1.25; margin-right: .35rem; }
-  .glint { display: none; width: 6px; height: 6px; border-radius: 99px; background: var(--primary);
-    vertical-align: 7px; margin-left: .5rem; }
-  .dtitle.today .glint { display: inline-block; }
   .iconbtn { width: 40px; height: 40px; border: none; border-radius: var(--r); background: var(--surface-high);
     color: var(--on-primary-container); font-size: 19px; font-weight: 600; cursor: pointer; line-height: 1;
     font-family: inherit; transition: background .15s; flex-shrink: 0; }
@@ -81,37 +77,16 @@
   .fillbtn { border: none; border-radius: var(--r); background: var(--surface-high); color: var(--on-primary-container);
     padding: 10px 15px; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   .fillbtn:hover { background: var(--surface-highest); }
+  /* 하루의 세 스위치 — 같은 모양, 색만 다르다 */
+  #mornbtn { background: var(--grad); color: #fff; }
+  #mornbtn:hover { filter: brightness(1.06); }
+  #sendday { background: var(--tertiary); color: #fff; }
+  #sendday:hover { filter: brightness(1.08); }
+  #sendday.sent { background: var(--secondary-container); color: var(--on-secondary-container); }
+  #sweepbtn { background: var(--surface-high); color: var(--on-primary-container); }
+
   #savedot { margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--on-surface-variant); }
   #savedot.bad { color: var(--tertiary); }
-
-  /* ───── 달력 (Contextual Blade) ───── */
-  #scrim { position: fixed; inset: 0; background: rgba(25, 28, 29, .18); opacity: 0; pointer-events: none;
-    transition: opacity .22s; z-index: 50; }
-  #scrim.on { opacity: 1; pointer-events: auto; }
-  #blade { position: fixed; top: 0; right: 0; height: 100%; width: 350px; max-width: 88vw; z-index: 51;
-    background: rgba(255, 255, 255, .8); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    box-shadow: var(--float); transform: translateX(101%); transition: transform .26s cubic-bezier(.32,.72,0,1);
-    padding: 1.4rem; overflow-y: auto; }
-  #blade.on { transform: translateX(0); }
-  .blade-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.4rem; }
-  .blade-top b { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-  .mrow { display: flex; align-items: center; justify-content: space-between; margin-bottom: .7rem; }
-  .mrow b { font-size: 15px; font-weight: 600; }
-  .grid7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-  .dow { text-align: center; font-size: 10.5px; font-weight: 600; color: var(--on-surface-variant); padding: 6px 0; }
-  .dow.sun { color: var(--tertiary); }
-  .day { position: relative; text-align: center; padding: 9px 0 12px; font-size: 13.5px; font-weight: 500;
-    border-radius: var(--r); cursor: pointer; color: var(--on-surface-variant); }
-  .day:hover { background: var(--surface-high); }
-  .day.empty { cursor: default; }
-  .day.sun { color: var(--tertiary); }
-  .day.has { color: var(--on-surface); font-weight: 600; }
-  .day.has::after { content: ""; position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%);
-    width: 4px; height: 4px; border-radius: 99px; background: var(--primary); }
-  .day.today { background: var(--surface-highest); }
-  .day.sel { background: var(--grad); color: #fff; font-weight: 700; }
-  .day.sel::after { background: #fff; }
-  .blade-foot { font-size: 12px; color: var(--on-surface-variant); margin-top: 1rem; }
 
   /* ───── 1순위 히어로 ───── */
   .hero { background: var(--grad); color: #fff; border-radius: var(--r-lg); padding: 1.5rem 1.75rem;
@@ -124,8 +99,13 @@
   /* ───── 3주 일정표 ───── */
   .cal2 { background: var(--surface-lowest); border-radius: var(--r-lg); padding: 1.1rem 1.2rem 1.2rem;
     box-shadow: var(--lift); margin-bottom: 1.75rem; }
-  .cal2 .c2head { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .8rem; }
-  .cal2 .c2head b { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; color: var(--on-surface-variant); }
+  .cal2 .c2head { display: flex; align-items: center; gap: .5rem; margin-bottom: .9rem; }
+  .cal2 .c2head .iconbtn { width: 34px; height: 34px; font-size: 17px; }
+  .cal2 .dnow { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+  .cal2 .dnow.isnow { color: var(--primary); }
+  .cal2 .c2head b { margin-left: auto; }
+  .cal2 .c2head b { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; color: var(--on-surface-variant);
+    margin-left: auto; }
   .cal2 .c2head .rng { font-size: 11.5px; color: var(--on-surface-variant); font-weight: 500; }
   .cal2 .grid14 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
   .cal2 .dw { text-align: center; font-size: 10px; font-weight: 700; color: var(--on-surface-variant);
@@ -534,7 +514,7 @@
   @media (max-width: 1080px) {
     .cols { grid-template-columns: 1fr; } .dept-cols { column-count: 1; }
     .wrap { padding: 0 1rem; } .topbar .inner { padding: .8rem 1rem; }
-    .dtitle { font-size: 22px; } .hero { padding: 1.25rem 1.4rem; } .hero .h { font-size: 21px; }
+    .cal2 .dnow { font-size: 17px; } .hero { padding: 1.25rem 1.4rem; } .hero .h { font-size: 21px; }
     .e-card { width: 118px; } .e-amt { width: 88px; }
   }
 </style>
@@ -554,32 +534,12 @@
 
   <div class="topbar">
     <div class="inner">
-      <div>
-        <span class="brand">BAMTOL HOLDINGS</span>
-        <div class="dtitle" id="dtitle"><span id="dtext">—</span><span class="glint"></span></div>
-      </div>
-      <button class="iconbtn" id="prev" type="button" title="이전 날">‹</button>
-      <button class="iconbtn" id="next" type="button" title="다음 날">›</button>
+      <span class="brand">BAMTOL HOLDINGS</span>
       <button class="fillbtn" id="mornbtn" type="button">출근</button>
       <button class="fillbtn" id="sendday" type="button">퇴근</button>
-      <button class="ghostbtn" id="sweepbtn" type="button">empty</button>
-      <button class="fillbtn" id="calbtn" type="button">달력</button>
-      <button class="ghostbtn" id="todaybtn" type="button">오늘로</button>
+      <button class="fillbtn" id="sweepbtn" type="button">empty</button>
       <div id="savedot"></div>
     </div>
-  </div>
-
-  <div id="scrim"></div>
-  <div id="blade">
-    <div class="blade-top"><b>날짜 고르기</b><button class="ghostbtn" id="bladeclose" type="button">닫기</button></div>
-    <div class="mrow">
-      <button class="ghostbtn" id="mprev" type="button">‹</button>
-      <b id="mlabel">—</b>
-      <button class="ghostbtn" id="mnext" type="button">›</button>
-    </div>
-    <div class="grid7" id="dows"></div>
-    <div class="grid7" id="days"></div>
-    <div class="blade-foot">점이 찍힌 날에 브리핑이 있습니다.</div>
   </div>
 
   <div class="wrap">
@@ -673,7 +633,7 @@ async function unlockText(pw, blob) {
 }
 
 /* ───── 상태 ───── */
-let PW = null, DATE = null, DAY = null, STATE = null, DATES = [], calYM = null, saveTimer = null;
+let PW = null, DATE = null, DAY = null, STATE = null, DATES = [], saveTimer = null;
 const todayStr = () => { const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const shift = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n);
@@ -961,10 +921,16 @@ function drawCal2() {
   const byDay = {};
   (evCache || []).forEach(e => { (byDay[e.d] = byDay[e.d] || []).push(e); });
 
-  const DW = ["일", "월", "화", "수", "목", "금", "토"];
-  let html = '<div class="c2head"><b>앞으로 3주</b><span class="rng">' +
+
+  const cur = new Date(DATE + "T12:00:00");
+  let html = '<div class="c2head">' +
+    '<button class="iconbtn" id="prev" type="button" title="이전 날">‹</button>' +
+    '<button class="iconbtn" id="next" type="button" title="다음 날">›</button>' +
+    '<div class="dnow' + (DATE === today ? " isnow" : "") + '">' +
+      (cur.getMonth() + 1) + '월 ' + cur.getDate() + '일 (' + DOW[cur.getDay()] + ')</div>' +
+    '<b>앞으로 3주</b><span class="rng">' +
     esc(start.slice(5).replace("-", "월 ") + "일 ~ " + end.slice(5).replace("-", "월 ") + "일") + '</span></div>' +
-    '<div class="grid14">' + DW.map((w, i) => '<div class="dw' + (i === 0 ? " sun" : "") + '">' + w + "</div>").join("") + '</div>' +
+    '<div class="grid14">' + DOW.map((w, i) => '<div class="dw' + (i === 0 ? " sun" : "") + '">' + w + "</div>").join("") + '</div>' +
     '<div class="grid14">';
   days.forEach(d => {
     const evs = byDay[d] || [];
@@ -992,6 +958,8 @@ function drawCal2() {
   box.innerHTML = html;
   box.querySelectorAll(".cell").forEach(c =>
     c.addEventListener("click", () => go(c.dataset.d)));
+  document.getElementById("prev").addEventListener("click", () => go(shift(DATE, -1)));
+  document.getElementById("next").addEventListener("click", () => go(shift(DATE, 1)));
 
   box.querySelectorAll(".evx").forEach(b => b.addEventListener("click", async e => {
     e.stopPropagation();                      // 날짜 이동은 막고 지우기만 한다
@@ -1075,13 +1043,12 @@ function moneyBlock(title, rows) {
 /* ───── 본문 ───── */
 function render() {
   const c = document.getElementById("content");
-  const d = new Date(DATE + "T12:00:00");
-  document.getElementById("dtext").textContent = (d.getMonth()+1) + "월 " + d.getDate() + "일 (" + DOW[d.getDay()] + ")";
-  document.getElementById("dtitle").classList.toggle("today", DATE === todayStr());
   document.getElementById("meta").textContent = DAY && DAY.meta ? DAY.meta : "";
 
   if (!DAY) {
-    c.innerHTML = '<div class="empty-day">이 날짜에는 브리핑이 없습니다.<br>화살표나 달력으로 다른 날짜를 골라주세요.</div>';
+    c.innerHTML = '<div class="cal2" id="cal2"></div>' +
+      '<div class="empty-day">이 날짜에는 브리핑이 없습니다.<br>위 달력에서 다른 날을 골라주세요.</div>';
+    drawCal2();
     return;
   }
   const p1 = DAY.p1 || {}, cards = DAY.cards || {};
@@ -1307,27 +1274,6 @@ function mountDept(key) {
   cb.addEventListener("click", () => openDock(key, team, person));
 }
 
-/* ───── 달력 ───── */
-function drawCal() {
-  const [y, m] = calYM;
-  document.getElementById("mlabel").textContent = y + "년 " + (m + 1) + "월";
-  document.getElementById("dows").innerHTML = DOW.map((x, i) => '<div class="dow' + (i === 0 ? " sun" : "") + '">' + x + "</div>").join("");
-  const first = new Date(y, m, 1).getDay(), last = new Date(y, m + 1, 0).getDate();
-  const box = document.getElementById("days"); box.innerHTML = "";
-  for (let i = 0; i < first; i++) { const e = document.createElement("div"); e.className = "day empty"; box.appendChild(e); }
-  for (let dd = 1; dd <= last; dd++) {
-    const s = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(dd).padStart(2, "0");
-    const el = document.createElement("div");
-    el.className = "day" + (new Date(y, m, dd).getDay() === 0 ? " sun" : "") + (DATES.includes(s) ? " has" : "") +
-      (s === todayStr() ? " today" : "") + (s === DATE ? " sel" : "");
-    el.textContent = dd;
-    el.addEventListener("click", () => { go(s); closeBlade(); });
-    box.appendChild(el);
-  }
-}
-function openBlade() { const dd = new Date(DATE + "T12:00:00"); calYM = [dd.getFullYear(), dd.getMonth()]; drawCal();
-  document.getElementById("blade").classList.add("on"); document.getElementById("scrim").classList.add("on"); }
-function closeBlade() { document.getElementById("blade").classList.remove("on"); document.getElementById("scrim").classList.remove("on"); }
 /* 채팅창 하나하나에 끌기·크기조절·보내기를 붙인다 */
 function placeNew(key, el) {
   const POS = "hq-dock-" + key;
@@ -1588,16 +1534,8 @@ function drawSend() {
   apply(localStorage.getItem(RKEY) !== "0");
 })();
 
-document.getElementById("calbtn").addEventListener("click", openBlade);
-document.getElementById("bladeclose").addEventListener("click", closeBlade);
-document.getElementById("scrim").addEventListener("click", closeBlade);
-document.getElementById("mprev").addEventListener("click", () => { calYM = calYM[1] ? [calYM[0], calYM[1] - 1] : [calYM[0] - 1, 11]; drawCal(); });
-document.getElementById("mnext").addEventListener("click", () => { calYM = calYM[1] === 11 ? [calYM[0] + 1, 0] : [calYM[0], calYM[1] + 1]; drawCal(); });
-document.getElementById("prev").addEventListener("click", () => go(shift(DATE, -1)));
-document.getElementById("next").addEventListener("click", () => go(shift(DATE, 1)));
-document.getElementById("todaybtn").addEventListener("click", () => go(todayStr()));
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") { closeBlade(); closeDock(); }
+  if (e.key === "Escape") closeDock();
   if (!PW || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) return;
   if (e.key === "ArrowLeft") go(shift(DATE, -1));
   if (e.key === "ArrowRight") go(shift(DATE, 1));
@@ -1618,7 +1556,6 @@ async function go(d) {
   chatLoad();
   loadEvents();
   setDot(true, row ? "저장 준비됨" : "브리핑 없음");
-  if (document.getElementById("blade").classList.contains("on")) drawCal();
   window.scrollTo({ top: 0 });
 }
 async function start() {
