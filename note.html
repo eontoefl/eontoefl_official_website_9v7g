@@ -144,6 +144,14 @@
   .cal2 .ev .pt { width: 5px; height: 5px; border-radius: 99px; flex-shrink: 0; margin-top: 4px; }
   .cal2 .ev .tx { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2;
     -webkit-box-orient: vertical; }
+  /* 지우기 — 잘못 올라온 일정을 대표님이 직접 치우신다 (2026-08-04) */
+  .cal2 .ev { position: relative; padding-right: 12px; }
+  .cal2 .evx { position: absolute; right: -2px; top: -1px; opacity: 0; border: none; background: var(--surface-lowest);
+    color: var(--on-surface-variant); font-size: 10px; line-height: 1; padding: 2px 3px; border-radius: 99px;
+    cursor: pointer; font-family: inherit; }
+  .cal2 .cell:hover .evx, .cal2 .lrow:hover .evx { opacity: .75; }
+  .cal2 .evx:hover { opacity: 1; background: var(--tertiary); color: #fff; }
+  .cal2 .lrow { position: relative; padding-right: 16px; }
   .cal2 .later { margin-top: .8rem; background: var(--surface-low); border-radius: var(--r); padding: .7rem .9rem;
     font-size: 11.5px; color: var(--on-surface-variant); line-height: 1.8; }
   .cal2 .later b { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--on-surface);
@@ -967,7 +975,8 @@ function drawCal2() {
     html += '<div class="cell' + (isToday ? " today" : "") + (past ? " past" : "") + '" data-d="' + d + '">' +
       '<div class="dd' + (sun ? " sun" : "") + '">' + Number(d.slice(8)) + '</div>' +
       evs.slice(0, 3).map(e => '<div class="ev"><span class="pt" style="background:' +
-        (TONE[e.team] || "#006688") + '"></span><span class="tx">' + esc(e.title) + '</span></div>').join("") +
+        (TONE[e.team] || "#006688") + '"></span><span class="tx">' + esc(e.title) + '</span>' +
+        '<button class="evx" type="button" data-ev="' + e.id + '" title="이 일정 지우기">✕</button></div>').join("") +
       (evs.length > 3 ? '<div class="ev"><span class="tx">+' + (evs.length - 3) + '</span></div>' : "") +
       '</div>';
   });
@@ -976,13 +985,24 @@ function drawCal2() {
   const later = (evCache || []).filter(e => e.d > end).slice(0, 6);
   if (later.length) {
     html += '<div class="later"><b>그 뒤로</b>' + later.map(e =>
-      '<div>' + esc(e.d.slice(5).replace("-", "월 ") + "일") + " · " + esc(e.title) + '</div>').join("") + '</div>';
+      '<div class="lrow">' + esc(e.d.slice(5).replace("-", "월 ") + "일") + " · " + esc(e.title) +
+      '<button class="evx" type="button" data-ev="' + e.id + '" title="이 일정 지우기">✕</button></div>').join("") + '</div>';
   } else if (!(evCache || []).length) {
     html += '<div class="empty2">아직 잡힌 일정이 없습니다. 팀장과 이야기하며 날짜를 정하면 여기에 뜹니다.</div>';
   }
   box.innerHTML = html;
   box.querySelectorAll(".cell").forEach(c =>
     c.addEventListener("click", () => go(c.dataset.d)));
+
+  box.querySelectorAll(".evx").forEach(b => b.addEventListener("click", async e => {
+    e.stopPropagation();                      // 날짜 이동은 막고 지우기만 한다
+    const id = b.dataset.ev;
+    const hit = (evCache || []).find(x => String(x.id) === String(id));
+    if (!confirm("이 일정을 지웁니다.\n\n" + (hit ? hit.d + " · " + hit.title : "") + "\n\n계속할까요?")) return;
+    b.disabled = true;
+    await fetch(EV + "?id=eq." + id, { method: "DELETE", headers: HDR });
+    await loadEvents();
+  }));
 }
 
 /* 돈 칸의 작은 목록 — 회계팀이 채운다 */
