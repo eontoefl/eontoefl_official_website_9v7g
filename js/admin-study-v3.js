@@ -136,6 +136,8 @@ async function loadStudyData() {
             const programStr = app.assigned_program || app.preferred_program || '';
             const programType = programStr.includes('Fast') ? 'Fast' : 'Standard';
             const isAustralia = programStr.includes('Australia');
+            // 자기주도: 저장값은 'Fast'지만 관리자 목록에서는 정규 Fast와 구별해 표기·필터한다
+            const selfPaced = !!app.self_paced;
             const totalWeeks = programType === 'Fast' ? 4 : 8;
 
             // 시작 전 여부
@@ -308,6 +310,7 @@ async function loadStudyData() {
                 name: user.name || app.name || '-',
                 email: user.email,
                 programType,
+                selfPaced,
                 isAustralia,
                 currentWeek: Math.min(currentWeek, totalWeeks),
                 totalWeeks,
@@ -396,7 +399,10 @@ function applyFilters() {
 
     filteredStudentData = allStudentData.filter(s => {
         if (searchTerm && !s.name.toLowerCase().includes(searchTerm)) return false;
-        if (programFilter && s.programType !== programFilter) return false;
+        // 'SELF'는 자기주도만, Fast/Standard는 자기주도를 제외한 정규 과정만
+        if (programFilter === 'SELF') {
+            if (!s.selfPaced) return false;
+        } else if (programFilter && (s.programType !== programFilter || s.selfPaced)) return false;
         if (weekFilter && s.currentWeek !== parseInt(weekFilter)) return false;
         return true;
     });
@@ -504,8 +510,8 @@ function renderTable() {
                 </td>
                 <td style="font-size:12px; color:#64748b; white-space:nowrap;">${escapeHtml(s.email || '')}</td>
                 <td>
-                    <span style="display:inline-block; background:${s.programType === 'Fast' ? '#ede9fe' : '#e0f2fe'}; color:${s.programType === 'Fast' ? '#7c3aed' : '#0284c7'}; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600;">
-                        ${s.isAustralia ? 'AU ' : ''}${s.programType}
+                    <span style="display:inline-block; background:${s.selfPaced ? '#fef3c7' : s.programType === 'Fast' ? '#ede9fe' : '#e0f2fe'}; color:${s.selfPaced ? '#b45309' : s.programType === 'Fast' ? '#7c3aed' : '#0284c7'}; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600;">
+                        ${s.isAustralia ? 'AU ' : ''}${s.selfPaced ? 'SELF' : s.programType}
                     </span>
                 </td>
                 <td style="font-size:13px; white-space:nowrap;">
@@ -667,7 +673,7 @@ function updateAlertBoard(students, v3Records, scheduleData) {
                 color: '#f59e0b',
                 icon: '⚠️',
                 title: `${s.name} - ${missedDays.length}일 연속 미제출 (${missedDays.reverse().join(', ')})`,
-                subtitle: `${s.isAustralia ? 'AU ' : ''}${s.programType} ${s.totalWeeks}주 | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}%`,
+                subtitle: `${s.isAustralia ? 'AU ' : ''}${s.selfPaced ? 'SELF PACED' : `${s.programType} ${s.totalWeeks}주`} | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}%`,
                 userId: s.userId
             });
         }

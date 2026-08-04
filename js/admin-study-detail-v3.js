@@ -208,13 +208,15 @@ function renderProfileHeader() {
     document.getElementById('studentAvatar').textContent = name.charAt(0);
     document.getElementById('studentName').textContent = name;
     const auLabel = isAustraliaTrack(app) ? '내벨업챌린지 Australia' : '내벨업챌린지';
-    document.getElementById('studentProgram').textContent =
-        `${auLabel} - ${getProgram(app)} (${getTotalWeeks(app)}주)`;
-    
+    // 자기주도: 저장값은 'Fast'지만 헤더에는 'SELF PACED'로 표기(주차 개념 없음), 종료일은 자기주도 완료일 기준
+    document.getElementById('studentProgram').textContent = app.self_paced
+        ? `${auLabel} - SELF PACED`
+        : `${auLabel} - ${getProgram(app)} (${getTotalWeeks(app)}주)`;
+
     const start = getScheduleStart(app);
-    const end = getScheduleEnd(app);
+    const end = app.self_paced ? getPracticeEndDate(app) : getScheduleEnd(app);
     document.getElementById('studentPeriod').textContent = start && end
-        ? `${formatKSTDate(app.schedule_start)} ~ ${formatKSTDate(app.schedule_end)}`
+        ? `${formatKSTDate(app.schedule_start)} ~ ${formatKSTDate(end)}`
         : '-';
     document.getElementById('studentEmail').textContent = user.email || '-';
 

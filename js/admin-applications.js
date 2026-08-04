@@ -603,8 +603,11 @@ function applyFilters() {
         const matchesStatus = statusFilter === 'all' || getAppStageFilter(app) === statusFilter;
         
         // 프로그램 필터 (배정 프로그램 우선, 없으면 희망 프로그램으로 비교)
-        const matchesProgram = programFilter === 'all' || 
-            (app.assigned_program || app.preferred_program || '') === programFilter;
+        // 'self_paced'는 자기주도만, 프로그램명 필터는 자기주도를 제외한 정규 과정만
+        const matchesProgram = programFilter === 'all' ||
+            (programFilter === 'self_paced'
+                ? !!app.self_paced
+                : ((app.assigned_program || app.preferred_program || '') === programFilter && !app.self_paced));
         
         // 첨삭 필터
         const matchesCorrection = correctionFilter === 'all' ||
@@ -699,7 +702,9 @@ function displayApplications() {
                 </td>
                 <td>
                     <span style="color: #9480c5; font-weight: 500; font-size: 13px;">
-                        ${escapeHtml(app.assigned_program || app.preferred_program || '-')}
+                        ${escapeHtml(app.self_paced
+                            ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED')
+                            : (app.assigned_program || app.preferred_program || '-'))}
                     </span>
                     ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;">첨삭</span>' : ''}
                 </td>
