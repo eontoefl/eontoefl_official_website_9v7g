@@ -250,10 +250,16 @@
   .dept-cols { column-count: 2; column-gap: 1.4rem; }
   .dept { background: var(--surface-lowest); border-radius: var(--r-lg); padding: 1.4rem; margin-bottom: 1.4rem;
     box-shadow: var(--lift); break-inside: avoid; display: inline-block; width: 100%; }
-  .dept-top { display: flex; align-items: center; gap: .6rem; margin-bottom: .9rem; }
-  .dept-top .dot { width: 8px; height: 8px; border-radius: 99px; flex-shrink: 0; }
-  .dept-top h3 { font-size: 16.5px; font-weight: 700; }
-  .dept-top .role { font-size: 11.5px; color: var(--on-surface-variant); margin-left: auto; text-align: right; font-weight: 400; }
+  .dept-top { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
+  .dept-top .who { position: relative; flex-shrink: 0; line-height: 0; }
+  .dept-top .avatar { width: 46px; height: 46px; border-radius: 99px; object-fit: cover;
+    background: var(--surface-high); display: block; }
+  .dept-top .dot { position: absolute; right: 0; bottom: 1px; width: 12px; height: 12px; border-radius: 99px;
+    box-shadow: 0 0 0 2.5px var(--surface-lowest); }
+  .dept-top h3 { font-size: 16.5px; font-weight: 700; line-height: 1.25; }
+  .dept-top .person { font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin-top: 1px; }
+  .dept-top .role { font-size: 11.5px; color: var(--on-surface-variant); margin-left: auto; text-align: right;
+    font-weight: 400; line-height: 1.45; max-width: 40%; }
   .kpi { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .kpi > div { background: var(--surface-low); border-radius: var(--r); padding: .7rem .95rem; flex: 1; min-width: 96px; }
   .kpi .k { font-size: 10.5px; font-weight: 600; color: var(--on-surface-variant); letter-spacing: .04em; }
@@ -619,8 +625,13 @@ function render() {
   (DAY.depts || []).forEach(dp => {
     const el = document.createElement("div");
     el.className = "dept";
-    el.innerHTML = '<div class="dept-top"><span class="dot" style="background:' + (TONE[dp.key] || "#006688") + '"></span>' +
-        '<h3>' + esc(dp.name) + '</h3><div class="role">' + esc(dp.role || "") + '</div></div>' +
+    const parts = String(dp.name || "").split(" · ");
+    const team = parts[0], person = parts[1] || "";
+    el.innerHTML = '<div class="dept-top">' +
+        '<div class="who"><img class="avatar" src="assets/team/' + dp.key + '.jpg" alt="" ' +
+          'onerror="this.style.display=\'none\'"><span class="dot" style="background:' + (TONE[dp.key] || "#006688") + '"></span></div>' +
+        '<div><h3>' + esc(team) + '</h3>' + (person ? '<div class="person">' + esc(person) + ' 팀장</div>' : "") + '</div>' +
+        '<div class="role">' + esc(dp.role || "") + '</div></div>' +
       (dp.kpi ? '<div class="kpi">' + dp.kpi.map(k => '<div><div class="k">' + esc(k.k) + '</div><div class="v">' + esc(k.v) + '</div></div>').join("") + '</div>' : "") +
       (dp.gauge ? '<div class="gauge"><div class="lab"><span>' + esc(dp.gauge.label) + '</span><span>' + esc(dp.gauge.text) + '</span></div>' +
         '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
