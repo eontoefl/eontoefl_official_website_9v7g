@@ -319,39 +319,39 @@
   @media (max-width: 1080px) { #alerts { top: auto; bottom: 20px; right: 12px; width: 260px; } }
 
   /* 플로팅 채팅창 */
-  #dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
+  .dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
     min-width: 300px; min-height: 260px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px);
     z-index: 60; display: none; flex-direction: column;
     background: rgba(255, 255, 255, .92); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border-radius: var(--r-lg); box-shadow: 0 12px 44px rgba(25, 28, 29, .16);
     overflow: hidden; resize: both; }
-  #dock::-webkit-resizer { background: transparent; }
-  #dock.on { display: flex; }
-  #dock.dragging { transition: none; user-select: none; }
-  #dock .head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; background: var(--surface-low);
+  .dock::-webkit-resizer { background: transparent; }
+  .dock.on { display: flex; }
+  .dock.dragging { transition: none; user-select: none; }
+  .dock .head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; background: var(--surface-low);
     cursor: grab; touch-action: none; }
-  #dock .head:active { cursor: grabbing; }
-  #dock .head .grip { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: 34px; height: 4px;
+  .dock .head:active { cursor: grabbing; }
+  .dock .head .grip { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: 34px; height: 4px;
     border-radius: 99px; background: var(--on-surface-variant); opacity: .22; }
-  #dock .head img { width: 36px; height: 36px; border-radius: 99px; object-fit: cover; flex-shrink: 0; }
-  #dock .head .nm { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
-  #dock .head .tm { font-size: 11.5px; color: var(--on-surface-variant); }
-  #dock .head .x { margin-left: auto; background: none; border: none; font-size: 17px; color: var(--on-surface-variant);
+  .dock .head img { width: 36px; height: 36px; border-radius: 99px; object-fit: cover; flex-shrink: 0; }
+  .dock .head .nm { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
+  .dock .head .tm { font-size: 11.5px; color: var(--on-surface-variant); }
+  .dock .head .x { margin-left: auto; background: none; border: none; font-size: 17px; color: var(--on-surface-variant);
     cursor: pointer; padding: 4px 6px; border-radius: var(--r); line-height: 1; }
-  #dock .head .x:hover { background: var(--surface-high); color: var(--on-surface); }
-  #dock .log { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .5rem; }
-  #dock .row { display: flex; gap: .45rem; align-items: flex-end; }
-  #dock .row.me { justify-content: flex-end; }
-  #dock .row .ava { width: 27px; height: 27px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+  .dock .head .x:hover { background: var(--surface-high); color: var(--on-surface); }
+  .dock .log { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .5rem; }
+  .dock .row { display: flex; gap: .45rem; align-items: flex-end; }
+  .dock .row.me { justify-content: flex-end; }
+  .dock .row .ava { width: 27px; height: 27px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
     margin-bottom: 2px; background: var(--surface-high); }
-  #dock .row .ava.hide { visibility: hidden; }
+  .dock .row .ava.hide { visibility: hidden; }
   /* 오른쪽 아래 크기 조절 손잡이 */
-  #dock .grabber { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; pointer-events: none;
+  .dock .grabber { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; pointer-events: none;
     opacity: .3; }
-  #dock .grabber::before { content: ""; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px;
+  .dock .grabber::before { content: ""; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px;
     border-right: 2px solid var(--on-surface-variant); border-bottom: 2px solid var(--on-surface-variant);
     border-radius: 0 0 2px 0; }
-  #dock .foot { padding: 0 1rem 1rem; }
+  .dock .foot { padding: 0 1rem 1rem; }
   .chat .log { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
   .bubble { max-width: 86%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--grad); color: #fff; border-bottom-right-radius: .2rem; }
@@ -369,7 +369,7 @@
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
   @media (max-width: 620px) {
-    #dock { right: 8px; left: 8px; bottom: 8px; width: auto; max-height: 78vh; }
+    .dock { right: 8px; left: 8px; bottom: 8px; width: auto; max-height: 78vh; }
   }
 
   .empty-day { background: var(--surface-low); border-radius: var(--r-lg); padding: 4rem 1.4rem; text-align: center;
@@ -431,21 +431,23 @@
 
   <div id="alerts"></div>
 
-  <div id="dock">
-    <div class="head">
-      <span class="grip"></span>
-      <img src="" alt="">
-      <div><div class="nm">—</div><div class="tm">—</div></div>
-      <button class="x" type="button" title="닫기">✕</button>
+  <template id="docktpl">
+    <div class="dock">
+      <div class="head">
+        <span class="grip"></span>
+        <img src="" alt="">
+        <div><div class="nm">—</div><div class="tm">—</div></div>
+        <button class="x" type="button" title="닫기">✕</button>
+      </div>
+      <div class="log"></div>
+      <span class="grabber"></span>
+      <div class="foot">
+        <div class="chat"><div class="composer">
+          <textarea placeholder="할 말"></textarea><button type="button">보내기</button>
+        </div></div>
+      </div>
     </div>
-    <div class="log"></div>
-    <span class="grabber"></span>
-    <div class="foot">
-      <div class="chat"><div class="composer">
-        <textarea placeholder="할 말"></textarea><button type="button">보내기</button>
-      </div></div>
-    </div>
-  </div>
+  </template>
 </div>
 
 <script>
@@ -542,7 +544,7 @@ const CHAT = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_chat";
 const PERSON = { dev: "김도윤", ct: "이서현", cs: "박준호", mkt: "최유진", fin: "정민석", hr: "한지우" };
 const SEENKEY = "hq-chat-seen";
 const TEAMNAME = { dev: "개발팀", ct: "콘텐츠팀", cs: "CS팀", mkt: "마케팅영업팀", fin: "회계팀", hr: "인사총무팀" };
-let chatBtns = {}, chatTimer = null, dockTeam = null, chatCache = {}, chatDrafts = {};
+let chatBtns = {}, chatTimer = null, chatCache = {}, chatDrafts = {};
 
 /* 안 읽은 답장 알림 카드 */
 function drawAlerts() {
@@ -551,7 +553,7 @@ function drawAlerts() {
   const s = seen();
   const items = [];
   Object.keys(TEAMNAME).forEach(key => {
-    if (key === dockTeam) return;
+    if (docks[key]) return;
     const list = chatCache[key] || [];
     const unread = list.filter(m => m.role === "lead" && m.id > (s[key] || 0));
     if (!unread.length) return;
@@ -587,41 +589,55 @@ function drawAlerts() {
 const seen = () => { try { return JSON.parse(localStorage.getItem(SEENKEY) || "{}"); } catch (e) { return {}; } };
 function markSeen(team, id) { const s = seen(); s[team] = id; localStorage.setItem(SEENKEY, JSON.stringify(s)); }
 
+/* 채팅창은 팀마다 하나씩, 여러 개를 동시에 띄울 수 있다 */
+let docks = {}, zTop = 60;
+
 function openDock(key, team, person) {
-  const box = document.querySelector("#dock .foot textarea");
-  if (box && dockTeam && dockTeam !== key) chatDrafts[dockTeam] = box.value;   // 쓰던 글은 그 방에 두고 간다
-  dockTeam = key;
-  dockSig = "";
-  if (box) box.value = chatDrafts[key] || "";
-  const d = document.getElementById("dock");
-  d.querySelector(".head img").src = "assets/team/" + key + ".jpg";
-  d.querySelector(".head .nm").textContent = (person || "팀장") + " 팀장";
-  d.querySelector(".head .tm").textContent = team;
-  d.querySelector(".foot textarea").placeholder = team + "에 할 말";
-  d.classList.add("on");
-  if (window.restoreDockPos) restoreDockPos();
-  drawDock();
-  d.querySelector(".foot textarea").focus();
+  if (docks[key]) { front(key); docks[key].ta.focus(); return; }
+
+  const el = document.getElementById("docktpl").content.firstElementChild.cloneNode(true);
+  el.dataset.team = key;
+  el.querySelector(".head img").src = "assets/team/" + key + ".jpg";
+  el.querySelector(".head .nm").textContent = (person || "팀장") + " 팀장";
+  el.querySelector(".head .tm").textContent = team;
+  const ta = el.querySelector(".foot textarea"), btn = el.querySelector(".foot button");
+  ta.placeholder = team + "에 할 말";
+  ta.value = chatDrafts[key] || "";
+  document.body.appendChild(el);
+
+  docks[key] = { el: el, log: el.querySelector(".log"), ta: ta, sig: "" };
+  placeNew(key, el);
+  wireDock(key, el, ta, btn);
+  el.classList.add("on");
+  front(key);
+  drawDock(key);
+  ta.focus();
+  drawAlerts();
   chatLoad();
 }
-function closeDock() {
-  const box = document.querySelector("#dock .foot textarea");
-  if (box && dockTeam) chatDrafts[dockTeam] = box.value;   // 쓰던 글 보관
-  dockTeam = null;
-  document.getElementById("dock").classList.remove("on");
+
+function closeDock(key) {
+  if (key === undefined) { Object.keys(docks).forEach(closeDock); return; }
+  const d = docks[key]; if (!d) return;
+  chatDrafts[key] = d.ta.value;
+  d.el.remove();
+  delete docks[key];
   drawAlerts();
 }
 
-let dockSig = "";
-function drawDock() {
-  if (!dockTeam) return;
-  const list = chatCache[dockTeam] || [];
-  const log = document.querySelector("#dock .log");
+function front(key) {
+  const d = docks[key]; if (!d) return;
+  d.el.style.zIndex = ++zTop;
+}
+
+function drawDock(key) {
+  const d = docks[key]; if (!d) return;
+  const list = chatCache[key] || [];
+  const log = d.log;
 
   // 내용이 그대로면 다시 그리지 않는다 (다시 그리면 읽던 자리가 맨 아래로 튄다)
-  const sig = dockTeam + "|" + list.map(m => m.id + ":" + m.status).join(",");
-  if (sig !== dockSig) {
-    // 사용자가 위로 올려 읽는 중이면 자동으로 내리지 않는다
+  const sig = list.map(m => m.id + ":" + m.status).join(",");
+  if (sig !== d.sig) {
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
     log.innerHTML = (list.length
       ? list.map((m, i) => {
@@ -629,21 +645,21 @@ function drawDock() {
             return '<div class="row me"><div class="bubble me">' + esc(m.text) + '</div></div>';
           const same = i > 0 && list[i - 1].role === "lead";
           return '<div class="row"><img class="ava' + (same ? " hide" : "") + '" src="assets/team/' +
-            dockTeam + '.jpg" alt=""><div class="bubble lead">' +
-            (same ? "" : '<span class="who">' + esc(PERSON[dockTeam] || "팀장") + '</span>') +
+            key + '.jpg" alt=""><div class="bubble lead">' +
+            (same ? "" : '<span class="who">' + esc(PERSON[key] || "팀장") + '</span>') +
             esc(m.text) + '</div></div>';
         }).join("")
       : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
       + (list.some(m => m.role === "boss" && m.status !== "done")
-          ? '<div class="wait">' + esc(PERSON[dockTeam] || "팀장") + ' 팀장이 문서 보는 중…</div>' : "");
-    if (atBottom || !dockSig) log.scrollTop = log.scrollHeight;
-    dockSig = sig;
+          ? '<div class="wait">' + esc(PERSON[key] || "팀장") + ' 팀장이 문서 보는 중…</div>' : "");
+    if (atBottom || !d.sig) log.scrollTop = log.scrollHeight;
+    d.sig = sig;
   }
-  const last = list.length ? list[list.length - 1].id : 0;
-  markSeen(dockTeam, last);
-  const b = chatBtns[dockTeam]; if (b) b.classList.remove("has-new");
-  drawAlerts();
+  markSeen(key, list.length ? list[list.length - 1].id : 0);
+  const b = chatBtns[key]; if (b) b.classList.remove("has-new");
 }
+
+function drawAllDocks() { Object.keys(docks).forEach(drawDock); }
 
 async function chatLoad() {
   clearTimeout(chatTimer);
@@ -679,7 +695,7 @@ async function chatLoad() {
     Object.entries(chatBtns).forEach(([key, btn]) => {
       const list = byTeam[key] || [];
       const last = list.length ? list[list.length - 1] : null;
-      const unread = last && last.role === "lead" && last.id > (s[key] || 0) && key !== dockTeam;
+      const unread = last && last.role === "lead" && last.id > (s[key] || 0) && !docks[key];
       btn.classList.toggle("has-new", !!unread);
       const tag = btn.querySelector(".new");
       if (unread) {
@@ -689,10 +705,10 @@ async function chatLoad() {
       }
     });
     document.title = (unreadTeams ? "(" + unreadTeams + ") " : "") + "eonToefl";
-    drawDock();
+    drawAllDocks();
     drawAlerts();
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
-  chatTimer = setTimeout(chatLoad, waiting ? 4000 : (dockTeam ? 8000 : 30000));
+  chatTimer = setTimeout(chatLoad, waiting ? 4000 : (Object.keys(docks).length ? 8000 : 30000));
 }
 async function chatSend(team, text) {
   const body = await lock(PW, text);
@@ -950,53 +966,50 @@ function drawCal() {
 function openBlade() { const dd = new Date(DATE + "T12:00:00"); calYM = [dd.getFullYear(), dd.getMonth()]; drawCal();
   document.getElementById("blade").classList.add("on"); document.getElementById("scrim").classList.add("on"); }
 function closeBlade() { document.getElementById("blade").classList.remove("on"); document.getElementById("scrim").classList.remove("on"); }
-/* 플로팅 채팅창 조작 */
-(function () {
-  const d = document.getElementById("dock");
-  const ta = d.querySelector(".foot textarea"), btn = d.querySelector(".foot button");
-  d.querySelector(".head .x").addEventListener("click", closeDock);
+/* 채팅창 하나하나에 끌기·크기조절·보내기를 붙인다 */
+function placeNew(key, el) {
+  const POS = "hq-dock-" + key;
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(POS) || "null"); } catch (e) {}
+  if (p && p.w && innerWidth > 620) { el.style.width = p.w + "px"; el.style.height = p.h + "px"; }
+  if (p && typeof p.x === "number" && innerWidth > 620) {
+    el.style.left = p.x + "px"; el.style.top = p.y + "px";
+    el.style.right = el.style.bottom = "auto";
+  } else if (innerWidth > 620) {
+    // 저장된 자리가 없으면 이미 떠 있는 창들과 안 겹치게 계단식으로 놓는다
+    const n = Object.keys(docks).length - 1;
+    el.style.right = (20 + n * 26) + "px";
+    el.style.bottom = (20 + n * 26) + "px";
+  }
+}
 
-  /* ── 끌어서 옮기기 ── */
-  const POS = "hq-dock-pos";
-  function place(x, y) {
-    const w = d.offsetWidth, h = d.offsetHeight;
-    x = Math.min(Math.max(8, x), Math.max(8, innerWidth - w - 8));
-    y = Math.min(Math.max(8, y), Math.max(8, innerHeight - h - 8));
-    d.style.left = x + "px"; d.style.top = y + "px";
-    d.style.right = "auto"; d.style.bottom = "auto";
+function wireDock(key, el, ta, btn) {
+  const POS = "hq-dock-" + key;
+  const head = el.querySelector(".head");
+  function savePos(o) {
     let p = {};
     try { p = JSON.parse(localStorage.getItem(POS) || "{}"); } catch (e) {}
-    p.x = x; p.y = y;
+    Object.assign(p, o);
     localStorage.setItem(POS, JSON.stringify(p));
   }
-  window.restoreDockPos = function () {
-    let p = null;
-    try { p = JSON.parse(localStorage.getItem(POS) || "null"); } catch (e) {}
-    if (p && p.w && innerWidth > 620) { d.style.width = p.w + "px"; d.style.height = p.h + "px"; }
-    if (p && typeof p.x === "number" && innerWidth > 620) place(p.x, p.y);
-    else { d.style.left = d.style.top = d.style.right = d.style.bottom = ""; }
-  };
-  // 크기를 바꾸면 그대로 기억한다
-  if (window.ResizeObserver) {
-    let t = null;
-    new ResizeObserver(() => {
-      if (!d.classList.contains("on")) return;
-      clearTimeout(t);
-      t = setTimeout(() => {
-        let p = {};
-        try { p = JSON.parse(localStorage.getItem(POS) || "{}"); } catch (e) {}
-        p.w = d.offsetWidth; p.h = d.offsetHeight;
-        localStorage.setItem(POS, JSON.stringify(p));
-      }, 400);
-    }).observe(d);
+  function place(x, y) {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    x = Math.min(Math.max(8, x), Math.max(8, innerWidth - w - 8));
+    y = Math.min(Math.max(8, y), Math.max(8, innerHeight - h - 8));
+    el.style.left = x + "px"; el.style.top = y + "px";
+    el.style.right = el.style.bottom = "auto";
+    savePos({ x: x, y: y });
   }
-  const head = d.querySelector(".head");
+
+  el.querySelector(".head .x").addEventListener("click", () => closeDock(key));
+  el.addEventListener("pointerdown", () => front(key), true);
+
   let drag = null;
   head.addEventListener("pointerdown", e => {
     if (e.target.closest("button")) return;
-    const r = d.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
-    d.classList.add("dragging");
+    el.classList.add("dragging");
     head.setPointerCapture(e.pointerId);
   });
   head.addEventListener("pointermove", e => {
@@ -1006,7 +1019,7 @@ function closeBlade() { document.getElementById("blade").classList.remove("on");
   });
   function endDrag(e) {
     if (!drag) return;
-    drag = null; d.classList.remove("dragging");
+    drag = null; el.classList.remove("dragging");
     try { head.releasePointerCapture(e.pointerId); } catch (err) {}
   }
   head.addEventListener("pointerup", endDrag);
@@ -1014,21 +1027,30 @@ function closeBlade() { document.getElementById("blade").classList.remove("on");
   head.addEventListener("dblclick", e => {
     if (e.target.closest("button")) return;
     localStorage.removeItem(POS);
-    d.style.left = d.style.top = d.style.right = d.style.bottom = "";
+    el.style.left = el.style.top = el.style.right = el.style.bottom = "";
+    el.style.width = el.style.height = "";
+    placeNew(key, el);
   });
-  addEventListener("resize", () => { if (d.classList.contains("on")) restoreDockPos(); });
-  async function send() {
-    const v = ta.value.trim(); if (!v || !dockTeam) return;
-    const team = dockTeam;
-    btn.disabled = true; ta.value = ""; chatDrafts[team] = "";
-    try { await chatSend(team, v); } finally { btn.disabled = false; ta.focus(); }
+
+  if (window.ResizeObserver) {
+    let t = null;
+    new ResizeObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(() => savePos({ w: el.offsetWidth, h: el.offsetHeight }), 400);
+    }).observe(el);
   }
-  ta.addEventListener("input", () => { if (dockTeam) chatDrafts[dockTeam] = ta.value; });
+
+  async function send() {
+    const v = ta.value.trim(); if (!v) return;
+    btn.disabled = true; ta.value = ""; chatDrafts[key] = "";
+    try { await chatSend(key, v); } finally { btn.disabled = false; ta.focus(); }
+  }
+  ta.addEventListener("input", () => { chatDrafts[key] = ta.value; });
   btn.addEventListener("click", send);
   ta.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
-})();
+}
 
 document.getElementById("calbtn").addEventListener("click", openBlade);
 document.getElementById("bladeclose").addEventListener("click", closeBlade);
@@ -1057,7 +1079,7 @@ async function go(d) {
   }
   cardEdit = {};
   render();
-  dockSig = "";
+  Object.values(docks).forEach(d => d.sig = "");
   chatLoad();
   setDot(true, row ? "저장 준비됨" : "브리핑 없음");
   if (document.getElementById("blade").classList.contains("on")) drawCal();
