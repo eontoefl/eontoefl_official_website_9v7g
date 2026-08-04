@@ -285,9 +285,11 @@
   .chatbtn .new { display: none; }
   .chatbtn.has-new { background: #fbe3dd; color: var(--tertiary); }
   .chatbtn.has-new:hover { background: #f7d8d0; }
-  .chatbtn.has-new .new { display: inline-block; position: static; margin-left: .45rem;
+  /* 배지는 자리를 차지하지 않게 띄운다 — 카드 높이가 바뀌면 2단 배치가 다시 계산돼 화면이 밀린다 */
+  .chatbtn.has-new .new { display: inline-block; position: absolute; right: 10px; top: 50%;
+    transform: translateY(-50%);
     background: var(--tertiary); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
-    padding: 2px 8px; border-radius: 99px; vertical-align: 1px; animation: pulse 1.6s ease-in-out infinite; }
+    padding: 2px 8px; border-radius: 99px; animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @media (prefers-reduced-motion: reduce) { .chatbtn.has-new .new { animation: none; } }
 
@@ -504,6 +506,7 @@ function markSeen(team, id) { const s = seen(); s[team] = id; localStorage.setIt
 
 function openDock(key, team, person) {
   dockTeam = key;
+  dockSig = "";
   const d = document.getElementById("dock");
   d.querySelector(".head img").src = "assets/team/" + key + ".jpg";
   d.querySelector(".head .nm").textContent = (person || "팀장") + " 팀장";
@@ -517,18 +520,27 @@ function openDock(key, team, person) {
 }
 function closeDock() { dockTeam = null; document.getElementById("dock").classList.remove("on"); }
 
+let dockSig = "";
 function drawDock() {
   if (!dockTeam) return;
   const list = chatCache[dockTeam] || [];
   const log = document.querySelector("#dock .log");
-  log.innerHTML = list.length
-    ? list.map(m => '<div class="bubble ' + (m.role === "boss" ? "me" : "lead") + '">' +
-        (m.role === "lead" ? '<span class="who">' + esc(PERSON[dockTeam] || "팀장") + '</span>' : "") +
-        esc(m.text) + '</div>').join("")
-    : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>';
-  if (list.some(m => m.role === "boss" && m.status !== "done"))
-    log.innerHTML += '<div class="wait">' + esc(PERSON[dockTeam] || "팀장") + ' 팀장이 문서 보는 중…</div>';
-  log.scrollTop = log.scrollHeight;
+
+  // 내용이 그대로면 다시 그리지 않는다 (다시 그리면 읽던 자리가 맨 아래로 튄다)
+  const sig = dockTeam + "|" + list.map(m => m.id + ":" + m.status).join(",");
+  if (sig !== dockSig) {
+    // 사용자가 위로 올려 읽는 중이면 자동으로 내리지 않는다
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+    log.innerHTML = (list.length
+      ? list.map(m => '<div class="bubble ' + (m.role === "boss" ? "me" : "lead") + '">' +
+          (m.role === "lead" ? '<span class="who">' + esc(PERSON[dockTeam] || "팀장") + '</span>' : "") +
+          esc(m.text) + '</div>').join("")
+      : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
+      + (list.some(m => m.role === "boss" && m.status !== "done")
+          ? '<div class="wait">' + esc(PERSON[dockTeam] || "팀장") + ' 팀장이 문서 보는 중…</div>' : "");
+    if (atBottom || !dockSig) log.scrollTop = log.scrollHeight;
+    dockSig = sig;
+  }
   const last = list.length ? list[list.length - 1].id : 0;
   markSeen(dockTeam, last);
   const b = chatBtns[dockTeam]; if (b) b.classList.remove("has-new");
@@ -898,10 +910,11 @@ async function go(d) {
     if (row.state) { try { STATE = Object.assign(STATE, await unlockText(PW, row.state)); } catch (e) {} }
   }
   render();
+  dockSig = "";
   chatLoad();
   setDot(true, row ? "저장 준비됨" : "브리핑 없음");
   if (document.getElementById("blade").classList.contains("on")) drawCal();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0 });
 }
 async function start() {
   await fetchDates();
