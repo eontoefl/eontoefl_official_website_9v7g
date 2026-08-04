@@ -708,6 +708,7 @@ async function chatLoad() {
     if (!Array.isArray(rows)) throw new Error("bad");
     const byTeam = {}, freshCards = {};
     for (const row of rows) {
+      if (row.role === "relay") continue;              // 팀끼리 넘긴 쪽지 — 화면에 안 보인다
       if (row.role === "card") {                       // 팀장이 자기 카드를 고친 것
         try {
           const c = await unlockText(PW, row.body);
