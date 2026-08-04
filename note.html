@@ -216,6 +216,35 @@
   .chip.opt { background: var(--surface-high); color: var(--on-surface-variant); }
   .chip.mine { background: var(--secondary-container); color: var(--on-secondary-container); }
 
+  /* 팀장들이 올린 후보 — 대표님이 오늘 할 것을 고르는 자리 */
+  .cand { margin-top: 1.3rem; }
+  .cand .ch { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+  .cand .ch .lab { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; }
+  .cand .ch .n { font-size: 11.5px; color: var(--on-surface-variant); }
+  .cand .ch button { margin-left: auto; border: none; border-radius: var(--r); padding: 9px 15px;
+    font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    background: var(--grad); color: #fff; }
+  .cand .ch button:disabled { background: var(--surface-high); color: var(--on-surface-variant); cursor: default; }
+  .cand .it { display: flex; gap: .55rem; padding: .6rem .7rem; border-radius: var(--r); align-items: flex-start; }
+  .cand .it:hover { background: var(--surface-low); }
+  .cand .it.on { background: var(--surface-low); }
+  .cand .it input[type=checkbox] { width: 16px; height: 16px; margin-top: 3px; flex-shrink: 0;
+    accent-color: var(--primary); cursor: pointer; }
+  .cand .it .body { flex: 1; min-width: 0; }
+  .cand .it .top { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+  .cand .it .ord { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--primary);
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; display: grid; place-items: center; }
+  .cand .it .dot { width: 7px; height: 7px; border-radius: 99px; flex-shrink: 0; }
+  .cand .it .who { font-size: 11.5px; font-weight: 600; color: var(--on-surface-variant); }
+  .cand .it .dur { font-size: 11px; font-weight: 600; color: var(--on-surface-variant);
+    background: var(--surface-high); border-radius: 99px; padding: 1px 7px; }
+  .cand .it .tk { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; margin-top: 2px; line-height: 1.5; }
+  .cand .it .wy { font-size: 12px; color: var(--on-surface-variant); line-height: 1.7; margin-top: 2px; }
+  .cand .it .pnote { width: 100%; margin-top: .5rem; background: var(--surface-highest); border: none;
+    border-radius: var(--r); padding: 8px 11px; font-family: inherit; font-size: 12.5px; color: var(--on-surface); }
+  .cand .it .pnote:focus { outline: 2px solid var(--primary-fixed-dim); }
+  .cand .none { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.7; padding: .3rem 0; }
+
   .addrow { display: flex; gap: .5rem; margin-top: 1rem; }
   .addrow input { flex: 1; min-width: 0; background: var(--surface-highest); border: none; border-radius: var(--r);
     padding: 11px 14px; font-family: inherit; font-size: 14px; color: var(--on-surface); outline: none; }
@@ -404,30 +433,30 @@
     #roster { box-shadow: -8px 0 40px rgba(25,28,29,.12); }
   }
 
-  /* 하루 정리 모달 */
-  #sweepscrim { position: fixed; inset: 0; background: rgba(25, 28, 29, .3); z-index: 70;
+  /* 아침 회의 · 하루 정리 모달 (같은 옷을 입는다) */
+  #sweepscrim, #mornscrim { position: fixed; inset: 0; background: rgba(25, 28, 29, .3); z-index: 70;
     display: none; place-items: center; padding: 1.4rem; }
-  #sweepscrim.on { display: grid; }
-  #sweep { width: 460px; max-width: 100%; max-height: 86vh; overflow-y: auto;
+  #sweepscrim.on, #mornscrim.on { display: grid; }
+  #sweep, #morn { width: 460px; max-width: 100%; max-height: 86vh; overflow-y: auto;
     background: var(--surface-lowest); border-radius: var(--r-lg); box-shadow: var(--float); padding: 1.5rem; }
-  #sweep h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
-  #sweep .lead-in { font-size: 13.5px; color: var(--on-surface-variant); margin: .4rem 0 1.2rem; line-height: 1.7; }
-  #sweep .row2 { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem 0; }
-  #sweep .row2 img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+  #sweep h3, #morn h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  #sweep .lead-in, #morn .lead-in { font-size: 13.5px; color: var(--on-surface-variant); margin: .4rem 0 1.2rem; line-height: 1.7; }
+  #sweep .row2, #morn .row2 { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem 0; }
+  #sweep .row2 img, #morn .row2 img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
     background: var(--surface-high); }
-  #sweep .row2 .who2 { font-size: 13.5px; font-weight: 700; }
-  #sweep .row2 .res { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.6; margin-top: .1rem; }
-  #sweep .row2 .mark { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 700;
+  #sweep .row2 .who2, #morn .row2 .who2 { font-size: 13.5px; font-weight: 700; }
+  #sweep .row2 .res, #morn .row2 .res { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.6; margin-top: .1rem; }
+  #sweep .row2 .mark, #morn .row2 .mark { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 700;
     color: var(--on-surface-variant); align-self: center; }
-  #sweep .row2.done .mark { color: var(--good); }
-  #sweep .row2.doing .mark { color: var(--primary); }
-  #sweep .btns2 { display: flex; gap: .5rem; margin-top: 1.4rem; }
-  #sweep .btns2 button { flex: 1; border: none; border-radius: var(--r); padding: 12px;
+  #sweep .row2.done .mark, #morn .row2.done .mark { color: var(--good); }
+  #sweep .row2.doing .mark, #morn .row2.doing .mark { color: var(--primary); }
+  #sweep .btns2, #morn .btns2 { display: flex; gap: .5rem; margin-top: 1.4rem; }
+  #sweep .btns2 button, #morn .btns2 button { flex: 1; border: none; border-radius: var(--r); padding: 12px;
     font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-  #sweep .go { background: var(--grad); color: #fff; }
-  #sweep .wipe { background: var(--tertiary); color: #fff; }
-  #sweep .wipe:disabled { background: var(--surface-high); color: var(--on-surface-variant); cursor: default; }
-  #sweep .close2 { background: var(--surface-high); color: var(--on-primary-container); flex: 0 0 90px; }
+  #sweep .go, #morn .go { background: var(--grad); color: #fff; }
+  #sweep .wipe, #morn .wipe { background: var(--tertiary); color: #fff; }
+  #sweep .wipe:disabled, #morn .wipe:disabled { background: var(--surface-high); color: var(--on-surface-variant); cursor: default; }
+  #sweep .close2, #morn .close2 { background: var(--surface-high); color: var(--on-primary-container); flex: 0 0 90px; }
 
   /* 플로팅 채팅창 */
   .dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
@@ -526,6 +555,7 @@
       </div>
       <button class="iconbtn" id="prev" type="button" title="이전 날">‹</button>
       <button class="iconbtn" id="next" type="button" title="다음 날">›</button>
+      <button class="fillbtn" id="mornbtn" type="button">출근</button>
       <button class="fillbtn" id="calbtn" type="button">달력</button>
       <button class="ghostbtn" id="todaybtn" type="button">오늘로</button>
       <div id="savedot"></div>
@@ -556,6 +586,20 @@
     <div class="rlist" id="rlist"></div>
   </aside>
   <button id="rostertab" type="button">팀장들<span class="dotn"></span></button>
+
+  <div id="mornscrim">
+    <div id="morn">
+      <h3>아침 회의</h3>
+      <div class="lead-in">팀장 여섯 명이 각자 조회해서 밤사이 무엇이 달라졌는지 보고,
+        자기 칸을 채우고, 오늘 대표님 시간이 필요한 것을 후보로 올립니다.
+        10~20분쯤 걸리니 그동안 다른 일 하고 계셔도 됩니다.</div>
+      <div id="mornlist"></div>
+      <div class="btns2">
+        <button class="go" type="button" id="morngo">회의 시작</button>
+        <button class="close2" type="button" id="mornclose">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <div id="sweepscrim">
     <div id="sweep">
@@ -820,7 +864,8 @@ async function chatLoad() {
     if (!Array.isArray(rows)) throw new Error("bad");
     const byTeam = {};
     for (const row of rows) {
-      if (row.role === "relay" || row.role === "card") continue;   // 화면에 안 보이는 줄
+      // 화면에 안 보이는 줄 (시스템이 쓰는 표시)
+      if (["relay", "card", "sweep", "sweepdone", "morning", "morningdone", "plan", "wipe"].includes(row.role)) continue;
       let text;
       try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
       (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text, at: row.created_at });
@@ -941,6 +986,65 @@ function drawCal2() {
 }
 
 /* 돈 칸의 작은 목록 — 회계팀이 채운다 */
+/* 팀장들이 올린 후보 — 대표님이 고르면 순서가 매겨지고, 그 순서로 한지우 팀장이 시간표를 짠다 */
+function drawCand() {
+  const box = document.getElementById("cand");
+  if (!box) return;
+  const cand = (DAY && DAY.cand) || [];
+  STATE.picks = (STATE.picks || []).filter(p => cand.some(c => c.id === p.id));
+  const picks = STATE.picks;
+  const pos = id => picks.findIndex(p => p.id === id);
+
+  if (!cand.length) {
+    box.innerHTML = '<div class="ch"><span class="lab">팀장들이 올린 후보</span></div>' +
+      '<div class="none">아직 없습니다. 위 <b>출근</b>을 누르면 팀장 여섯 명이 각자 조회하고 오늘 후보를 올립니다.</div>';
+    return;
+  }
+  box.innerHTML =
+    '<div class="ch"><span class="lab">팀장들이 올린 후보</span>' +
+      '<span class="n">' + cand.length + '개 중 ' + picks.length + '개' + (picks.length ? " 고르심" : "") + '</span>' +
+      '<button type="button" id="planbtn"' + (picks.length ? "" : " disabled") + '>고른 것으로 시간표 짜기</button></div>' +
+    cand.map(c => {
+      const n = pos(c.id);
+      return '<div class="it' + (n >= 0 ? " on" : "") + '" data-id="' + esc(c.id || "") + '">' +
+        '<input type="checkbox"' + (n >= 0 ? " checked" : "") + '>' +
+        '<div class="body"><div class="top">' +
+          (n >= 0 ? '<span class="ord">' + (n + 1) + '</span>' : "") +
+          '<span class="dot" style="background:' + (TONE[c.team] || "#006688") + '"></span>' +
+          '<span class="who">' + esc(PERSON[c.team] || "") + '</span>' +
+          (c.dur ? '<span class="dur">' + esc(c.dur) + '</span>' : "") +
+        '</div>' +
+        '<div class="tk">' + esc(c.task || "") + '</div>' +
+        (c.why ? '<div class="wy">' + esc(c.why) + '</div>' : "") +
+        (n >= 0 ? '<input class="pnote" placeholder="한지우 팀장에게 한마디 — 언제쯤, 얼마나 (선택)" value="' +
+          esc(picks[n].note || "") + '">' : "") +
+        '</div></div>';
+    }).join("");
+
+  box.querySelectorAll(".it").forEach(el => {
+    const id = el.dataset.id;
+    el.querySelector("input[type=checkbox]").addEventListener("change", e => {
+      if (e.target.checked) STATE.picks.push({ id: id, note: "" });
+      else STATE.picks = STATE.picks.filter(p => p.id !== id);
+      drawCand(); save();
+    });
+    const nt = el.querySelector(".pnote");
+    if (nt) nt.addEventListener("input", () => {
+      const p = STATE.picks.find(x => x.id === id);
+      if (p) { p.note = nt.value; save(); }
+    });
+  });
+
+  const pb = document.getElementById("planbtn");
+  if (pb) pb.addEventListener("click", async () => {
+    pb.disabled = true; pb.textContent = "한지우 팀장이 짜는 중…";
+    await pushState();          // 고르신 것을 먼저 저장해야 팀장이 그걸 읽는다
+    await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+      body: JSON.stringify({ team: "hr", role: "plan", status: "pending", body: await lock(PW, "시간표") }) });
+    setTimeout(() => { pb.textContent = "고른 것으로 시간표 짜기"; pb.disabled = false; }, 8000);
+  });
+}
+
 function moneyBlock(title, rows) {
   if (!Array.isArray(rows) || !rows.length) return "";
   return '<div class="mblock"><div class="uh">' + esc(title) + '</div>' +
@@ -973,6 +1077,7 @@ function render() {
           '<div class="prog"><div class="track"><div class="bar" id="pbar"></div></div><div class="n" id="pnum">0 / 0</div></div>' +
           '<ul class="todo" id="todolist"></ul>' +
           '<div class="addrow"><input id="newtodo" placeholder="내가 직접 추가할 할 일"><button id="addtodo" type="button">추가</button></div>' +
+          '<div class="cand" id="cand"></div>' +
           (DAY.changed ? '<div class="changed"><span class="lab">아침에서 바뀐 것</span>' + DAY.changed + '</div>' : "") +
         (DAY.skip ? '<div class="note-block">' + DAY.skip + '</div>' : "") +
           '</div></section>' +
@@ -1059,6 +1164,7 @@ function render() {
   }
   document.getElementById("addtodo").addEventListener("click", addTodo);
   addInp.addEventListener("keydown", e => { if (e.key === "Enter") addTodo(); });
+  drawCand();
 
   /* 지출 */
   const expBody = document.getElementById("exps");
@@ -1136,6 +1242,17 @@ async function refreshCards() {
     const j = await r.json();
     if (!Array.isArray(j) || !j.length || !j[0].payload) return;
     const fresh = await unlockText(PW, j[0].payload);
+
+    // 카드 말고 다른 칸(시간표·후보·돈)이 바뀌었으면 페이지를 통째로 다시 그린다.
+    // 대표님이 뭔가 입력하고 계실 때는 건드리지 않고 다음 차례로 미룬다.
+    const strip = o => { const x = Object.assign({}, o || {}); delete x.depts; return JSON.stringify(x); };
+    if (strip(fresh) !== strip(DAY)) {
+      const el = document.activeElement;
+      if (!(el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA"))) {
+        DAY = fresh; render(); return;
+      }
+    }
+
     (fresh.depts || []).forEach(dp => {
       const slot = deptEls[dp.key]; if (!slot) return;
       if (JSON.stringify(slot.base) === JSON.stringify(dp)) return;   // 안 바뀌었으면 그대로 둔다
@@ -1291,6 +1408,68 @@ function wireDock(key, el, ta, btn) {
   });
 }
 
+
+/* 아침 회의 — 팀장 여섯 명이 각자 조회하고 카드를 채우고 오늘 후보를 올린다 */
+(function () {
+  const scrim = document.getElementById("mornscrim"), list = document.getElementById("mornlist");
+  const go = document.getElementById("morngo");
+  let timer = null;
+
+  function open() { scrim.classList.add("on"); draw(); poll(); }
+  function close() { scrim.classList.remove("on"); clearTimeout(timer); }
+
+  async function state() {
+    const since = new Date(todayStr() + "T00:00:00").toISOString();
+    const r = await fetch(CHAT + "?select=id,team,role,body,status&role=in.(morning,morningdone)" +
+      "&created_at=gte." + since + "&order=id.asc", { headers: HDR, cache: "no-store" });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return { running: false, done: {} };
+    const done = {};
+    let running = false;
+    for (const x of rows) {
+      if (x.role === "morning") { if (x.status !== "done") running = true; continue; }
+      try { done[x.team] = await unlockText(PW, x.body); } catch (e) { done[x.team] = "확인 완료"; }
+    }
+    return { running: running, done: done };
+  }
+
+  async function draw() {
+    const st = await state();
+    const n = Object.keys(st.done).length;
+    list.innerHTML = ORDER.map(k => {
+      const res = st.done[k];
+      const cls = res ? " done" : (st.running ? " doing" : "");
+      return '<div class="row2' + cls + '"><img src="assets/team/' + k + '.jpg" alt="">' +
+        '<div><div class="who2">' + esc(PERSON[k]) + ' 팀장</div>' +
+        '<div class="res">' + (res ? esc(res) : (st.running ? "조회하고 있습니다…" : "대기")) + '</div></div>' +
+        '<span class="mark">' + (res ? "✓" : (st.running ? "…" : "")) + '</span></div>';
+    }).join("");
+    go.disabled = st.running;
+    go.textContent = st.running ? "회의 중… (" + n + "/6)" : (n >= 6 ? "다시 소집" : "회의 시작");
+    return st;
+  }
+
+  function poll() {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (!scrim.classList.contains("on")) return;
+      const st = await draw();
+      await refreshCards();            // 끝난 팀 카드와 후보를 바로 화면에 올린다
+      if (st.running || Object.keys(st.done).length < 6) poll();
+    }, 6000);
+  }
+
+  go.addEventListener("click", async () => {
+    go.disabled = true;
+    await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+      body: JSON.stringify({ team: "_all", role: "morning", status: "pending", body: await lock(PW, "아침 회의") }) });
+    draw(); poll();
+  });
+
+  document.getElementById("mornbtn").addEventListener("click", open);
+  document.getElementById("mornclose").addEventListener("click", close);
+  scrim.addEventListener("click", e => { if (e.target === scrim) close(); });
+})();
 
 /* 하루 정리하고 채팅 비우기 */
 (function () {
