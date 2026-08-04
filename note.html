@@ -277,9 +277,30 @@
   .nag { background: var(--surface-low); border-radius: var(--r); padding: 1rem 1.15rem; font-size: 13.5px;
     margin-top: 1rem; line-height: 1.7; color: var(--on-surface-variant); }
   .nag::before { content: "💬 "; }
-  /* 팀장 채팅 */
-  .chat { margin-top: 1rem; }
-  .chat .lab { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--on-surface-variant); margin-bottom: .5rem; }
+  /* 팀 카드의 이야기하기 버튼 */
+  .chatbtn { margin-top: 1rem; width: 100%; background: var(--surface-high); color: var(--on-primary-container);
+    border: none; border-radius: var(--r); padding: 11px; font-family: inherit; font-size: 13.5px;
+    font-weight: 600; cursor: pointer; position: relative; }
+  .chatbtn:hover { background: var(--surface-highest); }
+  .chatbtn .new { display: none; width: 7px; height: 7px; border-radius: 99px; background: var(--tertiary);
+    position: absolute; top: 9px; right: 10px; }
+  .chatbtn.has-new .new { display: block; }
+
+  /* 플로팅 채팅창 */
+  #dock { position: fixed; right: 20px; bottom: 20px; width: 390px; max-width: calc(100vw - 32px);
+    max-height: min(74vh, 620px); z-index: 60; display: none; flex-direction: column;
+    background: rgba(255, 255, 255, .92); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-radius: var(--r-lg); box-shadow: 0 12px 44px rgba(25, 28, 29, .16); overflow: hidden; }
+  #dock.on { display: flex; }
+  #dock .head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; background: var(--surface-low); }
+  #dock .head img { width: 36px; height: 36px; border-radius: 99px; object-fit: cover; flex-shrink: 0; }
+  #dock .head .nm { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
+  #dock .head .tm { font-size: 11.5px; color: var(--on-surface-variant); }
+  #dock .head .x { margin-left: auto; background: none; border: none; font-size: 17px; color: var(--on-surface-variant);
+    cursor: pointer; padding: 4px 6px; border-radius: var(--r); line-height: 1; }
+  #dock .head .x:hover { background: var(--surface-high); color: var(--on-surface); }
+  #dock .log { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .45rem; }
+  #dock .foot { padding: 0 1rem 1rem; }
   .chat .log { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
   .bubble { max-width: 86%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--grad); color: #fff; border-bottom-right-radius: .2rem; }
@@ -296,6 +317,9 @@
   .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
+  @media (max-width: 620px) {
+    #dock { right: 8px; left: 8px; bottom: 8px; width: auto; max-height: 78vh; }
+  }
 
   .empty-day { background: var(--surface-low); border-radius: var(--r-lg); padding: 4rem 1.4rem; text-align: center;
     color: var(--on-surface-variant); font-size: 14.5px; line-height: 1.8; }
@@ -352,6 +376,20 @@
   <div class="wrap">
     <div id="content"></div>
     <p class="foot" id="meta"></p>
+  </div>
+
+  <div id="dock">
+    <div class="head">
+      <img src="" alt="">
+      <div><div class="nm">—</div><div class="tm">—</div></div>
+      <button class="x" type="button" title="닫기">✕</button>
+    </div>
+    <div class="log"></div>
+    <div class="foot">
+      <div class="chat"><div class="composer">
+        <textarea placeholder="할 말"></textarea><button type="button">보내기</button>
+      </div></div>
+    </div>
   </div>
 </div>
 
@@ -447,11 +485,46 @@ async function doUnlock() {
 /* ───── 팀장 채팅 ───── */
 const CHAT = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_chat";
 const PERSON = { dev: "김도윤", ct: "이서현", cs: "박준호", mkt: "최유진", fin: "정민석", hr: "한지우" };
-let chatBoxes = {}, chatTimer = null;
+const SEENKEY = "hq-chat-seen";
+let chatBtns = {}, chatTimer = null, dockTeam = null, chatCache = {};
+
+const seen = () => { try { return JSON.parse(localStorage.getItem(SEENKEY) || "{}"); } catch (e) { return {}; } };
+function markSeen(team, id) { const s = seen(); s[team] = id; localStorage.setItem(SEENKEY, JSON.stringify(s)); }
+
+function openDock(key, team, person) {
+  dockTeam = key;
+  const d = document.getElementById("dock");
+  d.querySelector(".head img").src = "assets/team/" + key + ".jpg";
+  d.querySelector(".head .nm").textContent = (person || "팀장") + " 팀장";
+  d.querySelector(".head .tm").textContent = team;
+  d.querySelector(".foot textarea").placeholder = team + "에 할 말";
+  d.classList.add("on");
+  drawDock();
+  d.querySelector(".foot textarea").focus();
+  chatLoad();
+}
+function closeDock() { dockTeam = null; document.getElementById("dock").classList.remove("on"); }
+
+function drawDock() {
+  if (!dockTeam) return;
+  const list = chatCache[dockTeam] || [];
+  const log = document.querySelector("#dock .log");
+  log.innerHTML = list.length
+    ? list.map(m => '<div class="bubble ' + (m.role === "boss" ? "me" : "lead") + '">' +
+        (m.role === "lead" ? '<span class="who">' + esc(PERSON[dockTeam] || "팀장") + '</span>' : "") +
+        esc(m.text) + '</div>').join("")
+    : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>';
+  if (list.some(m => m.role === "boss" && m.status !== "done"))
+    log.innerHTML += '<div class="wait">' + esc(PERSON[dockTeam] || "팀장") + ' 팀장이 문서 보는 중…</div>';
+  log.scrollTop = log.scrollHeight;
+  const last = list.length ? list[list.length - 1].id : 0;
+  markSeen(dockTeam, last);
+  const b = chatBtns[dockTeam]; if (b) b.classList.remove("has-new");
+}
 
 async function chatLoad() {
   clearTimeout(chatTimer);
-  if (!PW || !Object.keys(chatBoxes).length) return;
+  if (!PW) return;
   let waiting = false;
   try {
     const r = await fetch(CHAT + "?select=id,team,role,body,status&order=id.asc&limit=400", { headers: HDR, cache: "no-store" });
@@ -461,21 +534,20 @@ async function chatLoad() {
     for (const row of rows) {
       let text;
       try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
-      (byTeam[row.team] = byTeam[row.team] || []).push({ role: row.role, status: row.status, text: text });
+      (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text });
       if (row.role === "boss" && row.status !== "done") waiting = true;
     }
-    Object.entries(chatBoxes).forEach(([key, b]) => {
+    chatCache = byTeam;
+    const s = seen();
+    Object.entries(chatBtns).forEach(([key, btn]) => {
       const list = byTeam[key] || [];
-      b.log.innerHTML = list.length
-        ? list.map(m => '<div class="bubble ' + (m.role === "boss" ? "me" : "lead") + '">' +
-            (m.role === "lead" ? '<span class="who">' + esc(PERSON[key] || "팀장") + '</span>' : "") +
-            esc(m.text) + '</div>').join("")
-        : '<div class="empty">아직 나눈 이야기가 없습니다</div>';
-      b.wait.style.display = list.some(m => m.role === "boss" && m.status !== "done") ? "" : "none";
-      b.log.scrollTop = b.log.scrollHeight;
+      const last = list.length ? list[list.length - 1] : null;
+      const unread = last && last.role === "lead" && last.id > (s[key] || 0) && key !== dockTeam;
+      btn.classList.toggle("has-new", !!unread);
     });
+    drawDock();
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
-  chatTimer = setTimeout(chatLoad, waiting ? 4000 : 20000);
+  chatTimer = setTimeout(chatLoad, waiting ? 4000 : (dockTeam ? 8000 : 30000));
 }
 async function chatSend(team, text) {
   const body = await lock(PW, text);
@@ -691,20 +763,10 @@ function render() {
         '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
       (dp.paras || []).map(p => "<p>" + p + "</p>").join("") +
       (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
-      '<div class="chat"><div class="lab">' + esc(person ? person + " 팀장과 이야기하기" : "이야기하기") + '</div>' +
-        '<div class="log"><div class="empty">불러오는 중…</div></div>' +
-        '<div class="wait" style="display:none">' + esc(person || "팀장") + ' 팀장이 문서 보는 중…</div>' +
-        '<div class="composer"><textarea placeholder="' + esc(team) + '에 할 말"></textarea><button type="button">보내기</button></div></div>';
-    const box = el.querySelector(".chat");
-    const ta = box.querySelector("textarea"), btn = box.querySelector("button");
-    chatBoxes[dp.key] = { log: box.querySelector(".log"), wait: box.querySelector(".wait") };
-    async function send() {
-      const v = ta.value.trim(); if (!v) return;
-      btn.disabled = true; ta.value = "";
-      try { await chatSend(dp.key, v); } finally { btn.disabled = false; }
-    }
-    btn.addEventListener("click", send);
-    ta.addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } });
+      '<button class="chatbtn" type="button">💬 ' + esc(person || "팀장") + ' 팀장과 이야기하기<span class="new"></span></button>';
+    const cb = el.querySelector(".chatbtn");
+    chatBtns[dp.key] = cb;
+    cb.addEventListener("click", () => openDock(dp.key, team, person));
     dc.appendChild(el);
   });
 }
@@ -730,6 +792,22 @@ function drawCal() {
 function openBlade() { const dd = new Date(DATE + "T12:00:00"); calYM = [dd.getFullYear(), dd.getMonth()]; drawCal();
   document.getElementById("blade").classList.add("on"); document.getElementById("scrim").classList.add("on"); }
 function closeBlade() { document.getElementById("blade").classList.remove("on"); document.getElementById("scrim").classList.remove("on"); }
+/* 플로팅 채팅창 조작 */
+(function () {
+  const d = document.getElementById("dock");
+  const ta = d.querySelector(".foot textarea"), btn = d.querySelector(".foot button");
+  d.querySelector(".head .x").addEventListener("click", closeDock);
+  async function send() {
+    const v = ta.value.trim(); if (!v || !dockTeam) return;
+    btn.disabled = true; ta.value = "";
+    try { await chatSend(dockTeam, v); } finally { btn.disabled = false; ta.focus(); }
+  }
+  btn.addEventListener("click", send);
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+
 document.getElementById("calbtn").addEventListener("click", openBlade);
 document.getElementById("bladeclose").addEventListener("click", closeBlade);
 document.getElementById("scrim").addEventListener("click", closeBlade);
@@ -739,7 +817,7 @@ document.getElementById("prev").addEventListener("click", () => go(shift(DATE, -
 document.getElementById("next").addEventListener("click", () => go(shift(DATE, 1)));
 document.getElementById("todaybtn").addEventListener("click", () => go(todayStr()));
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") closeBlade();
+  if (e.key === "Escape") { closeBlade(); closeDock(); }
   if (!PW || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) return;
   if (e.key === "ArrowLeft") go(shift(DATE, -1));
   if (e.key === "ArrowRight") go(shift(DATE, 1));
