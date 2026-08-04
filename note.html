@@ -863,7 +863,7 @@ async function chatLoad() {
     drawAllDocks();
     drawAlerts();
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
-  chatTimer = setTimeout(chatLoad, waiting ? 4000 : (Object.keys(docks).length ? 8000 : 30000));
+  chatTimer = setTimeout(chatLoad, waiting ? 2000 : (Object.keys(docks).length ? 5000 : 15000));  // 답장을 더 빨리 띄운다 (2026-08-05)
 }
 async function chatSend(team, text) {
   const body = await lock(PW, text);
