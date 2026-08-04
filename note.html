@@ -294,6 +294,30 @@
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @media (prefers-reduced-motion: reduce) { .chatbtn.has-new .new { animation: none; } }
 
+  /* 안 읽은 답장 알림 카드 */
+  #alerts { position: fixed; right: 20px; top: 88px; width: 300px; max-width: calc(100vw - 32px);
+    z-index: 55; display: flex; flex-direction: column; gap: .5rem; pointer-events: none; }
+  #alerts .alert { pointer-events: auto; display: flex; gap: .6rem; align-items: flex-start;
+    background: rgba(255, 255, 255, .93); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-radius: var(--r-lg); box-shadow: 0 8px 32px rgba(25, 28, 29, .13);
+    padding: .8rem .9rem; cursor: pointer; animation: slidein .26s cubic-bezier(.32,.72,0,1); }
+  #alerts .alert:hover { background: #fff; }
+  @keyframes slidein { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { #alerts .alert { animation: none; } }
+  #alerts .alert img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+    background: var(--surface-high); }
+  #alerts .alert .txt { flex: 1; min-width: 0; }
+  #alerts .alert .nm { font-size: 12.5px; font-weight: 700; line-height: 1.35; }
+  #alerts .alert .nm .tm { font-weight: 500; color: var(--on-surface-variant); margin-left: .3rem; font-size: 11px; }
+  #alerts .alert .pv { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.55; margin-top: .1rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #alerts .alert .n { flex-shrink: 0; background: var(--tertiary); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 99px; }
+  #alerts .alert .close { flex-shrink: 0; background: none; border: none; color: var(--on-surface-variant);
+    font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: var(--r); line-height: 1; opacity: .5; }
+  #alerts .alert .close:hover { opacity: 1; background: var(--surface-high); }
+  @media (max-width: 1080px) { #alerts { top: auto; bottom: 20px; right: 12px; width: 260px; } }
+
   /* 플로팅 채팅창 */
   #dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
     min-width: 300px; min-height: 260px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px);
@@ -405,6 +429,8 @@
     <p class="foot" id="meta"></p>
   </div>
 
+  <div id="alerts"></div>
+
   <div id="dock">
     <div class="head">
       <span class="grip"></span>
@@ -515,14 +541,58 @@ async function doUnlock() {
 const CHAT = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_chat";
 const PERSON = { dev: "김도윤", ct: "이서현", cs: "박준호", mkt: "최유진", fin: "정민석", hr: "한지우" };
 const SEENKEY = "hq-chat-seen";
-let chatBtns = {}, chatTimer = null, dockTeam = null, chatCache = {};
+const TEAMNAME = { dev: "개발팀", ct: "콘텐츠팀", cs: "CS팀", mkt: "마케팅영업팀", fin: "회계팀", hr: "인사총무팀" };
+let chatBtns = {}, chatTimer = null, dockTeam = null, chatCache = {}, chatDrafts = {};
+
+/* 안 읽은 답장 알림 카드 */
+function drawAlerts() {
+  const box = document.getElementById("alerts");
+  if (!box) return;
+  const s = seen();
+  const items = [];
+  Object.keys(TEAMNAME).forEach(key => {
+    if (key === dockTeam) return;
+    const list = chatCache[key] || [];
+    const unread = list.filter(m => m.role === "lead" && m.id > (s[key] || 0));
+    if (!unread.length) return;
+    const last = unread[unread.length - 1];
+    if (list[list.length - 1].role !== "lead") return;
+    items.push({ key: key, n: unread.length, text: last.text });
+  });
+  box.innerHTML = items.map(it =>
+    '<div class="alert" data-team="' + it.key + '">' +
+      '<img src="assets/team/' + it.key + '.jpg" alt="">' +
+      '<div class="txt"><div class="nm">' + esc(PERSON[it.key]) + ' 팀장' +
+        '<span class="tm">' + esc(TEAMNAME[it.key]) + '</span></div>' +
+        '<div class="pv">' + esc(it.text) + '</div></div>' +
+      (it.n > 1 ? '<span class="n">' + it.n + '</span>' : "") +
+      '<button class="close" type="button" title="읽음 처리">✕</button>' +
+    '</div>').join("");
+  box.querySelectorAll(".alert").forEach(el => {
+    const key = el.dataset.team;
+    el.addEventListener("click", e => {
+      if (e.target.closest(".close")) return;
+      openDock(key, TEAMNAME[key], PERSON[key]);
+    });
+    el.querySelector(".close").addEventListener("click", e => {
+      e.stopPropagation();
+      const list = chatCache[key] || [];
+      markSeen(key, list.length ? list[list.length - 1].id : 0);
+      const b = chatBtns[key]; if (b) b.classList.remove("has-new");
+      drawAlerts();
+    });
+  });
+}
 
 const seen = () => { try { return JSON.parse(localStorage.getItem(SEENKEY) || "{}"); } catch (e) { return {}; } };
 function markSeen(team, id) { const s = seen(); s[team] = id; localStorage.setItem(SEENKEY, JSON.stringify(s)); }
 
 function openDock(key, team, person) {
+  const box = document.querySelector("#dock .foot textarea");
+  if (box && dockTeam && dockTeam !== key) chatDrafts[dockTeam] = box.value;   // 쓰던 글은 그 방에 두고 간다
   dockTeam = key;
   dockSig = "";
+  if (box) box.value = chatDrafts[key] || "";
   const d = document.getElementById("dock");
   d.querySelector(".head img").src = "assets/team/" + key + ".jpg";
   d.querySelector(".head .nm").textContent = (person || "팀장") + " 팀장";
@@ -534,7 +604,13 @@ function openDock(key, team, person) {
   d.querySelector(".foot textarea").focus();
   chatLoad();
 }
-function closeDock() { dockTeam = null; document.getElementById("dock").classList.remove("on"); }
+function closeDock() {
+  const box = document.querySelector("#dock .foot textarea");
+  if (box && dockTeam) chatDrafts[dockTeam] = box.value;   // 쓰던 글 보관
+  dockTeam = null;
+  document.getElementById("dock").classList.remove("on");
+  drawAlerts();
+}
 
 let dockSig = "";
 function drawDock() {
@@ -566,6 +642,7 @@ function drawDock() {
   const last = list.length ? list[list.length - 1].id : 0;
   markSeen(dockTeam, last);
   const b = chatBtns[dockTeam]; if (b) b.classList.remove("has-new");
+  drawAlerts();
 }
 
 async function chatLoad() {
@@ -613,6 +690,7 @@ async function chatLoad() {
     });
     document.title = (unreadTeams ? "(" + unreadTeams + ") " : "") + "eonToefl";
     drawDock();
+    drawAlerts();
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
   chatTimer = setTimeout(chatLoad, waiting ? 4000 : (dockTeam ? 8000 : 30000));
 }
@@ -941,9 +1019,11 @@ function closeBlade() { document.getElementById("blade").classList.remove("on");
   addEventListener("resize", () => { if (d.classList.contains("on")) restoreDockPos(); });
   async function send() {
     const v = ta.value.trim(); if (!v || !dockTeam) return;
-    btn.disabled = true; ta.value = "";
-    try { await chatSend(dockTeam, v); } finally { btn.disabled = false; ta.focus(); }
+    const team = dockTeam;
+    btn.disabled = true; ta.value = ""; chatDrafts[team] = "";
+    try { await chatSend(team, v); } finally { btn.disabled = false; ta.focus(); }
   }
+  ta.addEventListener("input", () => { if (dockTeam) chatDrafts[dockTeam] = ta.value; });
   btn.addEventListener("click", send);
   ta.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
