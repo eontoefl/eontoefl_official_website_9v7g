@@ -225,6 +225,12 @@ function getCorrectionStatus(item) {
         return { text: 'AI 처리 중', cssClass: 'correction-badge-processing', isPending: false, isStuck: false };
     }
 
+    // AI processing FAILED — n8n set status to *_failed. Treat like "stuck" so the
+    // 재실행 버튼이 뜨고 stuck 카운트/필터에 잡힌다 (실패도 사람 손이 필요한 상태).
+    if (item.status === 'feedback1_failed' || item.status === 'feedback2_failed') {
+        return { text: 'AI 실패', cssClass: 'correction-badge-stuck', isPending: false, isStuck: true, isFailed: true };
+    }
+
     // Scheduled release — show schedule badge if not yet fully released
     if (item.scheduled_release_at && (!item.released_2 || !item.released_1)) {
         const schedDate = new Date(item.scheduled_release_at);
@@ -2763,13 +2769,15 @@ async function retryWebhook(id, btnElement) {
     const taskLabel = getTaskTypeLabel(item.task_type);
 
     // Determine draft round from status
+    //   멈춤(draftN_submitted) + 실패(feedbackN_failed) 둘 다 재실행 가능
     let draftNum = '';
-    if (item.status === 'draft1_submitted') draftNum = '1';
-    else if (item.status === 'draft2_submitted') draftNum = '2';
+    if (item.status === 'draft1_submitted' || item.status === 'feedback1_failed') draftNum = '1';
+    else if (item.status === 'draft2_submitted' || item.status === 'feedback2_failed') draftNum = '2';
     else {
         alert('재실행 가능한 상태가 아닙니다.');
         return;
     }
+    const isFailed = (item.status === 'feedback1_failed' || item.status === 'feedback2_failed');
 
     if (!confirm(`${user.name} - ${taskLabel} ${draftNum}차 첨삭을 재실행하시겠습니까?`)) return;
 
@@ -2792,7 +2800,7 @@ async function retryWebhook(id, btnElement) {
         speaking_aus_int4:        { draft1: '', draft2: '' }
     };
 
-    const isDraft1 = (item.status === 'draft1_submitted');
+    const isDraft1 = (draftNum === '1');
     let webhookUrl = '';
 
     if (isAusTaskType(taskType)) {
@@ -2823,9 +2831,28 @@ async function retryWebhook(id, btnElement) {
         return;
     }
 
+    const submittedEvent = isDraft1 ? 'draft1_submitted' : 'draft2_submitted';
+
+    // 실패(feedbackN_failed) 건은 상태를 제출 직후 상태로 되돌린 뒤 재실행한다.
+    //   → n8n이 새 제출처럼 처리하고, 화면도 'AI 처리 중'으로 정상 복귀.
+    //   (멈춤 건은 이미 draftN_submitted라 되돌릴 필요 없음)
+    if (isFailed) {
+        try {
+            await supabaseAPI.patch('correction_submissions', item.id, { status: submittedEvent });
+        } catch (e) {
+            console.error('상태 초기화 실패:', e);
+            alert(`재실행 준비 중 오류: ${e.message}. 잠시 후 다시 시도해주세요.`);
+            if (btnElement) {
+                btnElement.disabled = false;
+                btnElement.innerHTML = '<i class="fas fa-redo"></i> 재실행';
+            }
+            return;
+        }
+    }
+
     // Build payload identical to student submission
     const payload = {
-        event: item.status,
+        event: submittedEvent,
         user_id: item.user_id,
         user_name: user.name,
         user_email: user.email,

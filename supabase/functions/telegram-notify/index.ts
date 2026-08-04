@@ -74,6 +74,97 @@ function getKSTTimeString(): string {
   return new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+// ===== 첨삭(correction) 관련 헬퍼 (자동복구 실패 알림 + 텔레그램 재실행 버튼) =====
+const N8N_BASE = "https://eontoefl.app.n8n.cloud/webhook";
+
+// 과제 유형 + 차수 → n8n 재실행 웹훅 (admin-correction.js의 매핑과 동일)
+// 준비 안 된 호주 유형은 "" → 재실행 불가.
+function correctionWebhookUrl(taskType: string, isDraft1: boolean): string {
+  const t = (taskType || "").toLowerCase();
+  if (t === "writing_email" || t === "writing_discussion") {
+    return isDraft1 ? `${N8N_BASE}/correction-writing-draft1` : `${N8N_BASE}/correction-writing-draft2`;
+  }
+  if (t === "speaking_interview") {
+    return isDraft1 ? `${N8N_BASE}/correction-speaking-draft1` : `${N8N_BASE}/correction-speaking-draft2`;
+  }
+  if (t === "writing_aus_discussion") {
+    return isDraft1 ? `${N8N_BASE}/correction-aus-writing-draft1` : "";
+  }
+  return ""; // 그 외 호주 유형은 워크플로우 미준비
+}
+
+function correctionTaskLabel(taskType: string): string {
+  const t = (taskType || "").toLowerCase();
+  switch (t) {
+    case "writing_email": return "Email";
+    case "writing_discussion": return "Discussion";
+    case "speaking_interview": return "Interview";
+    case "writing_aus_discussion": return "호주 Discussion";
+    case "writing_aus_integrated": return "호주 통합라이팅";
+    case "speaking_aus_independent": return "호주 독립말하기";
+    default: return taskType || "-";
+  }
+}
+
+async function getCorrectionSubmission(id: string) {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/correction_submissions?id=eq.${id}&limit=1`,
+    {
+      headers: {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const data = await resp.json();
+  return data[0] || null;
+}
+
+async function getUser(userId: string) {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/users?id=eq.${userId}&limit=1&select=id,name,email`,
+    {
+      headers: {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  const data = await resp.json();
+  return data[0] || null;
+}
+
+async function updateCorrection(id: string, data: Record<string, unknown>) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/correction_submissions?id=eq.${id}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`correction update failed: ${resp.status} ${err}`);
+  }
+}
+
+async function postN8nWebhook(url: string, payload: Record<string, unknown>) {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`n8n webhook failed: ${resp.status} ${err}`);
+  }
+  return resp;
+}
+
 // ===== 기프티콘 미발송 인원 집계 =====
 // 관리자 응답자 명단과 동일 기준: (학생+시험날짜) 묶음 중 gifty_sent_at이 하나도 없는 그룹 수.
 async function countPendingGifty(): Promise<number> {
@@ -219,6 +310,27 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
       break;
     }
 
+    // ----- 첨삭 자동복구 실패 알림 (자동 재실행 2번 모두 실패) -----
+    case "correction_retry_failed": {
+      const draftRound = data.draft_round || 1;
+      const label = correctionTaskLabel(String(data.task_type || ""));
+      const roundStr = `${data.session_number ?? "-"}회 ${label} (${draftRound}차)`;
+      text =
+        `⚠️ 첨삭 자동복구 실패 — 확인 필요\n\n` +
+        `이름: ${data.name || "-"}\n` +
+        `항목: ${roundStr}\n` +
+        `시간: ${now}\n\n` +
+        `AI 채점을 자동으로 다시 돌려봤지만 계속 실패했어요.\n` +
+        `아래 '다시 재실행'을 누르거나 관리자 페이지에서 확인해주세요.`;
+      buttons = [
+        [
+          { text: "🔄 다시 재실행", callback_data: `retry_correction:${data.submission_id}` },
+          { text: "📄 관리자 페이지", url: `${SITE_URL}/admin-correction.html` },
+        ],
+      ];
+      break;
+    }
+
     default:
       return new Response(
         JSON.stringify({ error: "Unknown notification type" }),
@@ -254,6 +366,12 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
   const now = getKSTTimeString();
 
   const [action, appId] = callbackData.split(":");
+
+  // ----- 첨삭 재실행 (correction_retry_failed 알림의 버튼) -----
+  //   appId 자리는 correction_submissions.id (신청서 id 아님) → 별도 처리
+  if (action === "retry_correction") {
+    return await handleRetryCorrectionCallback(appId, callbackId, chatId, messageId, now, corsHeaders);
+  }
 
   try {
     // 신청서 정보 조회
@@ -388,6 +506,104 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
     await sendTelegram("answerCallbackQuery", {
       callback_query_id: callbackId,
       text: `오류 발생: ${error.message}`,
+      show_alert: true,
+    });
+  }
+
+  return new Response("OK", { headers: corsHeaders });
+}
+
+// ===== 첨삭 재실행 콜백 처리 (텔레그램 '다시 재실행' 버튼) =====
+async function handleRetryCorrectionCallback(
+  subId: string,
+  callbackId: string,
+  chatId: unknown,
+  messageId: unknown,
+  now: string,
+  corsHeaders: Record<string, string>,
+) {
+  try {
+    const sub = await getCorrectionSubmission(subId);
+    if (!sub) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "해당 첨삭 건을 찾을 수 없습니다.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    // 차수 판정. 이미 처리(성공)된 건이면 재실행 대상 아님.
+    let isDraft1: boolean;
+    if (sub.status === "feedback1_failed" || sub.status === "draft1_submitted") {
+      isDraft1 = true;
+    } else if (sub.status === "feedback2_failed" || sub.status === "draft2_submitted") {
+      isDraft1 = false;
+    } else {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "이미 처리되었거나 재실행 대상이 아닙니다.",
+        show_alert: true,
+      });
+      await sendTelegram("editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: `✅ 이미 처리된 건입니다. (${now})`,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    const webhookUrl = correctionWebhookUrl(sub.task_type, isDraft1);
+    if (!webhookUrl) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "이 유형은 아직 채점 워크플로우가 준비되지 않았습니다.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    const submittedEvent = isDraft1 ? "draft1_submitted" : "draft2_submitted";
+
+    // 상태를 제출 직후로 되돌리고, 자동 재실행 예산도 초기화(사람이 직접 눌렀으니 다시 기회 부여)
+    await updateCorrection(subId, {
+      status: submittedEvent,
+      auto_retry_count: 0,
+      last_auto_retry_at: null,
+      retry_failed_notified: false,
+    });
+
+    const user = await getUser(sub.user_id);
+    await postN8nWebhook(webhookUrl, {
+      event: submittedEvent,
+      user_id: sub.user_id,
+      user_name: user?.name || "",
+      user_email: user?.email || "",
+      session_number: sub.session_number,
+      task_type: sub.task_type,
+      task_number: sub.task_number,
+    });
+
+    const label = correctionTaskLabel(sub.task_type);
+    const draftRound = isDraft1 ? 1 : 2;
+    await sendTelegram("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text:
+        `⚠️ 첨삭 자동복구 실패 — 재실행 요청됨\n\n` +
+        `이름: ${user?.name || "-"}\n` +
+        `항목: ${sub.session_number ?? "-"}회 ${label} (${draftRound}차)\n\n` +
+        `재실행 요청 완료 (${now})\n결과가 나오면 평소처럼 승인 대기로 넘어갑니다.`,
+    });
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callbackId,
+      text: "재실행 요청 완료!",
+    });
+  } catch (error) {
+    console.error("retry_correction callback error:", error);
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callbackId,
+      text: `재실행 실패: ${error.message}`,
       show_alert: true,
     });
   }
