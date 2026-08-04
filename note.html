@@ -258,6 +258,7 @@
     box-shadow: 0 0 0 2.5px var(--surface-lowest); }
   .dept-top h3 { font-size: 16.5px; font-weight: 700; line-height: 1.25; }
   .dept-top .person { font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin-top: 1px; }
+  .dept-top .edited { color: var(--primary); font-weight: 600; margin-left: .3rem; font-size: 11px; }
   .dept-top .role { font-size: 11.5px; color: var(--on-surface-variant); margin-left: auto; text-align: right;
     font-weight: 400; line-height: 1.45; max-width: 40%; }
   .kpi { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
@@ -575,14 +576,27 @@ async function chatLoad() {
     const r = await fetch(CHAT + "?select=id,team,role,body,status&order=id.asc&limit=400", { headers: HDR, cache: "no-store" });
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
-    const byTeam = {};
+    const byTeam = {}, freshCards = {};
     for (const row of rows) {
+      if (row.role === "card") {                       // 팀장이 자기 카드를 고친 것
+        try {
+          const c = await unlockText(PW, row.body);
+          if (c && c.d === DATE) freshCards[row.team] = { card: c.card, at: c.at || "", id: row.id };
+        } catch (e) {}
+        continue;
+      }
       let text;
       try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
       (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text });
       if (row.role === "boss" && row.status !== "done") waiting = true;
     }
     chatCache = byTeam;
+    // 바뀐 카드만 그 자리에서 다시 그린다 (페이지 전체를 다시 그리면 읽던 자리가 튄다)
+    Object.entries(freshCards).forEach(([key, c]) => {
+      if ((cardEdit[key] || {}).id === c.id) return;
+      cardEdit[key] = c;
+      mountDept(key);
+    });
     const s = seen();
     let unreadTeams = 0;
     Object.entries(chatBtns).forEach(([key, btn]) => {
@@ -797,31 +811,44 @@ function render() {
   });
   drawSend();
 
-  /* 부서 카드 */
-  const TONE = { fin: "#2f6f4f", mkt: "#a53b22", cs: "#006688", ct: "#7b4fa0", dev: "#3e484f", hr: "#b0355c" };
+  /* 팀 카드 */
   const dc = document.getElementById("depts");
-  chatBoxes = {};
+  deptEls = {};
   (DAY.depts || []).forEach(dp => {
     const el = document.createElement("div");
     el.className = "dept";
-    const parts = String(dp.name || "").split(" · ");
-    const team = parts[0], person = parts[1] || "";
-    el.innerHTML = '<div class="dept-top">' +
-        '<div class="who"><img class="avatar" src="assets/team/' + dp.key + '.jpg" alt="" ' +
-          'onerror="this.style.display=\'none\'"><span class="dot" style="background:' + (TONE[dp.key] || "#006688") + '"></span></div>' +
-        '<div><h3>' + esc(team) + '</h3>' + (person ? '<div class="person">' + esc(person) + ' 팀장</div>' : "") + '</div>' +
-        '<div class="role">' + esc(dp.role || "") + '</div></div>' +
-      (dp.kpi ? '<div class="kpi">' + dp.kpi.map(k => '<div><div class="k">' + esc(k.k) + '</div><div class="v">' + esc(k.v) + '</div></div>').join("") + '</div>' : "") +
-      (dp.gauge ? '<div class="gauge"><div class="lab"><span>' + esc(dp.gauge.label) + '</span><span>' + esc(dp.gauge.text) + '</span></div>' +
-        '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
-      (dp.paras || []).map(p => "<p>" + p + "</p>").join("") +
-      (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
-      '<button class="chatbtn" type="button">💬 ' + esc(person || "팀장") + ' 팀장과 이야기하기<span class="new"></span></button>';
-    const cb = el.querySelector(".chatbtn");
-    chatBtns[dp.key] = cb;
-    cb.addEventListener("click", () => openDock(dp.key, team, person));
+    deptEls[dp.key] = { el: el, base: dp };
+    mountDept(dp.key);
     dc.appendChild(el);
   });
+}
+
+/* 카드 한 장 그리기 — 팀장이 고치면 이 카드만 다시 그린다 */
+const TONE = { fin: "#2f6f4f", mkt: "#a53b22", cs: "#006688", ct: "#7b4fa0", dev: "#3e484f", hr: "#b0355c" };
+let deptEls = {}, cardEdit = {};
+
+function mountDept(key) {
+  const slot = deptEls[key]; if (!slot) return;
+  const dp = Object.assign({}, slot.base, (cardEdit[key] || {}).card || {});
+  const el = slot.el;
+  const parts = String(slot.base.name || "").split(" · ");
+  const team = parts[0], person = parts[1] || "";
+  const when = (cardEdit[key] || {}).at;
+  el.innerHTML = '<div class="dept-top">' +
+      '<div class="who"><img class="avatar" src="assets/team/' + key + '.jpg" alt="" ' +
+        'onerror="this.style.display=\'none\'"><span class="dot" style="background:' + (TONE[key] || "#006688") + '"></span></div>' +
+      '<div><h3>' + esc(team) + '</h3>' + (person ? '<div class="person">' + esc(person) + ' 팀장' +
+        (when ? '<span class="edited">· ' + esc(when) + ' 고침</span>' : "") + '</div>' : "") + '</div>' +
+      '<div class="role">' + esc(slot.base.role || "") + '</div></div>' +
+    (dp.kpi ? '<div class="kpi">' + dp.kpi.map(k => '<div><div class="k">' + esc(k.k) + '</div><div class="v">' + esc(k.v) + '</div></div>').join("") + '</div>' : "") +
+    (dp.gauge ? '<div class="gauge"><div class="lab"><span>' + esc(dp.gauge.label) + '</span><span>' + esc(dp.gauge.text) + '</span></div>' +
+      '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
+    (dp.paras || []).map(p => "<p>" + p + "</p>").join("") +
+    (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
+    '<button class="chatbtn" type="button">💬 ' + esc(person || "팀장") + ' 팀장과 이야기하기<span class="new"></span></button>';
+  const cb = el.querySelector(".chatbtn");
+  chatBtns[key] = cb;
+  cb.addEventListener("click", () => openDock(key, team, person));
 }
 
 /* ───── 달력 ───── */
@@ -948,6 +975,7 @@ async function go(d) {
     if (row.payload) { try { DAY = await unlockText(PW, row.payload); } catch (e) { DAY = null; } }
     if (row.state) { try { STATE = Object.assign(STATE, await unlockText(PW, row.state)); } catch (e) {} }
   }
+  cardEdit = {};
   render();
   dockSig = "";
   chatLoad();
