@@ -83,7 +83,6 @@
   #sendday { background: var(--tertiary); color: #fff; }
   #sendday:hover { filter: brightness(1.08); }
   #sendday.sent { background: var(--secondary-container); color: var(--on-secondary-container); }
-  #sweepbtn { background: var(--surface-high); color: var(--on-primary-container); }
 
   #savedot { margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--on-surface-variant); }
   #savedot.bad { color: var(--tertiary); }
@@ -234,6 +233,13 @@
     border-radius: var(--r); padding: 8px 11px; font-family: inherit; font-size: 12.5px; color: var(--on-surface); }
   .cand .it .pnote:focus { outline: 2px solid var(--primary-fixed-dim); }
   .cand .none { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.7; padding: .3rem 0; }
+
+  /* 오늘 총평 — 한지우 팀장이 퇴근 때 쓴다. 칭찬 없는 대조표다 */
+  .verdict { margin-top: 1.1rem; background: var(--surface-low); border-radius: var(--r);
+    padding: .9rem 1.1rem; font-size: 13px; line-height: 1.85; color: var(--on-surface);
+    white-space: pre-wrap; }
+  .verdict .lab { display: block; font-size: 10px; font-weight: 700; letter-spacing: .12em;
+    color: var(--on-surface-variant); margin-bottom: .45rem; }
 
   .addrow { display: flex; gap: .5rem; margin-top: 1rem; }
   .addrow input { flex: 1; min-width: 0; background: var(--surface-highest); border: none; border-radius: var(--r);
@@ -419,29 +425,29 @@
   }
 
   /* 아침 회의 · 하루 정리 모달 (같은 옷을 입는다) */
-  #sweepscrim, #mornscrim { position: fixed; inset: 0; background: rgba(25, 28, 29, .3); z-index: 70;
+  #closescrim, #mornscrim { position: fixed; inset: 0; background: rgba(25, 28, 29, .3); z-index: 70;
     display: none; place-items: center; padding: 1.4rem; }
-  #sweepscrim.on, #mornscrim.on { display: grid; }
-  #sweep, #morn { width: 460px; max-width: 100%; max-height: 86vh; overflow-y: auto;
+  #closescrim.on, #mornscrim.on { display: grid; }
+  #closebox, #morn { width: 460px; max-width: 100%; max-height: 86vh; overflow-y: auto;
     background: var(--surface-lowest); border-radius: var(--r-lg); box-shadow: var(--float); padding: 1.5rem; }
-  #sweep h3, #morn h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
-  #sweep .lead-in, #morn .lead-in { font-size: 13.5px; color: var(--on-surface-variant); margin: .4rem 0 1.2rem; line-height: 1.7; }
-  #sweep .row2, #morn .row2 { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem 0; }
-  #sweep .row2 img, #morn .row2 img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+  #closebox h3, #morn h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  #closebox .lead-in, #morn .lead-in { font-size: 13.5px; color: var(--on-surface-variant); margin: .4rem 0 1.2rem; line-height: 1.7; }
+  #closebox .row2, #morn .row2 { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem 0; }
+  #closebox .row2 img, #morn .row2 img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
     background: var(--surface-high); }
-  #sweep .row2 .who2, #morn .row2 .who2 { font-size: 13.5px; font-weight: 700; }
-  #sweep .row2 .res, #morn .row2 .res { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.6; margin-top: .1rem; }
-  #sweep .row2 .mark, #morn .row2 .mark { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 700;
+  #closebox .row2 .who2, #morn .row2 .who2 { font-size: 13.5px; font-weight: 700; }
+  #closebox .row2 .res, #morn .row2 .res { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.6; margin-top: .1rem; }
+  #closebox .row2 .mark, #morn .row2 .mark { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 700;
     color: var(--on-surface-variant); align-self: center; }
-  #sweep .row2.done .mark, #morn .row2.done .mark { color: var(--good); }
-  #sweep .row2.doing .mark, #morn .row2.doing .mark { color: var(--primary); }
-  #sweep .btns2, #morn .btns2 { display: flex; gap: .5rem; margin-top: 1.4rem; }
-  #sweep .btns2 button, #morn .btns2 button { flex: 1; border: none; border-radius: var(--r); padding: 12px;
+  #closebox .row2.done .mark, #morn .row2.done .mark { color: var(--good); }
+  #closebox .row2.doing .mark, #morn .row2.doing .mark { color: var(--primary); }
+  #closebox .btns2, #morn .btns2 { display: flex; gap: .5rem; margin-top: 1.4rem; }
+  #closebox .btns2 button, #morn .btns2 button { flex: 1; border: none; border-radius: var(--r); padding: 12px;
     font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-  #sweep .go, #morn .go { background: var(--grad); color: #fff; }
-  #sweep .wipe, #morn .wipe { background: var(--tertiary); color: #fff; }
-  #sweep .wipe:disabled, #morn .wipe:disabled { background: var(--surface-high); color: var(--on-surface-variant); cursor: default; }
-  #sweep .close2, #morn .close2 { background: var(--surface-high); color: var(--on-primary-container); flex: 0 0 90px; }
+  #closebox .go, #morn .go { background: var(--grad); color: #fff; }
+  #closebox .wipe, #morn .wipe { background: var(--tertiary); color: #fff; }
+  #closebox .wipe:disabled, #morn .wipe:disabled { background: var(--surface-high); color: var(--on-surface-variant); cursor: default; }
+  #closebox .close2, #morn .close2 { background: var(--surface-high); color: var(--on-primary-container); flex: 0 0 90px; }
 
   /* 플로팅 채팅창 */
   .dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
@@ -537,7 +543,6 @@
       <span class="brand">BAMTOL HOLDINGS</span>
       <button class="fillbtn" id="mornbtn" type="button">출근</button>
       <button class="fillbtn" id="sendday" type="button">퇴근</button>
-      <button class="fillbtn" id="sweepbtn" type="button">empty</button>
       <div id="savedot"></div>
     </div>
   </div>
@@ -568,16 +573,16 @@
     </div>
   </div>
 
-  <div id="sweepscrim">
-    <div id="sweep">
-      <h3>하루 정리하고 채팅 비우기</h3>
-      <div class="lead-in">팀장 여섯 명이 오늘 대화를 다시 읽고, 문서에 안 들어간 것이 있으면 지금 넣습니다.
-        여섯 명이 다 끝나면 비우기가 열립니다. 비우기 전에 오늘 대화 원문은 파일로 저장됩니다.</div>
-      <div id="sweeplist"></div>
+  <div id="closescrim">
+    <div id="closebox">
+      <h3>퇴근 — 하루를 닫습니다</h3>
+      <div class="lead-in">팀장 여섯 명이 오늘 대화를 다시 읽어 문서에 넣고, 자기 지침서를 정리합니다.
+        그다음 한지우 팀장이 오늘 총평을 쓰고, 대화 원문을 파일로 내린 뒤 채팅을 비우고,
+        마지막으로 폴더를 백업합니다. 5~10분쯤 걸리니 그동안 다른 일 하셔도 됩니다.</div>
+      <div id="closelist"></div>
       <div class="btns2">
-        <button class="go" type="button" id="sweepgo">정리 시작</button>
-        <button class="wipe" type="button" id="sweepwipe" disabled>채팅 비우기</button>
-        <button class="close2" type="button" id="sweepclose">닫기</button>
+        <button class="go" type="button" id="closego">퇴근하기</button>
+        <button class="close2" type="button" id="closex">닫기</button>
       </div>
     </div>
   </div>
@@ -832,7 +837,7 @@ async function chatLoad() {
     const byTeam = {};
     for (const row of rows) {
       // 화면에 안 보이는 줄 (시스템이 쓰는 표시)
-      if (["relay", "card", "sweep", "sweepdone", "morning", "morningdone", "plan", "wipe"].includes(row.role)) continue;
+      if (["relay", "card", "morning", "morningdone", "plan", "closing", "closedone", "wipe", "backup"].includes(row.role)) continue;
       let text;
       try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
       (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text, at: row.created_at });
@@ -1077,6 +1082,8 @@ function render() {
           '<div class="cand" id="cand"></div>' +
           (DAY.changed ? '<div class="changed"><span class="lab">아침에서 바뀐 것</span>' + DAY.changed + '</div>' : "") +
         (DAY.skip ? '<div class="note-block">' + DAY.skip + '</div>' : "") +
+          (DAY.verdict ? '<div class="verdict"><span class="lab">오늘 총평 · 한지우 팀장</span>' +
+            esc(DAY.verdict) + '</div>' : "") +
           '</div></section>' +
       '<section><div class="seclab">돈 <span>· 회계팀 정민석 팀장이 관리합니다</span></div><div class="panel">' +
         (DAY.expNote ? '<div class="exp-note">' + DAY.expNote + '</div>' : "") +
@@ -1389,15 +1396,8 @@ function drawSend() {
   }
 }
 (function () {
-  document.getElementById("sendday").addEventListener("click", () => {
-    if (!DAY) return;
-    if (!confirm(STATE.submitted ? "다시 발송할까요?"
-      : "퇴근하시겠어요?\n오늘 체크·메모·지출·팀 메모가 팀장들에게 전달됩니다.")) return;
-    STATE.submitted = { at: new Date().toLocaleString("ko-KR") };
-    drawSend(); save();
-  });
-  document.getElementById("sweepbtn").addEventListener("click",
-    () => window.openSweep && window.openSweep());
+  document.getElementById("sendday").addEventListener("click",
+    () => window.openClosing && window.openClosing());
 })();
 
 /* 아침 회의 — 팀장 여섯 명이 각자 조회하고 카드를 채우고 오늘 후보를 올린다 */
@@ -1452,8 +1452,11 @@ function drawSend() {
 
   go.addEventListener("click", async () => {
     go.disabled = true;
-    await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
-      body: JSON.stringify({ team: "_all", role: "morning", status: "pending", body: await lock(PW, "아침 회의") }) });
+    const post = b => fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+      body: JSON.stringify(b) });
+    // 어젯밤 퇴근을 안 누르고 주무신 날을 대비해 아침에 한 번 백업하고 시작한다
+    await post({ team: "_all", role: "backup", status: "pending", body: await lock(PW, "아침 백업") });
+    await post({ team: "_all", role: "morning", status: "pending", body: await lock(PW, "아침 회의") });
     draw(); poll();
   });
 
@@ -1462,26 +1465,31 @@ function drawSend() {
   scrim.addEventListener("click", e => { if (e.target === scrim) close(); });
 })();
 
-/* 하루 정리하고 채팅 비우기 */
+/* 퇴근 — 하루를 통째로 닫는다 (팀장 정리 → 총평 → 비우기 → 백업) */
 (function () {
-  const scrim = document.getElementById("sweepscrim"), list = document.getElementById("sweeplist");
-  const go = document.getElementById("sweepgo"), wipe = document.getElementById("sweepwipe");
+  const scrim = document.getElementById("closescrim"), list = document.getElementById("closelist");
+  const go = document.getElementById("closego");
+  const EXTRA = { _verdict: ["오늘 총평", "한지우 팀장이 계획과 실제를 대조합니다"],
+                  _wipe: ["대화 정리·비우기", "원문을 파일로 내리고 채팅을 비웁니다"],
+                  _backup: ["폴더 백업", "다른 디스크에 두 벌로 남깁니다"] };
+  const STEPS = ORDER.concat(Object.keys(EXTRA));
   let timer = null;
 
   function open() { scrim.classList.add("on"); draw(); poll(); }
   function close() { scrim.classList.remove("on"); clearTimeout(timer); }
-  window.openSweep = open;
+  window.openClosing = open;
 
   async function state() {
-    const r = await fetch(CHAT + "?select=id,team,role,body,status&role=in.(sweep,sweepdone)&order=id.asc",
-      { headers: HDR, cache: "no-store" });
+    const since = new Date(todayStr() + "T00:00:00").toISOString();
+    const r = await fetch(CHAT + "?select=id,team,role,body,status&role=in.(closing,closedone)" +
+      "&created_at=gte." + since + "&order=id.asc", { headers: HDR, cache: "no-store" });
     const rows = await r.json();
     if (!Array.isArray(rows)) return { running: false, done: {} };
     const done = {};
     let running = false;
     for (const x of rows) {
-      if (x.role === "sweep") { if (x.status !== "done") running = true; continue; }
-      try { done[x.team] = await unlockText(PW, x.body); } catch (e) { done[x.team] = "확인 완료"; }
+      if (x.role === "closing") { if (x.status !== "done") running = true; continue; }
+      try { done[x.team] = await unlockText(PW, x.body); } catch (e) { done[x.team] = "끝났습니다"; }
     }
     return { running: running, done: done };
   }
@@ -1489,17 +1497,23 @@ function drawSend() {
   async function draw() {
     const st = await state();
     const n = Object.keys(st.done).length;
-    list.innerHTML = ORDER.map(k => {
+    list.innerHTML = STEPS.map(k => {
       const res = st.done[k];
       const cls = res ? " done" : (st.running ? " doing" : "");
-      return '<div class="row2' + cls + '"><img src="assets/team/' + k + '.jpg" alt="">' +
-        '<div><div class="who2">' + esc(PERSON[k]) + ' 팀장</div>' +
-        '<div class="res">' + (res ? esc(res) : (st.running ? "확인 중…" : "대기")) + '</div></div>' +
+      const ex = EXTRA[k];
+      const face = ex ? '<img src="assets/team/hr.jpg" alt="" style="visibility:' +
+            (k === "_verdict" ? "visible" : "hidden") + '">'
+          : '<img src="assets/team/' + k + '.jpg" alt="">';
+      const nm = ex ? ex[0] : esc(PERSON[k]) + " 팀장";
+      const wait = ex ? ex[1] : "대기";
+      return '<div class="row2' + cls + '">' + face +
+        '<div><div class="who2">' + nm + '</div>' +
+        '<div class="res">' + (res ? esc(res) : (st.running ? "하는 중…" : wait)) + '</div></div>' +
         '<span class="mark">' + (res ? "✓" : (st.running ? "…" : "")) + '</span></div>';
     }).join("");
     go.disabled = st.running;
-    go.textContent = st.running ? "정리 중… (" + n + "/6)" : (n >= 6 ? "다시 정리" : "정리 시작");
-    wipe.disabled = n < 6;
+    go.textContent = st.running ? "닫는 중… (" + n + "/" + STEPS.length + ")"
+      : (n >= STEPS.length ? "다시 닫기" : "퇴근하기");
     return st;
   }
 
@@ -1508,26 +1522,26 @@ function drawSend() {
     timer = setTimeout(async () => {
       if (!scrim.classList.contains("on")) return;
       const st = await draw();
-      if (st.running || Object.keys(st.done).length < 6) poll();
+      await refreshCards();                 // 총평이 들어오면 화면에 바로 뜬다
+      if (st.running || Object.keys(st.done).length < STEPS.length) poll();
+      else chatLoad();                      // 비워진 채팅을 화면에서도 치운다
     }, 6000);
   }
 
   go.addEventListener("click", async () => {
+    if (!DAY) return;
+    if (!confirm("퇴근하시겠어요?\n\n오늘 체크·메모가 팀에 전달되고, 팀장들이 문서를 정리한 뒤\n" +
+      "채팅이 비워지고 폴더가 백업됩니다.\n\n5~10분쯤 걸립니다.")) return;
     go.disabled = true;
+    STATE.submitted = { at: new Date().toLocaleString("ko-KR") };
+    drawSend();
+    await pushState();                      // 팀장이 읽을 수 있게 먼저 저장한다
     await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
-      body: JSON.stringify({ team: "_all", role: "sweep", status: "pending", body: await lock(PW, "하루 정리") }) });
+      body: JSON.stringify({ team: "_all", role: "closing", status: "pending", body: await lock(PW, "퇴근") }) });
     draw(); poll();
   });
 
-  wipe.addEventListener("click", async () => {
-    if (!confirm("오늘 대화를 전부 비웁니다.\n원문은 파일로 저장되고, 화면의 채팅은 모두 사라집니다.\n\n계속할까요?")) return;
-    wipe.disabled = true; wipe.textContent = "비우는 중…";
-    await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
-      body: JSON.stringify({ team: "_all", role: "wipe", status: "pending", body: await lock(PW, "비우기") }) });
-    setTimeout(() => { close(); chatLoad(); wipe.textContent = "채팅 비우기"; }, 8000);
-  });
-
-  document.getElementById("sweepclose").addEventListener("click", close);
+  document.getElementById("closex").addEventListener("click", close);
   scrim.addEventListener("click", e => { if (e.target === scrim) close(); });
 })();
 
