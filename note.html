@@ -144,8 +144,27 @@
     cursor: pointer; flex-shrink: 0; }
   .todo .t { font-size: 11px; font-weight: 600; color: var(--primary); min-width: 52px; margin-top: 5px; flex-shrink: 0; }
   .todo .b { flex: 1; min-width: 0; }
-  .todo .task { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
-  .todo .crit { font-size: 12.5px; color: var(--on-surface-variant); margin-top: .15rem; line-height: 1.6; }
+  .todo .task { font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.5; }
+  .todo .dur { display: inline-block; font-size: 10.5px; font-weight: 600; color: var(--on-surface-variant);
+    background: var(--surface-high); padding: 2px 8px; border-radius: 99px; margin-left: .4rem; vertical-align: 2px; }
+  .todo .crit { font-size: 13px; color: var(--on-surface-variant); margin-top: .4rem; line-height: 1.8; }
+  .todo .crit b, .todo .crit strong { color: var(--on-surface); font-weight: 600; }
+  .todo .crit em { font-style: normal; color: var(--primary); font-weight: 600; }
+  /* 단계 목록 — 선 없이 톤으로 묶는다 */
+  .todo .steps { margin-top: .65rem; background: var(--surface-low); border-radius: var(--r); padding: .75rem .95rem; }
+  .todo .steps > div { font-size: 13px; color: var(--on-surface-variant); line-height: 1.75; padding: .28rem 0 .28rem 1.35rem;
+    position: relative; }
+  .todo .steps > div .n { position: absolute; left: 0; top: .28rem; font-weight: 700; color: var(--primary); font-size: 12px; }
+  .todo .steps > div b { color: var(--on-surface); font-weight: 600; }
+  .todo .steps > div em { font-style: normal; color: var(--primary); font-weight: 600; }
+  /* 왜 지금 / 이러면 끝 */
+  .todo .why, .todo .done-crit { margin-top: .55rem; font-size: 12.5px; line-height: 1.7;
+    border-radius: var(--r); padding: .6rem .9rem; }
+  .todo .why { background: #e3f3fb; color: var(--on-primary-container); }
+  .todo .done-crit { background: var(--secondary-container); color: var(--on-secondary-container); }
+  .todo .why .lab, .todo .done-crit .lab { display: block; font-size: 9.5px; font-weight: 700;
+    letter-spacing: .14em; opacity: .6; margin-bottom: .15rem; }
+  .todo .why b, .todo .done-crit b { font-weight: 700; }
   .todo .note { width: 100%; margin-top: .5rem; background: var(--surface-low); border: none; border-radius: var(--r);
     font-size: 13px; padding: 7px 10px; color: var(--on-surface); font-family: inherit; outline: none; }
   .todo .note:focus { outline: 2px solid var(--primary-fixed-dim); background: var(--surface-highest); }
@@ -170,8 +189,28 @@
 
   .note-block { font-size: 13px; color: var(--on-surface-variant); margin-top: 1rem; line-height: 1.7; }
   .asks { background: var(--secondary-container); color: var(--on-secondary-container); border-radius: var(--r);
-    padding: 1rem 1.15rem; font-size: 13.5px; margin-top: 1rem; line-height: 1.7; }
-  .asks b { display: block; font-size: 11px; font-weight: 600; letter-spacing: .1em; margin-bottom: .35rem; opacity: .8; }
+    padding: 1rem 1.15rem 1.15rem; font-size: 13.5px; margin-top: 1rem; line-height: 1.7; }
+  .asks > .head { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; margin-bottom: .6rem; opacity: .65; }
+  .ask { padding: .55rem 0; }
+  .ask .q { font-size: 13.5px; line-height: 1.7; }
+  .ask .q .num { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 99px;
+    background: rgba(20,53,31,.14); font-size: 11px; font-weight: 700; margin-right: .4rem; vertical-align: 1px; }
+  .ask .q b { font-weight: 700; }
+  .ask textarea { width: 100%; min-height: 46px; margin-top: .45rem; background: rgba(255,255,255,.75);
+    border: none; border-radius: var(--r); padding: .55rem .75rem; font-family: inherit; font-size: 13.5px;
+    line-height: 1.65; color: var(--on-surface); resize: vertical; outline: none; }
+  .ask textarea:focus { outline: 2px solid var(--primary-fixed-dim); background: #fff; }
+  .ask textarea[readonly] { background: rgba(255,255,255,.45); color: var(--on-secondary-container); }
+  /* 저장 · 수정 버튼 (부서 메모와 공용) */
+  .btnrow { margin-top: .45rem; display: flex; gap: .4rem; }
+  .btnrow button { border: none; border-radius: var(--r); padding: 6px 15px; font-family: inherit;
+    font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .btnrow .save { background: var(--grad); color: #fff; }
+  .btnrow .save:disabled { background: rgba(20,53,31,.16); color: var(--on-secondary-container); cursor: default; }
+  .btnrow .edit { background: transparent; color: var(--primary); }
+  .btnrow .edit:hover:not(:disabled) { background: var(--surface-high); }
+  .btnrow .edit:disabled { opacity: .35; cursor: default; }
+  .dmemo .btnrow .save:disabled { background: var(--surface-high); color: var(--on-surface-variant); }
 
   /* ───── 지출 ───── */
   .exp-note { font-size: 12.5px; color: var(--on-surface-variant); background: var(--surface-low);
@@ -386,6 +425,24 @@ async function doUnlock() {
   await start();
 }
 
+/* ───── 저장 · 수정 버튼 (답변칸·팀 메모 공용) ───── */
+function saveEditBox(ta, get, set) {
+  const row = document.createElement("div");
+  row.className = "btnrow";
+  row.innerHTML = '<button type="button" class="save">저장</button><button type="button" class="edit" disabled>수정</button>';
+  const bs = row.querySelector(".save"), be = row.querySelector(".edit");
+  function lockUI(locked) {
+    ta.readOnly = locked;
+    bs.disabled = locked; bs.textContent = locked ? "저장됨" : "저장";
+    be.disabled = !locked;
+  }
+  bs.addEventListener("click", () => { set(ta.value, true); lockUI(true); save(); });
+  be.addEventListener("click", () => { set(ta.value, false); lockUI(false); ta.focus(); save(); });
+  ta.addEventListener("input", () => { set(ta.value, false); save(); });
+  lockUI(!!(get() || {}).saved);
+  return row;
+}
+
 /* ───── 본문 ───── */
 function render() {
   const c = document.getElementById("content");
@@ -410,7 +467,7 @@ function render() {
           '<ul class="todo" id="todolist"></ul>' +
           '<div class="addrow"><input id="newtodo" placeholder="내가 직접 추가할 할 일"><button id="addtodo" type="button">추가</button></div>' +
           (DAY.skip ? '<div class="note-block">' + DAY.skip + '</div>' : "") +
-          (DAY.asks ? '<div class="asks"><b>한마디만 주시면 제가 정리합니다</b>' + DAY.asks + '</div>' : "") +
+          (DAY.asks ? '<div class="asks" id="asks"><span class="head">한마디만 주시면 제가 정리합니다</span></div>' : "") +
         '</div></section>' +
       '<section><div class="seclab">오늘 쓴 돈 <span>· 저녁 마감 때 반영됩니다</span></div><div class="panel">' +
         (DAY.expNote ? '<div class="exp-note">' + DAY.expNote + '</div>' : "") +
@@ -436,11 +493,17 @@ function render() {
     const li = document.createElement("li");
     const done = mine ? !!t.done : (STATE.checks || []).includes(i);
     if (done) li.className = "done";
+    const steps = (t.steps || []).map((s, n) =>
+      '<div><span class="n">' + (n + 1) + '</span>' + s + '</div>').join("");
     li.innerHTML = '<input type="checkbox"' + (done ? " checked" : "") + '>' +
       '<span class="t">' + esc(mine ? "추가" : (t.time || "")) + '</span>' +
       '<div class="b"><div class="task">' + esc(t.task) +
-        (mine ? '<span class="chip mine">직접 추가</span>' : (t.badge ? '<span class="chip ' + t.badge.k + '">' + esc(t.badge.t) + '</span>' : "")) + '</div>' +
-      (t.crit ? '<div class="crit">' + esc(t.crit) + '</div>' : "") +
+        (mine ? '<span class="chip mine">직접 추가</span>' : (t.badge ? '<span class="chip ' + t.badge.k + '">' + esc(t.badge.t) + '</span>' : "")) +
+        (t.dur ? '<span class="dur">' + esc(t.dur) + '</span>' : "") + '</div>' +
+      (t.crit ? '<div class="crit">' + t.crit + '</div>' : "") +
+      (steps ? '<div class="steps">' + steps + '</div>' : "") +
+      (t.why ? '<div class="why"><span class="lab">왜 지금</span>' + t.why + '</div>' : "") +
+      (t.doneCrit ? '<div class="done-crit"><span class="lab">이러면 끝</span>' + t.doneCrit + '</div>' : "") +
       '<input class="note" placeholder="메모 (선택)" value="' + esc(mine ? (t.note || "") : (STATE.notes || {})[i] || "") + '"></div>' +
       (mine ? '<button class="del" type="button" title="지우기">✕</button>' : "");
     const box = li.querySelector("input[type=checkbox]");
@@ -481,6 +544,24 @@ function render() {
   }
   document.getElementById("addtodo").addEventListener("click", addTodo);
   addInp.addEventListener("keydown", e => { if (e.key === "Enter") addTodo(); });
+
+  /* 한마디만 주시면 — 답변칸 */
+  const asksBox = document.getElementById("asks");
+  if (asksBox && DAY.asks) {
+    const list = Array.isArray(DAY.asks) ? DAY.asks : [{ q: DAY.asks }];
+    STATE.asks = STATE.asks || {};
+    list.forEach((a, n) => {
+      const d = document.createElement("div");
+      d.className = "ask";
+      d.innerHTML = '<div class="q">' + (list.length > 1 ? '<span class="num">' + (n + 1) + '</span>' : "") +
+        (typeof a === "string" ? a : (a.q || "")) + '</div>' +
+        '<textarea placeholder="여기에 답을 적어주세요"></textarea>';
+      const ta = d.querySelector("textarea");
+      ta.value = (STATE.asks[n] || {}).text || "";
+      d.appendChild(saveEditBox(ta, () => STATE.asks[n], (v, saved) => { STATE.asks[n] = { text: v, saved }; }));
+      asksBox.appendChild(d);
+    });
+  }
 
   /* 지출 */
   const expBody = document.getElementById("exps");
@@ -547,8 +628,11 @@ function render() {
       (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
       '<div class="dmemo"><div class="lab">대표님 → ' + esc(dp.name) + '</div><textarea placeholder="이 부서에 답하거나 지시할 것 (선택)"></textarea></div>';
     const ta = el.querySelector("textarea");
-    ta.value = ((STATE.deptNotes || {})[dp.name] || {}).text || "";
-    ta.addEventListener("input", () => { STATE.deptNotes = STATE.deptNotes || {}; STATE.deptNotes[dp.name] = { text: ta.value, saved: true }; save(); });
+    STATE.deptNotes = STATE.deptNotes || {};
+    ta.value = (STATE.deptNotes[dp.name] || {}).text || "";
+    el.querySelector(".dmemo").appendChild(saveEditBox(ta,
+      () => STATE.deptNotes[dp.name],
+      (v, saved) => { STATE.deptNotes[dp.name] = { text: v, saved }; }));
     dc.appendChild(el);
   });
 }
