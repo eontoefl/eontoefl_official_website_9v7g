@@ -331,13 +331,8 @@
     padding: 1rem 1.15rem; font-family: inherit; font-size: 14.5px; line-height: 1.7; color: var(--on-surface);
     resize: vertical; outline: none; }
   #memo:focus { outline: 2px solid var(--primary-fixed-dim); }
-  #sendday { margin-top: .7rem; width: 100%; background: var(--grad); color: #fff; border: none; border-radius: var(--r);
-    padding: 13px; font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+  /* 출근·퇴근·empty는 맨 위에 나란히 있다 (2026-08-04 대표님 지시) */
   #sendday.sent { background: var(--secondary-container); color: var(--on-secondary-container); }
-  #sweepbtn { margin-top: .5rem; width: 100%; background: var(--surface-high); color: var(--on-primary-container);
-    border: none; border-radius: var(--r); padding: 12px; font-family: inherit; font-size: 13.5px;
-    font-weight: 600; cursor: pointer; }
-  #sweepbtn:hover { background: var(--surface-highest); }
 
   /* ───── 부서 보고 ───── */
   .dept-cols { column-count: 2; column-gap: 1.4rem; }
@@ -566,6 +561,8 @@
       <button class="iconbtn" id="prev" type="button" title="이전 날">‹</button>
       <button class="iconbtn" id="next" type="button" title="다음 날">›</button>
       <button class="fillbtn" id="mornbtn" type="button">출근</button>
+      <button class="fillbtn" id="sendday" type="button">퇴근</button>
+      <button class="ghostbtn" id="sweepbtn" type="button">empty</button>
       <button class="fillbtn" id="calbtn" type="button">달력</button>
       <button class="ghostbtn" id="todaybtn" type="button">오늘로</button>
       <div id="savedot"></div>
@@ -1115,8 +1112,7 @@ function render() {
       '</div></section>' +
       '<section><div class="seclab">대표님 메모장</div><div class="panel">' +
         '<textarea id="memo" placeholder="떠오르는 생각, 오늘 있었던 일, 뭐든 적어두세요."></textarea>' +
-        '<button id="sendday" type="button">퇴근발송 — 팀에 전달</button>' +
-        '<button id="sweepbtn" type="button">하루 정리하고 채팅 비우기</button></div></section>' +
+        '</div></section>' +
     '</div><div><section><div class="seclab">각 팀장 보고</div><div class="dept-cols" id="depts"></div></section></div></div>';
 
   /* 할 일 */
@@ -1229,16 +1225,7 @@ function render() {
   const memo = document.getElementById("memo");
   memo.value = STATE.memo || "";
   memo.addEventListener("input", () => { STATE.memo = memo.value; save(); });
-  const sd = document.getElementById("sendday");
-  const drawSend = () => { if (STATE.submitted) { sd.classList.add("sent"); sd.textContent = "발송됨 " + STATE.submitted.at + " · 다시 누르면 재발송"; }
-    else { sd.classList.remove("sent"); sd.textContent = "퇴근발송 — 부서에 전달"; } };
-  sd.addEventListener("click", () => {
-    if (!confirm(STATE.submitted ? "다시 발송할까요?" : "퇴근발송 하시겠어요?\n체크·메모·지출·부서 메모가 전달됩니다.")) return;
-    STATE.submitted = { at: new Date().toLocaleString("ko-KR") }; drawSend(); save();
-  });
   drawSend();
-  const sw = document.getElementById("sweepbtn");
-  if (sw) sw.addEventListener("click", () => window.openSweep && window.openSweep());
 
   /* 팀 카드 */
   const dc = document.getElementById("depts");
@@ -1430,6 +1417,30 @@ function wireDock(key, el, ta, btn) {
   });
 }
 
+
+/* 퇴근 · empty — 맨 위 출근 옆에 있다. 버튼이 화면에 고정이라 한 번만 걸어둔다 */
+function drawSend() {
+  const sd = document.getElementById("sendday");
+  if (!sd) return;
+  if (STATE.submitted) {
+    sd.classList.add("sent"); sd.textContent = "퇴근 ✓";
+    sd.title = STATE.submitted.at + " 발송됨 · 다시 누르면 재발송";
+  } else {
+    sd.classList.remove("sent"); sd.textContent = "퇴근";
+    sd.title = "오늘 체크·메모·지출을 팀장들에게 넘깁니다";
+  }
+}
+(function () {
+  document.getElementById("sendday").addEventListener("click", () => {
+    if (!DAY) return;
+    if (!confirm(STATE.submitted ? "다시 발송할까요?"
+      : "퇴근하시겠어요?\n오늘 체크·메모·지출·팀 메모가 팀장들에게 전달됩니다.")) return;
+    STATE.submitted = { at: new Date().toLocaleString("ko-KR") };
+    drawSend(); save();
+  });
+  document.getElementById("sweepbtn").addEventListener("click",
+    () => window.openSweep && window.openSweep());
+})();
 
 /* 아침 회의 — 팀장 여섯 명이 각자 조회하고 카드를 채우고 오늘 후보를 올린다 */
 (function () {
