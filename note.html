@@ -725,28 +725,16 @@ async function chatLoad() {
     const r = await fetch(CHAT + "?select=id,team,role,body,status,created_at&order=id.asc&limit=400", { headers: HDR, cache: "no-store" });
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
-    const byTeam = {}, freshCards = {};
+    const byTeam = {};
     for (const row of rows) {
-      if (row.role === "relay") continue;              // 팀끼리 넘긴 쪽지 — 화면에 안 보인다
-      if (row.role === "card") {                       // 팀장이 자기 카드를 고친 것
-        try {
-          const c = await unlockText(PW, row.body);
-          if (c && c.d === DATE) freshCards[row.team] = { card: c.card, at: c.at || "", id: row.id };
-        } catch (e) {}
-        continue;
-      }
+      if (row.role === "relay" || row.role === "card") continue;   // 화면에 안 보이는 줄
       let text;
       try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
       (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text, at: row.created_at });
       if (row.role === "boss" && row.status !== "done") waiting = true;
     }
     chatCache = byTeam;
-    // 바뀐 카드만 그 자리에서 다시 그린다 (페이지 전체를 다시 그리면 읽던 자리가 튄다)
-    Object.entries(freshCards).forEach(([key, c]) => {
-      if ((cardEdit[key] || {}).id === c.id) return;
-      cardEdit[key] = c;
-      mountDept(key);
-    });
+    await refreshCards();     // 브리핑이 바뀌었으면 그 카드만 다시 그린다
     const s = seen();
     let unreadTeams = 0;
     Object.entries(chatBtns).forEach(([key, btn]) => {
@@ -976,21 +964,39 @@ function render() {
 
 /* 카드 한 장 그리기 — 팀장이 고치면 이 카드만 다시 그린다 */
 const TONE = { fin: "#2f6f4f", mkt: "#a53b22", cs: "#006688", ct: "#7b4fa0", dev: "#3e484f", hr: "#b0355c" };
-let deptEls = {}, cardEdit = {};
+let deptEls = {};
+
+/* 브리핑이 바뀌었는지 보고, 바뀐 팀 카드만 다시 그린다 */
+async function refreshCards() {
+  if (!PW || !DATE || !DAY) return;
+  try {
+    const r = await fetch(SB + "?d=eq." + DATE + "&select=payload", { headers: HDR, cache: "no-store" });
+    const j = await r.json();
+    if (!Array.isArray(j) || !j.length || !j[0].payload) return;
+    const fresh = await unlockText(PW, j[0].payload);
+    (fresh.depts || []).forEach(dp => {
+      const slot = deptEls[dp.key]; if (!slot) return;
+      if (JSON.stringify(slot.base) === JSON.stringify(dp)) return;   // 안 바뀌었으면 그대로 둔다
+      slot.base = dp;
+      mountDept(dp.key);
+    });
+    DAY.depts = fresh.depts || DAY.depts;
+  } catch (e) { /* 다음 차례에 다시 본다 */ }
+}
 
 function mountDept(key) {
   const slot = deptEls[key]; if (!slot) return;
-  const dp = Object.assign({}, slot.base, (cardEdit[key] || {}).card || {});
+  const dp = slot.base;
   const el = slot.el;
-  const parts = String(slot.base.name || "").split(" · ");
+  const parts = String(dp.name || "").split(" · ");
   const team = parts[0], person = parts[1] || "";
-  const when = (cardEdit[key] || {}).at;
+  const when = dp.at;
   el.innerHTML = '<div class="dept-top">' +
       '<div class="who"><img class="avatar" src="assets/team/' + key + '.jpg" alt="" ' +
         'onerror="this.style.display=\'none\'"><span class="dot" style="background:' + (TONE[key] || "#006688") + '"></span></div>' +
       '<div><h3>' + esc(team) + '</h3>' + (person ? '<div class="person">' + esc(person) + ' 팀장' +
         (when ? '<span class="edited">· ' + esc(when) + ' 고침</span>' : "") + '</div>' : "") + '</div>' +
-      '<div class="role">' + esc(slot.base.role || "") + '</div></div>' +
+      '<div class="role">' + esc(dp.role || "") + '</div></div>' +
     (dp.kpi ? '<div class="kpi">' + dp.kpi.map(k => '<div><div class="k">' + esc(k.k) + '</div><div class="v">' + esc(k.v) + '</div></div>').join("") + '</div>' : "") +
     (dp.gauge ? '<div class="gauge"><div class="lab"><span>' + esc(dp.gauge.label) + '</span><span>' + esc(dp.gauge.text) + '</span></div>' +
       '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
@@ -1164,7 +1170,6 @@ async function go(d) {
     if (row.payload) { try { DAY = await unlockText(PW, row.payload); } catch (e) { DAY = null; } }
     if (row.state) { try { STATE = Object.assign(STATE, await unlockText(PW, row.state)); } catch (e) {} }
   }
-  cardEdit = {};
   render();
   Object.values(docks).forEach(d => d.sig = "");
   chatLoad();
