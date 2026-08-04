@@ -277,12 +277,25 @@
   .nag { background: var(--surface-low); border-radius: var(--r); padding: 1rem 1.15rem; font-size: 13.5px;
     margin-top: 1rem; line-height: 1.7; color: var(--on-surface-variant); }
   .nag::before { content: "💬 "; }
-  .dmemo { margin-top: 1rem; }
-  .dmemo .lab { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--on-surface-variant); margin-bottom: .4rem; }
-  .dmemo textarea { width: 100%; min-height: 58px; background: var(--surface-highest); border: none; border-radius: var(--r);
-    padding: 10px 12px; font-family: inherit; font-size: 13.5px; line-height: 1.65; color: var(--on-surface);
-    resize: vertical; outline: none; }
-  .dmemo textarea:focus { outline: 2px solid var(--primary-fixed-dim); }
+  /* 팀장 채팅 */
+  .chat { margin-top: 1rem; }
+  .chat .lab { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--on-surface-variant); margin-bottom: .5rem; }
+  .chat .log { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
+  .bubble { max-width: 86%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .bubble.me { align-self: flex-end; background: var(--grad); color: #fff; border-bottom-right-radius: .2rem; }
+  .bubble.lead { align-self: flex-start; background: var(--surface-low); color: var(--on-surface-variant); border-bottom-left-radius: .2rem; }
+  .bubble .who { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; opacity: .55; margin-bottom: .2rem; }
+  .chat .empty { font-size: 12.5px; color: var(--on-surface-variant); opacity: .65; padding: .3rem 0; }
+  .chat .wait { font-size: 12px; color: var(--primary); font-weight: 500; padding: .45rem 0 .1rem; }
+  .chat .wait::before { content: "● "; font-size: 9px; vertical-align: 2px; }
+  .chat .composer { display: flex; gap: .4rem; margin-top: .55rem; }
+  .chat .composer textarea { flex: 1; min-width: 0; min-height: 40px; max-height: 140px; background: var(--surface-highest);
+    border: none; border-radius: var(--r); padding: .6rem .8rem; font-family: inherit; font-size: 13.5px;
+    line-height: 1.6; color: var(--on-surface); resize: vertical; outline: none; }
+  .chat .composer textarea:focus { outline: 2px solid var(--primary-fixed-dim); }
+  .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
+    padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  .chat .composer button:disabled { opacity: .5; cursor: default; }
 
   .empty-day { background: var(--surface-low); border-radius: var(--r-lg); padding: 4rem 1.4rem; text-align: center;
     color: var(--on-surface-variant); font-size: 14.5px; line-height: 1.8; }
@@ -429,6 +442,46 @@ async function doUnlock() {
   document.getElementById("gate").style.display = "none";
   document.getElementById("app").style.display = "";
   await start();
+}
+
+/* ───── 팀장 채팅 ───── */
+const CHAT = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_chat";
+const PERSON = { dev: "김도윤", ct: "이서현", cs: "박준호", mkt: "최유진", fin: "정민석", hr: "한지우" };
+let chatBoxes = {}, chatTimer = null;
+
+async function chatLoad() {
+  clearTimeout(chatTimer);
+  if (!PW || !Object.keys(chatBoxes).length) return;
+  let waiting = false;
+  try {
+    const r = await fetch(CHAT + "?select=id,team,role,body,status&order=id.asc&limit=400", { headers: HDR, cache: "no-store" });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) throw new Error("bad");
+    const byTeam = {};
+    for (const row of rows) {
+      let text;
+      try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
+      (byTeam[row.team] = byTeam[row.team] || []).push({ role: row.role, status: row.status, text: text });
+      if (row.role === "boss" && row.status !== "done") waiting = true;
+    }
+    Object.entries(chatBoxes).forEach(([key, b]) => {
+      const list = byTeam[key] || [];
+      b.log.innerHTML = list.length
+        ? list.map(m => '<div class="bubble ' + (m.role === "boss" ? "me" : "lead") + '">' +
+            (m.role === "lead" ? '<span class="who">' + esc(PERSON[key] || "팀장") + '</span>' : "") +
+            esc(m.text) + '</div>').join("")
+        : '<div class="empty">아직 나눈 이야기가 없습니다</div>';
+      b.wait.style.display = list.some(m => m.role === "boss" && m.status !== "done") ? "" : "none";
+      b.log.scrollTop = b.log.scrollHeight;
+    });
+  } catch (e) { /* 조용히 다음 차례에 재시도 */ }
+  chatTimer = setTimeout(chatLoad, waiting ? 4000 : 20000);
+}
+async function chatSend(team, text) {
+  const body = await lock(PW, text);
+  await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+    body: JSON.stringify({ team: team, role: "boss", body: body, status: "pending" }) });
+  await chatLoad();
 }
 
 /* ───── 저장 · 수정 버튼 (답변칸·팀 메모 공용) ───── */
@@ -622,6 +675,7 @@ function render() {
   /* 부서 카드 */
   const TONE = { fin: "#2f6f4f", mkt: "#a53b22", cs: "#006688", ct: "#7b4fa0", dev: "#3e484f", hr: "#b0355c" };
   const dc = document.getElementById("depts");
+  chatBoxes = {};
   (DAY.depts || []).forEach(dp => {
     const el = document.createElement("div");
     el.className = "dept";
@@ -637,13 +691,20 @@ function render() {
         '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
       (dp.paras || []).map(p => "<p>" + p + "</p>").join("") +
       (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
-      '<div class="dmemo"><div class="lab">대표님 → ' + esc(dp.name) + '</div><textarea placeholder="이 부서에 답하거나 지시할 것 (선택)"></textarea></div>';
-    const ta = el.querySelector("textarea");
-    STATE.deptNotes = STATE.deptNotes || {};
-    ta.value = (STATE.deptNotes[dp.name] || {}).text || "";
-    el.querySelector(".dmemo").appendChild(saveEditBox(ta,
-      () => STATE.deptNotes[dp.name],
-      (v, saved) => { STATE.deptNotes[dp.name] = { text: v, saved }; }));
+      '<div class="chat"><div class="lab">' + esc(person ? person + " 팀장과 이야기하기" : "이야기하기") + '</div>' +
+        '<div class="log"><div class="empty">불러오는 중…</div></div>' +
+        '<div class="wait" style="display:none">' + esc(person || "팀장") + ' 팀장이 문서 보는 중…</div>' +
+        '<div class="composer"><textarea placeholder="' + esc(team) + '에 할 말"></textarea><button type="button">보내기</button></div></div>';
+    const box = el.querySelector(".chat");
+    const ta = box.querySelector("textarea"), btn = box.querySelector("button");
+    chatBoxes[dp.key] = { log: box.querySelector(".log"), wait: box.querySelector(".wait") };
+    async function send() {
+      const v = ta.value.trim(); if (!v) return;
+      btn.disabled = true; ta.value = "";
+      try { await chatSend(dp.key, v); } finally { btn.disabled = false; }
+    }
+    btn.addEventListener("click", send);
+    ta.addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } });
     dc.appendChild(el);
   });
 }
@@ -695,6 +756,7 @@ async function go(d) {
     if (row.state) { try { STATE = Object.assign(STATE, await unlockText(PW, row.state)); } catch (e) {} }
   }
   render();
+  chatLoad();
   setDot(true, row ? "저장 준비됨" : "브리핑 없음");
   if (document.getElementById("blade").classList.contains("on")) drawCal();
   window.scrollTo({ top: 0, behavior: "smooth" });
