@@ -826,6 +826,7 @@ function drawDock(key) {
 
 function drawAllDocks() { Object.keys(docks).forEach(drawDock); }
 
+const decCache = {};   // 한 번 푼 줄은 기억한다 — 채팅은 안 바뀌므로 다시 풀 이유가 없다 (2026-08-05)
 async function chatLoad() {
   clearTimeout(chatTimer);
   if (!PW) return;
@@ -835,14 +836,21 @@ async function chatLoad() {
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
     const byTeam = {};
+    const alive = new Set();
     for (const row of rows) {
       // 화면에 안 보이는 줄 (시스템이 쓰는 표시)
       if (["relay", "card", "morning", "morningdone", "plan", "closing", "closedone", "wipe", "backup"].includes(row.role)) continue;
-      let text;
-      try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
+      alive.add(row.id);
+      let text = decCache[row.id];
+      if (text === undefined) {
+        try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
+        decCache[row.id] = text;
+      }
       (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text, at: row.created_at });
       if (row.role === "boss" && row.status !== "done") waiting = true;
     }
+    // 비우기로 사라진 줄은 기억에서도 지운다 (하루치라 크진 않지만 무한히 들고 있지 않는다)
+    Object.keys(decCache).forEach(k => { if (!alive.has(+k)) delete decCache[k]; });
     chatCache = byTeam;
     await refreshCards();     // 브리핑이 바뀌었으면 그 카드만 다시 그린다
     const s = seen();
@@ -866,10 +874,22 @@ async function chatLoad() {
   chatTimer = setTimeout(chatLoad, waiting ? 2000 : (Object.keys(docks).length ? 5000 : 15000));  // 답장을 더 빨리 띄운다 (2026-08-05)
 }
 async function chatSend(team, text) {
+  // 말풍선을 저장을 기다리지 않고 즉시 띄운다 (2026-08-05 — "보냈는데 안 뜬다" 체감 제거)
+  chatCache[team] = chatCache[team] || [];
+  chatCache[team].push({ id: 0, role: "boss", status: "pending", text: text, at: new Date().toISOString() });
+  drawAllDocks();
   const body = await lock(PW, text);
-  await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+  const r = await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=representation" }),
     body: JSON.stringify({ team: team, role: "boss", body: body, status: "pending" }) });
-  await chatLoad();
+  try {
+    const saved = await r.json();
+    const mine = chatCache[team].find(m => m.id === 0);
+    if (mine && Array.isArray(saved) && saved.length) {
+      mine.id = saved[0].id;
+      decCache[mine.id] = text;         // 내가 보낸 건 이미 아니까 다시 풀지 않는다
+    }
+  } catch (e) { /* 다음 갱신 때 맞춰진다 */ }
+  chatLoad();
 }
 
 /* ───── 저장 · 수정 버튼 (답변칸·팀 메모 공용) ───── */
