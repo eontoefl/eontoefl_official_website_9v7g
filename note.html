@@ -379,6 +379,8 @@
   .bubble { max-width: 86%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--grad); color: #fff; border-bottom-right-radius: .2rem; }
   .bubble.lead { align-self: flex-start; background: var(--surface-low); color: var(--on-surface-variant); border-bottom-left-radius: .2rem; }
+  .bubble strong { font-weight: 700; }
+  .bubble.lead strong { color: var(--on-surface); }
   .bubble .who { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; opacity: .55; margin-bottom: .2rem; }
   .chat .empty { font-size: 12.5px; color: var(--on-surface-variant); opacity: .65; padding: .3rem 0; }
   .chat .wait { font-size: 12px; color: var(--primary); font-weight: 500; padding: .45rem 0 .1rem; }
@@ -517,6 +519,9 @@ const shift = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDa
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const won = n => (n || 0).toLocaleString("ko-KR") + "원";
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+/* 팀장이 쓰는 **굵게**를 실제 굵은 글씨로. 이스케이프 뒤에 하므로 안전하다 */
+const fmt = t => esc(t).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+const plain = t => String(t == null ? "" : t).replace(/\*\*/g, "");
 function setDot(ok, msg) { const d = document.getElementById("savedot"); d.textContent = msg; d.className = ok ? "" : "bad"; }
 
 /* ───── 서버 ───── */
@@ -597,7 +602,7 @@ function drawAlerts() {                     // 목록 다시 그리기
     total += unread ? 1 : 0;
     const waiting = list.some(m => m.role === "boss" && m.status !== "done");
     const pv = waiting ? '<span class="waiting">답장 쓰는 중…</span>'
-      : last ? (last.role === "boss" ? "나: " : "") + esc(last.text)
+      : last ? (last.role === "boss" ? "나: " : "") + esc(plain(last.text))
       : "아직 나눈 이야기가 없습니다";
     return '<div class="ritem' + (unread ? " unread" : "") + (docks[key] ? " open" : "") + '" data-team="' + key + '">' +
       '<img src="assets/team/' + key + '.jpg" alt="">' +
@@ -673,12 +678,12 @@ function drawDock(key) {
     log.innerHTML = (list.length
       ? list.map((m, i) => {
           if (m.role === "boss")
-            return '<div class="row me"><div class="bubble me">' + esc(m.text) + '</div></div>';
+            return '<div class="row me"><div class="bubble me">' + fmt(m.text) + '</div></div>';
           const same = i > 0 && list[i - 1].role === "lead";
           return '<div class="row"><img class="ava' + (same ? " hide" : "") + '" src="assets/team/' +
             key + '.jpg" alt=""><div class="bubble lead">' +
             (same ? "" : '<span class="who">' + esc(PERSON[key] || "팀장") + '</span>') +
-            esc(m.text) + '</div></div>';
+            fmt(m.text) + '</div></div>';
         }).join("")
       : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
       + (list.some(m => m.role === "boss" && m.status !== "done")
