@@ -245,6 +245,10 @@
   #sendday { margin-top: .7rem; width: 100%; background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 13px; font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; }
   #sendday.sent { background: var(--secondary-container); color: var(--on-secondary-container); }
+  #sweepbtn { margin-top: .5rem; width: 100%; background: var(--surface-high); color: var(--on-primary-container);
+    border: none; border-radius: var(--r); padding: 12px; font-family: inherit; font-size: 13.5px;
+    font-weight: 600; cursor: pointer; }
+  #sweepbtn:hover { background: var(--surface-highest); }
 
   /* ───── 부서 보고 ───── */
   .dept-cols { column-count: 2; column-gap: 1.4rem; }
@@ -349,6 +353,31 @@
     body.roster-on { padding-right: 0; }
     #roster { box-shadow: -8px 0 40px rgba(25,28,29,.12); }
   }
+
+  /* 하루 정리 모달 */
+  #sweepscrim { position: fixed; inset: 0; background: rgba(25, 28, 29, .3); z-index: 70;
+    display: none; place-items: center; padding: 1.4rem; }
+  #sweepscrim.on { display: grid; }
+  #sweep { width: 460px; max-width: 100%; max-height: 86vh; overflow-y: auto;
+    background: var(--surface-lowest); border-radius: var(--r-lg); box-shadow: var(--float); padding: 1.5rem; }
+  #sweep h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  #sweep .lead-in { font-size: 13.5px; color: var(--on-surface-variant); margin: .4rem 0 1.2rem; line-height: 1.7; }
+  #sweep .row2 { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem 0; }
+  #sweep .row2 img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+    background: var(--surface-high); }
+  #sweep .row2 .who2 { font-size: 13.5px; font-weight: 700; }
+  #sweep .row2 .res { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.6; margin-top: .1rem; }
+  #sweep .row2 .mark { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 700;
+    color: var(--on-surface-variant); align-self: center; }
+  #sweep .row2.done .mark { color: var(--good); }
+  #sweep .row2.doing .mark { color: var(--primary); }
+  #sweep .btns2 { display: flex; gap: .5rem; margin-top: 1.4rem; }
+  #sweep .btns2 button { flex: 1; border: none; border-radius: var(--r); padding: 12px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  #sweep .go { background: var(--grad); color: #fff; }
+  #sweep .wipe { background: var(--tertiary); color: #fff; }
+  #sweep .wipe:disabled { background: var(--surface-high); color: var(--on-surface-variant); cursor: default; }
+  #sweep .close2 { background: var(--surface-high); color: var(--on-primary-container); flex: 0 0 90px; }
 
   /* 플로팅 채팅창 */
   .dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
@@ -477,6 +506,20 @@
     <div class="rlist" id="rlist"></div>
   </aside>
   <button id="rostertab" type="button">팀장들<span class="dotn"></span></button>
+
+  <div id="sweepscrim">
+    <div id="sweep">
+      <h3>하루 정리하고 채팅 비우기</h3>
+      <div class="lead-in">팀장 여섯 명이 오늘 대화를 다시 읽고, 문서에 안 들어간 것이 있으면 지금 넣습니다.
+        여섯 명이 다 끝나면 비우기가 열립니다. 비우기 전에 오늘 대화 원문은 파일로 저장됩니다.</div>
+      <div id="sweeplist"></div>
+      <div class="btns2">
+        <button class="go" type="button" id="sweepgo">정리 시작</button>
+        <button class="wipe" type="button" id="sweepwipe" disabled>채팅 비우기</button>
+        <button class="close2" type="button" id="sweepclose">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <template id="docktpl">
     <div class="dock">
@@ -815,7 +858,8 @@ function render() {
       '</div></section>' +
       '<section><div class="seclab">대표님 메모장</div><div class="panel">' +
         '<textarea id="memo" placeholder="떠오르는 생각, 오늘 있었던 일, 뭐든 적어두세요."></textarea>' +
-        '<button id="sendday" type="button">퇴근발송 — 부서에 전달</button></div></section>' +
+        '<button id="sendday" type="button">퇴근발송 — 팀에 전달</button>' +
+        '<button id="sweepbtn" type="button">하루 정리하고 채팅 비우기</button></div></section>' +
     '</div><div><section><div class="seclab">각 팀장 보고</div><div class="dept-cols" id="depts"></div></section></div></div>';
 
   /* 할 일 */
@@ -949,6 +993,8 @@ function render() {
     STATE.submitted = { at: new Date().toLocaleString("ko-KR") }; drawSend(); save();
   });
   drawSend();
+  const sw = document.getElementById("sweepbtn");
+  if (sw) sw.addEventListener("click", () => window.openSweep && window.openSweep());
 
   /* 팀 카드 */
   const dc = document.getElementById("depts");
@@ -1129,6 +1175,75 @@ function wireDock(key, el, ta, btn) {
   });
 }
 
+
+/* 하루 정리하고 채팅 비우기 */
+(function () {
+  const scrim = document.getElementById("sweepscrim"), list = document.getElementById("sweeplist");
+  const go = document.getElementById("sweepgo"), wipe = document.getElementById("sweepwipe");
+  let timer = null;
+
+  function open() { scrim.classList.add("on"); draw(); poll(); }
+  function close() { scrim.classList.remove("on"); clearTimeout(timer); }
+  window.openSweep = open;
+
+  async function state() {
+    const r = await fetch(CHAT + "?select=id,team,role,body,status&role=in.(sweep,sweepdone)&order=id.asc",
+      { headers: HDR, cache: "no-store" });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return { running: false, done: {} };
+    const done = {};
+    let running = false;
+    for (const x of rows) {
+      if (x.role === "sweep") { if (x.status !== "done") running = true; continue; }
+      try { done[x.team] = await unlockText(PW, x.body); } catch (e) { done[x.team] = "확인 완료"; }
+    }
+    return { running: running, done: done };
+  }
+
+  async function draw() {
+    const st = await state();
+    const n = Object.keys(st.done).length;
+    list.innerHTML = ORDER.map(k => {
+      const res = st.done[k];
+      const cls = res ? " done" : (st.running ? " doing" : "");
+      return '<div class="row2' + cls + '"><img src="assets/team/' + k + '.jpg" alt="">' +
+        '<div><div class="who2">' + esc(PERSON[k]) + ' 팀장</div>' +
+        '<div class="res">' + (res ? esc(res) : (st.running ? "확인 중…" : "대기")) + '</div></div>' +
+        '<span class="mark">' + (res ? "✓" : (st.running ? "…" : "")) + '</span></div>';
+    }).join("");
+    go.disabled = st.running;
+    go.textContent = st.running ? "정리 중… (" + n + "/6)" : (n >= 6 ? "다시 정리" : "정리 시작");
+    wipe.disabled = n < 6;
+    return st;
+  }
+
+  function poll() {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (!scrim.classList.contains("on")) return;
+      const st = await draw();
+      if (st.running || Object.keys(st.done).length < 6) poll();
+    }, 6000);
+  }
+
+  go.addEventListener("click", async () => {
+    go.disabled = true;
+    await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+      body: JSON.stringify({ team: "_all", role: "sweep", status: "pending", body: await lock(PW, "하루 정리") }) });
+    draw(); poll();
+  });
+
+  wipe.addEventListener("click", async () => {
+    if (!confirm("오늘 대화를 전부 비웁니다.\n원문은 파일로 저장되고, 화면의 채팅은 모두 사라집니다.\n\n계속할까요?")) return;
+    wipe.disabled = true; wipe.textContent = "비우는 중…";
+    await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
+      body: JSON.stringify({ team: "_all", role: "wipe", status: "pending", body: await lock(PW, "비우기") }) });
+    setTimeout(() => { close(); chatLoad(); wipe.textContent = "채팅 비우기"; }, 8000);
+  });
+
+  document.getElementById("sweepclose").addEventListener("click", close);
+  scrim.addEventListener("click", e => { if (e.target === scrim) close(); });
+})();
 
 /* 오른쪽 목록 접기·펴기 */
 (function () {
