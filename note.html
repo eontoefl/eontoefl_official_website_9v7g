@@ -282,9 +282,14 @@
     border: none; border-radius: var(--r); padding: 11px; font-family: inherit; font-size: 13.5px;
     font-weight: 600; cursor: pointer; position: relative; }
   .chatbtn:hover { background: var(--surface-highest); }
-  .chatbtn .new { display: none; width: 7px; height: 7px; border-radius: 99px; background: var(--tertiary);
-    position: absolute; top: 9px; right: 10px; }
-  .chatbtn.has-new .new { display: block; }
+  .chatbtn .new { display: none; }
+  .chatbtn.has-new { background: #fbe3dd; color: var(--tertiary); }
+  .chatbtn.has-new:hover { background: #f7d8d0; }
+  .chatbtn.has-new .new { display: inline-block; position: static; margin-left: .45rem;
+    background: var(--tertiary); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+    padding: 2px 8px; border-radius: 99px; vertical-align: 1px; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .chatbtn.has-new .new { animation: none; } }
 
   /* 플로팅 채팅창 */
   #dock { position: fixed; right: 20px; bottom: 20px; width: 390px; max-width: calc(100vw - 32px);
@@ -546,12 +551,20 @@ async function chatLoad() {
     }
     chatCache = byTeam;
     const s = seen();
+    let unreadTeams = 0;
     Object.entries(chatBtns).forEach(([key, btn]) => {
       const list = byTeam[key] || [];
       const last = list.length ? list[list.length - 1] : null;
       const unread = last && last.role === "lead" && last.id > (s[key] || 0) && key !== dockTeam;
       btn.classList.toggle("has-new", !!unread);
+      const tag = btn.querySelector(".new");
+      if (unread) {
+        unreadTeams++;
+        const n = list.filter(m => m.role === "lead" && m.id > (s[key] || 0)).length;
+        tag.textContent = n > 1 ? "새 답장 " + n : "새 답장";
+      }
     });
+    document.title = (unreadTeams ? "(" + unreadTeams + ") " : "") + "eonToefl";
     drawDock();
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
   chatTimer = setTimeout(chatLoad, waiting ? 4000 : (dockTeam ? 8000 : 30000));
