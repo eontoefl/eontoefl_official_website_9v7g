@@ -292,7 +292,12 @@
     background: rgba(255, 255, 255, .92); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border-radius: var(--r-lg); box-shadow: 0 12px 44px rgba(25, 28, 29, .16); overflow: hidden; }
   #dock.on { display: flex; }
-  #dock .head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; background: var(--surface-low); }
+  #dock.dragging { transition: none; user-select: none; }
+  #dock .head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; background: var(--surface-low);
+    cursor: grab; touch-action: none; }
+  #dock .head:active { cursor: grabbing; }
+  #dock .head .grip { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: 34px; height: 4px;
+    border-radius: 99px; background: var(--on-surface-variant); opacity: .22; }
   #dock .head img { width: 36px; height: 36px; border-radius: 99px; object-fit: cover; flex-shrink: 0; }
   #dock .head .nm { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
   #dock .head .tm { font-size: 11.5px; color: var(--on-surface-variant); }
@@ -380,6 +385,7 @@
 
   <div id="dock">
     <div class="head">
+      <span class="grip"></span>
       <img src="" alt="">
       <div><div class="nm">—</div><div class="tm">—</div></div>
       <button class="x" type="button" title="닫기">✕</button>
@@ -499,6 +505,7 @@ function openDock(key, team, person) {
   d.querySelector(".head .tm").textContent = team;
   d.querySelector(".foot textarea").placeholder = team + "에 할 말";
   d.classList.add("on");
+  if (window.restoreDockPos) restoreDockPos();
   drawDock();
   d.querySelector(".foot textarea").focus();
   chatLoad();
@@ -797,6 +804,50 @@ function closeBlade() { document.getElementById("blade").classList.remove("on");
   const d = document.getElementById("dock");
   const ta = d.querySelector(".foot textarea"), btn = d.querySelector(".foot button");
   d.querySelector(".head .x").addEventListener("click", closeDock);
+
+  /* ── 끌어서 옮기기 ── */
+  const POS = "hq-dock-pos";
+  function place(x, y) {
+    const w = d.offsetWidth, h = d.offsetHeight;
+    x = Math.min(Math.max(8, x), Math.max(8, innerWidth - w - 8));
+    y = Math.min(Math.max(8, y), Math.max(8, innerHeight - h - 8));
+    d.style.left = x + "px"; d.style.top = y + "px";
+    d.style.right = "auto"; d.style.bottom = "auto";
+    localStorage.setItem(POS, JSON.stringify({ x: x, y: y }));
+  }
+  window.restoreDockPos = function () {
+    let p = null;
+    try { p = JSON.parse(localStorage.getItem(POS) || "null"); } catch (e) {}
+    if (p && innerWidth > 620) place(p.x, p.y);
+    else { d.style.left = d.style.top = ""; d.style.right = ""; d.style.bottom = ""; }
+  };
+  const head = d.querySelector(".head");
+  let drag = null;
+  head.addEventListener("pointerdown", e => {
+    if (e.target.closest("button")) return;
+    const r = d.getBoundingClientRect();
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    d.classList.add("dragging");
+    head.setPointerCapture(e.pointerId);
+  });
+  head.addEventListener("pointermove", e => {
+    if (!drag) return;
+    e.preventDefault();
+    place(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  function endDrag(e) {
+    if (!drag) return;
+    drag = null; d.classList.remove("dragging");
+    try { head.releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+  head.addEventListener("pointerup", endDrag);
+  head.addEventListener("pointercancel", endDrag);
+  head.addEventListener("dblclick", e => {
+    if (e.target.closest("button")) return;
+    localStorage.removeItem(POS);
+    d.style.left = d.style.top = d.style.right = d.style.bottom = "";
+  });
+  addEventListener("resize", () => { if (d.classList.contains("on")) restoreDockPos(); });
   async function send() {
     const v = ta.value.trim(); if (!v || !dockTeam) return;
     btn.disabled = true; ta.value = "";
