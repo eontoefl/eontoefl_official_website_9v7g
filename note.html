@@ -847,8 +847,7 @@ function render() {
           '<ul class="todo" id="todolist"></ul>' +
           '<div class="addrow"><input id="newtodo" placeholder="내가 직접 추가할 할 일"><button id="addtodo" type="button">추가</button></div>' +
           (DAY.skip ? '<div class="note-block">' + DAY.skip + '</div>' : "") +
-          (DAY.asks ? '<div class="asks" id="asks"><span class="head">한마디만 주시면 제가 정리합니다</span></div>' : "") +
-        '</div></section>' +
+          '</div></section>' +
       '<section><div class="seclab">오늘 쓴 돈 <span>· 저녁 마감 때 반영됩니다</span></div><div class="panel">' +
         (DAY.expNote ? '<div class="exp-note">' + DAY.expNote + '</div>' : "") +
         '<div id="exps"></div><button id="addexp" type="button">＋ 내역 추가</button>' +
@@ -925,24 +924,6 @@ function render() {
   }
   document.getElementById("addtodo").addEventListener("click", addTodo);
   addInp.addEventListener("keydown", e => { if (e.key === "Enter") addTodo(); });
-
-  /* 한마디만 주시면 — 답변칸 */
-  const asksBox = document.getElementById("asks");
-  if (asksBox && DAY.asks) {
-    const list = Array.isArray(DAY.asks) ? DAY.asks : [{ q: DAY.asks }];
-    STATE.asks = STATE.asks || {};
-    list.forEach((a, n) => {
-      const d = document.createElement("div");
-      d.className = "ask";
-      d.innerHTML = '<div class="q">' + (list.length > 1 ? '<span class="num">' + (n + 1) + '</span>' : "") +
-        (typeof a === "string" ? a : (a.q || "")) + '</div>' +
-        '<textarea placeholder="여기에 답을 적어주세요"></textarea>';
-      const ta = d.querySelector("textarea");
-      ta.value = (STATE.asks[n] || {}).text || "";
-      d.appendChild(saveEditBox(ta, () => STATE.asks[n], (v, saved) => { STATE.asks[n] = { text: v, saved }; }));
-      asksBox.appendChild(d);
-    });
-  }
 
   /* 지출 */
   const expBody = document.getElementById("exps");
