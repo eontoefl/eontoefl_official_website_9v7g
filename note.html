@@ -289,7 +289,7 @@
   .exp-row input, .exp-row select { background: var(--surface-highest); border: none; border-radius: var(--r);
     padding: 10px 12px; font-family: inherit; font-size: 13.5px; color: var(--on-surface); outline: none; min-width: 0; }
   .exp-row input:focus, .exp-row select:focus { outline: 2px solid var(--primary-fixed-dim); }
-  .e-item { flex: 1.4; } .e-amt { width: 108px; flex-shrink: 0; }
+  .e-item { flex: 1.4; } .e-cur { width: 58px; flex-shrink: 0; } .e-amt { width: 108px; flex-shrink: 0; }
   .e-card { width: 152px; flex-shrink: 0; } .e-why { flex: 1; }
   #addexp { margin-top: .5rem; width: 100%; background: transparent; color: var(--primary); border: none;
     border-radius: var(--r); padding: 10px; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
@@ -521,7 +521,7 @@
     .cols { grid-template-columns: 1fr; } .dept-cols { column-count: 1; }
     .wrap { padding: 0 1rem; } .topbar .inner { padding: .8rem 1rem; }
     .cal2 .dnow { font-size: 17px; } .hero { padding: 1.25rem 1.4rem; } .hero .h { font-size: 21px; }
-    .e-card { width: 118px; } .e-amt { width: 88px; }
+    .e-card { width: 118px; } .e-amt { width: 84px; } .e-cur { width: 52px; }
   }
 </style>
 </head>
@@ -1192,35 +1192,64 @@ function render() {
 
   /* 지출 */
   const expBody = document.getElementById("exps");
-  const fmt = el => { const v = el.value.replace(/[^0-9]/g, ""); el.value = v ? parseInt(v).toLocaleString("ko-KR") : ""; };
+  // 통화별 표기 — 원화는 정수, 달러는 49.51처럼 소수 둘째 자리까지 (2026-08-05 대표님 요청)
+  const isUSD = r => r.querySelector(".e-cur").value === "$";
+  const fmt = (el, usd) => {
+    if (usd) {
+      let v = el.value.replace(/[^0-9.]/g, "");
+      const i = v.indexOf(".");
+      if (i !== -1) v = v.slice(0, i + 1).replace(/\./g, (m, o) => o === i ? "." : "") + v.slice(i + 1).replace(/\./g, "").slice(0, 2);
+      const [a, b] = v.split(".");
+      el.value = v === "" ? "" : (a ? parseInt(a).toLocaleString("en-US") : "0") + (b !== undefined ? "." + b : "");
+    } else {
+      const v = el.value.replace(/[^0-9]/g, "");
+      el.value = v ? parseInt(v).toLocaleString("ko-KR") : "";
+    }
+  };
   const rows = () => [...expBody.querySelectorAll(".exp-row")];
-  const rowData = r => ({ item: r.querySelector(".e-item").value.trim(), amount: r.querySelector(".e-amt").value.replace(/[^0-9]/g, ""),
+  const rowData = r => ({ item: r.querySelector(".e-item").value.trim(),
+    amount: r.querySelector(".e-amt").value.replace(isUSD(r) ? /[^0-9.]/g : /[^0-9]/g, ""),
+    cur: isUSD(r) ? "USD" : "KRW",
     card: r.querySelector(".e-card").value, why: r.querySelector(".e-why").value.trim() });
   function expRow(d) {
     d = d || {};
     const div = document.createElement("div"); div.className = "exp-row";
-    div.innerHTML = '<div class="r1"><input class="e-item" placeholder="내역 (예: 점심 편의점)"><input class="e-amt" inputmode="numeric" placeholder="금액(원)"></div>' +
+    div.innerHTML = '<div class="r1"><input class="e-item" placeholder="내역 (예: 점심 편의점)">' +
+      '<select class="e-cur" title="통화"><option>₩</option><option>$</option></select>' +
+      '<input class="e-amt" inputmode="decimal" placeholder="금액"></div>' +
       '<div class="r2"><select class="e-card">' + CARDS.map(x => '<option>' + x + '</option>').join("") + '</select><input class="e-why" placeholder="왜 썼는지 한 줄"></div>';
     div.querySelector(".e-item").value = d.item || ""; div.querySelector(".e-amt").value = d.amount || "";
+    div.querySelector(".e-cur").value = d.cur === "USD" ? "$" : "₩";
     div.querySelector(".e-card").value = d.card || ""; div.querySelector(".e-why").value = d.why || "";
-    fmt(div.querySelector(".e-amt"));
-    div.querySelector(".e-amt").addEventListener("input", e => fmt(e.target));
+    fmt(div.querySelector(".e-amt"), d.cur === "USD");
+    div.querySelector(".e-amt").addEventListener("input", e => fmt(e.target, isUSD(div)));
+    div.querySelector(".e-cur").addEventListener("input", () => fmt(div.querySelector(".e-amt"), isUSD(div)));
     div.querySelectorAll("input,select").forEach(el => el.addEventListener("input", () => {
       ensureEmpty(); total(); STATE.expenses = rows().map(rowData).filter(x => x.item || x.amount); save(); }));
     expBody.appendChild(div);
   }
   function ensureEmpty() { const rs = rows(), last = rs[rs.length - 1];
     if (!last) return expRow(); const d = rowData(last); if (d.item || d.amount) expRow(); }
+  const usdFmt = v => "$" + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   function total() {
     const ds = rows().map(rowData);
-    document.getElementById("etotal").textContent = won(ds.reduce((s, x) => s + (parseInt(x.amount) || 0), 0));
-    const per = {}; ds.forEach(x => { const a = parseInt(x.amount) || 0; if (a && x.card) per[x.card] = (per[x.card] || 0) + a; });
+    // 원화와 달러는 섞어 더하지 않는다 — 환율을 지어내지 않는다 (2026-08-05)
+    const krw = ds.reduce((s, x) => s + (x.cur !== "USD" ? (parseInt(x.amount) || 0) : 0), 0);
+    const usd = ds.reduce((s, x) => s + (x.cur === "USD" ? (parseFloat(x.amount) || 0) : 0), 0);
+    document.getElementById("etotal").textContent = won(krw) + (usd ? " + " + usdFmt(usd) : "");
+    const per = {}, perU = {};
+    ds.forEach(x => {
+      if (!x.card) return;
+      if (x.cur === "USD") { const a = parseFloat(x.amount) || 0; if (a) perU[x.card] = (perU[x.card] || 0) + a; }
+      else { const a = parseInt(x.amount) || 0; if (a) per[x.card] = (per[x.card] || 0) + a; }
+    });
     let html = "";
     CARDS.slice(1).forEach(cn => {
-      const info = cards[cn] || {}, t = per[cn] || 0;
-      if (!t && !info.base) return;
-      html += '<div class="cs-row"><span class="nm">' + esc(cn) + '</span><span>오늘 <b>' + won(t) + '</b>' +
-        (info.base ? ' · 청구 누적 <b>' + won(info.base + t) + '</b> (' + esc(info.label || "") + ')' : "") + '</span></div>';
+      const info = cards[cn] || {}, t = per[cn] || 0, tu = perU[cn] || 0;
+      if (!t && !tu && !info.base) return;
+      const today = (t ? won(t) : "") + (t && tu ? " + " : "") + (tu ? usdFmt(tu) : "") || won(0);
+      html += '<div class="cs-row"><span class="nm">' + esc(cn) + '</span><span>오늘 <b>' + today + '</b>' +
+        (info.base ? ' · 청구 누적 <b>' + won(info.base + t) + (tu ? " + " + usdFmt(tu) : "") + '</b> (' + esc(info.label || "") + ')' : "") + '</span></div>';
     });
     document.getElementById("cardsum").innerHTML = html || '<div class="cs-row"><span>아직 기록된 지출이 없습니다</span></div>';
   }
