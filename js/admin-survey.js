@@ -1171,3 +1171,39 @@ function downloadSurveyReport() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
+// ===== 학생용 링크 복사 =====
+// 학생이 접속하는 실전 리포트 주소(카톡 안내용). 로컬에서 테스트해도 실서비스 주소가 복사되도록 고정.
+var STUDENT_SURVEY_URL = 'https://eonfl.com/survey.html';
+
+function copyStudentSurveyLink() {
+    var done = function() {
+        var btn = document.getElementById('copyStudentLinkBtn');
+        if (!btn) return;
+        var original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> 복사됨!';
+        btn.style.color = '#059669';
+        btn.style.borderColor = '#a7f3d0';
+        setTimeout(function() {
+            btn.innerHTML = original;
+            btn.style.color = '#7c3aed';
+            btn.style.borderColor = '#ddd6fe';
+        }, 1600);
+    };
+    var fallback = function() {
+        var ta = document.createElement('textarea');
+        ta.value = STUDENT_SURVEY_URL;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); }
+        catch (e) { prompt('아래 주소를 직접 복사하세요:', STUDENT_SURVEY_URL); }
+        document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(STUDENT_SURVEY_URL).then(done).catch(fallback);
+    } else {
+        fallback();
+    }
+}

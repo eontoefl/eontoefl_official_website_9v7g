@@ -428,11 +428,19 @@
     <div class="asv-container">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
             <h1 class="asv-h1" style="margin:0;">📋 실전 리포트 관리</h1>
-            <button type="button" onclick="downloadSurveyReport()" title="이 페이지의 모든 질문·응답·응답자 내용을 문서(.md)로 저장"
-                    style="display:inline-flex; align-items:center; gap:8px; padding:10px 16px; background:#7c3aed; color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;"
-                    onmouseover="this.style.background='#6d28d9';" onmouseout="this.style.background='#7c3aed';">
-                <i class="fas fa-download"></i> 전체 내용 문서로 다운로드
-            </button>
+            <div style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <!-- 학생용 링크 복사: 카톡으로 리포트 요청 보낼 때 바로 붙여넣기용 -->
+                <button type="button" id="copyStudentLinkBtn" onclick="copyStudentSurveyLink()" title="학생이 접속하는 실전 리포트 주소를 클립보드에 복사"
+                        style="display:inline-flex; align-items:center; gap:8px; padding:10px 16px; background:#fff; color:#7c3aed; border:1.5px solid #ddd6fe; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;"
+                        onmouseover="this.style.background='#f5f3ff';" onmouseout="this.style.background='#fff';">
+                    <i class="fas fa-link"></i> 학생용 링크 복사
+                </button>
+                <button type="button" onclick="downloadSurveyReport()" title="이 페이지의 모든 질문·응답·응답자 내용을 문서(.md)로 저장"
+                        style="display:inline-flex; align-items:center; gap:8px; padding:10px 16px; background:#7c3aed; color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;"
+                        onmouseover="this.style.background='#6d28d9';" onmouseout="this.style.background='#7c3aed';">
+                    <i class="fas fa-download"></i> 전체 내용 문서로 다운로드
+                </button>
+            </div>
         </div>
         <p class="asv-desc">
             실제 시험을 본 학생에게서 시험 정보를 수집해 가설을 검증합니다.
