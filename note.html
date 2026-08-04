@@ -294,29 +294,52 @@
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @media (prefers-reduced-motion: reduce) { .chatbtn.has-new .new { animation: none; } }
 
-  /* 안 읽은 답장 알림 카드 */
-  #alerts { position: fixed; right: 20px; top: 88px; width: 300px; max-width: calc(100vw - 32px);
-    z-index: 55; display: flex; flex-direction: column; gap: .5rem; pointer-events: none; }
-  #alerts .alert { pointer-events: auto; display: flex; gap: .6rem; align-items: flex-start;
-    background: rgba(255, 255, 255, .93); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    border-radius: var(--r-lg); box-shadow: 0 8px 32px rgba(25, 28, 29, .13);
-    padding: .8rem .9rem; cursor: pointer; animation: slidein .26s cubic-bezier(.32,.72,0,1); }
-  #alerts .alert:hover { background: #fff; }
-  @keyframes slidein { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: reduce) { #alerts .alert { animation: none; } }
-  #alerts .alert img { width: 34px; height: 34px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+  /* 오른쪽 채팅 목록 (카톡 목록처럼 상시) */
+  :root { --roster: 296px; }
+  body.roster-on { padding-right: var(--roster); }
+  #roster { position: fixed; right: 0; top: 0; bottom: 0; width: var(--roster); z-index: 45;
+    background: var(--surface-low); display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform .24s cubic-bezier(.32,.72,0,1); }
+  #roster.on { transform: none; }
+  #roster .rhead { display: flex; align-items: center; gap: .5rem; padding: 1.1rem 1.1rem .7rem; }
+  #roster .rhead b { font-size: 14.5px; font-weight: 700; letter-spacing: -0.02em; }
+  #roster .rhead .cnt { font-size: 11px; font-weight: 700; color: #fff; background: var(--tertiary);
+    padding: 2px 8px; border-radius: 99px; display: none; }
+  #roster .rhead .cnt.on { display: inline-block; }
+  #roster .rhead .fold { margin-left: auto; background: none; border: none; color: var(--on-surface-variant);
+    font-size: 15px; cursor: pointer; padding: 4px 7px; border-radius: var(--r); line-height: 1; }
+  #roster .rhead .fold:hover { background: var(--surface-high); color: var(--on-surface); }
+  #roster .rlist { flex: 1; overflow-y: auto; padding: 0 .6rem 1rem; }
+  .ritem { display: flex; gap: .65rem; align-items: flex-start; padding: .75rem .7rem; border-radius: var(--r);
+    cursor: pointer; }
+  .ritem:hover { background: var(--surface-high); }
+  .ritem.open { background: var(--surface-highest); }
+  .ritem img { width: 40px; height: 40px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
     background: var(--surface-high); }
-  #alerts .alert .txt { flex: 1; min-width: 0; }
-  #alerts .alert .nm { font-size: 12.5px; font-weight: 700; line-height: 1.35; }
-  #alerts .alert .nm .tm { font-weight: 500; color: var(--on-surface-variant); margin-left: .3rem; font-size: 11px; }
-  #alerts .alert .pv { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.55; margin-top: .1rem;
+  .ritem .txt { flex: 1; min-width: 0; }
+  .ritem .top { display: flex; align-items: baseline; gap: .35rem; }
+  .ritem .nm { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+  .ritem .tm { font-size: 10.5px; color: var(--on-surface-variant); font-weight: 500; }
+  .ritem .when { margin-left: auto; font-size: 10.5px; color: var(--on-surface-variant); white-space: nowrap; }
+  .ritem .pv { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.5; margin-top: .15rem;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #alerts .alert .n { flex-shrink: 0; background: var(--tertiary); color: #fff; font-size: 10px; font-weight: 700;
-    padding: 2px 7px; border-radius: 99px; }
-  #alerts .alert .close { flex-shrink: 0; background: none; border: none; color: var(--on-surface-variant);
-    font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: var(--r); line-height: 1; opacity: .5; }
-  #alerts .alert .close:hover { opacity: 1; background: var(--surface-high); }
-  @media (max-width: 1080px) { #alerts { top: auto; bottom: 20px; right: 12px; width: 260px; } }
+  .ritem.unread .nm, .ritem.unread .pv { color: var(--on-surface); font-weight: 600; }
+  .ritem .badge2 { flex-shrink: 0; align-self: center; background: var(--tertiary); color: #fff; font-size: 10px;
+    font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+  .ritem .waiting { color: var(--primary); font-weight: 600; }
+  /* 접었을 때 살짝 나오는 손잡이 */
+  #rostertab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 46;
+    background: var(--grad); color: #fff; border: none; border-radius: var(--r-lg) 0 0 var(--r-lg);
+    padding: 14px 9px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    writing-mode: vertical-rl; letter-spacing: .1em; box-shadow: 0 6px 24px rgba(25,28,29,.14); display: none; }
+  #rostertab.on { display: block; }
+  #rostertab .dotn { display: block; width: 7px; height: 7px; border-radius: 99px; background: #fff;
+    margin: 6px auto 0; opacity: 0; }
+  #rostertab.has-new .dotn { opacity: 1; animation: pulse 1.6s ease-in-out infinite; }
+  @media (max-width: 1080px) {
+    body.roster-on { padding-right: 0; }
+    #roster { box-shadow: -8px 0 40px rgba(25,28,29,.12); }
+  }
 
   /* 플로팅 채팅창 */
   .dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
@@ -429,7 +452,12 @@
     <p class="foot" id="meta"></p>
   </div>
 
-  <div id="alerts"></div>
+  <aside id="roster">
+    <div class="rhead"><b>팀장들</b><span class="cnt" id="rcnt"></span>
+      <button class="fold" type="button" title="접기">›</button></div>
+    <div class="rlist" id="rlist"></div>
+  </aside>
+  <button id="rostertab" type="button">팀장들<span class="dotn"></span></button>
 
   <template id="docktpl">
     <div class="dock">
@@ -546,44 +574,47 @@ const SEENKEY = "hq-chat-seen";
 const TEAMNAME = { dev: "개발팀", ct: "콘텐츠팀", cs: "CS팀", mkt: "마케팅영업팀", fin: "회계팀", hr: "인사총무팀" };
 let chatBtns = {}, chatTimer = null, chatCache = {}, chatDrafts = {};
 
-/* 안 읽은 답장 알림 카드 */
-function drawAlerts() {
-  const box = document.getElementById("alerts");
+/* 오른쪽 채팅 목록 */
+const ORDER = ["dev", "ct", "cs", "mkt", "fin", "hr"];
+function hhmm(iso) {
+  if (!iso) return "";
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (!sameDay) return (d.getMonth() + 1) + "/" + d.getDate();
+  let h = d.getHours(); const ap = h < 12 ? "오전" : "오후";
+  h = h % 12 || 12;
+  return ap + " " + h + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function drawAlerts() {                     // 목록 다시 그리기
+  const box = document.getElementById("rlist");
   if (!box) return;
   const s = seen();
-  const items = [];
-  Object.keys(TEAMNAME).forEach(key => {
-    if (docks[key]) return;
+  let total = 0;
+  box.innerHTML = ORDER.map(key => {
     const list = chatCache[key] || [];
-    const unread = list.filter(m => m.role === "lead" && m.id > (s[key] || 0));
-    if (!unread.length) return;
-    const last = unread[unread.length - 1];
-    if (list[list.length - 1].role !== "lead") return;
-    items.push({ key: key, n: unread.length, text: last.text });
-  });
-  box.innerHTML = items.map(it =>
-    '<div class="alert" data-team="' + it.key + '">' +
-      '<img src="assets/team/' + it.key + '.jpg" alt="">' +
-      '<div class="txt"><div class="nm">' + esc(PERSON[it.key]) + ' 팀장' +
-        '<span class="tm">' + esc(TEAMNAME[it.key]) + '</span></div>' +
-        '<div class="pv">' + esc(it.text) + '</div></div>' +
-      (it.n > 1 ? '<span class="n">' + it.n + '</span>' : "") +
-      '<button class="close" type="button" title="읽음 처리">✕</button>' +
-    '</div>').join("");
-  box.querySelectorAll(".alert").forEach(el => {
+    const last = list.length ? list[list.length - 1] : null;
+    const unread = docks[key] ? 0 : list.filter(m => m.role === "lead" && m.id > (s[key] || 0)).length;
+    total += unread ? 1 : 0;
+    const waiting = list.some(m => m.role === "boss" && m.status !== "done");
+    const pv = waiting ? '<span class="waiting">답장 쓰는 중…</span>'
+      : last ? (last.role === "boss" ? "나: " : "") + esc(last.text)
+      : "아직 나눈 이야기가 없습니다";
+    return '<div class="ritem' + (unread ? " unread" : "") + (docks[key] ? " open" : "") + '" data-team="' + key + '">' +
+      '<img src="assets/team/' + key + '.jpg" alt="">' +
+      '<div class="txt"><div class="top"><span class="nm">' + esc(PERSON[key]) + '</span>' +
+        '<span class="tm">' + esc(TEAMNAME[key]) + '</span>' +
+        '<span class="when">' + esc(last ? hhmm(last.at) : "") + '</span></div>' +
+        '<div class="pv">' + pv + '</div></div>' +
+      (unread ? '<span class="badge2">' + unread + '</span>' : "") +
+      '</div>';
+  }).join("");
+  box.querySelectorAll(".ritem").forEach(el => {
     const key = el.dataset.team;
-    el.addEventListener("click", e => {
-      if (e.target.closest(".close")) return;
-      openDock(key, TEAMNAME[key], PERSON[key]);
-    });
-    el.querySelector(".close").addEventListener("click", e => {
-      e.stopPropagation();
-      const list = chatCache[key] || [];
-      markSeen(key, list.length ? list[list.length - 1].id : 0);
-      const b = chatBtns[key]; if (b) b.classList.remove("has-new");
-      drawAlerts();
-    });
+    el.addEventListener("click", () => openDock(key, TEAMNAME[key], PERSON[key]));
   });
+  const cnt = document.getElementById("rcnt");
+  cnt.textContent = total; cnt.classList.toggle("on", total > 0);
+  document.getElementById("rostertab").classList.toggle("has-new", total > 0);
 }
 
 const seen = () => { try { return JSON.parse(localStorage.getItem(SEENKEY) || "{}"); } catch (e) { return {}; } };
@@ -657,6 +688,7 @@ function drawDock(key) {
   }
   markSeen(key, list.length ? list[list.length - 1].id : 0);
   const b = chatBtns[key]; if (b) b.classList.remove("has-new");
+  drawAlerts();
 }
 
 function drawAllDocks() { Object.keys(docks).forEach(drawDock); }
@@ -666,7 +698,7 @@ async function chatLoad() {
   if (!PW) return;
   let waiting = false;
   try {
-    const r = await fetch(CHAT + "?select=id,team,role,body,status&order=id.asc&limit=400", { headers: HDR, cache: "no-store" });
+    const r = await fetch(CHAT + "?select=id,team,role,body,status,created_at&order=id.asc&limit=400", { headers: HDR, cache: "no-store" });
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
     const byTeam = {}, freshCards = {};
@@ -680,7 +712,7 @@ async function chatLoad() {
       }
       let text;
       try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
-      (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text });
+      (byTeam[row.team] = byTeam[row.team] || []).push({ id: row.id, role: row.role, status: row.status, text: text, at: row.created_at });
       if (row.role === "boss" && row.status !== "done") waiting = true;
     }
     chatCache = byTeam;
@@ -978,7 +1010,7 @@ function placeNew(key, el) {
   } else if (innerWidth > 620) {
     // 저장된 자리가 없으면 이미 떠 있는 창들과 안 겹치게 계단식으로 놓는다
     const n = Object.keys(docks).length - 1;
-    el.style.right = (20 + n * 26) + "px";
+    el.style.right = ((document.body.classList.contains("roster-on") ? 316 : 20) + n * 26) + "px";
     el.style.bottom = (20 + n * 26) + "px";
   }
 }
@@ -1051,6 +1083,22 @@ function wireDock(key, el, ta, btn) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
 }
+
+
+/* 오른쪽 목록 접기·펴기 */
+(function () {
+  const RKEY = "hq-roster-open";
+  const ros = document.getElementById("roster"), tab = document.getElementById("rostertab");
+  function apply(open) {
+    ros.classList.toggle("on", open);
+    document.body.classList.toggle("roster-on", open);
+    tab.classList.toggle("on", !open);
+    localStorage.setItem(RKEY, open ? "1" : "0");
+  }
+  ros.querySelector(".fold").addEventListener("click", () => apply(false));
+  tab.addEventListener("click", () => apply(true));
+  apply(localStorage.getItem(RKEY) !== "0");
+})();
 
 document.getElementById("calbtn").addEventListener("click", openBlade);
 document.getElementById("bladeclose").addEventListener("click", closeBlade);
