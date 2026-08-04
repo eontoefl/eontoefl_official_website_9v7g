@@ -294,10 +294,13 @@
   @media (prefers-reduced-motion: reduce) { .chatbtn.has-new .new { animation: none; } }
 
   /* 플로팅 채팅창 */
-  #dock { position: fixed; right: 20px; bottom: 20px; width: 390px; max-width: calc(100vw - 32px);
-    max-height: min(74vh, 620px); z-index: 60; display: none; flex-direction: column;
+  #dock { position: fixed; right: 20px; bottom: 20px; width: 390px; height: 520px;
+    min-width: 300px; min-height: 260px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px);
+    z-index: 60; display: none; flex-direction: column;
     background: rgba(255, 255, 255, .92); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    border-radius: var(--r-lg); box-shadow: 0 12px 44px rgba(25, 28, 29, .16); overflow: hidden; }
+    border-radius: var(--r-lg); box-shadow: 0 12px 44px rgba(25, 28, 29, .16);
+    overflow: hidden; resize: both; }
+  #dock::-webkit-resizer { background: transparent; }
   #dock.on { display: flex; }
   #dock.dragging { transition: none; user-select: none; }
   #dock .head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem; background: var(--surface-low);
@@ -311,7 +314,18 @@
   #dock .head .x { margin-left: auto; background: none; border: none; font-size: 17px; color: var(--on-surface-variant);
     cursor: pointer; padding: 4px 6px; border-radius: var(--r); line-height: 1; }
   #dock .head .x:hover { background: var(--surface-high); color: var(--on-surface); }
-  #dock .log { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .45rem; }
+  #dock .log { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .5rem; }
+  #dock .row { display: flex; gap: .45rem; align-items: flex-end; }
+  #dock .row.me { justify-content: flex-end; }
+  #dock .row .ava { width: 27px; height: 27px; border-radius: 99px; object-fit: cover; flex-shrink: 0;
+    margin-bottom: 2px; background: var(--surface-high); }
+  #dock .row .ava.hide { visibility: hidden; }
+  /* 오른쪽 아래 크기 조절 손잡이 */
+  #dock .grabber { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; pointer-events: none;
+    opacity: .3; }
+  #dock .grabber::before { content: ""; position: absolute; right: 3px; bottom: 3px; width: 8px; height: 8px;
+    border-right: 2px solid var(--on-surface-variant); border-bottom: 2px solid var(--on-surface-variant);
+    border-radius: 0 0 2px 0; }
   #dock .foot { padding: 0 1rem 1rem; }
   .chat .log { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
   .bubble { max-width: 86%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
@@ -398,6 +412,7 @@
       <button class="x" type="button" title="닫기">✕</button>
     </div>
     <div class="log"></div>
+    <span class="grabber"></span>
     <div class="foot">
       <div class="chat"><div class="composer">
         <textarea placeholder="할 말"></textarea><button type="button">보내기</button>
@@ -532,9 +547,15 @@ function drawDock() {
     // 사용자가 위로 올려 읽는 중이면 자동으로 내리지 않는다
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
     log.innerHTML = (list.length
-      ? list.map(m => '<div class="bubble ' + (m.role === "boss" ? "me" : "lead") + '">' +
-          (m.role === "lead" ? '<span class="who">' + esc(PERSON[dockTeam] || "팀장") + '</span>' : "") +
-          esc(m.text) + '</div>').join("")
+      ? list.map((m, i) => {
+          if (m.role === "boss")
+            return '<div class="row me"><div class="bubble me">' + esc(m.text) + '</div></div>';
+          const same = i > 0 && list[i - 1].role === "lead";
+          return '<div class="row"><img class="ava' + (same ? " hide" : "") + '" src="assets/team/' +
+            dockTeam + '.jpg" alt=""><div class="bubble lead">' +
+            (same ? "" : '<span class="who">' + esc(PERSON[dockTeam] || "팀장") + '</span>') +
+            esc(m.text) + '</div></div>';
+        }).join("")
       : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
       + (list.some(m => m.role === "boss" && m.status !== "done")
           ? '<div class="wait">' + esc(PERSON[dockTeam] || "팀장") + ' 팀장이 문서 보는 중…</div>' : "");
@@ -838,14 +859,32 @@ function closeBlade() { document.getElementById("blade").classList.remove("on");
     y = Math.min(Math.max(8, y), Math.max(8, innerHeight - h - 8));
     d.style.left = x + "px"; d.style.top = y + "px";
     d.style.right = "auto"; d.style.bottom = "auto";
-    localStorage.setItem(POS, JSON.stringify({ x: x, y: y }));
+    let p = {};
+    try { p = JSON.parse(localStorage.getItem(POS) || "{}"); } catch (e) {}
+    p.x = x; p.y = y;
+    localStorage.setItem(POS, JSON.stringify(p));
   }
   window.restoreDockPos = function () {
     let p = null;
     try { p = JSON.parse(localStorage.getItem(POS) || "null"); } catch (e) {}
-    if (p && innerWidth > 620) place(p.x, p.y);
-    else { d.style.left = d.style.top = ""; d.style.right = ""; d.style.bottom = ""; }
+    if (p && p.w && innerWidth > 620) { d.style.width = p.w + "px"; d.style.height = p.h + "px"; }
+    if (p && typeof p.x === "number" && innerWidth > 620) place(p.x, p.y);
+    else { d.style.left = d.style.top = d.style.right = d.style.bottom = ""; }
   };
+  // 크기를 바꾸면 그대로 기억한다
+  if (window.ResizeObserver) {
+    let t = null;
+    new ResizeObserver(() => {
+      if (!d.classList.contains("on")) return;
+      clearTimeout(t);
+      t = setTimeout(() => {
+        let p = {};
+        try { p = JSON.parse(localStorage.getItem(POS) || "{}"); } catch (e) {}
+        p.w = d.offsetWidth; p.h = d.offsetHeight;
+        localStorage.setItem(POS, JSON.stringify(p));
+      }, 400);
+    }).observe(d);
+  }
   const head = d.querySelector(".head");
   let drag = null;
   head.addEventListener("pointerdown", e => {
