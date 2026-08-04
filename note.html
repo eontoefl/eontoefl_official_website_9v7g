@@ -138,16 +138,20 @@
 
   /* ───── 할 일 (선 없음 · 여백으로 구분) ───── */
   .todo { list-style: none; }
-  .todo li { display: flex; align-items: flex-start; gap: .8rem; padding: 1rem .15rem; border-radius: var(--r); }
+  .todo li { display: block; padding: 1rem .15rem; border-radius: var(--r); }
   .todo li:hover { background: var(--surface-low); }
-  .todo input[type=checkbox] { width: 21px; height: 21px; margin-top: 3px; accent-color: var(--primary);
+  .todo .line1 { display: flex; align-items: flex-start; gap: .7rem; }
+  .todo .line1 .del { margin-left: auto; }
+  .todo input[type=checkbox] { width: 21px; height: 21px; margin-top: 2px; accent-color: var(--primary);
     cursor: pointer; flex-shrink: 0; }
   .todo .t { font-size: 11px; font-weight: 600; color: var(--primary); min-width: 52px; margin-top: 5px; flex-shrink: 0; }
   .todo .b { flex: 1; min-width: 0; }
+  /* 본문은 제목 아래로 내려 카드 폭을 전부 쓴다 */
+  .todo .under { margin-top: .5rem; }
   .todo .task { font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.5; }
   .todo .dur { display: inline-block; font-size: 10.5px; font-weight: 600; color: var(--on-surface-variant);
     background: var(--surface-high); padding: 2px 8px; border-radius: 99px; margin-left: .4rem; vertical-align: 2px; }
-  .todo .crit { font-size: 13px; color: var(--on-surface-variant); margin-top: .4rem; line-height: 1.8; }
+  .todo .crit { font-size: 13px; color: var(--on-surface-variant); line-height: 1.8; }
   .todo .crit b, .todo .crit strong { color: var(--on-surface); font-weight: 600; }
   .todo .crit em { font-style: normal; color: var(--primary); font-weight: 600; }
   /* 단계 목록 — 선 없이 톤으로 묶는다 */
@@ -188,6 +192,12 @@
     font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
 
   .note-block { font-size: 13px; color: var(--on-surface-variant); margin-top: 1rem; line-height: 1.7; }
+  /* 아침에서 바뀐 것 — 바뀐 날에만 뜬다 */
+  .changed { margin-top: 1rem; background: #fdf0e7; border-radius: var(--r); padding: .9rem 1.1rem;
+    font-size: 13px; color: var(--on-surface-variant); line-height: 1.75; }
+  .changed .lab { display: block; font-size: 10px; font-weight: 700; letter-spacing: .12em;
+    color: var(--tertiary); margin-bottom: .35rem; }
+  .changed b { color: var(--on-surface); font-weight: 600; }
   .asks { background: var(--secondary-container); color: var(--on-secondary-container); border-radius: var(--r);
     padding: 1rem 1.15rem 1.15rem; font-size: 13.5px; margin-top: 1rem; line-height: 1.7; }
   .asks > .head { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; margin-bottom: .6rem; opacity: .65; }
@@ -237,6 +247,14 @@
   .upcoming { margin-top: 1rem; background: var(--surface-low); border-radius: var(--r); padding: 1rem 1.15rem;
     font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.75; }
   .upcoming .uh { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--on-surface); margin-bottom: .35rem; }
+  /* 계좌 · 카드값 · 빚 — 회계팀이 채우는 목록 */
+  .mblock { margin-top: 1rem; background: var(--surface-low); border-radius: var(--r); padding: .9rem 1.1rem; }
+  .mblock .uh { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; color: var(--on-surface); margin-bottom: .5rem; }
+  .mrow2 { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; padding: .3rem 0;
+    font-size: 12.5px; }
+  .mrow2 .nm2 { color: var(--on-surface-variant); font-weight: 500; flex-shrink: 0; }
+  .mrow2 .vv { text-align: right; font-weight: 700; color: var(--on-surface); }
+  .mrow2 .sub2 { display: block; font-size: 11px; font-weight: 500; color: var(--on-surface-variant); margin-top: 1px; }
 
   #memo { width: 100%; min-height: 120px; background: var(--surface-highest); border: none; border-radius: var(--r);
     padding: 1rem 1.15rem; font-family: inherit; font-size: 14.5px; line-height: 1.7; color: var(--on-surface);
@@ -823,6 +841,15 @@ function saveEditBox(ta, get, set) {
   return row;
 }
 
+/* 돈 칸의 작은 목록 — 회계팀이 채운다 */
+function moneyBlock(title, rows) {
+  if (!Array.isArray(rows) || !rows.length) return "";
+  return '<div class="mblock"><div class="uh">' + esc(title) + '</div>' +
+    rows.map(r => '<div class="mrow2"><span class="nm2">' + esc(r.k || "") + '</span>' +
+      '<span class="vv">' + esc(r.v || "") + (r.s ? '<span class="sub2">' + esc(r.s) + '</span>' : "") +
+      '</span></div>').join("") + '</div>';
+}
+
 /* ───── 본문 ───── */
 function render() {
   const c = document.getElementById("content");
@@ -846,12 +873,16 @@ function render() {
           '<div class="prog"><div class="track"><div class="bar" id="pbar"></div></div><div class="n" id="pnum">0 / 0</div></div>' +
           '<ul class="todo" id="todolist"></ul>' +
           '<div class="addrow"><input id="newtodo" placeholder="내가 직접 추가할 할 일"><button id="addtodo" type="button">추가</button></div>' +
-          (DAY.skip ? '<div class="note-block">' + DAY.skip + '</div>' : "") +
+          (DAY.changed ? '<div class="changed"><span class="lab">아침에서 바뀐 것</span>' + DAY.changed + '</div>' : "") +
+        (DAY.skip ? '<div class="note-block">' + DAY.skip + '</div>' : "") +
           '</div></section>' +
-      '<section><div class="seclab">오늘 쓴 돈 <span>· 저녁 마감 때 반영됩니다</span></div><div class="panel">' +
+      '<section><div class="seclab">돈 <span>· 회계팀 정민석 팀장이 관리합니다</span></div><div class="panel">' +
         (DAY.expNote ? '<div class="exp-note">' + DAY.expNote + '</div>' : "") +
         '<div id="exps"></div><button id="addexp" type="button">＋ 내역 추가</button>' +
         '<div class="etotal">오늘 합계<b id="etotal">0원</b></div><div class="cardsum" id="cardsum"></div>' +
+        moneyBlock("계좌", DAY.accounts) +
+        moneyBlock("카드값", DAY.cardbills) +
+        moneyBlock("빚", DAY.debts) +
         (DAY.upcoming && DAY.upcoming.length ? '<div class="upcoming"><div class="uh">다가오는 확정 출금</div>' +
           DAY.upcoming.map(u => "<div>" + esc(u) + "</div>").join("") + '</div>' : "") +
       '</div></section>' +
@@ -875,17 +906,21 @@ function render() {
     if (done) li.className = "done";
     const steps = (t.steps || []).map((s, n) =>
       '<div><span class="n">' + (n + 1) + '</span>' + s + '</div>').join("");
-    li.innerHTML = '<input type="checkbox"' + (done ? " checked" : "") + '>' +
-      '<span class="t">' + esc(mine ? "추가" : (t.time || "")) + '</span>' +
-      '<div class="b"><div class="task">' + esc(t.task) +
-        (mine ? '<span class="chip mine">직접 추가</span>' : (t.badge ? '<span class="chip ' + t.badge.k + '">' + esc(t.badge.t) + '</span>' : "")) +
-        (t.dur ? '<span class="dur">' + esc(t.dur) + '</span>' : "") + '</div>' +
-      (t.crit ? '<div class="crit">' + t.crit + '</div>' : "") +
-      (steps ? '<div class="steps">' + steps + '</div>' : "") +
-      (t.why ? '<div class="why"><span class="lab">왜 지금</span>' + t.why + '</div>' : "") +
-      (t.doneCrit ? '<div class="done-crit"><span class="lab">이러면 끝</span>' + t.doneCrit + '</div>' : "") +
-      '<input class="note" placeholder="메모 (선택)" value="' + esc(mine ? (t.note || "") : (STATE.notes || {})[i] || "") + '"></div>' +
-      (mine ? '<button class="del" type="button" title="지우기">✕</button>' : "");
+    li.innerHTML =
+      '<div class="line1"><input type="checkbox"' + (done ? " checked" : "") + '>' +
+        '<span class="t">' + esc(mine ? "추가" : (t.time || "")) + '</span>' +
+        '<div class="b"><div class="task">' + esc(t.task) +
+          (mine ? '<span class="chip mine">직접 추가</span>' : (t.badge ? '<span class="chip ' + t.badge.k + '">' + esc(t.badge.t) + '</span>' : "")) +
+          (t.dur ? '<span class="dur">' + esc(t.dur) + '</span>' : "") + '</div></div>' +
+        (mine ? '<button class="del" type="button" title="지우기">✕</button>' : "") +
+      '</div>' +
+      '<div class="under">' +
+        (t.crit ? '<div class="crit">' + t.crit + '</div>' : "") +
+        (steps ? '<div class="steps">' + steps + '</div>' : "") +
+        (t.why ? '<div class="why"><span class="lab">왜 지금</span>' + t.why + '</div>' : "") +
+        (t.doneCrit ? '<div class="done-crit"><span class="lab">이러면 끝</span>' + t.doneCrit + '</div>' : "") +
+        '<input class="note" placeholder="메모 (선택)" value="' + esc(mine ? (t.note || "") : (STATE.notes || {})[i] || "") + '">' +
+      '</div>';
     const box = li.querySelector("input[type=checkbox]");
     box.addEventListener("change", () => {
       if (mine) STATE.custom[i].done = box.checked;
