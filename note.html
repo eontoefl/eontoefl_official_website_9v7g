@@ -925,9 +925,9 @@ function drawCal2() {
   const cur = new Date(DATE + "T12:00:00");
   let html = '<div class="c2head">' +
     '<button class="iconbtn" id="prev" type="button" title="이전 날">‹</button>' +
-    '<button class="iconbtn" id="next" type="button" title="다음 날">›</button>' +
     '<div class="dnow' + (DATE === today ? " isnow" : "") + '">' +
       (cur.getMonth() + 1) + '월 ' + cur.getDate() + '일 (' + DOW[cur.getDay()] + ')</div>' +
+    '<button class="iconbtn" id="next" type="button" title="다음 날">›</button>' +
     '<b>앞으로 3주</b><span class="rng">' +
     esc(start.slice(5).replace("-", "월 ") + "일 ~ " + end.slice(5).replace("-", "월 ") + "일") + '</span></div>' +
     '<div class="grid14">' + DOW.map((w, i) => '<div class="dw' + (i === 0 ? " sun" : "") + '">' + w + "</div>").join("") + '</div>' +
