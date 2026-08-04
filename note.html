@@ -270,7 +270,13 @@
     color: var(--on-surface-variant); margin-bottom: .45rem; }
   .gauge .track { height: 8px; background: var(--surface-high); border-radius: 99px; overflow: hidden; }
   .gauge .bar { height: 100%; background: var(--grad); border-radius: 99px; }
-  .dept p { font-size: 14.5px; color: var(--on-surface-variant); margin-bottom: .9rem; line-height: 1.75; }
+  .dept p { font-size: 14.5px; color: var(--on-surface-variant); margin-bottom: .75rem; line-height: 1.72;
+    display: flex; gap: .55rem; align-items: flex-start; }
+  .dept p .no { flex-shrink: 0; width: 19px; height: 19px; border-radius: 99px; background: var(--surface-high);
+    color: var(--on-surface-variant); font-size: 11px; font-weight: 700; display: grid; place-items: center;
+    margin-top: 3px; }
+  .dept p.note { display: block; margin-top: 1rem; padding-top: .9rem; background: var(--surface-low);
+    border-radius: var(--r); padding: .9rem 1rem; font-size: 13.5px; }
   .dept p:last-of-type { margin-bottom: 0; }
   .dept p strong { color: var(--on-surface); font-weight: 600;
     background: linear-gradient(transparent 62%, #d7f0fb 62%); }
@@ -975,7 +981,14 @@ function mountDept(key) {
     (dp.kpi ? '<div class="kpi">' + dp.kpi.map(k => '<div><div class="k">' + esc(k.k) + '</div><div class="v">' + esc(k.v) + '</div></div>').join("") + '</div>' : "") +
     (dp.gauge ? '<div class="gauge"><div class="lab"><span>' + esc(dp.gauge.label) + '</span><span>' + esc(dp.gauge.text) + '</span></div>' +
       '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
-    (dp.paras || []).map(p => "<p>" + p + "</p>").join("") +
+    (function () {                                  // 보고는 번호를 붙여 한 줄씩
+      let n = 0;
+      return (dp.paras || []).map(p => {
+        const head = String(p).trim().startsWith("<b>");   // 소제목 문단은 번호 없이
+        return head ? '<p class="note">' + p + '</p>'
+                    : '<p><span class="no">' + (++n) + '</span><span>' + p + '</span></p>';
+      }).join("");
+    })() +
     (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
     '<button class="chatbtn" type="button">💬 ' + esc(person || "팀장") + ' 팀장과 이야기하기<span class="new"></span></button>';
   const cb = el.querySelector(".chatbtn");
