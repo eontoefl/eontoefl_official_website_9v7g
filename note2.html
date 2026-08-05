@@ -93,8 +93,9 @@
   #savedot { font-size: 12px; font-weight: 500; color: var(--on-surface-variant); }
   #savedot.bad { color: var(--tertiary); }
 
-  /* ───── 김비서 머리 배터리 (대화 맥락이 몇 % 찼나) ───── */
-  #kbbat { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; cursor: default; }
+  /* ───── 김비서 머리 배터리 (대화 맥락이 몇 % 찼나) — 채팅 카드 제목줄 오른쪽 ───── */
+  .chathead { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; }
+  #kbbat { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; cursor: default; margin-left: auto; }
   #kbbat .bat { position: relative; width: 23px; height: 12px; border: 1.5px solid var(--on-surface-variant);
     border-radius: 3.5px; margin-right: 3px; }
   #kbbat .bat::after { content: ""; position: absolute; right: -4.5px; top: 2px; width: 2.5px; height: 5px;
@@ -233,6 +234,8 @@
   /* 넓을 때 그룹 카드를 2~3열로 흘린다 (그룹은 중간에서 안 잘림) */
   @media (min-width: 1000px) { .wl .panel { column-count: 2; column-gap: 2.25rem; } }
   @media (min-width: 1500px) { .wl .panel { column-count: 3; } }
+  /* 완료 카드는 항목이 짧아서 한 열로만 (위 다열 규칙 무효화) */
+  .wl.dl .panel { column-count: 1; }
   .wlist { list-style: none; }
   .wlist li { display: flex; align-items: flex-start; gap: .6rem; padding: .45rem .3rem;
     border-radius: var(--r); cursor: default; }
@@ -340,11 +343,6 @@
   <div class="topbar">
     <div class="inner">
       <div class="brand">김비서<small>BAMTOL HOLDINGS</small></div>
-      <div id="kbbat" style="display:none" title="김비서 머리 — 대화 맥락이 얼마나 찼는지">
-        <span class="bat"><span class="fill" id="kbbatfill"></span></span>
-        <span class="pct" id="kbbatpct"></span>
-        <span class="who">김비서 머리</span>
-      </div>
       <div id="savedot"></div>
       <button id="offbtn" type="button">퇴근</button>
     </div>
@@ -359,7 +357,13 @@
         <div id="colside"></div>
 
         <section>
-          <div class="seclab">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span></div>
+          <div class="seclab chathead">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span>
+            <div id="kbbat" style="display:none" title="김비서 머리 — 대화 맥락이 얼마나 찼는지">
+              <span class="bat"><span class="fill" id="kbbatfill"></span></span>
+              <span class="pct" id="kbbatpct"></span>
+              <span class="who">김비서 머리</span>
+            </div>
+          </div>
           <div class="panel chat" id="chatpanel">
             <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다">수업 중<i>·</i><i>·</i><i>·</i></div>
             <div class="log" id="chatlog"></div>
@@ -696,6 +700,22 @@ function render() {
       '</div></details></section>';
   }
 
+  /* 완료 카드 — 퇴근 후 김비서가 worklist에서 옮겨 담는 donelist. 표시 전용, 기본 접힘, 없으면 숨김 */
+  const dl = (Array.isArray(DAY.donelist) ? DAY.donelist : [])
+    .filter(i => i && plain(i.text != null ? i.text : i).trim());
+  if (dl.length) {
+    left += '<section><details class="wl dl">' +
+      '<summary class="seclab">완료 ' + dl.length + ' <span>· 눌러서 접기/펼치기</span></summary>' +
+      '<div class="panel"><ul class="wlist">' +
+      dl.map(i => {
+        const text = plain(i.text != null ? i.text : i);
+        const memo = (i && typeof i === "object" && i.memo) ? String(i.memo) : "";
+        return '<li class="wdone"><span class="wmk on">✓</span>' +
+          '<div class="wb"><div class="wtx">' + esc(text) + '</div>' +
+          (memo ? '<div class="wmemo">' + fmt(memo) + '</div>' : '') + '</div></li>';
+      }).join("") + '</ul></div></details></section>';
+  }
+
   right += moneyCard(DAY.money);
 
   c.innerHTML = top; main.innerHTML = left; side.innerHTML = right;
@@ -761,7 +781,7 @@ const decCache = {};
 
 /* ── 김비서 머리 배터리 ──
    당번이 role="kimbi_meta", status="kbbat" 줄로 {"battery": 34}를 올린다.
-   말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 헤더에 그린다 */
+   말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 채팅 카드 제목줄에 그린다 */
 let kbBatSeen = null;
 function drawBattery(p) {
   const box = document.getElementById("kbbat");
