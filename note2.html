@@ -400,6 +400,14 @@
     padding: .45rem .7rem; background: rgba(255, 255, 255, .22); border-radius: .6rem; cursor: pointer;
     font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bubble.kb .att-file { background: var(--surface-high); }
+  /* 사진 여러 장이면 2열 격자로 */
+  .bubble .attgrid { margin-top: .3rem; }
+  .bubble .attgrid .att-img { margin-top: 0; }
+  .bubble .attgrid.many { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .bubble .attgrid.many .att-img { width: calc(50% - .15rem); max-height: 140px; min-height: 0;
+    object-fit: cover; }
+  #attrow .attsum { font-size: 11px; color: var(--on-surface-variant); margin-top: .3rem;
+    padding-left: .15rem; }
   /* 파일을 끌어오면 채팅 창 전체가 드롭 존 */
   #chatwin.dropping::after { content: "여기에 놓으면 첨부됩니다"; position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center; background: rgba(214, 240, 251, .9);
@@ -506,7 +514,7 @@
           <div id="tamirror" aria-hidden="true" style="display:none"></div>
         </div>
         <button id="chatsend" type="button">보내기</button>
-        <input type="file" id="chatfpick" hidden>
+        <input type="file" id="chatfpick" multiple hidden>
       </div>
     </div>
   </div>
@@ -994,7 +1002,7 @@ async function uploadFile(file) {
     ? "파일 보관함이 아직 없습니다 — 회의실\\파일 표 만들기.sql을 한 번 실행해 주세요"
     : "업로드 실패 (" + r.status + ")");
   const j = await r.json();
-  return { file: j[0].id, name: file.name, mime: f.type || "application/octet-stream" };
+  return { file: j[0].id, name: file.name, mime: f.type || "application/octet-stream", size: f.size };
 }
 async function getFile(id) {
   if (fileCache[id]) return fileCache[id];           // 복호화는 한 번만
@@ -1126,16 +1134,23 @@ async function kbLoad() {
   kbTimer = setTimeout(kbLoad, 4000);
 }
 
-/* 말풍선 속 내용 — 파일 첨부 메시지({file,name,mime,text})면 썸네일/파일 표시, 아니면 글 그대로 */
+/* 말풍선 속 내용 — 파일 첨부 메시지면 썸네일/파일 표시, 아니면 글 그대로.
+   새 형식 {files:[{file,name,mime},…], text} 와 옛 단건 형식 {file,name,mime,text} 둘 다 읽는다 */
 function bubbleBody(m) {
   const s = m.text;
   const base = txt => m.role === "boss" ? chipify(fmt(txt)) : fmt(txt);
-  if (s && typeof s === "object" && s.file) {
-    const img = /^image\//.test(s.mime || "") || /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(s.name || "");
+  const isImg = f => /^image\//.test(f.mime || "") || /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(f.name || "");
+  const one = f => isImg(f)
+    ? '<img class="att-img" data-fid="' + (+f.file) + '" alt="' + esc(f.name || "") + '">'
+    : '<span class="att-file" data-fid="' + (+f.file) + '" data-name="' + esc(f.name || "") +
+      '">📄 ' + esc(f.name || "파일") + '</span>';
+  if (s && typeof s === "object" && (s.file || Array.isArray(s.files))) {
+    const list = (Array.isArray(s.files) ? s.files : [s]).filter(f => f && f.file);
+    const imgs = list.filter(isImg), rest = list.filter(f => !isImg(f));
     return (s.text ? base(String(s.text)) : "") +
-      (img ? '<img class="att-img" data-fid="' + (+s.file) + '" alt="' + esc(s.name || "") + '">'
-           : '<span class="att-file" data-fid="' + (+s.file) + '" data-name="' + esc(s.name || "") +
-             '">📄 ' + esc(s.name || "파일") + '</span>');
+      (imgs.length ? '<div class="attgrid' + (imgs.length > 1 ? ' many' : '') + '">' +
+        imgs.map(one).join("") + '</div>' : "") +
+      rest.map(one).join("");
   }
   return base(plain(s));
 }
@@ -1215,26 +1230,39 @@ async function kbSend(text) {
     ta.classList.add("hascmd");
     mirror.scrollTop = ta.scrollTop;
   }
-  /* ── 첨부 대기 상태 — 입력창 위 미리보기(썸네일+파일명+X), 전송하면 {file,...} 페이로드로 ── */
-  let kbAtt = null;
+  /* ── 첨부 대기열 — 여러 개를 쌓아 한 번에 전송. 칩마다 X로 개별 제거, 상한 10개 ── */
+  let kbAtts = [];
   const attrow = document.getElementById("attrow"), fpick = document.getElementById("chatfpick");
-  function setAtt(meta) {
-    kbAtt = meta;
-    if (!meta) { attrow.innerHTML = ""; return; }
-    attrow.innerHTML = '<div class="attchip">' +
-      (meta.preview ? '<img class="th" src="' + meta.preview + '" alt="">' : '<span>📄</span>') +
-      '<span class="nm">' + esc(meta.name) + '</span>' +
-      '<button class="rm" type="button" title="첨부 취소">✕</button></div>';
-    attrow.querySelector(".rm").addEventListener("click", () => setAtt(null));
+  function drawAtts() {
+    if (!kbAtts.length) { attrow.innerHTML = ""; return; }
+    const total = kbAtts.reduce((n, a) => n + (a.size || 0), 0);
+    attrow.innerHTML = kbAtts.map((a, i) =>
+      '<div class="attchip">' +
+      (a.preview ? '<img class="th" src="' + a.preview + '" alt="">' : '<span>📄</span>') +
+      '<span class="nm">' + esc(a.name) + '</span>' +
+      '<button class="rm" data-i="' + i + '" type="button" title="이 첨부 빼기">✕</button></div>').join("") +
+      '<div class="attsum">' + kbAtts.length + '개 · ' + (total / 1048576).toFixed(1) + 'MB</div>';
+    attrow.querySelectorAll(".rm").forEach(b =>
+      b.addEventListener("click", () => { kbAtts.splice(+b.dataset.i, 1); drawAtts(); }));
   }
   async function attach(files) {
-    const f = files && files[0]; if (!f) return;
-    attrow.innerHTML = '<div class="attchip">⏳ 올리는 중… ' + esc(f.name) + '</div>';
-    try {
-      const meta = await uploadFile(f);
-      meta.preview = /^image\//.test(f.type || "") ? URL.createObjectURL(f) : null;
-      setAtt(meta);
-    } catch (e) { alert(e.message || e); setAtt(null); }
+    let list = Array.prototype.slice.call(files || []);
+    if (!list.length) return;
+    if (kbAtts.length + list.length > 10) {
+      alert("첨부는 한 번에 10개까지입니다.");
+      list = list.slice(0, Math.max(0, 10 - kbAtts.length));
+    }
+    for (const f of list) {                         // 하나씩 올린다 (실패한 것만 건너뛴다)
+      const ld = document.createElement("div");
+      ld.className = "attchip"; ld.textContent = "⏳ 올리는 중… " + f.name;
+      attrow.appendChild(ld);
+      try {
+        const meta = await uploadFile(f);
+        meta.preview = /^image\//.test(f.type || "") ? URL.createObjectURL(f) : null;
+        kbAtts.push(meta);
+      } catch (e) { alert(e.message || e); }
+    }
+    drawAtts();
   }
   document.getElementById("chatclip").addEventListener("click", () => fpick.click());
   fpick.addEventListener("change", () => { if (fpick.files.length) { attach(fpick.files); fpick.value = ""; } });
@@ -1258,10 +1286,12 @@ async function kbSend(text) {
 
   async function send() {
     const v = ta.value.trim();
-    if (!v && !kbAtt) return;                          // 사진만 단독 전송도 된다
+    if (!v && !kbAtts.length) return;                  // 사진만 단독 전송도 된다
     btn.disabled = true; ta.value = ""; drawMirror();   // 입력창이 비었으니 하이라이트도 해제
-    const payload = kbAtt ? { file: kbAtt.file, name: kbAtt.name, mime: kbAtt.mime, text: v } : v;
-    setAtt(null);
+    const payload = kbAtts.length
+      ? { files: kbAtts.map(a => ({ file: a.file, name: a.name, mime: a.mime })), text: v }
+      : v;
+    kbAtts = []; drawAtts();
     try { await kbSend(payload); } finally { btn.disabled = false; ta.focus(); }
   }
   btn.addEventListener("click", send);
