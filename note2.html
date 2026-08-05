@@ -205,6 +205,8 @@
   .todo li.done .task { text-decoration: line-through; color: var(--on-surface-variant); opacity: .6; }
   .todo li.done .sub { opacity: .5; }
   .todo .none { padding: .5rem .3rem; font-size: 13px; color: var(--on-surface-variant); opacity: .8; }
+  /* 김비서가 DB 실측으로 완료 확인한 항목 — 체크 고정(클릭 무시), 김비서 톤(초록) */
+  .todo li.kbdone input[type=checkbox] { accent-color: #2f6f4f; pointer-events: none; cursor: default; }
 
   /* ───── 김비서 업무 현황 ───── */
   .kb { list-style: none; }
@@ -658,9 +660,12 @@ function render() {
   const checks = STATE.checks2 || {};
   const todoList = (items, sub) => items.length
     ? items.map(t => {
-        const on = !!checks[t.id];
-        return '<li data-id="' + esc(t.id || "") + '"' + (on ? ' class="done"' : '') + '>' +
-          '<input type="checkbox"' + (on ? ' checked' : '') + '>' +
+        const fix = !!(t && t.done);            // 김비서가 실측으로 완료 확인 → 체크 고정
+        const on = fix || !!checks[t.id];
+        return '<li data-id="' + esc(t.id || "") + '"' +
+          (on ? ' class="done' + (fix ? ' kbdone' : '') + '"' : '') + '>' +
+          '<input type="checkbox"' + (on ? ' checked' : '') +
+          (fix ? ' title="김비서가 실측으로 완료 확인"' : '') + '>' +
           '<div class="b"><div class="task">' + esc(t.text || "") + '</div>' +
           (sub && t.note ? '<div class="sub">' + fmt(t.note) + '</div>' : '') + '</div></li>';
       }).join("")
@@ -736,7 +741,7 @@ function render() {
 
   /* 체크 동작 */
   function progress() {
-    const done = must.filter(t => (STATE.checks2 || {})[t.id]).length;
+    const done = must.filter(t => (t && t.done) || (STATE.checks2 || {})[t.id]).length;
     const pn = document.getElementById("pnum"), pb = document.getElementById("pbar");
     if (pn) pn.textContent = done + " / " + must.length;
     if (pb) pb.style.width = must.length ? (done / must.length * 100) + "%" : "0%";
@@ -744,6 +749,10 @@ function render() {
   main.querySelectorAll(".todo li[data-id]").forEach(li => {
     const box = li.querySelector("input[type=checkbox]");
     if (!box) return;
+    if (li.classList.contains("kbdone")) {      // done 고정 — 키보드 스페이스까지 막는다
+      box.addEventListener("click", e => e.preventDefault());
+      return;
+    }
     box.addEventListener("change", () => {
       STATE.checks2 = STATE.checks2 || {};
       if (box.checked) STATE.checks2[li.dataset.id] = true;
