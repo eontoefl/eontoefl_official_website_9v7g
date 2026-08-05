@@ -640,6 +640,7 @@ async function unlockText(pw, blob) {
 
 /* ───── 상태 ───── */
 let PW = null, DATE = null, DAY = null, STATE = null, DATES = [], saveTimer = null;
+let PLANNING = false;   // 한지우 팀장이 시간표를 짜는 중 (plan 줄이 done이 될 때까지)
 const todayStr = () => { const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const shift = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n);
@@ -838,7 +839,9 @@ async function chatLoad() {
     if (!Array.isArray(rows)) throw new Error("bad");
     const byTeam = {};
     const alive = new Set();
+    let planning = false;
     for (const row of rows) {
+      if (row.role === "plan" && row.status !== "done") planning = true;
       // 화면에 안 보이는 줄 (시스템이 쓰는 표시)
       if (["relay", "card", "morning", "morningdone", "plan", "closing", "closedone", "wipe", "backup"].includes(row.role)) continue;
       alive.add(row.id);
@@ -853,6 +856,7 @@ async function chatLoad() {
     // 비우기로 사라진 줄은 기억에서도 지운다 (하루치라 크진 않지만 무한히 들고 있지 않는다)
     Object.keys(decCache).forEach(k => { if (!alive.has(+k)) delete decCache[k]; });
     chatCache = byTeam;
+    if (planning !== PLANNING) { PLANNING = planning; drawCand(); }   // 짜는 중 표시를 실제 상태에 맞춘다
     await refreshCards();     // 브리핑이 바뀌었으면 그 카드만 다시 그린다
     const s = seen();
     let unreadTeams = 0;
@@ -872,7 +876,7 @@ async function chatLoad() {
     drawAllDocks();
     drawAlerts();
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
-  chatTimer = setTimeout(chatLoad, waiting ? 2000 : (Object.keys(docks).length ? 5000 : 15000));  // 답장을 더 빨리 띄운다 (2026-08-05)
+  chatTimer = setTimeout(chatLoad, (waiting || PLANNING) ? 2000 : (Object.keys(docks).length ? 5000 : 15000));  // 답장을 더 빨리 띄운다 (2026-08-05)
 }
 async function chatSend(team, text) {
   // 말풍선을 저장을 기다리지 않고 즉시 띄운다 (2026-08-05 — "보냈는데 안 뜬다" 체감 제거)
@@ -1017,7 +1021,9 @@ function drawCand() {
   box.innerHTML =
     '<div class="ch"><span class="lab">팀장들이 올린 후보</span>' +
       '<span class="n">' + cand.length + '개 중 ' + picks.length + '개' + (picks.length ? " 고르심" : "") + '</span>' +
-      '<button type="button" id="planbtn"' + (picks.length ? "" : " disabled") + '>고른 것으로 시간표 짜기</button></div>' +
+      (PLANNING
+        ? '<button type="button" id="planbtn" disabled>한지우 팀장이 시간표 짜는 중… (몇 분 걸립니다)</button></div>'
+        : '<button type="button" id="planbtn"' + (picks.length ? "" : " disabled") + '>고른 것으로 시간표 짜기</button></div>') +
     cand.map(c => {
       const n = pos(c.id);
       return '<div class="it' + (n >= 0 ? " on" : "") + '" data-id="' + esc(c.id || "") + '">' +
@@ -1051,11 +1057,13 @@ function drawCand() {
 
   const pb = document.getElementById("planbtn");
   if (pb) pb.addEventListener("click", async () => {
-    pb.disabled = true; pb.textContent = "한지우 팀장이 짜는 중…";
+    // 완성될 때까지 '짜는 중'을 유지한다 — 실제 완료(plan 줄 done)는 chatLoad가 감지해 되돌린다
+    PLANNING = true;
+    pb.disabled = true; pb.textContent = "한지우 팀장이 시간표 짜는 중… (몇 분 걸립니다)";
     await pushState();          // 고르신 것을 먼저 저장해야 팀장이 그걸 읽는다
     await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
       body: JSON.stringify({ team: "hr", role: "plan", status: "pending", body: await lock(PW, "시간표") }) });
-    setTimeout(() => { pb.textContent = "고른 것으로 시간표 짜기"; pb.disabled = false; }, 8000);
+    chatLoad();                 // 바로 감시를 돌려 완료 시점을 빨리 잡는다
   });
 }
 
