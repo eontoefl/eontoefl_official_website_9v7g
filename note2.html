@@ -308,6 +308,12 @@
       border-radius: 0; z-index: 80; }
   }
 
+  /* ───── 팝업 창 모드 (?chat=1) — 진짜 새 창에 채팅만 가득 채운다 ───── */
+  body.chatonly { padding: 0; }
+  body.chatonly .topbar, body.chatonly .wrap, body.chatonly #chatfab { display: none; }
+  body.chatonly #chatwin { display: flex; top: 0; right: 0; bottom: 0; left: 0; width: 100%;
+    max-width: none; border-radius: 0; box-shadow: none; }
+
   /* ───── 채팅 (창 몸통 — 로직이 쓰는 id·구조는 그대로) ───── */
   .chat { flex: 1; min-height: 0; display: flex; flex-direction: column;
     padding: .8rem 1rem 1rem; background: var(--surface-lowest); }
@@ -1070,10 +1076,15 @@ async function kbSend(text) {
   });
 })();
 
-/* ───── 플로팅 채팅 창 — 열림/닫힘(localStorage 기억)·안 읽음 뱃지 ─────
-   채팅 로직(폴링·전송·암호)은 위 그대로고, 여기는 껍데기(창)와 뱃지만 다룬다 */
+/* ───── 플로팅 채팅 — 기본은 진짜 새 창(팝업), 안 되면 오버레이 ─────
+   채팅 로직(폴링·전송·암호)은 위 그대로고, 여기는 껍데기(창)와 뱃지만 다룬다.
+   ?chat=1 로 열리면 이 페이지 자체가 "채팅만 있는 팝업 창"이 된다 (비번은 localStorage 공유) */
 const CHATOPEN_KEY = "kb-chat-open", CHATSEEN_KEY = "kb-chat-seen";
-let chatOpen = localStorage.getItem(CHATOPEN_KEY) === "1";
+const CHATONLY = new URLSearchParams(location.search).has("chat");
+if (CHATONLY) document.body.classList.add("chatonly");
+const narrowScreen = () => matchMedia("(max-width: 620px)").matches;
+/* 좁은 화면에서만 오버레이 열림 상태를 복원한다 — 넓은 화면 기본 경로는 팝업이라 자동으로 안 띄운다 */
+let chatOpen = CHATONLY || (narrowScreen() && localStorage.getItem(CHATOPEN_KEY) === "1");
 function drawChatBadge() {
   let seen = localStorage.getItem(CHATSEEN_KEY);
   const kbIds = kbCache.filter(m => m.role === "kimbi").map(m => m.id);
@@ -1096,17 +1107,37 @@ function markChatSeen() {
 }
 function drawChatWin() {
   document.getElementById("chatwin").classList.toggle("open", chatOpen);
-  document.getElementById("chatfab").classList.toggle("open", chatOpen);
-  localStorage.setItem(CHATOPEN_KEY, chatOpen ? "1" : "0");
+  document.getElementById("chatfab").classList.toggle("open", chatOpen && !CHATONLY);
+  if (!CHATONLY) localStorage.setItem(CHATOPEN_KEY, chatOpen ? "1" : "0");
   if (chatOpen) {
     markChatSeen();
     const log = document.getElementById("chatlog");
     log.scrollTop = log.scrollHeight;
   } else drawChatBadge();
 }
-document.getElementById("chatfab").addEventListener("click", () => { chatOpen = !chatOpen; drawChatWin(); });
-document.getElementById("chatclose").addEventListener("click", () => { chatOpen = false; drawChatWin(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && chatOpen) { chatOpen = false; drawChatWin(); } });
+/* 아이콘 클릭 — ① 오버레이가 떠 있으면 닫기(토글) ② 넓은 화면이면 팝업 새 창(끌기·크기조절 가능)
+   ③ 이미 팝업이 떠 있으면 그 창에 포커스 ④ 팝업이 차단되면·좁은 화면이면 오버레이로 */
+let popRef = null;
+function openChat() {
+  if (chatOpen) { chatOpen = false; drawChatWin(); return; }
+  if (!narrowScreen()) {
+    if (popRef && !popRef.closed) { popRef.focus(); return; }
+    popRef = window.open(location.pathname + "?chat=1", "kimbi_chat",
+      "popup=yes,width=420,height=680,resizable=yes");
+    if (popRef) return;
+  }
+  chatOpen = true; drawChatWin();
+}
+document.getElementById("chatfab").addEventListener("click", openChat);
+document.getElementById("chatclose").addEventListener("click", () => {
+  if (CHATONLY) { window.close(); return; }        // 팝업 창의 X — 창 자체를 닫는다
+  chatOpen = false; drawChatWin();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && chatOpen && !CHATONLY) { chatOpen = false; drawChatWin(); }
+});
+/* 팝업 창에서 읽으면(kb-chat-seen 갱신) 메인 페이지 뱃지도 바로 꺼진다 */
+window.addEventListener("storage", e => { if (e.key === CHATSEEN_KEY && !CHATONLY) drawChatBadge(); });
 drawChatWin();
 
 /* ───── 오늘판 새로 왔나 보기 (45초마다) ───── */
@@ -1177,6 +1208,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowRight" && DATE < todayStr()) go(shift(DATE, 1), true);
 });
 async function start() {
+  if (CHATONLY) { kbLoad(); return; }   // 팝업 창 — 오늘판·일정·감시는 안 싣고 채팅만 가볍게
   const h = (location.hash || "").replace("#", "");
   if (/^\d{4}-\d{2}-\d{2}$/.test(h) && h <= todayStr()) await go(h, h !== todayStr());
   else await loadDay();
