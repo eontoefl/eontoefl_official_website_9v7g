@@ -41,7 +41,25 @@
     line-height: 1.72; font-size: 15px; font-weight: 400;
     padding: 0 0 96px;
   }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 0 1.4rem; }
+  .wrap { max-width: 1460px; margin: 0 auto; padding: 0 1.4rem; }
+
+  /* ───── 2단 레이아웃 (넓은 화면) ─────
+     좁은 화면: .cols 는 그냥 블록 → 세로 한 줄 (기존 그대로)
+     760px↑  : 왼쪽(주 작업) + 오른쪽(현황·소통) 2단 그리드 */
+  .cols { display: block; }
+  .only-d { display: none; }
+  @media (min-width: 760px) {
+    .wrap { padding: 0 2rem; }
+    .cols { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+      column-gap: 1.75rem; align-items: start; }
+    .only-d { display: block; }
+    .only-m { display: none; }
+    /* 오늘판이 없어서 왼쪽이 비면 한 줄로 (채팅·메모만 가운데) */
+    .cols:has(> .main:empty) { display: block; max-width: 860px; }
+  }
+  @media (min-width: 1200px) {
+    .cols { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); column-gap: 2.25rem; }
+  }
   h1, h2, h3 { letter-spacing: -0.02em; }
   ::selection { background: var(--primary-fixed-dim); color: var(--on-primary-container); }
 
@@ -62,8 +80,9 @@
   /* ───── 상단 바 (유리) ───── */
   .topbar { position: sticky; top: 0; z-index: 40; background: rgba(255, 255, 255, .8);
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); margin-bottom: 1.75rem; }
-  .topbar .inner { max-width: 760px; margin: 0 auto; padding: 1rem 1.4rem;
+  .topbar .inner { max-width: 1460px; margin: 0 auto; padding: 1rem 1.4rem;
     display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  @media (min-width: 760px) { .topbar .inner { padding: 1rem 2rem; } }
   .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
   .brand small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .18em;
     color: var(--on-surface-variant); }
@@ -143,6 +162,11 @@
   .wlg { font-size: 12px; font-weight: 700; color: var(--on-surface-variant); letter-spacing: .04em;
     margin: 1rem .15rem .25rem; }
   .wlg:first-child { margin-top: 0; }
+  .wgroup { break-inside: avoid; -webkit-column-break-inside: avoid; margin-bottom: 1.1rem; }
+  .wgroup:last-child { margin-bottom: 0; }
+  /* 넓을 때 그룹 카드를 2~3열로 흘린다 (그룹은 중간에서 안 잘림) */
+  @media (min-width: 1000px) { .wl .panel { column-count: 2; column-gap: 2.25rem; } }
+  @media (min-width: 1500px) { .wl .panel { column-count: 3; } }
   .wlist { list-style: none; }
   .wlist li { display: flex; align-items: flex-start; gap: .6rem; padding: .45rem .3rem;
     border-radius: var(--r); cursor: default; }
@@ -236,23 +260,30 @@
   <div class="wrap">
     <div id="content"></div>
 
-    <section>
-      <div class="seclab">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span></div>
-      <div class="panel chat">
-        <div class="log" id="chatlog"></div>
-        <div class="composer">
-          <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
-          <button id="chatsend" type="button">보내기</button>
-        </div>
-      </div>
-    </section>
+    <div class="cols">
+      <div class="col main" id="colmain"></div>
+      <div class="col side">
+        <div id="colside"></div>
 
-    <section>
-      <div class="seclab">메모장 <span>· 자동 저장</span></div>
-      <div class="panel">
-        <textarea id="memo" placeholder="떠오르는 생각, 오늘 있었던 일, 뭐든 적어두세요."></textarea>
+        <section>
+          <div class="seclab">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span></div>
+          <div class="panel chat">
+            <div class="log" id="chatlog"></div>
+            <div class="composer">
+              <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
+              <button id="chatsend" type="button">보내기</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="seclab">메모장 <span>· 자동 저장</span></div>
+          <div class="panel">
+            <textarea id="memo" placeholder="떠오르는 생각, 오늘 있었던 일, 뭐든 적어두세요."></textarea>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
 
     <p class="foot">eonfl.com/note2 · 김비서</p>
   </div>
@@ -363,25 +394,33 @@ async function doUnlock() {
 
 /* ───── 본문 ───── */
 function render() {
+  /* 화면 구역: content=상단 전체폭 · colmain=왼쪽(주 작업) · colside=오른쪽(현황·소통) */
   const c = document.getElementById("content");
+  const main = document.getElementById("colmain");
+  const side = document.getElementById("colside");
   const today = todayStr();
 
   if (!DAY) {
     c.innerHTML = '<div class="empty-day"><div class="big">🗒️</div>' +
       '김비서가 아직 오늘판을 올리지 않았습니다.<br>아래 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
+    main.innerHTML = ""; side.innerHTML = "";
     return;
   }
 
-  let html = "";
+  let top = "", left = "", right = "";
   if (DATE !== today) {
-    html += '<div class="stale"><b>김비서가 아직 오늘판을 올리지 않았습니다.</b><br>' +
+    top += '<div class="stale"><b>김비서가 아직 오늘판을 올리지 않았습니다.</b><br>' +
       '아래는 ' + esc(korDate(DATE)) + '판입니다. 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
   }
   if (DAY.notice) {
-    html += '<div class="notice"><span class="head">김비서가 알립니다</span>' + fmt(DAY.notice) + '</div>';
+    /* 같은 알림말을 두 곳에 그려두고 화면 폭에 따라 하나만 보여준다
+       (좁은 화면=맨 위 그대로, 넓은 화면=오른쪽 컬럼 맨 위) */
+    const noticeHtml = '<span class="head">김비서가 알립니다</span>' + fmt(DAY.notice);
+    top += '<div class="notice only-m">' + noticeHtml + '</div>';
+    right += '<div class="notice only-d">' + noticeHtml + '</div>';
   }
 
-  html += '<div class="hero"><div class="lab">오늘 목표 — 무슨 일이 있어도 여기까지</div>' +
+  top += '<div class="hero"><div class="lab">오늘 목표 — 무슨 일이 있어도 여기까지</div>' +
     '<div class="h">' + esc(DAY.goal || "(목표가 비어 있습니다)") + '</div>' +
     '<div class="d">' + esc(korDate(DAY.d || DATE)) + '</div></div>';
 
@@ -398,15 +437,15 @@ function render() {
 
   const must = DAY.must || [], stretch = DAY.stretch || [];
 
-  html += '<section><div class="seclab">무조건 여기까지 <span>· 체크 자동 저장</span></div><div class="panel">' +
+  left += '<section><div class="seclab">무조건 여기까지 <span>· 체크 자동 저장</span></div><div class="panel">' +
     '<div class="prog"><div class="track"><div class="bar" id="pbar"></div></div><div class="n" id="pnum">0 / 0</div></div>' +
     '<ul class="todo" id="mustlist">' + todoList(must, true) + '</ul></div></section>';
 
-  html += '<section><div class="seclab">시간 나면 여기까지</div><div class="panel">' +
+  left += '<section><div class="seclab">시간 나면 여기까지</div><div class="panel">' +
     '<ul class="todo" id="strlist">' + todoList(stretch, false) + '</ul></div></section>';
 
   const kb = DAY.kimbi || [];
-  html += '<section><div class="seclab">김비서 업무 현황</div><div class="panel"><ul class="kb">' +
+  right += '<section><div class="seclab">김비서 업무 현황</div><div class="panel"><ul class="kb">' +
     (kb.length ? kb.map(k => {
       const st = k.state === "done" ? "done" : (k.state === "doing" ? "doing" : "todo");
       return '<li' + (st === "done" ? ' class="isdone"' : '') + '>' +
@@ -422,11 +461,11 @@ function render() {
   if (wl.length) {
     const wTotal = wl.reduce((n, g) => n + g.items.length, 0);
     const wDone = wl.reduce((n, g) => n + g.items.filter(i => i && i.done).length, 0);
-    html += '<section><details class="wl" open>' +
+    left += '<section><details class="wl" open>' +
       '<summary class="seclab">전체 업무리스트 <span>· ' + wDone + ' / ' + wTotal + ' · 눌러서 접기/펼치기</span></summary>' +
       '<div class="panel">' +
       wl.map(g =>
-        '<div class="wlg">' + esc(g.group || "") + '</div><ul class="wlist">' +
+        '<div class="wgroup"><div class="wlg">' + esc(g.group || "") + '</div><ul class="wlist">' +
         g.items.map(i => {
           const done = !!(i && i.done);
           return '<li' + (done ? ' class="wdone"' : '') + '>' +
@@ -436,7 +475,7 @@ function render() {
             esc(i && i.text || "") + '</div>' +
             (i && i.memo ? '<div class="wmemo">' + fmt(i.memo) + '</div>' : '') +
             '</div></li>';
-        }).join("") + '</ul>').join("") +
+        }).join("") + '</ul></div>').join("") +
       '</div></details></section>';
   }
 
@@ -445,10 +484,10 @@ function render() {
     (arr && arr.length ? arr.map(x => '<div>' + fmt(x) + '</div>').join("")
       : '<div class="none">' + emptyMsg + '</div>') + '</div></div></section>';
 
-  html += lineBlock("보고함 <span>· 김비서가 처리한 것</span>", DAY.reports, "아직 보고가 없습니다.");
-  html += lineBlock("돈", DAY.money, "오늘 돈 소식은 없습니다.");
+  right += lineBlock("보고함 <span>· 김비서가 처리한 것</span>", DAY.reports, "아직 보고가 없습니다.");
+  right += lineBlock("돈", DAY.money, "오늘 돈 소식은 없습니다.");
 
-  c.innerHTML = html;
+  c.innerHTML = top; main.innerHTML = left; side.innerHTML = right;
 
   /* 체크 동작 */
   function progress() {
@@ -457,7 +496,7 @@ function render() {
     if (pn) pn.textContent = done + " / " + must.length;
     if (pb) pb.style.width = must.length ? (done / must.length * 100) + "%" : "0%";
   }
-  c.querySelectorAll(".todo li[data-id]").forEach(li => {
+  main.querySelectorAll(".todo li[data-id]").forEach(li => {
     const box = li.querySelector("input[type=checkbox]");
     if (!box) return;
     box.addEventListener("change", () => {
