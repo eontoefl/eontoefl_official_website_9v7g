@@ -135,6 +135,30 @@
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @media (prefers-reduced-motion: reduce) { .kb .doing { animation: none; } }
 
+  /* ───── 전체 업무리스트 (표시 전용) ───── */
+  .wl summary { cursor: pointer; user-select: none; -webkit-user-select: none; list-style: none; }
+  .wl summary::-webkit-details-marker { display: none; }
+  .wl summary.seclab::after { content: " ▾"; font-size: 11px; }
+  .wl:not([open]) summary.seclab::after { content: " ▸"; }
+  .wlg { font-size: 12px; font-weight: 700; color: var(--on-surface-variant); letter-spacing: .04em;
+    margin: 1rem .15rem .25rem; }
+  .wlg:first-child { margin-top: 0; }
+  .wlist { list-style: none; }
+  .wlist li { display: flex; align-items: flex-start; gap: .6rem; padding: .45rem .3rem;
+    border-radius: var(--r); cursor: default; }
+  .wmk { flex-shrink: 0; width: 18px; height: 18px; margin-top: 4px; border-radius: 5px;
+    border: 2px solid var(--surface-highest); background: var(--surface-lowest);
+    display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+  .wmk.on { border: none; background: var(--grad); color: #fff; }
+  .wb { flex: 1; min-width: 0; }
+  .wtx { font-size: 14px; line-height: 1.6; word-break: break-word; }
+  .wlist li.wdone .wtx { text-decoration: line-through; color: var(--on-surface-variant); opacity: .6; }
+  .wlist li.wdone .wmemo { opacity: .55; }
+  .wurg { display: inline-block; width: 8px; height: 8px; border-radius: 99px;
+    background: var(--error); margin-right: .45rem; vertical-align: 1px; }
+  .wmemo { font-size: 12px; color: var(--on-surface-variant); line-height: 1.65; margin-top: .1rem;
+    word-break: break-word; }
+
   /* ───── 보고함 · 돈 ───── */
   .lines { font-size: 13.5px; color: var(--on-surface-variant); line-height: 1.8; }
   .lines > div { padding: .35rem .15rem .35rem 1.1rem; position: relative; }
@@ -391,6 +415,30 @@ function render() {
         (st === "doing" ? '<span class="doing">진행중</span>' : '') + '</li>';
     }).join("") : '<li><span class="tx" style="opacity:.7">등록된 일이 없습니다.</span></li>') +
     '</ul></div></section>';
+
+  /* 전체 업무리스트 — 표시 전용(체크해도 저장 안 됨), 없거나 비면 섹션 숨김 */
+  const wl = (Array.isArray(DAY.worklist) ? DAY.worklist : [])
+    .filter(g => g && Array.isArray(g.items) && g.items.length);
+  if (wl.length) {
+    const wTotal = wl.reduce((n, g) => n + g.items.length, 0);
+    const wDone = wl.reduce((n, g) => n + g.items.filter(i => i && i.done).length, 0);
+    html += '<section><details class="wl" open>' +
+      '<summary class="seclab">전체 업무리스트 <span>· ' + wDone + ' / ' + wTotal + ' · 눌러서 접기/펼치기</span></summary>' +
+      '<div class="panel">' +
+      wl.map(g =>
+        '<div class="wlg">' + esc(g.group || "") + '</div><ul class="wlist">' +
+        g.items.map(i => {
+          const done = !!(i && i.done);
+          return '<li' + (done ? ' class="wdone"' : '') + '>' +
+            '<span class="wmk' + (done ? ' on' : '') + '">' + (done ? '✓' : '') + '</span>' +
+            '<div class="wb"><div class="wtx">' +
+            (i && i.urgency === "긴급" ? '<span class="wurg"></span>' : '') +
+            esc(i && i.text || "") + '</div>' +
+            (i && i.memo ? '<div class="wmemo">' + fmt(i.memo) + '</div>' : '') +
+            '</div></li>';
+        }).join("") + '</ul>').join("") +
+      '</div></details></section>';
+  }
 
   const lineBlock = (label, arr, emptyMsg) =>
     '<section><div class="seclab">' + label + '</div><div class="panel"><div class="lines">' +
