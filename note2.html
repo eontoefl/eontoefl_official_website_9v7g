@@ -287,6 +287,15 @@
   .chat .empty { font-size: 12.5px; color: var(--on-surface-variant); opacity: .65; padding: .3rem 0; }
   .chat .wait { font-size: 12px; color: var(--primary); font-weight: 500; padding: .45rem 0 .1rem; }
   .chat .wait::before { content: "● "; font-size: 9px; vertical-align: 2px; }
+  /* 김비서 실시간 작업 상태줄 (입력창 위) */
+  #kbact { display: flex; align-items: center; font-size: 12px; color: var(--primary); font-weight: 500;
+    padding: .45rem .1rem 0; min-width: 0; }
+  #kbact i { font-style: normal; font-weight: 800; opacity: .3; flex-shrink: 0;
+    animation: teachdot 1.5s ease-in-out infinite; }
+  #kbact i:nth-of-type(2) { animation-delay: .25s; }
+  #kbact i:nth-of-type(3) { animation-delay: .5s; }
+  #kbact span { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { #kbact i { animation: none; opacity: 1; } }
   .chat .composer { display: flex; gap: .4rem; margin-top: .7rem; }
   .chat .composer textarea { flex: 1; min-width: 0; min-height: 42px; max-height: 140px;
     background: var(--surface-highest); border: none; border-radius: var(--r); padding: .6rem .8rem;
@@ -370,6 +379,7 @@
           <div class="panel chat" id="chatpanel">
             <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다"><span id="teachlabel">수업 중</span><i>·</i><i>·</i><i>·</i></div>
             <div class="log" id="chatlog"></div>
+            <div id="kbact" style="display:none" title="김비서가 지금 하는 일"><i>·</i><i>·</i><i>·</i><span id="kbactlabel"></span></div>
             <div class="composer">
               <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
               <button id="chatsend" type="button">보내기</button>
@@ -800,6 +810,22 @@ function drawBattery(p) {
 /* ── 수업 모드 (/teach ~ /end) ──
    당번이 role="kimbi_meta", status="kbmode" 줄로 {"teach": true/false}를 올린다.
    /teach·/end를 보내는 즉시 미리 켜고 끄되, 서버 kbmode 줄이 오면 그 값을 진실로 따른다 */
+/* ── 김비서 실시간 작업 표시 ──
+   당번이 role="kimbi_meta", status="kbact" 줄로 {"act":"파일 읽는 중: …","at":유닉스초}를
+   같은 줄에 계속 덮어쓴다(id 고정, body만 바뀜) — ★id 기반 캐시 금지, body가 바뀔 때만 다시 푼다.
+   act가 비었거나 at이 5분 넘게 오래되면 숨기고, 살아있는 동안엔 "확인하는 중…"을 대신한다 */
+let kbActBody = null, kbActVal = null, kbActLive = false;
+function drawAct() {
+  const box = document.getElementById("kbact");
+  const v = kbActVal;
+  const live = !!(v && v.act && typeof v.at === "number" && Date.now() / 1000 - v.at < 300);
+  if (live) {
+    document.getElementById("kbactlabel").textContent = "김비서: " + v.act;
+    box.style.display = "";
+  } else box.style.display = "none";
+  if (live !== kbActLive) { kbActLive = live; chatSig = ""; drawChat(); }
+}
+
 let kbTeach = false, kbModeSeen = null;
 const PH_CHAT = "김비서에게 할 말";
 const PH_TEACH = "수업 중 — 김비서가 배우고 있어요. 다 가르치셨으면 /end";
@@ -830,11 +856,12 @@ async function kbLoad() {
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
     const out = [], alive = new Set();
-    let meta = null, mode = null;
+    let meta = null, mode = null, act = null;
     for (const row of rows) {
       if (row.role === "kimbi_meta") {          // 상태 줄 — 채팅에는 절대 안 띄운다
         if (row.status === "kbbat") meta = row; // id 오름차순이라 마지막 것이 최신
         else if (row.status === "kbmode") mode = row;
+        else if (row.status === "kbact") act = row;
         continue;
       }
       const isMine = row.role === "boss";
@@ -863,6 +890,12 @@ async function kbLoad() {
       try { const v = await unlockText(PW, mode.body); drawTeach(!!(v && v.teach)); }
       catch (e) { /* 못 읽으면 이전 표시 유지 */ }
     }
+    if (act && act.body !== kbActBody) {        // 같은 id에 body만 덮어써지므로 body로 비교
+      kbActBody = act.body;
+      try { kbActVal = await unlockText(PW, act.body); }
+      catch (e) { /* 못 읽으면 이전 값 유지 */ }
+    }
+    drawAct();                                  // 매 갱신마다 5분 경과 여부도 다시 따진다
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
   kbTimer = setTimeout(kbLoad, 4000);
 }
@@ -873,7 +906,7 @@ function drawChat() {
   const sig = kbCache.map(m => m.id + ":" + m.role).join(",");
   if (sig === chatSig) return;
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
-  const waiting = kbCache.length && kbCache[kbCache.length - 1].role === "boss";
+  const waiting = !kbActLive && kbCache.length && kbCache[kbCache.length - 1].role === "boss";
   log.innerHTML = (kbCache.length
     ? kbCache.map((m, i) => {
         const t = '<span class="tm">' + esc(hhmm(m.at)) + '</span>';
