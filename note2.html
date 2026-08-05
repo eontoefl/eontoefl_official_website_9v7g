@@ -93,6 +93,18 @@
   #savedot { font-size: 12px; font-weight: 500; color: var(--on-surface-variant); }
   #savedot.bad { color: var(--tertiary); }
 
+  /* ───── 김비서 머리 배터리 (대화 맥락이 몇 % 찼나) ───── */
+  #kbbat { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; cursor: default; }
+  #kbbat .bat { position: relative; width: 23px; height: 12px; border: 1.5px solid var(--on-surface-variant);
+    border-radius: 3.5px; margin-right: 3px; }
+  #kbbat .bat::after { content: ""; position: absolute; right: -4.5px; top: 2px; width: 2.5px; height: 5px;
+    background: var(--on-surface-variant); border-radius: 0 1.5px 1.5px 0; }
+  #kbbat .fill { position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; max-width: calc(100% - 3px);
+    border-radius: 1.5px; background: #2f6f4f; transition: width .3s; }
+  #kbbat .pct { font-size: 12px; font-weight: 700; color: var(--on-surface); white-space: nowrap; }
+  #kbbat .who { font-size: 10px; font-weight: 500; color: var(--on-surface-variant); white-space: nowrap; }
+  @media (max-width: 620px) { #kbbat .who { display: none; } }
+
   /* ───── 날짜 이동 · 3주 일정표 (note.html에서 가져옴) ───── */
   .iconbtn { width: 40px; height: 40px; border: none; border-radius: var(--r); background: var(--surface-high);
     color: var(--on-primary-container); font-size: 19px; font-weight: 600; cursor: pointer; line-height: 1;
@@ -315,6 +327,11 @@
   <div class="topbar">
     <div class="inner">
       <div class="brand">김비서<small>BAMTOL HOLDINGS</small></div>
+      <div id="kbbat" style="display:none" title="김비서 머리 — 대화 맥락이 얼마나 찼는지">
+        <span class="bat"><span class="fill" id="kbbatfill"></span></span>
+        <span class="pct" id="kbbatpct"></span>
+        <span class="who">김비서 머리</span>
+      </div>
       <div id="savedot"></div>
       <button id="offbtn" type="button">퇴근</button>
     </div>
@@ -728,6 +745,21 @@ document.getElementById("offbtn").addEventListener("click", async () => {
 let kbCache = [], kbTimer = null;
 const decCache = {};
 
+/* ── 김비서 머리 배터리 ──
+   당번이 role="kimbi_meta", status="kbbat" 줄로 {"battery": 34}를 올린다.
+   말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 헤더에 그린다 */
+let kbBatSeen = null;
+function drawBattery(p) {
+  const box = document.getElementById("kbbat");
+  if (typeof p !== "number" || !isFinite(p)) { box.style.display = "none"; return; }
+  p = Math.max(0, Math.min(100, Math.round(p)));
+  const fill = document.getElementById("kbbatfill");
+  fill.style.width = p + "%";
+  fill.style.background = p >= 80 ? "var(--error)" : p >= 60 ? "#d9a100" : "#2f6f4f";
+  document.getElementById("kbbatpct").textContent = p + "%";
+  box.style.display = "";
+}
+
 async function kbLoad() {
   clearTimeout(kbTimer);
   if (!PW) return;
@@ -737,7 +769,12 @@ async function kbLoad() {
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
     const out = [], alive = new Set();
+    let meta = null;
     for (const row of rows) {
+      if (row.role === "kimbi_meta") {          // 상태 줄 — 채팅에는 절대 안 띄운다
+        if (row.status === "kbbat") meta = row; // id 오름차순이라 마지막 것이 최신
+        continue;
+      }
       const isMine = row.role === "boss";
       const isKb = row.role === "kimbi" && row.status === "kbdone";
       if (!isMine && !isKb) continue;
@@ -754,6 +791,11 @@ async function kbLoad() {
     kbCache.filter(m => m.id === 0).forEach(m => out.push(m));
     kbCache = out;
     drawChat();
+    if (meta && meta.id !== kbBatSeen) {
+      kbBatSeen = meta.id;
+      try { const v = await unlockText(PW, meta.body); drawBattery(v ? +v.battery : NaN); }
+      catch (e) { /* 못 읽으면 이전 표시 유지 */ }
+    }
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
   kbTimer = setTimeout(kbLoad, 4000);
 }
