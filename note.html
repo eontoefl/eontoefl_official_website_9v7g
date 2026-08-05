@@ -518,7 +518,10 @@
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
   @media (max-width: 620px) {
-    .dock { right: 8px; left: 8px; bottom: 8px; width: auto; max-height: 78vh; }
+    /* 모바일: 아래에서 올라오는 시트. 크기 조절 없음, 키보드가 뜨면 JS가 높이를 맞춘다 */
+    .dock { right: 0; left: 0; bottom: 0; width: auto; height: 58dvh; min-width: 0; min-height: 0;
+      max-height: none; border-radius: var(--r-lg) var(--r-lg) 0 0; resize: none; }
+    .dock .grabber { display: none; }
   }
 
   .empty-day { background: var(--surface-low); border-radius: var(--r-lg); padding: 4rem 1.4rem; text-align: center;
@@ -1379,6 +1382,22 @@ function mountDept(key) {
   cb.addEventListener("click", () => openDock(key, team, person));
 }
 
+/* 모바일 키보드 대응 — 키보드가 올라오면 채팅 시트를 그 위로 줄인다 (2026-08-05) */
+(function () {
+  if (!window.visualViewport) return;
+  const vv = window.visualViewport;
+  function fit() {
+    document.querySelectorAll(".dock.on").forEach(d => {
+      if (innerWidth > 620) { d.style.removeProperty("--kb"); return; }
+      const kb = Math.max(0, innerHeight - vv.height - vv.offsetTop);   // 키보드 높이
+      d.style.bottom = kb ? (kb + 4) + "px" : "0px";
+      d.style.height = kb ? Math.min(vv.height - 60, innerHeight * 0.58) + "px" : "";
+    });
+  }
+  vv.addEventListener("resize", fit);
+  vv.addEventListener("scroll", fit);
+})();
+
 /* 채팅창 하나하나에 끌기·크기조절·보내기를 붙인다 */
 function placeNew(key, el) {
   const POS = "hq-dock-" + key;
@@ -1420,6 +1439,7 @@ function wireDock(key, el, ta, btn) {
   let drag = null;
   head.addEventListener("pointerdown", e => {
     if (e.target.closest("button")) return;
+    if (innerWidth <= 620) return;              // 모바일 시트는 끌지 않는다 (아래 고정)
     const r = el.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
     el.classList.add("dragging");
