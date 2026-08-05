@@ -444,8 +444,12 @@
     .hero { padding: 1.25rem 1.4rem; }
     .hero .h { font-size: 19px; }
     .bubble { max-width: 88%; }
-    /* 입력창이 16px 미만이면 모바일 브라우저가 탭할 때 멋대로 확대한다 —
-       미러는 반드시 같은 값으로(커서 정합). 이 블록은 기본 규칙들보다 뒤라서 이긴다 */
+  }
+  /* 입력창이 16px 미만이면 터치 기기가 탭할 때 멋대로 확대한다 — 확대-방지 16px은
+     터치 기기에서만 적용한다 (PC는 팝업 420px·좁은 창이어도 원래 14px 유지).
+     ★입력창 글자 크기를 바꾸면 미러(#tamirror)도 반드시 같은 값으로 — 커서 정합.
+     이 블록은 기본 규칙들보다 뒤라서 이긴다 */
+  @media (hover: none) and (pointer: coarse) {
     .chat .composer textarea, #tamirror { font-size: 16px; }
     #memo { font-size: 16px; }
   }
