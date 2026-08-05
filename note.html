@@ -1049,14 +1049,13 @@ function drawCand() {
       return '<div class="it' + (n >= 0 ? " on" : "") + '" data-id="' + esc(c.id || "") + '">' +
         '<input type="checkbox"' + (n >= 0 ? " checked" : "") + '>' +
         '<div class="body"><div class="top">' +
-          (n >= 0 ? '<span class="ord">' + (n + 1) + '</span>' : "") +
           '<span class="dot" style="background:' + (TONE[c.team] || "#006688") + '"></span>' +
           '<span class="who">' + esc(PERSON[c.team] || "") + '</span>' +
           (c.dur ? '<span class="dur">' + esc(c.dur) + '</span>' : "") +
         '</div>' +
         '<div class="tk">' + esc(c.task || "") + '</div>' +
         (c.why ? '<div class="wy">' + esc(c.why) + '</div>' : "") +
-        (n >= 0 ? '<input class="pnote" placeholder="한지우 팀장에게 한마디 — 언제쯤, 얼마나 (선택)" value="' +
+        (n >= 0 ? '<input class="pnote" placeholder="한지우 팀장에게 한마디 — 제일 먼저 · 이건 오후에 · 30분만 (선택)" value="' +
           esc(picks[n].note || "") + '">' : "") +
         '</div></div>';
     }).join("");
