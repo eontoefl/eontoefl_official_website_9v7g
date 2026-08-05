@@ -383,6 +383,27 @@
     box-shadow: 0 0 0 2.5px rgba(180, 120, 0, .13); }
   #tamirror .cmdtok.end { color: #2f6f4f; background: rgba(47, 111, 79, .13);
     box-shadow: 0 0 0 2.5px rgba(47, 111, 79, .13); }
+
+  /* ───── 사진·파일 첨부 — note.html과 같은 방식 (hq_files 표) ───── */
+  .chat .composer .clip { background: var(--surface-high); color: var(--on-surface);
+    font-size: 15px; padding: 0 12px; }
+  #attrow .attchip { display: flex; align-items: center; gap: .5rem; margin-top: .5rem;
+    background: var(--surface-low); border-radius: var(--r); padding: .4rem .6rem;
+    font-size: 12.5px; overflow: hidden; }
+  #attrow .attchip .th { width: 42px; height: 42px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+  #attrow .attchip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #attrow .attchip .rm { margin-left: auto; border: none; background: none; cursor: pointer;
+    font-size: 13px; color: var(--on-surface-variant); flex-shrink: 0; padding: 4px; }
+  .bubble .att-img { max-width: 100%; max-height: 260px; border-radius: .6rem; display: block;
+    margin-top: .3rem; cursor: pointer; background: var(--surface-high); min-height: 60px; }
+  .bubble .att-file { display: inline-flex; align-items: center; gap: .4rem; margin-top: .3rem;
+    padding: .45rem .7rem; background: rgba(255, 255, 255, .22); border-radius: .6rem; cursor: pointer;
+    font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bubble.kb .att-file { background: var(--surface-high); }
+  /* 파일을 끌어오면 채팅 창 전체가 드롭 존 */
+  #chatwin.dropping::after { content: "여기에 놓으면 첨부됩니다"; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center; background: rgba(214, 240, 251, .9);
+    font-weight: 700; color: var(--on-primary-container); z-index: 5; pointer-events: none; }
   .chat .composer textarea:focus { outline: 2px solid var(--primary-fixed-dim); }
   .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
@@ -477,12 +498,15 @@
     <div class="chat" id="chatpanel">
       <div class="log" id="chatlog"></div>
       <div id="kbact" style="display:none" title="김비서가 지금 하는 일"><i>·</i><i>·</i><i>·</i><span id="kbactlabel"></span></div>
+      <div id="attrow"></div>
       <div class="composer">
+        <button type="button" class="clip" id="chatclip" title="사진·파일 첨부">📎</button>
         <div class="tawrap">
           <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
           <div id="tamirror" aria-hidden="true" style="display:none"></div>
         </div>
         <button id="chatsend" type="button">보내기</button>
+        <input type="file" id="chatfpick" hidden>
       </div>
     </div>
   </div>
@@ -929,6 +953,80 @@ const chipify = h => String(h).replace(CMD_RE(), (all, pre, tok, name) =>
   pre + '<span class="cmdchip' + (name.toLowerCase() === "end" ? " end" : "") + '">' +
   name.toLowerCase() + '</span>');
 
+/* ── 사진·파일 첨부 — note.html과 같은 데이터 경로: 전부 잠가서 hq_files 표에 저장 ──
+   채팅 body는 문자열 대신 {file: id, name, mime, text} 로 보낸다 (당번이 이 형식을 처리) */
+const FILEURL = CHAT.replace("hq_chat", "hq_files");
+const fileCache = {};                                // id → {name, mime, url}
+const MAXF = 8 * 1024 * 1024;                        // 비이미지 원본 한도 8MB
+
+function b64ofBuf(buf) {
+  let s = ""; const b = new Uint8Array(buf); const CH = 0x8000;
+  for (let i = 0; i < b.length; i += CH) s += String.fromCharCode.apply(null, b.subarray(i, i + CH));
+  return btoa(s);
+}
+function bufOfB64(b64) {
+  const s = atob(b64); const b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return b.buffer;
+}
+async function shrinkImage(file) {                   // 큰 사진은 긴 변 2000px JPEG로 줄인다
+  if (!/^image\/(jpeg|png|webp)/i.test(file.type) || file.size < 400 * 1024) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const sc = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    const blob = await new Promise(r => cv.toBlob(r, "image/jpeg", .85));
+    return blob && blob.size < file.size
+      ? new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+  } catch (e) { return file; }
+}
+async function uploadFile(file) {
+  const f = await shrinkImage(file);
+  if (f.size > MAXF) throw new Error("파일이 너무 큽니다 (8MB까지): " + file.name);
+  const data = b64ofBuf(await f.arrayBuffer());
+  const body = await lock(PW, { name: file.name, mime: f.type || "application/octet-stream", data: data });
+  const r = await fetch(FILEURL, { method: "POST",
+    headers: Object.assign({}, HDR, { Prefer: "return=representation" }),
+    body: JSON.stringify({ body: body }) });
+  if (!r.ok) throw new Error(r.status === 404
+    ? "파일 보관함이 아직 없습니다 — 회의실\\파일 표 만들기.sql을 한 번 실행해 주세요"
+    : "업로드 실패 (" + r.status + ")");
+  const j = await r.json();
+  return { file: j[0].id, name: file.name, mime: f.type || "application/octet-stream" };
+}
+async function getFile(id) {
+  if (fileCache[id]) return fileCache[id];           // 복호화는 한 번만
+  try {
+    const r = await fetch(FILEURL + "?id=eq." + id + "&select=body", { headers: HDR, cache: "no-store" });
+    const j = await r.json();
+    if (!Array.isArray(j) || !j.length) return null;
+    const o = await unlockText(PW, j[0].body);
+    const url = URL.createObjectURL(new Blob([bufOfB64(o.data)], { type: o.mime || "application/octet-stream" }));
+    return (fileCache[id] = { name: o.name, mime: o.mime, url: url });
+  } catch (e) { return null; }
+}
+function hydrateFiles(log) {
+  log.querySelectorAll("[data-fid]").forEach(elm => {
+    const id = +elm.dataset.fid;
+    if (elm.tagName === "IMG") {
+      getFile(id).then(f => { if (f) elm.src = f.url; });
+      elm.addEventListener("load", () => {           // 사진이 늦게 뜨면 바닥 근처일 때만 따라 내려간다
+        if (log.scrollHeight - log.scrollTop - log.clientHeight < 340) log.scrollTop = log.scrollHeight;
+      });
+      elm.addEventListener("click", () => getFile(id).then(f => f && window.open(f.url)));
+    } else {
+      elm.addEventListener("click", () => getFile(id).then(f => {
+        if (!f) return;
+        const a = document.createElement("a");
+        a.href = f.url; a.download = elm.dataset.name || f.name || "file";
+        a.click();
+      }));
+    }
+  });
+}
+
 /* ── 김비서 머리 배터리 ──
    당번이 role="kimbi_meta", status="kbbat" 줄로 {"battery": 34}를 올린다.
    말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 채팅 창 머리에 그린다 */
@@ -1028,6 +1126,20 @@ async function kbLoad() {
   kbTimer = setTimeout(kbLoad, 4000);
 }
 
+/* 말풍선 속 내용 — 파일 첨부 메시지({file,name,mime,text})면 썸네일/파일 표시, 아니면 글 그대로 */
+function bubbleBody(m) {
+  const s = m.text;
+  const base = txt => m.role === "boss" ? chipify(fmt(txt)) : fmt(txt);
+  if (s && typeof s === "object" && s.file) {
+    const img = /^image\//.test(s.mime || "") || /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(s.name || "");
+    return (s.text ? base(String(s.text)) : "") +
+      (img ? '<img class="att-img" data-fid="' + (+s.file) + '" alt="' + esc(s.name || "") + '">'
+           : '<span class="att-file" data-fid="' + (+s.file) + '" data-name="' + esc(s.name || "") +
+             '">📄 ' + esc(s.name || "파일") + '</span>');
+  }
+  return base(plain(s));
+}
+
 let chatSig = "";
 function drawChat() {
   const log = document.getElementById("chatlog");
@@ -1039,14 +1151,15 @@ function drawChat() {
     ? kbCache.map((m, i) => {
         const t = '<span class="tm">' + esc(hhmm(m.at)) + '</span>';
         if (m.role === "boss")
-          // 토큰이 어디에 있든 그 자리에서 칩으로 (저장 원문은 그대로, 렌더링만)
-          return '<div class="row me">' + t + '<div class="bubble me">' + chipify(fmt(plain(m.text))) + '</div></div>';
+          // 토큰 칩·파일 첨부 렌더링은 bubbleBody가 처리 (저장 원문은 그대로)
+          return '<div class="row me">' + t + '<div class="bubble me">' + bubbleBody(m) + '</div></div>';
         const same = i > 0 && kbCache[i - 1].role === "kimbi";
         return '<div class="row"><span class="ava' + (same ? ' hide' : '') + '">김</span>' +
-          '<div class="bubble kb">' + fmt(plain(m.text)) + '</div>' + t + '</div>';
+          '<div class="bubble kb">' + bubbleBody(m) + '</div>' + t + '</div>';
       }).join("")
     : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
     + (waiting ? '<div class="wait">김비서가 확인하는 중…</div>' : "");
+  hydrateFiles(log);                                  // 첨부 썸네일·파일은 여기서 채워 넣는다
   if (atBottom || !chatSig) log.scrollTop = log.scrollHeight;
   chatSig = sig;
   if (chatOpen) markChatSeen(); else drawChatBadge();   // 창이 닫혀 있으면 안 읽음 뱃지만 갱신
@@ -1054,8 +1167,10 @@ function drawChat() {
 
 async function kbSend(text) {
   // /teach·/end 토큰이 어느 위치에 있든 서버 확인 전에 미리 반영한다 (나중에 kbmode 줄이 오면 그 값이 진실)
-  if (hasCmd(text, "teach")) drawTeach(true);
-  else if (hasCmd(text, "end")) drawTeach(false);
+  // text는 문자열이거나 파일 첨부 {file,name,mime,text} — 명령 판정은 글 부분만 본다
+  const cmdSrc = (text && typeof text === "object") ? String(text.text || "") : String(text);
+  if (hasCmd(cmdSrc, "teach")) drawTeach(true);
+  else if (hasCmd(cmdSrc, "end")) drawTeach(false);
   // 말풍선을 저장을 기다리지 않고 즉시 띄운다
   kbCache.push({ id: 0, role: "boss", text: text, at: new Date().toISOString() });
   chatSig = ""; drawChat();
@@ -1100,10 +1215,54 @@ async function kbSend(text) {
     ta.classList.add("hascmd");
     mirror.scrollTop = ta.scrollTop;
   }
+  /* ── 첨부 대기 상태 — 입력창 위 미리보기(썸네일+파일명+X), 전송하면 {file,...} 페이로드로 ── */
+  let kbAtt = null;
+  const attrow = document.getElementById("attrow"), fpick = document.getElementById("chatfpick");
+  function setAtt(meta) {
+    kbAtt = meta;
+    if (!meta) { attrow.innerHTML = ""; return; }
+    attrow.innerHTML = '<div class="attchip">' +
+      (meta.preview ? '<img class="th" src="' + meta.preview + '" alt="">' : '<span>📄</span>') +
+      '<span class="nm">' + esc(meta.name) + '</span>' +
+      '<button class="rm" type="button" title="첨부 취소">✕</button></div>';
+    attrow.querySelector(".rm").addEventListener("click", () => setAtt(null));
+  }
+  async function attach(files) {
+    const f = files && files[0]; if (!f) return;
+    attrow.innerHTML = '<div class="attchip">⏳ 올리는 중… ' + esc(f.name) + '</div>';
+    try {
+      const meta = await uploadFile(f);
+      meta.preview = /^image\//.test(f.type || "") ? URL.createObjectURL(f) : null;
+      setAtt(meta);
+    } catch (e) { alert(e.message || e); setAtt(null); }
+  }
+  document.getElementById("chatclip").addEventListener("click", () => fpick.click());
+  fpick.addEventListener("change", () => { if (fpick.files.length) { attach(fpick.files); fpick.value = ""; } });
+  // 채팅 창 전체가 드롭 존 (팝업·오버레이 공용 — 같은 #chatwin)
+  const win = document.getElementById("chatwin");
+  ["dragenter", "dragover"].forEach(ev => win.addEventListener(ev, e => {
+    e.preventDefault(); win.classList.add("dropping");
+  }));
+  win.addEventListener("dragleave", e => {
+    if (!e.relatedTarget || !win.contains(e.relatedTarget)) win.classList.remove("dropping");
+  });
+  win.addEventListener("drop", e => {
+    e.preventDefault(); win.classList.remove("dropping");
+    if (e.dataTransfer && e.dataTransfer.files.length) attach(e.dataTransfer.files);
+  });
+  // 스크린샷 붙여넣기 (Ctrl+V)
+  ta.addEventListener("paste", e => {
+    const fs = e.clipboardData && e.clipboardData.files;
+    if (fs && fs.length) { e.preventDefault(); attach(fs); }
+  });
+
   async function send() {
-    const v = ta.value.trim(); if (!v) return;
+    const v = ta.value.trim();
+    if (!v && !kbAtt) return;                          // 사진만 단독 전송도 된다
     btn.disabled = true; ta.value = ""; drawMirror();   // 입력창이 비었으니 하이라이트도 해제
-    try { await kbSend(v); } finally { btn.disabled = false; ta.focus(); }
+    const payload = kbAtt ? { file: kbAtt.file, name: kbAtt.name, mime: kbAtt.mime, text: v } : v;
+    setAtt(null);
+    try { await kbSend(payload); } finally { btn.disabled = false; ta.focus(); }
   }
   btn.addEventListener("click", send);
   ta.addEventListener("input", drawMirror);
