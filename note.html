@@ -501,8 +501,12 @@
     letter-spacing: .01em; }
   .bubble.lead .cmd { background: #d7f0fb; color: var(--on-primary-container); }
   .bubble .fixbody { font-weight: 700; }
-  .chat .composer textarea.fixing { outline: 2px solid var(--primary-fixed-dim);
-    background: #eaf6fc; }
+  .chat .composer { position: relative; }
+  .chat .composer.fixon::before { content: "⚡ fix — 상시 지시로 등록됩니다"; position: absolute;
+    top: -21px; left: 2px; font-size: 11px; font-weight: 700; color: #fff; background: var(--grad);
+    padding: 2px 10px; border-radius: 99px; }
+  .chat .composer textarea.fixing { outline: 2px solid var(--primary);
+    background: #eaf6fc; color: var(--on-primary-container); font-weight: 600; }
   .bubble strong { font-weight: 700; }
   .bubble.lead strong { color: var(--on-surface); }
   .bubble .who { display: block; font-size: 10px; font-weight: 700; letter-spacing: .08em; opacity: .55; margin-bottom: .2rem; }
@@ -661,7 +665,7 @@ const won = n => (n || 0).toLocaleString("ko-KR") + "원";
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 /* 팀장이 쓰는 **굵게**를 실제 굵은 글씨로. 이스케이프 뒤에 하므로 안전하다 */
 const fmt = t => esc(t)
-  .replace(/^\/fix\b[ \t]*(.*)$/gm, '<span class="cmd">/fix</span> <b class="fixbody">$1</b>')
+  .replace(/^\/fix\b[ \t]*(.*)$/gm, '<span class="cmd">fix</span> <b class="fixbody">$1</b>')
   .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
 const plain = t => String(t == null ? "" : t).replace(/\*\*/g, "");
 function setDot(ok, msg) { const d = document.getElementById("savedot"); d.textContent = msg; d.className = ok ? "" : "bad"; }
@@ -1475,12 +1479,15 @@ function wireDock(key, el, ta, btn) {
 
   async function send() {
     const v = ta.value.trim(); if (!v) return;
-    btn.disabled = true; ta.value = ""; chatDrafts[key] = ""; ta.classList.remove("fixing");
+    btn.disabled = true; ta.value = ""; chatDrafts[key] = "";
+    ta.classList.remove("fixing"); ta.parentElement.classList.remove("fixon");
     try { await chatSend(key, v); } finally { btn.disabled = false; ta.focus(); }
   }
   ta.addEventListener("input", () => {
     chatDrafts[key] = ta.value;
-    ta.classList.toggle("fixing", /^\/fix\b/.test(ta.value));   // 쓰는 중에도 표시
+    const fx = /^\/fix\b/.test(ta.value);                        // 쓰는 중에도 표시
+    ta.classList.toggle("fixing", fx);
+    ta.parentElement.classList.toggle("fixon", fx);
   });
   btn.addEventListener("click", send);
   ta.addEventListener("keydown", e => {
