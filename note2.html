@@ -308,6 +308,9 @@
   #teachbadge i:nth-of-type(3) { animation-delay: .5s; }
   @keyframes teachdot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { #teachbadge i { animation: none; opacity: 1; } }
+  /* 입력창에 /teach·/end를 치는 중(전송 전) — 살짝 흐리고 점 애니메이션 멈춤 */
+  #teachbadge.pre { opacity: .72; }
+  #teachbadge.pre i { animation-play-state: paused; opacity: .3; }
 
   /* ───── 메모장 ───── */
   #memo { width: 100%; min-height: 120px; background: var(--surface-highest); border: none; border-radius: var(--r);
@@ -365,7 +368,7 @@
             </div>
           </div>
           <div class="panel chat" id="chatpanel">
-            <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다">수업 중<i>·</i><i>·</i><i>·</i></div>
+            <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다"><span id="teachlabel">수업 중</span><i>·</i><i>·</i><i>·</i></div>
             <div class="log" id="chatlog"></div>
             <div class="composer">
               <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
@@ -800,13 +803,22 @@ function drawBattery(p) {
 let kbTeach = false, kbModeSeen = null;
 const PH_CHAT = "김비서에게 할 말";
 const PH_TEACH = "수업 중 — 김비서가 배우고 있어요. 다 가르치셨으면 /end";
+let kbTypePre = null; // 입력창에 치는 중인 명령어(전송 전): "teach" | "end" | null
+function drawTeachUI() {
+  const badge = document.getElementById("teachbadge");
+  const showPre = !kbTeach && kbTypePre === "teach";   // 수업 전인데 /teach를 치는 중
+  const endPre = kbTeach && kbTypePre === "end";       // 수업 중인데 /end를 치는 중
+  badge.style.display = (kbTeach || showPre) ? "" : "none";
+  document.getElementById("teachlabel").textContent = showPre ? "수업 시작 대기" : "수업 중";
+  badge.classList.toggle("pre", showPre || endPre);
+}
 function drawTeach(on) {
   on = !!on;
   if (on === kbTeach) return;
   kbTeach = on;
-  document.getElementById("teachbadge").style.display = on ? "" : "none";
   document.getElementById("chatpanel").classList.toggle("teach", on);
   document.getElementById("chatta").placeholder = on ? PH_TEACH : PH_CHAT;
+  drawTeachUI();
 }
 
 async function kbLoad() {
@@ -905,9 +917,16 @@ async function kbSend(text) {
   async function send() {
     const v = ta.value.trim(); if (!v) return;
     btn.disabled = true; ta.value = "";
+    if (kbTypePre) { kbTypePre = null; drawTeachUI(); }   // 입력창이 비었으니 타이핑 미리보기 해제
     try { await kbSend(v); } finally { btn.disabled = false; ta.focus(); }
   }
   btn.addEventListener("click", send);
+  ta.addEventListener("input", () => {
+    // "/teach"를 치는 순간 뱃지를 미리 보여주고, 지우면 다시 숨긴다 (실제 수업 모드가 켜져 있으면 무관)
+    const v = ta.value.trim().toLowerCase();
+    const pre = v.startsWith("/teach") ? "teach" : v.startsWith("/end") ? "end" : null;
+    if (pre !== kbTypePre) { kbTypePre = pre; drawTeachUI(); }
+  });
   ta.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
