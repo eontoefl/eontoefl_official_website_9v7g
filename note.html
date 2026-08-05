@@ -521,6 +521,21 @@
   .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
+  /* 첨부 (2026-08-05) — 사진·파일 전부, 드래그앤드랍 포함 */
+  .chat .composer .clip { background: var(--surface-high); color: var(--on-surface); font-size: 15px; padding: 0 12px; }
+  .attchip { display: flex; align-items: center; gap: .45rem; margin-bottom: .45rem; background: var(--surface-low);
+    border-radius: var(--r); padding: .45rem .7rem; font-size: 12.5px; overflow: hidden; }
+  .attchip .rm { margin-left: auto; border: none; background: none; cursor: pointer; font-size: 13px;
+    color: var(--on-surface-variant); flex-shrink: 0; }
+  .bubble .att-img { max-width: 100%; max-height: 260px; border-radius: .6rem; display: block;
+    margin-top: .3rem; cursor: pointer; background: var(--surface-high); min-height: 60px; }
+  .bubble .att-file { display: inline-flex; align-items: center; gap: .4rem; margin-top: .3rem; padding: .45rem .7rem;
+    background: rgba(255, 255, 255, .22); border-radius: .6rem; cursor: pointer; font-weight: 600; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bubble.lead .att-file { background: var(--surface-high); }
+  .dock.dropping::after { content: "여기에 놓으면 첨부됩니다"; position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center; background: rgba(214, 240, 251, .88); font-weight: 700;
+    color: var(--on-primary-container); z-index: 5; border-radius: var(--r-lg); pointer-events: none; }
   @media (max-width: 620px) {
     /* 모바일: 아래에서 올라오는 시트. 크기 조절 없음, 키보드가 뜨면 JS가 높이를 맞춘다 */
     .dock { right: 0; left: 0; bottom: 0; width: auto; height: 58dvh; min-width: 0; min-height: 0;
@@ -614,8 +629,10 @@
       <div class="log"></div>
       <span class="grabber"></span>
       <div class="foot">
-        <div class="chat"><div class="composer">
-          <textarea placeholder="할 말"></textarea><button type="button">보내기</button>
+        <div class="chat"><div class="attrow"></div><div class="composer">
+          <button type="button" class="clip" title="파일 첨부">📎</button>
+          <textarea placeholder="할 말"></textarea><button type="button" class="send2">보내기</button>
+          <input type="file" class="fpick" hidden>
         </div></div>
       </div>
     </div>
@@ -667,7 +684,10 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp
 const fmt = t => esc(t)
   .replace(/^\/fix\b[ \t]*(.*)$/gm, '<span class="cmd">fix</span> <b class="fixbody">$1</b>')
   .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
-const plain = t => String(t == null ? "" : t).replace(/\*\*/g, "");
+const plain = t => {
+  if (t && typeof t === "object") return (t.text ? String(t.text).replace(/\*\*/g, "") + " " : "") + "📎 " + (t.name || "파일");
+  return String(t == null ? "" : t).replace(/\*\*/g, "");
+};
 function setDot(ok, msg) { const d = document.getElementById("savedot"); d.textContent = msg; d.className = ok ? "" : "bad"; }
 
 /* ───── 서버 ───── */
@@ -782,12 +802,12 @@ function openDock(key, team, person) {
   el.querySelector(".head img").src = "assets/team/" + key + ".jpg";
   el.querySelector(".head .nm").textContent = (person || "팀장") + " 팀장";
   el.querySelector(".head .tm").textContent = team;
-  const ta = el.querySelector(".foot textarea"), btn = el.querySelector(".foot button");
+  const ta = el.querySelector(".foot textarea"), btn = el.querySelector(".foot .send2");
   ta.placeholder = team + "에 할 말";
   ta.value = chatDrafts[key] || "";
   document.body.appendChild(el);
 
-  docks[key] = { el: el, log: el.querySelector(".log"), ta: ta, sig: "" };
+  docks[key] = { el: el, log: el.querySelector(".log"), ta: ta, sig: "", att: null };
   placeNew(key, el);
   wireDock(key, el, ta, btn);
   el.classList.add("on");
@@ -824,16 +844,17 @@ function drawDock(key) {
     log.innerHTML = (list.length
       ? list.map((m, i) => {
           if (m.role === "boss")
-            return '<div class="row me"><div class="bubble me">' + fmt(m.text) + '</div></div>';
+            return '<div class="row me"><div class="bubble me">' + bubbleBody(m) + '</div></div>';
           const same = i > 0 && list[i - 1].role === "lead";
           return '<div class="row"><img class="ava' + (same ? " hide" : "") + '" src="assets/team/' +
             key + '.jpg" alt=""><div class="bubble lead">' +
             (same ? "" : '<span class="who">' + esc(PERSON[key] || "팀장") + '</span>') +
-            fmt(m.text) + '</div></div>';
+            bubbleBody(m) + '</div></div>';
         }).join("")
       : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
       + (list.some(m => m.role === "boss" && m.status !== "done")
           ? '<div class="wait">' + esc(PERSON[key] || "팀장") + ' 팀장이 문서 보는 중…</div>' : "");
+    hydrateFiles(log);
     if (atBottom || !d.sig) log.scrollTop = log.scrollHeight;
     d.sig = sig;
   }
@@ -894,12 +915,12 @@ async function chatLoad() {
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
   chatTimer = setTimeout(chatLoad, (waiting || PLANNING) ? 2000 : (Object.keys(docks).length ? 5000 : 15000));  // 답장을 더 빨리 띄운다 (2026-08-05)
 }
-async function chatSend(team, text) {
+async function chatSend(team, payload) {           // payload = 문자열 또는 {file,name,mime,text}
   // 말풍선을 저장을 기다리지 않고 즉시 띄운다 (2026-08-05 — "보냈는데 안 뜬다" 체감 제거)
   chatCache[team] = chatCache[team] || [];
-  chatCache[team].push({ id: 0, role: "boss", status: "pending", text: text, at: new Date().toISOString() });
+  chatCache[team].push({ id: 0, role: "boss", status: "pending", text: payload, at: new Date().toISOString() });
   drawAllDocks();
-  const body = await lock(PW, text);
+  const body = await lock(PW, payload);
   const r = await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=representation" }),
     body: JSON.stringify({ team: team, role: "boss", body: body, status: "pending" }) });
   try {
@@ -907,10 +928,87 @@ async function chatSend(team, text) {
     const mine = chatCache[team].find(m => m.id === 0);
     if (mine && Array.isArray(saved) && saved.length) {
       mine.id = saved[0].id;
-      decCache[mine.id] = text;         // 내가 보낸 건 이미 아니까 다시 풀지 않는다
+      decCache[mine.id] = payload;      // 내가 보낸 건 이미 아니까 다시 풀지 않는다
     }
   } catch (e) { /* 다음 갱신 때 맞춰진다 */ }
   chatLoad();
+}
+
+/* ───── 첨부파일 (2026-08-05) — 전부 잠가서 hq_files 표에 저장 ───── */
+const FILEURL = CHAT.replace("hq_chat", "hq_files");
+const fileCache = {};                                // id → {name, mime, url}
+const MAXF = 10 * 1024 * 1024;
+
+function b64ofBuf(buf) {
+  let s = ""; const b = new Uint8Array(buf); const CH = 0x8000;
+  for (let i = 0; i < b.length; i += CH) s += String.fromCharCode.apply(null, b.subarray(i, i + CH));
+  return btoa(s);
+}
+function bufOfB64(b64) {
+  const s = atob(b64); const b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return b.buffer;
+}
+async function shrinkImage(file) {                   // 큰 사진은 1600px JPEG로 줄인다
+  if (!/^image\/(jpeg|png|webp)/i.test(file.type) || file.size < 400 * 1024) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const sc = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    const blob = await new Promise(r => cv.toBlob(r, "image/jpeg", .85));
+    return blob && blob.size < file.size ? new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+  } catch (e) { return file; }
+}
+async function uploadFile(file) {
+  const f = await shrinkImage(file);
+  if (f.size > MAXF) throw new Error("파일이 너무 큽니다 (10MB까지): " + file.name);
+  const data = b64ofBuf(await f.arrayBuffer());
+  const body = await lock(PW, { name: file.name, mime: f.type || "application/octet-stream", data: data });
+  const r = await fetch(FILEURL, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=representation" }),
+    body: JSON.stringify({ body: body }) });
+  if (!r.ok) throw new Error(r.status === 404 ? "파일 보관함이 아직 없습니다 — 회의실\\파일 표 만들기.sql을 한 번 실행해 주세요"
+                                              : "업로드 실패 (" + r.status + ")");
+  const j = await r.json();
+  return { file: j[0].id, name: file.name, mime: f.type || "application/octet-stream" };
+}
+async function getFile(id) {
+  if (fileCache[id]) return fileCache[id];
+  try {
+    const r = await fetch(FILEURL + "?id=eq." + id + "&select=body", { headers: HDR, cache: "no-store" });
+    const j = await r.json();
+    if (!Array.isArray(j) || !j.length) return null;
+    const o = await unlockText(PW, j[0].body);
+    const url = URL.createObjectURL(new Blob([bufOfB64(o.data)], { type: o.mime || "application/octet-stream" }));
+    return (fileCache[id] = { name: o.name, mime: o.mime, url: url });
+  } catch (e) { return null; }
+}
+function bubbleBody(m) {
+  const t = m.text;
+  if (t && typeof t === "object" && t.file) {
+    const img = /^image\//.test(t.mime || "");
+    return (t.text ? fmt(t.text) : "") +
+      (img ? '<img class="att-img" data-fid="' + t.file + '" alt="' + esc(t.name || "") + '">'
+           : '<span class="att-file" data-fid="' + t.file + '" data-name="' + esc(t.name || "") + '">📄 ' + esc(t.name || "파일") + '</span>');
+  }
+  return fmt(t);
+}
+function hydrateFiles(log) {
+  log.querySelectorAll("[data-fid]").forEach(elm => {
+    const id = +elm.dataset.fid;
+    if (elm.tagName === "IMG") {
+      getFile(id).then(f => { if (f) elm.src = f.url; });
+      elm.addEventListener("click", () => getFile(id).then(f => f && window.open(f.url)));
+    } else {
+      elm.addEventListener("click", () => getFile(id).then(f => {
+        if (!f) return;
+        const a = document.createElement("a");
+        a.href = f.url; a.download = elm.dataset.name || f.name || "file";
+        a.click();
+      }));
+    }
+  });
 }
 
 /* ───── 저장 · 수정 버튼 (답변칸·팀 메모 공용) ───── */
@@ -1477,11 +1575,43 @@ function wireDock(key, el, ta, btn) {
     }).observe(el);
   }
 
+  // 첨부 (2026-08-05) — 📎 버튼과 드래그앤드랍, 어떤 파일이든
+  function setAtt(meta) {
+    docks[key].att = meta;
+    const row = el.querySelector(".attrow");
+    row.innerHTML = meta ? '<div class="attchip">📎 ' + esc(meta.name) + '<button class="rm" type="button">✕</button></div>' : "";
+    const rm = row.querySelector(".rm");
+    if (rm) rm.addEventListener("click", () => setAtt(null));
+  }
+  async function attach(files) {
+    const f = files && files[0]; if (!f) return;
+    el.querySelector(".attrow").innerHTML = '<div class="attchip">⏳ 올리는 중… ' + esc(f.name) + '</div>';
+    try { setAtt(await uploadFile(f)); }
+    catch (e) { alert(e.message || e); setAtt(null); }
+  }
+  const clip = el.querySelector(".clip"), fpick = el.querySelector(".fpick");
+  clip.addEventListener("click", () => fpick.click());
+  fpick.addEventListener("change", () => { if (fpick.files.length) { attach(fpick.files); fpick.value = ""; } });
+  ["dragenter", "dragover"].forEach(ev => el.addEventListener(ev, e => {
+    e.preventDefault(); el.classList.add("dropping");
+  }));
+  el.addEventListener("dragleave", e => {
+    if (!e.relatedTarget || !el.contains(e.relatedTarget)) el.classList.remove("dropping");
+  });
+  el.addEventListener("drop", e => {
+    e.preventDefault(); el.classList.remove("dropping");
+    if (e.dataTransfer && e.dataTransfer.files.length) attach(e.dataTransfer.files);
+  });
+
   async function send() {
-    const v = ta.value.trim(); if (!v) return;
+    const v = ta.value.trim();
+    const att = docks[key].att;
+    if (!v && !att) return;
     btn.disabled = true; ta.value = ""; chatDrafts[key] = "";
     ta.classList.remove("fixing"); ta.parentElement.classList.remove("fixon");
-    try { await chatSend(key, v); } finally { btn.disabled = false; ta.focus(); }
+    const payload = att ? { file: att.file, name: att.name, mime: att.mime, text: v } : v;
+    setAtt(null);
+    try { await chatSend(key, payload); } finally { btn.disabled = false; ta.focus(); }
   }
   ta.addEventListener("input", () => {
     chatDrafts[key] = ta.value;
