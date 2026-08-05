@@ -93,18 +93,15 @@
   #savedot { font-size: 12px; font-weight: 500; color: var(--on-surface-variant); }
   #savedot.bad { color: var(--tertiary); }
 
-  /* ───── 김비서 머리 배터리 (대화 맥락이 몇 % 찼나) — 채팅 카드 제목줄 오른쪽 ───── */
-  .chathead { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; }
+  /* ───── 김비서 머리 배터리 (대화 맥락이 몇 % 찼나) — 채팅 창 머리(그라데이션 위)라 흰색 계열 ───── */
   #kbbat { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; cursor: default; margin-left: auto; }
-  #kbbat .bat { position: relative; width: 23px; height: 12px; border: 1.5px solid var(--on-surface-variant);
+  #kbbat .bat { position: relative; width: 23px; height: 12px; border: 1.5px solid rgba(255,255,255,.85);
     border-radius: 3.5px; margin-right: 3px; }
   #kbbat .bat::after { content: ""; position: absolute; right: -4.5px; top: 2px; width: 2.5px; height: 5px;
-    background: var(--on-surface-variant); border-radius: 0 1.5px 1.5px 0; }
+    background: rgba(255,255,255,.85); border-radius: 0 1.5px 1.5px 0; }
   #kbbat .fill { position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; max-width: calc(100% - 3px);
     border-radius: 1.5px; background: #2f6f4f; transition: width .3s; }
-  #kbbat .pct { font-size: 12px; font-weight: 700; color: var(--on-surface); white-space: nowrap; }
-  #kbbat .who { font-size: 10px; font-weight: 500; color: var(--on-surface-variant); white-space: nowrap; }
-  @media (max-width: 620px) { #kbbat .who { display: none; } }
+  #kbbat .pct { font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; }
 
   /* ───── 날짜 이동 · 3주 일정표 (note.html에서 가져옴) ───── */
   .iconbtn { width: 40px; height: 40px; border: none; border-radius: var(--r); background: var(--surface-high);
@@ -272,8 +269,49 @@
   .lines .none { padding-left: .15rem; opacity: .8; }
   .lines .none::before { display: none; }
 
-  /* ───── 채팅 ───── */
-  .chat .log { max-height: 420px; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column;
+  /* ───── 플로팅 채팅 버튼 (스크롤해도 오른쪽 위에 고정) ───── */
+  #chatfab { position: fixed; top: 78px; right: 18px; z-index: 75; width: 56px; height: 56px;
+    border: none; border-radius: 99px; background: var(--grad); color: #fff; cursor: pointer;
+    font-family: inherit; box-shadow: 0 6px 22px rgba(0, 102, 136, .38);
+    display: flex; align-items: center; justify-content: center; transition: transform .12s; }
+  #chatfab:hover { transform: scale(1.06); }
+  #chatfab .fabico { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  #chatfab .fabico svg { width: 22px; height: 22px; display: block; }
+  #chatfab .fabname { font-size: 9px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  #chatfab .fabx { display: none; font-size: 20px; font-weight: 600; line-height: 1; }
+  #chatfab.open .fabico { display: none; }
+  #chatfab.open .fabx { display: block; }
+  #chatbadge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px;
+    border-radius: 99px; background: var(--error); color: #fff; font-size: 11px; font-weight: 800;
+    display: grid; place-items: center; padding: 0 5px; box-shadow: 0 0 0 2px var(--surface); line-height: 1; }
+
+  /* ───── 채팅 창 (메신저처럼 페이지 위에 뜬다) ───── */
+  #chatwin { position: fixed; top: 146px; right: 18px; bottom: 18px; width: 400px;
+    max-width: calc(100vw - 36px); z-index: 70; display: none; flex-direction: column;
+    background: var(--surface-lowest); border-radius: var(--r-lg); overflow: hidden;
+    box-shadow: 0 12px 48px rgba(25, 28, 29, .25); }
+  #chatwin.open { display: flex; }
+  .cwhead { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: .55rem;
+    padding: .8rem 3rem .8rem 1rem; background: var(--grad); color: #fff; flex-shrink: 0; }
+  .cwhead .cava { width: 30px; height: 30px; border-radius: 99px; background: rgba(255, 255, 255, .22);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .cwhead .cwtt { font-size: 15px; font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; }
+  .cwhead .cwtt small { display: block; font-size: 10px; font-weight: 500; opacity: .85; letter-spacing: 0; }
+  .cwhead #teachbadge { margin-bottom: 0; }
+  #chatclose { position: absolute; top: .8rem; right: .8rem;
+    border: none; background: rgba(255, 255, 255, .18); color: #fff; width: 30px; height: 30px;
+    border-radius: 99px; font-size: 14px; line-height: 1; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+  #chatclose:hover { background: rgba(255, 255, 255, .32); }
+  @media (max-width: 620px) {
+    #chatfab { top: 70px; right: 12px; width: 50px; height: 50px; }
+    #chatwin { top: 0; right: 0; bottom: 0; left: 0; width: 100%; max-width: none;
+      border-radius: 0; z-index: 80; }
+  }
+
+  /* ───── 채팅 (창 몸통 — 로직이 쓰는 id·구조는 그대로) ───── */
+  .chat { flex: 1; min-height: 0; display: flex; flex-direction: column;
+    padding: .8rem 1rem 1rem; background: var(--surface-lowest); }
+  .chat .log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
     gap: .5rem; padding: .2rem .1rem; }
   .chat .row { display: flex; gap: .45rem; align-items: flex-end; }
   .chat .row.me { justify-content: flex-end; }
@@ -353,7 +391,6 @@
     .topbar .inner { padding: .8rem 1rem; }
     .hero { padding: 1.25rem 1.4rem; }
     .hero .h { font-size: 19px; }
-    .chat .log { max-height: 340px; }
     .bubble { max-width: 88%; }
   }
 </style>
@@ -388,25 +425,6 @@
         <div id="colside"></div>
 
         <section>
-          <div class="seclab chathead">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span>
-            <div id="kbbat" style="display:none" title="김비서 머리 — 대화 맥락이 얼마나 찼는지">
-              <span class="bat"><span class="fill" id="kbbatfill"></span></span>
-              <span class="pct" id="kbbatpct"></span>
-              <span class="who">김비서 머리</span>
-            </div>
-          </div>
-          <div class="panel chat" id="chatpanel">
-            <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다"><span id="teachlabel">수업 중</span><i>·</i><i>·</i><i>·</i></div>
-            <div class="log" id="chatlog"></div>
-            <div id="kbact" style="display:none" title="김비서가 지금 하는 일"><i>·</i><i>·</i><i>·</i><span id="kbactlabel"></span></div>
-            <div class="composer">
-              <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
-              <button id="chatsend" type="button">보내기</button>
-            </div>
-          </div>
-        </section>
-
-        <section>
           <div class="seclab">메모장 <span>· 자동 저장</span></div>
           <div class="panel">
             <textarea id="memo" placeholder="떠오르는 생각, 오늘 있었던 일, 뭐든 적어두세요."></textarea>
@@ -416,6 +434,38 @@
     </div>
 
     <p class="foot">eonfl.com/note2 · 김비서</p>
+  </div>
+
+  <!-- 플로팅 채팅 버튼 — 스크롤해도 오른쪽 위에 고정, 안 읽은 답이 오면 빨간 숫자 -->
+  <button id="chatfab" type="button" title="김비서와 채팅" aria-label="김비서와 채팅">
+    <span class="fabico">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.5 1.42 4.73 3.65 6.2-.18 1.02-.68 2.35-1.5 3.4-.13.17.02.41.23.38 1.87-.28 3.5-1.03 4.6-1.72.96.22 1.97.34 3.02.34 5.52 0 10-3.58 10-8s-4.48-8-10-8z"/></svg>
+      <span class="fabname">김비서</span>
+    </span>
+    <span class="fabx">✕</span>
+    <span id="chatbadge" style="display:none"></span>
+  </button>
+
+  <!-- 채팅 창 — 기존 채팅 카드가 통째로 이사 왔다 (id·구조 동일, 로직은 그대로) -->
+  <div id="chatwin" role="dialog" aria-label="김비서와 채팅">
+    <div class="cwhead">
+      <span class="cava">김</span>
+      <div class="cwtt">김비서<small>3~5초마다 새 답을 확인합니다</small></div>
+      <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다"><span id="teachlabel">수업 중</span><i>·</i><i>·</i><i>·</i></div>
+      <div id="kbbat" style="display:none" title="김비서 머리 — 대화 맥락이 얼마나 찼는지">
+        <span class="bat"><span class="fill" id="kbbatfill"></span></span>
+        <span class="pct" id="kbbatpct"></span>
+      </div>
+      <button id="chatclose" type="button" title="닫기" aria-label="채팅 창 닫기">✕</button>
+    </div>
+    <div class="chat" id="chatpanel">
+      <div class="log" id="chatlog"></div>
+      <div id="kbact" style="display:none" title="김비서가 지금 하는 일"><i>·</i><i>·</i><i>·</i><span id="kbactlabel"></span></div>
+      <div class="composer">
+        <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
+        <button id="chatsend" type="button">보내기</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -848,7 +898,7 @@ const decCache = {};
 
 /* ── 김비서 머리 배터리 ──
    당번이 role="kimbi_meta", status="kbbat" 줄로 {"battery": 34}를 올린다.
-   말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 채팅 카드 제목줄에 그린다 */
+   말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 채팅 창 머리에 그린다 */
 let kbBatSeen = null;
 function drawBattery(p) {
   const box = document.getElementById("kbbat");
@@ -974,6 +1024,7 @@ function drawChat() {
     + (waiting ? '<div class="wait">김비서가 확인하는 중…</div>' : "");
   if (atBottom || !chatSig) log.scrollTop = log.scrollHeight;
   chatSig = sig;
+  if (chatOpen) markChatSeen(); else drawChatBadge();   // 창이 닫혀 있으면 안 읽음 뱃지만 갱신
 }
 
 async function kbSend(text) {
@@ -1018,6 +1069,45 @@ async function kbSend(text) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
 })();
+
+/* ───── 플로팅 채팅 창 — 열림/닫힘(localStorage 기억)·안 읽음 뱃지 ─────
+   채팅 로직(폴링·전송·암호)은 위 그대로고, 여기는 껍데기(창)와 뱃지만 다룬다 */
+const CHATOPEN_KEY = "kb-chat-open", CHATSEEN_KEY = "kb-chat-seen";
+let chatOpen = localStorage.getItem(CHATOPEN_KEY) === "1";
+function drawChatBadge() {
+  let seen = localStorage.getItem(CHATSEEN_KEY);
+  const kbIds = kbCache.filter(m => m.role === "kimbi").map(m => m.id);
+  if (seen === null && kbIds.length) {      // 이 브라우저 첫 사용 — 지난 대화는 읽은 것으로 친다
+    seen = String(Math.max.apply(null, kbIds));
+    localStorage.setItem(CHATSEEN_KEY, seen);
+  }
+  const n = kbIds.filter(id => id > +(seen || 0)).length;
+  const b = document.getElementById("chatbadge");
+  if (!chatOpen && n > 0) { b.textContent = n > 99 ? "99+" : String(n); b.style.display = ""; }
+  else b.style.display = "none";
+}
+function markChatSeen() {
+  const kbIds = kbCache.filter(m => m.role === "kimbi").map(m => m.id);
+  if (kbIds.length) {
+    const top = Math.max.apply(null, kbIds);
+    if (top > +(localStorage.getItem(CHATSEEN_KEY) || 0)) localStorage.setItem(CHATSEEN_KEY, String(top));
+  }
+  drawChatBadge();
+}
+function drawChatWin() {
+  document.getElementById("chatwin").classList.toggle("open", chatOpen);
+  document.getElementById("chatfab").classList.toggle("open", chatOpen);
+  localStorage.setItem(CHATOPEN_KEY, chatOpen ? "1" : "0");
+  if (chatOpen) {
+    markChatSeen();
+    const log = document.getElementById("chatlog");
+    log.scrollTop = log.scrollHeight;
+  } else drawChatBadge();
+}
+document.getElementById("chatfab").addEventListener("click", () => { chatOpen = !chatOpen; drawChatWin(); });
+document.getElementById("chatclose").addEventListener("click", () => { chatOpen = false; drawChatWin(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && chatOpen) { chatOpen = false; drawChatWin(); } });
+drawChatWin();
 
 /* ───── 오늘판 새로 왔나 보기 (45초마다) ───── */
 let daySig = "", dayTimer = null, USERNAV = false;   // USERNAV=대표님이 직접 과거로 이동한 상태
