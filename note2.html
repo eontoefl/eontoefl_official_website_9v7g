@@ -297,7 +297,6 @@
     display: grid; place-items: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
   .cwhead .cwtt { font-size: 15px; font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; }
   .cwhead .cwtt small { display: block; font-size: 10px; font-weight: 500; opacity: .85; letter-spacing: 0; }
-  .cwhead #teachbadge { margin-bottom: 0; }
   #chatclose { position: absolute; top: .8rem; right: .8rem;
     border: none; background: rgba(255, 255, 255, .18); color: #fff; width: 30px; height: 30px;
     border-radius: 99px; font-size: 14px; line-height: 1; cursor: pointer; font-family: inherit; flex-shrink: 0; }
@@ -346,6 +345,11 @@
   .mdli { padding-left: 1.05em; text-indent: -1.05em; }
   .mdli::before { content: "•"; margin-right: .5em; color: var(--on-surface-variant); }
   .bubble.me .mdli::before { color: rgba(255,255,255,.8); }
+  /* 명령 칩 — 보낸 말풍선에서 /teach·/end 원문 대신 알약으로 */
+  .cmdchip { display: inline-block; background: #b47800; color: #fff; border-radius: 99px;
+    padding: 1px 10px; font-size: 11px; font-weight: 800; letter-spacing: .05em;
+    margin-right: .3rem; vertical-align: 1px; }
+  .cmdchip.end { background: #2f6f4f; }
   .chat .tm { font-size: 10px; color: var(--on-surface-variant); flex-shrink: 0; margin-bottom: 3px; }
   .chat .empty { font-size: 12.5px; color: var(--on-surface-variant); opacity: .65; padding: .3rem 0; }
   .chat .wait { font-size: 12px; color: var(--primary); font-weight: 500; padding: .45rem 0 .1rem; }
@@ -360,29 +364,28 @@
   #kbact span { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (prefers-reduced-motion: reduce) { #kbact i { animation: none; opacity: 1; } }
   .chat .composer { display: flex; gap: .4rem; margin-top: .7rem; }
-  .chat .composer textarea { flex: 1; min-width: 0; min-height: 42px; max-height: 140px;
+  .chat .composer .tawrap { flex: 1; min-width: 0; position: relative; }
+  .chat .composer textarea { display: block; width: 100%; min-height: 42px; max-height: 140px;
     background: var(--surface-highest); border: none; border-radius: var(--r); padding: .6rem .8rem;
     font-family: inherit; font-size: 14px; line-height: 1.6; color: var(--on-surface); resize: vertical; outline: none; }
+  /* 맨 앞 /teach·/end 하이라이트 — textarea 글자를 투명하게 하고, 같은 칸(미러)이 위에서 대신 그린다 */
+  .chat .composer textarea.hascmd { color: transparent; caret-color: var(--on-surface); }
+  #tamirror { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    padding: .6rem .8rem; border-radius: var(--r); font-family: inherit; font-size: 14px; line-height: 1.6;
+    color: var(--on-surface); white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
+  #tamirror .cmdtok { font-weight: 800; color: #b47800; }
+  #tamirror .cmdtok.end { color: #2f6f4f; }
   .chat .composer textarea:focus { outline: 2px solid var(--primary-fixed-dim); }
   .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
 
-  /* ───── 수업 모드 (/teach ~ /end) ───── */
-  .chat.teach { background: #fff8ec; box-shadow: var(--lift), inset 0 0 0 2px #f0cd85; }
+  /* ───── 수업 모드 (/teach ~ /end) — 뱃지 없이, 채팅창 안쪽 테두리 글로우로 알린다 ───── */
+  .chat { transition: background .25s, box-shadow .25s; }
+  .chat.teach { background: #fff8ec;
+    box-shadow: inset 0 0 0 2px #e6b04b, inset 0 0 34px rgba(203, 141, 15, .26); }
   .chat.teach .composer textarea { background: #f6ead2; }
-  #teachbadge { display: inline-flex; align-items: center; background: #b47800; color: #fff;
-    border-radius: 99px; padding: 3px 12px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
-    margin-bottom: .7rem; max-width: 100%; }
-  #teachbadge i { font-style: normal; font-weight: 800; margin-left: 2px; opacity: .3;
-    animation: teachdot 1.5s ease-in-out infinite; }
-  #teachbadge i:nth-of-type(2) { animation-delay: .25s; }
-  #teachbadge i:nth-of-type(3) { animation-delay: .5s; }
-  @keyframes teachdot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { #teachbadge i { animation: none; opacity: 1; } }
-  /* 입력창에 /teach·/end를 치는 중(전송 전) — 살짝 흐리고 점 애니메이션 멈춤 */
-  #teachbadge.pre { opacity: .72; }
-  #teachbadge.pre i { animation-play-state: paused; opacity: .3; }
+  @keyframes teachdot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }   /* #kbact 점이 쓴다 */
 
   /* ───── 메모장 ───── */
   #memo { width: 100%; min-height: 120px; background: var(--surface-highest); border: none; border-radius: var(--r);
@@ -457,7 +460,6 @@
     <div class="cwhead">
       <span class="cava">김</span>
       <div class="cwtt">김비서<small>3~5초마다 새 답을 확인합니다</small></div>
-      <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다"><span id="teachlabel">수업 중</span><i>·</i><i>·</i><i>·</i></div>
       <div id="kbbat" style="display:none" title="김비서 머리 — 대화 맥락이 얼마나 찼는지">
         <span class="bat"><span class="fill" id="kbbatfill"></span></span>
         <span class="pct" id="kbbatpct"></span>
@@ -468,7 +470,10 @@
       <div class="log" id="chatlog"></div>
       <div id="kbact" style="display:none" title="김비서가 지금 하는 일"><i>·</i><i>·</i><i>·</i><span id="kbactlabel"></span></div>
       <div class="composer">
-        <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
+        <div class="tawrap">
+          <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
+          <div id="tamirror" aria-hidden="true" style="display:none"></div>
+        </div>
         <button id="chatsend" type="button">보내기</button>
       </div>
     </div>
@@ -939,22 +944,13 @@ function drawAct() {
 let kbTeach = false, kbModeSeen = null;
 const PH_CHAT = "김비서에게 할 말";
 const PH_TEACH = "수업 중 — 김비서가 배우고 있어요. 다 가르치셨으면 /end";
-let kbTypePre = null; // 입력창에 치는 중인 명령어(전송 전): "teach" | "end" | null
-function drawTeachUI() {
-  const badge = document.getElementById("teachbadge");
-  const showPre = !kbTeach && kbTypePre === "teach";   // 수업 전인데 /teach를 치는 중
-  const endPre = kbTeach && kbTypePre === "end";       // 수업 중인데 /end를 치는 중
-  badge.style.display = (kbTeach || showPre) ? "" : "none";
-  document.getElementById("teachlabel").textContent = showPre ? "수업 시작 대기" : "수업 중";
-  badge.classList.toggle("pre", showPre || endPre);
-}
 function drawTeach(on) {
   on = !!on;
   if (on === kbTeach) return;
   kbTeach = on;
+  // .teach = 배경 틴트 + 안쪽 테두리 글로우 (뱃지는 없다 — 입력창 하이라이트·말풍선 칩이 대신한다)
   document.getElementById("chatpanel").classList.toggle("teach", on);
   document.getElementById("chatta").placeholder = on ? PH_TEACH : PH_CHAT;
-  drawTeachUI();
 }
 
 async function kbLoad() {
@@ -1020,8 +1016,15 @@ function drawChat() {
   log.innerHTML = (kbCache.length
     ? kbCache.map((m, i) => {
         const t = '<span class="tm">' + esc(hhmm(m.at)) + '</span>';
-        if (m.role === "boss")
-          return '<div class="row me">' + t + '<div class="bubble me">' + fmt(plain(m.text)) + '</div></div>';
+        if (m.role === "boss") {
+          const s = plain(m.text);
+          const cm = /^\s*\/(teach|end)(?=\s|$)/i.exec(s);   // 명령이면 원문 대신 칩 (저장 원문은 그대로)
+          const body = cm
+            ? '<span class="cmdchip' + (cm[1].toLowerCase() === "end" ? " end" : "") + '">' +
+              cm[1].toLowerCase() + '</span>' + fmt(s.slice(cm[0].length).replace(/^\s+/, ""))
+            : fmt(s);
+          return '<div class="row me">' + t + '<div class="bubble me">' + body + '</div></div>';
+        }
         const same = i > 0 && kbCache[i - 1].role === "kimbi";
         return '<div class="row"><span class="ava' + (same ? ' hide' : '') + '">김</span>' +
           '<div class="bubble kb">' + fmt(plain(m.text)) + '</div>' + t + '</div>';
@@ -1034,10 +1037,10 @@ function drawChat() {
 }
 
 async function kbSend(text) {
-  // /teach·/end는 서버 확인 전에 미리 반영한다 (나중에 kbmode 줄이 오면 그 값이 진실)
+  // /teach·/end(뒤에 말이 붙어도)는 서버 확인 전에 미리 반영한다 (나중에 kbmode 줄이 오면 그 값이 진실)
   const cmd = String(text).trim();
-  if (cmd === "/teach") drawTeach(true);
-  else if (cmd === "/end") drawTeach(false);
+  if (/^\/teach(\s|$)/i.test(cmd)) drawTeach(true);
+  else if (/^\/end(\s|$)/i.test(cmd)) drawTeach(false);
   // 말풍선을 저장을 기다리지 않고 즉시 띄운다
   kbCache.push({ id: 0, role: "boss", text: text, at: new Date().toISOString() });
   chatSig = ""; drawChat();
@@ -1058,19 +1061,32 @@ async function kbSend(text) {
 
 (function () {
   const ta = document.getElementById("chatta"), btn = document.getElementById("chatsend");
+  const mirror = document.getElementById("tamirror");
+  /* 입력값 맨 앞의 /teach·/end를 치는 순간 볼드+색으로 —
+     textarea 글자를 투명하게 하고, 똑같은 칸(미러)이 위에서 전체 글자를 대신 그린다 */
+  function drawMirror() {
+    const v = ta.value;
+    const m = /^(\s*)(\/teach|\/end)(?=\s|$)/i.exec(v);
+    if (m) {
+      mirror.innerHTML = esc(m[1]) +
+        '<span class="cmdtok' + (m[2].toLowerCase() === "/end" ? " end" : "") + '">' + esc(m[2]) + '</span>' +
+        esc(v.slice(m[0].length)) + "​";   // 끝의 빈 줄도 textarea와 똑같이 보이게
+      mirror.style.display = "";
+      ta.classList.add("hascmd");
+      mirror.scrollTop = ta.scrollTop;
+    } else {
+      mirror.style.display = "none";
+      ta.classList.remove("hascmd");
+    }
+  }
   async function send() {
     const v = ta.value.trim(); if (!v) return;
-    btn.disabled = true; ta.value = "";
-    if (kbTypePre) { kbTypePre = null; drawTeachUI(); }   // 입력창이 비었으니 타이핑 미리보기 해제
+    btn.disabled = true; ta.value = ""; drawMirror();   // 입력창이 비었으니 하이라이트도 해제
     try { await kbSend(v); } finally { btn.disabled = false; ta.focus(); }
   }
   btn.addEventListener("click", send);
-  ta.addEventListener("input", () => {
-    // "/teach"를 치는 순간 뱃지를 미리 보여주고, 지우면 다시 숨긴다 (실제 수업 모드가 켜져 있으면 무관)
-    const v = ta.value.trim().toLowerCase();
-    const pre = v.startsWith("/teach") ? "teach" : v.startsWith("/end") ? "end" : null;
-    if (pre !== kbTypePre) { kbTypePre = pre; drawTeachUI(); }
-  });
+  ta.addEventListener("input", drawMirror);
+  ta.addEventListener("scroll", () => { if (ta.classList.contains("hascmd")) mirror.scrollTop = ta.scrollTop; });
   ta.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
