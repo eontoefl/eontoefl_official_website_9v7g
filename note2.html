@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <title>김비서</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -303,21 +303,24 @@
   #chatclose:hover { background: rgba(255, 255, 255, .32); }
   @media (max-width: 620px) {
     #chatfab { top: 70px; right: 12px; width: 50px; height: 50px; }
-    #chatwin { top: 0; right: 0; bottom: 0; left: 0; width: 100%; max-width: none;
-      border-radius: 0; z-index: 80; }
+    /* 완전 전체 화면 — 100dvh로 주소창 변동·키보드(뷰포트 meta의 resizes-content)에 따라간다 */
+    #chatwin { top: 0; right: 0; bottom: auto; left: 0; width: 100%; height: 100vh; height: 100dvh;
+      max-width: none; border-radius: 0; z-index: 80; }
+    /* 채팅이 떠 있는 동안 뒤 페이지는 안 움직인다 */
+    body.chatlock { overflow: hidden; }
   }
 
-  /* ───── 팝업 창 모드 (?chat=1) — 진짜 새 창에 채팅만 가득 채운다 ───── */
-  body.chatonly { padding: 0; }
+  /* ───── 팝업 창 모드 (?chat=1) — 진짜 새 창(또는 모바일 즐겨찾기 탭)에 채팅만 가득 채운다 ───── */
+  body.chatonly { padding: 0; overflow: hidden; }
   body.chatonly .topbar, body.chatonly .wrap, body.chatonly #chatfab { display: none; }
-  body.chatonly #chatwin { display: flex; top: 0; right: 0; bottom: 0; left: 0; width: 100%;
-    max-width: none; border-radius: 0; box-shadow: none; }
+  body.chatonly #chatwin { display: flex; top: 0; right: 0; bottom: auto; left: 0; width: 100%;
+    height: 100vh; height: 100dvh; max-width: none; border-radius: 0; box-shadow: none; }
 
   /* ───── 채팅 (창 몸통 — 로직이 쓰는 id·구조는 그대로) ───── */
   .chat { flex: 1; min-height: 0; display: flex; flex-direction: column;
     padding: .8rem 1rem 1rem; background: var(--surface-lowest); }
-  .chat .log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
-    gap: .5rem; padding: .2rem .1rem; }
+  .chat .log { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: .5rem; padding: .2rem .1rem; }
   .chat .row { display: flex; gap: .45rem; align-items: flex-end; }
   .chat .row.me { justify-content: flex-end; }
   .chat .ava { width: 27px; height: 27px; border-radius: 99px; flex-shrink: 0; margin-bottom: 2px;
@@ -438,6 +441,10 @@
     .hero { padding: 1.25rem 1.4rem; }
     .hero .h { font-size: 19px; }
     .bubble { max-width: 88%; }
+    /* 입력창이 16px 미만이면 모바일 브라우저가 탭할 때 멋대로 확대한다 —
+       미러는 반드시 같은 값으로(커서 정합). 이 블록은 기본 규칙들보다 뒤라서 이긴다 */
+    .chat .composer textarea, #tamirror { font-size: 16px; }
+    #memo { font-size: 16px; }
   }
 </style>
 </head>
@@ -1334,6 +1341,8 @@ function markChatSeen() {
 function drawChatWin() {
   document.getElementById("chatwin").classList.toggle("open", chatOpen);
   document.getElementById("chatfab").classList.toggle("open", chatOpen && !CHATONLY);
+  // 좁은 화면에서 채팅이 떠 있는 동안 뒤 페이지 스크롤 잠금 (CSS는 620px 이하에서만 적용)
+  document.body.classList.toggle("chatlock", chatOpen && !CHATONLY);
   if (!CHATONLY) localStorage.setItem(CHATOPEN_KEY, chatOpen ? "1" : "0");
   if (chatOpen) {
     markChatSeen();
