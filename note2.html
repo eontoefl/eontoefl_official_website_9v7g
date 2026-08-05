@@ -293,6 +293,19 @@
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
 
+  /* ───── 수업 모드 (/teach ~ /end) ───── */
+  .chat.teach { background: #fff8ec; box-shadow: var(--lift), inset 0 0 0 2px #f0cd85; }
+  .chat.teach .composer textarea { background: #f6ead2; }
+  #teachbadge { display: inline-flex; align-items: center; background: #b47800; color: #fff;
+    border-radius: 99px; padding: 3px 12px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+    margin-bottom: .7rem; max-width: 100%; }
+  #teachbadge i { font-style: normal; font-weight: 800; margin-left: 2px; opacity: .3;
+    animation: teachdot 1.5s ease-in-out infinite; }
+  #teachbadge i:nth-of-type(2) { animation-delay: .25s; }
+  #teachbadge i:nth-of-type(3) { animation-delay: .5s; }
+  @keyframes teachdot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #teachbadge i { animation: none; opacity: 1; } }
+
   /* ───── 메모장 ───── */
   #memo { width: 100%; min-height: 120px; background: var(--surface-highest); border: none; border-radius: var(--r);
     padding: 1rem 1.15rem; font-family: inherit; font-size: 14.5px; line-height: 1.7; color: var(--on-surface);
@@ -347,7 +360,8 @@
 
         <section>
           <div class="seclab">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span></div>
-          <div class="panel chat">
+          <div class="panel chat" id="chatpanel">
+            <div id="teachbadge" style="display:none" title="/teach로 시작된 수업 모드 — /end로 끝납니다">수업 중<i>·</i><i>·</i><i>·</i></div>
             <div class="log" id="chatlog"></div>
             <div class="composer">
               <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
@@ -760,6 +774,21 @@ function drawBattery(p) {
   box.style.display = "";
 }
 
+/* ── 수업 모드 (/teach ~ /end) ──
+   당번이 role="kimbi_meta", status="kbmode" 줄로 {"teach": true/false}를 올린다.
+   /teach·/end를 보내는 즉시 미리 켜고 끄되, 서버 kbmode 줄이 오면 그 값을 진실로 따른다 */
+let kbTeach = false, kbModeSeen = null;
+const PH_CHAT = "김비서에게 할 말";
+const PH_TEACH = "수업 중 — 김비서가 배우고 있어요. 다 가르치셨으면 /end";
+function drawTeach(on) {
+  on = !!on;
+  if (on === kbTeach) return;
+  kbTeach = on;
+  document.getElementById("teachbadge").style.display = on ? "" : "none";
+  document.getElementById("chatpanel").classList.toggle("teach", on);
+  document.getElementById("chatta").placeholder = on ? PH_TEACH : PH_CHAT;
+}
+
 async function kbLoad() {
   clearTimeout(kbTimer);
   if (!PW) return;
@@ -769,10 +798,11 @@ async function kbLoad() {
     const rows = await r.json();
     if (!Array.isArray(rows)) throw new Error("bad");
     const out = [], alive = new Set();
-    let meta = null;
+    let meta = null, mode = null;
     for (const row of rows) {
       if (row.role === "kimbi_meta") {          // 상태 줄 — 채팅에는 절대 안 띄운다
         if (row.status === "kbbat") meta = row; // id 오름차순이라 마지막 것이 최신
+        else if (row.status === "kbmode") mode = row;
         continue;
       }
       const isMine = row.role === "boss";
@@ -794,6 +824,11 @@ async function kbLoad() {
     if (meta && meta.id !== kbBatSeen) {
       kbBatSeen = meta.id;
       try { const v = await unlockText(PW, meta.body); drawBattery(v ? +v.battery : NaN); }
+      catch (e) { /* 못 읽으면 이전 표시 유지 */ }
+    }
+    if (mode && mode.id !== kbModeSeen) {
+      kbModeSeen = mode.id;
+      try { const v = await unlockText(PW, mode.body); drawTeach(!!(v && v.teach)); }
       catch (e) { /* 못 읽으면 이전 표시 유지 */ }
     }
   } catch (e) { /* 조용히 다음 차례에 재시도 */ }
@@ -823,6 +858,10 @@ function drawChat() {
 }
 
 async function kbSend(text) {
+  // /teach·/end는 서버 확인 전에 미리 반영한다 (나중에 kbmode 줄이 오면 그 값이 진실)
+  const cmd = String(text).trim();
+  if (cmd === "/teach") drawTeach(true);
+  else if (cmd === "/end") drawTeach(false);
   // 말풍선을 저장을 기다리지 않고 즉시 띄운다
   kbCache.push({ id: 0, role: "boss", text: text, at: new Date().toISOString() });
   chatSig = ""; drawChat();
