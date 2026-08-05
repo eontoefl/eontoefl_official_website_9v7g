@@ -360,7 +360,15 @@
   .dept p b { color: var(--on-surface); font-weight: 600; }
   .nag { background: var(--surface-low); border-radius: var(--r); padding: 1rem 1.15rem; font-size: 13.5px;
     margin-top: 1rem; line-height: 1.7; color: var(--on-surface-variant); }
-  .nag::before { content: "💬 "; }
+  .nag::before { content: "🚨 "; }
+  /* 팀 카드의 접힌 백로그 (2026-08-05 계기판 개편) */
+  .blog-line { margin-top: .8rem; font-size: 12px; color: var(--on-surface-variant); cursor: pointer;
+    user-select: none; display: flex; align-items: center; gap: .35rem; }
+  .blog-line .tri { transition: transform .15s; font-size: 10px; }
+  .blog-line.open .tri { transform: rotate(90deg); }
+  .blog-list { display: none; margin: .4rem 0 0; padding-left: 1.1rem; font-size: 12.5px;
+    line-height: 1.9; color: var(--on-surface-variant); }
+  .blog-list.on { display: block; }
   /* 팀 카드의 이야기하기 버튼 */
   .chatbtn { margin-top: 1rem; width: 100%; background: var(--surface-high); color: var(--on-primary-container);
     border: none; border-radius: var(--r); padding: 11px; font-family: inherit; font-size: 13.5px;
@@ -1355,20 +1363,17 @@ function mountDept(key) {
     (dp.kpi ? '<div class="kpi">' + dp.kpi.map(k => '<div><div class="k">' + esc(k.k) + '</div><div class="v">' + esc(k.v) + '</div></div>').join("") + '</div>' : "") +
     (dp.gauge ? '<div class="gauge"><div class="lab"><span>' + esc(dp.gauge.label) + '</span><span>' + esc(dp.gauge.text) + '</span></div>' +
       '<div class="track"><div class="bar" style="width:' + dp.gauge.pct + '%"></div></div></div>' : "") +
-    (function () {              // 보고는 번호를 붙여 한 줄씩, 아래에 '그래서 이렇게 하자'
-      let n = 0;
-      return (dp.paras || []).map(p => {
-        if (typeof p !== "string") {                       // { f: 사실, s: 제안 }
-          return '<p><span class="no">' + (++n) + '</span><span>' + (p.f || "") +
-                 (p.s ? '<span class="sug">' + p.s + '</span>' : "") + '</span></p>';
-        }
-        const head = p.trim().startsWith("<b>");            // 소제목 문단은 번호 없이
-        return head ? '<p class="note">' + p + '</p>'
-                    : '<p><span class="no">' + (++n) + '</span><span>' + p + '</span></p>';
-      }).join("");
-    })() +
     (dp.nag ? '<div class="nag">' + esc(dp.nag) + '</div>' : "") +
+    (Array.isArray(dp.backlog) && dp.backlog.length
+      ? '<div class="blog-line"><span class="tri">▶</span>백로그 ' + dp.backlog.length + '개</div>' +
+        '<ul class="blog-list">' + dp.backlog.map(b => '<li>' + esc(String(b)) + '</li>').join("") + '</ul>'
+      : "") +
     '<button class="chatbtn" type="button">💬 ' + esc(person || "팀장") + ' 팀장과 이야기하기<span class="new"></span></button>';
+  const bl = el.querySelector(".blog-line");
+  if (bl) bl.addEventListener("click", () => {
+    bl.classList.toggle("open");
+    el.querySelector(".blog-list").classList.toggle("on");
+  });
   const cb = el.querySelector(".chatbtn");
   chatBtns[key] = cb;
   cb.addEventListener("click", () => openDock(key, team, person));
