@@ -907,6 +907,20 @@ document.getElementById("offbtn").addEventListener("click", async () => {
 let kbCache = [], kbTimer = null;
 const decCache = {};
 
+/* ── /teach·/end 토큰 판정 — 메시지 어느 위치에 있어도, 단어 경계 기준, 대소문자 무시 ──
+   당번(서버)의 (?<![\w/])\/(teach|end)(?!\w) 와 같은 판정이다. 룩비하인드 대신 앞글자를
+   캡처해 되돌려 넣는 방식(구형 사파리 호환): 앞글자가 글자·숫자·_·/ 가 아니어야 토큰 */
+const CMD_RE = () => /(^|[^\w/])(\/(teach|end))(?!\w)/gi;
+function hasCmd(text, which) {
+  let m; const re = CMD_RE();
+  while ((m = re.exec(String(text)))) if (m[3].toLowerCase() === which) return true;
+  return false;
+}
+/* esc를 이미 거친 HTML 속 토큰을 그 자리에서 칩으로 — 토큰엔 특수문자가 없어 esc 후에도 원형 */
+const chipify = h => String(h).replace(CMD_RE(), (all, pre, tok, name) =>
+  pre + '<span class="cmdchip' + (name.toLowerCase() === "end" ? " end" : "") + '">' +
+  name.toLowerCase() + '</span>');
+
 /* ── 김비서 머리 배터리 ──
    당번이 role="kimbi_meta", status="kbbat" 줄로 {"battery": 34}를 올린다.
    말풍선·"확인하는 중"에는 절대 안 섞고, 최신(id 최대) 줄만 채팅 창 머리에 그린다 */
@@ -1016,15 +1030,9 @@ function drawChat() {
   log.innerHTML = (kbCache.length
     ? kbCache.map((m, i) => {
         const t = '<span class="tm">' + esc(hhmm(m.at)) + '</span>';
-        if (m.role === "boss") {
-          const s = plain(m.text);
-          const cm = /^\s*\/(teach|end)(?=\s|$)/i.exec(s);   // 명령이면 원문 대신 칩 (저장 원문은 그대로)
-          const body = cm
-            ? '<span class="cmdchip' + (cm[1].toLowerCase() === "end" ? " end" : "") + '">' +
-              cm[1].toLowerCase() + '</span>' + fmt(s.slice(cm[0].length).replace(/^\s+/, ""))
-            : fmt(s);
-          return '<div class="row me">' + t + '<div class="bubble me">' + body + '</div></div>';
-        }
+        if (m.role === "boss")
+          // 토큰이 어디에 있든 그 자리에서 칩으로 (저장 원문은 그대로, 렌더링만)
+          return '<div class="row me">' + t + '<div class="bubble me">' + chipify(fmt(plain(m.text))) + '</div></div>';
         const same = i > 0 && kbCache[i - 1].role === "kimbi";
         return '<div class="row"><span class="ava' + (same ? ' hide' : '') + '">김</span>' +
           '<div class="bubble kb">' + fmt(plain(m.text)) + '</div>' + t + '</div>';
@@ -1037,10 +1045,9 @@ function drawChat() {
 }
 
 async function kbSend(text) {
-  // /teach·/end(뒤에 말이 붙어도)는 서버 확인 전에 미리 반영한다 (나중에 kbmode 줄이 오면 그 값이 진실)
-  const cmd = String(text).trim();
-  if (/^\/teach(\s|$)/i.test(cmd)) drawTeach(true);
-  else if (/^\/end(\s|$)/i.test(cmd)) drawTeach(false);
+  // /teach·/end 토큰이 어느 위치에 있든 서버 확인 전에 미리 반영한다 (나중에 kbmode 줄이 오면 그 값이 진실)
+  if (hasCmd(text, "teach")) drawTeach(true);
+  else if (hasCmd(text, "end")) drawTeach(false);
   // 말풍선을 저장을 기다리지 않고 즉시 띄운다
   kbCache.push({ id: 0, role: "boss", text: text, at: new Date().toISOString() });
   chatSig = ""; drawChat();
@@ -1062,22 +1069,28 @@ async function kbSend(text) {
 (function () {
   const ta = document.getElementById("chatta"), btn = document.getElementById("chatsend");
   const mirror = document.getElementById("tamirror");
-  /* 입력값 맨 앞의 /teach·/end를 치는 순간 볼드+색으로 —
+  /* 입력값 속 /teach·/end 토큰(위치 무관, 여러 개면 각각)을 치는 순간 볼드+색으로 —
      textarea 글자를 투명하게 하고, 똑같은 칸(미러)이 위에서 전체 글자를 대신 그린다 */
   function drawMirror() {
     const v = ta.value;
-    const m = /^(\s*)(\/teach|\/end)(?=\s|$)/i.exec(v);
-    if (m) {
-      mirror.innerHTML = esc(m[1]) +
-        '<span class="cmdtok' + (m[2].toLowerCase() === "/end" ? " end" : "") + '">' + esc(m[2]) + '</span>' +
-        esc(v.slice(m[0].length)) + "​";   // 끝의 빈 줄도 textarea와 똑같이 보이게
-      mirror.style.display = "";
-      ta.classList.add("hascmd");
-      mirror.scrollTop = ta.scrollTop;
-    } else {
+    if (!CMD_RE().test(v)) {
       mirror.style.display = "none";
+      mirror.innerHTML = "";
       ta.classList.remove("hascmd");
+      return;
     }
+    let html = "", last = 0, m;
+    const re = CMD_RE();
+    while ((m = re.exec(v))) {
+      const at = m.index + m[1].length;          // 캡처한 앞글자는 일반 글자로 되돌린다
+      html += esc(v.slice(last, at)) +
+        '<span class="cmdtok' + (m[3].toLowerCase() === "end" ? " end" : "") + '">' + esc(m[2]) + '</span>';
+      last = at + m[2].length;
+    }
+    mirror.innerHTML = html + esc(v.slice(last)) + "\u200b";   // 끝의 빈 줄도 textarea와 똑같이
+    mirror.style.display = "block";
+    ta.classList.add("hascmd");
+    mirror.scrollTop = ta.scrollTop;
   }
   async function send() {
     const v = ta.value.trim(); if (!v) return;
