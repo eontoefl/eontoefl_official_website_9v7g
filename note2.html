@@ -368,13 +368,21 @@
   .chat .composer textarea { display: block; width: 100%; min-height: 42px; max-height: 140px;
     background: var(--surface-highest); border: none; border-radius: var(--r); padding: .6rem .8rem;
     font-family: inherit; font-size: 14px; line-height: 1.6; color: var(--on-surface); resize: vertical; outline: none; }
-  /* 맨 앞 /teach·/end 하이라이트 — textarea 글자를 투명하게 하고, 같은 칸(미러)이 위에서 대신 그린다 */
+  /* 스크롤바가 폭을 먹으면 줄바꿈 지점이 미러와 어긋난다 — 입력창 스크롤바는 숨긴다(스크롤은 그대로 됨) */
+  .chat .composer textarea { scrollbar-width: none; }
+  .chat .composer textarea::-webkit-scrollbar { display: none; }
+  /* /teach·/end 하이라이트 — textarea 글자를 투명하게 하고, 같은 칸(미러)이 위에서 대신 그린다 */
   .chat .composer textarea.hascmd { color: transparent; caret-color: var(--on-surface); }
   #tamirror { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
     padding: .6rem .8rem; border-radius: var(--r); font-family: inherit; font-size: 14px; line-height: 1.6;
     color: var(--on-surface); white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
-  #tamirror .cmdtok { font-weight: 800; color: #b47800; }
-  #tamirror .cmdtok.end { color: #2f6f4f; }
+  /* 토큰 강조 — 글자 폭이 변하는 속성(볼드·패딩·자간) 금지: 커서는 textarea(비볼드) 기준으로
+     그려지므로 폭이 달라지면 커서가 어긋나 보인다. 색+배경 알약+가짜 볼드(text-shadow)로만 강조 */
+  #tamirror .cmdtok { color: #b47800; text-shadow: 0 0 .6px currentColor;
+    background: rgba(180, 120, 0, .13); border-radius: 4px;
+    box-shadow: 0 0 0 2.5px rgba(180, 120, 0, .13); }
+  #tamirror .cmdtok.end { color: #2f6f4f; background: rgba(47, 111, 79, .13);
+    box-shadow: 0 0 0 2.5px rgba(47, 111, 79, .13); }
   .chat .composer textarea:focus { outline: 2px solid var(--primary-fixed-dim); }
   .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
