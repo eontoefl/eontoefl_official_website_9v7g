@@ -641,6 +641,7 @@ async function unlockText(pw, blob) {
 /* ───── 상태 ───── */
 let PW = null, DATE = null, DAY = null, STATE = null, DATES = [], saveTimer = null;
 let PLANNING = false;   // 한지우 팀장이 시간표를 짜는 중 (plan 줄이 done이 될 때까지)
+let CANDOPEN = false;   // 시간표가 짜인 뒤에도 후보 칸을 펼쳐둔 상태 (다시 고르기)
 const todayStr = () => { const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const shift = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n);
@@ -1018,12 +1019,31 @@ function drawCand() {
       '채팅에서 <b>"확정"</b>하신 팀의 후보가 여기 올라옵니다.</div>';
     return;
   }
+  const planned = !!(DAY.todos && DAY.todos.length);
+  const unpicked = cand.length - picks.length;
+
+  // 짜는 중 — 한 줄로만 보인다
+  if (PLANNING) {
+    box.innerHTML = '<div class="ch"><span class="lab">팀장들이 올린 후보</span>' +
+      '<span class="n">한지우 팀장이 시간표 짜는 중… (몇 분 걸립니다)</span></div>';
+    return;
+  }
+  // 시간표가 이미 짜인 날은 접어둔다 — 위 시간표와 겹쳐 보이면 헷갈린다 (2026-08-05 대표님 지적)
+  if (planned && !CANDOPEN) {
+    box.innerHTML = '<div class="ch"><span class="lab">팀장들이 올린 후보</span>' +
+      '<span class="n">' + cand.length + '개 · 시간표에 반영됨' +
+        (unpicked > 0 ? ' · <b>안 고른 것 ' + unpicked + '개</b>' : '') + '</span>' +
+      '<button type="button" id="candopen">펼쳐서 다시 고르기</button></div>';
+    document.getElementById("candopen").addEventListener("click", () => { CANDOPEN = true; drawCand(); });
+    return;
+  }
+
   box.innerHTML =
     '<div class="ch"><span class="lab">팀장들이 올린 후보</span>' +
       '<span class="n">' + cand.length + '개 중 ' + picks.length + '개' + (picks.length ? " 고르심" : "") + '</span>' +
-      (PLANNING
-        ? '<button type="button" id="planbtn" disabled>한지우 팀장이 시간표 짜는 중… (몇 분 걸립니다)</button></div>'
-        : '<button type="button" id="planbtn"' + (picks.length ? "" : " disabled") + '>고른 것으로 시간표 짜기</button></div>') +
+      (planned ? '<button type="button" id="candfold">접기</button>' : '') +
+      '<button type="button" id="planbtn"' + (picks.length ? "" : " disabled") + '>고른 것으로 시간표 ' +
+        (planned ? '다시 ' : '') + '짜기</button></div>' +
     cand.map(c => {
       const n = pos(c.id);
       return '<div class="it' + (n >= 0 ? " on" : "") + '" data-id="' + esc(c.id || "") + '">' +
@@ -1055,11 +1075,14 @@ function drawCand() {
     });
   });
 
+  const cf = document.getElementById("candfold");
+  if (cf) cf.addEventListener("click", () => { CANDOPEN = false; drawCand(); });
+
   const pb = document.getElementById("planbtn");
   if (pb) pb.addEventListener("click", async () => {
-    // 완성될 때까지 '짜는 중'을 유지한다 — 실제 완료(plan 줄 done)는 chatLoad가 감지해 되돌린다
-    PLANNING = true;
-    pb.disabled = true; pb.textContent = "한지우 팀장이 시간표 짜는 중… (몇 분 걸립니다)";
+    // 완성될 때까지 '짜는 중' 한 줄로 접힌다 — 실제 완료(plan 줄 done)는 chatLoad가 감지해 되돌린다
+    PLANNING = true; CANDOPEN = false;
+    drawCand();
     await pushState();          // 고르신 것을 먼저 저장해야 팀장이 그걸 읽는다
     await fetch(CHAT, { method: "POST", headers: Object.assign({}, HDR, { Prefer: "return=minimal" }),
       body: JSON.stringify({ team: "hr", role: "plan", status: "pending", body: await lock(PW, "시간표") }) });
