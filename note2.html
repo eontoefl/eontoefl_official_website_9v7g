@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>김비서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* 표면 (톤으로 층을 만든다 — 선으로 나누지 않는다) */
+    --surface: #f8f9fa;
+    --surface-lowest: #ffffff;
+    --surface-low: #f3f4f5;
+    --surface-container: #edeef0;
+    --surface-high: #e7e9eb;
+    --surface-highest: #e1e4e6;
+    /* 글자 */
+    --on-surface: #191c1d;
+    --on-surface-variant: #3e484f;
+    /* 강조 */
+    --primary: #006688;
+    --primary-container: #50c9ff;
+    --primary-fixed-dim: #76d1ff;
+    --on-primary-container: #001e2b;
+    --secondary-container: #cfe9d6;
+    --on-secondary-container: #14351f;
+    --tertiary: #a53b22;
+    --error: #ba1a1a;
+    --grad: linear-gradient(135deg, #006688 0%, #50c9ff 100%);
+    --lift: 0 4px 28px rgba(25, 28, 29, .05);
+    --r: .5rem;
+    --r-lg: 1rem;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Inter", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--surface); color: var(--on-surface);
+    line-height: 1.72; font-size: 15px; font-weight: 400;
+    padding: 0 0 96px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 1.4rem; }
+  h1, h2, h3 { letter-spacing: -0.02em; }
+  ::selection { background: var(--primary-fixed-dim); color: var(--on-primary-container); }
+
+  /* ───── 잠금 화면 ───── */
+  #gate { max-width: 360px; margin: 16vh auto; padding: 0 1.4rem; text-align: center; }
+  #gate .mark { width: 52px; height: 52px; margin: 0 auto 1.4rem; border-radius: var(--r-lg);
+    background: var(--grad); display: grid; place-items: center; font-size: 23px; }
+  #gate h1 { font-size: 20px; font-weight: 700; margin-bottom: .35rem; }
+  #gate p { font-size: 13.5px; color: var(--on-surface-variant); margin-bottom: 1.4rem; }
+  #gate input { width: 100%; background: var(--surface-highest); border: none; border-radius: var(--r);
+    padding: 14px 16px; font-family: inherit; font-size: 16px; color: var(--on-surface);
+    outline: none; text-align: center; transition: outline-color .15s; }
+  #gate input:focus { outline: 2px solid var(--primary-fixed-dim); outline-offset: 0; }
+  #gate button { width: 100%; margin-top: .7rem; background: var(--grad); color: #fff; border: none;
+    border-radius: var(--r); padding: 14px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+  #gate .msg { font-size: 13px; color: var(--error); margin-top: .7rem; min-height: 20px; font-weight: 500; }
+
+  /* ───── 상단 바 (유리) ───── */
+  .topbar { position: sticky; top: 0; z-index: 40; background: rgba(255, 255, 255, .8);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); margin-bottom: 1.75rem; }
+  .topbar .inner { max-width: 760px; margin: 0 auto; padding: 1rem 1.4rem;
+    display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .18em;
+    color: var(--on-surface-variant); }
+  #offbtn { margin-left: auto; border: none; border-radius: var(--r); background: var(--tertiary); color: #fff;
+    padding: 10px 16px; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  #offbtn:hover { filter: brightness(1.08); }
+  #offbtn.sent { background: var(--secondary-container); color: var(--on-secondary-container); }
+  #savedot { font-size: 12px; font-weight: 500; color: var(--on-surface-variant); }
+  #savedot.bad { color: var(--tertiary); }
+
+  /* ───── 히어로 (오늘 목표) ───── */
+  .hero { background: var(--grad); color: #fff; border-radius: var(--r-lg); padding: 1.5rem 1.75rem;
+    margin-bottom: 1.75rem; }
+  .hero .lab { font-size: 10.5px; font-weight: 600; letter-spacing: .16em; opacity: .78; }
+  .hero .h { font-size: 23px; font-weight: 700; letter-spacing: -0.02em; margin-top: .15rem; line-height: 1.5; }
+  .hero .d { font-size: 12.5px; opacity: .85; margin-top: .3rem; }
+
+  /* 김비서의 알림말 · 오늘판 아님 배너 */
+  .notice { background: var(--secondary-container); color: var(--on-secondary-container);
+    border-radius: var(--r); padding: 1rem 1.15rem; font-size: 13.5px; line-height: 1.7; margin-bottom: 1.75rem; }
+  .notice .head { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
+    opacity: .65; margin-bottom: .25rem; }
+  .stale { background: #fdf0e7; color: var(--on-surface-variant); border-radius: var(--r);
+    padding: .9rem 1.1rem; font-size: 13px; line-height: 1.7; margin-bottom: 1.75rem; }
+  .stale b { color: var(--tertiary); font-weight: 700; }
+  .empty-day { background: var(--surface-low); border-radius: var(--r-lg); padding: 3rem 1.4rem;
+    text-align: center; color: var(--on-surface-variant); font-size: 14.5px; line-height: 1.8;
+    margin-bottom: 1.75rem; }
+  .empty-day .big { font-size: 34px; margin-bottom: .5rem; }
+
+  /* ───── 공통 패널 ───── */
+  section { margin-bottom: 1.75rem; }
+  .seclab { font-size: 10.5px; font-weight: 600; letter-spacing: .16em; color: var(--on-surface-variant);
+    margin-bottom: .7rem; padding-left: .15rem; }
+  .seclab span { font-weight: 400; letter-spacing: .02em; }
+  .panel { background: var(--surface-lowest); border-radius: var(--r-lg); padding: 1.4rem; box-shadow: var(--lift); }
+
+  /* ───── 진행 막대 ───── */
+  .prog { display: flex; align-items: center; gap: 1rem; margin-bottom: .5rem; }
+  .prog .track { flex: 1; height: 6px; background: var(--surface-high); border-radius: 99px; overflow: hidden; }
+  .prog .bar { height: 100%; width: 0%; background: var(--grad); border-radius: 99px; transition: width .3s; }
+  .prog .n { font-size: 12.5px; font-weight: 600; color: var(--on-surface-variant); white-space: nowrap; }
+
+  /* ───── 체크 목록 (must · stretch) ───── */
+  .todo { list-style: none; }
+  .todo li { display: flex; align-items: flex-start; gap: .7rem; padding: .8rem .3rem; border-radius: var(--r); }
+  .todo li:hover { background: var(--surface-low); }
+  .todo input[type=checkbox] { width: 21px; height: 21px; margin-top: 3px; accent-color: var(--primary);
+    cursor: pointer; flex-shrink: 0; }
+  .todo .b { flex: 1; min-width: 0; }
+  .todo .task { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.55; }
+  .todo .sub { font-size: 12.5px; color: var(--on-surface-variant); line-height: 1.65; margin-top: .1rem; }
+  .todo li.done .task { text-decoration: line-through; color: var(--on-surface-variant); opacity: .6; }
+  .todo li.done .sub { opacity: .5; }
+  .todo .none { padding: .5rem .3rem; font-size: 13px; color: var(--on-surface-variant); opacity: .8; }
+
+  /* ───── 김비서 업무 현황 ───── */
+  .kb { list-style: none; }
+  .kb li { display: flex; align-items: flex-start; gap: .7rem; padding: .7rem .3rem; border-radius: var(--r); }
+  .kb .mk { flex-shrink: 0; width: 21px; height: 21px; margin-top: 3px; border-radius: 6px;
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .kb .mk.todo { border: 2px solid var(--surface-highest); background: var(--surface-lowest); }
+  .kb .mk.done { background: var(--grad); color: #fff; }
+  .kb .tx { flex: 1; font-size: 14.5px; line-height: 1.6; }
+  .kb li.isdone .tx { text-decoration: line-through; color: var(--on-surface-variant); opacity: .6; }
+  .kb .doing { flex-shrink: 0; margin-top: 4px; font-size: 10.5px; font-weight: 700; color: #fff;
+    background: var(--tertiary); border-radius: 99px; padding: 2px 9px; letter-spacing: .02em;
+    animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .kb .doing { animation: none; } }
+
+  /* ───── 보고함 · 돈 ───── */
+  .lines { font-size: 13.5px; color: var(--on-surface-variant); line-height: 1.8; }
+  .lines > div { padding: .35rem .15rem .35rem 1.1rem; position: relative; }
+  .lines > div::before { content: ""; position: absolute; left: .15rem; top: .95em; width: 5px; height: 5px;
+    border-radius: 99px; background: var(--primary); }
+  .lines b, .lines strong { color: var(--on-surface); font-weight: 600; }
+  .lines .none { padding-left: .15rem; opacity: .8; }
+  .lines .none::before { display: none; }
+
+  /* ───── 채팅 ───── */
+  .chat .log { max-height: 420px; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column;
+    gap: .5rem; padding: .2rem .1rem; }
+  .chat .row { display: flex; gap: .45rem; align-items: flex-end; }
+  .chat .row.me { justify-content: flex-end; }
+  .chat .ava { width: 27px; height: 27px; border-radius: 99px; flex-shrink: 0; margin-bottom: 2px;
+    background: var(--grad); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .chat .ava.hide { visibility: hidden; }
+  .bubble { max-width: 82%; padding: .55rem .8rem; border-radius: .8rem; font-size: 13.5px; line-height: 1.7;
+    white-space: pre-wrap; word-break: break-word; }
+  .bubble.me { background: var(--grad); color: #fff; border-bottom-right-radius: .2rem; }
+  .bubble.kb { background: var(--surface-low); color: var(--on-surface); border-bottom-left-radius: .2rem; }
+  .bubble strong { font-weight: 700; }
+  .chat .tm { font-size: 10px; color: var(--on-surface-variant); flex-shrink: 0; margin-bottom: 3px; }
+  .chat .empty { font-size: 12.5px; color: var(--on-surface-variant); opacity: .65; padding: .3rem 0; }
+  .chat .wait { font-size: 12px; color: var(--primary); font-weight: 500; padding: .45rem 0 .1rem; }
+  .chat .wait::before { content: "● "; font-size: 9px; vertical-align: 2px; }
+  .chat .composer { display: flex; gap: .4rem; margin-top: .7rem; }
+  .chat .composer textarea { flex: 1; min-width: 0; min-height: 42px; max-height: 140px;
+    background: var(--surface-highest); border: none; border-radius: var(--r); padding: .6rem .8rem;
+    font-family: inherit; font-size: 14px; line-height: 1.6; color: var(--on-surface); resize: vertical; outline: none; }
+  .chat .composer textarea:focus { outline: 2px solid var(--primary-fixed-dim); }
+  .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
+    padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  .chat .composer button:disabled { opacity: .5; cursor: default; }
+
+  /* ───── 메모장 ───── */
+  #memo { width: 100%; min-height: 120px; background: var(--surface-highest); border: none; border-radius: var(--r);
+    padding: 1rem 1.15rem; font-family: inherit; font-size: 14.5px; line-height: 1.7; color: var(--on-surface);
+    resize: vertical; outline: none; }
+  #memo:focus { outline: 2px solid var(--primary-fixed-dim); }
+
+  .foot { font-size: 12px; color: var(--on-surface-variant); text-align: center; margin-top: 2.4rem; opacity: .8; }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 0 1rem; }
+    .topbar .inner { padding: .8rem 1rem; }
+    .hero { padding: 1.25rem 1.4rem; }
+    .hero .h { font-size: 19px; }
+    .chat .log { max-height: 340px; }
+    .bubble { max-width: 88%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="mark">🔒</div>
+  <h1>김비서</h1>
+  <p>비밀번호를 넣어주세요</p>
+  <input id="pw" type="password" autocomplete="current-password" placeholder="••••••••">
+  <button id="unlock" type="button">열기</button>
+  <div class="msg" id="gatemsg"></div>
+</div>
+
+<div id="app" style="display:none">
+
+  <div class="topbar">
+    <div class="inner">
+      <div class="brand">김비서<small>BAMTOL HOLDINGS</small></div>
+      <div id="savedot"></div>
+      <button id="offbtn" type="button">퇴근</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="content"></div>
+
+    <section>
+      <div class="seclab">김비서와 채팅 <span>· 3~5초마다 새 답을 확인합니다</span></div>
+      <div class="panel chat">
+        <div class="log" id="chatlog"></div>
+        <div class="composer">
+          <textarea id="chatta" placeholder="김비서에게 할 말"></textarea>
+          <button id="chatsend" type="button">보내기</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="seclab">메모장 <span>· 자동 저장</span></div>
+      <div class="panel">
+        <textarea id="memo" placeholder="떠오르는 생각, 오늘 있었던 일, 뭐든 적어두세요."></textarea>
+      </div>
+    </section>
+
+    <p class="foot">eonfl.com/note2 · 김비서</p>
+  </div>
+</div>
+
+<script>
+const SB = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_briefings";
+const CHAT = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_chat";
+const AK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc";
+const HDR = { "apikey": AK, "Authorization": "Bearer " + AK, "Content-Type": "application/json" };
+const PWKEY = "kb-pw";
+const DOW = ["일","월","화","수","목","금","토"];
+
+/* ───── 암호 (note.html · 브리핑 올리기.mjs와 같은 방식) ─────
+   salt(16) | iv(12) | AES-256-GCM ct+tag 를 이어 붙여 base64.
+   열쇠는 PBKDF2-SHA256 200000회로 비밀번호에서 뽑는다. */
+const enc = new TextEncoder(), dec = new TextDecoder();
+async function keyFrom(pw, salt) {
+  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+function b64e(b) { let s = ""; new Uint8Array(b).forEach(c => s += String.fromCharCode(c)); return btoa(s); }
+async function lock(pw, obj) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await keyFrom(pw, salt);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, enc.encode(JSON.stringify(obj)));
+  const out = new Uint8Array(28 + ct.byteLength);
+  out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(ct), 28);
+  return b64e(out);
+}
+async function unlockText(pw, blob) {
+  const raw = b64d(blob);
+  const k = await keyFrom(pw, raw.slice(0, 16));
+  return JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(16, 28) }, k, raw.slice(28))));
+}
+
+/* ───── 공통 ───── */
+let PW = null, DATE = null, DAY = null, STATE = null, saveTimer = null;
+const todayStr = () => { const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const fmt = t => esc(t).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+const plain = t => {
+  if (t && typeof t === "object") return String(t.text || t.name || "");
+  return String(t == null ? "" : t);
+};
+function hhmm(iso) {
+  if (!iso) return "";
+  const d = new Date(iso), now = new Date();
+  if (d.toDateString() !== now.toDateString()) return (d.getMonth() + 1) + "/" + d.getDate();
+  let h = d.getHours(); const ap = h < 12 ? "오전" : "오후";
+  h = h % 12 || 12;
+  return ap + " " + h + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function korDate(s) {
+  const d = new Date(s + "T12:00:00");
+  return (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + DOW[d.getDay()] + ")";
+}
+function setDot(ok, msg) { const d = document.getElementById("savedot"); d.textContent = msg; d.className = ok ? "" : "bad"; }
+
+/* ───── 서버 ───── */
+async function fetchDay(d) {
+  const r = await fetch(SB + "?d=eq." + d + "&select=d,payload,state", { headers: HDR, cache: "no-store" });
+  const j = await r.json();
+  return Array.isArray(j) && j.length ? j[0] : null;
+}
+async function fetchLatest() {
+  const r = await fetch(SB + "?select=d,payload,state&payload=not.is.null&order=d.desc&limit=1",
+    { headers: HDR, cache: "no-store" });
+  const j = await r.json();
+  return Array.isArray(j) && j.length ? j[0] : null;
+}
+async function pushState() {
+  if (!DATE || !STATE) return;
+  try {
+    STATE.updated = new Date().toLocaleString("ko-KR");
+    const blob = await lock(PW, STATE);
+    const r = await fetch(SB + "?on_conflict=d", { method: "POST",
+      headers: Object.assign({}, HDR, { "Prefer": "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify({ d: DATE, state: blob }) });
+    if (!r.ok) throw new Error(r.status);
+    setDot(true, "저장됨 " + STATE.updated);
+  } catch (e) { setDot(false, "저장 안 됨 — 인터넷 확인"); }
+}
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(pushState, 500); }
+
+/* ───── 잠금 해제 ───── */
+async function tryUnlock(pw) {
+  const row = await fetchLatest();
+  if (!row || !row.payload) return { ok: true };   // 검증할 자료가 아직 없으면 통과
+  try { await unlockText(pw, row.payload); return { ok: true }; } catch (e) { return { ok: false }; }
+}
+document.getElementById("unlock").addEventListener("click", doUnlock);
+document.getElementById("pw").addEventListener("keydown", e => { if (e.key === "Enter") doUnlock(); });
+async function doUnlock() {
+  const pw = document.getElementById("pw").value, msg = document.getElementById("gatemsg");
+  if (!pw) return;
+  msg.style.color = "var(--on-surface-variant)"; msg.textContent = "여는 중…";
+  const r = await tryUnlock(pw);
+  if (!r.ok) { msg.style.color = "var(--error)"; msg.textContent = "비밀번호가 다릅니다"; return; }
+  PW = pw; localStorage.setItem(PWKEY, pw);
+  document.getElementById("gate").style.display = "none";
+  document.getElementById("app").style.display = "";
+  await start();
+}
+
+/* ───── 본문 ───── */
+function render() {
+  const c = document.getElementById("content");
+  const today = todayStr();
+
+  if (!DAY) {
+    c.innerHTML = '<div class="empty-day"><div class="big">🗒️</div>' +
+      '김비서가 아직 오늘판을 올리지 않았습니다.<br>아래 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
+    return;
+  }
+
+  let html = "";
+  if (DATE !== today) {
+    html += '<div class="stale"><b>김비서가 아직 오늘판을 올리지 않았습니다.</b><br>' +
+      '아래는 ' + esc(korDate(DATE)) + '판입니다. 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
+  }
+  if (DAY.notice) {
+    html += '<div class="notice"><span class="head">김비서가 알립니다</span>' + fmt(DAY.notice) + '</div>';
+  }
+
+  html += '<div class="hero"><div class="lab">오늘 목표 — 무슨 일이 있어도 여기까지</div>' +
+    '<div class="h">' + esc(DAY.goal || "(목표가 비어 있습니다)") + '</div>' +
+    '<div class="d">' + esc(korDate(DAY.d || DATE)) + '</div></div>';
+
+  const checks = STATE.checks || {};
+  const todoList = (items, sub) => items.length
+    ? items.map(t => {
+        const on = !!checks[t.id];
+        return '<li data-id="' + esc(t.id || "") + '"' + (on ? ' class="done"' : '') + '>' +
+          '<input type="checkbox"' + (on ? ' checked' : '') + '>' +
+          '<div class="b"><div class="task">' + esc(t.text || "") + '</div>' +
+          (sub && t.note ? '<div class="sub">' + fmt(t.note) + '</div>' : '') + '</div></li>';
+      }).join("")
+    : '<li class="none">오늘은 없습니다.</li>';
+
+  const must = DAY.must || [], stretch = DAY.stretch || [];
+
+  html += '<section><div class="seclab">무조건 여기까지 <span>· 체크 자동 저장</span></div><div class="panel">' +
+    '<div class="prog"><div class="track"><div class="bar" id="pbar"></div></div><div class="n" id="pnum">0 / 0</div></div>' +
+    '<ul class="todo" id="mustlist">' + todoList(must, true) + '</ul></div></section>';
+
+  html += '<section><div class="seclab">시간 나면 여기까지</div><div class="panel">' +
+    '<ul class="todo" id="strlist">' + todoList(stretch, false) + '</ul></div></section>';
+
+  const kb = DAY.kimbi || [];
+  html += '<section><div class="seclab">김비서 업무 현황</div><div class="panel"><ul class="kb">' +
+    (kb.length ? kb.map(k => {
+      const st = k.state === "done" ? "done" : (k.state === "doing" ? "doing" : "todo");
+      return '<li' + (st === "done" ? ' class="isdone"' : '') + '>' +
+        '<span class="mk ' + (st === "done" ? 'done">✓' : 'todo">') + '</span>' +
+        '<span class="tx">' + esc(k.text || "") + '</span>' +
+        (st === "doing" ? '<span class="doing">진행중</span>' : '') + '</li>';
+    }).join("") : '<li><span class="tx" style="opacity:.7">등록된 일이 없습니다.</span></li>') +
+    '</ul></div></section>';
+
+  const lineBlock = (label, arr, emptyMsg) =>
+    '<section><div class="seclab">' + label + '</div><div class="panel"><div class="lines">' +
+    (arr && arr.length ? arr.map(x => '<div>' + fmt(x) + '</div>').join("")
+      : '<div class="none">' + emptyMsg + '</div>') + '</div></div></section>';
+
+  html += lineBlock("보고함 <span>· 김비서가 처리한 것</span>", DAY.reports, "아직 보고가 없습니다.");
+  html += lineBlock("돈", DAY.money, "오늘 돈 소식은 없습니다.");
+
+  c.innerHTML = html;
+
+  /* 체크 동작 */
+  function progress() {
+    const done = must.filter(t => (STATE.checks || {})[t.id]).length;
+    const pn = document.getElementById("pnum"), pb = document.getElementById("pbar");
+    if (pn) pn.textContent = done + " / " + must.length;
+    if (pb) pb.style.width = must.length ? (done / must.length * 100) + "%" : "0%";
+  }
+  c.querySelectorAll(".todo li[data-id]").forEach(li => {
+    const box = li.querySelector("input[type=checkbox]");
+    if (!box) return;
+    box.addEventListener("change", () => {
+      STATE.checks = STATE.checks || {};
+      if (box.checked) STATE.checks[li.dataset.id] = true;
+      else delete STATE.checks[li.dataset.id];
+      li.classList.toggle("done", box.checked);
+      progress(); save();
+    });
+  });
+  progress();
+}
+
+function mountMemo() {
+  const memo = document.getElementById("memo");
+  memo.value = STATE.memo || "";
+  memo.oninput = () => { STATE.memo = memo.value; save(); };
+}
+
+/* ───── 퇴근 버튼 ───── */
+function drawOff() {
+  const b = document.getElementById("offbtn");
+  if (STATE && STATE.offwork) {
+    b.classList.add("sent"); b.textContent = "퇴근 ✓";
+    b.title = (STATE.offwork_at || "") + " 퇴근 · 다시 누르면 재전송";
+  } else {
+    b.classList.remove("sent"); b.textContent = "퇴근";
+    b.title = "김비서에게 퇴근을 알립니다";
+  }
+}
+document.getElementById("offbtn").addEventListener("click", async () => {
+  if (!PW || !STATE) return;
+  if (!confirm("퇴근하시겠어요?\n\n김비서에게 퇴근을 알립니다.")) return;
+  const b = document.getElementById("offbtn");
+  b.disabled = true;
+  try {
+    STATE.offwork = true;
+    STATE.offwork_at = new Date().toLocaleString("ko-KR");
+    drawOff();
+    await pushState();
+    await kbSend("퇴근");
+  } finally { b.disabled = false; }
+});
+
+/* ───── 김비서 채팅 (hq_chat · team="kb") ─────
+   내가 보낸 줄: role="boss", status="kb"  ← 기존 팀장 시스템("pending")과 절대 겹치지 않게
+   김비서 답:    role="kimbi", status="kbdone" 인 줄만 화면에 띄운다 */
+let kbCache = [], kbTimer = null;
+const decCache = {};
+
+async function kbLoad() {
+  clearTimeout(kbTimer);
+  if (!PW) return;
+  try {
+    const r = await fetch(CHAT + "?select=id,team,role,body,status,created_at&team=eq.kb&order=id.asc&limit=300",
+      { headers: HDR, cache: "no-store" });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) throw new Error("bad");
+    const out = [], alive = new Set();
+    for (const row of rows) {
+      const isMine = row.role === "boss";
+      const isKb = row.role === "kimbi" && row.status === "kbdone";
+      if (!isMine && !isKb) continue;
+      alive.add(row.id);
+      let text = decCache[row.id];
+      if (text === undefined) {
+        try { text = await unlockText(PW, row.body); } catch (e) { text = "(읽을 수 없는 메시지)"; }
+        decCache[row.id] = text;
+      }
+      out.push({ id: row.id, role: isMine ? "boss" : "kimbi", text: text, at: row.created_at });
+    }
+    Object.keys(decCache).forEach(k => { if (!alive.has(+k)) delete decCache[k]; });
+    // 아직 저장이 안 끝난 임시 말풍선(id 0)은 그대로 살린다
+    kbCache.filter(m => m.id === 0).forEach(m => out.push(m));
+    kbCache = out;
+    drawChat();
+  } catch (e) { /* 조용히 다음 차례에 재시도 */ }
+  kbTimer = setTimeout(kbLoad, 4000);
+}
+
+let chatSig = "";
+function drawChat() {
+  const log = document.getElementById("chatlog");
+  const sig = kbCache.map(m => m.id + ":" + m.role).join(",");
+  if (sig === chatSig) return;
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  const waiting = kbCache.length && kbCache[kbCache.length - 1].role === "boss";
+  log.innerHTML = (kbCache.length
+    ? kbCache.map((m, i) => {
+        const t = '<span class="tm">' + esc(hhmm(m.at)) + '</span>';
+        if (m.role === "boss")
+          return '<div class="row me">' + t + '<div class="bubble me">' + fmt(plain(m.text)) + '</div></div>';
+        const same = i > 0 && kbCache[i - 1].role === "kimbi";
+        return '<div class="row"><span class="ava' + (same ? ' hide' : '') + '">김</span>' +
+          '<div class="bubble kb">' + fmt(plain(m.text)) + '</div>' + t + '</div>';
+      }).join("")
+    : '<div class="empty">아직 나눈 이야기가 없습니다. 편하게 말 걸어보세요.</div>')
+    + (waiting ? '<div class="wait">김비서가 확인하는 중…</div>' : "");
+  if (atBottom || !chatSig) log.scrollTop = log.scrollHeight;
+  chatSig = sig;
+}
+
+async function kbSend(text) {
+  // 말풍선을 저장을 기다리지 않고 즉시 띄운다
+  kbCache.push({ id: 0, role: "boss", text: text, at: new Date().toISOString() });
+  chatSig = ""; drawChat();
+  const body = await lock(PW, text);
+  const r = await fetch(CHAT, { method: "POST",
+    headers: Object.assign({}, HDR, { Prefer: "return=representation" }),
+    body: JSON.stringify({ team: "kb", role: "boss", body: body, status: "kb" }) });
+  try {
+    const saved = await r.json();
+    const mine = kbCache.find(m => m.id === 0);
+    if (mine && Array.isArray(saved) && saved.length) {
+      mine.id = saved[0].id;
+      decCache[mine.id] = text;
+    }
+  } catch (e) { /* 다음 갱신 때 맞춰진다 */ }
+  kbLoad();
+}
+
+(function () {
+  const ta = document.getElementById("chatta"), btn = document.getElementById("chatsend");
+  async function send() {
+    const v = ta.value.trim(); if (!v) return;
+    btn.disabled = true; ta.value = "";
+    try { await kbSend(v); } finally { btn.disabled = false; ta.focus(); }
+  }
+  btn.addEventListener("click", send);
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+
+/* ───── 오늘판 새로 왔나 보기 (45초마다) ───── */
+let daySig = "", dayTimer = null;
+async function watchDay() {
+  clearTimeout(dayTimer);
+  try {
+    const today = todayStr();
+    if (DATE !== today) {
+      const row = await fetchDay(today);
+      if (row && row.payload) { await loadDay(); return; }   // 오늘판이 방금 올라왔다
+    } else {
+      const row = await fetchDay(DATE);
+      const sig = row && row.payload ? row.payload.slice(0, 80) + row.payload.length : "";
+      if (sig !== daySig) {
+        const el = document.activeElement;
+        if (!(el && /INPUT|TEXTAREA/.test(el.tagName))) { await loadDay(); return; }
+      }
+    }
+  } catch (e) {}
+  dayTimer = setTimeout(watchDay, 45000);
+}
+
+/* ───── 시작 ───── */
+async function loadDay() {
+  clearTimeout(dayTimer);
+  setDot(true, "여는 중…");
+  const today = todayStr();
+  let row = await fetchDay(today);
+  if (!row || !row.payload) {
+    const latest = await fetchLatest();
+    if (latest) row = latest;
+  }
+  DATE = row ? row.d : today;
+  DAY = null;
+  STATE = { checks: {}, memo: "", offwork: false };
+  if (row) {
+    if (row.payload) { try { DAY = await unlockText(PW, row.payload); } catch (e) { DAY = null; } }
+    if (row.state) { try { STATE = Object.assign(STATE, await unlockText(PW, row.state)); } catch (e) {} }
+  }
+  daySig = row && row.payload ? row.payload.slice(0, 80) + row.payload.length : "";
+  render();
+  mountMemo();
+  drawOff();
+  setDot(true, row ? "저장 준비됨" : "오늘판 없음");
+  dayTimer = setTimeout(watchDay, 45000);
+}
+async function start() {
+  await loadDay();
+  kbLoad();
+}
+(async () => {
+  const saved = localStorage.getItem(PWKEY);
+  if (saved) {
+    const r = await tryUnlock(saved);
+    if (r.ok) {
+      PW = saved;
+      document.getElementById("gate").style.display = "none";
+      document.getElementById("app").style.display = "";
+      await start();
+      return;
+    }
+    localStorage.removeItem(PWKEY);
+  }
+  document.getElementById("pw").focus();
+})();
+</script>
+</body>
+</html>
