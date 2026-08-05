@@ -93,6 +93,64 @@
   #savedot { font-size: 12px; font-weight: 500; color: var(--on-surface-variant); }
   #savedot.bad { color: var(--tertiary); }
 
+  /* ───── 날짜 이동 · 3주 일정표 (note.html에서 가져옴) ───── */
+  .iconbtn { width: 40px; height: 40px; border: none; border-radius: var(--r); background: var(--surface-high);
+    color: var(--on-primary-container); font-size: 19px; font-weight: 600; cursor: pointer; line-height: 1;
+    font-family: inherit; transition: background .15s; flex-shrink: 0; }
+  .iconbtn:hover { background: var(--surface-highest); }
+  .iconbtn:disabled { opacity: .35; cursor: default; }
+  .iconbtn:disabled:hover { background: var(--surface-high); }
+  .cal2 { background: var(--surface-lowest); border-radius: var(--r-lg); padding: 1.1rem 1.2rem 1.2rem;
+    box-shadow: var(--lift); margin-bottom: 1.75rem; }
+  .cal2 .c2head { display: flex; align-items: center; gap: .5rem; margin-bottom: .9rem; }
+  .cal2 .c2head .iconbtn { width: 34px; height: 34px; font-size: 17px; }
+  .cal2 .dnow { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+  .cal2 .dnow.isnow { color: var(--primary); }
+  .cal2 .c2head b { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; color: var(--on-surface-variant);
+    margin-left: auto; }
+  .cal2 .c2head .rng { font-size: 11.5px; color: var(--on-surface-variant); font-weight: 500; }
+  .cal2 .grid14 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal2 .dw { text-align: center; font-size: 10px; font-weight: 700; color: var(--on-surface-variant);
+    padding: 2px 0 5px; letter-spacing: .06em; }
+  .cal2 .dw.sun { color: var(--tertiary); }
+  .cal2 .cell { min-height: 74px; border-radius: var(--r); background: var(--surface-low); padding: .4rem .45rem;
+    cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .cal2 .cell:hover { background: var(--surface-high); }
+  .cal2 .cell.today { background: #e3f3fb; box-shadow: inset 0 0 0 2px var(--primary-fixed-dim); }
+  .cal2 .cell.past { opacity: .45; }
+  .cal2 .cell.nofuture { cursor: default; }
+  .cal2 .cell .dd { font-size: 11.5px; font-weight: 700; color: var(--on-surface-variant);
+    display: flex; align-items: center; gap: 4px; }
+  .cal2 .cell.today .dd { color: var(--primary); }
+  .cal2 .cell .dd.sun { color: var(--tertiary); }
+  .cal2 .cell .tdy { font-size: 9px; font-weight: 700; letter-spacing: -0.01em; color: #fff;
+    background: var(--grad); border-radius: 99px; padding: 1.5px 6px; line-height: 1.3; }
+  .cal2 .ev { font-size: 10.5px; line-height: 1.4; color: var(--on-surface); display: flex; gap: 3px;
+    align-items: flex-start; position: relative; padding-right: 12px; }
+  .cal2 .ev .pt { width: 5px; height: 5px; border-radius: 99px; flex-shrink: 0; margin-top: 4px; }
+  .cal2 .ev .tx { word-break: break-word; }
+  .cal2 .evx { position: absolute; right: -2px; top: -1px; opacity: 0; border: none; background: var(--surface-lowest);
+    color: var(--on-surface-variant); font-size: 10px; line-height: 1; padding: 2px 3px; border-radius: 99px;
+    cursor: pointer; font-family: inherit; }
+  .cal2 .cell:hover .evx, .cal2 .lrow:hover .evx { opacity: .75; }
+  .cal2 .evx:hover { opacity: 1; background: var(--tertiary); color: #fff; }
+  .cal2 .lrow { position: relative; padding-right: 16px; }
+  .cal2 .later { margin-top: .8rem; background: var(--surface-low); border-radius: var(--r); padding: .7rem .9rem;
+    font-size: 11.5px; color: var(--on-surface-variant); line-height: 1.8; }
+  .cal2 .later b { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--on-surface);
+    display: block; margin-bottom: .2rem; }
+  .cal2 .empty2 { font-size: 12px; color: var(--on-surface-variant); opacity: .7; padding: .5rem 0; }
+  @media (max-width: 700px) {
+    .cal2 .cell { min-height: 58px; } .cal2 .ev { font-size: 9.5px; } .cal2 .dnow { font-size: 17px; }
+  }
+  /* 좁은 화면: 칸이 손톱만해서 글자가 세로로 부서진다 — 일정은 점으로만 보여준다 */
+  @media (max-width: 620px) {
+    .cal2 .cell { min-height: 44px; }
+    .cal2 .ev { padding-right: 0; }
+    .cal2 .ev .tx, .cal2 .ev .evx { display: none; }
+    .cal2 .ev .pt { margin-top: 2px; }
+  }
+
   /* ───── 히어로 (오늘 목표) ───── */
   .hero { background: var(--grad); color: #fff; border-radius: var(--r-lg); padding: 1.5rem 1.75rem;
     margin-bottom: 1.75rem; }
@@ -100,11 +158,7 @@
   .hero .h { font-size: 23px; font-weight: 700; letter-spacing: -0.02em; margin-top: .15rem; line-height: 1.5; }
   .hero .d { font-size: 12.5px; opacity: .85; margin-top: .3rem; }
 
-  /* 김비서의 알림말 · 오늘판 아님 배너 */
-  .notice { background: var(--secondary-container); color: var(--on-secondary-container);
-    border-radius: var(--r); padding: 1rem 1.15rem; font-size: 13.5px; line-height: 1.7; margin-bottom: 1.75rem; }
-  .notice .head { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
-    opacity: .65; margin-bottom: .25rem; }
+  /* 오늘판 아님 · 지난 판 배너 */
   .stale { background: #fdf0e7; color: var(--on-surface-variant); border-radius: var(--r);
     padding: .9rem 1.1rem; font-size: 13px; line-height: 1.7; margin-bottom: 1.75rem; }
   .stale b { color: var(--tertiary); font-weight: 700; }
@@ -183,7 +237,16 @@
   .wmemo { font-size: 12px; color: var(--on-surface-variant); line-height: 1.65; margin-top: .1rem;
     word-break: break-word; }
 
-  /* ───── 보고함 · 돈 ───── */
+  /* ───── 돈 (막대는 note.html의 gauge 스타일) ───── */
+  .gauge { background: var(--surface-low); border-radius: var(--r); padding: .8rem .95rem; }
+  .gauge .lab { display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 600;
+    color: var(--on-surface-variant); margin-bottom: .45rem; }
+  .gauge .lab span:last-child { color: var(--on-surface); font-weight: 700; }
+  .gauge .track { height: 8px; background: var(--surface-high); border-radius: 99px; overflow: hidden; }
+  .gauge .bar { height: 100%; background: var(--grad); border-radius: 99px; }
+  .mbars .gauge { margin-bottom: .6rem; }
+  .mbars .gauge:last-child { margin-bottom: 0; }
+  .mbars + .lines { margin-top: .9rem; }
   .lines { font-size: 13.5px; color: var(--on-surface-variant); line-height: 1.8; }
   .lines > div { padding: .35rem .15rem .35rem 1.1rem; position: relative; }
   .lines > div::before { content: ""; position: absolute; left: .15rem; top: .95em; width: 5px; height: 5px;
@@ -326,6 +389,8 @@ async function unlockText(pw, blob) {
 let PW = null, DATE = null, DAY = null, STATE = null, saveTimer = null;
 const todayStr = () => { const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+const shift = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 const fmt = t => esc(t).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
 const plain = t => {
@@ -392,6 +457,122 @@ async function doUnlock() {
   await start();
 }
 
+/* ───── 3주 일정표 (note.html에서 가져옴 · hq_events) ───── */
+const EV = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/hq_events";
+const TONE = { fin: "#2f6f4f", mkt: "#a53b22", cs: "#006688", ct: "#7b4fa0", dev: "#3e484f", hr: "#b0355c" };
+let evCache = null;
+
+async function loadEvents() {
+  if (!PW) return;
+  try {
+    const from = shift(todayStr(), -21), to = shift(todayStr(), 120);
+    const r = await fetch(EV + "?select=id,d,team,body&d=gte." + from + "&d=lte." + to + "&order=d.asc",
+      { headers: HDR, cache: "no-store" });
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    const out = [];
+    for (const x of rows) {
+      let v;
+      try { v = await unlockText(PW, x.body); } catch (e) { continue; }
+      out.push({ id: x.id, d: x.d, team: x.team, title: (v && v.title) || String(v || ""), note: (v && v.note) || "" });
+    }
+    evCache = out;
+    drawCal2();
+  } catch (e) { /* 표가 아직 없으면 조용히 넘어간다 */ }
+}
+
+function drawCal2() {
+  const box = document.getElementById("cal2");
+  if (!box || !DATE) return;
+  const today = todayStr();
+  const dow = new Date(today + "T12:00:00").getDay();
+  const start = shift(today, -dow);                 // 이번 주 일요일
+  const days = [];
+  for (let i = 0; i < 21; i++) days.push(shift(start, i));   // 3주
+  const end = days[20];
+
+  const byDay = {};
+  (evCache || []).forEach(e => { (byDay[e.d] = byDay[e.d] || []).push(e); });
+
+  const cur = new Date(DATE + "T12:00:00");
+  let html = '<div class="c2head">' +
+    '<button class="iconbtn" id="prev" type="button" title="이전 날">‹</button>' +
+    '<div class="dnow' + (DATE === today ? " isnow" : "") + '">' +
+      (cur.getMonth() + 1) + '월 ' + cur.getDate() + '일 (' + DOW[cur.getDay()] + ')</div>' +
+    '<button class="iconbtn" id="next" type="button" title="다음 날"' + (DATE >= today ? " disabled" : "") + '>›</button>' +
+    '<b>앞으로 3주</b><span class="rng">' +
+    esc(start.slice(5).replace("-", "월 ") + "일 ~ " + end.slice(5).replace("-", "월 ") + "일") + '</span></div>' +
+    '<div class="grid14">' + DOW.map((w, i) => '<div class="dw' + (i === 0 ? " sun" : "") + '">' + w + "</div>").join("") + '</div>' +
+    '<div class="grid14">';
+  days.forEach(d => {
+    const evs = byDay[d] || [];
+    const isToday = d === today;
+    const past = d < today;
+    const sun = new Date(d + "T12:00:00").getDay() === 0;
+    html += '<div class="cell' + (isToday ? " today" : "") + (past ? " past" : "") +
+      (d > today ? " nofuture" : "") + '" data-d="' + d + '">' +
+      '<div class="dd' + (sun ? " sun" : "") + '">' + Number(d.slice(8)) +
+        (isToday ? '<span class="tdy">오늘</span>' : "") + '</div>' +
+      evs.map(e => '<div class="ev"><span class="pt" style="background:' +
+        (TONE[e.team] || "#006688") + '"></span><span class="tx">' + esc(e.title) + '</span>' +
+        '<button class="evx" type="button" data-ev="' + e.id + '" title="이 일정 지우기">✕</button></div>').join("") +
+      '</div>';
+  });
+  html += '</div>';
+
+  const later = (evCache || []).filter(e => e.d > end).slice(0, 6);
+  if (later.length) {
+    html += '<div class="later"><b>그 뒤로</b>' + later.map(e =>
+      '<div class="lrow">' + esc(e.d.slice(5).replace("-", "월 ") + "일") + " · " + esc(e.title) +
+      '<button class="evx" type="button" data-ev="' + e.id + '" title="이 일정 지우기">✕</button></div>').join("") + '</div>';
+  } else if (!(evCache || []).length) {
+    html += '<div class="empty2">아직 잡힌 일정이 없습니다.</div>';
+  }
+  box.innerHTML = html;
+  /* 과거·오늘만 이동할 수 있다 — 미래 판은 아직 없으니 눌러도 가지 않는다 */
+  box.querySelectorAll(".cell").forEach(c =>
+    c.addEventListener("click", () => { if (c.dataset.d <= todayStr()) go(c.dataset.d, true); }));
+  document.getElementById("prev").addEventListener("click", () => go(shift(DATE, -1), true));
+  const nx = document.getElementById("next");
+  if (!nx.disabled) nx.addEventListener("click", () => go(shift(DATE, 1), true));
+
+  box.querySelectorAll(".evx").forEach(b => b.addEventListener("click", async e => {
+    e.stopPropagation();                      // 날짜 이동은 막고 지우기만 한다
+    const id = b.dataset.ev;
+    const hit = (evCache || []).find(x => String(x.id) === String(id));
+    if (!confirm("이 일정을 지웁니다.\n\n" + (hit ? hit.d + " · " + hit.title : "") + "\n\n계속할까요?")) return;
+    b.disabled = true;
+    await fetch(EV + "?id=eq." + id, { method: "DELETE", headers: HDR });
+    await loadEvents();
+  }));
+}
+
+/* ───── 돈 카드 — 옛 형태(문자열 배열)와 새 형태({lines, bars}) 둘 다 그린다 ───── */
+function manWon(n) {
+  n = +n || 0;
+  const v = Math.round(n / 1000) / 10;        // 만 단위, 소수 첫째 자리까지
+  return v.toLocaleString("ko-KR") + "만";
+}
+function moneyCard(money) {
+  let bars = [], lines = [];
+  if (Array.isArray(money)) lines = money;
+  else if (money && typeof money === "object") {
+    bars = Array.isArray(money.bars) ? money.bars : [];
+    lines = Array.isArray(money.lines) ? money.lines : [];
+  }
+  const barHtml = bars.map(b => {
+    const now = +(b && b.now) || 0, max = +(b && b.max) || 0;
+    const pct = max > 0 ? Math.max(0, Math.min(100, now / max * 100)) : 0;
+    return '<div class="gauge"><div class="lab"><span>' + esc(b && b.label || "") + '</span>' +
+      '<span>' + manWon(now) + ' / ' + manWon(max) + '</span></div>' +
+      '<div class="track"><div class="bar" style="width:' + pct + '%"></div></div></div>';
+  }).join("");
+  const body = (barHtml ? '<div class="mbars">' + barHtml + '</div>' : "") +
+    (lines.length ? '<div class="lines">' + lines.map(x => '<div>' + fmt(x) + '</div>').join("") + '</div>' : "");
+  return '<section><div class="seclab">돈</div><div class="panel">' +
+    (body || '<div class="lines"><div class="none">오늘 돈 소식은 없습니다.</div></div>') + '</div></section>';
+}
+
 /* ───── 본문 ───── */
 function render() {
   /* 화면 구역: content=상단 전체폭 · colmain=왼쪽(주 작업) · colside=오른쪽(현황·소통) */
@@ -401,30 +582,32 @@ function render() {
   const today = todayStr();
 
   if (!DAY) {
-    c.innerHTML = '<div class="empty-day"><div class="big">🗒️</div>' +
-      '김비서가 아직 오늘판을 올리지 않았습니다.<br>아래 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
+    c.innerHTML = '<div class="cal2" id="cal2"></div>' +
+      '<div class="empty-day"><div class="big">🗒️</div>' +
+      (DATE === today ? '김비서가 아직 오늘판을 올리지 않았습니다.'
+        : esc(korDate(DATE)) + '에는 올라온 판이 없습니다. 위 ‹ ›로 다른 날을 보세요.') +
+      '<br>아래 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
     main.innerHTML = ""; side.innerHTML = "";
+    drawCal2();
     return;
   }
 
   let top = "", left = "", right = "";
   if (DATE !== today) {
-    top += '<div class="stale"><b>김비서가 아직 오늘판을 올리지 않았습니다.</b><br>' +
-      '아래는 ' + esc(korDate(DATE)) + '판입니다. 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
-  }
-  if (DAY.notice) {
-    /* 같은 알림말을 두 곳에 그려두고 화면 폭에 따라 하나만 보여준다
-       (좁은 화면=맨 위 그대로, 넓은 화면=오른쪽 컬럼 맨 위) */
-    const noticeHtml = '<span class="head">김비서가 알립니다</span>' + fmt(DAY.notice);
-    top += '<div class="notice only-m">' + noticeHtml + '</div>';
-    right += '<div class="notice only-d">' + noticeHtml + '</div>';
+    top += USERNAV
+      ? '<div class="stale"><b>' + esc(korDate(DATE)) + ' 판을 보고 있습니다.</b><br>' +
+        '체크·메모는 이 날짜에 저장됩니다. 오늘로 오려면 날짜 옆 ›를 누르세요.</div>'
+      : '<div class="stale"><b>김비서가 아직 오늘판을 올리지 않았습니다.</b><br>' +
+        '아래는 ' + esc(korDate(DATE)) + '판입니다. 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
   }
 
   top += '<div class="hero"><div class="lab">오늘 목표 — 무슨 일이 있어도 여기까지</div>' +
     '<div class="h">' + esc(DAY.goal || "(목표가 비어 있습니다)") + '</div>' +
     '<div class="d">' + esc(korDate(DAY.d || DATE)) + '</div></div>';
 
-  const checks = STATE.checks || {};
+  top += '<div class="cal2" id="cal2"></div>';
+
+  const checks = STATE.checks2 || {};
   const todoList = (items, sub) => items.length
     ? items.map(t => {
         const on = !!checks[t.id];
@@ -444,15 +627,18 @@ function render() {
   left += '<section><div class="seclab">시간 나면 여기까지</div><div class="panel">' +
     '<ul class="todo" id="strlist">' + todoList(stretch, false) + '</ul></div></section>';
 
-  const kb = DAY.kimbi || [];
-  right += '<section><div class="seclab">김비서 업무 현황</div><div class="panel"><ul class="kb">' +
-    (kb.length ? kb.map(k => {
-      const st = k.state === "done" ? "done" : (k.state === "doing" ? "doing" : "todo");
-      return '<li' + (st === "done" ? ' class="isdone"' : '') + '>' +
-        '<span class="mk ' + (st === "done" ? 'done">✓' : 'todo">') + '</span>' +
-        '<span class="tx">' + esc(k.text || "") + '</span>' +
-        (st === "doing" ? '<span class="doing">진행중</span>' : '') + '</li>';
-    }).join("") : '<li><span class="tx" style="opacity:.7">등록된 일이 없습니다.</span></li>') +
+  /* 김비서 카드 — 업무 현황(kimbi)과 처리한 것(reports)을 한 체크리스트로. 표시 전용 */
+  const kb = DAY.kimbi || [], reps = DAY.reports || [];
+  const kbRow = (filled, text, doing, strike) =>
+    '<li' + (strike ? ' class="isdone"' : '') + '>' +
+    '<span class="mk ' + (filled ? 'done">✓' : 'todo">') + '</span>' +
+    '<span class="tx">' + fmt(text || "") + '</span>' +
+    (doing ? '<span class="doing">진행중</span>' : '') + '</li>';
+  right += '<section><div class="seclab">김비서 <span>· 업무 현황과 오늘 처리한 것</span></div><div class="panel"><ul class="kb">' +
+    ((kb.length || reps.length)
+      ? kb.map(k => kbRow(k.state === "done", k.text, k.state === "doing", k.state === "done")).join("") +
+        reps.map(t => kbRow(true, t, false, false)).join("")
+      : '<li><span class="tx" style="opacity:.7">등록된 일이 없습니다.</span></li>') +
     '</ul></div></section>';
 
   /* 전체 업무리스트 — 표시 전용(체크해도 저장 안 됨), 없거나 비면 섹션 숨김 */
@@ -479,19 +665,14 @@ function render() {
       '</div></details></section>';
   }
 
-  const lineBlock = (label, arr, emptyMsg) =>
-    '<section><div class="seclab">' + label + '</div><div class="panel"><div class="lines">' +
-    (arr && arr.length ? arr.map(x => '<div>' + fmt(x) + '</div>').join("")
-      : '<div class="none">' + emptyMsg + '</div>') + '</div></div></section>';
-
-  right += lineBlock("보고함 <span>· 김비서가 처리한 것</span>", DAY.reports, "아직 보고가 없습니다.");
-  right += lineBlock("돈", DAY.money, "오늘 돈 소식은 없습니다.");
+  right += moneyCard(DAY.money);
 
   c.innerHTML = top; main.innerHTML = left; side.innerHTML = right;
+  drawCal2();
 
   /* 체크 동작 */
   function progress() {
-    const done = must.filter(t => (STATE.checks || {})[t.id]).length;
+    const done = must.filter(t => (STATE.checks2 || {})[t.id]).length;
     const pn = document.getElementById("pnum"), pb = document.getElementById("pbar");
     if (pn) pn.textContent = done + " / " + must.length;
     if (pb) pb.style.width = must.length ? (done / must.length * 100) + "%" : "0%";
@@ -500,9 +681,9 @@ function render() {
     const box = li.querySelector("input[type=checkbox]");
     if (!box) return;
     box.addEventListener("change", () => {
-      STATE.checks = STATE.checks || {};
-      if (box.checked) STATE.checks[li.dataset.id] = true;
-      else delete STATE.checks[li.dataset.id];
+      STATE.checks2 = STATE.checks2 || {};
+      if (box.checked) STATE.checks2[li.dataset.id] = true;
+      else delete STATE.checks2[li.dataset.id];
       li.classList.toggle("done", box.checked);
       progress(); save();
     });
@@ -632,52 +813,76 @@ async function kbSend(text) {
 })();
 
 /* ───── 오늘판 새로 왔나 보기 (45초마다) ───── */
-let daySig = "", dayTimer = null;
+let daySig = "", dayTimer = null, USERNAV = false;   // USERNAV=대표님이 직접 과거로 이동한 상태
 async function watchDay() {
   clearTimeout(dayTimer);
   try {
     const today = todayStr();
-    if (DATE !== today) {
-      const row = await fetchDay(today);
-      if (row && row.payload) { await loadDay(); return; }   // 오늘판이 방금 올라왔다
-    } else {
+    if (DATE === today) {
       const row = await fetchDay(DATE);
       const sig = row && row.payload ? row.payload.slice(0, 80) + row.payload.length : "";
       if (sig !== daySig) {
         const el = document.activeElement;
-        if (!(el && /INPUT|TEXTAREA/.test(el.tagName))) { await loadDay(); return; }
+        if (!(el && /INPUT|TEXTAREA/.test(el.tagName))) { await go(DATE, USERNAV); return; }
       }
+    } else if (!USERNAV) {
+      const row = await fetchDay(today);
+      if (row && row.payload) { await go(today, false); return; }   // 오늘판이 방금 올라왔다
     }
   } catch (e) {}
   dayTimer = setTimeout(watchDay, 45000);
 }
 
-/* ───── 시작 ───── */
-async function loadDay() {
+/* ───── 날짜 이동 · 시작 ───── */
+async function go(d, nav) {
   clearTimeout(dayTimer);
+  USERNAV = !!nav;
+  DATE = d; history.replaceState(null, "", "#" + d);
   setDot(true, "여는 중…");
-  const today = todayStr();
-  let row = await fetchDay(today);
-  if (!row || !row.payload) {
-    const latest = await fetchLatest();
-    if (latest) row = latest;
-  }
-  DATE = row ? row.d : today;
+  const row = await fetchDay(d);
   DAY = null;
-  STATE = { checks: {}, memo: "", offwork: false };
+  STATE = { checks2: {}, memo: "", offwork: false };
   if (row) {
     if (row.payload) { try { DAY = await unlockText(PW, row.payload); } catch (e) { DAY = null; } }
     if (row.state) { try { STATE = Object.assign(STATE, await unlockText(PW, row.state)); } catch (e) {} }
+  }
+  /* ★ note.html(옛 팀장 페이지)이 같은 날짜의 state 칸을 같이 쓴다.
+     거기서는 checks가 '번호 배열'이라, 이 페이지가 같은 이름에 id→true 객체로 쓰면
+     배열에 얹힌 객체 키는 JSON 저장에서 조용히 사라진다 (새로고침하면 체크가 풀리던 버그).
+     그래서 이 페이지 체크는 checks2에 따로 담고, note.html의 checks 배열은 건드리지 않는다. */
+  if (!STATE.checks2 || typeof STATE.checks2 !== "object" || Array.isArray(STATE.checks2)) STATE.checks2 = {};
+  if (STATE.checks && typeof STATE.checks === "object" && !Array.isArray(STATE.checks)) {
+    if (!Object.keys(STATE.checks2).length) STATE.checks2 = Object.assign({}, STATE.checks);
+    delete STATE.checks;   // 옛 note2가 객체로 남긴 것 — note.html은 배열을 기대하므로 치운다
   }
   daySig = row && row.payload ? row.payload.slice(0, 80) + row.payload.length : "";
   render();
   mountMemo();
   drawOff();
-  setDot(true, row ? "저장 준비됨" : "오늘판 없음");
+  loadEvents();
+  setDot(true, row ? "저장 준비됨" : (d === todayStr() ? "오늘판 없음" : "이 날짜 판 없음"));
   dayTimer = setTimeout(watchDay, 45000);
+  window.scrollTo({ top: 0 });
 }
+async function loadDay() {                 // 기본: 오늘판, 없으면 가장 최근 판
+  const today = todayStr();
+  let d = today;
+  const row = await fetchDay(today);
+  if (!row || !row.payload) {
+    const latest = await fetchLatest();
+    if (latest) d = latest.d;
+  }
+  await go(d, false);
+}
+document.addEventListener("keydown", e => {
+  if (!PW || !DATE || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) return;
+  if (e.key === "ArrowLeft") go(shift(DATE, -1), true);
+  if (e.key === "ArrowRight" && DATE < todayStr()) go(shift(DATE, 1), true);
+});
 async function start() {
-  await loadDay();
+  const h = (location.hash || "").replace("#", "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(h) && h <= todayStr()) await go(h, h !== todayStr());
+  else await loadDay();
   kbLoad();
 }
 (async () => {
