@@ -1410,15 +1410,13 @@ async function renderProgramInfo(app) {
         console.warn('사이트 설정 로드 실패, 기본값 사용:', e);
     }
 
-    // 첨삭 종료일 계산 (해당 학기 시작일 + 27일)
-    // 연장(13~24세션) 학생은 연장 시작일 기준으로 종료일 전환
-    let correctionEndDate = null;
-    if (app.correction_enabled && app.correction_start_date) {
-        const baseStr = (app.extension_enabled && app.extension_start_date) ? app.extension_start_date : app.correction_start_date;
-        const cStart = new Date(baseStr);
-        correctionEndDate = new Date(cStart);
-        correctionEndDate.setDate(correctionEndDate.getDate() + 27);
-    }
+    // 첨삭 기간 계산 (각 학기 시작일 + 27일). 연장 시 1~12세션·13~24세션을 각각 한 줄로 표시.
+    const _DAY = 24 * 60 * 60 * 1000;
+    const c1Start = (app.correction_enabled && app.correction_start_date) ? new Date(app.correction_start_date) : null;
+    const c1End = c1Start ? new Date(c1Start.getTime() + 27 * _DAY) : null;
+    const hasCorrExt = !!(app.extension_enabled && app.extension_start_date);
+    const c2Start = hasCorrExt ? new Date(app.extension_start_date) : null;
+    const c2End = c2Start ? new Date(c2Start.getTime() + 27 * _DAY) : null;
 
     // 첨삭 상태 텍스트
     let correctionStatusHtml = '';
@@ -1462,15 +1460,17 @@ async function renderProgramInfo(app) {
             <span class="program-label">${app.correction_enabled ? '내챌 종료일' : '종료일'}</span>
             <span class="program-value">${formatDateWithDay(programEndDate)}</span>
         </div>
-        ${app.correction_enabled && app.correction_start_date ? `
+        ${c1Start ? `
         <div class="program-row">
-            <span class="program-label">첨삭 시작일</span>
-            <span class="program-value">${formatDateWithDay((app.extension_enabled && app.extension_start_date) ? app.extension_start_date : app.correction_start_date)}${correctionStatusHtml}</span>
+            <span class="program-label">${hasCorrExt ? '첨삭 1~12세션' : '첨삭 기간'}</span>
+            <span class="program-value">${formatDateWithDay(c1Start)} ~ ${formatDateWithDay(c1End)}${hasCorrExt ? '' : correctionStatusHtml}</span>
         </div>
+        ${hasCorrExt ? `
         <div class="program-row">
-            <span class="program-label">첨삭 종료일</span>
-            <span class="program-value">${correctionEndDate ? formatDateWithDay(correctionEndDate) : '-'}</span>
+            <span class="program-label">첨삭 13~24세션</span>
+            <span class="program-value">${formatDateWithDay(c2Start)} ~ ${formatDateWithDay(c2End)}${correctionStatusHtml}</span>
         </div>
+        ` : ''}
         ` : ''}
         <div class="program-row">
             <span class="program-label">플랫폼</span>
