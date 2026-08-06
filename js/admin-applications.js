@@ -1,6 +1,8 @@
 // Admin Applications Management JavaScript
 let allApplications = [];
 let filteredApplications = [];
+// 첨삭 연장 '입금 대기(pending)' 신청 — user_id → request (신청자 목록 배지용)
+let pendingExtensionByUser = {};
 
 // n8n 자동 개별분석 생성 웹훅 (신청서 제출 시 호출하는 것과 동일)
 const N8N_ANALYSIS_WEBHOOK = 'https://eontoefl.app.n8n.cloud/webhook/eontoefl-application-webhook';
@@ -389,7 +391,19 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadApplications() {
     try {
         const result = await supabaseAPI.get('applications', { limit: 1000 });
-        
+
+        // 첨삭 연장 '입금 대기' 신청 로드 (실패해도 목록은 정상 표시) → user_id별 매핑
+        pendingExtensionByUser = {};
+        try {
+            const ext = await supabaseAPI.get('correction_extension_requests', {
+                limit: 1000,
+                filter: { status: 'eq.pending' }
+            });
+            (ext.data || []).forEach(r => { if (r.user_id) pendingExtensionByUser[r.user_id] = r; });
+        } catch (e) {
+            console.warn('연장 신청(pending) 로드 실패 — 배지 생략:', e);
+        }
+
         if (result.data && result.data.length > 0) {
             allApplications = result.data;
             updateTabCounts();
@@ -721,6 +735,10 @@ function displayApplications() {
                 </td>
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                        ${pendingExtensionByUser[app.user_id]
+                            ? renderStatusBadge('#7c3aed', '연장 신청 · 입금 대기', { icon: 'fa-hourglass-half', bgColor: '#ede9fe' })
+                            : ''
+                        }
                         ${stall
                             ? (stall.type === 'warm'
                                 ? renderStatusBadge('#a53b22', `진행 중 이탈 · ${stall.days >= 1 ? stall.days + '일 지남' : '오늘 만료'}`, { icon: 'fa-hourglass-end', bgColor: '#f7e7e1' })

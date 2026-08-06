@@ -640,7 +640,14 @@ function loadModalAnalysisTab(app) {
         : !!app.self_paced;
     const fillSelfPacedEndDate = hasPendingDraft ? (pendingPayload.self_paced_end_date || '') : (app.self_paced_end_date || '');
     // 연장(13~24세션)은 개별분석 발행과 무관한 별도 즉시 액션 → 항상 실제 app 값 사용(pending 미사용)
-    const fillExtensionStartDate = app.extension_start_date || '';
+    // 아직 연장 적용 전이면 시작일 칸을 '다가오는 일요일'로 미리 채워 운영자가 확인만 하면 되게 한다.
+    // (원탭 처리와 동일 규칙. 다른 날짜가 필요하면 그대로 수정 가능.)
+    const fillExtensionStartDate = app.extension_start_date || _upcomingSundayStr();
+    // 이 학생의 '입금 대기' 연장 신청(있으면) — 연장 칸 위에 신청 정보 한 줄 표시용.
+    // admin-applications.js가 목록 로드 시 채워둔 전역 맵을 참조(같은 페이지).
+    const pendingExtReq = (typeof pendingExtensionByUser !== 'undefined' && app.user_id)
+        ? pendingExtensionByUser[app.user_id]
+        : null;
     const fillAdditionalDiscount = hasPendingDraft
         ? (pendingPayload.additional_discount || 0)
         : (app.additional_discount || 0);
@@ -947,6 +954,11 @@ function loadModalAnalysisTab(app) {
                     </div>
                     <!-- 첨삭 연장 (13~24세션) — 개별분석 발행과 무관한 독립 액션. 발행 후(읽기전용)에도 동작 -->
                     <div id="correctionExtensionWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
+                        ${pendingExtReq ? `
+                        <div style="background:#ede9fe; border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:12px; color:#5b21b6; line-height:1.5;">
+                            <i class="fas fa-hourglass-half" style="margin-right:6px;"></i>${_fmtReqTime(pendingExtReq.created_at)} 연장 신청 · ${pendingExtReq.agreed_at ? '동의 완료' : '동의 확인 필요'} · <strong>입금 대기</strong>
+                            <div style="color:#7c3aed; margin-top:2px;">통장에서 입금(200,000원 · 학생 이름)을 확인한 뒤 아래 [연장 적용]을 누르세요.</div>
+                        </div>` : ''}
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 연장 (13~24세션) <span style="color:#7c3aed; font-size:11px;">결제 확인 후 적용</span></label>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="date" id="extension_start_date" value="${fillExtensionStartDate}"
@@ -1299,6 +1311,40 @@ function toggleOptionSwitch(name) {
     if (name === 'correction_enabled') { toggleCorrectionStartDate(); calculateModalPrice(); }
 }
 
+// KST 기준 '다가오는 첫 일요일'(오늘이 일요일이면 오늘) → 'YYYY-MM-DD'.
+// 연장 시작일 기본값. 텔레그램 원탭 처리의 upcomingSundayKST와 동일 규칙.
+function _upcomingSundayStr() {
+    const now = new Date();
+    const add = (7 - now.getDay()) % 7;
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// 신청 시각을 'M/D HH:MM'로 (모달 신청 정보 줄 표시용)
+function _fmtReqTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// 해당 학생의 '입금 대기(pending)' 연장 신청을 confirmed로 확정 (있을 때만).
+async function _confirmExtensionRequest(userId) {
+    const url = `${SUPABASE_URL}/rest/v1/correction_extension_requests?user_id=eq.${userId}&status=eq.pending`;
+    await fetch(url, {
+        method: 'PATCH',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ status: 'confirmed', confirmed_at: new Date().toISOString() })
+    });
+}
+
 // ===== 첨삭 연장(13~24세션) 적용/해제 — 개별분석 저장과 분리된 즉시 액션 =====
 // applications(대시보드용 미러) + correction_schedules(테스트룸 원본) 양쪽에 기록.
 async function applyCorrectionExtension() {
@@ -1336,6 +1382,13 @@ async function applyCorrectionExtension() {
                 await maybeSendExtensionAlimTalk(userId, extStart);
             } catch (e) {
                 console.warn('연장 알림톡 처리 실패(무시):', e);
+            }
+            // 이 학생의 '입금 대기' 연장 신청이 있으면 확정 처리 → 목록 배지 사라짐 (있을 때만)
+            try {
+                await _confirmExtensionRequest(userId);
+                if (typeof pendingExtensionByUser !== 'undefined') delete pendingExtensionByUser[userId];
+            } catch (e) {
+                console.warn('연장 신청 확정 처리 실패(무시):', e);
             }
         }
 

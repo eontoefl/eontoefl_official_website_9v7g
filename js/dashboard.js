@@ -1164,6 +1164,19 @@ async function renderProgramInfo(app) {
         correctionEndDate.setDate(correctionEndDate.getDate() + 27);
     }
 
+    // 첨삭 연장 '입금 대기' 신청 조회 (아직 확정 전이면 대시보드에도 신청 상태를 보여준다)
+    // 확정되면 이 행은 사라지고 위의 첨삭 일정(연장 반영)이 그 역할을 이어받는다.
+    let pendingExtReq = null;
+    if (app.correction_enabled && app.user_id && !(app.extension_enabled && app.extension_start_date)) {
+        try {
+            const r = await supabaseAPI.query('correction_extension_requests',
+                { 'user_id': `eq.${app.user_id}`, 'status': 'eq.pending', 'limit': '1' });
+            pendingExtReq = (Array.isArray(r) && r[0]) || null;
+        } catch (e) {
+            console.warn('연장 신청 상태 조회 실패(무시):', e);
+        }
+    }
+
     // 첨삭 상태 텍스트
     let correctionStatusHtml = '';
     if (app.correction_enabled) {
@@ -1214,6 +1227,12 @@ async function renderProgramInfo(app) {
         <div class="program-row">
             <span class="program-label">첨삭 종료일</span>
             <span class="program-value">${correctionEndDate ? formatDateWithDay(correctionEndDate) : '-'}</span>
+        </div>
+        ` : ''}
+        ${pendingExtReq ? `
+        <div class="program-row">
+            <span class="program-label">첨삭 연장</span>
+            <span class="program-value"><span style="display:inline-block; white-space:nowrap; background:#ede9fe; color:#7c3aed; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px;">신청 접수 · 입금 확인 대기${pendingExtReq.deadline_date ? ' · 마감 ' + formatDateWithDay(pendingExtReq.deadline_date) : ''}</span></span>
         </div>
         ` : ''}
         <div class="program-row">
