@@ -461,6 +461,10 @@
   .chat .composer button { background: var(--grad); color: #fff; border: none; border-radius: var(--r);
     padding: 0 17px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
   .chat .composer button:disabled { opacity: .5; cursor: default; }
+  /* 김비서가 작업 중이면 보내기가 ■ 중지 버튼이 된다 (Esc와 동일) */
+  .chat .composer #chatsend.stop { background: var(--error); }
+  .chat .composer #chatsend.stopping { background: var(--error); opacity: .65; cursor: default;
+    font-size: 11.5px; }
 
   /* ───── 수업 모드 (/teach ~ /end) — 뱃지 없이, 채팅창 안쪽 테두리 글로우로 알린다 ───── */
   .chat { transition: background .25s, box-shadow .25s; }
@@ -1281,7 +1285,7 @@ async function kbLoad() {
         else if (row.status === "kbact") act = row;
         continue;
       }
-      const isMine = row.role === "boss";
+      const isMine = row.role === "boss" && row.status !== "kbstop";   // 중단 요청 줄은 말풍선에 안 띄운다
       const isKb = row.role === "kimbi" && row.status === "kbdone";
       if (!isMine && !isKb) continue;
       alive.add(row.id);
@@ -1343,6 +1347,30 @@ function bubbleBody(m) {
   return base(plain(s));
 }
 
+/* ── 작업 중단 — 당번이 kbstop 줄(2초 내 감지)로 김비서의 진행 중 턴을 멈춘다 ──
+   작업 중 = 실시간 작업 표시줄이 살아 있거나, 마지막 말풍선이 내 것("확인하는 중…") */
+const kbBusy = () => kbActLive || !!(kbCache.length && kbCache[kbCache.length - 1].role === "boss");
+let kbStopping = false;
+async function kbStop() {
+  if (kbStopping || !kbBusy()) return;
+  kbStopping = true; drawSendBtn();
+  try {
+    const body = await lock(PW, "중단");
+    await fetch(CHAT, { method: "POST", headers: HDR,
+      body: JSON.stringify({ team: "kb", role: "boss", body: body, status: "kbstop" }) });
+  } catch (e) { /* 다음 폴링에서 상태가 맞춰진다 */ }
+  kbLoad();
+}
+function drawSendBtn() {
+  const btn = document.getElementById("chatsend");
+  const busy = kbBusy();
+  if (!busy) kbStopping = false;                     // 김비서의 중단 확인(새 답변)이 오면 원복
+  btn.classList.toggle("stop", busy && !kbStopping);
+  btn.classList.toggle("stopping", busy && kbStopping);
+  btn.textContent = busy ? (kbStopping ? "중단 중…" : "■") : "보내기";
+  btn.title = busy && !kbStopping ? "하던 일 멈추기 (Esc)" : "";
+}
+
 let chatSig = "";
 function drawChat() {
   const log = document.getElementById("chatlog");
@@ -1366,6 +1394,7 @@ function drawChat() {
   if (atBottom || !chatSig) log.scrollTop = log.scrollHeight;
   chatSig = sig;
   if (chatOpen) markChatSeen(); else drawChatBadge();   // 창이 닫혀 있으면 안 읽음 뱃지만 갱신
+  drawSendBtn();                                        // 작업 중이면 보내기 → ■ 중지
 }
 
 async function kbSend(text) {
@@ -1482,7 +1511,11 @@ async function kbSend(text) {
     kbAtts = []; drawAtts();
     try { await kbSend(payload); } finally { btn.disabled = false; ta.focus(); }
   }
-  btn.addEventListener("click", send);
+  btn.addEventListener("click", () => {
+    // 작업 중이면 이 버튼은 ■ 중지다 — 입력창에 쓰던 글은 그대로 둔다 (Enter 전송은 계속 된다)
+    if (kbBusy()) { if (!kbStopping) kbStop(); return; }
+    send();
+  });
   ta.addEventListener("input", drawMirror);
   ta.addEventListener("scroll", () => { if (ta.classList.contains("hascmd")) mirror.scrollTop = ta.scrollTop; });
   ta.addEventListener("keydown", e => {
@@ -1550,7 +1583,12 @@ document.getElementById("chatclose").addEventListener("click", () => {
   chatOpen = false; drawChatWin();
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && chatOpen && !CHATONLY) { chatOpen = false; drawChatWin(); }
+  if (e.key !== "Escape") return;
+  if (!chatOpen && !CHATONLY) return;
+  // 작업 중이면 닫기보다 중지가 우선 (팝업·오버레이 공통)
+  if (kbBusy()) { e.preventDefault(); if (!kbStopping) kbStop(); return; }
+  if (CHATONLY) { window.close(); return; }          // 팝업 창은 창 자체를 닫는다
+  chatOpen = false; drawChatWin();
 });
 /* 팝업 창에서 읽으면(kb-chat-seen 갱신) 메인 페이지 뱃지도 바로 꺼진다 */
 window.addEventListener("storage", e => { if (e.key === CHATSEEN_KEY && !CHATONLY) drawChatBadge(); });
