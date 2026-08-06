@@ -728,14 +728,44 @@ async function markExtensionNotified(userId: string) {
   });
 }
 
-// KST 기준 "다가오는 첫 일요일" (오늘이 일요일이면 오늘) — YYYY-MM-DD
-function upcomingSundayKST(): string {
+// date(UTC 자정) 이후(포함) 첫 일요일
+function sundayOnOrAfterUTC(d: Date): Date {
+  const r = new Date(d.getTime());
+  const add = (7 - r.getUTCDay()) % 7;
+  r.setUTCDate(r.getUTCDate() + add);
+  return r;
+}
+function ymdUTC(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+// 12세션(writing·speaking) 모두 제출됐는지 = 1학기 진도 완료
+async function isSession12Submitted(userId: string): Promise<boolean> {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/correction_submissions?user_id=eq.${userId}&session_number=eq.12&select=task_type`,
+    { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } },
+  );
+  const rows = await resp.json();
+  if (!Array.isArray(rows)) return false;
+  const w = rows.some((r: Record<string, unknown>) => String(r.task_type || "").startsWith("writing"));
+  const s = rows.some((r: Record<string, unknown>) => String(r.task_type || "").startsWith("speaking"));
+  return w && s;
+}
+
+// 연장 시작일(KST, YYYY-MM-DD):
+//   12세션 제출 완료(선입선출/진도 끝) → 다가오는 첫 일요일
+//   아직 진행 중 → 1학기 종료(시작+27일) 이후 첫 일요일
+//   (입금이 늦어 그 일요일이 과거면 다가오는 일요일로 — 둘 중 늦은 날)
+async function computeExtStartDate(userId: string, correctionStartYmd: string | null): Promise<string> {
   const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const add = (7 - kstNow.getUTCDay()) % 7; // 일요일(0)이면 0 = 오늘
-  const d = new Date(kstNow.getTime() + add * 24 * 60 * 60 * 1000);
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${m}-${day}`;
+  const todayUTC = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
+  const base = sundayOnOrAfterUTC(todayUTC);            // 다가오는 일요일
+  const done = await isSession12Submitted(userId);
+  if (done || !correctionStartYmd) return ymdUTC(base);
+  const cStart = new Date(correctionStartYmd + "T00:00:00Z");
+  const cEnd = new Date(cStart.getTime() + 27 * 24 * 60 * 60 * 1000);   // 1학기 종료
+  const endSunday = sundayOnOrAfterUTC(cEnd);
+  return ymdUTC(endSunday.getTime() > base.getTime() ? endSunday : base);
 }
 
 // ===== 첨삭 연장 원탭 콜백 처리 (텔레그램 '입금 확인 → 연장 적용' 버튼) =====
@@ -790,7 +820,7 @@ async function handleConfirmExtensionCallback(
       return new Response("OK", { headers: corsHeaders });
     }
 
-    const extStart = upcomingSundayKST();
+    const extStart = await computeExtStartDate(reqRow.user_id, app.correction_start_date || null);
 
     // 1) applications 미러 (대시보드/신청상세가 읽음)
     await updateApplication(reqRow.application_id, {

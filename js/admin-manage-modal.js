@@ -102,7 +102,12 @@ async function openManageModal(appId) {
             return;
         }
         currentManageApp = app;
-        
+
+        // 연장 시작일 자동값(진도 기반) 미리 계산 — 연장 미적용 학생만
+        if (app.correction_enabled && !(app.extension_enabled && app.extension_start_date)) {
+            try { app._computedExtStart = await _computeExtStartForModal(app); } catch (e) { console.warn(e); }
+        }
+
         // 모달 표시
         document.getElementById('manageModal').style.display = 'flex';
         document.getElementById('modalStudentName').textContent = app.name;
@@ -642,7 +647,7 @@ function loadModalAnalysisTab(app) {
     // 연장(13~24세션)은 개별분석 발행과 무관한 별도 즉시 액션 → 항상 실제 app 값 사용(pending 미사용)
     // 아직 연장 적용 전이면 시작일 칸을 '다가오는 일요일'로 미리 채워 운영자가 확인만 하면 되게 한다.
     // (원탭 처리와 동일 규칙. 다른 날짜가 필요하면 그대로 수정 가능.)
-    const fillExtensionStartDate = app.extension_start_date || _upcomingSundayStr();
+    const fillExtensionStartDate = app.extension_start_date || app._computedExtStart || _upcomingSundayStr();
     // 이 학생의 '입금 대기' 연장 신청(있으면) — 연장 칸 위에 신청 정보 한 줄 표시용.
     // admin-applications.js가 목록 로드 시 채워둔 전역 맵을 참조(같은 페이지).
     const pendingExtReq = (typeof pendingExtensionByUser !== 'undefined' && app.user_id)
@@ -1320,6 +1325,33 @@ function _upcomingSundayStr() {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// 연장 시작일 자동값(진도 기반): 12세션 제출 완료면 다가오는 일요일,
+// 아직이면 1학기 종료(시작+27일) 이후 첫 일요일 (둘 중 늦은 날). 텔레그램 원탭과 동일 규칙.
+async function _computeExtStartForModal(app) {
+    const base = _upcomingSundayStr();
+    if (!app || !app.correction_start_date || !app.user_id) return base;
+    let done = false;
+    try {
+        const rows = await supabaseAPI.query('correction_submissions',
+            { 'user_id': `eq.${app.user_id}`, 'session_number': 'eq.12', 'select': 'task_type' });
+        if (Array.isArray(rows)) {
+            const w = rows.some(r => String(r.task_type || '').startsWith('writing'));
+            const s = rows.some(r => String(r.task_type || '').startsWith('speaking'));
+            done = w && s;
+        }
+    } catch (e) { console.warn('세션12 조회 실패(무시):', e); }
+    if (done) return base;
+    const cStart = new Date(app.correction_start_date + 'T00:00:00');
+    const cEnd = new Date(cStart.getTime() + 27 * 24 * 60 * 60 * 1000);
+    const endSun = new Date(cEnd);
+    endSun.setDate(endSun.getDate() + ((7 - endSun.getDay()) % 7));   // 종료 이후 첫 일요일
+    const baseD = new Date(base + 'T00:00:00');
+    const pick = endSun.getTime() > baseD.getTime() ? endSun : baseD;  // 둘 중 늦은 날
+    const m = String(pick.getMonth() + 1).padStart(2, '0');
+    const d = String(pick.getDate()).padStart(2, '0');
+    return `${pick.getFullYear()}-${m}-${d}`;
 }
 
 // 신청 시각을 'M/D HH:MM'로 (모달 신청 정보 줄 표시용)
