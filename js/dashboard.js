@@ -67,6 +67,7 @@ async function loadDashboard() {
         if (challengeApp && bookApp) {
             renderWelcome(challengeApp);
             renderProgressSection(challengeApp);
+            await renderCorrectionProgressSection(challengeApp);
             renderActionItems(challengeApp);
             renderTimeline(challengeApp);
             await renderQuickMenuGrid(challengeApp);
@@ -95,6 +96,7 @@ async function loadDashboard() {
         // 각 섹션 렌더링
         renderWelcome(application);
         renderProgressSection(application);
+        await renderCorrectionProgressSection(application);
         renderActionItems(application);
         renderTimeline(application);
         await renderQuickMenuGrid(application);
@@ -205,6 +207,118 @@ function renderProgressSection(app) {
                             icon = 'fa-spinner fa-pulse';
                         }
 
+                        return `
+                            <div class="timeline-step ${statusClass}">
+                                <div class="timeline-step-icon ${statusClass}">
+                                    <i class="fas ${icon}"></i>
+                                </div>
+                                <div class="timeline-step-label">${step.name.replace(/\\n/g, '<br>')}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * 첨삭 진행상황 섹션 (스라첨삭 신청자 전용 · 내챌 진행상황과 동일 디자인)
+ * 4단계 고정: 첨삭 시작 → 첨삭 종료 → 연장 시작 → 연장 종료
+ *   - 연장 미신청: 연장 2칸은 회색 잠금
+ *   - 연장 신청·입금 대기(pending): 카드 상단에 작은 배지만
+ */
+async function renderCorrectionProgressSection(app) {
+    const section = document.getElementById('correctionProgressSection');
+    if (!section) return;
+
+    // 스라첨삭 미희망(미신청)이면 카드 자체를 숨긴다
+    if (!app.correction_enabled) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    const DAY = 24 * 60 * 60 * 1000;
+    const today = (typeof getEffectiveToday === 'function') ? getEffectiveToday() : new Date();
+    const cStart = app.correction_start_date ? new Date(app.correction_start_date) : null;
+    const cEnd = cStart ? new Date(cStart.getTime() + 27 * DAY) : null;
+    const hasExt = !!(app.extension_enabled && app.extension_start_date);
+    const eStart = hasExt ? new Date(app.extension_start_date) : null;
+    const eEnd = eStart ? new Date(eStart.getTime() + 27 * DAY) : null;
+
+    const steps = [
+        { name: '첨삭\n시작', icon: 'fa-play',            completed: !!(cStart && today >= cStart), locked: false },
+        { name: '첨삭\n종료', icon: 'fa-flag-checkered',  completed: !!(cEnd && today >= cEnd),     locked: false },
+        { name: '연장\n시작', icon: 'fa-play',            completed: !!(hasExt && today >= eStart), locked: !hasExt },
+        { name: '연장\n종료', icon: 'fa-flag-checkered',  completed: !!(hasExt && today >= eEnd),   locked: !hasExt }
+    ];
+
+    // 진행률 = 완료 단계 수 / 전체(4)
+    const doneCount = steps.filter(s => s.completed).length;
+    const progress = Math.round((doneCount / steps.length) * 100);
+    const progressDeg = (progress / 100) * 360;
+    const allDone = doneCount === steps.length;
+    const progressDisplay = allDone
+        ? '<i class="fas fa-check" style="font-size: 40px; -webkit-text-stroke: 2px currentColor;"></i>'
+        : `${progress}%`;
+    const progressLabel = allDone ? '첨삭 완료' : '현재 진행률';
+
+    // 현재 단계(잠금 아닌 첫 미완료)
+    let currentStepIndex = steps.findIndex(s => !s.completed && !s.locked);
+
+    // 상태 배지(getCorrectionStatus) + 연장 신청 대기 배지
+    let statusBadge = '';
+    if (typeof getCorrectionStatus === 'function') {
+        const st = getCorrectionStatus(app);
+        if (st) statusBadge = `<span style="display:inline-block; background:${st.color}1f; color:${st.color}; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px;">${st.label}</span>`;
+    }
+
+    // 연장 신청 '입금 대기'(pending) 조회 → 상단 작은 배지
+    let pendingBanner = '';
+    if (!hasExt && app.user_id) {
+        try {
+            const r = await supabaseAPI.query('correction_extension_requests',
+                { 'user_id': `eq.${app.user_id}`, 'status': 'eq.pending', 'limit': '1' });
+            const pend = (Array.isArray(r) && r[0]) || null;
+            if (pend) {
+                const dl = pend.deadline_date ? ` · 마감 ${formatDateWithDay(pend.deadline_date)}` : '';
+                pendingBanner = `<div style="background:#ede9fe; color:#7c3aed; font-size:12px; font-weight:600; padding:8px 12px; border-radius:8px; margin-bottom:14px;"><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>연장 신청 · 입금 확인 대기${dl}</div>`;
+            }
+        } catch (e) { console.warn('연장 신청 상태 조회 실패(무시):', e); }
+    }
+
+    section.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 10px; margin: 0;">
+                <svg width="24" height="24" viewBox="0 0 24 24" style="flex-shrink: 0;">
+                    <path d="M4 7 L14 7 M4 12 L11 12 M4 17 L9 17" fill="none" stroke="#9480c5" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M15 15 l2 2 l4 -4" fill="none" stroke="#9480c5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                첨삭 진행상황 ${statusBadge}
+            </h2>
+        </div>
+        ${pendingBanner}
+        <div class="progress-main-layout" style="display: flex; align-items: center; gap: 10px;">
+            <div class="progress-circle" style="--progress-deg: ${progressDeg}deg;">
+                <div class="progress-circle-inner">
+                    <div class="progress-percentage">${progressDisplay}</div>
+                    <div class="progress-label">${progressLabel}</div>
+                </div>
+            </div>
+            <div class="timeline-bar-section" style="flex: 1; padding-left: 11px; padding-top: 0px;">
+                <div class="timeline-title">${app.name}님의 스라첨삭</div>
+                <div class="timeline-bar">
+                    ${steps.map((step, index) => {
+                        let statusClass = 'pending';
+                        let icon = 'fa-lock';
+                        if (step.locked) {
+                            statusClass = 'pending';
+                            icon = 'fa-lock';
+                        } else if (step.completed) {
+                            statusClass = 'completed';
+                            icon = 'fa-check';
+                        } else if (index === currentStepIndex) {
+                            statusClass = 'current';
+                            icon = 'fa-spinner fa-pulse';
+                        }
                         return `
                             <div class="timeline-step ${statusClass}">
                                 <div class="timeline-step-icon ${statusClass}">
@@ -583,7 +697,24 @@ function renderTimeline(app) {
             });
         }
     }
-    
+
+    // ── 스라첨삭/연장 이벤트 (첨삭 신청자 한정) ──
+    if (app.correction_enabled) {
+        const _today = (typeof getEffectiveToday === 'function') ? getEffectiveToday() : new Date();
+        if (app.correction_start_date) {
+            const cs = new Date(app.correction_start_date);
+            events.push(cs <= _today
+                ? { date: cs, icon: 'fa-pen-nib', iconColor: '#9480c5', title: '스라첨삭 시작', description: '첨삭 프로그램이 시작되었습니다.' }
+                : { date: cs, icon: 'fa-pen-nib', iconColor: '#f59e0b', title: '스라첨삭 시작 예정', description: '곧 첨삭이 시작됩니다!', future: true });
+        }
+        if (app.extension_enabled && app.extension_start_date) {
+            const es = new Date(app.extension_start_date);
+            events.push(es <= _today
+                ? { date: es, icon: 'fa-pen-nib', iconColor: '#7c3aed', title: '첨삭 연장 시작 (13~24세션)', description: '연장 세션이 시작되었습니다.' }
+                : { date: es, icon: 'fa-pen-nib', iconColor: '#f59e0b', title: '첨삭 연장 시작 예정 (13~24세션)', description: '곧 연장 세션이 시작됩니다!', future: true });
+        }
+    }
+
     // 날짜순 정렬 (최신순)
     events.sort((a, b) => b.date - a.date);
     
