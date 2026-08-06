@@ -246,8 +246,10 @@ async function renderCorrectionProgressSection(app) {
 
     const steps = [
         { name: '첨삭\n시작', icon: 'fa-play',            completed: !!(cStart && today >= cStart), locked: false },
+        { name: '첨삭\n진행', icon: 'fa-pen-nib',         completed: !!(cEnd && today >= cEnd),     locked: false },
         { name: '첨삭\n종료', icon: 'fa-flag-checkered',  completed: !!(cEnd && today >= cEnd),     locked: false },
         { name: '연장\n시작', icon: 'fa-play',            completed: !!(hasExt && today >= eStart), locked: !hasExt },
+        { name: '연장\n진행', icon: 'fa-pen-nib',         completed: !!(hasExt && today >= eEnd),   locked: !hasExt },
         { name: '연장\n종료', icon: 'fa-flag-checkered',  completed: !!(hasExt && today >= eEnd),   locked: !hasExt }
     ];
 
@@ -329,8 +331,9 @@ async function renderCorrectionProgressSection(app) {
                 <div class="timeline-title">${app.name}님의 스라첨삭</div>
                 <div class="timeline-bar">
                     ${steps.map((step, index) => {
+                        // 연장 미신청(locked)만 자물쇠. 그 외 미완료 단계는 고유 아이콘(회색)으로.
                         let statusClass = 'pending';
-                        let icon = 'fa-lock';
+                        let icon = step.icon || 'fa-circle';
                         if (step.locked) {
                             statusClass = 'pending';
                             icon = 'fa-lock';
