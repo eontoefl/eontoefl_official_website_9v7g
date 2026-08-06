@@ -35,6 +35,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
   practice_open:               50231,  // 연습코스 오픈 안내 (정규과정 종료 후 자동 활성화)
   toefl_exam_day:              50233,  // 시험 당일 회신 안내 + 리포트 참여
+  correction_extension_complete: 50227,  // 첨삭 연장(13~24세션) 완료 안내
 };
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
@@ -345,6 +346,21 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "또한, 오늘 응시한 시험에 대한 간단한 리포트(10초)에 참여해주세요.",
       ].join("\n");
 
+    case "correction_extension_complete":
+      // 승인 원문(2026-08-06)과 글자 단위 일치 — 수정 시 카카오 재검수 필요
+      return [
+        "이온토플 - 첨삭 연장 완료 안내",
+        "",
+        `${data.name}님, 안녕하세요!`,
+        "",
+        "요청하신 스라첨삭 연장이 정상적으로 완료되었습니다 :)",
+        "",
+        `- 연장 회차: ${data.round}회차`,
+        `- 연장 후 일정: ${data.start_date} ~ ${data.end_date}`,
+        "",
+        "기존과 동일하게 진행되며, 회차별 마감 기한을 넘기면 해당 회차는 자동 종료되니 일정을 꼭 지켜주세요.",
+      ].join("\n");
+
     case "analysis_agree_reminder":
       return [
         "이온토플 - 개별분석 동의 마감 안내",
@@ -439,6 +455,8 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return `[이온토플] 입금 기한 ${data.deadline}까지(${data.time}시간 남음). 미입금 시 신청이 자동취소돼요.`;
     case "toefl_exam_day":
       return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요. 시험 리포트도 참여 부탁드려요 https://eonfl.com/survey.html";
+    case "correction_extension_complete":
+      return "[이온토플] 스라첨삭 연장이 완료되었습니다. 테스트룸에서 13~24세션을 확인해주세요. https://testroom.eonfl.com";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -466,7 +484,10 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
 // ===== 버튼 없는 템플릿 여부 =====
 function hasNoButton(templateId: number): boolean {
   return templateId === TEMPLATE_IDS.payment_confirmed
-      || templateId === TEMPLATE_IDS.contract_deferred;
+      || templateId === TEMPLATE_IDS.contract_deferred
+      // 50227: 승인 원문에 버튼 없음으로 가정(발송 테스트로 검증 예정).
+      // 루나소프트 확인 결과 버튼이 있으면 이 줄을 지우고 getBtnUrl()에 링크를 추가할 것.
+      || templateId === TEMPLATE_IDS.correction_extension_complete;
 }
 
 // ===== 단건 메시지 객체 생성 =====
