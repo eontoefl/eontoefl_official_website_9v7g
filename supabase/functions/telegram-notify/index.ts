@@ -331,6 +331,26 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
       break;
     }
 
+    // ----- 첨삭 연장(13~24세션) 신청 접수 -----
+    // 테스트룸에서 학생이 [신청하기]를 누르는 순간 발송.
+    // 입금 확인 버튼 = 원탭 처리(연장 적용 + 알림톡). 시작일이 일요일이 아니어야 하는
+    // 예외 상황이면 버튼 대신 관리자 모달의 [연장 적용]으로 수동 처리한다.
+    case "extension_requested": {
+      text =
+        `📥 첨삭 연장 신청!\n\n` +
+        `👤 이름: ${data.name || "-"}\n` +
+        `💳 입금 대기 · 200,000원 (입금자명 = 학생 이름)\n` +
+        `📅 신청 마감: ${data.deadline || "-"}\n` +
+        `🕐 신청 시간: ${now}`;
+      buttons = [
+        [
+          { text: "✅ 입금 확인 → 연장 적용", callback_data: `confirm_extension:${data.request_id}` },
+          { text: "📄 신청서 보기", url: `${SITE_URL}/application-detail.html?id=${data.app_id}` },
+        ],
+      ];
+      break;
+    }
+
     default:
       return new Response(
         JSON.stringify({ error: "Unknown notification type" }),
@@ -371,6 +391,12 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
   //   appId 자리는 correction_submissions.id (신청서 id 아님) → 별도 처리
   if (action === "retry_correction") {
     return await handleRetryCorrectionCallback(appId, callbackId, chatId, messageId, now, corsHeaders);
+  }
+
+  // ----- 첨삭 연장 원탭 처리 (extension_requested 알림의 버튼) -----
+  //   appId 자리는 correction_extension_requests.id (신청서 id 아님) → 별도 처리
+  if (action === "confirm_extension") {
+    return await handleConfirmExtensionCallback(appId, callbackId, chatId, messageId, now, corsHeaders);
   }
 
   try {
@@ -604,6 +630,233 @@ async function handleRetryCorrectionCallback(
     await sendTelegram("answerCallbackQuery", {
       callback_query_id: callbackId,
       text: `재실행 실패: ${error.message}`,
+      show_alert: true,
+    });
+  }
+
+  return new Response("OK", { headers: corsHeaders });
+}
+
+// ===== 첨삭 연장(13~24세션) 관련 헬퍼 =====
+
+async function getExtensionRequest(id: string) {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/correction_extension_requests?id=eq.${id}&limit=1`,
+    {
+      headers: {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  const data = await resp.json();
+  return data[0] || null;
+}
+
+async function updateExtensionRequest(id: string, data: Record<string, unknown>) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/correction_extension_requests?id=eq.${id}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`extension request update failed: ${resp.status} ${err}`);
+  }
+}
+
+// correction_schedules에 연장 필드 UPSERT — 관리자 모달(upsertCorrectionExtensionSchedule)과 동일 규칙.
+// 행이 없을 때(신규 insert)에도 NOT NULL 제약을 만족하도록 1학기 시작일이 있으면 함께 보낸다.
+async function upsertScheduleExtension(userId: string, extStartDate: string, correctionStartDate: string | null) {
+  const body: Record<string, unknown> = {
+    user_id: userId,
+    extension_enabled: true,
+    extension_start_date: extStartDate,
+  };
+  if (correctionStartDate) {
+    body.start_date = correctionStartDate;
+    body.duration_weeks = 4;
+  }
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/correction_schedules?on_conflict=user_id`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal,resolution=merge-duplicates",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`correction_schedules upsert failed: ${resp.status} ${err}`);
+  }
+}
+
+async function getScheduleByUser(userId: string) {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/correction_schedules?user_id=eq.${userId}&limit=1&select=extension_notify_sent`,
+    {
+      headers: {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+  const data = await resp.json();
+  return data[0] || null;
+}
+
+async function markExtensionNotified(userId: string) {
+  await fetch(`${SUPABASE_URL}/rest/v1/correction_schedules?user_id=eq.${userId}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify({
+      extension_notify_sent: true,
+      extension_notify_sent_at: new Date().toISOString(),
+    }),
+  });
+}
+
+// KST 기준 "다가오는 첫 일요일" (오늘이 일요일이면 오늘) — YYYY-MM-DD
+function upcomingSundayKST(): string {
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const add = (7 - kstNow.getUTCDay()) % 7; // 일요일(0)이면 0 = 오늘
+  const d = new Date(kstNow.getTime() + add * 24 * 60 * 60 * 1000);
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${m}-${day}`;
+}
+
+// ===== 첨삭 연장 원탭 콜백 처리 (텔레그램 '입금 확인 → 연장 적용' 버튼) =====
+// 한 번의 탭으로: 신청 confirmed → applications 미러 + correction_schedules 원본 기록
+// (= 학생 화면 13~24세션 오픈) → 연장 완료 알림톡(50227) 발송.
+// 시작일 = 다가오는 첫 일요일(KST). 다른 시작일이 필요하면 이 버튼 대신
+// 관리자 모달의 [연장 적용]으로 수동 처리한다(그쪽은 날짜 선택 가능).
+async function handleConfirmExtensionCallback(
+  reqId: string,
+  callbackId: string,
+  chatId: unknown,
+  messageId: unknown,
+  now: string,
+  corsHeaders: Record<string, string>,
+) {
+  try {
+    const reqRow = await getExtensionRequest(reqId);
+    if (!reqRow) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "연장 신청 기록을 찾을 수 없습니다.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    if (reqRow.status === "confirmed") {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "이미 처리된 연장 신청입니다.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    if (!reqRow.application_id) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "신청서 연결 정보가 없습니다. 관리자 페이지에서 수동으로 적용해주세요.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    const app = await getApplication(reqRow.application_id);
+    if (!app) {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "신청서를 찾을 수 없습니다. 관리자 페이지에서 수동으로 적용해주세요.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
+
+    const extStart = upcomingSundayKST();
+
+    // 1) applications 미러 (대시보드/신청상세가 읽음)
+    await updateApplication(reqRow.application_id, {
+      extension_enabled: true,
+      extension_start_date: extStart,
+    });
+
+    // 2) correction_schedules 원본 (테스트룸이 읽음) — 이 순간 학생 화면에 13~24세션이 열림
+    await upsertScheduleExtension(reqRow.user_id, extStart, app.correction_start_date || null);
+
+    // 3) 신청 기록 확정
+    await updateExtensionRequest(reqId, {
+      status: "confirmed",
+      confirmed_at: new Date().toISOString(),
+    });
+
+    // 4) 연장 완료 알림톡(50227) — 학생당 1회, 실패해도 연장 적용은 유지
+    //    (관리자 모달 maybeSendExtensionAlimTalk와 동일 규칙·동일 일정 계산)
+    let kakaoOk = false;
+    try {
+      const schedule = await getScheduleByUser(reqRow.user_id);
+      if (schedule && schedule.extension_notify_sent === true) {
+        kakaoOk = true; // 이미 발송됨 — 재발송하지 않음
+      } else {
+        const startD = new Date(extStart + "T00:00:00");
+        const endD = new Date(startD.getTime() + 27 * 24 * 60 * 60 * 1000);
+        const fmt = (d: Date) =>
+          `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+        const res = await sendKakaoAlimTalk("correction_extension_complete", {
+          name: app.name,
+          phone: app.phone,
+          app_id: reqRow.application_id,
+          round: "1",
+          start_date: fmt(startD),
+          end_date: fmt(endD),
+        });
+        kakaoOk = !!(res && res.success);
+        if (kakaoOk) await markExtensionNotified(reqRow.user_id);
+      }
+    } catch (e) {
+      console.warn("연장 알림톡 발송 실패(연장 적용은 유지):", e);
+    }
+
+    // 5) 기존 메시지 수정 (버튼 제거, 완료 표시)
+    await sendTelegram("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text:
+        `📥 첨삭 연장 신청\n\n` +
+        `👤 이름: ${app.name || "-"}\n\n` +
+        `✅ 입금 확인 · 연장 적용 완료 (${now})\n` +
+        `📅 13~24세션 시작일: ${extStart} (일요일)\n` +
+        (kakaoOk
+          ? `📨 연장 완료 알림톡 발송됨`
+          : `⚠️ 알림톡 발송 실패 — 관리자 모달에서 [연장 적용]을 다시 누르면 재발송됩니다.`),
+    });
+
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callbackId,
+      text: "연장 적용 완료!",
+    });
+  } catch (error) {
+    console.error("confirm_extension callback error:", error);
+    await sendTelegram("answerCallbackQuery", {
+      callback_query_id: callbackId,
+      text: `연장 적용 실패: ${error.message}`,
       show_alert: true,
     });
   }
