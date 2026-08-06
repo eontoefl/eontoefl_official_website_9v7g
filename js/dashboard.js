@@ -271,8 +271,9 @@ async function renderCorrectionProgressSection(app) {
         if (st) statusBadge = `<span style="display:inline-block; background:${st.color}1f; color:${st.color}; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px;">${st.label}</span>`;
     }
 
-    // 연장 신청 '입금 대기'(pending) 조회 → 상단 작은 배지
+    // 연장 신청 '입금 대기'(pending) 조회 → 상단 작은 배지 / 없으면 연장 버튼 노출 판정
     let pendingBanner = '';
+    let showExtendBtn = false;
     if (!hasExt && app.user_id) {
         try {
             const r = await supabaseAPI.query('correction_extension_requests',
@@ -280,10 +281,26 @@ async function renderCorrectionProgressSection(app) {
             const pend = (Array.isArray(r) && r[0]) || null;
             if (pend) {
                 const dl = pend.deadline_date ? ` · 마감 ${formatDateWithDay(pend.deadline_date)}` : '';
-                pendingBanner = `<div style="background:#ede9fe; color:#7c3aed; font-size:12px; font-weight:600; padding:8px 12px; border-radius:8px; margin-bottom:14px;"><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>연장 신청 · 입금 확인 대기${dl}</div>`;
+                pendingBanner = `<div style="background:#ede9fe; border-radius:8px; padding:10px 12px; margin-bottom:14px;">
+                    <div style="color:#7c3aed; font-size:12px; font-weight:700;"><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>연장 신청 · 입금 확인 대기${dl}</div>
+                    <div style="color:#6b5aa0; font-size:11.5px; margin-top:5px;">국민은행 545601-01-233970 (황경민(이온)) · 200,000원 · <strong>본인 이름</strong>으로 입금</div>
+                </div>`;
+            } else {
+                // 신청 전 → 세션9 완료 + 마감 전이면 연장 버튼 노출 (테스트룸 업셀과 동일 조건)
+                const dl = cStart ? _corrExtDeadline(app.correction_start_date) : null;
+                const beforeDeadline = dl ? (today <= dl) : false;
+                if (beforeDeadline) {
+                    const s9 = await supabaseAPI.query('correction_submissions',
+                        { 'user_id': `eq.${app.user_id}`, 'session_number': 'eq.9', 'select': 'task_type,status,released_2' });
+                    const s9done = Array.isArray(s9) && s9.some(x =>
+                        (x.status === 'feedback2_ready' && x.released_2) ||
+                        ['complete', 'expired', 'skipped'].includes(x.status));
+                    if (s9done) showExtendBtn = true;
+                }
             }
         } catch (e) { console.warn('연장 신청 상태 조회 실패(무시):', e); }
     }
+    window._dashCorrectionApp = app;   // 버튼 핸들러가 참조
 
     section.innerHTML = `
         <div style="margin-bottom: 20px;">
@@ -331,7 +348,82 @@ async function renderCorrectionProgressSection(app) {
                 </div>
             </div>
         </div>
+        ${showExtendBtn ? `
+        <button onclick="requestExtensionFromDashboard(this)" style="width:100%; margin-top:16px; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg,#9480c5,#b49fe0); color:#fff; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 16px rgba(148,128,197,0.28);">
+            <i class="fas fa-arrow-right" style="margin-right:6px;"></i>13~24세션 연장하기
+        </button>
+        <div style="font-size:11.5px; color:#94a3b8; text-align:center; margin-top:7px;">지난 첨삭 흐름을 이어서, 다음 4주를 진행할 수 있어요.</div>
+        ` : ''}
     `;
+}
+
+// 첨삭 연장 신청 마감일: correction_start_date 기준 세션12(+25일)이 속한 주의 토요일
+function _corrExtDeadline(startYmd) {
+    const start = new Date(startYmd + 'T00:00:00');
+    const s12 = new Date(start.getTime() + 25 * 24 * 60 * 60 * 1000);
+    const d = new Date(s12);
+    d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));   // 이후 첫 토요일
+    d.setHours(23, 59, 59, 999);
+    return d;
+}
+
+// 대시보드 단축 연장 신청: 동의(confirm) → 신청 기록 INSERT + 텔레그램 알림
+async function requestExtensionFromDashboard(btn) {
+    const app = window._dashCorrectionApp;
+    if (!app || !app.user_id) return;
+    if (!confirm('기존 첨삭과 동일한 조건·규정으로 13~24세션 연장을 신청합니다.\n신청 후 안내되는 계좌로 입금하시면 확정됩니다.\n\n신청하시겠어요?')) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> 신청 중...';
+
+    const AGREE = '기존 첨삭과 동일한 조건·규정으로 진행되는 것에 동의합니다.';
+    const deadline = _corrExtDeadline(app.correction_start_date);
+    const deadlineYmd = deadline.getFullYear() + '-' +
+        String(deadline.getMonth() + 1).padStart(2, '0') + '-' + String(deadline.getDate()).padStart(2, '0');
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const deadlineLabel = (deadline.getMonth() + 1) + '/' + deadline.getDate() + '(' + days[deadline.getDay()] + ')';
+
+    try {
+        // 1) 신청 기록 INSERT (id 회수)
+        const insRes = await fetch(`${SUPABASE_URL}/rest/v1/correction_extension_requests`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json', 'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+                user_id: app.user_id,
+                application_id: app.id || null,
+                status: 'pending',
+                agreed_at: new Date().toISOString(),
+                agreement_text: AGREE,
+                deadline_date: deadlineYmd
+            })
+        });
+        const rows = await insRes.json();
+        const reqRow = Array.isArray(rows) ? rows[0] : rows;
+        if (!reqRow || !reqRow.id) throw new Error('신청 저장 실패');
+
+        // 2) 텔레그램 알림 (실패해도 신청은 접수됨)
+        try {
+            await fetch(`${SUPABASE_URL}/functions/v1/telegram-notify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+                body: JSON.stringify({
+                    type: 'extension_requested',
+                    data: { name: app.name || '', deadline: deadlineLabel, request_id: reqRow.id, app_id: app.id || '' }
+                })
+            });
+        } catch (e) { console.warn('텔레그램 알림 실패(무시):', e); }
+
+        alert('연장 신청이 접수되었습니다.\n\n국민은행 545601-01-233970 (황경민(이온))\n200,000원 · 반드시 본인 이름으로 입금해주세요.\n\n입금이 확인되면 카톡으로 안내드릴게요!');
+        await renderCorrectionProgressSection(app);   // pending 배지 상태로 갱신
+    } catch (e) {
+        console.error('연장 신청 실패:', e);
+        alert('신청 처리에 실패했습니다. 잠시 후 다시 시도하거나 카톡으로 문의해주세요.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-arrow-right" style="margin-right:6px;"></i>13~24세션 연장하기';
+    }
 }
 
 /**
