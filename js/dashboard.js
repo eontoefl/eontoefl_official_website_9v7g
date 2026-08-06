@@ -69,7 +69,7 @@ async function loadDashboard() {
             renderProgressSection(challengeApp);
             await renderCorrectionProgressSection(challengeApp);
             renderActionItems(challengeApp);
-            renderTimeline(challengeApp);
+            await renderTimeline(challengeApp);
             await renderQuickMenuGrid(challengeApp);
             renderShipping(challengeApp);
             await renderProgramInfo(challengeApp);
@@ -98,7 +98,7 @@ async function loadDashboard() {
         renderProgressSection(application);
         await renderCorrectionProgressSection(application);
         renderActionItems(application);
-        renderTimeline(application);
+        await renderTimeline(application);
         await renderQuickMenuGrid(application);
         renderShipping(application);
         await renderProgramInfo(application);
@@ -281,9 +281,14 @@ async function renderCorrectionProgressSection(app) {
             const pend = (Array.isArray(r) && r[0]) || null;
             if (pend) {
                 const dl = pend.deadline_date ? ` · 마감 ${formatDateWithDay(pend.deadline_date)}` : '';
-                pendingBanner = `<div style="background:#ede9fe; border-radius:8px; padding:10px 12px; margin-bottom:14px;">
-                    <div style="color:#7c3aed; font-size:12px; font-weight:700;"><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>연장 신청 · 입금 확인 대기${dl}</div>
-                    <div style="color:#6b5aa0; font-size:11.5px; margin-top:5px;">국민은행 545601-01-233970 (황경민(이온)) · 200,000원 · <strong>본인 이름</strong>으로 입금</div>
+                pendingBanner = `<div style="background:#ede9fe; border-radius:10px; padding:12px; margin-bottom:14px;">
+                    <div style="color:#7c3aed; font-size:12px; font-weight:700; margin-bottom:9px;"><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>연장 신청 · 입금 확인 대기${dl}</div>
+                    <div style="background:#fff; border-radius:8px; padding:11px; text-align:center;">
+                        <div style="font-size:13.5px; font-weight:700; color:#1e293b;">국민은행 545601-01-233970</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">예금주 황경민(이온)</div>
+                        <div style="font-size:18px; font-weight:800; color:#7c3aed; margin-top:4px; letter-spacing:-0.02em;">200,000원</div>
+                        <div style="font-size:11.5px; color:#94a3b8; margin-top:4px;">반드시 <strong style="color:#a53b22;">본인 이름</strong>으로 입금해주세요</div>
+                    </div>
                 </div>`;
             } else {
                 // 신청 전 → 세션9 완료 + 마감 전이면 연장 버튼 노출 (테스트룸 업셀과 동일 조건)
@@ -417,7 +422,8 @@ async function requestExtensionFromDashboard(btn) {
         } catch (e) { console.warn('텔레그램 알림 실패(무시):', e); }
 
         alert('연장 신청이 접수되었습니다.\n\n국민은행 545601-01-233970 (황경민(이온))\n200,000원 · 반드시 본인 이름으로 입금해주세요.\n\n입금이 확인되면 카톡으로 안내드릴게요!');
-        await renderCorrectionProgressSection(app);   // pending 배지 상태로 갱신
+        await renderCorrectionProgressSection(app);   // pending 배지(계좌)로 갱신
+        await renderTimeline(app);                    // 활동 타임라인에 '연장 신청' 반영
     } catch (e) {
         console.error('연장 신청 실패:', e);
         alert('신청 처리에 실패했습니다. 잠시 후 다시 시도하거나 카톡으로 문의해주세요.');
@@ -671,7 +677,7 @@ function formatDashboardCountdown(remainingMs, isIncentive) {
 /**
  * 타임라인 렌더링
  */
-function renderTimeline(app) {
+async function renderTimeline(app) {
     const timelineContent = document.getElementById('timelineContent');
     if (!timelineContent) return;
 
@@ -804,6 +810,22 @@ function renderTimeline(app) {
             events.push(es <= _today
                 ? { date: es, icon: 'fa-pen-nib', iconColor: '#7c3aed', title: '첨삭 연장 시작 (13~24세션)', description: '연장 세션이 시작되었습니다.' }
                 : { date: es, icon: 'fa-pen-nib', iconColor: '#f59e0b', title: '첨삭 연장 시작 예정 (13~24세션)', description: '곧 연장 세션이 시작됩니다!', future: true });
+        }
+        // 연장 신청 이벤트 (신청/확정 기록)
+        if (app.user_id) {
+            try {
+                const reqs = await supabaseAPI.query('correction_extension_requests',
+                    { 'user_id': `eq.${app.user_id}`, 'order': 'created_at.desc', 'select': 'created_at,status,confirmed_at' });
+                (Array.isArray(reqs) ? reqs : []).forEach(r => {
+                    if (r.created_at) {
+                        events.push({
+                            date: new Date(r.created_at), icon: 'fa-paper-plane', iconColor: '#7c3aed',
+                            title: '첨삭 연장 신청',
+                            description: r.status === 'confirmed' ? '입금 확인 완료' : (r.status === 'expired' ? '기간 만료' : '입금 확인 대기 중')
+                        });
+                    }
+                });
+            } catch (e) { console.warn('연장 신청 이벤트 조회 실패(무시):', e); }
         }
     }
 
