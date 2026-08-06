@@ -297,8 +297,9 @@ async function renderCorrectionProgressSection(app) {
                 const dl = cStart ? _corrExtDeadline(app.correction_start_date) : null;
                 const beforeDeadline = dl ? (today <= dl) : false;
                 if (beforeDeadline) {
+                    // 세션9 이상(9~12) 중 하나라도 완료면 노출. 세션9만 보면 세션9 건너뛴 학생을 놓침.
                     const s9 = await supabaseAPI.query('correction_submissions',
-                        { 'user_id': `eq.${app.user_id}`, 'session_number': 'eq.9', 'select': 'task_type,status,released_2' });
+                        { 'user_id': `eq.${app.user_id}`, 'session_number': 'gte.9', 'select': 'session_number,status,released_2' });
                     const s9done = Array.isArray(s9) && s9.some(x =>
                         (x.status === 'feedback2_ready' && x.released_2) ||
                         ['complete', 'expired', 'skipped'].includes(x.status));
