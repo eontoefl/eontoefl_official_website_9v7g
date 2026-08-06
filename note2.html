@@ -261,6 +261,35 @@
   .mbars .gauge { margin-bottom: .6rem; }
   .mbars .gauge:last-child { margin-bottom: 0; }
   .mbars + .lines { margin-top: .9rem; }
+  /* ───── 용돈기입장 (오늘 쓴 돈) — state.expenses2. note.html의 expenses 키와는 별개 ───── */
+  .expzone { margin-top: 1rem; border-top: 1px solid var(--surface-high); padding-top: .8rem; }
+  .expzone .ezhead { font-size: 11px; font-weight: 700; letter-spacing: .1em;
+    color: var(--on-surface-variant); display: flex; align-items: center; margin-bottom: .25rem; }
+  .expzone .ezhead b { margin-left: auto; font-size: 12.5px; letter-spacing: 0; color: var(--tertiary); }
+  .ezrow { display: flex; align-items: center; gap: .5rem; padding: .35rem .1rem; font-size: 13px; }
+  .ezrow .ezamt { font-weight: 700; white-space: nowrap; }
+  .ezrow .ezamt.minus { color: var(--tertiary); }
+  .ezrow .ezamt.plus { color: #2f6f4f; }
+  .ezrow .ezlb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ezrow .eztm { font-size: 10px; color: var(--on-surface-variant); flex-shrink: 0; }
+  .ezrow .ezx { border: none; background: none; color: var(--on-surface-variant); cursor: pointer;
+    font-size: 11px; padding: 2px 5px; border-radius: 99px; flex-shrink: 0; font-family: inherit; }
+  .ezrow .ezx:hover { background: var(--surface-high); color: var(--tertiary); }
+  .eznone { font-size: 12px; color: var(--on-surface-variant); opacity: .7; padding: .3rem 0; }
+  .ezform { display: flex; gap: .4rem; margin-top: .5rem; }
+  .ezform #exptype { width: 38px; border: none; border-radius: var(--r); background: var(--surface-high);
+    color: var(--tertiary); font-size: 17px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    font-family: inherit; }
+  .ezform #exptype.plus { color: #2f6f4f; }
+  .ezform input { background: var(--surface-highest); border: none; border-radius: var(--r);
+    padding: .55rem .7rem; font-family: inherit; font-size: 14px; color: var(--on-surface);
+    outline: none; min-width: 0; }
+  .ezform input:focus { outline: 2px solid var(--primary-fixed-dim); }
+  .ezform #expamt { width: 92px; flex-shrink: 0; text-align: right; }
+  .ezform #explabel { flex: 1; }
+  .ezform #expadd { border: none; border-radius: var(--r); background: var(--grad); color: #fff;
+    padding: 0 14px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    flex-shrink: 0; }
   .lines { font-size: 13.5px; color: var(--on-surface-variant); line-height: 1.8; }
   .lines > div { padding: .35rem .15rem .35rem 1.1rem; position: relative; }
   .lines > div::before { content: ""; position: absolute; left: .15rem; top: .95em; width: 5px; height: 5px;
@@ -452,6 +481,7 @@
   @media (hover: none) and (pointer: coarse) {
     .chat .composer textarea, #tamirror { font-size: 16px; }
     #memo { font-size: 16px; }
+    .ezform input { font-size: 16px; }
   }
 </style>
 </head>
@@ -780,8 +810,69 @@ function moneyCard(money) {
   }).join("");
   const body = (barHtml ? '<div class="mbars">' + barHtml + '</div>' : "") +
     (lines.length ? '<div class="lines">' + lines.map(x => '<div>' + fmt(x) + '</div>').join("") + '</div>' : "");
+  /* 용돈기입장 — 막대 아래에 오늘 쓴 돈 입력·목록 */
+  const expHtml = '<div class="expzone" id="expzone">' +
+    '<div class="ezhead">오늘 쓴 돈<b id="exptotal"></b></div>' +
+    '<div id="explist"></div>' +
+    '<div class="ezform">' +
+    '<button type="button" id="exptype" title="지출/수입 전환 (지금: 지출)">−</button>' +
+    '<input id="expamt" inputmode="numeric" placeholder="금액">' +
+    '<input id="explabel" placeholder="항목 (예: 점심 (편의점))">' +
+    '<button type="button" id="expadd">추가</button></div></div>';
   return '<section><div class="seclab">돈</div><div class="panel">' +
-    (body || '<div class="lines"><div class="none">오늘 돈 소식은 없습니다.</div></div>') + '</div></section>';
+    (body || '<div class="lines"><div class="none">오늘 돈 소식은 없습니다.</div></div>') +
+    expHtml + '</div></section>';
+}
+
+/* ── 용돈기입장 동작 — STATE.expenses2 배열에 담아 기존 자동저장(save)으로 잠가 올린다.
+   ★note.html 유산인 STATE.expenses(팀장 페이지 지출)는 절대 건드리지 않는다 (checks/checks2와 같은 원칙) */
+function mountExpenses() {
+  const zone = document.getElementById("expzone");
+  if (!zone) return;                                 // 오늘판이 없으면 돈 카드 자체가 없다
+  const amt = document.getElementById("expamt"), label = document.getElementById("explabel");
+  const typeBtn = document.getElementById("exptype"), list = document.getElementById("explist");
+  let type = "-";
+  amt.addEventListener("input", () => {              // 콤마 자동 표시
+    const v = amt.value.replace(/[^0-9]/g, "");
+    amt.value = v ? (+v).toLocaleString("ko-KR") : "";
+  });
+  typeBtn.addEventListener("click", () => {
+    type = type === "-" ? "+" : "-";
+    typeBtn.textContent = type === "-" ? "−" : "＋";
+    typeBtn.classList.toggle("plus", type === "+");
+    typeBtn.title = "지출/수입 전환 (지금: " + (type === "-" ? "지출" : "수입") + ")";
+  });
+  function drawExp() {
+    const rows = STATE.expenses2 || [];
+    list.innerHTML = rows.length ? rows.map((x, i) =>
+      '<div class="ezrow"><span class="ezamt ' + (x.t === "+" ? "plus" : "minus") + '">' +
+      (x.t === "+" ? "+" : "−") + (+x.amt || 0).toLocaleString("ko-KR") + '</span>' +
+      '<span class="ezlb">' + esc(x.label || "") + '</span>' +
+      '<span class="eztm">' + esc(hhmm(new Date((+x.at || 0) * 1000))) + '</span>' +
+      '<button class="ezx" data-i="' + i + '" type="button" title="이 줄 지우기">✕</button></div>').join("")
+      : '<div class="eznone">오늘 적은 지출이 없습니다.</div>';
+    const spend = rows.reduce((s, x) => s + (x.t !== "+" ? (+x.amt || 0) : 0), 0);
+    document.getElementById("exptotal").textContent =
+      spend ? "지출 " + spend.toLocaleString("ko-KR") + "원" : "";
+    list.querySelectorAll(".ezx").forEach(b => b.addEventListener("click", () => {
+      STATE.expenses2.splice(+b.dataset.i, 1);
+      drawExp(); save();
+    }));
+  }
+  function addExp() {
+    const a = +(amt.value.replace(/[^0-9]/g, "")) || 0;
+    const lb = label.value.trim();
+    if (!a && !lb) return;
+    STATE.expenses2 = STATE.expenses2 || [];
+    STATE.expenses2.push({ t: type, amt: a, label: lb, at: Math.floor(Date.now() / 1000) });
+    amt.value = ""; label.value = "";
+    drawExp(); save(); amt.focus();
+  }
+  document.getElementById("expadd").addEventListener("click", addExp);
+  [amt, label].forEach(el => el.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); addExp(); }
+  }));
+  drawExp();
 }
 
 /* ───── 본문 ───── */
@@ -899,6 +990,7 @@ function render() {
 
   c.innerHTML = top; main.innerHTML = left; side.innerHTML = right;
   drawCal2();
+  mountExpenses();
 
   /* 체크 동작 */
   function progress() {
@@ -1462,6 +1554,8 @@ async function go(d, nav) {
     if (!Object.keys(STATE.checks2).length) STATE.checks2 = Object.assign({}, STATE.checks);
     delete STATE.checks;   // 옛 note2가 객체로 남긴 것 — note.html은 배열을 기대하므로 치운다
   }
+  /* 용돈기입장은 expenses2에만 담는다 — note.html의 expenses 배열은 절대 손대지 않는다 */
+  if (!Array.isArray(STATE.expenses2)) STATE.expenses2 = [];
   daySig = row && row.payload ? row.payload.slice(0, 80) + row.payload.length : "";
   render();
   mountMemo();
