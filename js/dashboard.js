@@ -282,7 +282,7 @@ async function renderCorrectionProgressSection(app) {
                 { 'user_id': `eq.${app.user_id}`, 'status': 'eq.pending', 'limit': '1' });
             const pend = (Array.isArray(r) && r[0]) || null;
             if (pend) {
-                const dl = pend.deadline_date ? ` · 마감 ${formatDateWithDay(pend.deadline_date)}` : '';
+                const dl = pend.deadline_date ? ` · 마감 ${_corrFmtYmd(pend.deadline_date)}` : '';
                 pendingBanner = `<div style="background:#ede9fe; border-radius:10px; padding:12px; margin-bottom:14px;">
                     <div style="color:#7c3aed; font-size:12px; font-weight:700; margin-bottom:9px;"><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>연장 신청 · 입금 확인 대기${dl}</div>
                     <div style="background:#fff; border-radius:8px; padding:11px; text-align:center;">
@@ -363,6 +363,14 @@ async function renderCorrectionProgressSection(app) {
         <div style="font-size:11.5px; color:#94a3b8; text-align:center; margin-top:7px;">지난 첨삭 흐름을 이어서, 다음 4주를 진행할 수 있어요.</div>
         ` : ''}
     `;
+}
+
+// 'YYYY-MM-DD' → 'M/D(요일)' — renderProgramInfo의 로컬 formatDateWithDay를 못 쓰므로 자체 포맷
+function _corrFmtYmd(ymd) {
+    const d = new Date(ymd + 'T00:00:00');
+    if (isNaN(d.getTime())) return String(ymd);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return (d.getMonth() + 1) + '/' + d.getDate() + '(' + days[d.getDay()] + ')';
 }
 
 // 첨삭 연장 신청 마감일: correction_start_date 기준 세션12(+25일)이 속한 주의 토요일
