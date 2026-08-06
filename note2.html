@@ -276,17 +276,27 @@
     font-size: 11px; padding: 2px 5px; border-radius: 99px; flex-shrink: 0; font-family: inherit; }
   .ezrow .ezx:hover { background: var(--surface-high); color: var(--tertiary); }
   .eznone { font-size: 12px; color: var(--on-surface-variant); opacity: .7; padding: .3rem 0; }
-  .ezform { display: flex; gap: .4rem; margin-top: .5rem; }
+  .ezrow .ezpay { font-size: 11px; color: var(--on-surface-variant); flex-shrink: 0; white-space: nowrap; }
+  /* 폼은 flex-wrap — 좁으면 [토글·통화·카드·금액] / [항목·추가] 두 줄로 자연스럽게 접힌다 */
+  .ezform { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
   .ezform #exptype { width: 38px; border: none; border-radius: var(--r); background: var(--surface-high);
     color: var(--tertiary); font-size: 17px; font-weight: 700; cursor: pointer; flex-shrink: 0;
     font-family: inherit; }
   .ezform #exptype.plus { color: #2f6f4f; }
+  .ezform #expcur { width: 38px; border: none; border-radius: var(--r); background: var(--surface-high);
+    color: var(--on-surface); font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    font-family: inherit; }
+  .ezform select { background: var(--surface-highest); border: none; border-radius: var(--r);
+    padding: .55rem .45rem; font-family: inherit; font-size: 13px; color: var(--on-surface);
+    outline: none; flex-shrink: 0; max-width: 118px; }
+  .ezform select:focus { outline: 2px solid var(--primary-fixed-dim); }
   .ezform input { background: var(--surface-highest); border: none; border-radius: var(--r);
     padding: .55rem .7rem; font-family: inherit; font-size: 14px; color: var(--on-surface);
     outline: none; min-width: 0; }
   .ezform input:focus { outline: 2px solid var(--primary-fixed-dim); }
+  .ezform #exppayx { width: 96px; flex-shrink: 0; }
   .ezform #expamt { width: 92px; flex-shrink: 0; text-align: right; }
-  .ezform #explabel { flex: 1; }
+  .ezform #explabel { flex: 1 1 140px; }
   .ezform #expadd { border: none; border-radius: var(--r); background: var(--grad); color: #fff;
     padding: 0 14px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
     flex-shrink: 0; }
@@ -481,7 +491,7 @@
   @media (hover: none) and (pointer: coarse) {
     .chat .composer textarea, #tamirror { font-size: 16px; }
     #memo { font-size: 16px; }
-    .ezform input { font-size: 16px; }
+    .ezform input, .ezform select { font-size: 16px; }
   }
 </style>
 </head>
@@ -816,6 +826,10 @@ function moneyCard(money) {
     '<div id="explist"></div>' +
     '<div class="ezform">' +
     '<button type="button" id="exptype" title="지출/수입 전환 (지금: 지출)">−</button>' +
+    '<button type="button" id="expcur" title="통화 전환 (₩/$)">₩</button>' +
+    '<select id="exppay" title="결제수단">' +
+      EXP_PAYS.map(p => '<option>' + esc(p) + '</option>').join("") + '</select>' +
+    '<input id="exppayx" placeholder="어디로" style="display:none">' +
     '<input id="expamt" inputmode="numeric" placeholder="금액">' +
     '<input id="explabel" placeholder="항목 (예: 점심 (편의점))">' +
     '<button type="button" id="expadd">추가</button></div></div>';
@@ -825,51 +839,91 @@ function moneyCard(money) {
 }
 
 /* ── 용돈기입장 동작 — STATE.expenses2 배열에 담아 기존 자동저장(save)으로 잠가 올린다.
-   ★note.html 유산인 STATE.expenses(팀장 페이지 지출)는 절대 건드리지 않는다 (checks/checks2와 같은 원칙) */
+   ★note.html 유산인 STATE.expenses(팀장 페이지 지출)는 절대 건드리지 않는다 (checks/checks2와 같은 원칙)
+   항목 형식: {t:"-"|"+", amt, label, at, pay:"아멕스"…, cur:"KRW"|"USD"} — pay·cur 없는 옛 줄은 원화·수단 미상 */
+const EXP_PAYS = ["토스파랑이", "카뱅파랑이", "카뱅노랑이", "아멕스", "신한", "KB", "국민(사업)", "현금", "기타"];
+const EXP_PAY_KEY = "kb-exp-pay", EXP_CUR_KEY = "kb-exp-cur";
 function mountExpenses() {
   const zone = document.getElementById("expzone");
   if (!zone) return;                                 // 오늘판이 없으면 돈 카드 자체가 없다
   const amt = document.getElementById("expamt"), label = document.getElementById("explabel");
   const typeBtn = document.getElementById("exptype"), list = document.getElementById("explist");
+  const pay = document.getElementById("exppay"), payx = document.getElementById("exppayx");
+  const curBtn = document.getElementById("expcur");
   let type = "-";
-  amt.addEventListener("input", () => {              // 콤마 자동 표시
-    const v = amt.value.replace(/[^0-9]/g, "");
-    amt.value = v ? (+v).toLocaleString("ko-KR") : "";
+  let cur = localStorage.getItem(EXP_CUR_KEY) === "USD" ? "USD" : "KRW";   // 마지막 통화 기억
+  if (EXP_PAYS.indexOf(localStorage.getItem(EXP_PAY_KEY)) >= 0)            // 마지막 카드 기억
+    pay.value = localStorage.getItem(EXP_PAY_KEY);
+  const usdFmt = n => "$" + (+n || 0).toLocaleString("en-US",
+    { minimumFractionDigits: (+n % 1 ? 2 : 0), maximumFractionDigits: 2 });
+  function fmtAmt() {
+    if (cur === "USD") {                             // 달러: 소수점 허용 (12.50)
+      let v = amt.value.replace(/[^0-9.]/g, "");
+      const i = v.indexOf(".");
+      if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, "").slice(0, 2);
+      amt.value = v;
+    } else {                                         // 원화: 콤마 자동 표시
+      const v = amt.value.replace(/[^0-9]/g, "");
+      amt.value = v ? (+v).toLocaleString("ko-KR") : "";
+    }
+  }
+  const drawCur = () => {
+    curBtn.textContent = cur === "USD" ? "$" : "₩";
+    amt.inputMode = cur === "USD" ? "decimal" : "numeric";
+  };
+  const drawPayx = () => { payx.style.display = pay.value === "기타" ? "" : "none"; };
+  drawCur(); drawPayx();
+  amt.addEventListener("input", fmtAmt);
+  curBtn.addEventListener("click", () => {
+    cur = cur === "USD" ? "KRW" : "USD";
+    localStorage.setItem(EXP_CUR_KEY, cur);
+    drawCur(); fmtAmt();
   });
+  pay.addEventListener("change", () => { localStorage.setItem(EXP_PAY_KEY, pay.value); drawPayx(); });
   typeBtn.addEventListener("click", () => {
     type = type === "-" ? "+" : "-";
     typeBtn.textContent = type === "-" ? "−" : "＋";
     typeBtn.classList.toggle("plus", type === "+");
     typeBtn.title = "지출/수입 전환 (지금: " + (type === "-" ? "지출" : "수입") + ")";
   });
+  const money = x => (x.t === "+" ? "+" : "−") +
+    (x.cur === "USD" ? usdFmt(x.amt) : (+x.amt || 0).toLocaleString("ko-KR") + "원");
   function drawExp() {
     const rows = STATE.expenses2 || [];
     list.innerHTML = rows.length ? rows.map((x, i) =>
       '<div class="ezrow"><span class="ezamt ' + (x.t === "+" ? "plus" : "minus") + '">' +
-      (x.t === "+" ? "+" : "−") + (+x.amt || 0).toLocaleString("ko-KR") + '</span>' +
+      money(x) + '</span>' +
       '<span class="ezlb">' + esc(x.label || "") + '</span>' +
+      (x.pay ? '<span class="ezpay">· ' + esc(x.pay) + '</span>' : '') +
       '<span class="eztm">' + esc(hhmm(new Date((+x.at || 0) * 1000))) + '</span>' +
       '<button class="ezx" data-i="' + i + '" type="button" title="이 줄 지우기">✕</button></div>').join("")
       : '<div class="eznone">오늘 적은 지출이 없습니다.</div>';
-    const spend = rows.reduce((s, x) => s + (x.t !== "+" ? (+x.amt || 0) : 0), 0);
-    document.getElementById("exptotal").textContent =
-      spend ? "지출 " + spend.toLocaleString("ko-KR") + "원" : "";
+    // 합계는 통화별로 따로 — 환율을 지어내지 않는다
+    const krw = rows.reduce((s, x) => s + (x.t !== "+" && x.cur !== "USD" ? (+x.amt || 0) : 0), 0);
+    const usd = rows.reduce((s, x) => s + (x.t !== "+" && x.cur === "USD" ? (+x.amt || 0) : 0), 0);
+    document.getElementById("exptotal").textContent = (krw || usd)
+      ? "지출 " + [krw ? "−" + krw.toLocaleString("ko-KR") + "원" : null,
+                   usd ? "−" + usdFmt(usd) : null].filter(Boolean).join(" · ")
+      : "";
     list.querySelectorAll(".ezx").forEach(b => b.addEventListener("click", () => {
       STATE.expenses2.splice(+b.dataset.i, 1);
       drawExp(); save();
     }));
   }
   function addExp() {
-    const a = +(amt.value.replace(/[^0-9]/g, "")) || 0;
+    const a = cur === "USD" ? (parseFloat(amt.value.replace(/[^0-9.]/g, "")) || 0)
+                            : (+(amt.value.replace(/[^0-9]/g, "")) || 0);
     const lb = label.value.trim();
     if (!a && !lb) return;
+    const payName = pay.value === "기타" ? (payx.value.trim() || "기타") : pay.value;
     STATE.expenses2 = STATE.expenses2 || [];
-    STATE.expenses2.push({ t: type, amt: a, label: lb, at: Math.floor(Date.now() / 1000) });
+    STATE.expenses2.push({ t: type, amt: a, label: lb, at: Math.floor(Date.now() / 1000),
+      pay: payName, cur: cur });
     amt.value = ""; label.value = "";
     drawExp(); save(); amt.focus();
   }
   document.getElementById("expadd").addEventListener("click", addExp);
-  [amt, label].forEach(el => el.addEventListener("keydown", e => {
+  [amt, label, payx].forEach(el => el.addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); addExp(); }
   }));
   drawExp();
