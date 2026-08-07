@@ -220,6 +220,21 @@
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @media (prefers-reduced-motion: reduce) { .kb .doing { animation: none; } }
 
+  /* ───── 김비서 v2 오늘판 ───── */
+  .v2hero .h { margin-top: .05rem; }
+  .v2note { font-size: 12px; color: var(--on-surface-variant); line-height: 1.55; margin-top: .15rem; }
+  .v2memory { list-style: none; }
+  .v2memory li { padding: .72rem .2rem; border-bottom: 1px solid var(--surface-high); }
+  .v2memory li:last-child { border-bottom: 0; }
+  .v2memory .tag { display: inline-block; margin-right: .4rem; padding: 2px 8px; border-radius: 99px;
+    background: var(--secondary-container); color: var(--on-secondary-container); font-size: 10.5px;
+    font-weight: 700; vertical-align: 1px; }
+  .v2memory .text { font-size: 13px; line-height: 1.65; }
+  .v2trust { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
+  .v2trust span { border-radius: 10px; background: var(--surface-low); padding: .55rem .7rem;
+    font-size: 12px; font-weight: 700; }
+  .v2horizon { margin-top: .8rem; color: var(--on-surface-variant); font-size: 12px; line-height: 1.6; }
+
   /* ───── 전체 업무리스트 (표시 전용) ───── */
   .wl summary { cursor: pointer; user-select: none; -webkit-user-select: none; list-style: none; }
   .wl summary::-webkit-details-marker { display: none; }
@@ -958,6 +973,8 @@ function render() {
     return;
   }
 
+  const isV2 = Number(DAY.v) === 2 || DAY.managed_by === "kimsecretary_v2";
+
   let top = "", left = "", right = "";
   if (DATE !== today) {
     top += USERNAV
@@ -967,9 +984,15 @@ function render() {
         '아래는 ' + esc(korDate(DATE)) + '판입니다. 채팅과 메모장은 그대로 쓸 수 있습니다.</div>';
   }
 
-  top += '<div class="hero"><div class="lab">오늘 목표 — 무슨 일이 있어도 여기까지</div>' +
-    '<div class="h">' + esc(DAY.goal || "(목표가 비어 있습니다)") + '</div>' +
-    '<div class="d">' + esc(korDate(DAY.d || DATE)) + '</div></div>';
+  if (isV2) {
+    top += '<div class="hero v2hero"><div class="lab">KIM SECRETARY V2</div>' +
+      '<div class="h">김비서 v2 오늘판</div>' +
+      '<div class="d">' + esc(korDate(DAY.d || DATE)) + '</div></div>';
+  } else {
+    top += '<div class="hero"><div class="lab">오늘 목표 — 무슨 일이 있어도 여기까지</div>' +
+      '<div class="h">' + esc(DAY.goal || "(목표가 비어 있습니다)") + '</div>' +
+      '<div class="d">' + esc(korDate(DAY.d || DATE)) + '</div></div>';
+  }
 
   top += '<div class="cal2" id="cal2"></div>';
 
@@ -987,14 +1010,17 @@ function render() {
       }).join("")
     : '<li class="none">오늘은 없습니다.</li>';
 
-  const must = DAY.must || [], stretch = DAY.stretch || [];
+  const must = isV2 ? ((DAY.today && DAY.today.items) || []) : (DAY.must || []);
+  const stretch = isV2 ? (DAY.tomorrow || []) : (DAY.stretch || []);
 
-  left += '<section><div class="seclab">무조건 여기까지 <span>· 체크 자동 저장</span></div><div class="panel">' +
+  left += '<section><div class="seclab">' + (isV2 ? '오늘 내가 할 일' : '무조건 여기까지') +
+    ' <span>· 체크 자동 저장</span></div><div class="panel">' +
     '<div class="prog"><div class="track"><div class="bar" id="pbar"></div></div><div class="n" id="pnum">0 / 0</div></div>' +
     '<ul class="todo" id="mustlist">' + todoList(must, true) + '</ul></div></section>';
 
-  left += '<section><div class="seclab">시간 나면 여기까지</div><div class="panel">' +
-    '<ul class="todo" id="strlist">' + todoList(stretch, false) + '</ul></div></section>';
+  left += '<section><div class="seclab">' + (isV2 ? '내일 내가 할 일 <span>· 오늘을 마치면 바로 당겨서 할 수 있음</span>' : '시간 나면 여기까지') +
+    '</div><div class="panel"><ul class="todo" id="strlist">' +
+    todoList(stretch, isV2) + '</ul></div></section>';
 
   /* 김비서 카드 — 업무 현황(kimbi)과 처리한 것(reports)을 한 체크리스트로. 표시 전용 */
   const kb = DAY.kimbi || [], reps = DAY.reports || [];
@@ -1003,12 +1029,53 @@ function render() {
     '<span class="mk ' + (filled ? 'done">✓' : 'todo">') + '</span>' +
     '<span class="tx">' + fmt(text || "") + '</span>' +
     (doing ? '<span class="doing">진행중</span>' : '') + '</li>';
-  right += '<section><div class="seclab">김비서 <span>· 업무 현황과 오늘 처리한 것</span></div><div class="panel"><ul class="kb">' +
-    ((kb.length || reps.length)
-      ? kb.map(k => kbRow(k.state === "done", k.text, k.state === "doing", k.state === "done")).join("") +
-        reps.map(t => kbRow(true, t, false, false)).join("")
-      : '<li><span class="tx" style="opacity:.7">등록된 일이 없습니다.</span></li>') +
-    '</ul></div></section>';
+  if (isV2) {
+    const secretary = DAY.secretary || {};
+    const secDone = Array.isArray(secretary.done) ? secretary.done : [];
+    const secProgress = Array.isArray(secretary.progress) ? secretary.progress : [];
+    const secBlocked = Array.isArray(secretary.blocked) ? secretary.blocked : [];
+    const secRow = (mark, item, doing) => '<li><span class="mk ' +
+      (mark === '✓' ? 'done">✓' : 'todo">' + esc(mark)) + '</span><div class="tx"><div>' +
+      esc(item && item.text || '') + '</div>' +
+      (item && (item.note || item.memo) ? '<div class="v2note">' + fmt(item.note || item.memo) + '</div>' : '') +
+      '</div>' + (doing ? '<span class="doing">진행중</span>' : '') + '</li>';
+    right += '<section><div class="seclab">김비서가 대신 챙기는 것</div><div class="panel"><ul class="kb">' +
+      (secDone.length || secProgress.length || secBlocked.length
+        ? secDone.map(i => secRow('✓', i, false)).join('') +
+          secProgress.map(i => secRow('', i, true)).join('') +
+          secBlocked.map(i => secRow('!', i, false)).join('')
+        : '<li><span class="tx" style="opacity:.7">따로 처리 중인 중요 업무가 없습니다.</span></li>') +
+      '</ul></div></section>';
+
+    const requests = Array.isArray(DAY.owner_requests) ? DAY.owner_requests : [];
+    right += '<section><div class="seclab">대표님 확인·김비서 요청</div><div class="panel"><ul class="kb">' +
+      (requests.length
+        ? requests.map(i => secRow('!', i, false)).join('')
+        : '<li><span class="tx" style="opacity:.7">지금 대표님께 따로 부탁드릴 일이 없습니다.</span></li>') +
+      '</ul></div></section>';
+
+    const coverage = DAY.coverage || {};
+    const memories = Array.isArray(coverage.memory_highlights) ? coverage.memory_highlights : [];
+    const horizons = DAY.horizons || {};
+    right += '<section><div class="seclab">김비서가 기억한 정보</div><div class="panel">' +
+      (memories.length
+        ? '<ul class="v2memory">' + memories.map(i => '<li><span class="tag">' +
+          esc(i.kind || '기억') + '</span><span class="text">' + esc(i.remembered || '') + '</span></li>').join('') + '</ul>'
+        : '<div style="opacity:.7;font-size:13px">최근 새로 기억해 둘 정보가 없습니다.</div>') +
+      '<div class="v2trust"><span>미반영 ' + Number(coverage.unreflected || 0) + '</span>' +
+      '<span>판단 대기 ' + Number(coverage.pending || 0) + '</span>' +
+      '<span>일정 충돌 ' + Number(coverage.conflicts || 0) + '</span></div>' +
+      '<div class="v2horizon">전체 인지 업무 · 오늘 ' + Number(horizons.today || 0) +
+      ' · 내일 ' + Number(horizons.tomorrow || 0) + ' · 이번 주 ' + Number(horizons.this_week || 0) +
+      ' · 나중 ' + Number(horizons.later || 0) + '</div></div></section>';
+  } else {
+    right += '<section><div class="seclab">김비서 <span>· 업무 현황과 오늘 처리한 것</span></div><div class="panel"><ul class="kb">' +
+      ((kb.length || reps.length)
+        ? kb.map(k => kbRow(k.state === "done", k.text, k.state === "doing", k.state === "done")).join("") +
+          reps.map(t => kbRow(true, t, false, false)).join("")
+        : '<li><span class="tx" style="opacity:.7">등록된 일이 없습니다.</span></li>') +
+      '</ul></div></section>';
+  }
 
   /* 전체 업무리스트 — 표시 전용(체크해도 저장 안 됨), 없거나 비면 섹션 숨김 */
   const wl = (Array.isArray(DAY.worklist) ? DAY.worklist : [])
