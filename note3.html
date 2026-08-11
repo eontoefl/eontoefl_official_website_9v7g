@@ -76,6 +76,10 @@
   .sweepbtn { margin-left:auto; border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:99px; padding:3px 11px; font-size:11.5px; font-weight:700; }
   .sweepbtn:hover { background:var(--surface-highest); }
   .today-done .card.done { opacity:.82; }
+  .rangerow { display:flex; gap:.5rem; align-items:center; }
+  .rangerow input { flex:1; min-width:0; }
+  .rangerow .tilde { color:var(--on-surface-variant); flex-shrink:0; }
+  .fld .hint { font-size:11px; color:var(--on-surface-variant); margin-top:.35rem; opacity:.85; }
 
   /* 접이식 (반복 업무 · 완료·지난 것) */
   .fold { margin-bottom:1.3rem; }
@@ -251,13 +255,17 @@
   </div>
 
   <div id="blk_appt">
-    <div class="fld"><label>날짜</label><input type="date" id="a_date"></div>
+    <div class="fld"><label>날짜</label>
+      <div class="rangerow"><input type="date" id="a_date"><span class="tilde">~</span><input type="date" id="a_date2"></div>
+      <div class="hint">끝 날짜는 여러 날 걸치는 일정일 때만 (선택)</div>
+    </div>
     <div class="fld"><label>시간</label>
       <div class="chips" id="a_tbd" style="margin-bottom:.6rem">
         <button type="button" data-v="" class="on">시간 지정</button>
         <button type="button" data-v="tbd">시간 미정</button>
       </div>
-      <input type="time" id="a_time"></div>
+      <div class="rangerow" id="a_timewrap"><input type="time" id="a_time"><span class="tilde">~</span><input type="time" id="a_time2"></div>
+    </div>
     <div class="fld"><label>누구랑 (선택)</label><input type="text" id="a_who" placeholder="예: 남편" autocomplete="off"></div>
     <div class="fld"><label>장소 (선택)</label><input type="text" id="a_place" placeholder="예: CGV 강남" autocomplete="off"></div>
   </div>
@@ -370,13 +378,22 @@ function dueLabel(it){
   if (it.due){ const d=new Date(it.due+"T12:00:00"); return { text:(d.getMonth()+1)+"월 "+d.getDate()+"일", over:it.due<todayStr() && !it.done }; }
   return null;
 }
+function fmtD(s){ const d=new Date(s+"T12:00:00"); return (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+")"; }
+function fmtT(t){ const p=t.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; return ap+" "+h+":"+p[1]; }
 function apptWhen(it){
-  let s; if (it.date){ const d=new Date(it.date+"T12:00:00"); s=(d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+")"; } else s="날짜 미정";
-  if (it.timeTBD) s+=" · 시간 미정";
-  else if (it.time){ const p=it.time.split(":"), H=+p[0], ap=H<12?"오전":"오후", h12=H%12||12; s+=" · "+ap+" "+h12+":"+p[1]; }
+  let s;
+  if(it.date){ s=fmtD(it.date); if(it.endDate && it.endDate!==it.date) s+=" ~ "+fmtD(it.endDate); }
+  else s="날짜 미정";
+  if(it.timeTBD) s+=" · 시간 미정";
+  else if(it.time){ s+=" · "+fmtT(it.time); if(it.endTime && it.endTime!==it.time) s+=" ~ "+fmtT(it.endTime); }
   return s;
 }
-function apptPast(it){ if(!it.date) return false; const t=todayStr(); if(it.date<t) return true; if(it.date===t && it.time && !it.timeTBD) return it.time<nowHM(); return false; }
+function apptPast(it){
+  const endD = it.endDate || it.date; if(!endD) return false; const t=todayStr();
+  if(endD<t) return true;
+  if(endD===t && !it.timeTBD){ const endT=it.endTime||it.time; if(endT) return endT<nowHM(); }
+  return false;
+}
 const postBtn = '<button class="badge post" type="button" data-act="postpone">📅 미루기</button>';
 function deadlineWhen(it){ if(!it.due) return ""; const d=new Date(it.due+"T12:00:00"); let s=(d.getMonth()+1)+"월 "+d.getDate()+"일"; if(it.dtime){ const p=it.dtime.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; s+=" "+ap+" "+h+":"+p[1]; } return s; }
 function recurLabel(it){ if(it.wday==="daily") return "매일"; if(it.wday!=="" && it.wday!=null) return "매주 "+DOW[+it.wday]; return "반복"; }
@@ -673,7 +690,7 @@ $("f_pkind").addEventListener("click", e=>{ const b=e.target.closest("button"); 
 $("f_bucket").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
 $("f_chip").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickChip=b.dataset.v; selChips($("f_chip"),pickChip); if(pickChip) $("f_date").value=""; });
 $("f_date").addEventListener("input", ()=>{ if($("f_date").value){ pickChip=""; selChips($("f_chip"),""); } });
-$("a_tbd").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickTbd=b.dataset.v; selChips($("a_tbd"),pickTbd); $("a_time").style.display=pickTbd==="tbd"?"none":""; });
+$("a_tbd").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickTbd=b.dataset.v; selChips($("a_tbd"),pickTbd); $("a_timewrap").style.display=pickTbd==="tbd"?"none":"flex"; });
 $("f_wday").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickWday=b.dataset.v; selChips($("f_wday"),pickWday); });
 $("f_hope").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickHope=b.dataset.v; selChips($("f_hope"),pickHope); });
 $("f_title").addEventListener("input", updateSave);
@@ -699,8 +716,8 @@ function openForm(ctx){
   $("f_why").value = it && it.why ? it.why : "";
   $("f_memo").value = it ? (it.memo||it.desc||"") : "";
   pickChip = it && it.dueChip ? it.dueChip : ""; $("f_date").value = it && it.type==="task" && it.due && !it.dueChip ? it.due : ""; selChips($("f_chip"), pickChip);
-  $("a_date").value = it && it.date ? it.date : "";
-  pickTbd = it && it.timeTBD ? "tbd" : ""; $("a_time").value = it && it.time ? it.time : ""; $("a_time").style.display = pickTbd==="tbd"?"none":""; selChips($("a_tbd"), pickTbd);
+  $("a_date").value = it && it.date ? it.date : ""; $("a_date2").value = it && it.endDate ? it.endDate : "";
+  pickTbd = it && it.timeTBD ? "tbd" : ""; $("a_time").value = it && it.time ? it.time : ""; $("a_time2").value = it && it.endTime ? it.endTime : ""; $("a_timewrap").style.display = pickTbd==="tbd"?"none":"flex"; selChips($("a_tbd"), pickTbd);
   $("a_who").value = it && ctx.tab==="personal" && it.who ? it.who : ""; $("a_place").value = it && it.place ? it.place : "";
   $("w_who").value = it && ctx.tab==="work" && it.who ? it.who : "";
   $("w_due").value = it && ctx.type==="deadline" && it.due ? it.due : "";
@@ -721,7 +738,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("ov").classLi
 function buildItem(){
   const {tab,type}=curCtx, title=$("f_title").value.trim(), why=$("f_why").value.trim(), memo=$("f_memo").value.trim(), now=Date.now();
   if(tab==="personal"){
-    if(type==="appt") return { type:"appt", title, memo, date:$("a_date").value, time:pickTbd==="tbd"?"":$("a_time").value, timeTBD:pickTbd==="tbd", who:$("a_who").value.trim(), place:$("a_place").value.trim(), updated:now };
+    if(type==="appt") return { type:"appt", title, memo, date:$("a_date").value, endDate:$("a_date2").value, time:pickTbd==="tbd"?"":$("a_time").value, endTime:pickTbd==="tbd"?"":$("a_time2").value, timeTBD:pickTbd==="tbd", who:$("a_who").value.trim(), place:$("a_place").value.trim(), updated:now };
     if(type==="routine") return { type:"routine", title, memo, wday:pickWday, updated:now };
     if(type==="goal") return { type:"goal", title, memo, target:(+$("g_target").value||30), updated:now };
     return { type:"task", title, why, memo, dueChip:pickChip, due:pickChip?"":$("f_date").value, updated:now };
@@ -732,7 +749,7 @@ function buildItem(){
   if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
   if(type==="project") return { bucket:"project", title, desc:memo, hope:pickHope, subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
 }
-const KEYS = ["why","dueChip","due","date","time","timeTBD","who","place","dtime","wday","hope","target","memo","desc"];
+const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","memo","desc"];
 function saveForm(){
   if($("shsave").disabled) return;
   const data=buildItem();
