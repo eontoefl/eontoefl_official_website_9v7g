@@ -350,9 +350,9 @@ function freqLabel(it){ if(it.freq==="weekly") return "매주 "+DOW[it.freqDay||
 const doneToday = it => it.lastDone === todayStr();
 
 /* 저장소 */
-async function pullBlob(){
-  try { const r=await fetch(SB+"?id=eq.main&select=data",{headers:HDR,cache:"no-store"}); if(r.ok){ const j=await r.json(); storeSrc="sb"; return Array.isArray(j)&&j.length?j[0].data:null; } } catch(e){}
-  storeSrc="local"; return localStorage.getItem(LSKEY);
+async function pullCloud(){
+  try { const r=await fetch(SB+"?id=eq.main&select=data",{headers:HDR,cache:"no-store"}); if(r.ok){ const j=await r.json(); return { reachable:true, blob:(Array.isArray(j)&&j.length?j[0].data:null) }; } } catch(e){}
+  return { reachable:false, blob:null };
 }
 async function pushBlob(blob){
   localStorage.setItem(LSKEY, blob);
@@ -374,12 +374,24 @@ async function doUnlock(){
   PW=pw; localStorage.setItem(PWKEY,pw); $("gate").style.display="none"; $("app").style.display=""; await start();
 }
 async function loadStore(){
-  const blob=await pullBlob(); STORE=blankStore();
+  /* 클라우드 우선. 단, 클라우드가 '연결은 되는데 비어 있고' 이 기기(localStorage)에 저장분이 있으면
+     → 기기 저장분을 복구해서 쓰고 클라우드로 올린다(옛 localStorage 데이터가 빈 클라우드에 가려지는 사고 방지). */
+  const cloud = await pullCloud();
+  const local = localStorage.getItem(LSKEY);
+  let blob=null, migrate=false;
+  if(cloud.reachable){
+    if(cloud.blob){ blob=cloud.blob; storeSrc="sb"; }
+    else if(local){ blob=local; storeSrc="sb"; migrate=true; }
+    else { storeSrc="sb"; }
+  } else { blob=local; storeSrc="local"; }
+  STORE=blankStore();
   if(blob){ try { STORE=Object.assign(blankStore(), await unlockText(PW,blob)); } catch(e){} }
   if(!Array.isArray(STORE.personal)) STORE.personal=[];
   if(!Array.isArray(STORE.marketing)) STORE.marketing=[];
-  if(!STORE.work || Array.isArray(STORE.work) || typeof STORE.work!=="object") STORE.work={};
+  if(Array.isArray(STORE.work)){ const old=STORE.work; STORE.work={ quick:[],deadline:[],recurring:[],someday:[],project:[] }; old.forEach(x=>STORE.work.quick.push(Object.assign({ bucket:"quick" }, x))); }
+  else if(!STORE.work || typeof STORE.work!=="object"){ STORE.work={}; }
   ["quick","deadline","recurring","someday","project"].forEach(k=>{ if(!Array.isArray(STORE.work[k])) STORE.work[k]=[]; });
+  if(migrate) save();   // 이 기기 저장분을 클라우드로 올려 동기화 복구
 }
 
 /* ═══ 탭 ═══ */
