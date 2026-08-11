@@ -46,6 +46,13 @@
   .brand small { display:block; font-size:10px; font-weight:600; letter-spacing:.18em; color:var(--on-surface-variant); }
   #savedot { font-size:12px; font-weight:500; color:var(--on-surface-variant); margin-left:auto; }
   #savedot.bad { color:var(--danger); }
+  #restorebtn { border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:var(--r); padding:7px 12px; font-size:12.5px; font-weight:600; flex-shrink:0; }
+  #restorebtn:hover { background:var(--surface-highest); }
+  .snap-row { display:flex; align-items:center; gap:.6rem; padding:.75rem .2rem; }
+  .snap-row + .snap-row { box-shadow:inset 0 1px 0 rgba(109,98,112,.12); }
+  .snap-row span { flex:1; font-size:14px; color:var(--on-surface); }
+  .snap-restore { border:none; background:var(--grad); color:var(--accent-ink); border-radius:var(--r); padding:8px 14px; font-size:13px; font-weight:700; flex-shrink:0; }
+  #restorelist { max-height:52vh; overflow-y:auto; }
 
   .tabs { display:flex; gap:.3rem; background:var(--surface-low); border-radius:var(--r-lg); padding:.35rem; margin-bottom:1.75rem; }
   .tabs button { flex:1; border:none; background:transparent; border-radius:.7rem; padding:.7rem .4rem; font-size:14px; font-weight:600; color:var(--on-surface-variant); transition:.15s; }
@@ -173,6 +180,7 @@
   <div class="topbar"><div class="inner">
     <div class="brand">김비서 v3<small>내가 기록한다</small></div>
     <div id="savedot"></div>
+    <button id="restorebtn" type="button" title="이전 상태로 되돌리기">⟲ 복원</button>
   </div></div>
   <div class="wrap">
     <nav class="tabs" id="tabs">
@@ -280,6 +288,14 @@
   </div>
 </div></div>
 
+<!-- 복원 (자동 스냅샷) -->
+<div class="ov" id="restore"><div class="sheet">
+  <h3>이전 상태로 되돌리기</h3>
+  <p style="font-size:13px;color:var(--on-surface-variant);margin:-.7rem 0 1.1rem;line-height:1.6">저장할 때마다 자동으로 남겨둔 시점들이에요. 되돌리면 전체가 그 시점으로 돌아가고, 지금 상태도 스냅샷으로 남겨둬요.</p>
+  <div id="restorelist"></div>
+  <div class="row"><button type="button" class="cancel" id="restorecancel" style="flex:1">닫기</button></div>
+</div></div>
+
 <script>
 /* ═══ 김비서 v3 · note3.html ═══
    저장: Supabase note3_store(암호블롭) ↔ localStorage. 관리자 비번 게이트.
@@ -347,9 +363,36 @@ async function pushBlob(blob){
   try { const r=await fetch(SB+"?on_conflict=id",{method:"POST",headers:Object.assign({},HDR,{"Prefer":"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify({id:"main",data:blob})}); if(r.ok){ storeSrc="sb"; return; } } catch(e){}
   storeSrc="local";
 }
-async function pushState(){ if(!STORE||!PW) return; try { STORE.updated=new Date().toLocaleString("ko-KR"); await pushBlob(await lock(PW,STORE)); setDot(true,"저장됨 "+(storeSrc==="local"?"· 이 기기":"· 동기화")); } catch(e){ setDot(false,"저장 안 됨"); } }
+async function pushState(){
+  if(!STORE||!PW) return;
+  try {
+    STORE.updated=new Date().toLocaleString("ko-KR");
+    const blob=await lock(PW,STORE);
+    await pushBlob(blob);
+    setDot(true,"저장됨 "+(storeSrc==="local"?"· 이 기기":"· 동기화"));
+    if(storeSrc==="sb"){ const now=Date.now(); if(now-lastSnapMs>=SNAP_MIN_MS){ lastSnapMs=now; writeSnapshot(blob); } }
+  } catch(e){ setDot(false,"저장 안 됨"); }
+}
 function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(pushState,500); }
 function blankStore(){ return { v:3, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{} }; }
+function normalizeStore(){
+  if(!Array.isArray(STORE.personal)) STORE.personal=[];
+  if(!Array.isArray(STORE.marketing)) STORE.marketing=[];
+  if(Array.isArray(STORE.work)){ const old=STORE.work; STORE.work={ quick:[],deadline:[],recurring:[],someday:[],project:[] }; old.forEach(x=>STORE.work.quick.push(Object.assign({ bucket:"quick" }, x))); }
+  else if(!STORE.work || typeof STORE.work!=="object"){ STORE.work={}; }
+  ["quick","deadline","recurring","someday","project"].forEach(k=>{ if(!Array.isArray(STORE.work[k])) STORE.work[k]=[]; });
+}
+
+/* ── 자동 버전 스냅샷 (별도 행 snap-<시각>, 최근 SNAP_KEEP개 유지) ── */
+const SNAP_KEEP=30, SNAP_MIN_MS=90000;   // 최소 90초 간격
+let lastSnapMs=0;
+async function writeSnapshot(blob){
+  try {
+    await fetch(SB, { method:"POST", headers:Object.assign({},HDR,{"Prefer":"return=minimal"}), body:JSON.stringify({ id:"snap-"+Date.now(), data:blob }) });
+    const r=await fetch(SB+"?id=like.snap-*&select=id&order=id.desc",{headers:HDR,cache:"no-store"});
+    if(r.ok){ const rows=await r.json(); if(Array.isArray(rows)&&rows.length>SNAP_KEEP){ const del=rows.slice(SNAP_KEEP).map(x=>x.id); if(del.length) await fetch(SB+"?id=in.("+del.join(",")+")",{method:"DELETE",headers:HDR}); } }
+  } catch(e){}
+}
 
 async function tryUnlock(pw){ try { const t=await unlockText(pw,VERIFIER); if(t&&t.ok==="note3") return {ok:true}; } catch(e){} return {ok:false}; }
 $("unlock").addEventListener("click", doUnlock);
@@ -367,11 +410,7 @@ async function loadStore(){
   else { blob=local; storeSrc="local"; }
   STORE=blankStore();
   if(blob){ try { STORE=Object.assign(blankStore(), await unlockText(PW,blob)); } catch(e){} }
-  if(!Array.isArray(STORE.personal)) STORE.personal=[];
-  if(!Array.isArray(STORE.marketing)) STORE.marketing=[];
-  if(Array.isArray(STORE.work)){ const old=STORE.work; STORE.work={ quick:[],deadline:[],recurring:[],someday:[],project:[] }; old.forEach(x=>STORE.work.quick.push(Object.assign({ bucket:"quick" }, x))); }
-  else if(!STORE.work || typeof STORE.work!=="object"){ STORE.work={}; }
-  ["quick","deadline","recurring","someday","project"].forEach(k=>{ if(!Array.isArray(STORE.work[k])) STORE.work[k]=[]; });
+  normalizeStore();
   if(migrate) save();
 }
 
@@ -638,6 +677,31 @@ function saveForm(){
     arr.unshift(Object.assign(base, data));
   }
   closeForm(); save(); render();
+}
+
+/* ═══ 복원 (스냅샷 목록 → 되돌리기) ═══ */
+$("restorebtn").addEventListener("click", openRestore);
+$("restorecancel").addEventListener("click", ()=>$("restore").classList.remove("on"));
+$("restore").addEventListener("click", e=>{ if(e.target===$("restore")) $("restore").classList.remove("on"); });
+function openRestore(){
+  $("restore").classList.add("on");
+  const box=$("restorelist"); box.innerHTML='<div class="wsec-empty">불러오는 중…</div>';
+  fetch(SB+"?id=like.snap-*&select=id&order=id.desc&limit=50",{headers:HDR,cache:"no-store"})
+    .then(r=>r.ok?r.json():Promise.reject()).then(rows=>{
+      if(!Array.isArray(rows)||!rows.length){ box.innerHTML='<div class="wsec-empty">아직 저장된 시점이 없어요. 기록을 저장하면 자동으로 쌓여요.</div>'; return; }
+      box.innerHTML=rows.map(x=>{ const ms=+String(x.id).replace("snap-",""); const lab=isNaN(ms)?x.id:new Date(ms).toLocaleString("ko-KR"); return '<div class="snap-row"><span>'+esc(lab)+'</span><button type="button" class="snap-restore" data-snap="'+esc(x.id)+'">이 상태로</button></div>'; }).join("");
+      box.querySelectorAll(".snap-restore").forEach(b=> b.addEventListener("click", ()=>restoreTo(b.dataset.snap)));
+    }).catch(()=>{ box.innerHTML='<div class="wsec-empty">불러오지 못했어요 (인터넷 확인).</div>'; });
+}
+async function restoreTo(snapId){
+  if(!confirm("이 시점 상태로 전체를 되돌립니다.\n지금 상태도 스냅샷으로 남겨두니 다시 되돌릴 수 있어요.\n\n계속할까요?")) return;
+  try { await writeSnapshot(await lock(PW,STORE)); } catch(e){}
+  let obj=null;
+  try { const r=await fetch(SB+"?id=eq."+encodeURIComponent(snapId)+"&select=data",{headers:HDR,cache:"no-store"}); const j=await r.json(); obj=await unlockText(PW, j&&j[0]&&j[0].data); }
+  catch(e){ alert("복원할 데이터를 못 열었어요."); return; }
+  STORE=Object.assign(blankStore(), obj); normalizeStore();
+  $("restore").classList.remove("on");
+  await pushState(); render(); setDot(true,"복원됨 ✓");
 }
 
 async function start(){ setDot(true,"여는 중…"); await loadStore(); render(); setDot(true,"준비됨"); }
