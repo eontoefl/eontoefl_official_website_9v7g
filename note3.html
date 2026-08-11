@@ -427,30 +427,39 @@ async function loadStore() {
 /* ═══════════════ 탭 ═══════════════ */
 let TAB = "personal";
 const TABNAME = { money: "돈관리", work: "업무", personal: "개인", marketing: "마케팅" };
+/* 카드 기록 탭 설정 (돈관리·마케팅은 아직 안 만듦) */
+const LISTS = {
+  personal: { key: "personal", name: "개인", appt: true  },   // 할일 + 약속
+  work:     { key: "work",     name: "업무", appt: false },   // 이온토플 업무 (할일만)
+};
+let curKey = "personal", curCfg = LISTS.personal;
 document.querySelectorAll("#tabs button").forEach(b =>
   b.addEventListener("click", () => { TAB = b.dataset.tab; render(); }));
 
 function render() {
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
-  $("view").innerHTML = TAB === "personal" ? personalView() : soonView(TABNAME[TAB]);
-  if (TAB === "personal") wirePersonal();
+  const cfg = LISTS[TAB];
+  if (cfg) { curKey = cfg.key; curCfg = cfg; $("view").innerHTML = listView(cfg); wireList(); }
+  else $("view").innerHTML = soonView(TABNAME[TAB]);
   window.scrollTo({ top: 0 });
 }
 function soonView(name) {
   return '<div class="soon"><div class="big">🧱</div>' +
     '<div class="t">' + esc(name) + ' 영역은 곧 만듭니다</div>' +
-    '<div class="d">개인 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>';
+    '<div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>';
 }
 
-/* ═══════════════ 개인 탭 ═══════════════ */
-function personalView() {
-  const items = STORE.personal;
+/* ═══════════════ 기록 목록 (개인·업무 공용 엔진) ═══════════════ */
+function listView(cfg) {
+  const items = STORE[cfg.key];
   const active = items.filter(i => i.type === "appt" ? !apptPast(i) : !i.done).length;
-  const head = '<div class="vhead"><span class="t">개인</span>' +
+  const head = '<div class="vhead"><span class="t">' + esc(cfg.name) + '</span>' +
     (items.length ? '<span class="c">' + active + ' 남음</span>' : '') +
     '<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
-  if (!items.length)
-    return head + '<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일이나 약속을 적어보세요.</div>';
+  if (!items.length) {
+    const hint = cfg.appt ? '할일이나 약속' : '할 일';
+    return head + '<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 ' + hint + '을 적어보세요.</div>';
+  }
   return head + '<div class="list">' + items.map(cardHtml).join("") + '</div>';
 }
 
@@ -491,7 +500,7 @@ function apptCard(it) {
       '</div>' + actsHtml() + '</div>';
 }
 
-function wirePersonal() {
+function wireList() {
   const addBtn = $("padd");
   if (addBtn) addBtn.addEventListener("click", () => openSheet(null));
   document.querySelectorAll("#view .card").forEach(card => {
@@ -501,7 +510,7 @@ function wirePersonal() {
   });
 }
 function handleAct(id, act) {
-  const arr = STORE.personal, i = arr.findIndex(x => x.id === id);
+  const arr = STORE[curKey], i = arr.findIndex(x => x.id === id);
   if (i < 0) return;
   const it = arr[i];
   if (act === "done") { it.done = !it.done; it.updated = Date.now(); }
@@ -541,6 +550,7 @@ $("f_title").addEventListener("input", () => { $("shsave").disabled = !$("f_titl
 function openSheet(it) {
   editId = it ? it.id : null;
   const t = it ? (it.type || "task") : "task";
+  $("f_type").style.display = curCfg.appt ? "" : "none";   // 업무엔 약속 토글 없음
   $("f_title").value = it ? it.title : "";
   $("f_memo").value = it && it.memo ? it.memo : "";
   // 할일 필드
@@ -556,7 +566,7 @@ function openSheet(it) {
   selChips($("a_tbd"), pickTbd);
   $("a_who").value = it && it.who ? it.who : "";
   $("a_place").value = it && it.place ? it.place : "";
-  setType(t);
+  setType(curCfg.appt ? t : "task");
   $("shsave").disabled = !$("f_title").value.trim();
   $("ov").classList.add("on");
   setTimeout(() => $("f_title").focus(), 50);
@@ -581,13 +591,13 @@ function saveSheet() {
       updated: Date.now() };
   }
   if (editId) {
-    const it = STORE.personal.find(x => x.id === editId);
+    const it = STORE[curKey].find(x => x.id === editId);
     if (it) {
       ["importance","dueChip","due","date","time","timeTBD","who","place"].forEach(k => delete it[k]);
       Object.assign(it, data);
     }
   } else {
-    STORE.personal.unshift(Object.assign({ id: uid(), done: false, created: Date.now() }, data));
+    STORE[curKey].unshift(Object.assign({ id: uid(), done: false, created: Date.now() }, data));
   }
   closeSheet(); save(); render();
 }
