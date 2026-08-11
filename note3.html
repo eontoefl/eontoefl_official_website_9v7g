@@ -266,6 +266,7 @@
   <div id="blk_recur">
     <div class="fld"><label>매주 언제 (선택)</label>
       <div class="chips" id="f_wday">
+        <button type="button" data-v="daily">매일</button>
         <button type="button" data-v="" class="on">정함 없음</button>
         <button type="button" data-v="0">일</button><button type="button" data-v="1">월</button>
         <button type="button" data-v="2">화</button><button type="button" data-v="3">수</button>
@@ -373,7 +374,7 @@ function apptWhen(it){
 function apptPast(it){ if(!it.date) return false; const t=todayStr(); if(it.date<t) return true; if(it.date===t && it.time && !it.timeTBD) return it.time<nowHM(); return false; }
 const postBtn = '<button class="badge post" type="button" data-act="postpone">📅 미루기</button>';
 function deadlineWhen(it){ if(!it.due) return ""; const d=new Date(it.due+"T12:00:00"); let s=(d.getMonth()+1)+"월 "+d.getDate()+"일"; if(it.dtime){ const p=it.dtime.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; s+=" "+ap+" "+h+":"+p[1]; } return s; }
-function recurLabel(it){ return (it.wday!=="" && it.wday!=null) ? "매주 "+DOW[+it.wday] : "반복"; }
+function recurLabel(it){ if(it.wday==="daily") return "매일"; if(it.wday!=="" && it.wday!=null) return "매주 "+DOW[+it.wday]; return "반복"; }
 
 async function pullCloud(){
   try { const r=await fetch(SB+"?id=eq.main&select=data",{headers:HDR,cache:"no-store"}); if(r.ok){ const j=await r.json(); return { reachable:true, blob:(Array.isArray(j)&&j.length?j[0].data:null) }; } } catch(e){}
@@ -562,10 +563,10 @@ function recurCard(it){
 }
 function projectCard(p){
   const subs=p.subtasks||[]; const doneN=subs.filter(s=>s.done).length; const open=openProjects.has(p.id);
-  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">📚 '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' ▾':' ▸')+'</div></div>'+actsH+'</div>';
+  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">📚 '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(p.hope?'<div class="meta"><span class="badge soft">⏳ '+esc(HOPE[p.hope]||"")+'</span></div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' ▾':' ▸')+'</div></div>'+actsH+'</div>';
   if(open){
     html+='<div class="proj-sub" data-proj="'+p.id+'">';
-    html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">⋮⋮</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">🗑</button></div>').join("");
+    html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">⋮⋮</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">🗑</button></div>').join("");
     html+='<div class="subadd"><input type="text" placeholder="서브태스크 추가" data-subinput="'+p.id+'"><button type="button" data-subadd="'+p.id+'">추가</button></div></div>';
   }
   return html+'</div>';
@@ -579,6 +580,11 @@ function wireWork(){
     card.querySelectorAll("[data-sub]").forEach(el=>{ const sub=el.closest("[data-id]"); const sid=sub.dataset.id; el.addEventListener("click", ()=>actSub(id, sid, el.dataset.sub)); });
     const si=card.querySelector("[data-subinput]"); if(si) si.addEventListener("keydown", e=>{ if(e.key==="Enter") addSub(id, si.value, si); });
     const sb=card.querySelector("[data-subadd]"); if(sb) sb.addEventListener("click", ()=>{ const inp=card.querySelector("[data-subinput]"); addSub(id, inp.value, inp); });
+    card.querySelectorAll(".proj-sub .sub .st").forEach(st=>{
+      const sid=st.closest("[data-id]").dataset.id;
+      st.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); st.blur(); } });
+      st.addEventListener("blur", ()=>{ const p=STORE.work.project.find(x=>x.id===id); if(!p) return; const s=(p.subtasks||[]).find(x=>x.id===sid); if(!s) return; const v=st.textContent.trim(); if(v && v!==s.title){ s.title=v; save(); } else if(!v){ st.textContent=s.title; } });
+    });
     const subwrap=card.querySelector(".proj-sub"); if(subwrap){ const p=STORE.work.project.find(x=>x.id===id); if(p) enableDrag(subwrap, p.subtasks); }
   });
   document.querySelectorAll("#view .list[data-bucket]").forEach(list=>{ enableDrag(list, STORE.work[list.dataset.bucket]); });
@@ -622,7 +628,7 @@ function configForm(){
   show("blk_appt", isP && type==="appt");
   show("blk_wdue", tab==="work" && type==="deadline");
   show("blk_recur", (tab==="work" && type==="recurring") || isRoutine);
-  show("blk_hope", tab==="work" && type==="someday");
+  show("blk_hope", tab==="work" && (type==="someday" || type==="project"));
   show("blk_goal", isGoal);
   show("blk_projsub", isProj);
   show("blk_memo", true);
@@ -672,7 +678,7 @@ function openForm(ctx){
   $("w_due").value = it && ctx.type==="deadline" && it.due ? it.due : "";
   $("w_time").value = it && ctx.type==="deadline" && it.dtime ? it.dtime : "";
   pickWday = it && (ctx.type==="recurring"||ctx.type==="routine") && it.wday!=null ? String(it.wday) : ""; selChips($("f_wday"), pickWday);
-  pickHope = it && ctx.type==="someday" && it.hope ? it.hope : ""; selChips($("f_hope"), pickHope);
+  pickHope = it && (ctx.type==="someday"||ctx.type==="project") && it.hope ? it.hope : ""; selChips($("f_hope"), pickHope);
   $("g_target").value = it && ctx.type==="goal" && it.target ? it.target : "";
   draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
   configForm(); renderDraft(); updateSave();
@@ -696,7 +702,7 @@ function buildItem(){
   if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, updated:now };
   if(type==="recurring") return { bucket:"recurring", title, memo, wday:pickWday, updated:now };
   if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
-  if(type==="project") return { bucket:"project", title, desc:memo, subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
+  if(type==="project") return { bucket:"project", title, desc:memo, hope:pickHope, subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
 }
 const KEYS = ["why","dueChip","due","date","time","timeTBD","who","place","dtime","wday","hope","target","memo","desc"];
 function saveForm(){
