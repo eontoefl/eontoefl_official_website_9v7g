@@ -71,6 +71,11 @@
   .wsec-h .ic { font-size:15px; }
   .wsec-h .n { background:var(--surface-high); color:var(--on-surface-variant); font-size:11.5px; font-weight:700; border-radius:99px; padding:1px 9px; }
   .wsec-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.6; padding:.2rem 0 .2rem .3rem; }
+  .secadd { border:none; background:var(--surface-high); color:var(--on-surface-variant); width:22px; height:22px; border-radius:99px; font-size:15px; font-weight:700; line-height:1; padding:0; }
+  .secadd:hover { background:var(--accent-soft); color:var(--accent-ink); }
+  .sweepbtn { margin-left:auto; border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:99px; padding:3px 11px; font-size:11.5px; font-weight:700; }
+  .sweepbtn:hover { background:var(--surface-highest); }
+  .today-done .card.done { opacity:.82; }
 
   /* 접이식 (반복 업무 · 완료·지난 것) */
   .fold { margin-bottom:1.3rem; }
@@ -375,6 +380,9 @@ function apptPast(it){ if(!it.date) return false; const t=todayStr(); if(it.date
 const postBtn = '<button class="badge post" type="button" data-act="postpone">📅 미루기</button>';
 function deadlineWhen(it){ if(!it.due) return ""; const d=new Date(it.due+"T12:00:00"); let s=(d.getMonth()+1)+"월 "+d.getDate()+"일"; if(it.dtime){ const p=it.dtime.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; s+=" "+ap+" "+h+":"+p[1]; } return s; }
 function recurLabel(it){ if(it.wday==="daily") return "매일"; if(it.wday!=="" && it.wday!=null) return "매주 "+DOW[+it.wday]; return "반복"; }
+/* 완료한 것: 오늘 완료(눈에 띄게 남김) vs 지난 완료(접힌 아카이브). doneAt=완료한 날, swept='지금 정리'로 넘긴 것 */
+const freshDone = it => !!it.done && !it.swept && it.doneAt===todayStr();
+const oldDone   = it => !!it.done && (it.swept || it.doneAt!==todayStr());
 
 async function pullCloud(){
   try { const r=await fetch(SB+"?id=eq.main&select=data",{headers:HDR,cache:"no-store"}); if(r.ok){ const j=await r.json(); return { reachable:true, blob:(Array.isArray(j)&&j.length?j[0].data:null) }; } } catch(e){}
@@ -448,6 +456,7 @@ function render(){
   if(TAB==="personal"){ v.innerHTML=personalView(); wirePersonal(); }
   else if(TAB==="work"){ v.innerHTML=workView(); wireWork(); }
   else v.innerHTML=soonView(TABNAME[TAB]);
+  wireBtns();
   window.scrollTo({ top:0 });
 }
 function soonView(name){ return '<div class="soon"><div class="big">🧱</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
@@ -470,8 +479,23 @@ function enableDrag(container, arr, onDone){
 }
 const dragH = '<span class="drag" title="드래그해서 순서 이동">⋮⋮</span>';
 const actsH = '<div class="acts"><button type="button" data-act="edit" title="수정">✎</button><button type="button" class="del" data-act="del" title="삭제">🗑</button></div>';
-function foldHeader(key, ic, label, n){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span><span class="chev">'+(fold[key]?'▾':'▸')+'</span></div>'; }
+function foldHeader(key, ic, label, n, addBucket){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span>'+(addBucket?'<button class="secadd" type="button" data-add="'+addBucket+'" data-addtab="work">+</button>':'')+'<span class="chev">'+(fold[key]?'▾':'▸')+'</span></div>'; }
 function wireFolds(){ document.querySelectorAll("#view [data-fold]").forEach(h=> h.addEventListener("click", ()=>{ fold[h.dataset.fold]=!fold[h.dataset.fold]; render(); })); }
+/* '오늘 한 것' 섹션 (완료해도 오늘은 눈에 띄게 남아서 뿌듯 → 다음날 자동으로 아카이브) */
+function todaySection(items, cardFn, tab){
+  if(!items.length) return "";
+  return '<div class="wsec"><div class="wsec-h"><span class="ic">✅</span>오늘 한 것<span class="n">'+items.length+'</span><button class="sweepbtn" type="button" data-sweep="'+tab+'">지금 정리</button></div><div class="list today-done">'+items.map(cardFn).join("")+'</div></div>';
+}
+function sweepToday(tab){
+  const mark = it => { if(freshDone(it)) it.swept=true; };
+  if(tab==="work"){ ["quick","deadline","someday"].forEach(k=>STORE.work[k].forEach(mark)); }
+  else { STORE.personal.forEach(mark); }
+  save(); render();
+}
+function wireBtns(){
+  document.querySelectorAll("#view [data-add]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); openForm({ tab:(b.dataset.addtab||"work"), type:b.dataset.add, id:null }); }));
+  document.querySelectorAll("#view [data-sweep]").forEach(b=> b.addEventListener("click", ()=>sweepToday(b.dataset.sweep)));
+}
 
 /* ═══ 개인 탭 ═══ */
 function personalView(){
@@ -479,12 +503,14 @@ function personalView(){
   const goals = items.filter(i=>i.type==="goal");
   const routines = items.filter(i=>i.type==="routine");
   const active = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) );
-  const archived = items.filter(i=> (i.type==="task"&&i.done) || (i.type==="appt"&&apptPast(i)) );
+  const fresh = items.filter(i=> i.type==="task" && freshDone(i) );
+  const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) );
   const head='<div class="vhead"><span class="t">개인</span>'+(active.length?'<span class="c">'+active.length+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
   if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
   let html=head;
   if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">🎯</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
   html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
+  html += todaySection(fresh, personalCard, "personal");
   html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine","🔁","반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
   if(archived.length) html += '<div class="fold">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
   return html;
@@ -523,7 +549,7 @@ function wirePersonal(){
 }
 function actPersonal(id, act){
   const arr=STORE.personal, i=arr.findIndex(x=>x.id===id); if(i<0) return; const it=arr[i];
-  if(act==="done"){ it.done=!it.done; it.updated=Date.now(); }
+  if(act==="done"){ it.done=!it.done; if(it.done){ it.doneAt=todayStr(); it.swept=false; } else { it.doneAt=""; it.swept=false; } it.updated=Date.now(); }
   else if(act==="claim"){ if(!Array.isArray(it.claimed)) it.claimed=[]; const t=todayStr(); if(it.claimed.includes(t) || it.claimed.length>=(it.target||30)) return; it.claimed.push(t); it.updated=Date.now(); }
   else if(act==="edit" || act==="postpone"){ openForm({tab:"personal", type:it.type||"task", id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); }
@@ -532,22 +558,24 @@ function actPersonal(id, act){
 }
 
 /* ═══ 업무 탭 ═══ */
-const WMETA = { quick:{ic:"⚡",name:"단발"}, deadline:{ic:"📌",name:"약속·마감"}, project:{ic:"📚",name:"장기 프로젝트"}, someday:{ic:"💤",name:"백로그"} };
+const WMETA = { quick:{ic:"⚡",name:"단발"}, deadline:{ic:"📌",name:"약속·마감"}, project:{ic:"📚",name:"프로젝트"}, someday:{ic:"💤",name:"백로그"} };
 function workView(){
   let html='<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>';
   ["quick","deadline","project","someday"].forEach(k=>{ html += sectionHtml(k); });
+  // 오늘 한 것 (완료해도 오늘은 눈에 띄게)
+  html += todaySection(["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(freshDone)), workCard, "work");
   // 반복: 별도 접이식 참고 목록 (그날 뜨는 건 나중에 캘린더에서)
   const rec=STORE.work.recurring;
-  html += '<div class="fold">'+foldHeader("recur","🔁","반복 업무", rec.length)+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
-  // 완료·지난 것 (단발·약속마감·백로그의 완료 항목)
-  const done = ["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(x=>x.done));
+  html += '<div class="fold">'+foldHeader("recur","🔁","반복 업무", rec.length, "recurring")+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
+  // 완료·지난 것 (지난 완료만)
+  const done = ["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(oldDone));
   if(done.length) html += '<div class="fold">'+foldHeader("wdone","✓","완료·지난 것", done.length)+(fold.wdone?'<div class="fold-body"><div class="list donelist">'+done.map(workCard).join("")+'</div></div>':'')+'</div>';
   return html;
 }
 function sectionHtml(key){
   const meta=WMETA[key], arr=STORE.work[key];
   const items = key==="project" ? arr : arr.filter(x=>!x.done);
-  const h='<div class="wsec-h"><span class="ic">'+meta.ic+'</span>'+esc(meta.name)+'<span class="n">'+items.length+'</span></div>';
+  const h='<div class="wsec-h"><span class="ic">'+meta.ic+'</span>'+esc(meta.name)+'<span class="n">'+items.length+'</span><button class="secadd" type="button" data-add="'+key+'">+</button></div>';
   if(!items.length) return '<div class="wsec">'+h+'<div class="wsec-empty">비어 있음</div></div>';
   const cards = key==="project" ? items.map(projectCard).join("") : items.map(workCard).join("");
   return '<div class="wsec">'+h+'<div class="list" data-bucket="'+key+'">'+cards+'</div></div>';
@@ -592,7 +620,7 @@ function wireWork(){
 }
 function actWork(id, act){
   const f=findWork(id); if(!f) return; const { arr, i, bucket }=f; const it=arr[i];
-  if(act==="done"){ it.done=!it.done; it.updated=Date.now(); }
+  if(act==="done"){ it.done=!it.done; if(it.done){ it.doneAt=todayStr(); it.swept=false; } else { it.doneAt=""; it.swept=false; } it.updated=Date.now(); }
   else if(act==="toggle"){ if(openProjects.has(id)) openProjects.delete(id); else openProjects.add(id); }
   else if(act==="edit" || act==="postpone"){ openForm({tab:"work", type:bucket, id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); openProjects.delete(id); }
