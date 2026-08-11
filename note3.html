@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>김비서 v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ───── 색 토큰 ─────
+     DESIGN.md 방식(선 없이 톤으로 층 만들기·유리·소프트 글로우)은 유지하되
+     색은 이온토플 공식 팔레트로 교체.
+     메인 = 색상1(연보라)  →  전체 배경·표면·카드 톤
+     강조 = 색상2(연하늘)  →  선택·버튼·중요/기한 뱃지·포커스에만 */
+  :root {
+    /* 색상1 (연보라) — 메인 표면 사다리 (선 대신 톤으로 층) */
+    --surface:         #f7edf5;
+    --surface-lowest:  #ffffff;   /* 카드는 흰색으로 살짝 떠오르게 */
+    --surface-low:     #f4e6f0;
+    --surface-container:#efdcea;
+    --surface-high:    #ecd4e6;
+    --surface-highest: #e9cde2;
+    /* 글자 (순검정 금지 — 자두빛 짙은 회색) */
+    --on-surface:         #2a2431;
+    --on-surface-variant: #6d6270;
+    /* 색상2 (연하늘) — 강조 전용 */
+    --accent:          #b1d1e7;   /* 강조 표면 */
+    --accent-soft:     #c8dfee;
+    --accent-lightest: #e4eff7;
+    --accent-ink:      #16384e;   /* 연하늘 위 글자 (진한 청록 잉크) */
+    --accent-strong:   #3f7fa8;   /* 흰 바탕 위 강조 글자·아이콘 (색상2 계열) */
+    --accent-line:     #86b8dc;   /* 체크·포커스 링 같은 작은 강조 */
+    --grad:      linear-gradient(135deg, #b1d1e7 0%, #c8dfee 100%);  /* 강조 버튼 */
+    --brandmark: linear-gradient(135deg, #e9cde2 0%, #c8dfee 100%);  /* 로고 타일: 연보라→연하늘 */
+    /* 위험 (삭제·기한 초과) — 브랜드에 맞춘 베리색 */
+    --danger:      #b0476a;
+    --danger-soft: #f7e4ec;
+    --lift:    0 4px 28px rgba(80, 40, 70, .06);
+    --lift-hi: 0 12px 40px rgba(80, 40, 70, .11);
+    --r: .5rem;
+    --r-lg: 1rem;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Inter", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--surface); color: var(--on-surface);
+    line-height: 1.72; font-size: 15px; font-weight: 400; padding: 0 0 96px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 1.4rem; }
+  @media (min-width: 760px) { .wrap { padding: 0 2rem; } }
+  h1, h2, h3 { letter-spacing: -0.02em; }
+  ::selection { background: var(--accent-soft); color: var(--accent-ink); }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ───── 잠금 화면 ───── */
+  #gate { max-width: 360px; margin: 16vh auto; padding: 0 1.4rem; text-align: center; }
+  #gate .mark { width: 52px; height: 52px; margin: 0 auto 1.4rem; border-radius: var(--r-lg);
+    background: var(--brandmark); display: grid; place-items: center; font-size: 23px; }
+  #gate h1 { font-size: 20px; font-weight: 700; margin-bottom: .35rem; }
+  #gate p { font-size: 13.5px; color: var(--on-surface-variant); margin-bottom: 1.4rem; }
+  #gate input { width: 100%; background: var(--surface-highest); border: none; border-radius: var(--r);
+    padding: 14px 16px; font-family: inherit; font-size: 16px; color: var(--on-surface);
+    outline: none; text-align: center; transition: outline-color .15s; }
+  #gate input:focus { outline: 2px solid var(--accent-line); outline-offset: 0; }
+  #gate button { width: 100%; margin-top: .7rem; background: var(--grad); color: var(--accent-ink); border: none;
+    border-radius: var(--r); padding: 14px; font-size: 15px; font-weight: 700; box-shadow: var(--lift); }
+  #gate .msg { font-size: 13px; color: var(--danger); margin-top: .7rem; min-height: 20px; font-weight: 500; }
+
+  /* ───── 상단 바 (유리) ───── */
+  .topbar { position: sticky; top: 0; z-index: 40; background: rgba(255, 255, 255, .72);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); margin-bottom: 1.5rem; }
+  .topbar .inner { max-width: 900px; margin: 0 auto; padding: 1rem 1.4rem;
+    display: flex; align-items: center; gap: .7rem; }
+  @media (min-width: 760px) { .topbar .inner { padding: 1rem 2rem; } }
+  .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .18em;
+    color: var(--on-surface-variant); }
+  #savedot { font-size: 12px; font-weight: 500; color: var(--on-surface-variant); margin-left: auto; }
+  #savedot.bad { color: var(--danger); }
+  #lockbtn { border: none; border-radius: var(--r); background: var(--surface-high);
+    color: var(--on-surface-variant); padding: 8px 13px; font-size: 12.5px; font-weight: 600; }
+  #lockbtn:hover { background: var(--surface-highest); }
+
+  /* ───── 탭 (선 없이 톤으로 · 강조는 색상2) ───── */
+  .tabs { display: flex; gap: .3rem; background: var(--surface-low); border-radius: var(--r-lg);
+    padding: .35rem; margin-bottom: 1.75rem; }
+  .tabs button { flex: 1; border: none; background: transparent; border-radius: .7rem;
+    padding: .7rem .4rem; font-size: 14px; font-weight: 600; color: var(--on-surface-variant);
+    transition: background .15s, color .15s, box-shadow .15s; letter-spacing: -0.01em; }
+  .tabs button:hover { color: var(--on-surface); }
+  .tabs button.on { background: var(--surface-lowest); color: var(--accent-strong); box-shadow: var(--lift); }
+  @media (max-width: 480px) { .tabs button { font-size: 13px; padding: .65rem .2rem; } }
+
+  /* ───── 영역 머리 ───── */
+  .vhead { display: flex; align-items: center; gap: .8rem; margin-bottom: 1.1rem; padding-left: .15rem; }
+  .vhead .t { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .vhead .c { font-size: 12.5px; font-weight: 600; color: var(--on-surface-variant);
+    background: var(--surface-high); border-radius: 99px; padding: 2px 10px; }
+  .addbtn { margin-left: auto; border: none; border-radius: var(--r); background: var(--grad); color: var(--accent-ink);
+    padding: 10px 16px; font-size: 13.5px; font-weight: 700; box-shadow: var(--lift); }
+  .addbtn:hover { filter: brightness(1.03); }
+
+  /* ───── 카드 목록 (선 없이 · 여백으로 구분 — DESIGN §5) ───── */
+  .list { display: flex; flex-direction: column; gap: .7rem; }
+  .card { display: flex; align-items: flex-start; gap: .85rem; background: var(--surface-lowest);
+    border-radius: var(--r-lg); padding: 1.05rem 1.15rem; box-shadow: var(--lift);
+    transition: box-shadow .15s, opacity .15s; }
+  .card:hover { box-shadow: var(--lift-hi); }
+  .card.done { opacity: .55; }
+  .card > input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent-line);
+    cursor: pointer; flex-shrink: 0; }
+  .card .body { flex: 1; min-width: 0; }
+  .card .title { font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.5;
+    word-break: break-word; }
+  .card.done .title { text-decoration: line-through; text-decoration-color: var(--on-surface-variant); }
+  .card .memo { font-size: 13.5px; color: var(--on-surface-variant); margin-top: .2rem;
+    white-space: pre-wrap; word-break: break-word; }
+  .card .meta { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+  .card .meta:empty { display: none; }
+  .badge { font-size: 11.5px; font-weight: 600; border-radius: 99px; padding: 2.5px 10px; line-height: 1.5;
+    display: inline-flex; align-items: center; gap: 4px; }
+  .badge.imp-high { background: var(--accent); color: var(--accent-ink); }
+  .badge.imp-mid  { background: var(--surface-high); color: var(--on-surface-variant); }
+  .badge.imp-low  { background: var(--surface-high); color: var(--on-surface-variant); opacity: .8; }
+  .badge.due      { background: var(--accent-lightest); color: var(--accent-strong); }
+  .badge.due.over { background: var(--danger-soft); color: var(--danger); }
+  .card .acts { display: flex; align-items: center; gap: .1rem; flex-shrink: 0; margin: -2px -4px 0 0; }
+  .card .acts button { border: none; background: transparent; color: var(--on-surface-variant);
+    width: 30px; height: 30px; border-radius: var(--r); font-size: 15px; line-height: 1;
+    opacity: .55; transition: background .12s, opacity .12s, color .12s; }
+  .card:hover .acts button { opacity: 1; }
+  .card .acts button:hover { background: var(--surface-high); }
+  .card .acts button.del:hover { background: var(--danger-soft); color: var(--danger); }
+  .card .acts button:disabled { opacity: .2; }
+
+  /* ───── 빈 상태 ───── */
+  .empty { background: var(--surface-low); border-radius: var(--r-lg); padding: 3rem 1.4rem;
+    text-align: center; color: var(--on-surface-variant); font-size: 14px; line-height: 1.8; }
+  .empty .big { font-size: 34px; margin-bottom: .5rem; }
+  .empty b { color: var(--accent-strong); font-weight: 700; }
+
+  /* ───── 아직 안 만든 영역 안내 ───── */
+  .soon { background: var(--surface-low); border-radius: var(--r-lg); padding: 3.2rem 1.4rem;
+    text-align: center; color: var(--on-surface-variant); }
+  .soon .big { font-size: 30px; margin-bottom: .6rem; }
+  .soon .t { font-size: 16px; font-weight: 600; color: var(--on-surface); }
+  .soon .d { font-size: 13px; margin-top: .35rem; }
+
+  .foot { text-align: center; font-size: 11px; color: var(--on-surface-variant); opacity: .6;
+    margin-top: 2.5rem; letter-spacing: .04em; }
+
+  /* ───── 편집 시트 (유리 오버레이) ───── */
+  #ov { position: fixed; inset: 0; z-index: 60; background: rgba(42, 36, 49, .30);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: none; align-items: flex-end; justify-content: center; }
+  #ov.on { display: flex; }
+  @media (min-width: 620px) { #ov { align-items: center; } }
+  .sheet { width: 100%; max-width: 520px; background: var(--surface-lowest);
+    border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: 0 -12px 40px rgba(80, 40, 70, .16);
+    padding: 1.5rem 1.4rem 1.6rem; max-height: 92vh; overflow-y: auto; }
+  @media (min-width: 620px) { .sheet { border-radius: var(--r-lg); box-shadow: 0 20px 60px rgba(80, 40, 70, .20); } }
+  .sheet h3 { font-size: 17px; font-weight: 700; margin-bottom: 1.2rem; }
+  .fld { margin-bottom: 1.1rem; }
+  .fld label { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
+    color: var(--on-surface-variant); margin-bottom: .5rem; }
+  .fld input[type=text], .fld textarea, .fld input[type=date] {
+    width: 100%; background: var(--surface-highest); border: none; border-radius: var(--r);
+    padding: 12px 14px; font-family: inherit; font-size: 15px; color: var(--on-surface);
+    outline: none; transition: outline-color .15s; }
+  .fld input:focus, .fld textarea:focus { outline: 2px solid var(--accent-line); }
+  .fld textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .chips button { border: none; background: var(--surface-highest); color: var(--on-surface-variant);
+    border-radius: 99px; padding: 8px 14px; font-size: 13px; font-weight: 600; transition: all .12s; }
+  .chips button.on { background: var(--grad); color: var(--accent-ink); }
+  .sheet .row { display: flex; gap: .6rem; margin-top: 1.4rem; }
+  .sheet .row button { flex: 1; border: none; border-radius: var(--r); padding: 13px;
+    font-size: 14.5px; font-weight: 700; }
+  .sheet .cancel { background: var(--surface-high); color: var(--on-surface-variant); }
+  .sheet .save { background: var(--grad); color: var(--accent-ink); box-shadow: var(--lift); }
+  .sheet .save:disabled { opacity: .45; box-shadow: none; }
+</style>
+</head>
+<body>
+
+<!-- ───── 잠금 ───── -->
+<div id="gate">
+  <div class="mark">🔒</div>
+  <h1>김비서 v3</h1>
+  <p>비밀번호를 넣어주세요</p>
+  <input id="pw" type="password" autocomplete="current-password" placeholder="••••••••">
+  <button id="unlock" type="button">열기</button>
+  <div class="msg" id="gatemsg"></div>
+</div>
+
+<!-- ───── 앱 ───── -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="inner">
+      <div class="brand">김비서 v3<small>내가 기록한다</small></div>
+      <div id="savedot"></div>
+      <button id="lockbtn" type="button">잠그기</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <nav class="tabs" id="tabs">
+      <button type="button" data-tab="money">돈관리</button>
+      <button type="button" data-tab="work">업무</button>
+      <button type="button" data-tab="personal">개인</button>
+      <button type="button" data-tab="marketing">마케팅</button>
+    </nav>
+    <div id="view"></div>
+    <p class="foot">eonfl.com/note3 · 김비서 v3</p>
+  </div>
+</div>
+
+<!-- ───── 편집 시트 ───── -->
+<div id="ov">
+  <div class="sheet">
+    <h3 id="shtitle">새 할일</h3>
+    <div class="fld">
+      <label>제목</label>
+      <input type="text" id="f_title" placeholder="무엇을 해야 하나요?" autocomplete="off">
+    </div>
+    <div class="fld">
+      <label>메모 (선택)</label>
+      <textarea id="f_memo" placeholder="자세한 내용, 떠오르는 생각"></textarea>
+    </div>
+    <div class="fld">
+      <label>중요도</label>
+      <div class="chips" id="f_imp">
+        <button type="button" data-v="low">낮음</button>
+        <button type="button" data-v="mid">보통</button>
+        <button type="button" data-v="high">높음</button>
+      </div>
+    </div>
+    <div class="fld">
+      <label>기한</label>
+      <div class="chips" id="f_chip" style="margin-bottom:.6rem">
+        <button type="button" data-v="">없음</button>
+        <button type="button" data-v="asap">최대한 빨리</button>
+        <button type="button" data-v="1-2d">하루이틀 이내</button>
+        <button type="button" data-v="1w">일주일 이내</button>
+      </div>
+      <input type="date" id="f_date">
+    </div>
+    <div class="row">
+      <button type="button" class="cancel" id="shcancel">취소</button>
+      <button type="button" class="save" id="shsave">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   김비서 v3 · note3.html
+   note2에서 물려받은 것: 비번 게이트 + AES-256-GCM 암호화 + Supabase 저장
+   v3에서 새로: 4개 탭(돈/업무/개인/마케팅) · 대표가 직접 기록하는 카드(ADEM)
+   지금 담긴 것: 0단계(탭 4개) + 1단계(개인 탭 카드 추가·수정·삭제·순서·저장)
+   색: 이온토플 공식 팔레트 — 메인=색상1(연보라), 강조=색상2(연하늘)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ───── 저장소 ─────
+   1순위: Supabase 테이블 note3_store (id='main', data=암호블롭) → 폰·PC 동기화
+   테이블이 아직 없으면 자동으로 localStorage로 떨어져서 이 기기에서 바로 작동한다.
+   (테이블 만드는 SQL은 대표님께 따로 안내 — 만들면 다음 저장부터 클라우드로 붙음) */
+const SB = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/note3_store";
+const AK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc";
+const HDR = { "apikey": AK, "Authorization": "Bearer " + AK, "Content-Type": "application/json" };
+const LSKEY = "note3-data";
+const PWKEY = "note3-pw";              // note3 전용 로그인 키 (note2와 분리 — 서로 안 엉킴)
+/* 관리자 비밀번호 검증 토큰 — 이 비번으로만 복호화된다({ok:"note3"}).
+   파일 어디에도 비번 평문은 없다. 아래 blob은 정해진 비번으로 lock()해 만든 것. */
+const VERIFIER = "V7uWulHtpDENBm/QesZjFzu2q6wWjlpWD8HO42Um/SQ+LkHXgeK+Li6z3BuWb1M3Vt9kGQlDVtzTbA==";
+
+/* ───── 암호 (note2 · note.html과 동일 방식) ─────
+   salt(16) | iv(12) | AES-256-GCM 을 이어붙여 base64. 열쇠는 PBKDF2-SHA256 20만회. */
+const enc = new TextEncoder(), dec = new TextDecoder();
+async function keyFrom(pw, salt) {
+  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+function b64e(b) { let s = ""; new Uint8Array(b).forEach(c => s += String.fromCharCode(c)); return btoa(s); }
+async function lock(pw, obj) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await keyFrom(pw, salt);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, enc.encode(JSON.stringify(obj)));
+  const out = new Uint8Array(28 + ct.byteLength);
+  out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(ct), 28);
+  return b64e(out);
+}
+async function unlockText(pw, blob) {
+  const raw = b64d(blob);
+  const k = await keyFrom(pw, raw.slice(0, 16));
+  return JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(16, 28) }, k, raw.slice(28))));
+}
+
+/* ───── 공통 ───── */
+let PW = null, STORE = null, saveTimer = null, storeSrc = "local";
+const $ = id => document.getElementById(id);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const todayStr = () => { const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+function setDot(ok, msg) { const d = $("savedot"); d.textContent = msg; d.className = ok ? "" : "bad"; }
+const IMP = { low: "낮음", mid: "보통", high: "높음" };
+const CHIP = { asap: "최대한 빨리", "1-2d": "하루이틀 이내", "1w": "일주일 이내" };
+function dueLabel(it) {
+  if (it.dueChip && CHIP[it.dueChip]) return { text: CHIP[it.dueChip], over: false };
+  if (it.due) {
+    const d = new Date(it.due + "T12:00:00");
+    return { text: (d.getMonth()+1) + "월 " + d.getDate() + "일", over: it.due < todayStr() && !it.done };
+  }
+  return null;
+}
+
+/* ───── 저장소 읽기/쓰기 (Supabase → 실패 시 localStorage) ───── */
+async function pullBlob() {
+  try {
+    const r = await fetch(SB + "?id=eq.main&select=data", { headers: HDR, cache: "no-store" });
+    if (r.ok) {
+      const j = await r.json();
+      storeSrc = "sb";
+      return Array.isArray(j) && j.length ? j[0].data : null;
+    }
+  } catch (e) { /* 테이블 없음·오프라인 → 로컬로 */ }
+  storeSrc = "local";
+  return localStorage.getItem(LSKEY);
+}
+async function pushBlob(blob) {
+  localStorage.setItem(LSKEY, blob);          // 항상 로컬에도 복제 (안전망)
+  try {
+    const r = await fetch(SB + "?on_conflict=id", { method: "POST",
+      headers: Object.assign({}, HDR, { "Prefer": "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify({ id: "main", data: blob }) });
+    if (r.ok) { storeSrc = "sb"; return; }
+  } catch (e) {}
+  storeSrc = "local";
+}
+async function pushState() {
+  if (!STORE || !PW) return;
+  try {
+    STORE.updated = new Date().toLocaleString("ko-KR");
+    await pushBlob(await lock(PW, STORE));
+    setDot(true, "저장됨 " + (storeSrc === "local" ? "· 이 기기" : "· 동기화"));
+  } catch (e) { setDot(false, "저장 안 됨"); }
+}
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(pushState, 500); }
+
+function blankStore() { return { v: 3, personal: [], work: [], marketing: [], money: {} }; }
+
+/* ───── 잠금 해제 (관리자 전용 — 정해진 비번만 통과) ─────
+   VERIFIER를 입력 비번으로 복호화해서 {ok:"note3"}가 나오면 정답.
+   자료는 늘 이 비번으로 암호화되므로 데이터도 같은 비번으로 열린다. */
+async function tryUnlock(pw) {
+  try { const t = await unlockText(pw, VERIFIER); if (t && t.ok === "note3") return { ok: true }; } catch (e) {}
+  return { ok: false };
+}
+$("unlock").addEventListener("click", doUnlock);
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") doUnlock(); });
+async function doUnlock() {
+  const pw = $("pw").value, msg = $("gatemsg");
+  if (!pw) return;
+  msg.style.color = "var(--on-surface-variant)"; msg.textContent = "여는 중…";
+  const r = await tryUnlock(pw);
+  if (!r.ok) { msg.style.color = "var(--danger)"; msg.textContent = "비밀번호가 다릅니다"; return; }
+  PW = pw; localStorage.setItem(PWKEY, pw);
+  $("gate").style.display = "none"; $("app").style.display = "";
+  await start();
+}
+$("lockbtn").addEventListener("click", () => { localStorage.removeItem(PWKEY); location.reload(); });
+
+/* ───── 자료 싣기 ───── */
+async function loadStore() {
+  const blob = await pullBlob();
+  STORE = blankStore();
+  if (blob) { try { STORE = Object.assign(blankStore(), await unlockText(PW, blob)); } catch (e) {} }
+  ["personal", "work", "marketing"].forEach(k => { if (!Array.isArray(STORE[k])) STORE[k] = []; });
+}
+
+/* ═══════════════ 탭 ═══════════════ */
+let TAB = "personal";
+const TABNAME = { money: "돈관리", work: "업무", personal: "개인", marketing: "마케팅" };
+document.querySelectorAll("#tabs button").forEach(b =>
+  b.addEventListener("click", () => { TAB = b.dataset.tab; render(); }));
+
+function render() {
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === TAB));
+  const v = $("view");
+  if (TAB === "personal") v.innerHTML = personalView();
+  else v.innerHTML = soonView(TABNAME[TAB]);
+  if (TAB === "personal") wirePersonal();
+  window.scrollTo({ top: 0 });
+}
+
+function soonView(name) {
+  return '<div class="soon"><div class="big">🧱</div>' +
+    '<div class="t">' + esc(name) + ' 영역은 곧 만듭니다</div>' +
+    '<div class="d">개인 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>';
+}
+
+/* ═══════════════ 개인 탭 ═══════════════ */
+function personalView() {
+  const items = STORE.personal;
+  const head = '<div class="vhead"><span class="t">개인</span>' +
+    (items.length ? '<span class="c">' + items.filter(i => !i.done).length + ' 남음</span>' : '') +
+    '<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
+  if (!items.length)
+    return head + '<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 첫 할일을 적어보세요.</div>';
+  return head + '<div class="list">' + items.map(cardHtml).join("") + '</div>';
+}
+
+function cardHtml(it) {
+  const meta = [];
+  if (it.importance && it.importance !== "mid")
+    meta.push('<span class="badge imp-' + it.importance + '">' + IMP[it.importance] + '</span>');
+  const d = dueLabel(it);
+  if (d) meta.push('<span class="badge due' + (d.over ? ' over' : '') + '">📅 ' + esc(d.text) + '</span>');
+  return '<div class="card' + (it.done ? ' done' : '') + '" data-id="' + it.id + '">' +
+      '<input type="checkbox" ' + (it.done ? 'checked' : '') + ' data-act="done">' +
+      '<div class="body">' +
+        '<div class="title">' + esc(it.title) + '</div>' +
+        (it.memo ? '<div class="memo">' + esc(it.memo) + '</div>' : '') +
+        '<div class="meta">' + meta.join("") + '</div>' +
+      '</div>' +
+      '<div class="acts">' +
+        '<button type="button" data-act="up" title="위로">▲</button>' +
+        '<button type="button" data-act="down" title="아래로">▼</button>' +
+        '<button type="button" data-act="edit" title="수정">✎</button>' +
+        '<button type="button" class="del" data-act="del" title="삭제">🗑</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function wirePersonal() {
+  const addBtn = $("padd");
+  if (addBtn) addBtn.addEventListener("click", () => openSheet(null));
+  document.querySelectorAll("#view .card").forEach(card => {
+    const id = card.dataset.id;
+    card.querySelectorAll("[data-act]").forEach(el => {
+      el.addEventListener("click", () => handleAct(id, el.dataset.act));
+    });
+  });
+}
+
+function handleAct(id, act) {
+  const arr = STORE.personal, i = arr.findIndex(x => x.id === id);
+  if (i < 0) return;
+  const it = arr[i];
+  if (act === "done") { it.done = !it.done; it.updated = Date.now(); }
+  else if (act === "edit") { openSheet(it); return; }
+  else if (act === "del") {
+    if (!confirm('이 할일을 지웁니다.\n\n"' + it.title + '"\n\n계속할까요?')) return;
+    arr.splice(i, 1);
+  }
+  else if (act === "up" && i > 0) { arr.splice(i - 1, 0, arr.splice(i, 1)[0]); }
+  else if (act === "down" && i < arr.length - 1) { arr.splice(i + 1, 0, arr.splice(i, 1)[0]); }
+  else return;
+  save(); render();
+}
+
+/* ═══════════════ 편집 시트 ═══════════════ */
+let editId = null, pickImp = "mid", pickChip = "";
+function selChips(box, val) {
+  box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === val));
+}
+$("f_imp").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  pickImp = b.dataset.v; selChips($("f_imp"), pickImp);
+});
+$("f_chip").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  pickChip = b.dataset.v; selChips($("f_chip"), pickChip);
+  if (pickChip) $("f_date").value = "";          // 빠른 칩과 날짜는 하나만
+});
+$("f_date").addEventListener("input", () => { if ($("f_date").value) { pickChip = ""; selChips($("f_chip"), ""); } });
+$("f_title").addEventListener("input", () => { $("shsave").disabled = !$("f_title").value.trim(); });
+
+function openSheet(it) {
+  editId = it ? it.id : null;
+  $("shtitle").textContent = it ? "할일 수정" : "새 할일";
+  $("f_title").value = it ? it.title : "";
+  $("f_memo").value = it && it.memo ? it.memo : "";
+  pickImp = it && it.importance ? it.importance : "mid";
+  pickChip = it && it.dueChip ? it.dueChip : "";
+  $("f_date").value = it && it.due ? it.due : "";
+  selChips($("f_imp"), pickImp); selChips($("f_chip"), pickChip);
+  $("shsave").disabled = !$("f_title").value.trim();
+  $("ov").classList.add("on");
+  setTimeout(() => $("f_title").focus(), 50);
+}
+function closeSheet() { $("ov").classList.remove("on"); editId = null; }
+$("shcancel").addEventListener("click", closeSheet);
+$("ov").addEventListener("click", e => { if (e.target === $("ov")) closeSheet(); });
+$("shsave").addEventListener("click", saveSheet);
+
+function saveSheet() {
+  const title = $("f_title").value.trim();
+  if (!title) return;
+  const data = {
+    title, memo: $("f_memo").value.trim(),
+    importance: pickImp, dueChip: pickChip, due: pickChip ? "" : $("f_date").value,
+    updated: Date.now()
+  };
+  if (editId) {
+    const it = STORE.personal.find(x => x.id === editId);
+    if (it) Object.assign(it, data);
+  } else {
+    STORE.personal.unshift(Object.assign({ id: uid(), done: false, created: Date.now() }, data));
+  }
+  closeSheet(); save(); render();
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("ov").classList.contains("on")) closeSheet(); });
+
+/* ───── 시작 ───── */
+async function start() {
+  setDot(true, "여는 중…");
+  await loadStore();
+  render();
+  setDot(true, "준비됨");
+}
+(async () => {
+  const saved = localStorage.getItem(PWKEY);
+  if (saved) {
+    const r = await tryUnlock(saved);
+    if (r.ok) {
+      PW = saved;
+      $("gate").style.display = "none"; $("app").style.display = "";
+      await start();
+      return;
+    }
+    localStorage.removeItem(PWKEY);
+  }
+  $("pw").focus();
+})();
+</script>
+</body>
+</html>
