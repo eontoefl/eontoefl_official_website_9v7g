@@ -66,6 +66,16 @@
   .wsec-h .n { background:var(--surface-high); color:var(--on-surface-variant); font-size:11.5px; font-weight:700; border-radius:99px; padding:1px 9px; }
   .wsec-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.6; padding:.2rem 0 .2rem .3rem; }
 
+  /* 접이식 (반복 업무 · 완료·지난 것) */
+  .fold { margin-bottom:1.3rem; }
+  .fold-h { display:flex; align-items:center; gap:.5rem; cursor:pointer; font-size:13.5px; font-weight:700; color:var(--on-surface-variant); padding:.55rem .15rem; user-select:none; border-radius:var(--r); }
+  .fold-h:hover { color:var(--on-surface); background:var(--surface-low); }
+  .fold-h .ic { font-size:15px; }
+  .fold-h .n { background:var(--surface-high); font-size:11.5px; font-weight:700; border-radius:99px; padding:1px 9px; }
+  .fold-h .chev { margin-left:auto; opacity:.55; font-size:12px; }
+  .fold-body { padding-top:.5rem; }
+  .donelist .card { opacity:.6; }
+
   .list { display:flex; flex-direction:column; gap:.7rem; }
   .card { display:flex; align-items:flex-start; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:1rem 1.05rem 1rem .7rem; box-shadow:var(--lift); transition:box-shadow .15s, opacity .15s; }
   .card:hover { box-shadow:var(--lift-hi); }
@@ -80,13 +90,15 @@
   .card.done .title { text-decoration:line-through; text-decoration-color:var(--on-surface-variant); }
   .card .why { font-size:13px; color:var(--accent-strong); margin-top:.2rem; word-break:break-word; }
   .card .memo { font-size:13px; color:var(--on-surface-variant); margin-top:.15rem; white-space:pre-wrap; word-break:break-word; }
-  .card .meta { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.55rem; }
+  .card .meta { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; margin-top:.55rem; }
   .card .meta:empty { display:none; }
   .badge { font-size:11.5px; font-weight:600; border-radius:99px; padding:2.5px 10px; line-height:1.5; display:inline-flex; align-items:center; gap:4px; }
   .badge.due { background:var(--accent-lightest); color:var(--accent-strong); }
   .badge.due.over { background:var(--danger-soft); color:var(--danger); }
   .badge.when { background:var(--accent-lightest); color:var(--accent-strong); }
   .badge.soft { background:var(--surface-high); color:var(--on-surface-variant); }
+  .badge.post { border:none; cursor:pointer; background:var(--accent-soft); color:var(--accent-ink); font-family:inherit; }
+  .badge.post:hover { filter:brightness(1.05); }
   .card .acts { display:flex; align-items:center; gap:.1rem; flex-shrink:0; margin:-1px -3px 0 0; }
   .card .acts button { border:none; background:transparent; color:var(--on-surface-variant); width:30px; height:30px; border-radius:var(--r); font-size:15px; opacity:.55; transition:.12s; }
   .card:hover .acts button { opacity:1; }
@@ -179,7 +191,6 @@
 <div class="ov" id="ov"><div class="sheet">
   <h3 id="shtitle">새 할일</h3>
 
-  <!-- 개인: 할일/약속 토글 -->
   <div class="seg" id="f_seg">
     <button type="button" data-v="task" class="on">할일</button>
     <button type="button" data-v="appt">약속</button>
@@ -188,7 +199,6 @@
   <div class="fld"><label id="lbl_title">제목</label>
     <input type="text" id="f_title" autocomplete="off"></div>
 
-  <!-- 업무: 성격 (제목 쓰고 나서 · 안 고르면 단발) -->
   <div class="fld" id="blk_bucket"><label>성격 <span style="font-weight:400;letter-spacing:0">· 안 고르면 단발</span></label>
     <div class="chips" id="f_bucket">
       <button type="button" data-v="quick" class="on">⚡ 단발</button>
@@ -199,11 +209,9 @@
     </div>
   </div>
 
-  <!-- 개인 할일: 왜 -->
   <div class="fld" id="blk_why"><label>왜 필요한지 (선택)</label>
     <textarea id="f_why" placeholder="이게 왜 필요한지 — 나중에 AI가 이걸 보고 판단해요."></textarea></div>
 
-  <!-- 개인 할일: 기한 -->
   <div id="blk_ptask">
     <div class="fld"><label>기한</label>
       <div class="chips" id="f_chip" style="margin-bottom:.6rem">
@@ -215,7 +223,6 @@
       <input type="date" id="f_date"></div>
   </div>
 
-  <!-- 개인 약속 -->
   <div id="blk_appt">
     <div class="fld"><label>날짜</label><input type="date" id="a_date"></div>
     <div class="fld"><label>시간</label>
@@ -228,14 +235,12 @@
     <div class="fld"><label>장소 (선택)</label><input type="text" id="a_place" placeholder="예: CGV 강남" autocomplete="off"></div>
   </div>
 
-  <!-- 업무 약속·마감 -->
   <div id="blk_wdue">
     <div class="fld"><label>누구랑 / 무슨 약속</label><input type="text" id="w_who" placeholder="예: 김OO 학생 / OO업체 납품" autocomplete="off"></div>
     <div class="fld"><label>날짜</label><input type="date" id="w_due"></div>
     <div class="fld"><label>시간 (선택)</label><input type="time" id="w_time"></div>
   </div>
 
-  <!-- 업무 반복: 매주 언제(선택) -->
   <div id="blk_recur">
     <div class="fld"><label>매주 언제 (선택)</label>
       <div class="chips" id="f_wday">
@@ -248,7 +253,6 @@
     </div>
   </div>
 
-  <!-- 업무 언젠가: 희망 완료 시기 -->
   <div id="blk_hope">
     <div class="fld"><label>희망 완료 시기 (선택)</label>
       <div class="chips" id="f_hope">
@@ -264,7 +268,6 @@
   <div class="fld" id="blk_memo"><label id="lbl_memo">메모 (선택)</label>
     <textarea id="f_memo" placeholder="자세한 내용"></textarea></div>
 
-  <!-- 프로젝트: 등록할 때 서브태스크 몇 개 미리 넣기 -->
   <div id="blk_projsub">
     <div class="fld"><label>서브태스크 (지금 넣어도 되고 나중에 추가해도 돼요)</label>
       <div id="draftsub" class="proj-sub" style="margin:0 0 .5rem 0"></div>
@@ -281,10 +284,9 @@
 <script>
 /* ═══ 김비서 v3 · note3.html ═══
    저장: Supabase note3_store(암호블롭) ↔ localStorage. 관리자 비번 게이트.
-   개인: 할일(제목·왜·기한·메모)/약속(날짜·시간·누구랑·장소)
-   업무: +추가 → 제목부터 씀 → 성격 줄(기본 단발) → 필요할 때 칩 하나 → 그 칸 등장
-        (단발/약속마감/반복/언젠가/프로젝트). 수정 중 성격 바꾸면 버킷 이동(승격).
-   정렬: 왼쪽 드래그 핸들. 색: 메인=연보라, 강조=연하늘 */
+   개인: 할일(제목·왜·기한·메모)/약속. 업무: 제목먼저→성격칩(기본 단발)→그 칸 등장.
+   반복 = 별도 접이식 참고 목록(체크 없음, 캘린더 연동은 추후). 완료·지난 것 = 맨 밑 접이식.
+   마감 지난 미완료 = 빨간 유지 + '미루기' 칩. 정렬: 왼쪽 드래그 핸들. */
 
 const SB = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/note3_store";
 const AK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc";
@@ -333,10 +335,9 @@ function apptWhen(it){
   return s;
 }
 function apptPast(it){ if(!it.date) return false; const t=todayStr(); if(it.date<t) return true; if(it.date===t && it.time && !it.timeTBD) return it.time<nowHM(); return false; }
-function dueBadge(it){ const d=dueLabel(it); return d ? '<span class="badge due'+(d.over?' over':'')+'">📅 '+esc(d.text)+'</span>' : ''; }
+const postBtn = '<button class="badge post" type="button" data-act="postpone">📅 미루기</button>';
 function deadlineWhen(it){ if(!it.due) return ""; const d=new Date(it.due+"T12:00:00"); let s=(d.getMonth()+1)+"월 "+d.getDate()+"일"; if(it.dtime){ const p=it.dtime.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; s+=" "+ap+" "+h+":"+p[1]; } return s; }
 function recurLabel(it){ return (it.wday!=="" && it.wday!=null) ? "매주 "+DOW[+it.wday] : "반복"; }
-const doneToday = it => it.lastDone === todayStr();
 
 async function pullCloud(){
   try { const r=await fetch(SB+"?id=eq.main&select=data",{headers:HDR,cache:"no-store"}); if(r.ok){ const j=await r.json(); return { reachable:true, blob:(Array.isArray(j)&&j.length?j[0].data:null) }; } } catch(e){}
@@ -361,8 +362,6 @@ async function doUnlock(){
   PW=pw; localStorage.setItem(PWKEY,pw); $("gate").style.display="none"; $("app").style.display=""; await start();
 }
 async function loadStore(){
-  /* 클라우드 우선. 단, 클라우드가 연결되지만 비어 있고 이 기기에 저장분이 있으면
-     기기 저장분을 복구해서 쓰고 클라우드로 올린다(빈 클라우드가 기기 데이터 가리는 사고 방지). */
   const cloud=await pullCloud(); const local=localStorage.getItem(LSKEY);
   let blob=null, migrate=false;
   if(cloud.reachable){ if(cloud.blob){ blob=cloud.blob; storeSrc="sb"; } else if(local){ blob=local; storeSrc="sb"; migrate=true; } else { storeSrc="sb"; } }
@@ -381,6 +380,7 @@ async function loadStore(){
 let TAB="personal";
 const TABNAME = { money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
 const openProjects = new Set();
+let fold = { recur:false, wdone:false, pdone:false };   // 접힘 상태 (기본 접힘)
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); }));
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===TAB));
@@ -392,7 +392,7 @@ function render(){
 }
 function soonView(name){ return '<div class="soon"><div class="big">🧱</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
 
-/* 드래그 정렬 */
+/* 드래그 정렬 (보이는 것만 재정렬, 안 보이는 것은 뒤에 그대로 유지) */
 function enableDrag(container, arr, onDone){
   container.querySelectorAll(":scope > [data-id] > .drag, :scope > [data-id] > .proj-top > .drag").forEach(handle=>{
     handle.addEventListener("pointerdown", e=>{
@@ -401,21 +401,29 @@ function enableDrag(container, arr, onDone){
       const move=ev=>{ moved=true; const others=[...container.querySelectorAll(":scope > [data-id]:not(.dragging)")]; let placed=false;
         for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(card,o); placed=true; break; } } if(!placed) container.appendChild(card); };
       const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); card.classList.remove("dragging");
-        if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id); arr.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id)); if(onDone) onDone(); else { save(); render(); } } };
+        if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id);
+          const inDom=ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); const rest=arr.filter(x=>!ids.includes(x.id));
+          arr.length=0; arr.push(...inDom, ...rest); if(onDone) onDone(); else { save(); render(); } } };
       document.addEventListener("pointermove",move); document.addEventListener("pointerup",up);
     });
   });
 }
 const dragH = '<span class="drag" title="드래그해서 순서 이동">⋮⋮</span>';
 const actsH = '<div class="acts"><button type="button" data-act="edit" title="수정">✎</button><button type="button" class="del" data-act="del" title="삭제">🗑</button></div>';
+function foldHeader(key, ic, label, n){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span><span class="chev">'+(fold[key]?'▾':'▸')+'</span></div>'; }
+function wireFolds(){ document.querySelectorAll("#view [data-fold]").forEach(h=> h.addEventListener("click", ()=>{ fold[h.dataset.fold]=!fold[h.dataset.fold]; render(); })); }
 
 /* ═══ 개인 탭 ═══ */
 function personalView(){
   const items=STORE.personal;
-  const active=items.filter(i=> i.type==="appt" ? !apptPast(i) : !i.done).length;
-  const head='<div class="vhead"><span class="t">개인</span>'+(items.length?'<span class="c">'+active+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
+  const active = items.filter(i=> i.type==="appt" ? !apptPast(i) : !i.done);
+  const archived = items.filter(i=> i.type==="appt" ? apptPast(i) : i.done);
+  const head='<div class="vhead"><span class="t">개인</span>'+(active.length?'<span class="c">'+active.length+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
   if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일이나 약속을 적어보세요.</div>';
-  return head+'<div class="list" id="plist">'+items.map(personalCard).join("")+'</div>';
+  let html=head;
+  html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
+  if(archived.length) html += '<div class="fold" style="margin-top:1.5rem">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
+  return html;
 }
 function personalCard(it){
   if(it.type==="appt"){
@@ -424,44 +432,54 @@ function personalCard(it){
     if(it.place) meta.push('<span class="badge soft">📍 '+esc(it.place)+'</span>');
     return '<div class="card appt'+(apptPast(it)?' past':'')+'" data-id="'+it.id+'">'+dragH+'<div class="cal">🗓️</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta.join("")+'</div></div>'+actsH+'</div>';
   }
-  return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+dueBadge(it)+'</div></div>'+actsH+'</div>';
+  const d=dueLabel(it); let meta="";
+  if(d){ meta+='<span class="badge due'+(d.over?' over':'')+'">📅 '+esc(d.text)+'</span>'; if(d.over) meta+=postBtn; }
+  return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
 }
 function wirePersonal(){
   const add=$("padd"); if(add) add.addEventListener("click", ()=>openForm({tab:"personal",type:"task",id:null}));
-  const list=$("plist");
-  if(list){ list.querySelectorAll(":scope > .card").forEach(card=>{ const id=card.dataset.id; card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actPersonal(id, el.dataset.act))); }); enableDrag(list, STORE.personal); }
+  document.querySelectorAll("#view .card").forEach(card=>{ const id=card.dataset.id; card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actPersonal(id, el.dataset.act))); });
+  const plist=$("plist"); if(plist) enableDrag(plist, STORE.personal);
+  wireFolds();
 }
 function actPersonal(id, act){
   const arr=STORE.personal, i=arr.findIndex(x=>x.id===id); if(i<0) return; const it=arr[i];
   if(act==="done"){ it.done=!it.done; it.updated=Date.now(); }
-  else if(act==="edit"){ openForm({tab:"personal", type:it.type||"task", id}); return; }
+  else if(act==="edit" || act==="postpone"){ openForm({tab:"personal", type:it.type||"task", id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); }
   else return;
   save(); render();
 }
 
 /* ═══ 업무 탭 ═══ */
-const WBUCKETS = [
-  { key:"quick", ic:"⚡", name:"단발" }, { key:"deadline", ic:"📌", name:"약속·마감" },
-  { key:"recurring", ic:"🔁", name:"반복" }, { key:"project", ic:"📚", name:"장기 프로젝트" }, { key:"someday", ic:"💤", name:"백로그" },
-];
+const WMETA = { quick:{ic:"⚡",name:"단발"}, deadline:{ic:"📌",name:"약속·마감"}, project:{ic:"📚",name:"장기 프로젝트"}, someday:{ic:"💤",name:"백로그"} };
 function workView(){
-  return '<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>' + WBUCKETS.map(sectionHtml).join("");
+  let html='<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>';
+  ["quick","deadline","project","someday"].forEach(k=>{ html += sectionHtml(k); });
+  // 반복: 별도 접이식 참고 목록 (그날 뜨는 건 나중에 캘린더에서)
+  const rec=STORE.work.recurring;
+  html += '<div class="fold">'+foldHeader("recur","🔁","반복 업무", rec.length)+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
+  // 완료·지난 것 (단발·약속마감·백로그의 완료 항목)
+  const done = ["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(x=>x.done));
+  if(done.length) html += '<div class="fold">'+foldHeader("wdone","✓","완료·지난 것", done.length)+(fold.wdone?'<div class="fold-body"><div class="list donelist">'+done.map(workCard).join("")+'</div></div>':'')+'</div>';
+  return html;
 }
-function sectionHtml(b){
-  const arr=STORE.work[b.key];
-  const h='<div class="wsec-h"><span class="ic">'+b.ic+'</span>'+esc(b.name)+'<span class="n">'+arr.length+'</span></div>';
-  if(!arr.length) return '<div class="wsec">'+h+'<div class="wsec-empty">비어 있음</div></div>';
-  const cards = b.key==="project" ? arr.map(projectCard).join("") : arr.map(workCard).join("");
-  return '<div class="wsec">'+h+'<div class="list" data-bucket="'+b.key+'">'+cards+'</div></div>';
+function sectionHtml(key){
+  const meta=WMETA[key], arr=STORE.work[key];
+  const items = key==="project" ? arr : arr.filter(x=>!x.done);
+  const h='<div class="wsec-h"><span class="ic">'+meta.ic+'</span>'+esc(meta.name)+'<span class="n">'+items.length+'</span></div>';
+  if(!items.length) return '<div class="wsec">'+h+'<div class="wsec-empty">비어 있음</div></div>';
+  const cards = key==="project" ? items.map(projectCard).join("") : items.map(workCard).join("");
+  return '<div class="wsec">'+h+'<div class="list" data-bucket="'+key+'">'+cards+'</div></div>';
 }
 function workCard(it){
   const b=it.bucket; let meta="";
-  if(b==="deadline"){ const w=deadlineWhen(it), over=it.due&&it.due<todayStr()&&!it.done; if(w) meta+='<span class="badge due'+(over?' over':'')+'">📅 '+esc(w)+'</span>'; if(it.who) meta+='<span class="badge soft">🧑 '+esc(it.who)+'</span>'; }
-  else if(b==="recurring"){ meta='<span class="badge when">🔁 '+esc(recurLabel(it))+'</span>'; }
+  if(b==="deadline"){ const w=deadlineWhen(it), over=it.due&&it.due<todayStr()&&!it.done; if(w) meta+='<span class="badge due'+(over?' over':'')+'">📅 '+esc(w)+'</span>'; if(it.who) meta+='<span class="badge soft">🧑 '+esc(it.who)+'</span>'; if(over) meta+=postBtn; }
   else if(b==="someday" && it.hope){ meta='<span class="badge soft">💤 '+esc(HOPE[it.hope]||"")+'</span>'; }
-  const checked = b==="recurring" ? doneToday(it) : it.done;
-  return '<div class="card'+(checked?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(checked?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
+  return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
+}
+function recurCard(it){
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
 }
 function projectCard(p){
   const subs=p.subtasks||[]; const doneN=subs.filter(s=>s.done).length; const open=openProjects.has(p.id);
@@ -473,26 +491,25 @@ function projectCard(p){
   }
   return html+'</div>';
 }
+function findWork(id){ for(const k of ["quick","deadline","recurring","someday","project"]){ const i=STORE.work[k].findIndex(x=>x.id===id); if(i>=0) return { bucket:k, arr:STORE.work[k], i }; } return null; }
 function wireWork(){
   const add=$("wadd"); if(add) add.addEventListener("click", ()=>openForm({tab:"work", type:"quick", id:null}));
-  document.querySelectorAll("#view .list[data-bucket]").forEach(list=>{
-    const bucket=list.dataset.bucket, arr=STORE.work[bucket];
-    list.querySelectorAll(":scope > .card").forEach(card=>{
-      const id=card.dataset.id;
-      card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actWork(bucket, id, el.dataset.act)));
-      card.querySelectorAll("[data-sub]").forEach(el=>{ const sub=el.closest("[data-id]"); const sid=sub.dataset.id; el.addEventListener("click", ()=>actSub(id, sid, el.dataset.sub)); });
-      const si=card.querySelector("[data-subinput]"); if(si){ si.addEventListener("keydown", e=>{ if(e.key==="Enter") addSub(id, si.value, si); }); }
-      const sb=card.querySelector("[data-subadd]"); if(sb){ sb.addEventListener("click", ()=>{ const inp=card.querySelector("[data-subinput]"); addSub(id, inp.value, inp); }); }
-      const subwrap=card.querySelector(".proj-sub"); if(subwrap){ const p=arr.find(x=>x.id===id); if(p) enableDrag(subwrap, p.subtasks); }
-    });
-    enableDrag(list, arr);
+  document.querySelectorAll("#view .card").forEach(card=>{
+    const id=card.dataset.id;
+    card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actWork(id, el.dataset.act)));
+    card.querySelectorAll("[data-sub]").forEach(el=>{ const sub=el.closest("[data-id]"); const sid=sub.dataset.id; el.addEventListener("click", ()=>actSub(id, sid, el.dataset.sub)); });
+    const si=card.querySelector("[data-subinput]"); if(si) si.addEventListener("keydown", e=>{ if(e.key==="Enter") addSub(id, si.value, si); });
+    const sb=card.querySelector("[data-subadd]"); if(sb) sb.addEventListener("click", ()=>{ const inp=card.querySelector("[data-subinput]"); addSub(id, inp.value, inp); });
+    const subwrap=card.querySelector(".proj-sub"); if(subwrap){ const p=STORE.work.project.find(x=>x.id===id); if(p) enableDrag(subwrap, p.subtasks); }
   });
+  document.querySelectorAll("#view .list[data-bucket]").forEach(list=>{ enableDrag(list, STORE.work[list.dataset.bucket]); });
+  wireFolds();
 }
-function actWork(bucket, id, act){
-  const arr=STORE.work[bucket], i=arr.findIndex(x=>x.id===id); if(i<0) return; const it=arr[i];
-  if(act==="done"){ if(bucket==="recurring"){ it.lastDone = doneToday(it) ? "" : todayStr(); } else { it.done=!it.done; } it.updated=Date.now(); }
+function actWork(id, act){
+  const f=findWork(id); if(!f) return; const { arr, i, bucket }=f; const it=arr[i];
+  if(act==="done"){ it.done=!it.done; it.updated=Date.now(); }
   else if(act==="toggle"){ if(openProjects.has(id)) openProjects.delete(id); else openProjects.add(id); }
-  else if(act==="edit"){ openForm({tab:"work", type:bucket, id}); return; }
+  else if(act==="edit" || act==="postpone"){ openForm({tab:"work", type:bucket, id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); openProjects.delete(id); }
   else return;
   save(); render();
@@ -548,7 +565,6 @@ $("f_title").addEventListener("input", updateSave);
 $("w_due").addEventListener("input", updateSave);
 function updateSave(){ const t=$("f_title").value.trim(); let ok=!!t; if(curCtx.tab==="work"&&curCtx.type==="deadline"&&!$("w_due").value) ok=false; $("shsave").disabled=!ok; }
 
-/* 프로젝트 등록/수정 시 모달 안에서 서브태스크 미리 넣기 + 순서 바꾸기 (초안) */
 let draftSubs=[];
 function renderDraft(){
   const el=$("draftsub"); if(!el) return;
@@ -604,14 +620,12 @@ function saveForm(){
   const data=buildItem();
   if(curCtx.id){
     if(curCtx.tab==="work" && curCtx.type!==curCtx.origType){
-      // 성격(버킷) 변경 = 승격/재분류: 원래 버킷에서 빼서 새 버킷으로 이동
       const from=STORE.work[curCtx.origType], i=from.findIndex(x=>x.id===curCtx.id);
       const old = i>=0 ? from.splice(i,1)[0] : {};
       const merged=Object.assign({ id:curCtx.id, created:old.created||Date.now() }, data);
       if(curCtx.type==="project" && !Array.isArray(merged.subtasks)) merged.subtasks=old.subtasks||[];
       if(["quick","deadline","someday"].includes(curCtx.type)) merged.done=old.done||false;
-      STORE.work[curCtx.type].unshift(merged);
-      openProjects.delete(curCtx.id);
+      STORE.work[curCtx.type].unshift(merged); openProjects.delete(curCtx.id);
     } else {
       const arr = curCtx.tab==="personal" ? STORE.personal : STORE.work[curCtx.type];
       const it=arr.find(x=>x.id===curCtx.id);
