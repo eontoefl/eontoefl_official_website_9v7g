@@ -194,7 +194,7 @@
       <button type="button" data-v="quick" class="on">⚡ 단발</button>
       <button type="button" data-v="deadline">📌 약속·마감</button>
       <button type="button" data-v="recurring">🔁 반복</button>
-      <button type="button" data-v="someday">💤 언젠가</button>
+      <button type="button" data-v="someday">💤 백로그</button>
       <button type="button" data-v="project">📚 프로젝트</button>
     </div>
   </div>
@@ -263,6 +263,14 @@
 
   <div class="fld" id="blk_memo"><label id="lbl_memo">메모 (선택)</label>
     <textarea id="f_memo" placeholder="자세한 내용"></textarea></div>
+
+  <!-- 프로젝트: 등록할 때 서브태스크 몇 개 미리 넣기 -->
+  <div id="blk_projsub">
+    <div class="fld"><label>서브태스크 (지금 넣어도 되고 나중에 추가해도 돼요)</label>
+      <div id="draftsub" class="proj-sub" style="margin:0 0 .5rem 0"></div>
+      <div class="subadd"><input type="text" id="draftinput" placeholder="서브태스크 추가" autocomplete="off"><button type="button" id="draftadd">추가</button></div>
+    </div>
+  </div>
 
   <div class="row">
     <button type="button" class="cancel" id="shcancel">취소</button>
@@ -385,7 +393,7 @@ function render(){
 function soonView(name){ return '<div class="soon"><div class="big">🧱</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
 
 /* 드래그 정렬 */
-function enableDrag(container, arr){
+function enableDrag(container, arr, onDone){
   container.querySelectorAll(":scope > [data-id] > .drag, :scope > [data-id] > .proj-top > .drag").forEach(handle=>{
     handle.addEventListener("pointerdown", e=>{
       e.preventDefault(); const card=handle.closest("[data-id]"); if(!card) return;
@@ -393,7 +401,7 @@ function enableDrag(container, arr){
       const move=ev=>{ moved=true; const others=[...container.querySelectorAll(":scope > [data-id]:not(.dragging)")]; let placed=false;
         for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(card,o); placed=true; break; } } if(!placed) container.appendChild(card); };
       const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); card.classList.remove("dragging");
-        if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id); arr.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id)); save(); render(); } };
+        if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id); arr.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id)); if(onDone) onDone(); else { save(); render(); } } };
       document.addEventListener("pointermove",move); document.addEventListener("pointerup",up);
     });
   });
@@ -435,7 +443,7 @@ function actPersonal(id, act){
 /* ═══ 업무 탭 ═══ */
 const WBUCKETS = [
   { key:"quick", ic:"⚡", name:"단발" }, { key:"deadline", ic:"📌", name:"약속·마감" },
-  { key:"recurring", ic:"🔁", name:"반복" }, { key:"project", ic:"📚", name:"장기 프로젝트" }, { key:"someday", ic:"💤", name:"언젠가" },
+  { key:"recurring", ic:"🔁", name:"반복" }, { key:"project", ic:"📚", name:"장기 프로젝트" }, { key:"someday", ic:"💤", name:"백로그" },
 ];
 function workView(){
   return '<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>' + WBUCKETS.map(sectionHtml).join("");
@@ -518,14 +526,15 @@ function configForm(){
   show("blk_wdue", tab==="work" && type==="deadline");
   show("blk_recur", tab==="work" && type==="recurring");
   show("blk_hope", tab==="work" && type==="someday");
+  show("blk_projsub", isProj);
   show("blk_memo", true);
   $("lbl_title").textContent = isProj ? "프로젝트 이름" : "제목";
   $("lbl_memo").textContent = isProj ? "설명 (선택)" : "메모 (선택)";
   $("f_title").placeholder = isP ? (type==="task"?"무엇을 해야 하나요?":"무슨 약속인가요?") : (isProj?"프로젝트 이름":"무엇을 하나요?");
   if(isP) selChips($("f_seg"), type);
   if(tab==="work") selChips($("f_bucket"), type);
-  const names={ task:"할일", appt:"약속", quick:"단발", deadline:"약속·마감", recurring:"반복", someday:"언젠가", project:"프로젝트" };
-  $("shtitle").textContent = (curCtx.id?"수정 · ":"새 ")+names[type];
+  if(tab==="work"){ $("shtitle").textContent = curCtx.id ? "업무 수정" : "새 업무"; }
+  else { const names={ task:"할일", appt:"약속" }; $("shtitle").textContent = (curCtx.id?"수정 · ":"새 ")+names[type]; }
 }
 
 $("f_seg").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
@@ -538,6 +547,18 @@ $("f_hope").addEventListener("click", e=>{ const b=e.target.closest("button"); i
 $("f_title").addEventListener("input", updateSave);
 $("w_due").addEventListener("input", updateSave);
 function updateSave(){ const t=$("f_title").value.trim(); let ok=!!t; if(curCtx.tab==="work"&&curCtx.type==="deadline"&&!$("w_due").value) ok=false; $("shsave").disabled=!ok; }
+
+/* 프로젝트 등록/수정 시 모달 안에서 서브태스크 미리 넣기 + 순서 바꾸기 (초안) */
+let draftSubs=[];
+function renderDraft(){
+  const el=$("draftsub"); if(!el) return;
+  el.innerHTML = draftSubs.map(s=>'<div class="sub" data-id="'+s.id+'"><span class="drag">⋮⋮</span><span class="st">'+esc(s.title)+'</span><button class="x" type="button" data-dsub="'+s.id+'">🗑</button></div>').join("");
+  el.querySelectorAll("[data-dsub]").forEach(b=> b.addEventListener("click", ()=>{ const i=draftSubs.findIndex(x=>x.id===b.dataset.dsub); if(i>=0){ draftSubs.splice(i,1); renderDraft(); } }));
+  enableDrag(el, draftSubs, renderDraft);
+}
+function draftAdd(){ const inp=$("draftinput"); const t=(inp.value||"").trim(); if(!t) return; draftSubs.push({ id:uid(), title:t, done:false }); inp.value=""; renderDraft(); inp.focus(); }
+$("draftadd").addEventListener("click", draftAdd);
+$("draftinput").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); draftAdd(); } });
 
 function findItem(ctx){ return ctx.tab==="personal" ? STORE.personal.find(x=>x.id===ctx.id) : STORE.work[ctx.type].find(x=>x.id===ctx.id); }
 function openForm(ctx){
@@ -555,7 +576,8 @@ function openForm(ctx){
   $("w_time").value = it && ctx.type==="deadline" && it.dtime ? it.dtime : "";
   pickWday = it && ctx.type==="recurring" && it.wday!=null ? String(it.wday) : ""; selChips($("f_wday"), pickWday);
   pickHope = it && ctx.type==="someday" && it.hope ? it.hope : ""; selChips($("f_hope"), pickHope);
-  configForm(); updateSave();
+  draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
+  configForm(); renderDraft(); updateSave();
   $("ov").classList.add("on"); setTimeout(()=>$("f_title").focus(), 50);
 }
 function closeForm(){ $("ov").classList.remove("on"); curCtx.id=null; }
@@ -574,7 +596,7 @@ function buildItem(){
   if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, updated:now };
   if(type==="recurring") return { bucket:"recurring", title, memo, wday:pickWday, updated:now };
   if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
-  if(type==="project") return { bucket:"project", title, desc:memo, updated:now };
+  if(type==="project") return { bucket:"project", title, desc:memo, subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
 }
 const KEYS = ["why","dueChip","due","date","time","timeTBD","who","place","dtime","wday","hope","memo","desc"];
 function saveForm(){
@@ -586,7 +608,7 @@ function saveForm(){
       const from=STORE.work[curCtx.origType], i=from.findIndex(x=>x.id===curCtx.id);
       const old = i>=0 ? from.splice(i,1)[0] : {};
       const merged=Object.assign({ id:curCtx.id, created:old.created||Date.now() }, data);
-      if(curCtx.type==="project") merged.subtasks=old.subtasks||[];
+      if(curCtx.type==="project" && !Array.isArray(merged.subtasks)) merged.subtasks=old.subtasks||[];
       if(["quick","deadline","someday"].includes(curCtx.type)) merged.done=old.done||false;
       STORE.work[curCtx.type].unshift(merged);
       openProjects.delete(curCtx.id);
