@@ -82,6 +82,17 @@
   .fold-body { padding-top:.5rem; }
   .donelist .card { opacity:.6; }
 
+  /* 목표 스티커판 */
+  .card.goal { flex-direction:column; align-items:stretch; gap:0; }
+  .goal-top { display:flex; align-items:flex-start; gap:.6rem; }
+  .goal-top .body { flex:1; min-width:0; }
+  .goal-prog { font-size:12.5px; font-weight:600; color:var(--on-surface-variant); margin-top:.3rem; }
+  .stickers { display:flex; flex-wrap:wrap; gap:5px; margin:.9rem 0 .2rem; }
+  .sticker { width:26px; height:26px; border-radius:50%; background:var(--surface-high); display:grid; place-items:center; font-size:14px; line-height:1; }
+  .sticker.on { background:#fff3d6; }
+  .goal-claim { width:100%; border:none; border-radius:var(--r); background:var(--grad); color:var(--accent-ink); padding:11px; font-size:14px; font-weight:700; box-shadow:var(--lift); margin-top:.7rem; }
+  .goal-claim.claimed { background:var(--surface-high); color:var(--on-surface-variant); box-shadow:none; }
+
   .list { display:flex; flex-direction:column; gap:.7rem; }
   .card { display:flex; align-items:flex-start; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:1rem 1.05rem 1rem .7rem; box-shadow:var(--lift); transition:box-shadow .15s, opacity .15s; }
   .card:hover { box-shadow:var(--lift-hi); }
@@ -198,13 +209,17 @@
 <div class="ov" id="ov"><div class="sheet">
   <h3 id="shtitle">새 할일</h3>
 
-  <div class="seg" id="f_seg">
-    <button type="button" data-v="task" class="on">할일</button>
-    <button type="button" data-v="appt">약속</button>
-  </div>
-
   <div class="fld"><label id="lbl_title">제목</label>
     <input type="text" id="f_title" autocomplete="off"></div>
+
+  <div class="fld" id="blk_pkind"><label>종류</label>
+    <div class="chips" id="f_pkind">
+      <button type="button" data-v="task" class="on">✅ 할일</button>
+      <button type="button" data-v="appt">📅 약속</button>
+      <button type="button" data-v="routine">🔁 루틴</button>
+      <button type="button" data-v="goal">🎯 목표</button>
+    </div>
+  </div>
 
   <div class="fld" id="blk_bucket"><label>성격 <span style="font-weight:400;letter-spacing:0">· 안 고르면 단발</span></label>
     <div class="chips" id="f_bucket">
@@ -272,6 +287,10 @@
     </div>
   </div>
 
+  <div id="blk_goal">
+    <div class="fld"><label>목표 칸 수 (며칠/몇 번 채울지)</label><input type="number" id="g_target" min="1" max="365" placeholder="예: 30"></div>
+  </div>
+
   <div class="fld" id="blk_memo"><label id="lbl_memo">메모 (선택)</label>
     <textarea id="f_memo" placeholder="자세한 내용"></textarea></div>
 
@@ -335,6 +354,8 @@ const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<"
 const DOW = ["일","월","화","수","목","금","토"];
 const HOPE = { "1m":"한달 이내", "3m":"2-3개월 이내", "6m":"6개월 이내", "1y":"1년 이내" };
 const todayStr = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const shiftDay = (s,n) => { const d=new Date(s+"T12:00:00"); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+function goalStreak(claimed){ if(!claimed||!claimed.length) return 0; const set=new Set(claimed); let d = set.has(todayStr()) ? todayStr() : claimed.slice().sort().pop(); let n=0; while(set.has(d)){ n++; d=shiftDay(d,-1); } return n; }
 const nowHM = () => { const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
 function setDot(ok,msg){ const d=$("savedot"); d.textContent=msg; d.className=ok?"":"bad"; }
 const CHIP = { asap:"최대한 빨리", "1-2d":"하루이틀 이내", "1w":"일주일 이내" };
@@ -418,7 +439,7 @@ async function loadStore(){
 let TAB="personal";
 const TABNAME = { money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
 const openProjects = new Set();
-let fold = { recur:false, wdone:false, pdone:false };   // 접힘 상태 (기본 접힘)
+let fold = { recur:false, wdone:false, pdone:false, proutine:false };   // 접힘 상태 (기본 접힘)
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); }));
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===TAB));
@@ -454,14 +475,33 @@ function wireFolds(){ document.querySelectorAll("#view [data-fold]").forEach(h=>
 /* ═══ 개인 탭 ═══ */
 function personalView(){
   const items=STORE.personal;
-  const active = items.filter(i=> i.type==="appt" ? !apptPast(i) : !i.done);
-  const archived = items.filter(i=> i.type==="appt" ? apptPast(i) : i.done);
+  const goals = items.filter(i=>i.type==="goal");
+  const routines = items.filter(i=>i.type==="routine");
+  const active = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) );
+  const archived = items.filter(i=> (i.type==="task"&&i.done) || (i.type==="appt"&&apptPast(i)) );
   const head='<div class="vhead"><span class="t">개인</span>'+(active.length?'<span class="c">'+active.length+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
-  if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일이나 약속을 적어보세요.</div>';
+  if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
   let html=head;
+  if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">🎯</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
   html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
-  if(archived.length) html += '<div class="fold" style="margin-top:1.5rem">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
+  html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine","🔁","반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
+  if(archived.length) html += '<div class="fold">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
   return html;
+}
+function goalCard(g){
+  const claimed = Array.isArray(g.claimed)?g.claimed:[]; const target = g.target||30; const n = Math.min(claimed.length, target);
+  const doneAll = claimed.length>=target; const claimedToday = claimed.includes(todayStr()); const streak = goalStreak(claimed);
+  let dots=""; for(let i=0;i<target;i++){ dots += '<span class="sticker'+(i<n?" on":"")+'">'+(i<n?"⭐":"")+'</span>'; }
+  return '<div class="card goal" data-id="'+g.id+'"><div class="goal-top">'+dragH+
+    '<div class="body"><div class="title">🎯 '+esc(g.title)+(doneAll?' <span class="badge soft">🎉 달성</span>':'')+'</div>'+
+    (g.memo?'<div class="memo">'+esc(g.memo)+'</div>':'')+
+    '<div class="goal-prog">'+claimed.length+'/'+target+(streak>1?' · 🔥 '+streak+'일 연속':'')+'</div></div>'+actsH+'</div>'+
+    '<div class="stickers">'+dots+'</div>'+
+    (doneAll?'':'<button class="goal-claim'+(claimedToday?' claimed':'')+'" type="button" data-act="claim"'+(claimedToday?' disabled':'')+'>'+(claimedToday?'오늘 완료 ✓':'오늘 스티커 붙이기 ⭐')+'</button>')+
+    '</div>';
+}
+function routineCard(it){
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
 }
 function personalCard(it){
   if(it.type==="appt"){
@@ -477,12 +517,13 @@ function personalCard(it){
 function wirePersonal(){
   const add=$("padd"); if(add) add.addEventListener("click", ()=>openForm({tab:"personal",type:"task",id:null}));
   document.querySelectorAll("#view .card").forEach(card=>{ const id=card.dataset.id; card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actPersonal(id, el.dataset.act))); });
-  const plist=$("plist"); if(plist) enableDrag(plist, STORE.personal);
+  ["plist","pgoals","proutines"].forEach(pid=>{ const el=$(pid); if(el) enableDrag(el, STORE.personal); });
   wireFolds();
 }
 function actPersonal(id, act){
   const arr=STORE.personal, i=arr.findIndex(x=>x.id===id); if(i<0) return; const it=arr[i];
   if(act==="done"){ it.done=!it.done; it.updated=Date.now(); }
+  else if(act==="claim"){ if(!Array.isArray(it.claimed)) it.claimed=[]; const t=todayStr(); if(it.claimed.includes(t) || it.claimed.length>=(it.target||30)) return; it.claimed.push(t); it.updated=Date.now(); }
   else if(act==="edit" || act==="postpone"){ openForm({tab:"personal", type:it.type||"task", id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); }
   else return;
@@ -573,26 +614,28 @@ function show(id, on){ $(id).classList.toggle("hide", !on); }
 
 function configForm(){
   const {tab,type}=curCtx, isP=tab==="personal", isProj=tab==="work"&&type==="project";
-  show("f_seg", isP);
+  const isGoal=isP&&type==="goal", isRoutine=isP&&type==="routine";
+  show("blk_pkind", isP);
   show("blk_bucket", tab==="work");
   show("blk_why", isP && type==="task");
   show("blk_ptask", isP && type==="task");
   show("blk_appt", isP && type==="appt");
   show("blk_wdue", tab==="work" && type==="deadline");
-  show("blk_recur", tab==="work" && type==="recurring");
+  show("blk_recur", (tab==="work" && type==="recurring") || isRoutine);
   show("blk_hope", tab==="work" && type==="someday");
+  show("blk_goal", isGoal);
   show("blk_projsub", isProj);
   show("blk_memo", true);
-  $("lbl_title").textContent = isProj ? "프로젝트 이름" : "제목";
+  $("lbl_title").textContent = isProj?"프로젝트 이름" : isGoal?"목표 이름" : isRoutine?"루틴 이름" : "제목";
   $("lbl_memo").textContent = isProj ? "설명 (선택)" : "메모 (선택)";
-  $("f_title").placeholder = isP ? (type==="task"?"무엇을 해야 하나요?":"무슨 약속인가요?") : (isProj?"프로젝트 이름":"무엇을 하나요?");
-  if(isP) selChips($("f_seg"), type);
+  $("f_title").placeholder = isP ? (type==="task"?"무엇을 해야 하나요?":type==="appt"?"무슨 약속인가요?":type==="routine"?"어떤 루틴인가요?":"무슨 목표인가요?") : (isProj?"프로젝트 이름":"무엇을 하나요?");
+  if(isP) selChips($("f_pkind"), type);
   if(tab==="work") selChips($("f_bucket"), type);
   if(tab==="work"){ $("shtitle").textContent = curCtx.id ? "업무 수정" : "새 업무"; }
-  else { const names={ task:"할일", appt:"약속" }; $("shtitle").textContent = (curCtx.id?"수정 · ":"새 ")+names[type]; }
+  else { const names={ task:"할일", appt:"약속", routine:"루틴", goal:"목표" }; $("shtitle").textContent = (curCtx.id?"수정 · ":"새 ")+names[type]; }
 }
 
-$("f_seg").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
+$("f_pkind").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
 $("f_bucket").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
 $("f_chip").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickChip=b.dataset.v; selChips($("f_chip"),pickChip); if(pickChip) $("f_date").value=""; });
 $("f_date").addEventListener("input", ()=>{ if($("f_date").value){ pickChip=""; selChips($("f_chip"),""); } });
@@ -628,8 +671,9 @@ function openForm(ctx){
   $("w_who").value = it && ctx.tab==="work" && it.who ? it.who : "";
   $("w_due").value = it && ctx.type==="deadline" && it.due ? it.due : "";
   $("w_time").value = it && ctx.type==="deadline" && it.dtime ? it.dtime : "";
-  pickWday = it && ctx.type==="recurring" && it.wday!=null ? String(it.wday) : ""; selChips($("f_wday"), pickWday);
+  pickWday = it && (ctx.type==="recurring"||ctx.type==="routine") && it.wday!=null ? String(it.wday) : ""; selChips($("f_wday"), pickWday);
   pickHope = it && ctx.type==="someday" && it.hope ? it.hope : ""; selChips($("f_hope"), pickHope);
+  $("g_target").value = it && ctx.type==="goal" && it.target ? it.target : "";
   draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
   configForm(); renderDraft(); updateSave();
   $("ov").classList.add("on"); setTimeout(()=>$("f_title").focus(), 50);
@@ -644,6 +688,8 @@ function buildItem(){
   const {tab,type}=curCtx, title=$("f_title").value.trim(), why=$("f_why").value.trim(), memo=$("f_memo").value.trim(), now=Date.now();
   if(tab==="personal"){
     if(type==="appt") return { type:"appt", title, memo, date:$("a_date").value, time:pickTbd==="tbd"?"":$("a_time").value, timeTBD:pickTbd==="tbd", who:$("a_who").value.trim(), place:$("a_place").value.trim(), updated:now };
+    if(type==="routine") return { type:"routine", title, memo, wday:pickWday, updated:now };
+    if(type==="goal") return { type:"goal", title, memo, target:(+$("g_target").value||30), updated:now };
     return { type:"task", title, why, memo, dueChip:pickChip, due:pickChip?"":$("f_date").value, updated:now };
   }
   if(type==="quick") return { bucket:"quick", title, memo, updated:now };
@@ -652,7 +698,7 @@ function buildItem(){
   if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
   if(type==="project") return { bucket:"project", title, desc:memo, subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
 }
-const KEYS = ["why","dueChip","due","date","time","timeTBD","who","place","dtime","wday","hope","memo","desc"];
+const KEYS = ["why","dueChip","due","date","time","timeTBD","who","place","dtime","wday","hope","target","memo","desc"];
 function saveForm(){
   if($("shsave").disabled) return;
   const data=buildItem();
@@ -673,6 +719,7 @@ function saveForm(){
     const base={ id:uid(), created:Date.now() };
     if(curCtx.tab==="personal" || ["quick","deadline","someday"].includes(curCtx.type)) base.done=false;
     if(curCtx.type==="project") base.subtasks=[];
+    if(curCtx.tab==="personal" && curCtx.type==="goal") base.claimed=[];
     const arr = curCtx.tab==="personal" ? STORE.personal : STORE.work[curCtx.type];
     arr.unshift(Object.assign(base, data));
   }
