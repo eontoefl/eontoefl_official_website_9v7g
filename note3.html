@@ -538,15 +538,15 @@ function personalView(){
   const items=STORE.personal;
   const goals = items.filter(i=>i.type==="goal");
   const routines = items.filter(i=>i.type==="routine");
-  const active = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) );
-  const fresh = items.filter(i=> i.type==="task" && freshDone(i) );
+  // 완료해도 오늘은 그 자리에 취소선만 (active에 freshDone 포함), 다음날 archived로
+  const active = items.filter(i=> (i.type==="task"&&!oldDone(i)) || (i.type==="appt"&&!apptPast(i)) );
+  const remaining = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) ).length;
   const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) );
-  const head='<div class="vhead"><span class="t">개인</span>'+(active.length?'<span class="c">'+active.length+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
+  const head='<div class="vhead"><span class="t">개인</span>'+(remaining?'<span class="c">'+remaining+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
   if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
   let html=head;
   if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">🎯</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
   html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
-  html += todaySection(fresh, personalCard, "personal");
   html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine","🔁","반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
   if(archived.length) html += '<div class="fold">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
   return html;
@@ -619,8 +619,6 @@ const WMETA = { quick:{ic:"⚡",name:"단발"}, deadline:{ic:"📌",name:"약속
 function workView(){
   let html='<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>';
   ["quick","deadline","project","someday"].forEach(k=>{ html += sectionHtml(k); });
-  // 오늘 한 것 (완료해도 오늘은 눈에 띄게)
-  html += todaySection(["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(freshDone)), workCard, "work");
   // 반복: 별도 접이식 참고 목록 (그날 뜨는 건 나중에 캘린더에서)
   const rec=STORE.work.recurring;
   html += '<div class="fold">'+foldHeader("recur","🔁","반복 업무", rec.length, "recurring")+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
@@ -631,7 +629,7 @@ function workView(){
 }
 function sectionHtml(key){
   const meta=WMETA[key], arr=STORE.work[key];
-  const items = key==="project" ? arr : arr.filter(x=>!x.done);
+  const items = key==="project" ? arr : arr.filter(x=>!oldDone(x));   // 오늘 완료는 그 자리에 취소선, 지난 완료만 아카이브로
   const h='<div class="wsec-h"><span class="ic">'+meta.ic+'</span>'+esc(meta.name)+'<span class="n">'+items.length+'</span><button class="secadd" type="button" data-add="'+key+'">+</button></div>';
   if(!items.length) return '<div class="wsec">'+h+'<div class="wsec-empty">비어 있음</div></div>';
   const cards = key==="project" ? items.map(projectCard).join("") : items.map(workCard).join("");
