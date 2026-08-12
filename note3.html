@@ -76,6 +76,8 @@
   .sweepbtn { margin-left:auto; border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:99px; padding:3px 11px; font-size:11.5px; font-weight:700; }
   .sweepbtn:hover { background:var(--surface-highest); }
   .today-done .card.done { opacity:.82; }
+  body.dragging-lock { user-select:none; -webkit-user-select:none; }
+  body.dragging-lock .sub .st { pointer-events:none; }
   .rangerow { display:flex; gap:.5rem; align-items:center; }
   .rangerow input { flex:1; min-width:0; }
   .rangerow .tilde { color:var(--on-surface-variant); flex-shrink:0; }
@@ -466,7 +468,7 @@ let TAB="personal";
 const TABNAME = { money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
 const openProjects = new Set();
 let fold = { recur:false, wdone:false, pdone:false, proutine:false };   // 접힘 상태 (기본 접힘)
-document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); }));
+document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); window.scrollTo({ top:0 }); }));
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===TAB));
   const v=$("view");
@@ -474,7 +476,6 @@ function render(){
   else if(TAB==="work"){ v.innerHTML=workView(); wireWork(); }
   else v.innerHTML=soonView(TABNAME[TAB]);
   wireBtns();
-  window.scrollTo({ top:0 });
 }
 function soonView(name){ return '<div class="soon"><div class="big">🧱</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
 
@@ -483,14 +484,16 @@ function enableDrag(container, arr, onDone){
   container.querySelectorAll(":scope > [data-id] > .drag, :scope > [data-id] > .proj-top > .drag").forEach(handle=>{
     handle.addEventListener("pointerdown", e=>{
       e.preventDefault(); const card=handle.closest("[data-id]"); if(!card) return;
-      card.classList.add("dragging"); let moved=false;
-      const move=ev=>{ moved=true; const others=[...container.querySelectorAll(":scope > [data-id]:not(.dragging)")]; let placed=false;
+      try { handle.setPointerCapture(e.pointerId); } catch(_){}   // 모든 이동 이벤트를 핸들로 (contenteditable 등이 가로채지 못하게)
+      card.classList.add("dragging"); document.body.classList.add("dragging-lock"); let moved=false;
+      const move=ev=>{ ev.preventDefault(); moved=true; const others=[...container.querySelectorAll(":scope > [data-id]:not(.dragging)")]; let placed=false;
         for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(card,o); placed=true; break; } } if(!placed) container.appendChild(card); };
-      const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); card.classList.remove("dragging");
+      const up=()=>{ handle.removeEventListener("pointermove",move); handle.removeEventListener("pointerup",up); handle.removeEventListener("pointercancel",up);
+        card.classList.remove("dragging"); document.body.classList.remove("dragging-lock");
         if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id);
           const inDom=ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); const rest=arr.filter(x=>!ids.includes(x.id));
           arr.length=0; arr.push(...inDom, ...rest); if(onDone) onDone(); else { save(); render(); } } };
-      document.addEventListener("pointermove",move); document.addEventListener("pointerup",up);
+      handle.addEventListener("pointermove",move); handle.addEventListener("pointerup",up); handle.addEventListener("pointercancel",up);
     });
   });
 }
@@ -700,8 +703,13 @@ function updateSave(){ const t=$("f_title").value.trim(); let ok=!!t; if(curCtx.
 let draftSubs=[];
 function renderDraft(){
   const el=$("draftsub"); if(!el) return;
-  el.innerHTML = draftSubs.map(s=>'<div class="sub" data-id="'+s.id+'"><span class="drag">⋮⋮</span><span class="st">'+esc(s.title)+'</span><button class="x" type="button" data-dsub="'+s.id+'">🗑</button></div>').join("");
+  el.innerHTML = draftSubs.map(s=>'<div class="sub" data-id="'+s.id+'"><span class="drag">⋮⋮</span><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-dsub="'+s.id+'">🗑</button></div>').join("");
   el.querySelectorAll("[data-dsub]").forEach(b=> b.addEventListener("click", ()=>{ const i=draftSubs.findIndex(x=>x.id===b.dataset.dsub); if(i>=0){ draftSubs.splice(i,1); renderDraft(); } }));
+  el.querySelectorAll(".sub .st").forEach(st=>{
+    const sid=st.closest("[data-id]").dataset.id;
+    st.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); st.blur(); } });
+    st.addEventListener("blur", ()=>{ const s=draftSubs.find(x=>x.id===sid); if(!s) return; const v=st.textContent.trim(); if(v) s.title=v; else st.textContent=s.title; });
+  });
   enableDrag(el, draftSubs, renderDraft);
 }
 function draftAdd(){ const inp=$("draftinput"); const t=(inp.value||"").trim(); if(!t) return; draftSubs.push({ id:uid(), title:t, done:false }); inp.value=""; renderDraft(); inp.focus(); }
