@@ -180,7 +180,7 @@
   .soon .d { font-size:13px; margin-top:.35rem; }
   .foot { text-align:center; font-size:11px; color:var(--on-surface-variant); opacity:.6; margin-top:2.5rem; }
   /* 홈 · 캘린더 */
-  .cal { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1rem; margin-bottom:1.5rem; }
+  .hcal { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1rem; margin-bottom:1.5rem; }
   .calhead { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px; }
   .calhead div { text-align:center; font-size:10px; font-weight:700; color:var(--on-surface-variant); }
   .calhead .sun { color:var(--danger); }
@@ -692,7 +692,7 @@ function homeCalendar(){
     cells+='<div class="calcell'+(isT?' today':'')+(d<today?' past':'')+(ev.length?' has':'')+'"><div class="caldd">'+(+d.slice(8))+'</div>'+
       ev.map(x=>'<div class="calev">'+svi(x.ic)+' <span>'+esc(x.t)+'</span></div>').join("")+'</div>';
   }
-  return '<div class="cal"><div class="calhead">'+wk.map((w,i)=>'<div'+(i===0?' class="sun"':'')+'>'+w+'</div>').join("")+'</div><div class="calgrid">'+cells+'</div></div>';
+  return '<div class="hcal"><div class="calhead">'+wk.map((w,i)=>'<div'+(i===0?' class="sun"':'')+'>'+w+'</div>').join("")+'</div><div class="calgrid">'+cells+'</div></div>';
 }
 function homeDayCard(label, D, withQuick){
   let ev=[];
