@@ -269,6 +269,8 @@
   .ledger-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.7; padding:.3rem .3rem .2rem; }
   .fld input[type=number] { width:100%; background:var(--field); border:none; border-radius:var(--r); padding:12px 14px; font-family:inherit; font-size:15px; color:var(--on-surface); outline:none; }
   .fld input[type=number]:focus { outline:2px solid var(--accent-line); }
+  .fld select { width:100%; background:var(--field); border:none; border-radius:var(--r); padding:12px 38px 12px 14px; font-family:inherit; font-size:15px; color:var(--on-surface); outline:none; -webkit-appearance:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236d6270' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; }
+  .fld select:focus { outline:2px solid var(--accent-line); }
   .swatches { display:flex; flex-wrap:wrap; gap:.55rem; }
   .swatch { width:30px; height:30px; border-radius:50%; cursor:pointer; position:relative; box-shadow:inset 0 0 0 1px rgba(0,0,0,.05); }
   .swatch.on::after { content:""; position:absolute; inset:-4px; border-radius:50%; box-shadow:0 0 0 2px var(--accent-strong); }
@@ -436,7 +438,37 @@
 <div class="ov" id="ovacct"><div class="sheet">
   <h3 id="acctTitle">새 계좌</h3>
   <div class="fld"><label>별칭</label><input type="text" id="ac_alias" placeholder="예: 사업 주거래" autocomplete="off"></div>
-  <div class="fld"><label>은행명 (선택)</label><input type="text" id="ac_bank" placeholder="예: 국민은행" autocomplete="off"></div>
+  <div class="fld"><label>은행 (선택)</label>
+    <select id="ac_bank">
+      <option value="">은행 선택</option>
+      <option>국민은행</option>
+      <option>신한은행</option>
+      <option>우리은행</option>
+      <option>하나은행</option>
+      <option>NH농협은행</option>
+      <option>IBK기업은행</option>
+      <option>카카오뱅크</option>
+      <option>토스뱅크</option>
+      <option>케이뱅크</option>
+      <option>SC제일은행</option>
+      <option>씨티은행</option>
+      <option>산업은행</option>
+      <option>수협은행</option>
+      <option>새마을금고</option>
+      <option>신협</option>
+      <option>우체국</option>
+      <option>부산은행</option>
+      <option>대구은행(iM뱅크)</option>
+      <option>경남은행</option>
+      <option>광주은행</option>
+      <option>전북은행</option>
+      <option>제주은행</option>
+      <option>카카오페이</option>
+      <option>네이버페이</option>
+      <option>토스</option>
+      <option>페이팔(PayPal)</option>
+      <option>기타</option>
+    </select></div>
   <div class="fld"><label>계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
   <div class="fld"><label>시작 잔액 (원)</label><input type="number" id="ac_start" placeholder="0" inputmode="numeric"></div>
   <div class="fld"><label>색상</label><div class="swatches" id="ac_colors"></div></div>
@@ -1110,7 +1142,10 @@ function openAcct(id){
   mAcctEdit=id; const a=id?findAcct(id):null;
   $("acctTitle").textContent=id?"계좌 수정":"새 계좌";
   $("ac_alias").value=a?(a.alias||""):"";
-  $("ac_bank").value=a?(a.bank||""):"";
+  const bankSel=$("ac_bank"), bv=a?(a.bank||""):"";
+  [...bankSel.querySelectorAll("option[data-custom]")].forEach(o=>o.remove());
+  if(bv && ![...bankSel.options].some(o=>o.value===bv)){ const o=document.createElement("option"); o.value=bv; o.textContent=bv; o.dataset.custom="1"; bankSel.appendChild(o); }
+  bankSel.value=bv;
   $("ac_num").value=a?(a.num||""):"";
   $("ac_start").value=a&&(a.startBalance||a.startBalance===0)?a.startBalance:"";
   mAcctColor=a&&a.color?a.color:ACCT_COLORS[STORE.money.accounts.length%ACCT_COLORS.length];
