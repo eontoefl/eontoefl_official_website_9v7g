@@ -73,8 +73,6 @@
   .wsec-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.6; padding:.2rem 0 .2rem .3rem; }
   .secadd { border:none; background:var(--surface-high); color:var(--on-surface-variant); width:22px; height:22px; border-radius:99px; font-size:15px; font-weight:700; line-height:1; padding:0; }
   .secadd:hover { background:var(--accent-soft); color:var(--accent-ink); }
-  .sweepbtn { margin-left:auto; border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:99px; padding:3px 11px; font-size:11.5px; font-weight:700; }
-  .sweepbtn:hover { background:var(--surface-highest); }
   .today-done .card.done { opacity:.82; }
   body.dragging-lock { user-select:none; -webkit-user-select:none; }
   body.dragging-lock .sub .st { pointer-events:none; }
@@ -517,20 +515,8 @@ const dragH = '<span class="drag" title="드래그해서 순서 이동">⋮⋮</
 const actsH = '<div class="acts"><button type="button" data-act="edit" title="수정">✎</button><button type="button" class="del" data-act="del" title="삭제">🗑</button></div>';
 function foldHeader(key, ic, label, n, addBucket){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span>'+(addBucket?'<button class="secadd" type="button" data-add="'+addBucket+'" data-addtab="work">+</button>':'')+'<span class="chev">'+(fold[key]?'▾':'▸')+'</span></div>'; }
 function wireFolds(){ document.querySelectorAll("#view [data-fold]").forEach(h=> h.addEventListener("click", ()=>{ fold[h.dataset.fold]=!fold[h.dataset.fold]; render(); })); }
-/* '오늘 한 것' 섹션 (완료해도 오늘은 눈에 띄게 남아서 뿌듯 → 다음날 자동으로 아카이브) */
-function todaySection(items, cardFn, tab){
-  if(!items.length) return "";
-  return '<div class="wsec"><div class="wsec-h"><span class="ic">✅</span>오늘 한 것<span class="n">'+items.length+'</span><button class="sweepbtn" type="button" data-sweep="'+tab+'">지금 정리</button></div><div class="list today-done">'+items.map(cardFn).join("")+'</div></div>';
-}
-function sweepToday(tab){
-  const mark = it => { if(freshDone(it)) it.swept=true; };
-  if(tab==="work"){ ["quick","deadline","someday"].forEach(k=>STORE.work[k].forEach(mark)); }
-  else { STORE.personal.forEach(mark); }
-  save(); render();
-}
 function wireBtns(){
   document.querySelectorAll("#view [data-add]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); openForm({ tab:(b.dataset.addtab||"work"), type:b.dataset.add, id:null }); }));
-  document.querySelectorAll("#view [data-sweep]").forEach(b=> b.addEventListener("click", ()=>sweepToday(b.dataset.sweep)));
 }
 
 /* ═══ 개인 탭 ═══ */
