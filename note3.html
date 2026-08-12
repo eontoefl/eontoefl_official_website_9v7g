@@ -185,7 +185,7 @@
   .calhead div { text-align:center; font-size:10px; font-weight:700; color:var(--on-surface-variant); }
   .calhead .sun { color:var(--danger); }
   .calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
-  .calcell { min-height:60px; background:var(--surface-low); border-radius:var(--r); padding:4px 5px; display:flex; flex-direction:column; gap:2px; align-self:start; }
+  .calcell { min-height:60px; background:var(--surface-low); border-radius:var(--r); padding:4px 5px; display:flex; flex-direction:column; gap:2px; }
   .calcell.today { background:#e3f3fb; box-shadow:inset 0 0 0 2px var(--accent-line); }
   .calcell.past { opacity:.5; }
   .caldd { font-size:11px; font-weight:700; color:var(--on-surface-variant); }
@@ -193,7 +193,7 @@
   .calev { font-size:9px; line-height:1.35; color:var(--on-surface); word-break:break-word; display:flex; align-items:baseline; gap:2px; }
   .calev .svic { width:9px; height:9px; }
   @media (max-width:620px){ .calcell { min-height:34px; padding:3px; } .calev { font-size:8px; } }
-  .calgrid { align-items:start; }
+  .calgrid { align-items:stretch; }
   .hcols { display:grid; grid-template-columns:1fr; gap:1rem; }
   @media (min-width:640px){ .hcols { grid-template-columns:1fr 1fr; } }
   .hcard { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1.1rem 1.2rem; }
@@ -694,19 +694,19 @@ function homeCalendar(){
   }
   return '<div class="hcal"><div class="calhead">'+wk.map((w,i)=>'<div'+(i===0?' class="sun"':'')+'>'+w+'</div>').join("")+'</div><div class="calgrid">'+cells+'</div></div>';
 }
-function homeDayCard(label, D, withQuick){
+function homeDayCard(label, D){
+  // 김비서 소환 전 — 규칙이 확실한 루틴만 자동 표시. 나머지(단발·약속·마감 등)는 소환해야 큐레이션됨.
   let ev=[];
-  if(D===todayStr()) STORE.work.deadline.forEach(it=>{ if(!it.done && it.due && it.due<D) ev.push({ ic:"alert", danger:true, t:it.title+" (마감 지남)" }); });
-  ev = ev.concat(itemsForDate(D));
-  if(withQuick) STORE.work.quick.filter(x=>!x.done).forEach(it=> ev.push({ ic:"bolt", t:it.title }));
-  const body = ev.length ? '<div class="hlist">'+ev.map(x=>'<div class="hitem"><span class="hic">'+svi(x.ic, x.danger?'danger':'')+'</span><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</div>').join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .2rem">비어 있음</div>';
+  STORE.personal.forEach(it=>{ if(it.type==="routine" && recurOnDate(it,D)) ev.push({ ic:"repeat", t:it.title }); });
+  STORE.work.recurring.forEach(it=>{ if(recurOnDate(it,D)) ev.push({ ic:"repeat", t:it.title }); });
+  const body = ev.length ? '<div class="hlist">'+ev.map(x=>'<div class="hitem"><span class="hic">'+svi(x.ic, x.danger?'danger':'')+'</span><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</div>').join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .2rem">루틴 없음 · 김비서 소환 전</div>';
   return '<div class="hcard"><div class="hcard-h">'+esc(label)+'</div>'+body+'</div>';
 }
 function homeView(){
   const today=todayStr(), tmr=shiftDay(today,1);
   return '<div class="vhead"><span class="t">홈</span><span class="c">'+fmtD(today)+'</span></div>'+
     homeCalendar()+
-    '<div class="hcols">'+homeDayCard("오늘 · "+fmtD(today), today, true)+homeDayCard("내일 · "+fmtD(tmr), tmr, false)+'</div>';
+    '<div class="hcols">'+homeDayCard("오늘 · "+fmtD(today), today)+homeDayCard("내일 · "+fmtD(tmr), tmr)+'</div>';
 }
 function personalCard(it){
   if(it.type==="appt"){
