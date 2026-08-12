@@ -243,11 +243,14 @@
   .acct-top { display:flex; align-items:center; gap:.6rem; padding:.9rem 1rem .9rem .75rem; }
   .acct-top .drag { align-self:center; }
   .acct-body { flex:1; min-width:0; cursor:pointer; }
-  .acct-alias { font-size:15px; font-weight:700; color:var(--on-surface); }
+  .acct-alias { font-size:15px; font-weight:700; color:var(--on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .acct-alias .svic { width:15px; height:15px; color:var(--on-surface-variant); vertical-align:-.15em; }
-  .acct-sub { font-size:12px; color:var(--on-surface-variant); margin-top:1px; word-break:break-all; }
-  .acct-bal { font-size:15px; font-weight:800; color:var(--on-surface); white-space:nowrap; }
+  .acct-sub { font-size:12px; color:var(--on-surface-variant); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .acct-bal { font-size:15px; font-weight:800; color:var(--on-surface); white-space:nowrap; text-align:right; }
   .acct-bal.neg { color:var(--danger); }
+  .acct-bal.stmt { color:var(--danger); }
+  .acct-bal .bal-lbl { display:block; font-size:9.5px; font-weight:700; letter-spacing:.02em; color:var(--on-surface-variant); margin-bottom:1px; }
+  .kind-tag { display:inline-block; font-size:9.5px; font-weight:700; color:var(--plum); background:var(--surface-high); border-radius:99px; padding:1px 7px; vertical-align:middle; }
   .mcard .acts { display:flex; align-items:center; gap:.1rem; flex-shrink:0; }
   .mcard .acts button { border:none; background:transparent; color:var(--on-surface-variant); width:30px; height:30px; border-radius:var(--r); display:grid; place-items:center; cursor:pointer; }
   .mcard .acts button:hover { background:var(--surface-high); }
@@ -455,40 +458,22 @@
 <!-- 계좌 폼 -->
 <div class="ov" id="ovacct"><div class="sheet">
   <h3 id="acctTitle">새 계좌</h3>
+  <div class="seg" id="ac_kind">
+    <button type="button" data-v="account" class="on">계좌</button>
+    <button type="button" data-v="card">신용카드</button>
+  </div>
   <div class="fld"><label>별칭</label><input type="text" id="ac_alias" placeholder="예: 사업 주거래" lang="ko" autocomplete="off"></div>
-  <div class="fld"><label>은행 (선택)</label>
-    <select id="ac_bank">
-      <option value="">은행 선택</option>
-      <option>국민은행</option>
-      <option>신한은행</option>
-      <option>우리은행</option>
-      <option>하나은행</option>
-      <option>NH농협은행</option>
-      <option>IBK기업은행</option>
-      <option>카카오뱅크</option>
-      <option>토스뱅크</option>
-      <option>케이뱅크</option>
-      <option>SC제일은행</option>
-      <option>씨티은행</option>
-      <option>산업은행</option>
-      <option>수협은행</option>
-      <option>새마을금고</option>
-      <option>신협</option>
-      <option>우체국</option>
-      <option>부산은행</option>
-      <option>대구은행(iM뱅크)</option>
-      <option>경남은행</option>
-      <option>광주은행</option>
-      <option>전북은행</option>
-      <option>제주은행</option>
-      <option>카카오페이</option>
-      <option>네이버페이</option>
-      <option>토스</option>
-      <option>페이팔(PayPal)</option>
-      <option>기타</option>
-    </select></div>
-  <div class="fld"><label>계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
-  <div class="fld"><label>시작 잔액 (원)</label><input type="text" id="ac_start" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld"><label id="ac_bankLbl">은행 (선택)</label><select id="ac_bank"></select></div>
+  <div class="fld"><label id="ac_numLbl">계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
+  <div class="fld" id="ac_startFld"><label>시작 잔액 (원)</label><input type="text" id="ac_start" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div id="ac_cardBlk">
+    <div class="fld"><label>매달 결제일</label><input type="number" id="ac_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"></div>
+    <div class="fld"><label>출금 계좌</label><select id="ac_payacct"></select></div>
+    <div class="fld"><label>청구 기간 (며칠 ~ 며칠 사용분)</label>
+      <div class="rangerow"><input type="number" id="ac_cyc1" min="1" max="31" placeholder="시작일" inputmode="numeric"><span class="tilde">~</span><input type="number" id="ac_cyc2" min="1" max="31" placeholder="종료일" inputmode="numeric"></div>
+      <div class="hint">예: 1 ~ 31 이면 그 달 1일~말일 사용분. 비워두면 이번 달(1일~말일) 기준.</div>
+    </div>
+  </div>
   <div class="fld"><label>색상</label><div class="swatches" id="ac_colors"></div></div>
   <div class="row">
     <button type="button" class="cancel" id="acctDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
@@ -690,7 +675,7 @@ function normalizeStore(){
   if(!STORE.money || typeof STORE.money!=="object" || Array.isArray(STORE.money)) STORE.money={ accounts:[] };
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
-  STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; });
+  STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; });
 }
 
 /* ── 자동 버전 스냅샷 (별도 행 snap-<시각>, 최근 SNAP_KEEP개 유지) ── */
@@ -1123,6 +1108,27 @@ function saveForm(){
 
 /* ═══ 돈관리 (계좌 + 거래, 잔액은 원화 기준) ═══ */
 const ACCT_COLORS = ["#F6A6A6","#F7C08A","#F3DE8A","#CDE88A","#A6E0A6","#8FE0D2","#8FD3F0","#9FB8F5","#B3A6F0","#D0A6EE","#F0A6D8","#F5A6BE"];
+const BANKS = ["국민은행","신한은행","우리은행","하나은행","NH농협은행","IBK기업은행","카카오뱅크","토스뱅크","케이뱅크","SC제일은행","씨티은행","산업은행","수협은행","새마을금고","신협","우체국","부산은행","대구은행(iM뱅크)","경남은행","광주은행","전북은행","제주은행","카카오페이","네이버페이","토스","페이팔(PayPal)","기타"];
+const CARDCOS = ["신한카드","삼성카드","현대카드","KB국민카드","롯데카드","우리카드","하나카드","BC카드","NH농협카드","IBK기업카드","씨티카드","카카오뱅크 카드","토스 카드","기타"];
+// 신용카드 청구 주기: cs~ce(매달 일자)로 오늘이 속한 청구기간 [시작일, 종료일] 반환. 미설정이면 이번 달(1일~말일).
+function ymd(y,m,day){ const last=new Date(y,m,0).getDate(); const d=Math.min(day,last); return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"); }
+function cardCycleBounds(card, todayS){
+  const cs=+card.cycleStart||0, ce=+card.cycleEnd||0;
+  const [Y,M]=todayS.split("-").map(Number);
+  if(!cs||!ce) return [ymd(Y,M,1), ymd(Y,M,31)];
+  const prev=(y,m)=> m-1>=1?[y,m-1]:[y-1,12], next=(y,m)=> m+1<=12?[y,m+1]:[y+1,1];
+  if(cs<=ce){
+    let s=ymd(Y,M,cs), e=ymd(Y,M,ce);
+    if(todayS<s){ const [py,pm]=prev(Y,M); s=ymd(py,pm,cs); e=ymd(py,pm,ce); }
+    else if(todayS>e){ const [ny,nm]=next(Y,M); s=ymd(ny,nm,cs); e=ymd(ny,nm,ce); }
+    return [s,e];
+  } else {
+    const eThis=ymd(Y,M,ce);
+    if(todayS<=eThis){ const [py,pm]=prev(Y,M); return [ymd(py,pm,cs), eThis]; }
+    const [ny,nm]=next(Y,M); return [ymd(Y,M,cs), ymd(ny,nm,ce)];
+  }
+}
+function cardStatement(card){ const [s,e]=cardCycleBounds(card, todayStr()); return (card.tx||[]).filter(t=>t.date>=s && t.date<=e).reduce((sum,t)=>sum+(t.dir==="out"?1:-1)*mnum(t.krw),0); }
 const CUR = { KRW:{sym:"₩",dec:0}, USD:{sym:"$",dec:2}, EUR:{sym:"€",dec:2} };
 const mnum = v => { const n=parseFloat(String(v==null?"":v).replace(/[^0-9.\-]/g,"")); return isFinite(n)?n:0; };
 function fmtMoney(v, cur){ const c=CUR[cur]||CUR.KRW; return c.sym + mnum(v).toLocaleString("ko-KR",{ minimumFractionDigits:c.dec, maximumFractionDigits:c.dec }); }
@@ -1152,17 +1158,26 @@ function moneyView(){
   const accts=STORE.money.accounts;
   let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn" id="acctAdd" type="button">+ 계좌</button></div>';
   if(!accts.length) return html+'<div class="empty">아직 계좌가 없어요.<br><b>+ 계좌</b>로 첫 계좌를 등록해 보세요.</div>';
-  const total=accts.reduce((s,a)=>s+acctBalance(a),0);
+  const total=accts.filter(a=>a.kind!=="card").reduce((s,a)=>s+acctBalance(a),0);
   html+='<div class="mtotal">전체 잔액<b>'+fmtMoney(total,"KRW")+'</b></div><div id="acctList">';
   accts.forEach(acc=>{
-    const open=openAccounts.has(acc.id), bal=acctBalance(acc);
-    const sub=[acc.bank,acc.num].filter(Boolean).join(" · ");
+    const open=openAccounts.has(acc.id), isCard=acc.kind==="card";
+    let rightHtml, sub;
+    if(isCard){
+      const stmt=cardStatement(acc), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
+      rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 청구분</span>'+fmtMoney(stmt,"KRW")+'</div>';
+      sub=["카드", acc.payDay?(acc.payDay+"일 결제"):"", payAcc?(esc(payAcc.alias)+" 출금"):""].filter(Boolean).join(" · ");
+    } else {
+      const bal=acctBalance(acc);
+      rightHtml='<div class="acct-bal'+(bal<0?' neg':'')+'">'+fmtMoney(bal,"KRW")+'</div>';
+      sub=[esc(acc.bank),esc(acc.num)].filter(Boolean).join(" · ");
+    }
     html+='<div class="mcard acct" data-id="'+acc.id+'" style="--ac:'+esc(acc.color||"#ccc")+'"><div class="acct-top">'+dragH+
-      '<div class="acct-body" data-act="toggle"><div class="acct-alias">'+esc(acc.alias||"계좌")+' '+svi(open?"chevD":"chevR")+'</div>'+(sub?'<div class="acct-sub">'+esc(sub)+'</div>':'')+'</div>'+
-      '<div class="acct-bal'+(bal<0?' neg':'')+'">'+fmtMoney(bal,"KRW")+'</div>'+
-      '<div class="acts"><button type="button" data-act="addtx" title="거래 추가">'+svi('plus')+'</button><button type="button" data-act="edit" title="계좌 수정">'+svi('edit')+'</button></div></div>';
+      '<div class="acct-body" data-act="toggle"><div class="acct-alias">'+esc(acc.alias||"계좌")+' '+svi(open?"chevD":"chevR")+'</div>'+(sub?'<div class="acct-sub">'+sub+'</div>':'')+'</div>'+
+      rightHtml+
+      '<div class="acts"><button type="button" data-act="addtx" title="'+(isCard?'사용 추가':'거래 추가')+'">'+svi('plus')+'</button><button type="button" data-act="edit" title="수정">'+svi('edit')+'</button></div></div>';
     if(open){
-      html+='<div class="ledger">'+ledgerHtml(acc)+'<button class="txadd" type="button" data-txadd="'+acc.id+'">+ 거래 추가</button></div>';
+      html+='<div class="ledger">'+ledgerHtml(acc)+'<button class="txadd" type="button" data-txadd="'+acc.id+'">+ '+(isCard?'사용 내역':'거래')+' 추가</button></div>';
     }
     html+='</div>';
   });
@@ -1188,9 +1203,11 @@ function fixedSectionHtml(){
 }
 function fmtDayLabel(s){ if(!s) return "날짜없음"; const p=String(s).split("-"); if(p.length<3) return s; const d=new Date(s+"T12:00:00"); return (+p[1])+"/"+(+p[2])+'<span>'+DOW[d.getDay()]+'</span>'; }
 function ledgerHtml(acc){
-  const rows=ledgerRows(acc);
-  if(!rows.length) return '<div class="ledger-empty">아직 거래가 없어요.</div>';
-  const disp=rows.slice().reverse();   // 최신 날짜 위로
+  const isCard=acc.kind==="card";
+  const disp = isCard
+    ? (acc.tx||[]).slice().sort((a,b)=> a.date<b.date?1 : a.date>b.date?-1 : (b.created||0)-(a.created||0)).map(t=>({t, bal:null}))
+    : ledgerRows(acc).slice().reverse();   // 계좌: 누적잔액 포함, 최신 위로
+  if(!disp.length) return '<div class="ledger-empty">'+(isCard?"아직 사용 내역이 없어요.":"아직 거래가 없어요.")+'</div>';
   let html="", cur=null;
   disp.forEach(r=>{
     if(r.t.date!==cur){
@@ -1207,8 +1224,9 @@ function txRowHtml(acctId, r){
   const t=r.t, sign=t.dir==="in"?"+":"−", foreign=t.cur&&t.cur!=="KRW";
   const amtMain=sign+(foreign?fmtMoney(t.famount,t.cur):fmtMoney(t.krw,"KRW"));
   const krwTag=foreign?'<span class="tx-krw">'+fmtMoney(t.krw,"KRW")+'</span>':'';
+  const balHtml=(r.bal==null)?"":'<div class="tx-bal">'+fmtMoney(r.bal,"KRW")+'</div>';
   return '<div class="txrow" data-acct="'+acctId+'" data-tx="'+t.id+'"><div class="tx-l"><div class="tx-desc">'+esc(t.desc||"(내역 없음)")+'</div>'+(t.note?'<div class="tx-meta">'+esc(t.note)+'</div>':'')+'</div>'+
-    '<div class="tx-r"><div class="tx-amt '+(t.dir==="in"?"in":"out")+'">'+amtMain+krwTag+'</div><div class="tx-bal">'+fmtMoney(r.bal,"KRW")+'</div></div></div>';
+    '<div class="tx-r"><div class="tx-amt '+(t.dir==="in"?"in":"out")+'">'+amtMain+krwTag+'</div>'+balHtml+'</div></div>';
 }
 function wireMoney(){
   const add=$("acctAdd"); if(add) add.addEventListener("click",()=>openAcct(null));
@@ -1227,29 +1245,63 @@ function actAcct(id, act){
 }
 
 /* 계좌 폼 */
-let mAcctEdit=null, mAcctColor=ACCT_COLORS[0];
+let mAcctEdit=null, mAcctColor=ACCT_COLORS[0], mAcctKind="account";
 function renderSwatches(){ $("ac_colors").innerHTML=ACCT_COLORS.map(c=>'<span class="swatch'+(c===mAcctColor?' on':'')+'" data-color="'+c+'" style="background:'+c+'"></span>').join(""); }
+function fillIssuer(kind, selected){
+  const list=kind==="card"?CARDCOS:BANKS, cur=selected||"";
+  $("ac_bank").innerHTML='<option value="">'+(kind==="card"?"카드사 선택":"은행 선택")+'</option>'+list.map(b=>'<option>'+esc(b)+'</option>').join("");
+  if(cur && !list.includes(cur)){ const o=document.createElement("option"); o.value=cur; o.textContent=cur; $("ac_bank").appendChild(o); }
+  $("ac_bank").value=cur;
+}
+function fillPayAccts(selected){
+  $("ac_payacct").innerHTML=['<option value="">미지정</option>'].concat(STORE.money.accounts.filter(a=>a.kind!=="card" && a.id!==mAcctEdit).map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>')).join("");
+  $("ac_payacct").value=selected||"";
+}
+function acKindUpdate(kind){
+  const card=kind==="card";
+  $("ac_startFld").style.display=card?"none":"";
+  $("ac_cardBlk").style.display=card?"":"none";
+  $("ac_bankLbl").textContent=card?"카드사 (선택)":"은행 (선택)";
+  $("ac_numLbl").textContent=card?"카드번호 (선택)":"계좌번호 (선택)";
+  $("ac_num").placeholder=card?"예: 1234-****-****-5678":"예: 123-45-678900";
+  fillIssuer(kind, $("ac_bank").value);
+  if(card) fillPayAccts($("ac_payacct").value);
+}
 function openAcct(id){
   mAcctEdit=id; const a=id?findAcct(id):null;
-  $("acctTitle").textContent=id?"계좌 수정":"새 계좌";
+  mAcctKind=a?(a.kind||"account"):"account";
+  selChips($("ac_kind"), mAcctKind);
+  const kName=mAcctKind==="card"?"신용카드":"계좌";
+  $("acctTitle").textContent=id?(kName+" 수정"):("새 "+kName);
   $("ac_alias").value=a?(a.alias||""):"";
-  const bankSel=$("ac_bank"), bv=a?(a.bank||""):"";
-  [...bankSel.querySelectorAll("option[data-custom]")].forEach(o=>o.remove());
-  if(bv && ![...bankSel.options].some(o=>o.value===bv)){ const o=document.createElement("option"); o.value=bv; o.textContent=bv; o.dataset.custom="1"; bankSel.appendChild(o); }
-  bankSel.value=bv;
+  fillIssuer(mAcctKind, a?(a.bank||""):"");
   $("ac_num").value=a?(a.num||""):"";
   $("ac_start").value=a&&(a.startBalance||a.startBalance===0)?commaFmt(String(a.startBalance)):"";
+  $("ac_payday").value=a&&a.payDay?a.payDay:"";
+  fillPayAccts(a?(a.payAcctId||""):"");
+  $("ac_cyc1").value=a&&a.cycleStart?a.cycleStart:"";
+  $("ac_cyc2").value=a&&a.cycleEnd?a.cycleEnd:"";
   mAcctColor=a&&a.color?a.color:ACCT_COLORS[STORE.money.accounts.length%ACCT_COLORS.length];
   renderSwatches();
+  acKindUpdate(mAcctKind);
   $("acctDelete").style.display=id?"":"none";
   $("ovacct").classList.add("on"); setTimeout(()=>$("ac_alias").focus(),50);
 }
 function closeAcct(){ $("ovacct").classList.remove("on"); mAcctEdit=null; }
 function saveAcct(){
   const alias=$("ac_alias").value.trim(); if(!alias){ $("ac_alias").focus(); return; }
-  const data={ alias, bank:$("ac_bank").value.trim(), num:$("ac_num").value.trim(), startBalance:mnum($("ac_start").value), color:mAcctColor };
-  if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a) Object.assign(a, data, { updated:Date.now() }); }
-  else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[] }, data); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
+  const base={ kind:mAcctKind, alias, bank:$("ac_bank").value.trim(), num:$("ac_num").value.trim(), color:mAcctColor };
+  if(mAcctKind==="card"){
+    const pd=parseInt($("ac_payday").value,10); base.payDay=(isFinite(pd)&&pd>=1)?Math.min(31,pd):null;
+    base.payAcctId=$("ac_payacct").value||"";
+    const c1=parseInt($("ac_cyc1").value,10), c2=parseInt($("ac_cyc2").value,10);
+    base.cycleStart=(isFinite(c1)&&c1>=1)?Math.min(31,c1):null;
+    base.cycleEnd=(isFinite(c2)&&c2>=1)?Math.min(31,c2):null;
+  } else {
+    base.startBalance=mnum($("ac_start").value);
+  }
+  if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ ["startBalance","payDay","payAcctId","cycleStart","cycleEnd"].forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; } }
+  else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
   closeAcct(); save(); render();
 }
 function delAcct(){
@@ -1270,8 +1322,10 @@ function txCurUpdate(){
 function openTx(acctId, txId){
   const a=findAcct(acctId); if(!a) return;
   mTxAcct=acctId; mTxEdit=txId||null;
-  const t=txId?(a.tx||[]).find(x=>x.id===txId):null;
-  $("txTitle").textContent=txId?"거래 수정":"새 거래";
+  const t=txId?(a.tx||[]).find(x=>x.id===txId):null, isCard=a.kind==="card";
+  $("txTitle").textContent=(txId?"수정 · ":"새 ")+(isCard?"카드 사용":"거래");
+  $("tx_dir").querySelector('[data-v="in"]').textContent=isCard?"+ 취소/환급":"+ 입금";
+  $("tx_dir").querySelector('[data-v="out"]').textContent=isCard?"− 사용":"− 출금";
   $("tx_date").value=t?t.date:todayStr();
   mTxDir=t?(t.dir||"out"):"out"; selChips($("tx_dir"),mTxDir);
   $("tx_desc").value=t?(t.desc||""):"";
@@ -1341,6 +1395,7 @@ $("acctSave").addEventListener("click", saveAcct);
 $("acctDelete").addEventListener("click", delAcct);
 overlayDismiss("ovacct", closeAcct);
 $("ac_colors").addEventListener("click", e=>{ const s=e.target.closest("[data-color]"); if(!s) return; mAcctColor=s.dataset.color; renderSwatches(); });
+$("ac_kind").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mAcctKind=b.dataset.v; selChips($("ac_kind"),mAcctKind); const kn=mAcctKind==="card"?"신용카드":"계좌"; $("acctTitle").textContent=mAcctEdit?(kn+" 수정"):("새 "+kn); acKindUpdate(mAcctKind); });
 $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
