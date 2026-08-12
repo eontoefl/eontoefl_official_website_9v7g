@@ -255,8 +255,8 @@
   .ledger { padding:.1rem .9rem 1rem; }
   .daygroup { display:flex; gap:.7rem; padding:.15rem 0; }
   .daygroup + .daygroup { border-top:1px solid var(--surface-container); }
-  .day-label { flex:0 0 42px; font-size:11.5px; font-weight:700; color:var(--on-surface-variant); padding-top:.85rem; line-height:1.2; }
-  .day-label span { display:block; font-size:10px; font-weight:600; opacity:.75; margin-top:1px; }
+  .day-label { flex:0 0 auto; min-width:52px; white-space:nowrap; font-size:11.5px; font-weight:700; color:var(--on-surface-variant); padding-top:.85rem; line-height:1.2; }
+  .day-label span { font-size:10px; font-weight:600; opacity:.75; margin-left:3px; }
   .day-txs { flex:1; min-width:0; }
   .txrow { display:flex; align-items:center; gap:.7rem; padding:.6rem .3rem; border-radius:var(--r); cursor:pointer; }
   .txrow:hover { background:var(--surface-low); }
