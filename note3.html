@@ -272,6 +272,19 @@
   .txadd { width:100%; border:none; background:var(--surface-low); color:var(--accent-strong); border-radius:var(--r); padding:9px; font-size:13px; font-weight:700; margin-top:.5rem; cursor:pointer; }
   .txadd:hover { background:var(--surface-high); }
   .ledger-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.7; padding:.3rem .3rem .2rem; }
+  .msec { margin-top:1.7rem; }
+  .msec-h { display:flex; align-items:center; gap:.6rem; margin:0 .15rem .75rem; }
+  .msec-h .mt { font-size:16px; font-weight:800; color:var(--on-surface); }
+  .msec-total { font-size:12.5px; font-weight:700; color:var(--on-surface-variant); }
+  .secadd-btn { margin-left:auto; border:none; border-radius:var(--r); background:var(--sgrad); color:#fff; padding:7px 13px; font-size:12.5px; font-weight:700; box-shadow:var(--lift); cursor:pointer; }
+  .fixlist { display:flex; flex-direction:column; gap:.5rem; }
+  .fixrow { display:flex; align-items:center; gap:.7rem; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:.85rem .9rem; cursor:pointer; transition:box-shadow .15s; }
+  .fixrow:hover { box-shadow:var(--lift-hi); }
+  .fix-day { flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--accent-strong); background:var(--accent-lightest); border-radius:99px; padding:4px 10px; white-space:nowrap; }
+  .fix-body { flex:1; min-width:0; }
+  .fix-desc { font-size:14px; font-weight:600; color:var(--on-surface); word-break:break-word; }
+  .fix-sub { font-size:11.5px; color:var(--on-surface-variant); margin-top:1px; word-break:break-word; }
+  .fix-amt { font-size:14px; font-weight:700; color:var(--danger); white-space:nowrap; flex-shrink:0; text-align:right; }
   .fld input[type=number] { width:100%; background:var(--field); border:none; border-radius:var(--r); padding:12px 14px; font-family:inherit; font-size:15px; color:var(--on-surface); outline:none; }
   .fld input[type=number]:focus { outline:2px solid var(--accent-line); }
   .fld select { width:100%; background:var(--field); border:none; border-radius:var(--r); padding:12px 38px 12px 14px; font-family:inherit; font-size:15px; color:var(--on-surface); outline:none; -webkit-appearance:none; appearance:none; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236d6270' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; }
@@ -512,6 +525,29 @@
   </div>
 </div></div>
 
+<!-- 고정비 폼 -->
+<div class="ov" id="ovfix"><div class="sheet">
+  <h3 id="fixTitle">새 고정비</h3>
+  <div class="fld"><label>매달 며칠</label><input type="number" id="fx_day" min="1" max="31" placeholder="예: 15" inputmode="numeric"></div>
+  <div class="fld"><label>내역</label><input type="text" id="fx_desc" placeholder="예: 서버 호스팅비" lang="ko" autocomplete="off"></div>
+  <div class="fld"><label>통화</label>
+    <div class="chips" id="fx_cur">
+      <button type="button" data-v="KRW" class="on">₩ 원</button>
+      <button type="button" data-v="USD">$ 달러</button>
+      <button type="button" data-v="EUR">€ 유로</button>
+    </div>
+  </div>
+  <div class="fld" id="fx_fFld" style="display:none"><label id="fx_fLbl">외화 금액</label><input type="number" id="fx_famt" placeholder="예: 5.01" inputmode="decimal"></div>
+  <div class="fld" id="fx_krwFld"><label id="fx_krwLbl">금액 (원)</label><input type="text" id="fx_krw" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld"><label>나가는 계좌</label><select id="fx_acct"></select></div>
+  <div class="fld"><label>왜 필요한지 (선택)</label><textarea id="fx_why" placeholder="이 고정비가 왜 필요한지 — 나중에 정리할 때 판단 기준이 돼요." lang="ko"></textarea></div>
+  <div class="row">
+    <button type="button" class="cancel" id="fixDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
+    <button type="button" class="cancel" id="fixCancel">취소</button>
+    <button type="button" class="save" id="fixSave">저장</button>
+  </div>
+</div></div>
+
 <!-- 복원 (자동 스냅샷) -->
 <div class="ov" id="restore"><div class="sheet">
   <h3>이전 상태로 되돌리기</h3>
@@ -644,7 +680,7 @@ async function pushState(){
   } catch(e){ setDot(false,"저장 안 됨"); }
 }
 function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(pushState,500); }
-function blankStore(){ return { v:3, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{ accounts:[] } }; }
+function blankStore(){ return { v:3, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{ accounts:[], fixed:[] } }; }
 function normalizeStore(){
   if(!Array.isArray(STORE.personal)) STORE.personal=[];
   if(!Array.isArray(STORE.marketing)) STORE.marketing=[];
@@ -653,6 +689,7 @@ function normalizeStore(){
   ["quick","deadline","recurring","someday","project"].forEach(k=>{ if(!Array.isArray(STORE.work[k])) STORE.work[k]=[]; });
   if(!STORE.money || typeof STORE.money!=="object" || Array.isArray(STORE.money)) STORE.money={ accounts:[] };
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
+  if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; });
 }
 
@@ -1129,7 +1166,25 @@ function moneyView(){
     }
     html+='</div>';
   });
-  return html+'</div>';
+  html+='</div>';
+  return html+fixedSectionHtml();
+}
+function fixedSectionHtml(){
+  const list=STORE.money.fixed.slice().sort((a,b)=>(a.day||99)-(b.day||99));
+  const monthly=list.reduce((s,f)=>s+mnum(f.krw),0);
+  let h='<div class="msec"><div class="msec-h"><span class="mt">고정비</span>'+(list.length?'<span class="msec-total">월 '+fmtMoney(monthly,"KRW")+'</span>':'')+'<button class="secadd-btn" type="button" id="fixAdd">+ 고정비</button></div>';
+  if(!list.length) return h+'<div class="ledger-empty" style="padding:.5rem .2rem">아직 등록한 고정비가 없어요.</div></div>';
+  h+='<div class="fixlist">';
+  list.forEach(f=>{
+    const acc=findAcct(f.acctId), foreign=f.cur&&f.cur!=="KRW";
+    const amt=foreign?fmtMoney(f.famount,f.cur):fmtMoney(f.krw,"KRW");
+    const krwTag=foreign?'<span class="tx-krw">'+fmtMoney(f.krw,"KRW")+'</span>':'';
+    const sub=[acc?acc.alias:"계좌 미지정", f.why].filter(Boolean).join(" · ");
+    h+='<div class="fixrow" data-fix="'+f.id+'"><div class="fix-day">'+(f.day?"매달 "+f.day+"일":"-")+'</div>'+
+      '<div class="fix-body"><div class="fix-desc">'+esc(f.desc||"(내역 없음)")+'</div>'+(sub?'<div class="fix-sub">'+esc(sub)+'</div>':'')+'</div>'+
+      '<div class="fix-amt">−'+amt+krwTag+'</div></div>';
+  });
+  return h+'</div></div>';
 }
 function fmtDayLabel(s){ if(!s) return "날짜없음"; const p=String(s).split("-"); if(p.length<3) return s; const d=new Date(s+"T12:00:00"); return (+p[1])+"/"+(+p[2])+'<span>'+DOW[d.getDay()]+'</span>'; }
 function ledgerHtml(acc){
@@ -1161,6 +1216,8 @@ function wireMoney(){
     card.querySelectorAll(".acct-top [data-act]").forEach(el=> el.addEventListener("click", e=>{ if(el.dataset.act!=="toggle") e.stopPropagation(); actAcct(id, el.dataset.act); })); });
   document.querySelectorAll("#view .txrow").forEach(row=> row.addEventListener("click", ()=> openTx(row.dataset.acct, row.dataset.tx)));
   document.querySelectorAll("#view [data-txadd]").forEach(b=> b.addEventListener("click", ()=> openTx(b.dataset.txadd, null)));
+  const fadd=$("fixAdd"); if(fadd) fadd.addEventListener("click", ()=>openFix(null));
+  document.querySelectorAll("#view .fixrow").forEach(r=> r.addEventListener("click", ()=> openFix(r.dataset.fix)));
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
 }
 function actAcct(id, act){
@@ -1242,6 +1299,43 @@ function delTx(){
   const i=(a.tx||[]).findIndex(x=>x.id===mTxEdit); if(i>=0) a.tx.splice(i,1);
   closeTx(); save(); render();
 }
+
+/* 고정비 폼 (매달 나가는 고정 지출) */
+let mFixEdit=null, mFixCur="KRW";
+function fxCurUpdate(){
+  const f=mFixCur!=="KRW";
+  $("fx_fFld").style.display=f?"":"none";
+  $("fx_fLbl").textContent=(mFixCur==="USD"?"달러($) 금액":"유로(€) 금액");
+  $("fx_krwLbl").textContent=f?"실제 결제 원화":"금액 (원)";
+}
+function fillFixAccts(){
+  $("fx_acct").innerHTML=['<option value="">계좌 미지정</option>'].concat(STORE.money.accounts.map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>')).join("");
+}
+function openFix(id){
+  mFixEdit=id||null; const f=id?STORE.money.fixed.find(x=>x.id===id):null;
+  $("fixTitle").textContent=id?"고정비 수정":"새 고정비";
+  $("fx_day").value=f&&f.day?f.day:"";
+  $("fx_desc").value=f?(f.desc||""):"";
+  mFixCur=f?(f.cur||"KRW"):"KRW"; selChips($("fx_cur"),mFixCur);
+  $("fx_krw").value=f&&(f.krw||f.krw===0)?commaFmt(String(f.krw)):"";
+  $("fx_famt").value=f&&f.famount!=null?f.famount:"";
+  fillFixAccts(); $("fx_acct").value=f?(f.acctId||""):"";
+  $("fx_why").value=f?(f.why||""):"";
+  fxCurUpdate();
+  $("fixDelete").style.display=id?"":"none";
+  $("ovfix").classList.add("on"); setTimeout(()=>$("fx_desc").focus(),50);
+}
+function closeFix(){ $("ovfix").classList.remove("on"); mFixEdit=null; }
+function saveFix(){
+  const desc=$("fx_desc").value.trim(); if(!desc){ $("fx_desc").focus(); return; }
+  const dv=parseInt($("fx_day").value,10), day=(isFinite(dv)&&dv>=1)?Math.min(31,dv):null;
+  const foreign=mFixCur!=="KRW";
+  const data={ day, desc, cur:mFixCur, krw:mnum($("fx_krw").value), famount:foreign?mnum($("fx_famt").value):null, acctId:$("fx_acct").value||"", why:$("fx_why").value.trim() };
+  if(mFixEdit){ const f=STORE.money.fixed.find(x=>x.id===mFixEdit); if(f) Object.assign(f, data, { updated:Date.now() }); }
+  else { STORE.money.fixed.push(Object.assign({ id:uid(), created:Date.now() }, data)); }
+  closeFix(); save(); render();
+}
+function delFix(){ if(!mFixEdit) return; const i=STORE.money.fixed.findIndex(x=>x.id===mFixEdit); if(i>=0) STORE.money.fixed.splice(i,1); closeFix(); save(); render(); }
 $("acctCancel").addEventListener("click", closeAcct);
 $("acctSave").addEventListener("click", saveAcct);
 $("acctDelete").addEventListener("click", delAcct);
@@ -1251,10 +1345,15 @@ $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
-attachThousands($("ac_start")); attachThousands($("tx_krw"));
+attachThousands($("ac_start")); attachThousands($("tx_krw")); attachThousands($("fx_krw"));
 $("tx_dir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxDir=b.dataset.v; selChips($("tx_dir"),mTxDir); });
 $("tx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxCur=b.dataset.v; selChips($("tx_cur"),mTxCur); txCurUpdate(); });
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); } });
+$("fixCancel").addEventListener("click", closeFix);
+$("fixSave").addEventListener("click", saveFix);
+$("fixDelete").addEventListener("click", delFix);
+overlayDismiss("ovfix", closeFix);
+$("fx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mFixCur=b.dataset.v; selChips($("fx_cur"),mFixCur); fxCurUpdate(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); } });
 
 /* ═══ 복원 (스냅샷 목록 → 되돌리기) ═══ */
 $("restorebtn").addEventListener("click", openRestore);
