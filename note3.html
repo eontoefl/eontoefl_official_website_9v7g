@@ -182,17 +182,17 @@
   /* 홈 · 캘린더 */
   .hcal { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1rem; margin-bottom:1.5rem; }
   .calhead { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px; }
-  .calhead div { text-align:center; font-size:10px; font-weight:700; color:var(--on-surface-variant); }
+  .calhead div { text-align:center; font-size:11.5px; font-weight:700; color:var(--on-surface-variant); }
   .calhead .sun { color:var(--danger); }
   .calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
   .calcell { min-height:60px; background:var(--surface-low); border-radius:var(--r); padding:4px 5px; display:flex; flex-direction:column; gap:2px; }
   .calcell.today { background:#e3f3fb; box-shadow:inset 0 0 0 2px var(--accent-line); }
   .calcell.past { opacity:.5; }
-  .caldd { font-size:11px; font-weight:700; color:var(--on-surface-variant); }
+  .caldd { font-size:13px; font-weight:700; color:var(--on-surface-variant); }
   .calcell.today .caldd { color:var(--accent-strong); }
-  .calev { font-size:9px; line-height:1.35; color:var(--on-surface); word-break:break-word; display:flex; align-items:baseline; gap:2px; }
-  .calev .svic { width:9px; height:9px; }
-  @media (max-width:620px){ .calcell { min-height:34px; padding:3px; } .calev { font-size:8px; } }
+  .calev { font-size:11px; line-height:1.35; color:var(--on-surface); word-break:break-word; display:flex; align-items:baseline; gap:3px; }
+  .calev .svic { width:11px; height:11px; }
+  @media (max-width:620px){ .calcell { min-height:34px; padding:3px 4px; } .calev { font-size:10px; } .calev .svic { width:10px; height:10px; } }
   .calgrid { align-items:stretch; }
   .hcols { display:grid; grid-template-columns:1fr; gap:1rem; }
   @media (min-width:640px){ .hcols { grid-template-columns:1fr 1fr; } }
