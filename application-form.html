@@ -23,7 +23,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
-    <link rel="stylesheet" href="css/application-form.css?v=9">
+    <link rel="stylesheet" href="css/application-form.css?v=10">
 </head>
 <body>
     <!-- 상단 진행 표시 (폼 스크롤 진행도) -->
@@ -145,7 +145,7 @@
                 </div>
 
                 <div class="subsection-title">환불 계좌 정보 <span style="color: #a53b22; font-weight: 700;">*</span></div>
-                <div class="two-column-grid">
+                <div class="bank-fields-grid">
                     <div class="form-group">
                         <label>은행명</label>
                         <div class="bank-select" id="bankSelect">
@@ -171,12 +171,13 @@
                         <input type="text" name="account_number" id="accountNumberInput" inputmode="numeric" placeholder="- 없이 숫자만 입력" required>
                         <small class="account-hint" id="accountHint">‘-’(하이픈) 없이 숫자만 입력해주세요.</small>
                     </div>
+                    <div class="form-group">
+                        <label>예금주</label>
+                        <input type="text" name="account_holder" id="accountHolderInput" placeholder="예: 홍길동" required>
+                        <small>통장 표기명과 <strong>정확히 일치</strong>해야 해요.</small>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>예금주</label>
-                    <input type="text" name="account_holder" id="accountHolderInput" placeholder="예: 홍길동" required>
-                    <small>통장에 표기된 <strong>예금주명과 정확히 일치</strong>해야 환불이 정상 처리됩니다. 보증금 환급·환불 시 사용돼요.</small>
-                </div>
+                <small class="bank-section-note">보증금 환급·환불 처리 시 사용됩니다. 정확한 계좌 정보를 입력해주세요.</small>
             </div>
 
             <!-- Section 2: 직업 정보 -->

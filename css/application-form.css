@@ -924,6 +924,37 @@ label:has(+ textarea[required])::after,
     }
 }
 
+/* ===== 환불 계좌 — 은행명/계좌번호/예금주 한 줄(PC) ===== */
+.bank-fields-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1.2fr 0.7fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.bank-fields-grid .form-group {
+    margin-bottom: 0.5rem;
+    min-width: 0;
+}
+
+.bank-section-note {
+    display: block;
+    margin: 0 0 1rem;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .bank-fields-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+    .bank-fields-grid .form-group {
+        margin-bottom: 1rem;
+    }
+}
+
 /* ===== 환불 계좌 — 은행 선택 드롭다운 ===== */
 .bank-select {
     position: relative;
@@ -1007,7 +1038,9 @@ label:has(+ textarea[required])::after,
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
-    right: 0;
+    right: auto;
+    width: 100%;
+    min-width: 260px;
     z-index: 40;
     background: #ffffff;
     border: 1px solid #e2e6ec;
@@ -1015,6 +1048,13 @@ label:has(+ textarea[required])::after,
     box-shadow: 0 12px 30px rgba(30, 41, 59, 0.14);
     padding: 10px;
     overflow: hidden;
+}
+
+/* 좁은 칸에서도 펼침 목록은 넉넉히 (모바일은 트리거 폭에 맞춤) */
+@media (max-width: 768px) {
+    .bank-select-panel {
+        min-width: 0;
+    }
 }
 
 .bank-search-wrap {
