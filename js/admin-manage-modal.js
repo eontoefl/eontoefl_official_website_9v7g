@@ -190,7 +190,7 @@ function downloadInfoTxt() {
     lines.push(`이메일 : ${app.email || '-'}`);
     lines.push(`직업 : ${app.occupation || '-'}`);
     lines.push(`주소 : ${app.address || '-'}`);
-    lines.push(`환불 계좌 : ${app.bank_account || '-'}`);
+    lines.push(`환불 계좌 : ${(app.bank_name || app.account_number || app.account_holder) ? [app.bank_name, app.account_number, app.account_holder].filter(Boolean).join(' ') : (app.bank_account || '-')}`);
     lines.push(`신청일 : ${app.submitted_date ? new Date(app.submitted_date).toLocaleString('ko-KR') : '-'}`);
     lines.push(`현재 단계 : STEP ${app.current_step || 1}`);
 
@@ -509,7 +509,7 @@ function loadModalInfoTab(app) {
                 <div class="info-item"><label>현재 단계</label><div>STEP ${app.current_step || 1}</div></div>
             </div>
             <div class="info-item"><label>주소</label><div>${app.address || '-'}</div></div>
-            <div class="info-item"><label>환불 계좌</label><div>${app.bank_account || '-'}</div></div>
+            <div class="info-item"><label>환불 계좌</label><div>${(app.bank_name || app.account_number || app.account_holder) ? `${app.bank_name || '-'} / ${app.account_number || '-'} / ${app.account_holder || '-'}` : (app.bank_account || '-')}</div></div>
         </div>
 
         <!-- 2. 현재 토플 점수 / 라이팅 샘플 -->

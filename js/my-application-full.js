@@ -69,14 +69,16 @@ function displayResults(applications) {
                 </div>
                 
                 <!-- 환불 계좌 정보 -->
-                ${app.bank_name || app.account_number ? `
+                ${(app.bank_name || app.account_number || app.account_holder || app.bank_account) ? `
                 <div style="margin-bottom: 20px;">
                     <h4 style="font-size: 14px; font-weight: 700; color: #475569; margin-bottom: 12px;">
                         <i class="fas fa-university"></i> 환불 계좌 정보
                     </h4>
                     <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
                         <div style="font-size: 13px; color: #1e293b;">
-                            ${escapeHtml(app.bank_name || '')} ${escapeHtml(app.account_number || '')} ${escapeHtml(app.account_holder || '')}
+                            ${(app.bank_name || app.account_number || app.account_holder)
+                                ? `${escapeHtml(app.bank_name || '')} ${escapeHtml(app.account_number || '')} ${escapeHtml(app.account_holder || '')}`
+                                : escapeHtml(app.bank_account || '')}
                         </div>
                     </div>
                 </div>

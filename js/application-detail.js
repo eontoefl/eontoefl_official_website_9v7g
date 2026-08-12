@@ -622,11 +622,15 @@ function displayApplicationDetail(app) {
                 <div class="s1-label">주소</div>
                 <div class="s1-value">${escapeHtml(app.address)}</div>
             </div>` : ''}
-            ${app.bank_account ? `
+            ${(app.bank_name || app.account_number || app.account_holder) ? `
+            <div class="s1-row">
+                <div class="s1-label">환불 계좌</div>
+                <div class="s1-value">${escapeHtml([app.bank_name, app.account_number, app.account_holder].filter(Boolean).join(' '))}</div>
+            </div>` : (app.bank_account ? `
             <div class="s1-row">
                 <div class="s1-label">환불 계좌</div>
                 <div class="s1-value">${escapeHtml(app.bank_account)}</div>
-            </div>` : ''}
+            </div>` : '')}
         </div>
 
         <!-- 2. 직업 정보 (한 줄이라 제목 옆에 바로 값을 붙인다) -->

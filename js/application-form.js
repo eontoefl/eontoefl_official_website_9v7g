@@ -53,8 +53,243 @@ function toggleTargetScore(checked) {
     }
 }
 
+// ===== 환불 계좌: 은행/증권사 목록 (브랜드색 원형 배지) =====
+const BANK_LIST = [
+    // 은행
+    { name: '국민은행', short: '국', color: '#FFB600', group: '은행' },
+    { name: '신한은행', short: '신', color: '#1B4298', group: '은행' },
+    { name: '우리은행', short: '우', color: '#0067AC', group: '은행' },
+    { name: '하나은행', short: '하', color: '#008485', group: '은행' },
+    { name: '농협은행', short: 'NH', color: '#19A63B', group: '은행' },
+    { name: '기업은행', short: '기', color: '#00539B', group: '은행' },
+    { name: 'SC제일은행', short: 'SC', color: '#1D8649', group: '은행' },
+    { name: '한국씨티은행', short: '씨', color: '#003C71', group: '은행' },
+    { name: '산업은행(KDB)', short: 'KDB', color: '#003DA5', group: '은행' },
+    { name: '수협은행', short: '수', color: '#0086CB', group: '은행' },
+    { name: 'iM뱅크(대구)', short: 'iM', color: '#00B8A9', group: '은행' },
+    { name: '부산은행', short: '부', color: '#D6002E', group: '은행' },
+    { name: '경남은행', short: '경', color: '#E4002B', group: '은행' },
+    { name: '광주은행', short: '광', color: '#0075C1', group: '은행' },
+    { name: '전북은행', short: '전', color: '#003876', group: '은행' },
+    { name: '제주은행', short: '제', color: '#1552A0', group: '은행' },
+    { name: '케이뱅크', short: 'K', color: '#1B2C55', group: '은행' },
+    { name: '카카오뱅크', short: '카', color: '#FEE500', group: '은행' },
+    { name: '토스뱅크', short: '토', color: '#0064FF', group: '은행' },
+    { name: '새마을금고', short: 'MG', color: '#009FDA', group: '은행' },
+    { name: '신협', short: '신협', color: '#0072BC', group: '은행' },
+    { name: '우체국', short: '우체', color: '#DA291C', group: '은행' },
+    { name: '저축은행', short: 'SB', color: '#00A650', group: '은행' },
+    { name: '산림조합', short: '산림', color: '#0B6B3A', group: '은행' },
+    { name: 'HSBC은행', short: 'HS', color: '#DB0011', group: '은행' },
+    { name: '도이치은행', short: '도', color: '#0018A8', group: '은행' },
+    { name: 'JP모간체이스은행', short: 'JP', color: '#005EB8', group: '은행' },
+    { name: 'BNP파리바은행', short: 'BNP', color: '#008859', group: '은행' },
+    { name: '중국은행', short: '중', color: '#C7000B', group: '은행' },
+    { name: '중국공상은행', short: '공상', color: '#C7000B', group: '은행' },
+    { name: '중국건설은행', short: '건설', color: '#005BAC', group: '은행' },
+    { name: '뱅크오브아메리카', short: 'BA', color: '#E31837', group: '은행' },
+    // 증권 (CMA)
+    { name: '미래에셋증권', short: '미래', color: '#FF6600', group: '증권' },
+    { name: '삼성증권', short: '삼성', color: '#1428A0', group: '증권' },
+    { name: 'NH투자증권', short: 'NH', color: '#19A63B', group: '증권' },
+    { name: 'KB증권', short: 'KB', color: '#736A5F', group: '증권' },
+    { name: '키움증권', short: '키움', color: '#C8102E', group: '증권' },
+    { name: '한국투자증권', short: '한투', color: '#6E4A2E', group: '증권' },
+    { name: '신한투자증권', short: '신한', color: '#1B4298', group: '증권' },
+    { name: '하나증권', short: '하나', color: '#008485', group: '증권' },
+    { name: '메리츠증권', short: '메', color: '#ED1C24', group: '증권' },
+    { name: '대신증권', short: '대신', color: '#00A94F', group: '증권' },
+    { name: '유안타증권', short: '유안', color: '#0067B1', group: '증권' },
+    { name: '유진투자증권', short: '유진', color: '#ED1C24', group: '증권' },
+    { name: '신영증권', short: '신영', color: '#00843D', group: '증권' },
+    { name: '교보증권', short: '교보', color: '#00693C', group: '증권' },
+    { name: 'SK증권', short: 'SK', color: '#EA002C', group: '증권' },
+    { name: '현대차증권', short: '현대', color: '#002C5F', group: '증권' },
+    { name: '부국증권', short: '부국', color: '#1B3A6B', group: '증권' },
+    { name: 'DB증권', short: 'DB', color: '#009639', group: '증권' },
+    { name: 'LS증권', short: 'LS', color: '#003A70', group: '증권' },
+    { name: '케이프투자증권', short: '케이', color: '#C8102E', group: '증권' },
+    { name: '우리투자증권', short: '우리', color: '#0067AC', group: '증권' },
+    { name: '상상인증권', short: '상상', color: '#00A99D', group: '증권' },
+    { name: '한화투자증권', short: '한화', color: '#F37021', group: '증권' },
+    { name: '다올투자증권', short: '다올', color: '#111111', group: '증권' },
+    { name: 'BNK투자증권', short: 'BNK', color: '#E4002B', group: '증권' },
+    { name: '카카오페이증권', short: '페이', color: '#FEE500', group: '증권' },
+    { name: 'IBK투자증권', short: 'IBK', color: '#00539B', group: '증권' },
+    { name: '토스증권', short: '토스', color: '#0064FF', group: '증권' },
+    { name: 'iM증권', short: 'iM', color: '#00B8A9', group: '증권' }
+];
+
+// 배지 배경 밝기에 따라 글자색(검정/흰색) 결정
+function bankBadgeTextColor(hex) {
+    const c = hex.replace('#', '');
+    const r = parseInt(c.substr(0, 2), 16);
+    const g = parseInt(c.substr(2, 2), 16);
+    const b = parseInt(c.substr(4, 2), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.62 ? '#3d3d3d' : '#ffffff';
+}
+
+// 배지 글자 길이에 따른 폰트 크기
+function bankBadgeFontSize(short) {
+    if (short.length >= 3) return '8px';
+    if (short.length === 2) return '11px';
+    return '14px';
+}
+
+// 배지 HTML
+function bankBadgeHTML(bank) {
+    return `<span class="bank-badge" style="background:${bank.color};color:${bankBadgeTextColor(bank.color)};font-size:${bankBadgeFontSize(bank.short)}">${bank.short}</span>`;
+}
+
+// 은행 선택 드롭다운 설정
+function setupBankSelector() {
+    const wrap = document.getElementById('bankSelect');
+    const trigger = document.getElementById('bankTrigger');
+    const panel = document.getElementById('bankPanel');
+    const content = document.getElementById('bankTriggerContent');
+    const listEl = document.getElementById('bankList');
+    const searchEl = document.getElementById('bankSearch');
+    const emptyEl = document.getElementById('bankEmpty');
+    const hiddenInput = document.getElementById('bankNameInput');
+    if (!wrap || !trigger || !panel || !listEl || !hiddenInput) return;
+
+    // 목록 렌더 (검색어 필터 + 그룹 구분)
+    function renderList(query) {
+        const q = (query || '').trim().toLowerCase().replace(/\s+/g, '');
+        const filtered = BANK_LIST.filter(b => {
+            if (!q) return true;
+            return b.name.toLowerCase().replace(/\s+/g, '').includes(q)
+                || b.short.toLowerCase().includes(q);
+        });
+
+        listEl.innerHTML = '';
+        if (filtered.length === 0) {
+            emptyEl.hidden = false;
+            return;
+        }
+        emptyEl.hidden = true;
+
+        let lastGroup = null;
+        filtered.forEach(bank => {
+            if (bank.group !== lastGroup) {
+                lastGroup = bank.group;
+                const gl = document.createElement('li');
+                gl.className = 'bank-group-label';
+                gl.setAttribute('aria-hidden', 'true');
+                gl.textContent = bank.group;
+                listEl.appendChild(gl);
+            }
+            const li = document.createElement('li');
+            li.className = 'bank-item';
+            li.setAttribute('role', 'option');
+            li.dataset.name = bank.name;
+            li.innerHTML = `${bankBadgeHTML(bank)}<span class="bank-item-name">${bank.name}</span>`;
+            if (hiddenInput.value === bank.name) li.classList.add('active');
+            li.addEventListener('click', () => selectBank(bank));
+            listEl.appendChild(li);
+        });
+    }
+
+    function selectBank(bank) {
+        hiddenInput.value = bank.name;
+        content.innerHTML = `${bankBadgeHTML(bank)}<span class="bank-trigger-name">${bank.name}</span>`;
+        closePanel();
+    }
+
+    function openPanel() {
+        panel.hidden = false;
+        wrap.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+        searchEl.value = '';
+        renderList('');
+        setTimeout(() => searchEl.focus(), 0);
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        wrap.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    trigger.addEventListener('click', () => {
+        if (panel.hidden) openPanel();
+        else closePanel();
+    });
+
+    searchEl.addEventListener('input', () => renderList(searchEl.value));
+    searchEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { closePanel(); trigger.focus(); }
+    });
+
+    // 바깥 클릭 시 닫기
+    document.addEventListener('click', (e) => {
+        if (!wrap.contains(e.target)) closePanel();
+    });
+
+    // 계좌번호 하이픈/문자 실시간 제거 + 경고
+    const acct = document.getElementById('accountNumberInput');
+    const hint = document.getElementById('accountHint');
+    if (acct && hint) {
+        const defaultMsg = '‘-’(하이픈) 없이 숫자만 입력해주세요.';
+        let warnTimer = null;
+        acct.addEventListener('input', () => {
+            if (/[^0-9]/.test(acct.value)) {
+                acct.value = acct.value.replace(/[^0-9]/g, '');
+                hint.textContent = '‘-’ 없이 숫자만 입력할 수 있어요. 자동으로 지웠어요.';
+                hint.classList.add('warn');
+                clearTimeout(warnTimer);
+                warnTimer = setTimeout(() => {
+                    hint.textContent = defaultMsg;
+                    hint.classList.remove('warn');
+                }, 2500);
+            }
+        });
+    }
+}
+
+// 수정 모드: 저장된 값으로 은행 선택 트리거 표시를 복원
+function restoreBankSelection(app) {
+    const hiddenInput = document.getElementById('bankNameInput');
+    const content = document.getElementById('bankTriggerContent');
+    if (!hiddenInput || !content) return;
+
+    let bankName = app.bank_name || null;
+    let accountNumber = app.account_number || null;
+    let accountHolder = app.account_holder || null;
+
+    // 새 컬럼이 비어있고 구버전 합친 문자열만 있으면 최선 파싱
+    if (!bankName && !accountNumber && !accountHolder && app.bank_account) {
+        const raw = String(app.bank_account).trim();
+        const matched = BANK_LIST.find(b => raw.startsWith(b.name) || raw.includes(b.name));
+        if (matched) {
+            bankName = matched.name;
+            const rest = raw.replace(matched.name, '').trim().split(/\s+/);
+            const numToken = rest.find(t => /\d/.test(t));
+            if (numToken) accountNumber = numToken.replace(/[^0-9]/g, '');
+            const holderToken = rest.filter(t => !/\d/.test(t)).join(' ').trim();
+            if (holderToken) accountHolder = holderToken;
+        }
+    }
+
+    if (bankName) {
+        const bank = BANK_LIST.find(b => b.name === bankName);
+        hiddenInput.value = bankName;
+        if (bank) {
+            content.innerHTML = `${bankBadgeHTML(bank)}<span class="bank-trigger-name">${bank.name}</span>`;
+        } else {
+            content.innerHTML = `<span class="bank-trigger-name">${bankName}</span>`;
+        }
+    }
+
+    const acctNumInput = document.getElementById('accountNumberInput');
+    const acctHolderInput = document.getElementById('accountHolderInput');
+    if (acctNumInput && accountNumber) acctNumInput.value = accountNumber;
+    if (acctHolderInput && accountHolder) acctHolderInput.value = accountHolder;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     // Check if user is logged in
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
     
@@ -94,6 +329,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Setup date dropdowns
     setupDateDropdowns();
+
+    // 환불 계좌 — 은행 선택 드롭다운 + 계좌번호 하이픈 처리
+    setupBankSelector();
 
     // 초기 상태: 비활성 탭의 required 해제
     cleanupInactiveTabRequired();
@@ -436,7 +674,8 @@ function populateFormData(app) {
 
     // 텍스트/이메일/tel 입력 필드
     const textFields = [
-        'application_title', 'name', 'phone', 'email', 'address', 'bank_account',
+        'application_title', 'name', 'phone', 'email', 'address',
+        'account_number', 'account_holder',
         'occupation', 'score_history', 'current_study_method',
         'target_note', 'toefl_reason_detail', 'memorable_blog_content',
         'preferred_program', 'preferred_correction', 'program_note',
@@ -507,6 +746,9 @@ function populateFormData(app) {
         const cb = form.querySelector('input[name="privacy_agreement"]');
         if (cb) cb.checked = true;
     }
+
+    // 환불 계좌 — 은행 선택 복원 (없으면 구버전 bank_account 문자열에서 최선 파싱)
+    restoreBankSelection(app);
 
     // 선택 필드 (select)
     const selectFields = ['daily_study_time', 'toefl_reason'];
@@ -718,6 +960,32 @@ function setupFormSubmission() {
 
 // Validate form
 function validateForm() {
+    // 환불 계좌 정보 검증
+    const bankNameInput = document.getElementById('bankNameInput');
+    const acctNumInput = document.getElementById('accountNumberInput');
+    const acctHolderInput = document.getElementById('accountHolderInput');
+    if (bankNameInput && !bankNameInput.value) {
+        alert('환불 계좌의 은행명을 선택해주세요.');
+        const trigger = document.getElementById('bankTrigger');
+        if (trigger) trigger.focus();
+        return false;
+    }
+    if (acctNumInput && !acctNumInput.value.trim()) {
+        alert('환불 계좌번호를 입력해주세요.');
+        acctNumInput.focus();
+        return false;
+    }
+    if (acctNumInput && /[^0-9]/.test(acctNumInput.value)) {
+        alert('계좌번호는 ‘-’(하이픈) 없이 숫자만 입력해주세요.');
+        acctNumInput.focus();
+        return false;
+    }
+    if (acctHolderInput && !acctHolderInput.value.trim()) {
+        alert('환불 계좌의 예금주명을 입력해주세요.');
+        acctHolderInput.focus();
+        return false;
+    }
+
     // Check if writing samples are required and valid (when no TOEFL score)
     const hasToeflScore = document.querySelector('input[name="has_toefl_score"]:checked');
     
@@ -975,6 +1243,14 @@ function collectFormData() {
             data.target_speaking_old = null;
             data.target_writing_old = null;
         }
+    }
+
+    // 환불 계좌: 분리된 3개 필드를 합친 문자열도 저장 (관리자 표시·구버전 호환)
+    if (data.bank_name || data.account_number || data.account_holder) {
+        data.bank_account = [data.bank_name, data.account_number, data.account_holder]
+            .map(v => (v || '').trim())
+            .filter(Boolean)
+            .join(' ');
     }
 
     // Set status

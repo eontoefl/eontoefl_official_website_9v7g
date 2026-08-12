@@ -923,3 +923,186 @@ label:has(+ textarea[required])::after,
         grid-template-columns: 1fr !important;
     }
 }
+
+/* ===== 환불 계좌 — 은행 선택 드롭다운 ===== */
+.bank-select {
+    position: relative;
+}
+
+/* 트리거 버튼 (인풋처럼 보이게) */
+.bank-select-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 10px;
+    background: #f6f8fa;
+    border: 1px solid #e2e6ec;
+    color: #1e293b;
+    font-size: 0.9rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    text-align: left;
+    transition: box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.bank-select-trigger:hover {
+    background: #eef1f5;
+}
+
+.bank-select.open .bank-select-trigger {
+    outline: none;
+    background: #ffffff;
+    border-color: #b9a9dc;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.22);
+}
+
+.bank-trigger-content {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.bank-trigger-placeholder {
+    color: #98a2b0;
+}
+
+.bank-trigger-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bank-select-caret {
+    color: #94a3b8;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.bank-select.open .bank-select-caret {
+    transform: rotate(180deg);
+}
+
+/* 브랜드색 원형 배지 */
+.bank-badge {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+/* 펼침 패널 */
+.bank-select-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    background: #ffffff;
+    border: 1px solid #e2e6ec;
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(30, 41, 59, 0.14);
+    padding: 10px;
+    overflow: hidden;
+}
+
+.bank-search-wrap {
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.bank-search-wrap i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #98a2b0;
+    font-size: 0.8rem;
+    pointer-events: none;
+}
+
+.bank-search-input {
+    width: 100%;
+    padding: 0.6rem 0.9rem 0.6rem 2.1rem !important;
+    border-radius: 9px;
+    background: #f6f8fa;
+    border: 1px solid #e2e6ec;
+    font-size: 0.88rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: #1e293b;
+}
+
+.bank-search-input:focus {
+    outline: none;
+    background: #ffffff;
+    border-color: #b9a9dc;
+    box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.18);
+}
+
+.bank-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.bank-group-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #94a3b8;
+    padding: 8px 8px 4px;
+    letter-spacing: 0.02em;
+}
+
+.bank-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 8px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #1e293b;
+}
+
+.bank-item:hover,
+.bank-item.active {
+    background: #f3f0fa;
+}
+
+.bank-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bank-empty {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    padding: 22px 0 16px;
+}
+
+/* 계좌번호 하이픈 경고 */
+.account-hint.warn {
+    color: #a53b22;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .bank-list {
+        max-height: 46vh;
+    }
+}

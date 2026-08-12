@@ -23,7 +23,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
-    <link rel="stylesheet" href="css/application-form.css?v=8">
+    <link rel="stylesheet" href="css/application-form.css?v=9">
 </head>
 <body>
     <!-- 상단 진행 표시 (폼 스크롤 진행도) -->
@@ -145,9 +145,37 @@
                 </div>
 
                 <div class="subsection-title">환불 계좌 정보 <span style="color: #a53b22; font-weight: 700;">*</span></div>
+                <div class="two-column-grid">
+                    <div class="form-group">
+                        <label>은행명</label>
+                        <div class="bank-select" id="bankSelect">
+                            <button type="button" class="bank-select-trigger" id="bankTrigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="bank-trigger-content" id="bankTriggerContent">
+                                    <span class="bank-trigger-placeholder">은행을 선택하세요</span>
+                                </span>
+                                <i class="fas fa-chevron-down bank-select-caret"></i>
+                            </button>
+                            <div class="bank-select-panel" id="bankPanel" hidden>
+                                <div class="bank-search-wrap">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" class="bank-search-input" id="bankSearch" placeholder="은행 검색" autocomplete="off">
+                                </div>
+                                <ul class="bank-list" id="bankList" role="listbox" aria-label="은행 목록"></ul>
+                                <div class="bank-empty" id="bankEmpty" hidden>검색 결과가 없습니다</div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="bank_name" id="bankNameInput" required>
+                    </div>
+                    <div class="form-group">
+                        <label>계좌번호</label>
+                        <input type="text" name="account_number" id="accountNumberInput" inputmode="numeric" placeholder="- 없이 숫자만 입력" required>
+                        <small class="account-hint" id="accountHint">‘-’(하이픈) 없이 숫자만 입력해주세요.</small>
+                    </div>
+                </div>
                 <div class="form-group">
-                    <input type="text" name="bank_account" placeholder="은행명 계좌번호 예금주 (예: 신한 110-123-456789 홍길동)" required>
-                    <small>보증금 환급 및 환불 처리 시 사용됩니다. 정확한 정보를 입력해주세요.</small>
+                    <label>예금주</label>
+                    <input type="text" name="account_holder" id="accountHolderInput" placeholder="예: 홍길동" required>
+                    <small>통장에 표기된 <strong>예금주명과 정확히 일치</strong>해야 환불이 정상 처리됩니다. 보증금 환급·환불 시 사용돼요.</small>
                 </div>
             </div>
 
@@ -891,7 +919,7 @@
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
-    <script src="js/application-form.js?v=3"></script>
+    <script src="js/application-form.js?v=4"></script>
 
     <!-- 진행 표시: 폼 영역 스크롤 진행도만 계산 (폼 로직·필드와 무관) -->
     <script>
