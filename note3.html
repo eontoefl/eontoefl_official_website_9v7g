@@ -29,6 +29,16 @@
   h1,h2,h3 { letter-spacing:-0.02em; }
   ::selection { background:var(--accent-soft); color:var(--accent-ink); }
   button { font-family:inherit; cursor:pointer; }
+  .svic { width:1.08em; height:1.08em; display:inline-block; vertical-align:-.16em; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .svic.danger { color:var(--danger); } .svic.gold { color:#e0a92a; }
+  .badge .svic { width:12px; height:12px; }
+  .wsec-h .ic .svic, .fold-h .ic .svic { width:15px; height:15px; vertical-align:-.2em; }
+  .card .cal .svic { width:18px; height:18px; }
+  .acts button .svic, .sub .x .svic { width:17px; height:17px; }
+  .drag .svic { width:16px; height:16px; }
+  .secadd .svic { width:14px; height:14px; } .fold-h .chev .svic { width:14px; height:14px; }
+  .proj-top .prog .svic { width:12px; height:12px; }
+  .sticker .svic { width:15px; height:15px; }
 
   #gate { max-width:360px; margin:16vh auto; padding:0 1.4rem; text-align:center; }
   #gate .mark { width:52px; height:52px; margin:0 auto 1.4rem; border-radius:var(--r-lg); background:var(--brandmark); display:grid; place-items:center; font-size:23px; }
@@ -58,7 +68,10 @@
   .tabs button { flex:1; border:none; background:transparent; border-radius:.7rem; padding:.7rem .4rem; font-size:14px; font-weight:600; color:var(--on-surface-variant); transition:.15s; }
   .tabs button:hover { color:var(--on-surface); }
   .tabs button.on { background:var(--surface-lowest); color:var(--accent-strong); box-shadow:var(--lift); }
-  @media (max-width:480px){ .tabs button { font-size:13px; padding:.65rem .2rem; } }
+  .tabs button.home { display:flex; align-items:center; justify-content:center; gap:.3rem; flex:0 0 auto; padding:.7rem 1rem; background:var(--accent-lightest); color:var(--accent-strong); }
+  .tabs button.home.on { background:var(--grad); color:var(--accent-ink); box-shadow:var(--lift); }
+  .tabs button.home .svic { width:16px; height:16px; }
+  @media (max-width:480px){ .tabs button { font-size:13px; padding:.65rem .2rem; } .tabs button.home { padding:.65rem .7rem; } }
 
   .vhead { display:flex; align-items:center; gap:.8rem; margin-bottom:1.1rem; padding-left:.15rem; }
   .vhead .t { font-size:22px; font-weight:700; }
@@ -167,14 +180,15 @@
   .calhead div { text-align:center; font-size:10px; font-weight:700; color:var(--on-surface-variant); }
   .calhead .sun { color:var(--danger); }
   .calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
-  .calcell { min-height:62px; background:var(--surface-low); border-radius:var(--r); padding:4px 5px; display:flex; flex-direction:column; gap:2px; overflow:hidden; }
+  .calcell { min-height:60px; background:var(--surface-low); border-radius:var(--r); padding:4px 5px; display:flex; flex-direction:column; gap:2px; align-self:start; }
   .calcell.today { background:#e3f3fb; box-shadow:inset 0 0 0 2px var(--accent-line); }
   .calcell.past { opacity:.5; }
   .caldd { font-size:11px; font-weight:700; color:var(--on-surface-variant); }
   .calcell.today .caldd { color:var(--accent-strong); }
-  .calev { font-size:9px; line-height:1.35; color:var(--on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .calmore { font-size:9px; color:var(--on-surface-variant); }
-  @media (max-width:620px){ .calcell { min-height:40px; padding:3px; } .calev, .calmore { display:none; } .calcell.has .caldd::after { content:" ·"; color:var(--accent-strong); font-weight:800; } }
+  .calev { font-size:9px; line-height:1.35; color:var(--on-surface); word-break:break-word; display:flex; align-items:baseline; gap:2px; }
+  .calev .svic { width:9px; height:9px; }
+  @media (max-width:620px){ .calcell { min-height:34px; padding:3px; } .calev { font-size:8px; } }
+  .calgrid { align-items:start; }
   .hcols { display:grid; grid-template-columns:1fr; gap:1rem; }
   @media (min-width:640px){ .hcols { grid-template-columns:1fr 1fr; } }
   .hcard { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1.1rem 1.2rem; }
@@ -210,12 +224,15 @@
   .save { background:var(--grad); color:var(--accent-ink); box-shadow:var(--lift); }
   .save:disabled { opacity:.45; box-shadow:none; }
   .hide { display:none !important; }
+  .empty .svic, .soon .svic { width:32px; height:32px; }
+  #gate .mark .svic { width:24px; height:24px; color:var(--accent-ink); }
+  #restorebtn .svic { width:14px; height:14px; }
 </style>
 </head>
 <body>
 
 <div id="gate">
-  <div class="mark">🔒</div>
+  <div class="mark"><svg class="svic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
   <h1>김비서 v3</h1>
   <p>비밀번호를 넣어주세요</p>
   <input id="pw" type="password" autocomplete="current-password">
@@ -227,11 +244,11 @@
   <div class="topbar"><div class="inner">
     <div class="brand">김비서 v3<small>내가 기록한다</small></div>
     <div id="savedot"></div>
-    <button id="restorebtn" type="button" title="이전 상태로 되돌리기">⟲ 복원</button>
+    <button id="restorebtn" type="button" title="이전 상태로 되돌리기"><svg class="svic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4h4"/></svg> 복원</button>
   </div></div>
   <div class="wrap">
     <nav class="tabs" id="tabs">
-      <button type="button" data-tab="home">홈</button>
+      <button type="button" data-tab="home" class="home"><svg class="svic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/></svg>홈</button>
       <button type="button" data-tab="money">돈관리</button>
       <button type="button" data-tab="work">업무</button>
       <button type="button" data-tab="personal">개인</button>
@@ -421,6 +438,38 @@ const shiftDay = (s,n) => { const d=new Date(s+"T12:00:00"); d.setDate(d.getDate
 function goalStreak(claimed){ if(!claimed||!claimed.length) return 0; const set=new Set(claimed); let d = set.has(todayStr()) ? todayStr() : claimed.slice().sort().pop(); let n=0; while(set.has(d)){ n++; d=shiftDay(d,-1); } return n; }
 const nowHM = () => { const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
 function setDot(ok,msg){ const d=$("savedot"); d.textContent=msg; d.className=ok?"":"bad"; }
+/* ── 라인 아이콘 (이모지 대체, currentColor로 팔레트 상속) ── */
+const IC = {
+  home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>',
+  trash:'<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
+  grip:'<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+  restore:'<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4h4"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  chevR:'<path d="M9 6l6 6-6 6"/>', chevD:'<path d="M6 9l6 6 6-6"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  check:'<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+  cal:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/>',
+  pin:'<path d="M9 3h6l-1 6 3 3v1H7v-1l3-3-1-6z"/><path d="M12 16v5"/>',
+  repeat:'<path d="M4 11V9a3 3 0 0 1 3-3h11"/><path d="M15 3l3 3-3 3"/><path d="M20 13v2a3 3 0 0 1-3 3H6"/><path d="M9 21l-3-3 3-3"/>',
+  layers:'<path d="M12 4l8 4-8 4-8-4 8-4z"/><path d="M4 13l8 4 8-4"/>',
+  moon:'<path d="M20 13a8 8 0 1 1-9-9 6.3 6.3 0 0 0 9 9z"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  bolt:'<path d="M13 3L5 13h6l-1 8 8-11h-6l1-7z"/>',
+  hourglass:'<path d="M7 3h10M7 21h10"/><path d="M8 3c0 4 4 5 4 9s-4 5-4 9M16 3c0 4-4 5-4 9s4 5 4 9"/>',
+  user:'<circle cx="12" cy="8" r="3.2"/><path d="M6 19c0-3 2.7-5 6-5s6 2 6 5"/>',
+  mappin:'<path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  alert:'<circle cx="12" cy="12" r="8.5"/><path d="M12 8v5"/><circle cx="12" cy="16" r="0.7" fill="currentColor" stroke="none"/>',
+  star:'<path d="M12 4l2.4 5 5.5.6-4 3.8 1 5.5-4.9-2.7-4.9 2.7 1-5.5-4-3.8 5.5-.6L12 4z" fill="currentColor" stroke="none"/>',
+  trophy:'<path d="M8 21h8M12 17v4M7 5h10v3a5 5 0 0 1-10 0V5z"/><path d="M7 7H4.5v1A2.5 2.5 0 0 0 7 10.5M17 7h2.5v1a2.5 2.5 0 0 1-2.5 2.5"/>',
+  note:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 12.5h6M9 16h4"/>',
+  tools:'<path d="M15.5 7.5a3 3 0 0 1-4 4L5 18l1.5 1.5L13 13a3 3 0 0 1 4-4l-2 2-1.5-1.5 2-2z"/>'
+};
+function svi(n, cls){ return '<svg class="svic'+(cls?' '+cls:'')+'" viewBox="0 0 24 24" aria-hidden="true">'+(IC[n]||'')+'</svg>'; }
+/* 모달 종류 칩의 이모지를 아이콘으로 교체 (한 번) */
+(function(){ const map={ task:'check', appt:'cal', routine:'repeat', goal:'target', reminder:'pin', quick:'bolt', deadline:'pin', recurring:'repeat', someday:'moon', project:'layers' };
+  document.querySelectorAll('#f_pkind button, #f_bucket button').forEach(b=>{ const ic=map[b.dataset.v]; if(ic) b.innerHTML = svi(ic)+' '+b.textContent.replace(/^\S+\s+/,''); }); })();
 const CHIP = { asap:"최대한 빨리", "1-2d":"하루이틀 이내", "1w":"일주일 이내" };
 function dueLabel(it){
   if (it.dueChip && CHIP[it.dueChip]) return { text:CHIP[it.dueChip], over:false };
@@ -443,7 +492,7 @@ function apptPast(it){
   if(endD===t && !it.timeTBD){ const endT=it.endTime||it.time; if(endT) return endT<nowHM(); }
   return false;
 }
-const postBtn = '<button class="badge post" type="button" data-act="postpone">📅 미루기</button>';
+const postBtn = '<button class="badge post" type="button" data-act="postpone">'+svi('cal')+' 미루기</button>';
 function deadlineWhen(it){ if(!it.due) return ""; const d=new Date(it.due+"T12:00:00"); let s=(d.getMonth()+1)+"월 "+d.getDate()+"일"; if(it.dtime){ const p=it.dtime.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; s+=" "+ap+" "+h+":"+p[1]; } return s; }
 function recurLabel(it){ if(it.wday==="daily") return "매일"; if(it.wday!=="" && it.wday!=null) return "매주 "+DOW[+it.wday]; return "반복"; }
 /* 완료한 것: 오늘 완료(눈에 띄게 남김) vs 지난 완료(접힌 아카이브). doneAt=완료한 날, swept='지금 정리'로 넘긴 것 */
@@ -525,7 +574,7 @@ function render(){
   else v.innerHTML=soonView(TABNAME[TAB]);
   wireBtns();
 }
-function soonView(name){ return '<div class="soon"><div class="big">🧱</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
+function soonView(name){ return '<div class="soon"><div class="big">'+svi('tools')+'</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
 
 /* 드래그 정렬 (보이는 것만 재정렬, 안 보이는 것은 뒤에 그대로 유지) */
 function enableDrag(container, arr, onDone){
@@ -545,9 +594,9 @@ function enableDrag(container, arr, onDone){
     });
   });
 }
-const dragH = '<span class="drag" title="드래그해서 순서 이동">⋮⋮</span>';
-const actsH = '<div class="acts"><button type="button" data-act="edit" title="수정">✎</button><button type="button" class="del" data-act="del" title="삭제">🗑</button></div>';
-function foldHeader(key, ic, label, n, addBucket){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span>'+(addBucket?'<button class="secadd" type="button" data-add="'+addBucket+'" data-addtab="work">+</button>':'')+'<span class="chev">'+(fold[key]?'▾':'▸')+'</span></div>'; }
+const dragH = '<span class="drag" title="드래그해서 순서 이동">'+svi('grip')+'</span>';
+const actsH = '<div class="acts"><button type="button" data-act="edit" title="수정">'+svi('edit')+'</button><button type="button" class="del" data-act="del" title="삭제">'+svi('trash')+'</button></div>';
+function foldHeader(key, ic, label, n, addBucket){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span>'+(addBucket?'<button class="secadd" type="button" data-add="'+addBucket+'" data-addtab="work">'+svi('plus')+'</button>':'')+'<span class="chev">'+svi(fold[key]?'chevD':'chevR')+'</span></div>'; }
 function wireFolds(){ document.querySelectorAll("#view [data-fold]").forEach(h=> h.addEventListener("click", ()=>{ fold[h.dataset.fold]=!fold[h.dataset.fold]; render(); })); }
 function wireBtns(){
   document.querySelectorAll("#view [data-add]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); openForm({ tab:(b.dataset.addtab||"work"), type:b.dataset.add, id:null }); }));
@@ -564,13 +613,13 @@ function personalView(){
   const remaining = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) ).length;
   const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) || (i.type==="reminder"&&reminderPast(i)) );
   const head='<div class="vhead"><span class="t">개인</span>'+(remaining?'<span class="c">'+remaining+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
-  if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
+  if(!items.length) return head+'<div class="empty"><div class="big">'+svi('note')+'</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
   let html=head;
-  if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">🎯</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
-  if(reminders.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">📌</span>리마인드<span class="n">'+reminders.length+'</span></div><div class="list" id="prem">'+reminders.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(reminderCard).join("")+'</div></div>';
+  if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('target')+'</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
+  if(reminders.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('pin')+'</span>리마인드<span class="n">'+reminders.length+'</span></div><div class="list" id="prem">'+reminders.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(reminderCard).join("")+'</div></div>';
   html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
-  html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine","🔁","반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
-  if(archived.length) html += '<div class="fold">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
+  html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine",svi('repeat'),"반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
+  if(archived.length) html += '<div class="fold">'+foldHeader("pdone",svi('check'),"완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
   return html;
 }
 const mmdd = s => { const p=s.split("-"); return (+p[1])+"/"+(+p[2]); };
@@ -582,7 +631,7 @@ function goalFilled(g){ return Array.isArray(g.filled) ? g.filled : (Array.isArr
 function goalCard(g){
   const total = goalTotal(g); const set = new Set(goalFilled(g));
   const filledN = [...set].filter(i=>i<total).length; const doneAll = filledN>=total;
-  const cell = i => '<span class="sticker'+(set.has(i)?" on":"")+'" data-cell="'+i+'">'+(set.has(i)?"⭐":"")+'</span>';
+  const cell = i => '<span class="sticker'+(set.has(i)?" on":"")+'" data-cell="'+i+'">'+(set.has(i)?svi('star','gold'):"")+'</span>';
   let board;
   if(g.start && g.end){
     const per=g.perDay||1, days=Math.round((new Date(g.end+"T12:00:00")-new Date(g.start+"T12:00:00"))/86400000)+1;
@@ -595,12 +644,12 @@ function goalCard(g){
   let info = filledN+"/"+total;
   if(g.perDay>1) info += " · 하루 "+g.perDay+"번";
   return '<div class="card goal" data-id="'+g.id+'"><div class="goal-top">'+dragH+
-    '<div class="body"><div class="title">🎯 '+esc(g.title)+(doneAll?' <span class="badge soft">🎉 달성</span>':'')+'</div>'+
+    '<div class="body"><div class="title">'+svi('target')+' '+esc(g.title)+(doneAll?' <span class="badge soft">'+svi('trophy')+' 달성</span>':'')+'</div>'+
     (g.memo?'<div class="memo">'+esc(g.memo)+'</div>':'')+
     '<div class="goal-prog">'+info+'</div></div>'+actsH+'</div>'+ board + '</div>';
 }
 function routineCard(it){
-  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('repeat')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('repeat')+' '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
 }
 /* ── 리마인드 ── */
 function reminderPast(it){ return (it.endDate||it.date||"") < todayStr() && !!it.date; }
@@ -612,21 +661,21 @@ function reminderWhen(it){
   return s;
 }
 function reminderCard(it){
-  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">📌</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🗓️ '+esc(reminderWhen(it))+'</span></div></div>'+actsH+'</div>';
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('pin')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('cal')+' '+esc(reminderWhen(it))+'</span></div></div>'+actsH+'</div>';
 }
 /* ── 홈 (규칙 뼈대: 3주 캘린더 + 오늘/내일) ── */
 function recurOnDate(it, D){ if(it.wday==="daily") return true; if(it.wday!=="" && it.wday!=null) return new Date(D+"T12:00:00").getDay()===+it.wday; return false; }
 function itemsForDate(D){
   const out=[];
   STORE.personal.forEach(it=>{
-    if(it.type==="appt"){ if(it.date && it.date<=D && D<=(it.endDate||it.date)) out.push({ ic:"📅", t:it.title, s:(!it.timeTBD&&it.time)?fmtT(it.time):"" }); }
-    else if(it.type==="reminder"){ if(reminderActive(it,D)) out.push({ ic:"📌", t:it.title }); }
-    else if(it.type==="routine"){ if(recurOnDate(it,D)) out.push({ ic:"🔁", t:it.title }); }
-    else if(it.type==="task"){ if(!it.done && it.due===D) out.push({ ic:"✅", t:it.title }); }
+    if(it.type==="appt"){ if(it.date && it.date<=D && D<=(it.endDate||it.date)) out.push({ ic:"cal", t:it.title, s:(!it.timeTBD&&it.time)?fmtT(it.time):"" }); }
+    else if(it.type==="reminder"){ if(reminderActive(it,D)) out.push({ ic:"pin", t:it.title }); }
+    else if(it.type==="routine"){ if(recurOnDate(it,D)) out.push({ ic:"repeat", t:it.title }); }
+    else if(it.type==="task"){ if(!it.done && it.due===D) out.push({ ic:"check", t:it.title }); }
   });
-  STORE.work.deadline.forEach(it=>{ if(!it.done && it.due===D) out.push({ ic:"📌", t:it.title }); });
-  STORE.work.project.forEach(p=>{ if(p.due===D) out.push({ ic:"📚", t:p.title }); });
-  STORE.work.recurring.forEach(it=>{ if(recurOnDate(it,D)) out.push({ ic:"🔁", t:it.title }); });
+  STORE.work.deadline.forEach(it=>{ if(!it.done && it.due===D) out.push({ ic:"pin", t:it.title }); });
+  STORE.work.project.forEach(p=>{ if(p.due===D) out.push({ ic:"layers", t:p.title }); });
+  STORE.work.recurring.forEach(it=>{ if(recurOnDate(it,D)) out.push({ ic:"repeat", t:it.title }); });
   return out;
 }
 function homeCalendar(){
@@ -636,16 +685,16 @@ function homeCalendar(){
   for(let i=0;i<21;i++){
     const d=shiftDay(start,i), ev=itemsForDate(d), isT=d===today;
     cells+='<div class="calcell'+(isT?' today':'')+(d<today?' past':'')+(ev.length?' has':'')+'"><div class="caldd">'+(+d.slice(8))+'</div>'+
-      ev.slice(0,3).map(x=>'<div class="calev">'+x.ic+' '+esc(x.t)+'</div>').join("")+(ev.length>3?'<div class="calmore">+'+(ev.length-3)+'</div>':'')+'</div>';
+      ev.map(x=>'<div class="calev">'+svi(x.ic)+' <span>'+esc(x.t)+'</span></div>').join("")+'</div>';
   }
   return '<div class="cal"><div class="calhead">'+wk.map((w,i)=>'<div'+(i===0?' class="sun"':'')+'>'+w+'</div>').join("")+'</div><div class="calgrid">'+cells+'</div></div>';
 }
 function homeDayCard(label, D, withQuick){
   let ev=[];
-  if(D===todayStr()) STORE.work.deadline.forEach(it=>{ if(!it.done && it.due && it.due<D) ev.push({ ic:"🔴", t:it.title+" (마감 지남)" }); });
+  if(D===todayStr()) STORE.work.deadline.forEach(it=>{ if(!it.done && it.due && it.due<D) ev.push({ ic:"alert", danger:true, t:it.title+" (마감 지남)" }); });
   ev = ev.concat(itemsForDate(D));
-  if(withQuick) STORE.work.quick.filter(x=>!x.done).forEach(it=> ev.push({ ic:"⚡", t:it.title }));
-  const body = ev.length ? '<div class="hlist">'+ev.map(x=>'<div class="hitem"><span class="hic">'+x.ic+'</span><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</div>').join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .2rem">비어 있음</div>';
+  if(withQuick) STORE.work.quick.filter(x=>!x.done).forEach(it=> ev.push({ ic:"bolt", t:it.title }));
+  const body = ev.length ? '<div class="hlist">'+ev.map(x=>'<div class="hitem"><span class="hic">'+svi(x.ic, x.danger?'danger':'')+'</span><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</div>').join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .2rem">비어 있음</div>';
   return '<div class="hcard"><div class="hcard-h">'+esc(label)+'</div>'+body+'</div>';
 }
 function homeView(){
@@ -656,13 +705,13 @@ function homeView(){
 }
 function personalCard(it){
   if(it.type==="appt"){
-    const meta=['<span class="badge when">🕑 '+esc(apptWhen(it))+'</span>'];
-    if(it.who) meta.push('<span class="badge soft">🧑 '+esc(it.who)+'</span>');
-    if(it.place) meta.push('<span class="badge soft">📍 '+esc(it.place)+'</span>');
-    return '<div class="card appt'+(apptPast(it)?' past':'')+'" data-id="'+it.id+'">'+dragH+'<div class="cal">🗓️</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta.join("")+'</div></div>'+actsH+'</div>';
+    const meta=['<span class="badge when">'+svi('clock')+' '+esc(apptWhen(it))+'</span>'];
+    if(it.who) meta.push('<span class="badge soft">'+svi('user')+' '+esc(it.who)+'</span>');
+    if(it.place) meta.push('<span class="badge soft">'+svi('mappin')+' '+esc(it.place)+'</span>');
+    return '<div class="card appt'+(apptPast(it)?' past':'')+'" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('cal')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta.join("")+'</div></div>'+actsH+'</div>';
   }
   const d=dueLabel(it); let meta="";
-  if(d){ meta+='<span class="badge due'+(d.over?' over':'')+'">📅 '+esc(d.text)+'</span>'; if(d.over) meta+=postBtn; }
+  if(d){ meta+='<span class="badge due'+(d.over?' over':'')+'">'+svi('cal')+' '+esc(d.text)+'</span>'; if(d.over) meta+=postBtn; }
   return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
 }
 function wirePersonal(){
@@ -689,45 +738,45 @@ function actPersonal(id, act){
 }
 
 /* ═══ 업무 탭 ═══ */
-const WMETA = { quick:{ic:"⚡",name:"단발"}, deadline:{ic:"📌",name:"약속·마감"}, project:{ic:"📚",name:"프로젝트"}, someday:{ic:"💤",name:"백로그"} };
+const WMETA = { quick:{ic:"bolt",name:"단발"}, deadline:{ic:"pin",name:"약속·마감"}, project:{ic:"layers",name:"프로젝트"}, someday:{ic:"moon",name:"백로그"} };
 function workView(){
   let html='<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>';
   ["quick","deadline","project","someday"].forEach(k=>{ html += sectionHtml(k); });
   // 반복: 별도 접이식 참고 목록 (그날 뜨는 건 나중에 캘린더에서)
   const rec=STORE.work.recurring;
-  html += '<div class="fold">'+foldHeader("recur","🔁","반복 업무", rec.length, "recurring")+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
+  html += '<div class="fold">'+foldHeader("recur",svi('repeat'),"반복 업무", rec.length, "recurring")+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
   // 완료·지난 것 (지난 완료만)
   const done = ["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(oldDone));
-  if(done.length) html += '<div class="fold">'+foldHeader("wdone","✓","완료·지난 것", done.length)+(fold.wdone?'<div class="fold-body"><div class="list donelist">'+done.map(workCard).join("")+'</div></div>':'')+'</div>';
+  if(done.length) html += '<div class="fold">'+foldHeader("wdone",svi('check'),"완료·지난 것", done.length)+(fold.wdone?'<div class="fold-body"><div class="list donelist">'+done.map(workCard).join("")+'</div></div>':'')+'</div>';
   return html;
 }
 function sectionHtml(key){
   const meta=WMETA[key], arr=STORE.work[key];
   const items = key==="project" ? arr : arr.filter(x=>!oldDone(x));   // 오늘 완료는 그 자리에 취소선, 지난 완료만 아카이브로
-  const h='<div class="wsec-h"><span class="ic">'+meta.ic+'</span>'+esc(meta.name)+'<span class="n">'+items.length+'</span><button class="secadd" type="button" data-add="'+key+'">+</button></div>';
+  const h='<div class="wsec-h"><span class="ic">'+svi(meta.ic)+'</span>'+esc(meta.name)+'<span class="n">'+items.length+'</span><button class="secadd" type="button" data-add="'+key+'">'+svi('plus')+'</button></div>';
   if(!items.length) return '<div class="wsec">'+h+'<div class="wsec-empty">비어 있음</div></div>';
   const cards = key==="project" ? items.map(projectCard).join("") : items.map(workCard).join("");
   return '<div class="wsec">'+h+'<div class="list" data-bucket="'+key+'">'+cards+'</div></div>';
 }
 function workCard(it){
   const b=it.bucket; let meta="";
-  if(b==="deadline"){ const w=deadlineWhen(it), over=it.due&&it.due<todayStr()&&!it.done; if(w) meta+='<span class="badge due'+(over?' over':'')+'">📅 '+esc(w)+'</span>'; if(it.who) meta+='<span class="badge soft">🧑 '+esc(it.who)+'</span>'; if(over) meta+=postBtn; }
-  else if(b==="someday" && it.hope){ meta='<span class="badge soft">💤 '+esc(HOPE[it.hope]||"")+'</span>'; }
+  if(b==="deadline"){ const w=deadlineWhen(it), over=it.due&&it.due<todayStr()&&!it.done; if(w) meta+='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(w)+'</span>'; if(it.who) meta+='<span class="badge soft">'+svi('user')+' '+esc(it.who)+'</span>'; if(over) meta+=postBtn; }
+  else if(b==="someday" && it.hope){ meta='<span class="badge soft">'+svi('moon')+' '+esc(HOPE[it.hope]||"")+'</span>'; }
   return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
 }
 function recurCard(it){
-  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('repeat')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('repeat')+' '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
 }
 function projectCard(p){
   const subs=p.subtasks||[]; const doneN=subs.filter(s=>s.done).length; const open=openProjects.has(p.id);
   let dm="";
   if(p.due){ const allDone=subs.length>0 && doneN===subs.length; const over=p.due<todayStr() && !allDone;
-    dm='<span class="badge due'+(over?' over':'')+'">📅 '+esc(deadlineWhen(p))+'</span>'+(p.who?'<span class="badge soft">🧑 '+esc(p.who)+'</span>':'')+(over?postBtn:''); }
-  else if(p.hope){ dm='<span class="badge soft">⏳ '+esc(HOPE[p.hope]||"")+'</span>'; }
-  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">📚 '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(dm?'<div class="meta">'+dm+'</div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' ▾':' ▸')+'</div></div>'+actsH+'</div>';
+    dm='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(deadlineWhen(p))+'</span>'+(p.who?'<span class="badge soft">'+svi('user')+' '+esc(p.who)+'</span>':'')+(over?postBtn:''); }
+  else if(p.hope){ dm='<span class="badge soft">'+svi('hourglass')+' '+esc(HOPE[p.hope]||"")+'</span>'; }
+  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(dm?'<div class="meta">'+dm+'</div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' '+svi('chevD'):' '+svi('chevR'))+'</div></div>'+actsH+'</div>';
   if(open){
     html+='<div class="proj-sub" data-proj="'+p.id+'">';
-    html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">⋮⋮</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">🗑</button></div>').join("");
+    html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">'+svi('grip')+'</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">'+svi('trash')+'</button></div>').join("");
     html+='<div class="subadd"><input type="text" placeholder="서브태스크 추가" data-subinput="'+p.id+'"><button type="button" data-subadd="'+p.id+'">추가</button></div></div>';
   }
   return html+'</div>';
@@ -819,7 +868,7 @@ function updateSave(){ const t=$("f_title").value.trim(); let ok=!!t; if(curCtx.
 let draftSubs=[];
 function renderDraft(){
   const el=$("draftsub"); if(!el) return;
-  el.innerHTML = draftSubs.map(s=>'<div class="sub" data-id="'+s.id+'"><span class="drag">⋮⋮</span><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-dsub="'+s.id+'">🗑</button></div>').join("");
+  el.innerHTML = draftSubs.map(s=>'<div class="sub" data-id="'+s.id+'"><span class="drag">'+svi('grip')+'</span><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-dsub="'+s.id+'">'+svi('trash')+'</button></div>').join("");
   el.querySelectorAll("[data-dsub]").forEach(b=> b.addEventListener("click", ()=>{ const i=draftSubs.findIndex(x=>x.id===b.dataset.dsub); if(i>=0){ draftSubs.splice(i,1); renderDraft(); } }));
   el.querySelectorAll(".sub .st").forEach(st=>{
     const sid=st.closest("[data-id]").dataset.id;
