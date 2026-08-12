@@ -99,6 +99,10 @@
   .goal-top .body { flex:1; min-width:0; }
   .goal-prog { font-size:12.5px; font-weight:600; color:var(--on-surface-variant); margin-top:.3rem; }
   .stickers { display:flex; flex-wrap:wrap; gap:5px; margin:.9rem 0 .2rem; }
+  .stickers.grouped { gap:.55rem .7rem; }
+  .gday { display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .gdate { font-size:9.5px; font-weight:600; color:var(--on-surface-variant); white-space:nowrap; }
+  .gcells { display:flex; gap:4px; }
   .sticker { width:26px; height:26px; border-radius:50%; background:var(--surface-high); display:grid; place-items:center; font-size:14px; line-height:1; cursor:pointer; transition:background .1s, transform .05s; }
   .sticker:hover { outline:2px solid var(--accent-line); }
   .sticker:active { transform:scale(.9); }
@@ -556,15 +560,22 @@ function goalFilled(g){ return Array.isArray(g.filled) ? g.filled : (Array.isArr
 function goalCard(g){
   const total = goalTotal(g); const set = new Set(goalFilled(g));
   const filledN = [...set].filter(i=>i<total).length; const doneAll = filledN>=total;
-  let dots=""; for(let i=0;i<total;i++){ const on=set.has(i); dots += '<span class="sticker'+(on?" on":"")+'" data-cell="'+i+'">'+(on?"⭐":"")+'</span>'; }
+  const cell = i => '<span class="sticker'+(set.has(i)?" on":"")+'" data-cell="'+i+'">'+(set.has(i)?"⭐":"")+'</span>';
+  let board;
+  if(g.start && g.end){
+    const per=g.perDay||1, days=Math.round((new Date(g.end+"T12:00:00")-new Date(g.start+"T12:00:00"))/86400000)+1;
+    let groups=""; for(let d=0; d<days; d++){ const dt=shiftDay(g.start,d); let cs=""; for(let r=0;r<per;r++) cs+=cell(d*per+r);
+      groups+='<div class="gday"><span class="gdate">'+mmdd(dt)+' '+DOW[new Date(dt+"T12:00:00").getDay()]+'</span><span class="gcells">'+cs+'</span></div>'; }
+    board='<div class="stickers grouped">'+groups+'</div>';
+  } else {
+    let dots=""; for(let i=0;i<total;i++) dots+=cell(i); board='<div class="stickers">'+dots+'</div>';
+  }
   let info = filledN+"/"+total;
-  if(g.start && g.end) info += " · "+mmdd(g.start)+"~"+mmdd(g.end);
   if(g.perDay>1) info += " · 하루 "+g.perDay+"번";
   return '<div class="card goal" data-id="'+g.id+'"><div class="goal-top">'+dragH+
     '<div class="body"><div class="title">🎯 '+esc(g.title)+(doneAll?' <span class="badge soft">🎉 달성</span>':'')+'</div>'+
     (g.memo?'<div class="memo">'+esc(g.memo)+'</div>':'')+
-    '<div class="goal-prog">'+info+'</div></div>'+actsH+'</div>'+
-    '<div class="stickers">'+dots+'</div></div>';
+    '<div class="goal-prog">'+info+'</div></div>'+actsH+'</div>'+ board + '</div>';
 }
 function routineCard(it){
   return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
