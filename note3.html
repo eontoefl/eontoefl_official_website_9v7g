@@ -99,10 +99,10 @@
   .goal-top .body { flex:1; min-width:0; }
   .goal-prog { font-size:12.5px; font-weight:600; color:var(--on-surface-variant); margin-top:.3rem; }
   .stickers { display:flex; flex-wrap:wrap; gap:5px; margin:.9rem 0 .2rem; }
-  .sticker { width:26px; height:26px; border-radius:50%; background:var(--surface-high); display:grid; place-items:center; font-size:14px; line-height:1; }
+  .sticker { width:26px; height:26px; border-radius:50%; background:var(--surface-high); display:grid; place-items:center; font-size:14px; line-height:1; cursor:pointer; transition:background .1s, transform .05s; }
+  .sticker:hover { outline:2px solid var(--accent-line); }
+  .sticker:active { transform:scale(.9); }
   .sticker.on { background:#fff3d6; }
-  .goal-claim { width:100%; border:none; border-radius:var(--r); background:var(--grad); color:var(--accent-ink); padding:11px; font-size:14px; font-weight:700; box-shadow:var(--lift); margin-top:.7rem; }
-  .goal-claim.claimed { background:var(--surface-high); color:var(--on-surface-variant); box-shadow:none; }
 
   .list { display:flex; flex-direction:column; gap:.7rem; }
   .card { display:flex; align-items:flex-start; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:1rem 1.05rem 1rem .7rem; box-shadow:var(--lift); transition:box-shadow .15s, opacity .15s; }
@@ -303,8 +303,20 @@
     </div>
   </div>
 
+  <div id="blk_pdue">
+    <div class="fld"><label>또는 정확한 마감일 (선택)</label>
+      <input type="date" id="p_due">
+      <input type="text" id="p_who" placeholder="누구랑 / 무슨 약속 (마감일 있을 때)" autocomplete="off" style="margin-top:.5rem">
+      <div class="hint">날짜를 넣으면 마감으로 취급돼요(지나면 빨갛게 + 미루기). 위 '희망 시기'와 둘 중 하나만.</div>
+    </div>
+  </div>
+
   <div id="blk_goal">
-    <div class="fld"><label>목표 칸 수 (며칠/몇 번 채울지)</label><input type="number" id="g_target" min="1" max="365" placeholder="예: 30"></div>
+    <div class="fld"><label>기간 (선택)</label>
+      <div class="rangerow"><input type="date" id="g_start"><span class="tilde">~</span><input type="date" id="g_end"></div>
+    </div>
+    <div class="fld"><label>하루 목표 횟수</label><input type="number" id="g_per" min="1" max="50" placeholder="예: 1"></div>
+    <div class="fld hint" style="margin-top:-.5rem">칸 수는 기간 × 하루 횟수로 자동 계산돼요. 기간 없으면 하루 횟수만큼.</div>
   </div>
 
   <div class="fld" id="blk_memo"><label id="lbl_memo">메모 (선택)</label>
@@ -535,17 +547,24 @@ function personalView(){
   if(archived.length) html += '<div class="fold">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
   return html;
 }
+const mmdd = s => { const p=s.split("-"); return (+p[1])+"/"+(+p[2]); };
+function goalTotal(g){
+  if(g.start && g.end){ const days=Math.max(1, Math.round((new Date(g.end+"T12:00:00")-new Date(g.start+"T12:00:00"))/86400000)+1); return days*(g.perDay||1); }
+  return g.target || (g.perDay||30);
+}
+function goalFilled(g){ return Array.isArray(g.filled) ? g.filled : (Array.isArray(g.claimed) ? g.claimed.map((_,i)=>i) : []); }
 function goalCard(g){
-  const claimed = Array.isArray(g.claimed)?g.claimed:[]; const target = g.target||30; const n = Math.min(claimed.length, target);
-  const doneAll = claimed.length>=target; const claimedToday = claimed.includes(todayStr()); const streak = goalStreak(claimed);
-  let dots=""; for(let i=0;i<target;i++){ dots += '<span class="sticker'+(i<n?" on":"")+'">'+(i<n?"⭐":"")+'</span>'; }
+  const total = goalTotal(g); const set = new Set(goalFilled(g));
+  const filledN = [...set].filter(i=>i<total).length; const doneAll = filledN>=total;
+  let dots=""; for(let i=0;i<total;i++){ const on=set.has(i); dots += '<span class="sticker'+(on?" on":"")+'" data-cell="'+i+'">'+(on?"⭐":"")+'</span>'; }
+  let info = filledN+"/"+total;
+  if(g.start && g.end) info += " · "+mmdd(g.start)+"~"+mmdd(g.end);
+  if(g.perDay>1) info += " · 하루 "+g.perDay+"번";
   return '<div class="card goal" data-id="'+g.id+'"><div class="goal-top">'+dragH+
     '<div class="body"><div class="title">🎯 '+esc(g.title)+(doneAll?' <span class="badge soft">🎉 달성</span>':'')+'</div>'+
     (g.memo?'<div class="memo">'+esc(g.memo)+'</div>':'')+
-    '<div class="goal-prog">'+claimed.length+'/'+target+(streak>1?' · 🔥 '+streak+'일 연속':'')+'</div></div>'+actsH+'</div>'+
-    '<div class="stickers">'+dots+'</div>'+
-    (doneAll?'':'<button class="goal-claim'+(claimedToday?' claimed':'')+'" type="button" data-act="claim"'+(claimedToday?' disabled':'')+'>'+(claimedToday?'오늘 완료 ✓':'오늘 스티커 붙이기 ⭐')+'</button>')+
-    '</div>';
+    '<div class="goal-prog">'+info+'</div></div>'+actsH+'</div>'+
+    '<div class="stickers">'+dots+'</div></div>';
 }
 function routineCard(it){
   return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
@@ -564,13 +583,20 @@ function personalCard(it){
 function wirePersonal(){
   const add=$("padd"); if(add) add.addEventListener("click", ()=>openForm({tab:"personal",type:"task",id:null}));
   document.querySelectorAll("#view .card").forEach(card=>{ const id=card.dataset.id; card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actPersonal(id, el.dataset.act))); });
+  document.querySelectorAll("#view .sticker[data-cell]").forEach(st=>{ st.addEventListener("click", ()=>{ const gid=st.closest("[data-id]").dataset.id; toggleGoalCell(gid, +st.dataset.cell); }); });
   ["plist","pgoals","proutines"].forEach(pid=>{ const el=$(pid); if(el) enableDrag(el, STORE.personal); });
   wireFolds();
+}
+function toggleGoalCell(gid, i){
+  const g=STORE.personal.find(x=>x.id===gid); if(!g) return;
+  if(!Array.isArray(g.filled)) g.filled = Array.isArray(g.claimed) ? g.claimed.map((_,k)=>k) : [];
+  const idx=g.filled.indexOf(i);
+  if(idx>=0) g.filled.splice(idx,1); else g.filled.push(i);
+  g.updated=Date.now(); save(); render();
 }
 function actPersonal(id, act){
   const arr=STORE.personal, i=arr.findIndex(x=>x.id===id); if(i<0) return; const it=arr[i];
   if(act==="done"){ it.done=!it.done; if(it.done){ it.doneAt=todayStr(); it.swept=false; } else { it.doneAt=""; it.swept=false; } it.updated=Date.now(); }
-  else if(act==="claim"){ if(!Array.isArray(it.claimed)) it.claimed=[]; const t=todayStr(); if(it.claimed.includes(t) || it.claimed.length>=(it.target||30)) return; it.claimed.push(t); it.updated=Date.now(); }
   else if(act==="edit" || act==="postpone"){ openForm({tab:"personal", type:it.type||"task", id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); }
   else return;
@@ -611,7 +637,11 @@ function recurCard(it){
 }
 function projectCard(p){
   const subs=p.subtasks||[]; const doneN=subs.filter(s=>s.done).length; const open=openProjects.has(p.id);
-  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">📚 '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(p.hope?'<div class="meta"><span class="badge soft">⏳ '+esc(HOPE[p.hope]||"")+'</span></div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' ▾':' ▸')+'</div></div>'+actsH+'</div>';
+  let dm="";
+  if(p.due){ const allDone=subs.length>0 && doneN===subs.length; const over=p.due<todayStr() && !allDone;
+    dm='<span class="badge due'+(over?' over':'')+'">📅 '+esc(deadlineWhen(p))+'</span>'+(p.who?'<span class="badge soft">🧑 '+esc(p.who)+'</span>':'')+(over?postBtn:''); }
+  else if(p.hope){ dm='<span class="badge soft">⏳ '+esc(HOPE[p.hope]||"")+'</span>'; }
+  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">📚 '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(dm?'<div class="meta">'+dm+'</div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' ▾':' ▸')+'</div></div>'+actsH+'</div>';
   if(open){
     html+='<div class="proj-sub" data-proj="'+p.id+'">';
     html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">⋮⋮</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">🗑</button></div>').join("");
@@ -624,7 +654,7 @@ function wireWork(){
   const add=$("wadd"); if(add) add.addEventListener("click", ()=>openForm({tab:"work", type:"quick", id:null}));
   document.querySelectorAll("#view .card").forEach(card=>{
     const id=card.dataset.id;
-    card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actWork(id, el.dataset.act)));
+    card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", (e)=>{ if(el.dataset.act!=="toggle") e.stopPropagation(); actWork(id, el.dataset.act); }));
     card.querySelectorAll("[data-sub]").forEach(el=>{ const sub=el.closest("[data-id]"); const sid=sub.dataset.id; el.addEventListener("click", ()=>actSub(id, sid, el.dataset.sub)); });
     const si=card.querySelector("[data-subinput]"); if(si) si.addEventListener("keydown", e=>{ if(e.key==="Enter") addSub(id, si.value, si); });
     const sb=card.querySelector("[data-subadd]"); if(sb) sb.addEventListener("click", ()=>{ const inp=card.querySelector("[data-subinput]"); addSub(id, inp.value, inp); });
@@ -677,6 +707,7 @@ function configForm(){
   show("blk_wdue", tab==="work" && type==="deadline");
   show("blk_recur", (tab==="work" && type==="recurring") || isRoutine);
   show("blk_hope", tab==="work" && (type==="someday" || type==="project"));
+  show("blk_pdue", isProj);
   show("blk_goal", isGoal);
   show("blk_projsub", isProj);
   show("blk_memo", true);
@@ -695,7 +726,8 @@ $("f_chip").addEventListener("click", e=>{ const b=e.target.closest("button"); i
 $("f_date").addEventListener("input", ()=>{ if($("f_date").value){ pickChip=""; selChips($("f_chip"),""); } });
 $("a_tbd").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickTbd=b.dataset.v; selChips($("a_tbd"),pickTbd); $("a_timewrap").style.display=pickTbd==="tbd"?"none":"flex"; });
 $("f_wday").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickWday=b.dataset.v; selChips($("f_wday"),pickWday); });
-$("f_hope").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickHope=b.dataset.v; selChips($("f_hope"),pickHope); });
+$("f_hope").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickHope=b.dataset.v; selChips($("f_hope"),pickHope); if(pickHope) $("p_due").value=""; });
+$("p_due").addEventListener("input", ()=>{ if($("p_due").value){ pickHope=""; selChips($("f_hope"),""); } });
 $("f_title").addEventListener("input", updateSave);
 $("w_due").addEventListener("input", updateSave);
 function updateSave(){ const t=$("f_title").value.trim(); let ok=!!t; if(curCtx.tab==="work"&&curCtx.type==="deadline"&&!$("w_due").value) ok=false; $("shsave").disabled=!ok; }
@@ -732,7 +764,8 @@ function openForm(ctx){
   $("w_time").value = it && ctx.type==="deadline" && it.dtime ? it.dtime : "";
   pickWday = it && (ctx.type==="recurring"||ctx.type==="routine") && it.wday!=null ? String(it.wday) : ""; selChips($("f_wday"), pickWday);
   pickHope = it && (ctx.type==="someday"||ctx.type==="project") && it.hope ? it.hope : ""; selChips($("f_hope"), pickHope);
-  $("g_target").value = it && ctx.type==="goal" && it.target ? it.target : "";
+  $("p_due").value = it && ctx.type==="project" && it.due ? it.due : ""; $("p_who").value = it && ctx.type==="project" && it.who ? it.who : "";
+  $("g_start").value = it && ctx.type==="goal" && it.start ? it.start : ""; $("g_end").value = it && ctx.type==="goal" && it.end ? it.end : ""; $("g_per").value = it && ctx.type==="goal" && it.perDay ? it.perDay : "";
   draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
   configForm(); renderDraft(); updateSave();
   $("ov").classList.add("on"); setTimeout(()=>$("f_title").focus(), 50);
@@ -748,16 +781,16 @@ function buildItem(){
   if(tab==="personal"){
     if(type==="appt") return { type:"appt", title, memo, date:$("a_date").value, endDate:$("a_date2").value, time:pickTbd==="tbd"?"":$("a_time").value, endTime:pickTbd==="tbd"?"":$("a_time2").value, timeTBD:pickTbd==="tbd", who:$("a_who").value.trim(), place:$("a_place").value.trim(), updated:now };
     if(type==="routine") return { type:"routine", title, memo, wday:pickWday, updated:now };
-    if(type==="goal") return { type:"goal", title, memo, target:(+$("g_target").value||30), updated:now };
+    if(type==="goal") return { type:"goal", title, memo, start:$("g_start").value, end:$("g_end").value, perDay:(+$("g_per").value||1), updated:now };
     return { type:"task", title, why, memo, dueChip:pickChip, due:pickChip?"":$("f_date").value, updated:now };
   }
   if(type==="quick") return { bucket:"quick", title, memo, updated:now };
   if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, updated:now };
   if(type==="recurring") return { bucket:"recurring", title, memo, wday:pickWday, updated:now };
   if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
-  if(type==="project") return { bucket:"project", title, desc:memo, hope:pickHope, subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
+  if(type==="project") return { bucket:"project", title, desc:memo, hope:$("p_due").value?"":pickHope, due:$("p_due").value, who:$("p_who").value.trim(), subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
 }
-const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","memo","desc"];
+const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","start","end","perDay","memo","desc"];
 function saveForm(){
   if($("shsave").disabled) return;
   const data=buildItem();
