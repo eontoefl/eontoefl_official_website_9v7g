@@ -277,6 +277,9 @@
   .tx-amt.in { color:#2f8f6b; }
   .tx-amt.out { color:var(--danger); }
   .tx-krw { font-size:11px; font-weight:600; color:var(--on-surface-variant); margin-left:4px; }
+  .tx-tag { display:inline-block; font-size:9px; font-weight:700; color:var(--accent-strong); background:var(--accent-lightest); border-radius:99px; padding:1px 6px; vertical-align:middle; margin-left:3px; }
+  .toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%,14px); z-index:90; background:var(--accent-ink); color:#fff; font-size:13px; font-weight:600; padding:11px 18px; border-radius:99px; box-shadow:var(--lift-hi); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; max-width:88%; text-align:center; }
+  .toast.show { opacity:1; transform:translate(-50%,0); }
   .tx-bal { font-size:11px; color:var(--on-surface-variant); margin-top:1px; }
   .txadd { width:100%; border:none; background:var(--surface-low); color:var(--accent-strong); border-radius:var(--r); padding:9px; font-size:13px; font-weight:700; margin-top:.5rem; cursor:pointer; }
   .txadd:hover { background:var(--surface-high); }
@@ -539,6 +542,8 @@
   </div>
 </div></div>
 
+<div id="toast" class="toast"></div>
+
 <!-- 내역 우클릭 메뉴 -->
 <div id="ctxmenu" class="ctxmenu"><div class="ctx-info" id="ctx_info"></div><button type="button" data-ctx="del" class="ctx-del"></button></div>
 
@@ -684,6 +689,7 @@ function normalizeStore(){
   if(!STORE.money || typeof STORE.money!=="object" || Array.isArray(STORE.money)) STORE.money={ accounts:[] };
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
+  STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; });
 }
 
@@ -1234,7 +1240,7 @@ function txRowHtml(acctId, r){
   const amtMain=sign+(foreign?fmtMoney(t.famount,t.cur):fmtMoney(t.krw,"KRW"));
   const krwTag=foreign?'<span class="tx-krw">'+fmtMoney(t.krw,"KRW")+'</span>':'';
   const balHtml=(r.bal==null)?"":'<div class="tx-bal">'+fmtMoney(r.bal,"KRW")+'</div>';
-  return '<div class="txrow" data-acct="'+acctId+'" data-tx="'+t.id+'"><div class="tx-l"><div class="tx-desc">'+esc(t.desc||"(내역 없음)")+'</div>'+(t.note?'<div class="tx-meta">'+esc(t.note)+'</div>':'')+'</div>'+
+  return '<div class="txrow" data-acct="'+acctId+'" data-tx="'+t.id+'"><div class="tx-l"><div class="tx-desc">'+esc(t.desc||"(내역 없음)")+(t.fromFixed?' <span class="tx-tag">고정</span>':'')+'</div>'+(t.note?'<div class="tx-meta">'+esc(t.note)+'</div>':'')+'</div>'+
     '<div class="tx-r"><div class="tx-amt '+(t.dir==="in"?"in":"out")+'">'+amtMain+krwTag+'</div>'+balHtml+'</div></div>';
 }
 function wireMoney(){
@@ -1402,6 +1408,24 @@ function saveFix(){
   closeFix(); save(); render();
 }
 function delFix(){ if(!mFixEdit) return; const i=STORE.money.fixed.findIndex(x=>x.id===mFixEdit); if(i>=0) STORE.money.fixed.splice(i,1); closeFix(); save(); render(); }
+// 고정비 자동 반영: 앱 열 때, 이번 달 결제일이 지났고 아직 안 넣은 고정비를 지정 계좌/카드 내역에 생성 (달마다 한 번)
+function autoPostFixed(){
+  const today=todayStr(), mk=today.slice(0,7); let n=0;
+  (STORE.money.fixed||[]).forEach(f=>{
+    if(!f.acctId || !f.day) return;
+    const acc=findAcct(f.acctId); if(!acc) return;
+    if(!Array.isArray(f.postedMonths)) f.postedMonths=[];
+    if(f.postedMonths.includes(mk)) return;
+    const [Y,M]=mk.split("-").map(Number), chargeDate=ymd(Y,M,f.day);
+    if(today<chargeDate) return;   // 이번 달 결제일 아직 안 됨
+    if(!Array.isArray(acc.tx)) acc.tx=[];
+    acc.tx.push({ id:uid(), created:Date.now(), date:chargeDate, dir:"out", desc:f.desc, cur:f.cur||"KRW", krw:mnum(f.krw), famount:(f.cur&&f.cur!=="KRW"&&f.famount!=null)?f.famount:null, note:"", fromFixed:f.id });
+    f.postedMonths.push(mk); if(f.postedMonths.length>24) f.postedMonths=f.postedMonths.slice(-24);
+    n++;
+  });
+  return n;
+}
+function toast(msg){ const t=$("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), 3400); }
 
 /* 내역 우클릭 → 삭제 메뉴 */
 let ctxTx=null;
@@ -1464,7 +1488,7 @@ async function restoreTo(snapId){
   await pushState(); render(); setDot(true,"복원됨 ✓");
 }
 
-async function start(){ setDot(true,"여는 중…"); await loadStore(); render(); setDot(true,"준비됨"); }
+async function start(){ setDot(true,"여는 중…"); await loadStore(); const n=autoPostFixed(); if(n>0) save(); render(); if(n>0) toast("고정비 "+n+"건이 이번 달 내역에 반영됐어요"); setDot(true,"준비됨"); }
 (async ()=>{
   const saved=localStorage.getItem(PWKEY);
   if(saved){ const r=await tryUnlock(saved); if(r.ok){ PW=saved; $("gate").style.display="none"; $("app").style.display=""; await start(); return; } localStorage.removeItem(PWKEY); }
