@@ -16,6 +16,9 @@
     --accent:#b1d1e7; --accent-soft:#c8dfee; --accent-lightest:#e4eff7;
     --accent-ink:#16384e; --accent-strong:#3f7fa8; --accent-line:#86b8dc;
     --grad:linear-gradient(135deg,#b1d1e7 0%,#c8dfee 100%);
+    /* 강조(어두운 배경+흰 글자) & 아이콘: 색상2(파랑)·색상1(분홍)의 진한 톤만 */
+    --strong:#3f7fa8; --sgrad:linear-gradient(135deg,#4c8ab2 0%,#2f6f97 100%);
+    --plum:#a05a82;
     --brandmark:linear-gradient(135deg,#e9cde2 0%,#c8dfee 100%);
     --danger:#b0476a; --danger-soft:#f7e4ec;
     --lift:0 4px 28px rgba(80,40,70,.06); --lift-hi:0 12px 40px rgba(80,40,70,.11);
@@ -30,7 +33,9 @@
   ::selection { background:var(--accent-soft); color:var(--accent-ink); }
   button { font-family:inherit; cursor:pointer; }
   .svic { width:1.08em; height:1.08em; display:inline-block; vertical-align:-.16em; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
-  .svic.danger { color:var(--danger); } .svic.gold { color:#e0a92a; }
+  .svic.danger { color:var(--danger); } .svic.blue { color:var(--strong); } .svic.plum { color:var(--plum); }
+  .wsec-h .ic .svic, .fold-h .ic .svic, .card .cal .svic, .calev .svic:not(.danger), .hitem .hic .svic:not(.danger) { color:var(--strong); }
+  .card .cal.plum .svic { color:var(--plum); }
   .badge .svic { width:12px; height:12px; }
   .wsec-h .ic .svic, .fold-h .ic .svic { width:15px; height:15px; vertical-align:-.2em; }
   .card .cal .svic { width:18px; height:18px; }
@@ -46,7 +51,7 @@
   #gate p { font-size:13.5px; color:var(--on-surface-variant); margin-bottom:1.4rem; }
   #gate input { width:100%; background:#fff; border:none; border-radius:var(--r); padding:14px 16px; font-family:inherit; font-size:16px; color:var(--on-surface); outline:none; text-align:center; box-shadow:var(--lift); }
   #gate input:focus { outline:2px solid var(--accent-line); }
-  #gate button { width:100%; margin-top:.7rem; background:var(--grad); color:var(--accent-ink); border:none; border-radius:var(--r); padding:14px; font-size:15px; font-weight:700; box-shadow:var(--lift); }
+  #gate button { width:100%; margin-top:.7rem; background:var(--sgrad); color:#fff; border:none; border-radius:var(--r); padding:14px; font-size:15px; font-weight:700; box-shadow:var(--lift); }
   #gate .msg { font-size:13px; color:var(--danger); margin-top:.7rem; min-height:20px; font-weight:500; }
 
   .topbar { position:sticky; top:0; z-index:40; background:rgba(255,255,255,.72); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); margin-bottom:1.5rem; }
@@ -69,14 +74,14 @@
   .tabs button:hover { color:var(--on-surface); }
   .tabs button.on { background:var(--surface-lowest); color:var(--accent-strong); box-shadow:var(--lift); }
   .tabs button.home { display:flex; align-items:center; justify-content:center; gap:.3rem; flex:0 0 auto; padding:.7rem 1rem; background:var(--accent-lightest); color:var(--accent-strong); }
-  .tabs button.home.on { background:var(--grad); color:var(--accent-ink); box-shadow:var(--lift); }
+  .tabs button.home.on { background:var(--sgrad); color:#fff; box-shadow:var(--lift); }
   .tabs button.home .svic { width:16px; height:16px; }
   @media (max-width:480px){ .tabs button { font-size:13px; padding:.65rem .2rem; } .tabs button.home { padding:.65rem .7rem; } }
 
   .vhead { display:flex; align-items:center; gap:.8rem; margin-bottom:1.1rem; padding-left:.15rem; }
   .vhead .t { font-size:22px; font-weight:700; }
   .vhead .c { font-size:12.5px; font-weight:600; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:2px 10px; }
-  .addbtn { margin-left:auto; border:none; border-radius:var(--r); background:var(--grad); color:var(--accent-ink); padding:10px 16px; font-size:13.5px; font-weight:700; box-shadow:var(--lift); }
+  .addbtn { margin-left:auto; border:none; border-radius:var(--r); background:var(--sgrad); color:#fff; padding:10px 16px; font-size:13.5px; font-weight:700; box-shadow:var(--lift); }
   .addbtn:hover { filter:brightness(1.03); }
 
   .wsec { margin-bottom:1.4rem; }
@@ -117,7 +122,7 @@
   .sticker { width:26px; height:26px; border-radius:50%; background:var(--surface-high); display:grid; place-items:center; font-size:14px; line-height:1; cursor:pointer; transition:background .1s, transform .05s; }
   .sticker:hover { outline:2px solid var(--accent-line); }
   .sticker:active { transform:scale(.9); }
-  .sticker.on { background:#fff3d6; }
+  .sticker.on { background:#f3e2ec; }
 
   .list { display:flex; flex-direction:column; gap:.7rem; }
   .card { display:flex; align-items:flex-start; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:1rem 1.05rem 1rem .7rem; box-shadow:var(--lift); transition:box-shadow .15s, opacity .15s; }
@@ -217,11 +222,11 @@
   .fld textarea { resize:vertical; min-height:64px; line-height:1.6; }
   .chips { display:flex; flex-wrap:wrap; gap:.4rem; }
   .chips button { border:none; background:var(--field); color:var(--on-surface-variant); border-radius:99px; padding:8px 14px; font-size:13px; font-weight:600; transition:.12s; }
-  .chips button.on { background:var(--grad); color:var(--accent-ink); }
+  .chips button.on { background:var(--sgrad); color:#fff; }
   .row { display:flex; gap:.6rem; margin-top:1.4rem; }
   .row button { flex:1; border:none; border-radius:var(--r); padding:13px; font-size:14.5px; font-weight:700; }
   .cancel { background:var(--surface-high); color:var(--on-surface-variant); }
-  .save { background:var(--grad); color:var(--accent-ink); box-shadow:var(--lift); }
+  .save { background:var(--sgrad); color:#fff; box-shadow:var(--lift); }
   .save:disabled { opacity:.45; box-shadow:none; }
   .hide { display:none !important; }
   .empty .svic, .soon .svic { width:32px; height:32px; }
@@ -631,7 +636,7 @@ function goalFilled(g){ return Array.isArray(g.filled) ? g.filled : (Array.isArr
 function goalCard(g){
   const total = goalTotal(g); const set = new Set(goalFilled(g));
   const filledN = [...set].filter(i=>i<total).length; const doneAll = filledN>=total;
-  const cell = i => '<span class="sticker'+(set.has(i)?" on":"")+'" data-cell="'+i+'">'+(set.has(i)?svi('star','gold'):"")+'</span>';
+  const cell = i => '<span class="sticker'+(set.has(i)?" on":"")+'" data-cell="'+i+'">'+(set.has(i)?svi('star','plum'):"")+'</span>';
   let board;
   if(g.start && g.end){
     const per=g.perDay||1, days=Math.round((new Date(g.end+"T12:00:00")-new Date(g.start+"T12:00:00"))/86400000)+1;
@@ -661,7 +666,7 @@ function reminderWhen(it){
   return s;
 }
 function reminderCard(it){
-  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('pin')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('cal')+' '+esc(reminderWhen(it))+'</span></div></div>'+actsH+'</div>';
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal plum">'+svi('pin')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('cal')+' '+esc(reminderWhen(it))+'</span></div></div>'+actsH+'</div>';
 }
 /* ── 홈 (규칙 뼈대: 3주 캘린더 + 오늘/내일) ── */
 function recurOnDate(it, D){ if(it.wday==="daily") return true; if(it.wday!=="" && it.wday!=null) return new Date(D+"T12:00:00").getDay()===+it.wday; return false; }
