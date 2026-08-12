@@ -1030,7 +1030,9 @@ function openForm(ctx){
 }
 function closeForm(){ $("ov").classList.remove("on"); curCtx.id=null; }
 $("shcancel").addEventListener("click", closeForm);
-$("ov").addEventListener("click", e=>{ if(e.target===$("ov")) closeForm(); });
+// 배경 클릭으로 닫기 — 단, '누르기 시작'이 배경일 때만 (안에서 드래그해 배경에서 손 떼도 안 닫힘)
+function overlayDismiss(id, closeFn){ const ov=$(id); let downSelf=false; ov.addEventListener("pointerdown", e=>{ downSelf=(e.target===ov); }); ov.addEventListener("click", e=>{ if(e.target===ov && downSelf) closeFn(); }); }
+overlayDismiss("ov", closeForm);
 $("shsave").addEventListener("click", saveForm);
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("ov").classList.contains("on")) closeForm(); });
 
@@ -1223,12 +1225,12 @@ function delTx(){
 $("acctCancel").addEventListener("click", closeAcct);
 $("acctSave").addEventListener("click", saveAcct);
 $("acctDelete").addEventListener("click", delAcct);
-$("ovacct").addEventListener("click", e=>{ if(e.target===$("ovacct")) closeAcct(); });
+overlayDismiss("ovacct", closeAcct);
 $("ac_colors").addEventListener("click", e=>{ const s=e.target.closest("[data-color]"); if(!s) return; mAcctColor=s.dataset.color; renderSwatches(); });
 $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
-$("ovtx").addEventListener("click", e=>{ if(e.target===$("ovtx")) closeTx(); });
+overlayDismiss("ovtx", closeTx);
 attachThousands($("ac_start")); attachThousands($("tx_krw"));
 $("tx_dir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxDir=b.dataset.v; selChips($("tx_dir"),mTxDir); });
 $("tx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxCur=b.dataset.v; selChips($("tx_cur"),mTxCur); txCurUpdate(); });
@@ -1237,7 +1239,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").c
 /* ═══ 복원 (스냅샷 목록 → 되돌리기) ═══ */
 $("restorebtn").addEventListener("click", openRestore);
 $("restorecancel").addEventListener("click", ()=>$("restore").classList.remove("on"));
-$("restore").addEventListener("click", e=>{ if(e.target===$("restore")) $("restore").classList.remove("on"); });
+overlayDismiss("restore", ()=>$("restore").classList.remove("on"));
 function openRestore(){
   $("restore").classList.add("on");
   const box=$("restorelist"); box.innerHTML='<div class="wsec-empty">불러오는 중…</div>';
