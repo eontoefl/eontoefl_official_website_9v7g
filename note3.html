@@ -161,6 +161,29 @@
   .soon .t { font-size:16px; font-weight:600; color:var(--on-surface); }
   .soon .d { font-size:13px; margin-top:.35rem; }
   .foot { text-align:center; font-size:11px; color:var(--on-surface-variant); opacity:.6; margin-top:2.5rem; }
+  /* 홈 · 캘린더 */
+  .cal { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1rem; margin-bottom:1.5rem; }
+  .calhead { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px; }
+  .calhead div { text-align:center; font-size:10px; font-weight:700; color:var(--on-surface-variant); }
+  .calhead .sun { color:var(--danger); }
+  .calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .calcell { min-height:62px; background:var(--surface-low); border-radius:var(--r); padding:4px 5px; display:flex; flex-direction:column; gap:2px; overflow:hidden; }
+  .calcell.today { background:#e3f3fb; box-shadow:inset 0 0 0 2px var(--accent-line); }
+  .calcell.past { opacity:.5; }
+  .caldd { font-size:11px; font-weight:700; color:var(--on-surface-variant); }
+  .calcell.today .caldd { color:var(--accent-strong); }
+  .calev { font-size:9px; line-height:1.35; color:var(--on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .calmore { font-size:9px; color:var(--on-surface-variant); }
+  @media (max-width:620px){ .calcell { min-height:40px; padding:3px; } .calev, .calmore { display:none; } .calcell.has .caldd::after { content:" ·"; color:var(--accent-strong); font-weight:800; } }
+  .hcols { display:grid; grid-template-columns:1fr; gap:1rem; }
+  @media (min-width:640px){ .hcols { grid-template-columns:1fr 1fr; } }
+  .hcard { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:1.1rem 1.2rem; }
+  .hcard-h { font-size:13px; font-weight:700; color:var(--accent-strong); margin-bottom:.7rem; }
+  .hlist { display:flex; flex-direction:column; gap:.55rem; }
+  .hitem { display:flex; align-items:baseline; gap:.5rem; font-size:14px; }
+  .hitem .hic { flex-shrink:0; }
+  .hitem .ht { flex:1; min-width:0; word-break:break-word; }
+  .hitem .hs { font-size:12px; color:var(--on-surface-variant); flex-shrink:0; }
 
   .ov { position:fixed; inset:0; z-index:60; background:rgba(42,36,49,.30); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:none; align-items:flex-end; justify-content:center; }
   .ov.on { display:flex; }
@@ -208,6 +231,7 @@
   </div></div>
   <div class="wrap">
     <nav class="tabs" id="tabs">
+      <button type="button" data-tab="home">홈</button>
       <button type="button" data-tab="money">돈관리</button>
       <button type="button" data-tab="work">업무</button>
       <button type="button" data-tab="personal">개인</button>
@@ -231,6 +255,7 @@
       <button type="button" data-v="appt">📅 약속</button>
       <button type="button" data-v="routine">🔁 루틴</button>
       <button type="button" data-v="goal">🎯 목표</button>
+      <button type="button" data-v="reminder">📌 리마인드</button>
     </div>
   </div>
 
@@ -319,6 +344,14 @@
     </div>
     <div class="fld"><label>하루 목표 횟수</label><input type="number" id="g_per" min="1" max="50" placeholder="예: 1"></div>
     <div class="fld hint" style="margin-top:-.5rem">칸 수는 기간 × 하루 횟수로 자동 계산돼요. 기간 없으면 하루 횟수만큼.</div>
+  </div>
+
+  <div id="blk_reminder">
+    <div class="fld"><label>날짜</label>
+      <div class="rangerow"><input type="date" id="r_date"><span class="tilde">~</span><input type="date" id="r_end"></div>
+      <div class="hint">하루면 시작 날짜만, 여러 날이면 끝 날짜까지. 그날 홈 화면에 떠요.</div>
+    </div>
+    <div class="fld"><label>며칠 전부터 미리 알림 (선택)</label><input type="number" id="r_lead" min="0" max="60" placeholder="예: 3"></div>
   </div>
 
   <div class="fld" id="blk_memo"><label id="lbl_memo">메모 (선택)</label>
@@ -478,15 +511,16 @@ async function loadStore(){
 }
 
 /* ═══ 탭 ═══ */
-let TAB="personal";
-const TABNAME = { money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
+let TAB="home";
+const TABNAME = { home:"홈", money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
 const openProjects = new Set();
 let fold = { recur:false, wdone:false, pdone:false, proutine:false };   // 접힘 상태 (기본 접힘)
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); window.scrollTo({ top:0 }); }));
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===TAB));
   const v=$("view");
-  if(TAB==="personal"){ v.innerHTML=personalView(); wirePersonal(); }
+  if(TAB==="home"){ v.innerHTML=homeView(); }
+  else if(TAB==="personal"){ v.innerHTML=personalView(); wirePersonal(); }
   else if(TAB==="work"){ v.innerHTML=workView(); wireWork(); }
   else v.innerHTML=soonView(TABNAME[TAB]);
   wireBtns();
@@ -524,14 +558,16 @@ function personalView(){
   const items=STORE.personal;
   const goals = items.filter(i=>i.type==="goal");
   const routines = items.filter(i=>i.type==="routine");
+  const reminders = items.filter(i=> i.type==="reminder" && !reminderPast(i));
   // 완료해도 오늘은 그 자리에 취소선만 (active에 freshDone 포함), 다음날 archived로
   const active = items.filter(i=> (i.type==="task"&&!oldDone(i)) || (i.type==="appt"&&!apptPast(i)) );
   const remaining = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) ).length;
-  const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) );
+  const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) || (i.type==="reminder"&&reminderPast(i)) );
   const head='<div class="vhead"><span class="t">개인</span>'+(remaining?'<span class="c">'+remaining+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
   if(!items.length) return head+'<div class="empty"><div class="big">🗒️</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
   let html=head;
   if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">🎯</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
+  if(reminders.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">📌</span>리마인드<span class="n">'+reminders.length+'</span></div><div class="list" id="prem">'+reminders.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(reminderCard).join("")+'</div></div>';
   html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
   html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine","🔁","반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
   if(archived.length) html += '<div class="fold">'+foldHeader("pdone","✓","완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
@@ -565,6 +601,58 @@ function goalCard(g){
 }
 function routineCard(it){
   return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">🔁</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🔁 '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
+}
+/* ── 리마인드 ── */
+function reminderPast(it){ return (it.endDate||it.date||"") < todayStr() && !!it.date; }
+function reminderActive(it, D){ if(!it.date) return false; const from=it.lead?shiftDay(it.date,-it.lead):it.date; const to=it.endDate||it.date; return from<=D && D<=to; }
+function reminderWhen(it){
+  let s = it.date ? fmtD(it.date) : "날짜 없음";
+  if(it.endDate && it.endDate!==it.date) s += " ~ "+fmtD(it.endDate);
+  if(it.lead>0) s += " · "+it.lead+"일 전부터";
+  return s;
+}
+function reminderCard(it){
+  return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">📌</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">🗓️ '+esc(reminderWhen(it))+'</span></div></div>'+actsH+'</div>';
+}
+/* ── 홈 (규칙 뼈대: 3주 캘린더 + 오늘/내일) ── */
+function recurOnDate(it, D){ if(it.wday==="daily") return true; if(it.wday!=="" && it.wday!=null) return new Date(D+"T12:00:00").getDay()===+it.wday; return false; }
+function itemsForDate(D){
+  const out=[];
+  STORE.personal.forEach(it=>{
+    if(it.type==="appt"){ if(it.date && it.date<=D && D<=(it.endDate||it.date)) out.push({ ic:"📅", t:it.title, s:(!it.timeTBD&&it.time)?fmtT(it.time):"" }); }
+    else if(it.type==="reminder"){ if(reminderActive(it,D)) out.push({ ic:"📌", t:it.title }); }
+    else if(it.type==="routine"){ if(recurOnDate(it,D)) out.push({ ic:"🔁", t:it.title }); }
+    else if(it.type==="task"){ if(!it.done && it.due===D) out.push({ ic:"✅", t:it.title }); }
+  });
+  STORE.work.deadline.forEach(it=>{ if(!it.done && it.due===D) out.push({ ic:"📌", t:it.title }); });
+  STORE.work.project.forEach(p=>{ if(p.due===D) out.push({ ic:"📚", t:p.title }); });
+  STORE.work.recurring.forEach(it=>{ if(recurOnDate(it,D)) out.push({ ic:"🔁", t:it.title }); });
+  return out;
+}
+function homeCalendar(){
+  const today=todayStr(), dow=new Date(today+"T12:00:00").getDay(), start=shiftDay(today,-dow);
+  const wk=["일","월","화","수","목","금","토"];
+  let cells="";
+  for(let i=0;i<21;i++){
+    const d=shiftDay(start,i), ev=itemsForDate(d), isT=d===today;
+    cells+='<div class="calcell'+(isT?' today':'')+(d<today?' past':'')+(ev.length?' has':'')+'"><div class="caldd">'+(+d.slice(8))+'</div>'+
+      ev.slice(0,3).map(x=>'<div class="calev">'+x.ic+' '+esc(x.t)+'</div>').join("")+(ev.length>3?'<div class="calmore">+'+(ev.length-3)+'</div>':'')+'</div>';
+  }
+  return '<div class="cal"><div class="calhead">'+wk.map((w,i)=>'<div'+(i===0?' class="sun"':'')+'>'+w+'</div>').join("")+'</div><div class="calgrid">'+cells+'</div></div>';
+}
+function homeDayCard(label, D, withQuick){
+  let ev=[];
+  if(D===todayStr()) STORE.work.deadline.forEach(it=>{ if(!it.done && it.due && it.due<D) ev.push({ ic:"🔴", t:it.title+" (마감 지남)" }); });
+  ev = ev.concat(itemsForDate(D));
+  if(withQuick) STORE.work.quick.filter(x=>!x.done).forEach(it=> ev.push({ ic:"⚡", t:it.title }));
+  const body = ev.length ? '<div class="hlist">'+ev.map(x=>'<div class="hitem"><span class="hic">'+x.ic+'</span><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</div>').join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .2rem">비어 있음</div>';
+  return '<div class="hcard"><div class="hcard-h">'+esc(label)+'</div>'+body+'</div>';
+}
+function homeView(){
+  const today=todayStr(), tmr=shiftDay(today,1);
+  return '<div class="vhead"><span class="t">홈</span><span class="c">'+fmtD(today)+'</span></div>'+
+    homeCalendar()+
+    '<div class="hcols">'+homeDayCard("오늘 · "+fmtD(today), today, true)+homeDayCard("내일 · "+fmtD(tmr), tmr, false)+'</div>';
 }
 function personalCard(it){
   if(it.type==="appt"){
@@ -693,7 +781,7 @@ function show(id, on){ $(id).classList.toggle("hide", !on); }
 
 function configForm(){
   const {tab,type}=curCtx, isP=tab==="personal", isProj=tab==="work"&&type==="project";
-  const isGoal=isP&&type==="goal", isRoutine=isP&&type==="routine";
+  const isGoal=isP&&type==="goal", isRoutine=isP&&type==="routine", isRem=isP&&type==="reminder";
   show("blk_pkind", isP);
   show("blk_bucket", tab==="work");
   show("blk_why", isP && type==="task");
@@ -704,15 +792,16 @@ function configForm(){
   show("blk_hope", tab==="work" && (type==="someday" || type==="project"));
   show("blk_pdue", isProj);
   show("blk_goal", isGoal);
+  show("blk_reminder", isRem);
   show("blk_projsub", isProj);
   show("blk_memo", true);
-  $("lbl_title").textContent = isProj?"프로젝트 이름" : isGoal?"목표 이름" : isRoutine?"루틴 이름" : "제목";
+  $("lbl_title").textContent = isProj?"프로젝트 이름" : isGoal?"목표 이름" : isRoutine?"루틴 이름" : isRem?"리마인드 내용" : "제목";
   $("lbl_memo").textContent = isProj ? "설명 (선택)" : "메모 (선택)";
-  $("f_title").placeholder = isP ? (type==="task"?"무엇을 해야 하나요?":type==="appt"?"무슨 약속인가요?":type==="routine"?"어떤 루틴인가요?":"무슨 목표인가요?") : (isProj?"프로젝트 이름":"무엇을 하나요?");
+  $("f_title").placeholder = isP ? (type==="task"?"무엇을 해야 하나요?":type==="appt"?"무슨 약속인가요?":type==="routine"?"어떤 루틴인가요?":type==="goal"?"무슨 목표인가요?":"뭘 기억할까요?") : (isProj?"프로젝트 이름":"무엇을 하나요?");
   if(isP) selChips($("f_pkind"), type);
   if(tab==="work") selChips($("f_bucket"), type);
   if(tab==="work"){ $("shtitle").textContent = curCtx.id ? "업무 수정" : "새 업무"; }
-  else { const names={ task:"할일", appt:"약속", routine:"루틴", goal:"목표" }; $("shtitle").textContent = (curCtx.id?"수정 · ":"새 ")+names[type]; }
+  else { const names={ task:"할일", appt:"약속", routine:"루틴", goal:"목표", reminder:"리마인드" }; $("shtitle").textContent = (curCtx.id?"수정 · ":"새 ")+names[type]; }
 }
 
 $("f_pkind").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
@@ -761,6 +850,7 @@ function openForm(ctx){
   pickHope = it && (ctx.type==="someday"||ctx.type==="project") && it.hope ? it.hope : ""; selChips($("f_hope"), pickHope);
   $("p_due").value = it && ctx.type==="project" && it.due ? it.due : ""; $("p_who").value = it && ctx.type==="project" && it.who ? it.who : "";
   $("g_start").value = it && ctx.type==="goal" && it.start ? it.start : ""; $("g_end").value = it && ctx.type==="goal" && it.end ? it.end : ""; $("g_per").value = it && ctx.type==="goal" && it.perDay ? it.perDay : "";
+  $("r_date").value = it && ctx.type==="reminder" && it.date ? it.date : ""; $("r_end").value = it && ctx.type==="reminder" && it.endDate ? it.endDate : ""; $("r_lead").value = it && ctx.type==="reminder" && it.lead ? it.lead : "";
   draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
   configForm(); renderDraft(); updateSave();
   $("ov").classList.add("on"); setTimeout(()=>$("f_title").focus(), 50);
@@ -777,6 +867,7 @@ function buildItem(){
     if(type==="appt") return { type:"appt", title, memo, date:$("a_date").value, endDate:$("a_date2").value, time:pickTbd==="tbd"?"":$("a_time").value, endTime:pickTbd==="tbd"?"":$("a_time2").value, timeTBD:pickTbd==="tbd", who:$("a_who").value.trim(), place:$("a_place").value.trim(), updated:now };
     if(type==="routine") return { type:"routine", title, memo, wday:pickWday, updated:now };
     if(type==="goal") return { type:"goal", title, memo, start:$("g_start").value, end:$("g_end").value, perDay:(+$("g_per").value||1), updated:now };
+    if(type==="reminder") return { type:"reminder", title, memo, date:$("r_date").value, endDate:$("r_end").value, lead:(+$("r_lead").value||0), updated:now };
     return { type:"task", title, why, memo, dueChip:pickChip, due:pickChip?"":$("f_date").value, updated:now };
   }
   if(type==="quick") return { bucket:"quick", title, memo, updated:now };
@@ -785,7 +876,7 @@ function buildItem(){
   if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
   if(type==="project") return { bucket:"project", title, desc:memo, hope:$("p_due").value?"":pickHope, due:$("p_due").value, who:$("p_who").value.trim(), subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
 }
-const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","start","end","perDay","memo","desc"];
+const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","start","end","perDay","lead","memo","desc"];
 function saveForm(){
   if($("shsave").disabled) return;
   const data=buildItem();
