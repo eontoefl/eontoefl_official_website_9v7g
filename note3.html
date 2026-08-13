@@ -83,6 +83,9 @@
   .vhead .c { font-size:12.5px; font-weight:600; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:2px 10px; }
   .addbtn { margin-left:auto; border:none; border-radius:var(--r); background:var(--sgrad); color:#fff; padding:10px 16px; font-size:13.5px; font-weight:700; box-shadow:var(--lift); }
   .addbtn:hover { filter:brightness(1.03); }
+  .addbtn.ghost { background:var(--surface-high); color:var(--on-surface); box-shadow:none; }
+  .addbtn.ghost:hover { background:var(--surface-highest); filter:none; }
+  .addbtn.ghost .svic { width:15px; height:15px; vertical-align:-.2em; margin-right:1px; }
 
   .wsec { margin-bottom:1.4rem; }
   .wsec-h { display:flex; align-items:center; gap:.5rem; margin:0 0 .6rem .15rem; font-size:13.5px; font-weight:700; color:var(--on-surface); }
@@ -720,6 +723,7 @@ const IC = {
   grip:'<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
   restore:'<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4h4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  download:'<path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>',
   chevR:'<path d="M9 6l6 6-6 6"/>', chevD:'<path d="M6 9l6 6 6-6"/>',
   lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   check:'<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
@@ -1323,9 +1327,114 @@ function conduitBreakdown(acctId){
   return { total:already+upcoming, already, remaining:upcoming };
 }
 
+function financeDocHtml(){
+  const m=STORE.money||{}, accts=m.accounts||[], fixed=m.fixed||[];
+  const won=v=>fmtMoney(v,"KRW");
+  const nm=id=>{const a=accts.find(x=>x.id===id);return a?esc(a.alias||"(이름없음)"):(id?"삭제된 계좌":"미지정");};
+  const REPAY={free:"자유상환(수시상환)",interest:"이자만",amortize:"원리금균등",principal:"원금균등"};
+  const mrate=a=>mnum(a.balance)*mnum(a.rate)/100/12;
+  const sortTx=arr=>arr.slice().sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+  const cash=accts.filter(a=>a.kind==="account"&&!a.conduit&&!a.overdraft);
+  const od=accts.filter(a=>a.kind==="account"&&a.overdraft);
+  const cond=accts.filter(a=>a.kind==="account"&&a.conduit);
+  const cards=accts.filter(a=>a.kind==="card");
+  const loans=accts.filter(a=>a.kind==="loan");
+  const realLoans=loans.filter(a=>!a.returnAtMaturity), matLoans=loans.filter(a=>a.returnAtMaturity);
+  const asset=cash.reduce((s,a)=>s+acctBalance(a),0);
+  const odDebt=od.reduce((s,a)=>s+Math.max(0,-acctBalance(a)),0);
+  const loanDebt=realLoans.reduce((s,a)=>s+mnum(a.balance),0);
+  const debt=odDebt+loanDebt, net=asset-debt;
+  const matDebt=matLoans.reduce((s,a)=>s+mnum(a.balance),0);
+  const fixedM=fixed.reduce((s,f)=>s+mnum(f.krw),0);
+  const loanIntM=Math.round(loans.reduce((s,a)=>s+mrate(a),0));
+  const stamp=todayStr(); const P=[];
+  P.push('<h1>이온토플 대표 부부 — 재정 현황 문서</h1>');
+  P.push('<blockquote>김비서 v3 돈관리 데이터 전체를 그대로 옮긴 문서입니다. 조언용 자료.<br>생성: <b>'+stamp+'</b><br>수입원: <b>수강료 → 사업자계좌 입금</b>, 금액·시기 불규칙. (이 외 수입원 없음)</blockquote>');
+  P.push('<h2>0. 한눈에 보는 요약</h2>');
+  P.push('<div class="tw"><table><tbody>'+
+    '<tr><td>💰 자산 (현금성 계좌 잔액 합계)</td><td><b>'+won(asset)+'</b></td></tr>'+
+    '<tr><td>🔴 부채 (실부담: 마통 + 만기반환 아닌 대출)</td><td><b>'+won(debt)+'</b></td></tr>'+
+    '<tr><td>⭐ 순자산 (자산 − 실부담 부채)</td><td><b>'+won(net)+'</b></td></tr>'+
+    '<tr><td>🏠 (별도) 전세 등 만기반환 대출</td><td>'+won(matDebt)+'</td></tr>'+
+    '<tr><td>📄 월 고정비 합계</td><td>'+won(fixedM)+'</td></tr>'+
+    '<tr><td>🏦 월 대출이자 합계(현재 잔액 기준, 근사)</td><td>'+won(loanIntM)+'</td></tr>'+
+    '</tbody></table></div>');
+  P.push('<p class="muted">※ "실부담"에서 만기반환 대출('+won(matDebt)+')은 만기에 보증금 등으로 반환되는 성격이라 제외. 부채 총액에 넣어 보려면 순자산에서 '+won(matDebt)+'을 추가로 빼면 됩니다.</p>');
+  P.push('<h2>1. 현금성 계좌 (자산)</h2>');
+  cash.forEach(a=>{
+    P.push('<h3>'+esc(a.alias||"계좌")+' <span class="bal">잔액 '+won(acctBalance(a))+'</span></h3>');
+    P.push('<ul><li>은행: '+(esc(a.bank)||"—")+(a.num?(' · 계좌번호 '+esc(a.num)):'')+'</li><li>시작 잔액: '+won(a.startBalance)+'</li>'+(mnum(a.budget)>0?('<li><b>월 예산: '+won(a.budget)+'</b></li>'):'')+'</ul>');
+    const txs=sortTx(a.tx||[]);
+    if(txs.length) P.push('<div class="tw"><table><thead><tr><th>날짜</th><th>구분</th><th>금액</th><th>내용</th><th>메모</th></tr></thead><tbody>'+txs.map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+(t.dir==="in"?"입금(+)":"출금(−)")+'</td><td>'+won(t.krw)+'</td><td>'+esc(t.desc)+'</td><td>'+(esc(t.note)||'')+'</td></tr>').join('')+'</tbody></table></div>');
+    else P.push('<p class="muted">거래 내역 없음</p>');
+  });
+  P.push('<h2>2. 지출 통로 계좌</h2>');
+  if(!cond.length) P.push('<p class="muted">없음</p>');
+  cond.forEach(a=>{
+    P.push('<h3>'+esc(a.alias||"계좌")+' <span class="bal">지출 통로</span></h3>');
+    P.push('<ul><li>은행: '+(esc(a.bank)||"—")+'</li><li>공과금·이자·보험 등이 빠져나가는 통로. 수입은 사업자계좌에서 흘러옴.</li></ul>');
+    const txs=sortTx(a.tx||[]);
+    if(txs.length) P.push('<div class="tw"><table><thead><tr><th>날짜</th><th>금액</th><th>내용</th><th>출처</th><th>메모</th></tr></thead><tbody>'+txs.map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+won(t.krw)+'</td><td>'+esc(t.desc)+'</td><td>'+(t.fromFixed?"고정비":(t.fromLoan?"대출":(t.fromCard?"카드":"수동")))+'</td><td>'+(esc(t.note)||'')+'</td></tr>').join('')+'</tbody></table></div>');
+    else P.push('<p class="muted">거래 내역 없음</p>');
+  });
+  P.push('<h2>3. 마이너스통장</h2>');
+  if(!od.length) P.push('<p class="muted">없음</p>');
+  od.forEach(a=>{
+    P.push('<h3>'+esc(a.alias||"계좌")+' <span class="bal">잔액 '+won(acctBalance(a))+'</span></h3>');
+    P.push('<ul><li>은행: '+(esc(a.bank)||"—")+(a.num?(' · '+esc(a.num)):'')+'</li><li>현재 잔액: '+won(acctBalance(a))+' (마이너스면 그만큼이 빚)</li><li>연 이자율: '+(a.odRate?(a.odRate+"%"):"—")+' · 이자 납부일: 매달 '+dayLabel(a.odInterestDay)+'</li><li>시작 잔액: '+won(a.startBalance)+'</li></ul>');
+    const txs=sortTx(a.tx||[]);
+    if(txs.length) P.push('<div class="tw"><table><thead><tr><th>날짜</th><th>구분</th><th>금액</th><th>내용</th><th>메모</th></tr></thead><tbody>'+txs.map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+(t.dir==="in"?"입금(+)":"출금(−)")+'</td><td>'+won(t.krw)+'</td><td>'+esc(t.desc)+'</td><td>'+(esc(t.note)||'')+'</td></tr>').join('')+'</tbody></table></div>');
+  });
+  P.push('<h2>4. 신용카드 — 전체 사용내역</h2>');
+  cards.forEach(a=>{
+    const txs=sortTx(a.tx||[]); const sum=txs.filter(t=>t.dir!=="in").reduce((s,t)=>s+mnum(t.krw),0);
+    P.push('<h3>'+esc(a.alias||"카드")+'</h3>');
+    P.push('<ul><li>카드사: '+(esc(a.bank)||"—")+'</li><li>결제일: 매달 '+dayLabel(a.payDay)+' · 출금 계좌: '+nm(a.payAcctId)+'</li>'+((a.cycleStart||a.cycleEnd)?('<li>사용주기: '+esc(a.cycleStart)+'일 ~ '+esc(a.cycleEnd)+'일</li>'):'')+'<li>사용내역 합계: '+won(sum)+' ('+txs.length+'건)</li></ul>');
+    if(txs.length) P.push('<div class="tw"><table><thead><tr><th>날짜</th><th>금액</th><th>내용</th><th>출처</th><th>메모</th></tr></thead><tbody>'+txs.map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+won(t.krw)+'</td><td>'+esc(t.desc)+'</td><td>'+(t.fromFixed?"고정비(자동)":(t.fromCard?"카드":"수동"))+'</td><td>'+(esc(t.note)||'')+'</td></tr>').join('')+'</tbody></table></div>');
+  });
+  P.push('<h2>5. 대출 — 전체 상세</h2>');
+  loans.forEach(a=>{
+    P.push('<h3>'+esc(a.alias||"대출")+' <span class="bal">잔액 '+won(a.balance)+(a.returnAtMaturity?" · 만기반환":"")+'</span></h3>');
+    const L=['기관: '+(esc(a.bank)||"—"),'대출 종류: '+(LOANTYPES[a.loanType]||esc(a.loanType)||"—"),'최초 원금: '+won(a.principal),'현재 잔액: '+won(a.balance),'연 이자율: '+esc(a.rate)+'%','월 이자(현재 잔액 기준): 약 '+won(Math.round(mrate(a))),'상환 방식: '+(REPAY[a.repayType]||esc(a.repayType))];
+    if(a.graceMonths||a.graceEndDate) L.push('거치기간: '+(a.graceMonths?(a.graceMonths+'개월'):'')+(a.graceEndDate?(' (거치 종료 '+esc(a.graceEndDate)+')'):''));
+    if(a.startDate) L.push('실행일: '+esc(a.startDate));
+    if(a.maturityDate) L.push('만기일: '+esc(a.maturityDate));
+    L.push('상환일: 매달 '+dayLabel(a.payDay)+' · 출금 계좌: '+nm(a.payAcctId));
+    if(mnum(a.monthlyPay)>0) L.push('월 상환액(원리금균등): '+won(a.monthlyPay));
+    if(a.monthlyManual) L.push('월 상환액(직접입력): '+won(a.monthlyManual));
+    L.push('만기 반환 여부: '+(a.returnAtMaturity?'예 (실부담 부채 제외)':'아니오'));
+    if(a.lastPaymentDate) L.push('마지막 상환일: '+esc(a.lastPaymentDate));
+    P.push('<ul>'+L.map(x=>'<li>'+x+'</li>').join('')+'</ul>');
+  });
+  P.push('<h2>6. 고정비 (매달 정기 지출) — 전체 · 메모 포함</h2>');
+  P.push('<p>총 '+fixed.length+'건, 월 합계 '+won(fixedM)+'.</p>');
+  P.push('<div class="tw"><table><thead><tr><th>항목</th><th>금액</th><th>결제일</th><th>출금계좌</th><th>메모(왜)</th></tr></thead><tbody>'+fixed.map(f=>'<tr><td>'+esc(f.desc)+'</td><td>'+won(f.krw)+'</td><td>매달 '+dayLabel(f.day)+'</td><td>'+nm(f.acctId)+'</td><td>'+(esc(f.why)||"—")+'</td></tr>').join('')+'</tbody></table></div>');
+  P.push('<h2>7. 빚 상환 우선순위 (이자율 높은 순)</h2>');
+  const dlist=[];
+  loans.forEach(a=>dlist.push({name:esc(a.alias||"대출")+(a.returnAtMaturity?"(만기반환)":""),kind:"대출",rate:mnum(a.rate),bal:mnum(a.balance)}));
+  od.forEach(a=>dlist.push({name:esc(a.alias||"마통"),kind:"마통",rate:mnum(a.odRate),bal:Math.max(0,-acctBalance(a))}));
+  dlist.sort((x,y)=>y.rate-x.rate);
+  P.push('<div class="tw"><table><thead><tr><th>순위</th><th>빚</th><th>종류</th><th>이자율</th><th>잔액</th></tr></thead><tbody>'+dlist.map((d,i)=>'<tr><td>'+(i+1)+'</td><td>'+d.name+'</td><td>'+d.kind+'</td><td>'+d.rate+'%</td><td>'+won(d.bal)+'</td></tr>').join('')+'</tbody></table></div>');
+  P.push('<h2>8. 참고 / 데이터 특이사항</h2>');
+  P.push('<ul><li><b>수입 기록 방식:</b> 수강료가 들어올 때마다 사업자계좌에 입금으로 기록. 불규칙.</li><li><b>돈 흐름:</b> 모든 수입은 사업자계좌로 → 각 계좌(생활비=토스생활비, 이자·공과금=남편계좌 등)로 분배되어 지출.</li><li><b>대출 이자 표기:</b> "이자만" 대출은 매달 이자만 자동 출금(원금 안 줄어듦). 원금이 실제 줄어드는 달만 "상환"으로 표기.</li></ul>');
+  P.push('<p class="muted">문서 생성: 김비서 v3 데이터 기준. 모든 계좌·거래·메모·대출·고정비를 누락 없이 포함.</p>');
+  const CSS='*{box-sizing:border-box}body{font-family:"Pretendard Variable","Pretendard","Malgun Gothic",sans-serif;color:#2a2431;background:#faf6f9;line-height:1.7;margin:0;padding:32px 18px 80px}.doc{max-width:900px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(80,40,70,.08);padding:40px 44px}h1{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}h2{font-size:20px;margin:34px 0 12px;padding-top:14px;border-top:2px solid #f0e2ec;color:#3f7fa8}h3{font-size:16px;margin:22px 0 6px}h3 .bal{font-weight:600;color:#6d6270;font-size:13px;margin-left:6px}blockquote{background:#f5edf3;border-left:4px solid #c8a7c0;margin:14px 0;padding:12px 16px;border-radius:8px;color:#5a4f5e;font-size:14px}ul{margin:8px 0;padding-left:20px}li{margin:2px 0;font-size:14px}p{margin:8px 0;font-size:14px}.muted{color:#9a8fa0;font-size:12px}.tw{overflow-x:auto;margin:10px 0 18px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #eaddE6;padding:6px 9px;text-align:left;vertical-align:top}th{background:#f3e8f0;color:#4a3f52;font-weight:700;white-space:nowrap}td:nth-child(3){white-space:nowrap}tbody tr:nth-child(even){background:#fbf7fa}strong,b{color:#20303a}@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0;padding:10px 0}tr{break-inside:avoid}}';
+  return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>재정 현황 — '+stamp+'</title><style>'+CSS+'</style></head><body><div class="doc">'+P.join('\n')+'</div></body></html>';
+}
+function downloadFinanceDoc(){
+  try{
+    const html=financeDocHtml();
+    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="재정현황_"+todayStr()+".html";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    toast("재정 현황 문서를 저장했어요 📄");
+  }catch(e){ toast("문서 생성 오류: "+e.message); }
+}
 function moneyView(){
   const accts=STORE.money.accounts;
-  let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn" id="acctAdd" type="button">+ 추가</button></div>';
+  let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn ghost" id="finDl" type="button" style="margin-left:auto">'+svi("download")+' 문서 저장</button><button class="addbtn" id="acctAdd" type="button" style="margin-left:.5rem">+ 추가</button></div>';
   if(!accts.length) return html+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
   const assets=accts.filter(a=>a.kind==="account" && !a.conduit && !a.overdraft).reduce((s,a)=>s+acctBalance(a),0);
   const odDebt=accts.filter(a=>a.kind==="account" && a.overdraft).reduce((s,a)=>s+Math.max(0,-acctBalance(a)),0);   // 마통 사용액
@@ -1474,6 +1583,7 @@ function txRowHtml(acctId, r){
 }
 function wireMoney(){
   const add=$("acctAdd"); if(add) add.addEventListener("click",()=>openAcct(null));
+  const fdl=$("finDl"); if(fdl) fdl.addEventListener("click",downloadFinanceDoc);
   document.querySelectorAll("#view .mcard").forEach(card=>{ const id=card.dataset.id;
     card.querySelectorAll(".acct-top [data-act]").forEach(el=> el.addEventListener("click", e=>{ if(el.dataset.act!=="toggle") e.stopPropagation(); actAcct(id, el.dataset.act); })); });
   document.querySelectorAll("#view .txrow").forEach(row=>{
