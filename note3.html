@@ -1359,7 +1359,8 @@ function financeDocHtml(){
     '<tr><td>📄 월 고정비 합계</td><td>'+won(fixedM)+'</td></tr>'+
     '<tr><td>🏦 월 대출이자 합계(현재 잔액 기준, 근사)</td><td>'+won(loanIntM)+'</td></tr>'+
     '</tbody></table></div>');
-  P.push('<p class="muted">※ "실부담"에서 만기반환 대출('+won(matDebt)+')은 만기에 보증금 등으로 반환되는 성격이라 제외. 부채 총액에 넣어 보려면 순자산에서 '+won(matDebt)+'을 추가로 빼면 됩니다.</p>');
+  P.push('<p class="muted">※ "실부담"에서 만기반환 대출('+won(matDebt)+')은 만기에 보증금 등으로 반환되는 성격이라 제외.</p>');
+  if(matLoans.length) P.push('<div class="warn">📌 <b>이 문서를 읽는 분께 (중요)</b><br>"만기반환" 대출('+matLoans.map(a=>esc(a.alias)).join(", ")+' · 합계 '+won(matDebt)+')은 <b>갚아야 할 급한 빚이 아닙니다.</b> 예를 들어 전세대출은 <b>전세보증금(만기에 돌려받는 자산)</b>을 마련하려고 받은 것으로, 만기에 그 보증금으로 한 번에 상환됩니다. 매달 나가는 것은 <b>이자뿐</b>이고 원금은 조기상환 대상이 아닙니다. 따라서 <b>상환 우선순위에서 제외</b>하고 판단해 주세요. (아래 7번 우선순위 표에도 일부러 넣지 않았습니다.)</div>');
   P.push('<h2>1. 현금성 계좌 (자산)</h2>');
   cash.forEach(a=>{
     P.push('<h3>'+esc(a.alias||"계좌")+' <span class="bal">잔액 '+won(acctBalance(a))+'</span></h3>');
@@ -1410,15 +1411,17 @@ function financeDocHtml(){
   P.push('<p>총 '+fixed.length+'건, 월 합계 '+won(fixedM)+'.</p>');
   P.push('<div class="tw"><table><thead><tr><th>항목</th><th>금액</th><th>결제일</th><th>출금계좌</th><th>메모(왜)</th></tr></thead><tbody>'+fixed.map(f=>'<tr><td>'+esc(f.desc)+'</td><td>'+won(f.krw)+'</td><td>매달 '+dayLabel(f.day)+'</td><td>'+nm(f.acctId)+'</td><td>'+(esc(f.why)||"—")+'</td></tr>').join('')+'</tbody></table></div>');
   P.push('<h2>7. 빚 상환 우선순위 (이자율 높은 순)</h2>');
+  P.push('<p class="muted">여윳돈이 생기면 이자율 높은 것부터 갚는 게 이자 절약에 유리합니다. (만기반환 대출은 조기상환 대상이 아니라 제외)</p>');
   const dlist=[];
-  loans.forEach(a=>dlist.push({name:esc(a.alias||"대출")+(a.returnAtMaturity?"(만기반환)":""),kind:"대출",rate:mnum(a.rate),bal:mnum(a.balance)}));
+  realLoans.forEach(a=>dlist.push({name:esc(a.alias||"대출"),kind:"대출",rate:mnum(a.rate),bal:mnum(a.balance)}));
   od.forEach(a=>dlist.push({name:esc(a.alias||"마통"),kind:"마통",rate:mnum(a.odRate),bal:Math.max(0,-acctBalance(a))}));
   dlist.sort((x,y)=>y.rate-x.rate);
   P.push('<div class="tw"><table><thead><tr><th>순위</th><th>빚</th><th>종류</th><th>이자율</th><th>잔액</th></tr></thead><tbody>'+dlist.map((d,i)=>'<tr><td>'+(i+1)+'</td><td>'+d.name+'</td><td>'+d.kind+'</td><td>'+d.rate+'%</td><td>'+won(d.bal)+'</td></tr>').join('')+'</tbody></table></div>');
+  if(matLoans.length) P.push('<p class="muted">※ 만기반환 대출('+matLoans.map(a=>esc(a.alias)).join(", ")+')은 만기 일시상환이라 위 우선순위에서 <b>제외</b>했습니다. 조기상환 대상이 아닙니다.</p>');
   P.push('<h2>8. 참고 / 데이터 특이사항</h2>');
   P.push('<ul><li><b>수입 기록 방식:</b> 수강료가 들어올 때마다 사업자계좌에 입금으로 기록. 불규칙.</li><li><b>돈 흐름:</b> 모든 수입은 사업자계좌로 → 각 계좌(생활비=토스생활비, 이자·공과금=남편계좌 등)로 분배되어 지출.</li><li><b>대출 이자 표기:</b> "이자만" 대출은 매달 이자만 자동 출금(원금 안 줄어듦). 원금이 실제 줄어드는 달만 "상환"으로 표기.</li></ul>');
   P.push('<p class="muted">문서 생성: 김비서 v3 데이터 기준. 모든 계좌·거래·메모·대출·고정비를 누락 없이 포함.</p>');
-  const CSS='*{box-sizing:border-box}body{font-family:"Pretendard Variable","Pretendard","Malgun Gothic",sans-serif;color:#2a2431;background:#faf6f9;line-height:1.7;margin:0;padding:32px 18px 80px}.doc{max-width:900px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(80,40,70,.08);padding:40px 44px}h1{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}h2{font-size:20px;margin:34px 0 12px;padding-top:14px;border-top:2px solid #f0e2ec;color:#3f7fa8}h3{font-size:16px;margin:22px 0 6px}h3 .bal{font-weight:600;color:#6d6270;font-size:13px;margin-left:6px}blockquote{background:#f5edf3;border-left:4px solid #c8a7c0;margin:14px 0;padding:12px 16px;border-radius:8px;color:#5a4f5e;font-size:14px}ul{margin:8px 0;padding-left:20px}li{margin:2px 0;font-size:14px}p{margin:8px 0;font-size:14px}.muted{color:#9a8fa0;font-size:12px}.tw{overflow-x:auto;margin:10px 0 18px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #eaddE6;padding:6px 9px;text-align:left;vertical-align:top}th{background:#f3e8f0;color:#4a3f52;font-weight:700;white-space:nowrap}td:nth-child(3){white-space:nowrap}tbody tr:nth-child(even){background:#fbf7fa}strong,b{color:#20303a}@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0;padding:10px 0}tr{break-inside:avoid}}';
+  const CSS='*{box-sizing:border-box}body{font-family:"Pretendard Variable","Pretendard","Malgun Gothic",sans-serif;color:#2a2431;background:#faf6f9;line-height:1.7;margin:0;padding:32px 18px 80px}.doc{max-width:900px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(80,40,70,.08);padding:40px 44px}h1{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}h2{font-size:20px;margin:34px 0 12px;padding-top:14px;border-top:2px solid #f0e2ec;color:#3f7fa8}h3{font-size:16px;margin:22px 0 6px}h3 .bal{font-weight:600;color:#6d6270;font-size:13px;margin-left:6px}blockquote{background:#f5edf3;border-left:4px solid #c8a7c0;margin:14px 0;padding:12px 16px;border-radius:8px;color:#5a4f5e;font-size:14px}.warn{background:#fdf3e7;border-left:4px solid #e0a44e;margin:14px 0;padding:13px 16px;border-radius:8px;color:#5a4632;font-size:13.5px;line-height:1.6}ul{margin:8px 0;padding-left:20px}li{margin:2px 0;font-size:14px}p{margin:8px 0;font-size:14px}.muted{color:#9a8fa0;font-size:12px}.tw{overflow-x:auto;margin:10px 0 18px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #eaddE6;padding:6px 9px;text-align:left;vertical-align:top}th{background:#f3e8f0;color:#4a3f52;font-weight:700;white-space:nowrap}td:nth-child(3){white-space:nowrap}tbody tr:nth-child(even){background:#fbf7fa}strong,b{color:#20303a}@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0;padding:10px 0}tr{break-inside:avoid}}';
   return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>재정 현황 — '+stamp+'</title><style>'+CSS+'</style></head><body><div class="doc">'+P.join('\n')+'</div></body></html>';
 }
 function downloadFinanceDoc(){
