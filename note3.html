@@ -309,6 +309,8 @@
   .txadd { width:100%; border:none; background:var(--surface-low); color:var(--accent-strong); border-radius:var(--r); padding:9px; font-size:13px; font-weight:700; margin-top:.5rem; cursor:pointer; }
   .txadd:hover { background:var(--surface-high); }
   .ledger-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.7; padding:.3rem .3rem .2rem; }
+  .conduit-sum { font-size:12.5px; color:var(--on-surface-variant); padding:.2rem .3rem .6rem; line-height:1.7; }
+  .conduit-sum b { color:var(--on-surface); font-weight:700; }
   .msec { margin-top:1.7rem; }
   .msec-h { display:flex; align-items:center; gap:.6rem; margin:0 .15rem .75rem; }
   .msec-h .mt { font-size:16px; font-weight:800; color:var(--on-surface); }
@@ -1292,10 +1294,15 @@ function ledgerRows(acc){
 }
 function acctBalance(acc){ const r=ledgerRows(acc); return r.length ? r[r.length-1].bal : mnum(acc.startBalance); }
 // 지출 통로 계좌: 이번 달 여기서 나갈 총액(고정비 + 대출 월납) = 보내줄 금액
-function conduitMonthly(acctId){
-  const f=(STORE.money.fixed||[]).filter(x=>x.acctId===acctId).reduce((s,x)=>s+mnum(x.krw),0);
-  const l=(STORE.money.accounts||[]).filter(a=>a.kind==="loan" && a.payAcctId===acctId).reduce((s,a)=>s+Math.round(loanMonthly(a, todayStr())),0);
-  return f+l;
+function conduitMonthly(acctId){ return conduitBreakdown(acctId).total; }
+// 지출 통로: 결제일 기준으로 이번 달 이미 나간 것 / 앞으로 나갈 것 분해
+function conduitBreakdown(acctId){
+  const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate();
+  const dueDay=d=> (+d>=32?last:(+d||99));
+  let already=0, upcoming=0;
+  (STORE.money.fixed||[]).filter(f=>f.acctId===acctId).forEach(f=>{ const amt=mnum(f.krw); if(dueDay(f.day)<=td) already+=amt; else upcoming+=amt; });
+  (STORE.money.accounts||[]).filter(a=>a.kind==="loan" && a.repayType!=="free" && a.payAcctId===acctId).forEach(a=>{ const amt=Math.round(loanMonthly(a,t)); if(dueDay(a.payDay)<=td) already+=amt; else upcoming+=amt; });
+  return { total:already+upcoming, already, remaining:upcoming };
 }
 
 function moneyView(){
@@ -1327,7 +1334,8 @@ function moneyView(){
       sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.returnAtMaturity?"만기반환":"", acc.repayType==="free"?"수시상환":(acc.payDay?(dayLabel(acc.payDay)+" 상환"):""), payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
       typeIcon="loan"; typeCls=" danger";
     } else if(acc.conduit){
-      rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 달 나갈 총액</span>−'+fmtMoney(conduitMonthly(acc.id),"KRW")+'</div>';
+      const bd=conduitBreakdown(acc.id);
+      rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 달 남은 (보낼 금액)</span>−'+fmtMoney(bd.remaining,"KRW")+'</div>';
       sub=["지출 통로", esc(acc.bank)].filter(Boolean).join(" · ");
     } else {
       const bal=acctBalance(acc);
@@ -1340,6 +1348,8 @@ function moneyView(){
       '<div class="acts">'+(isLoan?'':'<button type="button" data-act="addtx" title="'+(isCard?'사용 추가':'거래 추가')+'">'+svi('plus')+'</button>')+'<button type="button" data-act="edit" title="수정">'+svi('edit')+'</button></div></div>';
     if(open){
       if(isLoan){ html+='<div class="ledger">'+loanDetailHtml(acc)+'</div>'; }
+      else if(acc.conduit){ const bd=conduitBreakdown(acc.id);
+        html+='<div class="ledger"><div class="conduit-sum">이번 달 총 <b>'+fmtMoney(bd.total,"KRW")+'</b> · 이미 나감 '+fmtMoney(bd.already,"KRW")+' · 남은 <b>'+fmtMoney(bd.remaining,"KRW")+'</b><br>아래는 이미 나간 내역이에요.</div>'+ledgerHtml(acc)+'<button class="txadd" type="button" data-txadd="'+acc.id+'">+ 거래 추가</button></div>'; }
       else { html+='<div class="ledger">'+ledgerHtml(acc)+'<button class="txadd" type="button" data-txadd="'+acc.id+'">+ '+(isCard?'사용 내역':'거래')+' 추가</button></div>'; }
     }
     html+='</div>';
