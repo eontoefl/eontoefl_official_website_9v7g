@@ -1728,7 +1728,7 @@ function autoPostLoans(){
       if(prin){ principal=Math.min(Math.round(loanPrincipalPart(acc)), bal); pay=principal+interest;
         acc.balance=Math.max(0, bal-principal);
         note="원금 "+fmtMoney(principal,"KRW")+" + 이자 "+fmtMoney(interest,"KRW"); }
-      if(pay>0){ if(!Array.isArray(payAcc.tx)) payAcc.tx=[]; payAcc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:(acc.alias||"대출")+" 상환",cur:"KRW",krw:pay,note:note,fromLoan:acc.id }); n++; }
+      if(pay>0){ if(!Array.isArray(payAcc.tx)) payAcc.tx=[]; payAcc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:(acc.alias||"대출")+(principal>0?" 상환":" 이자"),cur:"KRW",krw:pay,note:note,fromLoan:acc.id }); n++; }
       acc.postedMonths.push(mk); trimPosted(acc);
     }
   });
