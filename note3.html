@@ -272,11 +272,13 @@
   .ld-v { color:var(--on-surface); font-weight:600; text-align:right; }
   .acct-sub { font-size:12px; color:var(--on-surface-variant); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .acct-budget { margin-top:7px; padding-right:.5rem; }
-  .bgt-bar { height:6px; border-radius:99px; background:var(--surface-high); overflow:hidden; }
+  .bgt-bar { position:relative; height:6px; border-radius:99px; background:var(--surface-high); }
   .bgt-bar span { display:block; height:100%; border-radius:99px; background:var(--accent-strong); transition:width .35s ease; }
   .acct-budget.warn .bgt-bar span { background:#cf8a2e; }
   .acct-budget.over .bgt-bar span { background:var(--danger); }
+  .bgt-fund { position:absolute; top:-2px; bottom:-2px; width:2px; border-radius:2px; background:var(--on-surface); opacity:.5; transform:translateX(-1px); }
   .bgt-lbl { display:flex; justify-content:space-between; gap:.5rem; font-size:10.5px; font-weight:700; color:var(--on-surface-variant); margin-top:4px; white-space:nowrap; }
+  .bgt-lbl.sub2 { margin-top:2px; opacity:.85; }
   .bgt-rem { flex-shrink:0; }
   .acct-budget.warn .bgt-rem { color:#b5771f; }
   .acct-budget.over .bgt-rem { color:var(--danger); }
@@ -1361,11 +1363,15 @@ function moneyView(){
     let budgetHtml="";
     if(acc.kind==="account" && !acc.conduit && mnum(acc.budget)>0){
       const bg=mnum(acc.budget), mk=todayStr().slice(0,7);
-      const spent=(acc.tx||[]).filter(t=>t.dir==="out" && String(t.date||"").slice(0,7)===mk).reduce((s,t)=>s+mnum(t.krw),0);
-      const over=spent>bg, pct=Math.min(100, bg>0?Math.round(spent/bg*100):0);
+      const mtx=(acc.tx||[]).filter(t=>String(t.date||"").slice(0,7)===mk);
+      const spent=mtx.filter(t=>t.dir==="out").reduce((s,t)=>s+mnum(t.krw),0);
+      const funded=mtx.filter(t=>t.dir==="in").reduce((s,t)=>s+mnum(t.krw),0);
+      const over=spent>bg, pct=Math.min(100, bg>0?Math.round(spent/bg*100):0), fpct=Math.min(100, bg>0?Math.round(funded/bg*100):0);
       const lvl=over?" over":(spent>=bg*0.8?" warn":"");
-      budgetHtml='<div class="acct-budget'+lvl+'"><div class="bgt-bar"><span style="width:'+pct+'%"></span></div>'+
-        '<div class="bgt-lbl"><span>이번 달 '+fmtMoney(spent,"KRW")+' / '+fmtMoney(bg,"KRW")+'</span>'+
+      budgetHtml='<div class="acct-budget'+lvl+'">'+
+        '<div class="bgt-bar"><span style="width:'+pct+'%"></span>'+(funded>0?'<i class="bgt-fund" style="left:'+fpct+'%" title="이번 달 입금 '+fmtMoney(funded,"KRW")+'"></i>':'')+'</div>'+
+        '<div class="bgt-lbl"><span>입금 '+fmtMoney(funded,"KRW")+'</span><span>사용 '+fmtMoney(spent,"KRW")+'</span></div>'+
+        '<div class="bgt-lbl sub2"><span>예산 '+fmtMoney(bg,"KRW")+'</span>'+
         '<span class="bgt-rem">'+(over?("+"+fmtMoney(spent-bg,"KRW")+" 초과"):(fmtMoney(bg-spent,"KRW")+" 남음"))+'</span></div></div>';
     }
     html+='<div class="mcard acct" data-id="'+acc.id+'" style="--ac:'+esc(acc.color||"#ccc")+'"><div class="acct-top">'+dragH+
