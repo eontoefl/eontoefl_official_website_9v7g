@@ -719,6 +719,7 @@ function dueLabel(it){
   return null;
 }
 function fmtD(s){ const d=new Date(s+"T12:00:00"); return (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+")"; }
+function fmtDY(s){ if(!s) return "-"; const d=new Date(s+"T12:00:00"); return d.getFullYear()+". "+(d.getMonth()+1)+". "+d.getDate(); }
 function fmtT(t){ const p=t.split(":"),H=+p[0],ap=H<12?"오전":"오후",h=H%12||12; return ap+" "+h+":"+p[1]; }
 function apptWhen(it){
   let s;
@@ -1342,8 +1343,8 @@ function loanDetailHtml(acc){
   ];
   if(amortNow){ rows.push(["　└ 이자", fmtMoney(interest,"KRW")]); rows.push(["　└ 원금", fmtMoney(principal,"KRW")]); }
   if(acc.repayType==="amortize" && acc.graceMonths) rows.push(["거치기간", acc.graceMonths+"개월"]);
-  if(acc.repayType==="amortize" && acc.graceEndDate) rows.push(["원금상환 시작", fmtD(acc.graceEndDate)]);
-  if(acc.maturityDate) rows.push(["만기", fmtD(acc.maturityDate)]);
+  if(acc.repayType==="amortize" && acc.graceEndDate) rows.push(["원금상환 시작", fmtDY(acc.graceEndDate)]);
+  if(acc.maturityDate) rows.push(["만기", fmtDY(acc.maturityDate)]);
   const daily=Math.round(dailyInterest(acc)), base=loanAccrualBase(acc,today), accrued=Math.round(dailyInterest(acc)*Math.max(0,daysBetween(base,today)));
   rows.push(["하루에 쌓이는 이자", fmtMoney(daily,"KRW")+" / 일"]);
   rows.push(["쌓인 이자"+(base?" (기산 "+fmtDShort(base)+")":""), fmtMoney(accrued,"KRW")]);
