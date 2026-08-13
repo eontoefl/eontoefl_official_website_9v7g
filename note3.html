@@ -530,9 +530,9 @@
     </div>
     <div id="lo_graceFld" style="display:none">
       <div class="fld"><label>거치기간 (개월, 선택)</label><input type="number" id="lo_graceMonths" min="0" max="120" placeholder="예: 12" inputmode="numeric">
-        <div class="hint">이자만 내는 기간. 시작일+개월로 아래 날짜를 자동 채워줘요.</div></div>
-      <div class="fld"><label>원금상환 시작일 (선택)</label><input type="date" id="lo_grace">
-        <div class="hint">은행 안내서의 실제 날짜로. 은행마다 실행 <b>다음 달</b>부터라, 개월수보다 한 달 뒤일 수 있어요(직접 수정 OK).</div></div>
+        <div class="hint">이자만 내는 기간(개월). 첫 납입이 실행 다음 달이라 → 원금상환 시작 = <b>시작일 + 거치개월 + 1달</b>로 자동 계산돼요.</div></div>
+      <div class="fld"><label>원금상환 시작일 (자동, 선택)</label><input type="date" id="lo_grace">
+        <div class="hint">위 개월수로 자동 계산됨. 은행 안내서와 다른 상품이면 직접 수정하세요.</div></div>
     </div>
     <div class="fld" id="lo_paydayFld"><label>매달 출금일</label><div class="dayrow"><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"><label class="daylast"><input type="checkbox" id="lo_paylast"> 말일</label></div></div>
     <div class="fld"><label>출금 계좌</label><select id="lo_payacct"></select></div>
@@ -1440,7 +1440,7 @@ function odFieldsUpdate(){ $("ac_odFields").style.display = $("ac_od").checked ?
 function dayFrom(numId, chkId){ if($(chkId).checked) return 99; const v=parseInt($(numId).value,10); return (isFinite(v)&&v>=1)?Math.min(31,v):null; }
 function setDayField(numId, chkId, day){ const last=(+day>=32); $(chkId).checked=last; $(numId).value=(day&&!last)?day:""; $(numId).disabled=last; }
 function syncLast(numId, chkId){ $(numId).disabled=$(chkId).checked; }
-function updateGraceCalc(){ const m=parseInt($("lo_graceMonths").value,10)||0, s=$("lo_start").value; if(m>0 && s) $("lo_grace").value=addMonths(s,m); }
+function updateGraceCalc(){ const m=parseInt($("lo_graceMonths").value,10)||0, s=$("lo_start").value; if(m>0 && s) $("lo_grace").value=addMonths(s,m+1); }   // +1: 첫 납입이 실행 다음달이라 (거치 N회 이자 후 그 다음달부터 원금상환)
 function loRepayUpdate(){
   const am=(mLoanRepay==="amortize"), free=(mLoanRepay==="free");
   $("lo_graceFld").style.display=am?"":"none";
@@ -1520,7 +1520,7 @@ function saveAcct(){
     base.repayType=mLoanRepay;
     base.startDate=$("lo_start").value||"";
     base.graceMonths = mLoanRepay==="amortize" ? (parseInt($("lo_graceMonths").value,10)||0) : 0;
-    base.graceEndDate = mLoanRepay==="amortize" ? ($("lo_grace").value || (base.graceMonths>0?addMonths(base.startDate||todayStr(), base.graceMonths):"")) : "";
+    base.graceEndDate = mLoanRepay==="amortize" ? ($("lo_grace").value || (base.graceMonths>0?addMonths(base.startDate||todayStr(), base.graceMonths+1):"")) : "";
     base.payDay=dayFrom("lo_payday","lo_paylast");
     base.payAcctId=$("lo_payacct").value||"";
     base.maturityDate=$("lo_maturity").value||"";
