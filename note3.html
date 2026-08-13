@@ -494,6 +494,7 @@
   <div class="fld" id="ac_numFld"><label id="ac_numLbl">계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
 
   <div class="fld" id="ac_startFld"><label>시작 잔액 (원)</label><input type="text" id="ac_start" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld" id="ac_conduitFld"><label class="chkline"><input type="checkbox" id="ac_conduit"> 지출 통로 (잔액 추적 안 함 · 이번 달 나갈 총액만 표시)</label></div>
   <div id="ac_odBlk">
     <div class="fld"><label class="chkline"><input type="checkbox" id="ac_od"> 마이너스 통장이에요 (이자 자동 계산)</label></div>
     <div id="ac_odFields" style="display:none">
@@ -520,6 +521,7 @@
       </select></div>
     <div class="fld"><label>원금 (빌린 금액, 원)</label><input type="text" id="lo_principal" placeholder="0" inputmode="numeric" autocomplete="off"></div>
     <div class="fld"><label>현재 잔액 (남은 원금, 원)</label><input type="text" id="lo_balance" placeholder="비우면 원금과 동일" inputmode="numeric" autocomplete="off"></div>
+    <div class="fld"><label class="chkline"><input type="checkbox" id="lo_return"> 만기에 돌려받아 상환 (전세보증금 등 — 내 실부담 아님)</label></div>
     <div class="fld"><label>연 금리 (%)</label><input type="number" id="lo_rate" step="0.01" placeholder="예: 4.2" inputmode="decimal"></div>
     <div class="fld"><label>상환 방식</label>
       <div class="chips" id="lo_repay">
@@ -1281,13 +1283,19 @@ function ledgerRows(acc){
   return list.map(t=>{ bal += (t.dir==="in"?1:-1)*mnum(t.krw); return { t, bal }; });
 }
 function acctBalance(acc){ const r=ledgerRows(acc); return r.length ? r[r.length-1].bal : mnum(acc.startBalance); }
+// 지출 통로 계좌: 이번 달 여기서 나갈 총액(고정비 + 대출 월납) = 보내줄 금액
+function conduitMonthly(acctId){
+  const f=(STORE.money.fixed||[]).filter(x=>x.acctId===acctId).reduce((s,x)=>s+mnum(x.krw),0);
+  const l=(STORE.money.accounts||[]).filter(a=>a.kind==="loan" && a.payAcctId===acctId).reduce((s,a)=>s+Math.round(loanMonthly(a, todayStr())),0);
+  return f+l;
+}
 
 function moneyView(){
   const accts=STORE.money.accounts;
   let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn" id="acctAdd" type="button">+ 추가</button></div>';
   if(!accts.length) return html+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
-  const total=accts.filter(a=>a.kind==="account").reduce((s,a)=>s+acctBalance(a),0);
-  const debt=accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+mnum(a.balance),0);
+  const total=accts.filter(a=>a.kind==="account" && !a.conduit).reduce((s,a)=>s+acctBalance(a),0);
+  const debt=accts.filter(a=>a.kind==="loan" && !a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
   html+='<div class="mtotal">전체 잔액<b>'+fmtMoney(total,"KRW")+'</b>'+(debt>0?'<span class="mdebt">총 대출 −'+fmtMoney(debt,"KRW")+'</span>':'')+'</div><div id="acctList">';
   accts.forEach(acc=>{
     const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
@@ -1299,9 +1307,12 @@ function moneyView(){
       typeIcon="card"; typeCls=" plum";
     } else if(isLoan){
       const bal=mnum(acc.balance), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
-      rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출</span>−'+fmtMoney(bal,"KRW")+'</div>';
-      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.repayType==="free"?"수시상환":(acc.payDay?(dayLabel(acc.payDay)+" 상환"):""), payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
+      rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출'+(acc.returnAtMaturity?" (만기반환)":"")+'</span>−'+fmtMoney(bal,"KRW")+'</div>';
+      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.returnAtMaturity?"만기반환":"", acc.repayType==="free"?"수시상환":(acc.payDay?(dayLabel(acc.payDay)+" 상환"):""), payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
       typeIcon="loan"; typeCls=" danger";
+    } else if(acc.conduit){
+      rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 달 나갈 총액</span>−'+fmtMoney(conduitMonthly(acc.id),"KRW")+'</div>';
+      sub=["지출 통로", esc(acc.bank)].filter(Boolean).join(" · ");
     } else {
       const bal=acctBalance(acc);
       rightHtml='<div class="acct-bal'+(bal<0?' neg':'')+'">'+fmtMoney(bal,"KRW")+'</div>';
@@ -1457,6 +1468,7 @@ function loRepayUpdate(){
 function acKindUpdate(kind){
   const card=kind==="card", loan=kind==="loan", acct=kind==="account";
   $("ac_startFld").style.display=acct?"":"none";
+  $("ac_conduitFld").style.display=acct?"":"none";
   $("ac_odBlk").style.display=acct?"":"none";
   $("ac_cardBlk").style.display=card?"":"none";
   $("ac_loanBlk").style.display=loan?"":"none";
@@ -1479,6 +1491,7 @@ function openAcct(id){
   $("ac_num").value=a?(a.num||""):"";
   $("ac_start").value=a&&(a.startBalance||a.startBalance===0)?commaFmt(String(a.startBalance)):"";
   $("ac_od").checked=!!(a&&a.overdraft);
+  $("ac_conduit").checked=!!(a&&a.conduit);
   $("ac_odrate").value=a&&a.odRate?a.odRate:"";
   setDayField("ac_odday","ac_odlast", a?a.odInterestDay:0);
   setDayField("ac_payday","ac_paylast", (a&&mAcctKind==="card")?a.payDay:0);
@@ -1486,6 +1499,7 @@ function openAcct(id){
   $("ac_cyc1").value=a&&a.cycleStart?a.cycleStart:"";
   $("ac_cyc2").value=a&&a.cycleEnd?a.cycleEnd:"";
   $("lo_type").value=a&&a.loanType?a.loanType:"credit";
+  $("lo_return").checked=!!(a&&a.returnAtMaturity);
   $("lo_principal").value=a&&(a.principal||a.principal===0)?commaFmt(String(a.principal)):"";
   $("lo_balance").value=a&&(a.balance||a.balance===0)?commaFmt(String(a.balance)):"";
   $("lo_rate").value=a&&a.rate?a.rate:"";
@@ -1518,6 +1532,7 @@ function saveAcct(){
     base.cycleEnd=(isFinite(c2)&&c2>=1)?Math.min(31,c2):null;
   } else if(mAcctKind==="loan"){
     base.loanType=$("lo_type").value;
+    base.returnAtMaturity=$("lo_return").checked;
     base.principal=mnum($("lo_principal").value);
     base.balance = $("lo_balance").value.trim()!=="" ? mnum($("lo_balance").value) : mnum($("lo_principal").value);
     base.rate=mnum($("lo_rate").value);
@@ -1539,9 +1554,10 @@ function saveAcct(){
   } else {
     base.startBalance=mnum($("ac_start").value);
     base.overdraft=$("ac_od").checked;
+    base.conduit=$("ac_conduit").checked;
     if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); base.odInterestDay=dayFrom("ac_odday","ac_odlast"); }
   }
-  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","graceMonths","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate"];
+  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","graceMonths","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate","conduit","returnAtMaturity"];
   if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ KEYS_ACC.forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; } }
   else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[], postedMonths:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
   closeAcct(); save(); render();
