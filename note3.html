@@ -247,6 +247,16 @@
   .acct-alias .svic { width:15px; height:15px; color:var(--on-surface-variant); vertical-align:-.15em; }
   .acct-alias .type-ic { width:16px; height:16px; color:var(--accent-strong); margin-right:1px; }
   .acct-alias .type-ic.plum { color:var(--plum); }
+  .acct-alias .type-ic.danger { color:var(--danger); }
+  .mdebt { font-size:12px; font-weight:700; color:var(--danger); margin-left:.6rem; }
+  .acct-bal.stmt.loan { color:var(--danger); }
+  .fld label.chkline { display:flex; align-items:center; gap:.5rem; font-size:13.5px; font-weight:600; letter-spacing:0; color:var(--on-surface); cursor:pointer; margin-bottom:0; }
+  .fld label.chkline input { width:17px; height:17px; accent-color:var(--accent-strong); }
+  .loandet { padding:.3rem .2rem .2rem; }
+  .ld-row { display:flex; justify-content:space-between; gap:1rem; padding:.45rem .1rem; font-size:13px; }
+  .ld-row + .ld-row { border-top:1px solid var(--surface-container); }
+  .ld-k { color:var(--on-surface-variant); flex-shrink:0; }
+  .ld-v { color:var(--on-surface); font-weight:600; text-align:right; }
   .acct-sub { font-size:12px; color:var(--on-surface-variant); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .acct-bal { font-size:15px; font-weight:800; color:var(--on-surface); white-space:nowrap; text-align:right; }
   .acct-bal.neg { color:var(--danger); }
@@ -472,11 +482,22 @@
   <div class="seg" id="ac_kind">
     <button type="button" data-v="account" class="on">계좌</button>
     <button type="button" data-v="card">신용카드</button>
+    <button type="button" data-v="loan">대출</button>
   </div>
   <div class="fld"><label>별칭</label><input type="text" id="ac_alias" placeholder="예: 사업 주거래" lang="ko" autocomplete="off"></div>
   <div class="fld"><label id="ac_bankLbl">은행 (선택)</label><select id="ac_bank"></select></div>
-  <div class="fld"><label id="ac_numLbl">계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
+  <div class="fld" id="ac_numFld"><label id="ac_numLbl">계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
+
   <div class="fld" id="ac_startFld"><label>시작 잔액 (원)</label><input type="text" id="ac_start" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div id="ac_odBlk">
+    <div class="fld"><label class="chkline"><input type="checkbox" id="ac_od"> 마이너스 통장이에요 (이자 자동 계산)</label></div>
+    <div id="ac_odFields" style="display:none">
+      <div class="fld"><label>연 금리 (%)</label><input type="number" id="ac_odrate" step="0.01" placeholder="예: 6.5" inputmode="decimal"></div>
+      <div class="fld"><label>이자 납부일 (매달)</label><input type="number" id="ac_odday" min="1" max="31" placeholder="예: 17" inputmode="numeric">
+        <div class="hint">매달 이 날, (마이너스 잔액 × 금리 ÷ 12) 이자가 이 통장에 자동으로 붙어요.</div></div>
+    </div>
+  </div>
+
   <div id="ac_cardBlk">
     <div class="fld"><label>매달 결제일</label><input type="number" id="ac_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"></div>
     <div class="fld"><label>출금 계좌</label><select id="ac_payacct"></select></div>
@@ -485,6 +506,31 @@
       <div class="hint">예: 1 ~ 31 이면 그 달 1일~말일 사용분. 비워두면 이번 달(1일~말일) 기준.</div>
     </div>
   </div>
+
+  <div id="ac_loanBlk">
+    <div class="fld"><label>대출 종류</label>
+      <select id="lo_type">
+        <option value="credit">신용대출</option><option value="mortgage">담보대출</option><option value="jeonse">전세대출</option>
+        <option value="cardloan">카드론</option><option value="cash">현금서비스</option><option value="insurance">보험약관대출</option><option value="other">기타</option>
+      </select></div>
+    <div class="fld"><label>원금 (빌린 금액, 원)</label><input type="text" id="lo_principal" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+    <div class="fld"><label>현재 잔액 (남은 원금, 원)</label><input type="text" id="lo_balance" placeholder="비우면 원금과 동일" inputmode="numeric" autocomplete="off"></div>
+    <div class="fld"><label>연 금리 (%)</label><input type="number" id="lo_rate" step="0.01" placeholder="예: 4.2" inputmode="decimal"></div>
+    <div class="fld"><label>상환 방식</label>
+      <div class="chips" id="lo_repay">
+        <button type="button" data-v="interest" class="on">이자만</button>
+        <button type="button" data-v="free">자유상환</button>
+        <button type="button" data-v="amortize">거치후 원리금</button>
+      </div>
+    </div>
+    <div class="fld" id="lo_graceFld" style="display:none"><label>원금상환 시작일 (거치 종료)</label><input type="date" id="lo_grace">
+      <div class="hint">이 날 전까지는 이자만, 이 날부터 원리금균등으로 자동 전환돼요.</div></div>
+    <div class="fld"><label>매달 출금일</label><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"></div>
+    <div class="fld"><label>출금 계좌</label><select id="lo_payacct"></select></div>
+    <div class="fld"><label>만기일 (선택)</label><input type="date" id="lo_maturity">
+      <div class="hint">원리금균등 계산에 쓰여요.</div></div>
+  </div>
+
   <div class="fld"><label>색상</label><div class="swatches" id="ac_colors"></div></div>
   <div class="row">
     <button type="button" class="cancel" id="acctDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
@@ -628,7 +674,8 @@ const IC = {
   note:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 12.5h6M9 16h4"/>',
   tools:'<path d="M15.5 7.5a3 3 0 0 1-4 4L5 18l1.5 1.5L13 13a3 3 0 0 1 4-4l-2 2-1.5-1.5 2-2z"/>',
   bank:'<path d="M3 9.5l9-5 9 5"/><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7"/><path d="M3.5 20.5h17"/>',
-  card:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9.5h18"/><path d="M6.5 14.5h4"/>'
+  card:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9.5h18"/><path d="M6.5 14.5h4"/>',
+  loan:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 11.9v.02M18 11.9v.02"/>'
 };
 function svi(n, cls){ return '<svg class="svic'+(cls?' '+cls:'')+'" viewBox="0 0 24 24" aria-hidden="true">'+(IC[n]||'')+'</svg>'; }
 /* 모달 종류 칩의 이모지를 아이콘으로 교체 (한 번) */
@@ -694,7 +741,7 @@ function normalizeStore(){
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
   STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
-  STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; });
+  STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; });
 }
 
 /* ── 자동 버전 스냅샷 (별도 행 snap-<시각>, 최근 SNAP_KEEP개 유지) ── */
@@ -1129,6 +1176,19 @@ function saveForm(){
 const ACCT_COLORS = ["#F6A6A6","#F7C08A","#F3DE8A","#CDE88A","#A6E0A6","#8FE0D2","#8FD3F0","#9FB8F5","#B3A6F0","#D0A6EE","#F0A6D8","#F5A6BE"];
 const BANKS = ["국민은행","신한은행","우리은행","하나은행","NH농협은행","IBK기업은행","카카오뱅크","토스뱅크","케이뱅크","SC제일은행","씨티은행","산업은행","수협은행","새마을금고","신협","우체국","부산은행","대구은행(iM뱅크)","경남은행","광주은행","전북은행","제주은행","카카오페이","네이버페이","토스","페이팔(PayPal)","기타"];
 const CARDCOS = ["신한카드","삼성카드","현대카드","KB국민카드","롯데카드","우리카드","하나카드","BC카드","NH농협카드","IBK기업카드","씨티카드","카카오뱅크 카드","토스 카드","기타"];
+const LOAN_ORGS = ["국민은행","신한은행","우리은행","하나은행","NH농협은행","IBK기업은행","카카오뱅크","토스뱅크","케이뱅크","SC제일은행","산업은행","수협은행","새마을금고","신협","주택도시기금","신한카드","삼성카드","현대카드","KB국민카드","롯데카드","현대캐피탈","신한캐피탈","KB캐피탈","OK저축은행","SBI저축은행","웰컴저축은행","보험약관대출","기타"];
+const LOANTYPES = { credit:"신용대출", mortgage:"담보대출", jeonse:"전세대출", cardloan:"카드론", cash:"현금서비스", insurance:"보험약관대출", other:"기타" };
+const REPAYTYPES = { interest:"이자만", free:"자유상환", amortize:"거치후 원리금" };
+function monthsBetween(fromS, toS){ if(!fromS||!toS) return 0; const [fy,fm]=fromS.split("-").map(Number),[ty,tm]=toS.split("-").map(Number); return (ty-fy)*12+(tm-fm); }
+// 원리금균등 월 상환액 = P·r·(1+r)^n / ((1+r)^n − 1)  (P=원금, r=월이율, n=총 상환개월)
+function amortM(P, ratePct, n){ P=mnum(P); const r=mnum(ratePct)/100/12; if(n<=0) return P; if(r===0) return P/n; return P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
+// 대출 이번 달 월납액. 이자만/자유상환/거치중=이자, 거치후 원리금=고정 월납(저장된 monthlyPay), 막판엔 잔액+이자로 캡
+function loanMonthly(loan, onDate){
+  const r=mnum(loan.rate)/100/12, bal=mnum(loan.balance);
+  const amortActive = loan.repayType==="amortize" && (!loan.graceEndDate || onDate>=loan.graceEndDate);
+  if(amortActive && mnum(loan.monthlyPay)>0) return Math.min(mnum(loan.monthlyPay), Math.round(bal*(1+r)));
+  return bal*r;   // 이자만 / 자유상환 / 거치중 / 계산불가
+}
 // 신용카드 청구 주기: cs~ce(매달 일자)로 오늘이 속한 청구기간 [시작일, 종료일] 반환. 미설정이면 이번 달(1일~말일).
 function ymd(y,m,day){ const last=new Date(y,m,0).getDate(); const d=Math.min(day,last); return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"); }
 function cardCycleBounds(card, todayS){
@@ -1175,33 +1235,55 @@ function acctBalance(acc){ const r=ledgerRows(acc); return r.length ? r[r.length
 
 function moneyView(){
   const accts=STORE.money.accounts;
-  let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn" id="acctAdd" type="button">+ 계좌</button></div>';
-  if(!accts.length) return html+'<div class="empty">아직 계좌가 없어요.<br><b>+ 계좌</b>로 첫 계좌를 등록해 보세요.</div>';
-  const total=accts.filter(a=>a.kind!=="card").reduce((s,a)=>s+acctBalance(a),0);
-  html+='<div class="mtotal">전체 잔액<b>'+fmtMoney(total,"KRW")+'</b></div><div id="acctList">';
+  let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn" id="acctAdd" type="button">+ 추가</button></div>';
+  if(!accts.length) return html+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
+  const total=accts.filter(a=>a.kind==="account").reduce((s,a)=>s+acctBalance(a),0);
+  const debt=accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+mnum(a.balance),0);
+  html+='<div class="mtotal">전체 잔액<b>'+fmtMoney(total,"KRW")+'</b>'+(debt>0?'<span class="mdebt">총 대출 '+fmtMoney(debt,"KRW")+'</span>':'')+'</div><div id="acctList">';
   accts.forEach(acc=>{
-    const open=openAccounts.has(acc.id), isCard=acc.kind==="card";
-    let rightHtml, sub;
+    const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
+    let rightHtml, sub, typeIcon="bank", typeCls="";
     if(isCard){
       const stmt=cardStatement(acc), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
       rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 청구분</span>'+fmtMoney(stmt,"KRW")+'</div>';
       sub=["카드", acc.payDay?(acc.payDay+"일 결제"):"", payAcc?(esc(payAcc.alias)+" 출금"):""].filter(Boolean).join(" · ");
+      typeIcon="card"; typeCls=" plum";
+    } else if(isLoan){
+      const bal=mnum(acc.balance), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
+      rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출</span>'+fmtMoney(bal,"KRW")+'</div>';
+      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.payDay?(acc.payDay+"일 상환"):"", payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
+      typeIcon="loan"; typeCls=" danger";
     } else {
       const bal=acctBalance(acc);
       rightHtml='<div class="acct-bal'+(bal<0?' neg':'')+'">'+fmtMoney(bal,"KRW")+'</div>';
-      sub=[esc(acc.bank),esc(acc.num)].filter(Boolean).join(" · ");
+      sub=[isOD?"마이너스통장":"", esc(acc.bank), esc(acc.num), (isOD&&mnum(acc.odRate)>0)?(mnum(acc.odRate)+"%"):""].filter(Boolean).join(" · ");
     }
     html+='<div class="mcard acct" data-id="'+acc.id+'" style="--ac:'+esc(acc.color||"#ccc")+'"><div class="acct-top">'+dragH+
-      '<div class="acct-body" data-act="toggle"><div class="acct-alias">'+svi(isCard?"card":"bank","type-ic"+(isCard?" plum":""))+' '+esc(acc.alias||"계좌")+' '+svi(open?"chevD":"chevR")+'</div>'+(sub?'<div class="acct-sub">'+sub+'</div>':'')+'</div>'+
+      '<div class="acct-body" data-act="toggle"><div class="acct-alias">'+svi(typeIcon,"type-ic"+typeCls)+' '+esc(acc.alias||"계좌")+' '+svi(open?"chevD":"chevR")+'</div>'+(sub?'<div class="acct-sub">'+sub+'</div>':'')+'</div>'+
       rightHtml+
-      '<div class="acts"><button type="button" data-act="addtx" title="'+(isCard?'사용 추가':'거래 추가')+'">'+svi('plus')+'</button><button type="button" data-act="edit" title="수정">'+svi('edit')+'</button></div></div>';
+      '<div class="acts">'+(isLoan?'':'<button type="button" data-act="addtx" title="'+(isCard?'사용 추가':'거래 추가')+'">'+svi('plus')+'</button>')+'<button type="button" data-act="edit" title="수정">'+svi('edit')+'</button></div></div>';
     if(open){
-      html+='<div class="ledger">'+ledgerHtml(acc)+'<button class="txadd" type="button" data-txadd="'+acc.id+'">+ '+(isCard?'사용 내역':'거래')+' 추가</button></div>';
+      if(isLoan){ html+='<div class="ledger">'+loanDetailHtml(acc)+'</div>'; }
+      else { html+='<div class="ledger">'+ledgerHtml(acc)+'<button class="txadd" type="button" data-txadd="'+acc.id+'">+ '+(isCard?'사용 내역':'거래')+' 추가</button></div>'; }
     }
     html+='</div>';
   });
   html+='</div>';
   return html+fixedSectionHtml();
+}
+function loanDetailHtml(acc){
+  const today=todayStr(), r=mnum(acc.rate), monthly=Math.round(loanMonthly(acc, today));
+  const grace = acc.repayType==="amortize" && acc.graceEndDate && today<acc.graceEndDate;
+  const rows=[
+    ["상환 방식", REPAYTYPES[acc.repayType]||"-"],
+    ["연 금리", r+"%"],
+    ["원금", fmtMoney(acc.principal,"KRW")],
+    ["이번 달 월납"+(grace?" (거치·이자만)":""), fmtMoney(monthly,"KRW")]
+  ];
+  if(acc.repayType==="amortize" && acc.graceEndDate) rows.push(["원금상환 시작", fmtD(acc.graceEndDate)]);
+  if(acc.maturityDate) rows.push(["만기", fmtD(acc.maturityDate)]);
+  return '<div class="loandet">'+rows.map(kv=>'<div class="ld-row"><span class="ld-k">'+kv[0]+'</span><span class="ld-v">'+kv[1]+'</span></div>').join("")+
+    '<div class="hint" style="padding:.55rem .2rem 0">매달 출금일에 위 월납이 출금계좌 내역으로 자동 반영돼요. 원금을 갚으면 수정에서 "현재 잔액"을 낮춰 주세요.</div></div>';
 }
 function fixedSectionHtml(){
   const list=STORE.money.fixed.slice().sort((a,b)=>(a.day||99)-(b.day||99));
@@ -1267,42 +1349,63 @@ function actAcct(id, act){
 }
 
 /* 계좌 폼 */
-let mAcctEdit=null, mAcctColor=ACCT_COLORS[0], mAcctKind="account";
+let mAcctEdit=null, mAcctColor=ACCT_COLORS[0], mAcctKind="account", mLoanRepay="interest";
 function renderSwatches(){ $("ac_colors").innerHTML=ACCT_COLORS.map(c=>'<span class="swatch'+(c===mAcctColor?' on':'')+'" data-color="'+c+'" style="background:'+c+'"></span>').join(""); }
 function fillIssuer(kind, selected){
-  const list=kind==="card"?CARDCOS:BANKS, cur=selected||"";
-  $("ac_bank").innerHTML='<option value="">'+(kind==="card"?"카드사 선택":"은행 선택")+'</option>'+list.map(b=>'<option>'+esc(b)+'</option>').join("");
+  const list = kind==="card"?CARDCOS : kind==="loan"?LOAN_ORGS : BANKS;
+  const lbl = kind==="card"?"카드사 선택" : kind==="loan"?"기관 선택" : "은행 선택";
+  const cur=selected||"";
+  $("ac_bank").innerHTML='<option value="">'+lbl+'</option>'+list.map(b=>'<option>'+esc(b)+'</option>').join("");
   if(cur && !list.includes(cur)){ const o=document.createElement("option"); o.value=cur; o.textContent=cur; $("ac_bank").appendChild(o); }
   $("ac_bank").value=cur;
 }
-function fillPayAccts(selected){
-  $("ac_payacct").innerHTML=['<option value="">미지정</option>'].concat(STORE.money.accounts.filter(a=>a.kind!=="card" && a.id!==mAcctEdit).map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>')).join("");
-  $("ac_payacct").value=selected||"";
+function acctOptionsHtml(){
+  return ['<option value="">미지정</option>'].concat(STORE.money.accounts.filter(a=>a.kind==="account" && a.id!==mAcctEdit).map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>')).join("");
 }
+function fillPayAccts(selected){ $("ac_payacct").innerHTML=acctOptionsHtml(); $("ac_payacct").value=selected||""; }
+function fillLoanPayAccts(selected){ $("lo_payacct").innerHTML=acctOptionsHtml(); $("lo_payacct").value=selected||""; }
+function odFieldsUpdate(){ $("ac_odFields").style.display = $("ac_od").checked ? "" : "none"; }
 function acKindUpdate(kind){
-  const card=kind==="card";
-  $("ac_startFld").style.display=card?"none":"";
+  const card=kind==="card", loan=kind==="loan", acct=kind==="account";
+  $("ac_startFld").style.display=acct?"":"none";
+  $("ac_odBlk").style.display=acct?"":"none";
   $("ac_cardBlk").style.display=card?"":"none";
-  $("ac_bankLbl").textContent=card?"카드사 (선택)":"은행 (선택)";
-  $("ac_numLbl").textContent=card?"카드번호 (선택)":"계좌번호 (선택)";
-  $("ac_num").placeholder=card?"예: 1234-****-****-5678":"예: 123-45-678900";
+  $("ac_loanBlk").style.display=loan?"":"none";
+  $("ac_numFld").style.display=loan?"none":"";
+  $("ac_bankLbl").textContent = card?"카드사 (선택)" : loan?"기관 (선택)" : "은행 (선택)";
+  $("ac_num").placeholder = card?"예: 1234-****-****-5678":"예: 123-45-678900";
   fillIssuer(kind, $("ac_bank").value);
   if(card) fillPayAccts($("ac_payacct").value);
+  if(loan) fillLoanPayAccts($("lo_payacct").value);
+  if(acct) odFieldsUpdate();
 }
 function openAcct(id){
   mAcctEdit=id; const a=id?findAcct(id):null;
   mAcctKind=a?(a.kind||"account"):"account";
   selChips($("ac_kind"), mAcctKind);
-  const kName=mAcctKind==="card"?"신용카드":"계좌";
+  const kName=mAcctKind==="card"?"신용카드":mAcctKind==="loan"?"대출":"계좌";
   $("acctTitle").textContent=id?(kName+" 수정"):("새 "+kName);
   $("ac_alias").value=a?(a.alias||""):"";
   fillIssuer(mAcctKind, a?(a.bank||""):"");
   $("ac_num").value=a?(a.num||""):"";
   $("ac_start").value=a&&(a.startBalance||a.startBalance===0)?commaFmt(String(a.startBalance)):"";
-  $("ac_payday").value=a&&a.payDay?a.payDay:"";
-  fillPayAccts(a?(a.payAcctId||""):"");
+  $("ac_od").checked=!!(a&&a.overdraft);
+  $("ac_odrate").value=a&&a.odRate?a.odRate:"";
+  $("ac_odday").value=a&&a.odInterestDay?a.odInterestDay:"";
+  $("ac_payday").value=a&&a.payDay&&mAcctKind==="card"?a.payDay:"";
+  fillPayAccts(a&&mAcctKind==="card"?(a.payAcctId||""):"");
   $("ac_cyc1").value=a&&a.cycleStart?a.cycleStart:"";
   $("ac_cyc2").value=a&&a.cycleEnd?a.cycleEnd:"";
+  $("lo_type").value=a&&a.loanType?a.loanType:"credit";
+  $("lo_principal").value=a&&(a.principal||a.principal===0)?commaFmt(String(a.principal)):"";
+  $("lo_balance").value=a&&(a.balance||a.balance===0)?commaFmt(String(a.balance)):"";
+  $("lo_rate").value=a&&a.rate?a.rate:"";
+  mLoanRepay=a&&a.repayType?a.repayType:"interest"; selChips($("lo_repay"),mLoanRepay);
+  $("lo_graceFld").style.display=(mLoanRepay==="amortize")?"":"none";
+  $("lo_grace").value=a&&a.graceEndDate?a.graceEndDate:"";
+  $("lo_payday").value=a&&a.payDay&&mAcctKind==="loan"?a.payDay:"";
+  fillLoanPayAccts(a&&mAcctKind==="loan"?(a.payAcctId||""):"");
+  $("lo_maturity").value=a&&a.maturityDate?a.maturityDate:"";
   mAcctColor=a&&a.color?a.color:ACCT_COLORS[STORE.money.accounts.length%ACCT_COLORS.length];
   renderSwatches();
   acKindUpdate(mAcctKind);
@@ -1319,11 +1422,26 @@ function saveAcct(){
     const c1=parseInt($("ac_cyc1").value,10), c2=parseInt($("ac_cyc2").value,10);
     base.cycleStart=(isFinite(c1)&&c1>=1)?Math.min(31,c1):null;
     base.cycleEnd=(isFinite(c2)&&c2>=1)?Math.min(31,c2):null;
+  } else if(mAcctKind==="loan"){
+    base.loanType=$("lo_type").value;
+    base.principal=mnum($("lo_principal").value);
+    base.balance = $("lo_balance").value.trim()!=="" ? mnum($("lo_balance").value) : mnum($("lo_principal").value);
+    base.rate=mnum($("lo_rate").value);
+    base.repayType=mLoanRepay;
+    base.graceEndDate = mLoanRepay==="amortize" ? ($("lo_grace").value||"") : "";
+    const lpd=parseInt($("lo_payday").value,10); base.payDay=(isFinite(lpd)&&lpd>=1)?Math.min(31,lpd):null;
+    base.payAcctId=$("lo_payacct").value||"";
+    base.maturityDate=$("lo_maturity").value||"";
+    if(mLoanRepay==="amortize"){ const repayStart=(base.graceEndDate||todayStr()).slice(0,7)+"-01"; const N=base.maturityDate?monthsBetween(repayStart, base.maturityDate):0; base.monthlyPay = N>0 ? Math.round(amortM(base.principal, base.rate, N)) : 0; }
+    else base.monthlyPay=0;
   } else {
     base.startBalance=mnum($("ac_start").value);
+    base.overdraft=$("ac_od").checked;
+    if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); const od=parseInt($("ac_odday").value,10); base.odInterestDay=(isFinite(od)&&od>=1)?Math.min(31,od):null; }
   }
-  if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ ["startBalance","payDay","payAcctId","cycleStart","cycleEnd"].forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; } }
-  else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
+  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","maturityDate","monthlyPay"];
+  if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ KEYS_ACC.forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; } }
+  else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[], postedMonths:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
   closeAcct(); save(); render();
 }
 function delAcct(){
@@ -1429,6 +1547,39 @@ function autoPostFixed(){
   });
   return n;
 }
+function trimPosted(acc){ if(acc.postedMonths.length>36) acc.postedMonths=acc.postedMonths.slice(-36); }
+// 대출·마통 자동 반영: 앱 열 때, 이번 달 출금일/이자일이 지났고 아직 안 넣은 것을 반영 (달마다 1회)
+function autoPostLoans(){
+  const today=todayStr(), mk=today.slice(0,7), [Y,M]=mk.split("-").map(Number); let n=0;
+  STORE.money.accounts.forEach(acc=>{
+    if(!Array.isArray(acc.postedMonths)) acc.postedMonths=[];
+    // 마이너스통장 이자 → 통장 자신에 붙음(빚 증가)
+    if(acc.kind==="account" && acc.overdraft && mnum(acc.odRate)>0 && acc.odInterestDay){
+      const key="od"+mk; if(acc.postedMonths.includes(key)) return;
+      const d=ymd(Y,M,acc.odInterestDay); if(today<d) return;
+      const bal=acctBalance(acc);
+      if(bal<0){ const interest=Math.round(Math.abs(bal)*(mnum(acc.odRate)/100/12));
+        if(interest>0){ if(!Array.isArray(acc.tx)) acc.tx=[]; acc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:"마이너스통장 이자",cur:"KRW",krw:interest,note:"",fromLoan:acc.id }); n++; } }
+      acc.postedMonths.push(key); trimPosted(acc); return;
+    }
+    // 대출 상환 → 출금계좌에서 빠짐, 원리금이면 대출 잔액도 감소
+    if(acc.kind==="loan" && acc.payDay && acc.payAcctId){
+      if(acc.postedMonths.includes(mk)) return;
+      const payAcc=findAcct(acc.payAcctId); if(!payAcc) return;
+      const d=ymd(Y,M,acc.payDay); if(today<d) return;
+      const r=mnum(acc.rate)/100/12, bal=mnum(acc.balance);
+      let interest=Math.round(bal*r), principal=0, pay=interest, note="이자";
+      const amort = acc.repayType==="amortize" && (!acc.graceEndDate || d>=acc.graceEndDate);
+      if(amort){ pay=Math.round(loanMonthly(acc,d)); principal=Math.max(0,pay-interest);
+        if(principal>bal){ principal=bal; pay=interest+principal; }
+        acc.balance=Math.max(0, bal-principal);
+        note="원금 "+fmtMoney(principal,"KRW")+" + 이자 "+fmtMoney(interest,"KRW"); }
+      if(pay>0){ if(!Array.isArray(payAcc.tx)) payAcc.tx=[]; payAcc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:(acc.alias||"대출")+" 상환",cur:"KRW",krw:pay,note:note,fromLoan:acc.id }); n++; }
+      acc.postedMonths.push(mk); trimPosted(acc);
+    }
+  });
+  return n;
+}
 function toast(msg){ const t=$("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), 3400); }
 
 /* 내역 우클릭 → 삭제 메뉴 */
@@ -1448,12 +1599,14 @@ $("acctSave").addEventListener("click", saveAcct);
 $("acctDelete").addEventListener("click", delAcct);
 overlayDismiss("ovacct", closeAcct);
 $("ac_colors").addEventListener("click", e=>{ const s=e.target.closest("[data-color]"); if(!s) return; mAcctColor=s.dataset.color; renderSwatches(); });
-$("ac_kind").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mAcctKind=b.dataset.v; selChips($("ac_kind"),mAcctKind); const kn=mAcctKind==="card"?"신용카드":"계좌"; $("acctTitle").textContent=mAcctEdit?(kn+" 수정"):("새 "+kn); acKindUpdate(mAcctKind); });
+$("ac_kind").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mAcctKind=b.dataset.v; selChips($("ac_kind"),mAcctKind); const kn=mAcctKind==="card"?"신용카드":mAcctKind==="loan"?"대출":"계좌"; $("acctTitle").textContent=mAcctEdit?(kn+" 수정"):("새 "+kn); acKindUpdate(mAcctKind); });
+$("ac_od").addEventListener("change", odFieldsUpdate);
+$("lo_repay").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mLoanRepay=b.dataset.v; selChips($("lo_repay"),mLoanRepay); $("lo_graceFld").style.display=(mLoanRepay==="amortize")?"":"none"; });
 $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
-attachThousands($("ac_start")); attachThousands($("tx_krw")); attachThousands($("fx_krw"));
+attachThousands($("ac_start")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
 $("tx_dir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxDir=b.dataset.v; selChips($("tx_dir"),mTxDir); });
 $("tx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxCur=b.dataset.v; selChips($("tx_cur"),mTxCur); txCurUpdate(); });
 $("fixCancel").addEventListener("click", closeFix);
@@ -1492,7 +1645,7 @@ async function restoreTo(snapId){
   await pushState(); render(); setDot(true,"복원됨 ✓");
 }
 
-async function start(){ setDot(true,"여는 중…"); await loadStore(); const n=autoPostFixed(); if(n>0) save(); render(); if(n>0) toast("고정비 "+n+"건이 이번 달 내역에 반영됐어요"); setDot(true,"준비됨"); }
+async function start(){ setDot(true,"여는 중…"); await loadStore(); const n=autoPostFixed()+autoPostLoans(); if(n>0) save(); render(); if(n>0) toast(n+"건이 이번 달 내역에 자동 반영됐어요"); setDot(true,"준비됨"); }
 (async ()=>{
   const saved=localStorage.getItem(PWKEY);
   if(saved){ const r=await tryUnlock(saved); if(r.ok){ PW=saved; $("gate").style.display="none"; $("app").style.display=""; await start(); return; } localStorage.removeItem(PWKEY); }
