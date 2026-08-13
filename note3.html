@@ -1270,7 +1270,7 @@ function moneyView(){
   if(!accts.length) return html+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
   const total=accts.filter(a=>a.kind==="account").reduce((s,a)=>s+acctBalance(a),0);
   const debt=accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+mnum(a.balance),0);
-  html+='<div class="mtotal">전체 잔액<b>'+fmtMoney(total,"KRW")+'</b>'+(debt>0?'<span class="mdebt">총 대출 '+fmtMoney(debt,"KRW")+'</span>':'')+'</div><div id="acctList">';
+  html+='<div class="mtotal">전체 잔액<b>'+fmtMoney(total,"KRW")+'</b>'+(debt>0?'<span class="mdebt">총 대출 −'+fmtMoney(debt,"KRW")+'</span>':'')+'</div><div id="acctList">';
   accts.forEach(acc=>{
     const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
     let rightHtml, sub, typeIcon="bank", typeCls="";
@@ -1281,7 +1281,7 @@ function moneyView(){
       typeIcon="card"; typeCls=" plum";
     } else if(isLoan){
       const bal=mnum(acc.balance), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
-      rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출</span>'+fmtMoney(bal,"KRW")+'</div>';
+      rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출</span>−'+fmtMoney(bal,"KRW")+'</div>';
       sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.repayType==="free"?"수시상환":(acc.payDay?(dayLabel(acc.payDay)+" 상환"):""), payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
       typeIcon="loan"; typeCls=" danger";
     } else {
