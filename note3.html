@@ -639,6 +639,19 @@
   </div>
 </div></div>
 
+<!-- 비유동자산 폼 -->
+<div class="ov" id="ovasset"><div class="sheet">
+  <h3 id="assetTitle">새 비유동자산</h3>
+  <div class="fld"><label>자산 이름</label><input type="text" id="as_name" placeholder="예: 전세보증금, 부동산, 자동차" lang="ko" autocomplete="off"></div>
+  <div class="fld"><label>현재 평가액 (원)</label><input type="text" id="as_value" placeholder="예: 650,000,000" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld"><label>설명 (선택)</label><textarea id="as_note" placeholder="예: 전세보증금 6.5억 (전세대출 5억 + 내 돈 1.5억). 만기에 돌려받는 자산." lang="ko"></textarea></div>
+  <div class="row">
+    <button type="button" class="cancel" id="assetDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
+    <button type="button" class="cancel" id="assetCancel">취소</button>
+    <button type="button" class="save" id="assetSave">저장</button>
+  </div>
+</div></div>
+
 <!-- 대출 상환하기 (자유상환) -->
 <div class="ov" id="ovrepay"><div class="sheet">
   <h3 id="rpTitle">상환하기</h3>
@@ -1340,11 +1353,14 @@ function financeDocHtml(){
   const cards=accts.filter(a=>a.kind==="card");
   const loans=accts.filter(a=>a.kind==="loan");
   const realLoans=loans.filter(a=>!a.returnAtMaturity), matLoans=loans.filter(a=>a.returnAtMaturity);
+  const illiquidList=Array.isArray(m.assets)?m.assets:[];
   const asset=cash.reduce((s,a)=>s+acctBalance(a),0);
+  const illiquid=illiquidList.reduce((s,a)=>s+mnum(a.value),0);
   const odDebt=od.reduce((s,a)=>s+Math.max(0,-acctBalance(a)),0);
   const loanDebt=realLoans.reduce((s,a)=>s+mnum(a.balance),0);
-  const debt=odDebt+loanDebt, net=asset-debt;
+  const debt=odDebt+loanDebt;
   const matDebt=matLoans.reduce((s,a)=>s+mnum(a.balance),0);
+  const net=asset+illiquid-debt-matDebt;
   const fixedM=fixed.reduce((s,f)=>s+mnum(f.krw),0);
   const loanIntM=Math.round(loans.reduce((s,a)=>s+mrate(a),0));
   const stamp=todayStr(); const P=[];
@@ -1352,14 +1368,15 @@ function financeDocHtml(){
   P.push('<blockquote>김비서 v3 돈관리 데이터 전체를 그대로 옮긴 문서입니다. 조언용 자료.<br>생성: <b>'+stamp+'</b><br>수입원: <b>수강료 → 사업자계좌 입금</b>, 금액·시기 불규칙. (이 외 수입원 없음)</blockquote>');
   P.push('<h2>0. 한눈에 보는 요약</h2>');
   P.push('<div class="tw"><table><tbody>'+
-    '<tr><td>💰 자산 (현금성 계좌 잔액 합계)</td><td><b>'+won(asset)+'</b></td></tr>'+
+    '<tr><td>💰 현금성 자산 (계좌 잔액 합계)</td><td><b>'+won(asset)+'</b></td></tr>'+
+    (illiquid>0?'<tr><td>🏛 비유동자산 (전세보증금·부동산 등)</td><td><b>'+won(illiquid)+'</b></td></tr>':'')+
     '<tr><td>🔴 부채 (실부담: 마통 + 만기반환 아닌 대출)</td><td><b>'+won(debt)+'</b></td></tr>'+
-    '<tr><td>⭐ 순자산 (자산 − 실부담 부채)</td><td><b>'+won(net)+'</b></td></tr>'+
-    '<tr><td>🏠 (별도) 전세 등 만기반환 대출</td><td>'+won(matDebt)+'</td></tr>'+
+    (matDebt>0?'<tr><td>🏠 만기반환 대출 (전세 등)</td><td><b>'+won(matDebt)+'</b></td></tr>':'')+
+    '<tr><td>⭐ 순자산 (총자산 − 총부채)</td><td><b>'+won(net)+'</b></td></tr>'+
     '<tr><td>📄 월 고정비 합계</td><td>'+won(fixedM)+'</td></tr>'+
     '<tr><td>🏦 월 대출이자 합계(현재 잔액 기준, 근사)</td><td>'+won(loanIntM)+'</td></tr>'+
     '</tbody></table></div>');
-  P.push('<p class="muted">※ "실부담"에서 만기반환 대출('+won(matDebt)+')은 만기에 보증금 등으로 반환되는 성격이라 제외.</p>');
+  P.push('<p class="muted">※ 순자산 = (현금성 자산 + 비유동자산) − (실부담 부채 + 만기반환 대출). 전세보증금 같은 자산과 전세대출이 서로 상쇄되어 실제 순자산이 나옵니다.</p>');
   if(matLoans.length) P.push('<div class="warn">📌 <b>이 문서를 읽는 분께 (중요)</b><br>"만기반환" 대출('+matLoans.map(a=>esc(a.alias)).join(", ")+' · 합계 '+won(matDebt)+')은 <b>갚아야 할 급한 빚이 아닙니다.</b> 예를 들어 전세대출은 <b>전세보증금(만기에 돌려받는 자산)</b>을 마련하려고 받은 것으로, 만기에 그 보증금으로 한 번에 상환됩니다. 매달 나가는 것은 <b>이자뿐</b>이고 원금은 조기상환 대상이 아닙니다. 따라서 <b>상환 우선순위에서 제외</b>하고 판단해 주세요. (아래 7번 우선순위 표에도 일부러 넣지 않았습니다.)</div>');
   P.push('<h2>1. 현금성 계좌 (자산)</h2>');
   cash.forEach(a=>{
@@ -1369,6 +1386,11 @@ function financeDocHtml(){
     if(txs.length) P.push('<div class="tw"><table><thead><tr><th>날짜</th><th>구분</th><th>금액</th><th>내용</th><th>메모</th></tr></thead><tbody>'+txs.map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+(t.dir==="in"?"입금(+)":"출금(−)")+'</td><td>'+won(t.krw)+'</td><td>'+esc(t.desc)+'</td><td>'+(esc(t.note)||'')+'</td></tr>').join('')+'</tbody></table></div>');
     else P.push('<p class="muted">거래 내역 없음</p>');
   });
+  if(illiquidList.length){
+    P.push('<h2>1-2. 비유동자산 (전세보증금·부동산 등)</h2>');
+    P.push('<p>합계 '+won(illiquid)+'. 바로 현금화하긴 어렵지만 순자산에 포함되는 자산.</p>');
+    P.push('<div class="tw"><table><thead><tr><th>자산</th><th>평가액</th><th>설명</th></tr></thead><tbody>'+illiquidList.map(a=>'<tr><td>'+esc(a.name)+'</td><td>'+won(a.value)+'</td><td>'+(esc(a.note)||"—")+'</td></tr>').join('')+'</tbody></table></div>');
+  }
   P.push('<h2>2. 지출 통로 계좌</h2>');
   if(!cond.length) P.push('<p class="muted">없음</p>');
   cond.forEach(a=>{
@@ -1440,15 +1462,19 @@ function moneyView(){
   let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn ghost" id="finDl" type="button" style="margin-left:auto">'+svi("download")+' 문서 저장</button><button class="addbtn" id="acctAdd" type="button" style="margin-left:.5rem">+ 추가</button></div>';
   if(!accts.length) return html+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
   const assets=accts.filter(a=>a.kind==="account" && !a.conduit && !a.overdraft).reduce((s,a)=>s+acctBalance(a),0);
+  const illiquid=(STORE.money.assets||[]).reduce((s,a)=>s+mnum(a.value),0);
   const odDebt=accts.filter(a=>a.kind==="account" && a.overdraft).reduce((s,a)=>s+Math.max(0,-acctBalance(a)),0);   // 마통 사용액
   const loanDebt=accts.filter(a=>a.kind==="loan" && !a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
-  const debt=odDebt+loanDebt, net=assets-debt;
+  const debt=odDebt+loanDebt;
   const returnLoans=accts.filter(a=>a.kind==="loan" && a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
+  const net=assets+illiquid-debt-returnLoans;
   html+='<div class="msum">'+
-    '<div class="msum-row"><span>자산</span><b>'+fmtMoney(assets,"KRW")+'</b></div>'+
+    '<div class="msum-row"><span>현금성 자산</span><b>'+fmtMoney(assets,"KRW")+'</b></div>'+
+    (illiquid>0?'<div class="msum-row"><span>비유동자산</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
     '<div class="msum-row"><span>부채 (실부담)</span><b class="neg">'+(debt>0?"−":"")+fmtMoney(debt,"KRW")+'</b></div>'+
+    (returnLoans>0?'<div class="msum-row"><span>만기반환 대출</span><b class="neg">−'+fmtMoney(returnLoans,"KRW")+'</b></div>':'')+
     '<div class="msum-row net"><span>순자산</span><b'+(net<0?' class="neg"':'')+'>'+fmtMoney(net,"KRW")+'</b></div>'+
-    (returnLoans>0?'<div class="msum-note">+ 만기반환 대출 '+fmtMoney(returnLoans,"KRW")+' (전세보증금 등 — 실부담 제외)</div>':'')+
+    (returnLoans>0&&illiquid<=0?'<div class="msum-note">만기반환 대출(전세 등)은 전세보증금 같은 자산으로 상환돼요. 아래 <b>비유동자산</b>에 그 보증금을 넣으면 순자산이 정확해져요.</div>':'')+
     '</div><div id="acctList">';
   accts.forEach(acc=>{
     const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
@@ -1499,7 +1525,7 @@ function moneyView(){
     html+='</div>';
   });
   html+='</div>';
-  return html+fixedSectionHtml();
+  return html+assetSectionHtml()+fixedSectionHtml();
 }
 function loanDetailHtml(acc){
   const today=todayStr(), r=mnum(acc.rate);
@@ -1539,6 +1565,19 @@ function loanDetailHtml(acc){
   return '<div class="loandet">'+rows.map(kv=>'<div class="ld-row"><span class="ld-k">'+kv[0]+'</span><span class="ld-v">'+kv[1]+'</span></div>').join("")+
     '<button class="txadd" type="button" data-repay="'+acc.id+'">+ 조기상환</button>'+
     '<div class="hint" style="padding:.55rem .2rem 0">매달 출금일에 위 금액이 자동 반영돼요. 여윳돈으로 원금을 더 갚으려면 "조기상환".</div></div>';
+}
+function assetSectionHtml(){
+  if(!Array.isArray(STORE.money.assets)) STORE.money.assets=[];
+  const list=STORE.money.assets.slice();
+  const total=list.reduce((s,a)=>s+mnum(a.value),0);
+  let h='<div class="msec"><div class="msec-h"><span class="mt">비유동자산</span>'+(list.length?'<span class="msec-total">합계 '+fmtMoney(total,"KRW")+'</span>':'')+'<button class="secadd-btn" type="button" id="assetAdd">+ 자산</button></div>';
+  if(!list.length) return h+'<div class="ledger-empty" style="padding:.5rem .2rem">전세보증금·부동산 등 바로 현금화하기 어려운 자산을 여기에 넣어요. (순자산에 반영됩니다)</div></div>';
+  h+='<div class="fixlist">';
+  list.forEach(a=>{
+    h+='<div class="fixrow" data-asset="'+a.id+'"><div class="fix-body"><div class="fix-desc">'+esc(a.name||"(이름 없음)")+'</div>'+(a.note?'<div class="fix-sub">'+esc(a.note)+'</div>':'')+'</div>'+
+      '<div class="fix-amt" style="color:var(--accent-strong)">'+fmtMoney(a.value,"KRW")+'</div></div>';
+  });
+  return h+'</div></div>';
 }
 function fixedSectionHtml(){
   const list=STORE.money.fixed.slice().sort((a,b)=>(a.day||99)-(b.day||99));
@@ -1596,7 +1635,9 @@ function wireMoney(){
   document.querySelectorAll("#view [data-txadd]").forEach(b=> b.addEventListener("click", ()=> openTx(b.dataset.txadd, null)));
   document.querySelectorAll("#view [data-repay]").forEach(b=> b.addEventListener("click", ()=> openRepay(b.dataset.repay)));
   const fadd=$("fixAdd"); if(fadd) fadd.addEventListener("click", ()=>openFix(null));
-  document.querySelectorAll("#view .fixrow").forEach(r=> r.addEventListener("click", ()=> openFix(r.dataset.fix)));
+  document.querySelectorAll("#view .fixrow[data-fix]").forEach(r=> r.addEventListener("click", ()=> openFix(r.dataset.fix)));
+  const aadd=$("assetAdd"); if(aadd) aadd.addEventListener("click", ()=>openAsset(null));
+  document.querySelectorAll("#view .fixrow[data-asset]").forEach(r=> r.addEventListener("click", ()=> openAsset(r.dataset.asset)));
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
 }
 function actAcct(id, act){
@@ -1822,6 +1863,27 @@ function saveFix(){
   closeFix(); save(); render();
 }
 function delFix(){ if(!mFixEdit) return; const i=STORE.money.fixed.findIndex(x=>x.id===mFixEdit); if(i>=0) STORE.money.fixed.splice(i,1); closeFix(); save(); render(); }
+let mAssetEdit=null;
+function openAsset(id){
+  if(!Array.isArray(STORE.money.assets)) STORE.money.assets=[];
+  mAssetEdit=id||null; const a=id?STORE.money.assets.find(x=>x.id===id):null;
+  $("assetTitle").textContent=id?"비유동자산 수정":"새 비유동자산";
+  $("as_name").value=a?(a.name||""):"";
+  $("as_value").value=a&&(a.value||a.value===0)?commaFmt(String(a.value)):"";
+  $("as_note").value=a?(a.note||""):"";
+  $("assetDelete").style.display=id?"":"none";
+  $("ovasset").classList.add("on"); setTimeout(()=>$("as_name").focus(),50);
+}
+function closeAsset(){ $("ovasset").classList.remove("on"); mAssetEdit=null; }
+function saveAsset(){
+  const name=$("as_name").value.trim(); if(!name){ $("as_name").focus(); return; }
+  if(!Array.isArray(STORE.money.assets)) STORE.money.assets=[];
+  const data={ name, value:mnum($("as_value").value), note:$("as_note").value.trim() };
+  if(mAssetEdit){ const a=STORE.money.assets.find(x=>x.id===mAssetEdit); if(a) Object.assign(a, data, { updated:Date.now() }); }
+  else { STORE.money.assets.push(Object.assign({ id:uid(), created:Date.now() }, data)); }
+  closeAsset(); save(); render();
+}
+function delAsset(){ if(!mAssetEdit) return; const i=STORE.money.assets.findIndex(x=>x.id===mAssetEdit); if(i>=0) STORE.money.assets.splice(i,1); closeAsset(); save(); render(); }
 // 고정비 자동 반영: 앱 열 때, 이번 달 결제일이 지났고 아직 안 넣은 고정비를 지정 계좌/카드 내역에 생성 (달마다 한 번)
 function autoPostFixed(){
   const today=todayStr(), mk=today.slice(0,7); let n=0;
@@ -1970,7 +2032,7 @@ $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
-attachThousands($("ac_start")); attachThousands($("ac_budget")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
+attachThousands($("ac_start")); attachThousands($("ac_budget")); attachThousands($("as_value")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
 attachThousands($("lo_monthly")); attachThousands($("rp_amount"));
 $("rpCancel").addEventListener("click", closeRepay);
 $("rpSave").addEventListener("click", saveRepay);
@@ -1987,6 +2049,10 @@ $("fixCancel").addEventListener("click", closeFix);
 $("fixSave").addEventListener("click", saveFix);
 $("fixDelete").addEventListener("click", delFix);
 overlayDismiss("ovfix", closeFix);
+$("assetCancel").addEventListener("click", closeAsset);
+$("assetSave").addEventListener("click", saveAsset);
+$("assetDelete").addEventListener("click", delAsset);
+overlayDismiss("ovasset", closeAsset);
 $("fx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mFixCur=b.dataset.v; selChips($("fx_cur"),mFixCur); fxCurUpdate(); });
 $("ctxmenu").querySelector('[data-ctx="del"]').innerHTML=svi('trash')+" 삭제";
 $("ctxmenu").addEventListener("click", e=>{ if(!e.target.closest('[data-ctx="del"]')) return; if(ctxTx){ const a=findAcct(ctxTx.acctId); if(a){ const i=(a.tx||[]).findIndex(t=>t.id===ctxTx.txId); if(i>=0){ a.tx.splice(i,1); save(); } } } closeCtx(); render(); });
