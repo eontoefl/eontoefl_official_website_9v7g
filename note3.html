@@ -530,8 +530,10 @@
     </div>
     <div class="fld" id="lo_graceFld" style="display:none"><label>거치 종료일 = 원금상환 시작 (선택)</label><input type="date" id="lo_grace">
       <div class="hint">비우면 지금부터 원금+이자 상환. 거치기간(이자만 내는 기간)이 있으면 그 종료일을 넣으면 그때부터 원금이 붙어요.</div></div>
-    <div class="fld"><label>매달 출금일</label><div class="dayrow"><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"><label class="daylast"><input type="checkbox" id="lo_paylast"> 말일</label></div></div>
+    <div class="fld" id="lo_paydayFld"><label>매달 출금일</label><div class="dayrow"><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"><label class="daylast"><input type="checkbox" id="lo_paylast"> 말일</label></div></div>
     <div class="fld"><label>출금 계좌</label><select id="lo_payacct"></select></div>
+    <div class="fld" id="lo_lastpayFld" style="display:none"><label>마지막으로 낸 날 (이자 기산일)</label><input type="date" id="lo_lastpay">
+      <div class="hint">이 날부터 이자가 쌓여요. 비우면 대출 시작일/오늘 기준.</div></div>
     <div class="fld"><label>대출 시작일 (실행일, 선택)</label><input type="date" id="lo_start">
       <div class="hint">오래된 대출이면 꼭 넣어주세요 — 원리금균등 기간 계산의 기준이 돼요.</div></div>
     <div class="fld" id="lo_matFld"><label>만기일 <span id="lo_matReq" style="color:var(--danger)"></span></label><input type="date" id="lo_maturity">
@@ -596,6 +598,19 @@
     <button type="button" class="cancel" id="fixDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
     <button type="button" class="cancel" id="fixCancel">취소</button>
     <button type="button" class="save" id="fixSave">저장</button>
+  </div>
+</div></div>
+
+<!-- 대출 상환하기 (자유상환) -->
+<div class="ov" id="ovrepay"><div class="sheet">
+  <h3 id="rpTitle">상환하기</h3>
+  <div class="fld"><label>상환 금액 (원)</label><input type="text" id="rp_amount" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld"><label>날짜</label><input type="date" id="rp_date"></div>
+  <div class="fld"><label>출금 계좌</label><select id="rp_acct"></select></div>
+  <div id="rp_preview"></div>
+  <div class="row">
+    <button type="button" class="cancel" id="rpCancel">취소</button>
+    <button type="button" class="save" id="rpSave">상환</button>
   </div>
 </div></div>
 
@@ -1191,6 +1206,10 @@ const REPAYTYPES = { interest:"이자만", free:"자유상환", amortize:"원리
 function monthsBetween(fromS, toS){ if(!fromS||!toS) return 0; const [fy,fm]=fromS.split("-").map(Number),[ty,tm]=toS.split("-").map(Number); return (ty-fy)*12+(tm-fm); }
 // 원리금균등 월 상환액 = P·r·(1+r)^n / ((1+r)^n − 1)  (P=원금, r=월이율, n=총 상환개월)
 function amortM(P, ratePct, n){ P=mnum(P); const r=mnum(ratePct)/100/12; if(n<=0) return P; if(r===0) return P/n; return P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
+// 자유상환(일할): 하루 이자·경과일수·지금까지 쌓인 이자
+function daysBetween(a,b){ if(!a||!b) return 0; return Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000); }
+function dailyInterest(loan){ return mnum(loan.balance)*mnum(loan.rate)/100/365; }
+function accruedInterest(loan, today){ const base=loan.lastPaymentDate||loan.startDate||today; return dailyInterest(loan)*Math.max(0, daysBetween(base, today)); }
 // 대출 이번 달 월납액. 이자만/자유상환/거치중=이자, 거치후 원리금=고정 월납(저장된 monthlyPay), 막판엔 잔액+이자로 캡
 function loanMonthly(loan, onDate){
   const r=mnum(loan.rate)/100/12, bal=mnum(loan.balance);
@@ -1263,7 +1282,7 @@ function moneyView(){
     } else if(isLoan){
       const bal=mnum(acc.balance), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
       rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출</span>'+fmtMoney(bal,"KRW")+'</div>';
-      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.payDay?(dayLabel(acc.payDay)+" 상환"):"", payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
+      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.repayType==="free"?"수시상환":(acc.payDay?(dayLabel(acc.payDay)+" 상환"):""), payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
       typeIcon="loan"; typeCls=" danger";
     } else {
       const bal=acctBalance(acc);
@@ -1284,7 +1303,21 @@ function moneyView(){
   return html+fixedSectionHtml();
 }
 function loanDetailHtml(acc){
-  const today=todayStr(), r=mnum(acc.rate), monthly=Math.round(loanMonthly(acc, today));
+  const today=todayStr(), r=mnum(acc.rate);
+  if(acc.repayType==="free"){
+    const daily=Math.round(dailyInterest(acc)), accrued=Math.round(accruedInterest(acc,today)), bal=mnum(acc.balance);
+    const rows=[
+      ["연 금리", r+"%"],
+      ["남은 원금", fmtMoney(bal,"KRW")],
+      ["하루에 쌓이는 이자", fmtMoney(daily,"KRW")+" / 일"],
+      ["지금까지 쌓인 이자"+(acc.lastPaymentDate?" (기산 "+fmtDShort(acc.lastPaymentDate)+")":""), fmtMoney(accrued,"KRW")],
+      ["지금 전액 상환하려면", fmtMoney(bal+accrued,"KRW")]
+    ];
+    return '<div class="loandet">'+rows.map(kv=>'<div class="ld-row"><span class="ld-k">'+kv[0]+'</span><span class="ld-v">'+kv[1]+'</span></div>').join("")+
+      '<button class="txadd" type="button" data-repay="'+acc.id+'">+ 상환하기</button>'+
+      '<div class="hint" style="padding:.55rem .2rem 0">돈 생겨서 갚을 때 "상환하기"에 금액만 넣으면 이자·원금 자동 분리 + 남은 원금 갱신돼요.</div></div>';
+  }
+  const monthly=Math.round(loanMonthly(acc, today));
   const grace = acc.repayType==="amortize" && acc.graceEndDate && today<acc.graceEndDate;
   const amortNow = acc.repayType==="amortize" && !grace;
   const interest = Math.round(mnum(acc.balance)*r/100/12);
@@ -1355,6 +1388,7 @@ function wireMoney(){
     row.addEventListener("contextmenu", e=>{ e.preventDefault(); openTxCtx(e.clientX, e.clientY, row.dataset.acct, row.dataset.tx); });
   });
   document.querySelectorAll("#view [data-txadd]").forEach(b=> b.addEventListener("click", ()=> openTx(b.dataset.txadd, null)));
+  document.querySelectorAll("#view [data-repay]").forEach(b=> b.addEventListener("click", ()=> openRepay(b.dataset.repay)));
   const fadd=$("fixAdd"); if(fadd) fadd.addEventListener("click", ()=>openFix(null));
   document.querySelectorAll("#view .fixrow").forEach(r=> r.addEventListener("click", ()=> openFix(r.dataset.fix)));
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
@@ -1385,7 +1419,16 @@ function odFieldsUpdate(){ $("ac_odFields").style.display = $("ac_od").checked ?
 function dayFrom(numId, chkId){ if($(chkId).checked) return 99; const v=parseInt($(numId).value,10); return (isFinite(v)&&v>=1)?Math.min(31,v):null; }
 function setDayField(numId, chkId, day){ const last=(+day>=32); $(chkId).checked=last; $(numId).value=(day&&!last)?day:""; $(numId).disabled=last; }
 function syncLast(numId, chkId){ $(numId).disabled=$(chkId).checked; }
-function loRepayUpdate(){ const am=(mLoanRepay==="amortize"); $("lo_graceFld").style.display=am?"":"none"; $("lo_monthlyFld").style.display=am?"":"none"; $("lo_matReq").textContent=""; $("lo_matHint").textContent=am?"만기일 또는 아래 '월 상환액' 중 하나가 있어야 자동 계산돼요.":"선택 사항"; }
+function loRepayUpdate(){
+  const am=(mLoanRepay==="amortize"), free=(mLoanRepay==="free");
+  $("lo_graceFld").style.display=am?"":"none";
+  $("lo_monthlyFld").style.display=am?"":"none";
+  $("lo_paydayFld").style.display=free?"none":"";
+  $("lo_matFld").style.display=free?"none":"";
+  $("lo_lastpayFld").style.display=free?"":"none";
+  $("lo_matReq").textContent="";
+  $("lo_matHint").textContent=am?"만기일 또는 아래 '월 상환액' 중 하나가 있어야 자동 계산돼요.":"선택 사항";
+}
 function acKindUpdate(kind){
   const card=kind==="card", loan=kind==="loan", acct=kind==="account";
   $("ac_startFld").style.display=acct?"":"none";
@@ -1428,6 +1471,7 @@ function openAcct(id){
   $("lo_maturity").value=a&&a.maturityDate?a.maturityDate:"";
   $("lo_start").value=a&&a.startDate?a.startDate:"";
   $("lo_monthly").value=a&&a.monthlyManual?commaFmt(String(a.monthlyManual)):"";
+  $("lo_lastpay").value=a&&a.lastPaymentDate?a.lastPaymentDate:"";
   mAcctColor=a&&a.color?a.color:ACCT_COLORS[STORE.money.accounts.length%ACCT_COLORS.length];
   renderSwatches();
   acKindUpdate(mAcctKind);
@@ -1456,6 +1500,8 @@ function saveAcct(){
     base.payAcctId=$("lo_payacct").value||"";
     base.maturityDate=$("lo_maturity").value||"";
     base.startDate=$("lo_start").value||"";
+    base.lastPaymentDate = mLoanRepay==="free" ? ($("lo_lastpay").value||"") : "";
+    if(mLoanRepay==="free") base.payDay=null;
     if(mLoanRepay==="amortize"){
       const manual=mnum($("lo_monthly").value); base.monthlyManual=manual>0?Math.round(manual):0;
       if(manual>0){ base.monthlyPay=Math.round(manual); }
@@ -1466,7 +1512,7 @@ function saveAcct(){
     base.overdraft=$("ac_od").checked;
     if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); base.odInterestDay=dayFrom("ac_odday","ac_odlast"); }
   }
-  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","maturityDate","monthlyPay","startDate","monthlyManual"];
+  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate"];
   if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ KEYS_ACC.forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; } }
   else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[], postedMonths:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
   closeAcct(); save(); render();
@@ -1589,8 +1635,8 @@ function autoPostLoans(){
         if(interest>0){ if(!Array.isArray(acc.tx)) acc.tx=[]; acc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:"마이너스통장 이자",cur:"KRW",krw:interest,note:"",fromLoan:acc.id }); n++; } }
       acc.postedMonths.push(key); trimPosted(acc); return;
     }
-    // 대출 상환 → 출금계좌에서 빠짐, 원리금이면 대출 잔액도 감소
-    if(acc.kind==="loan" && acc.payDay && acc.payAcctId){
+    // 대출 상환 → 출금계좌에서 빠짐, 원리금이면 대출 잔액도 감소 (자유상환은 수동이라 제외)
+    if(acc.kind==="loan" && acc.repayType!=="free" && acc.payDay && acc.payAcctId){
       if(acc.postedMonths.includes(mk)) return;
       const payAcc=findAcct(acc.payAcctId); if(!payAcc) return;
       const d=nextBusinessDay(ymd(Y,M,acc.payDay)); if(today<d) return;
@@ -1608,6 +1654,39 @@ function autoPostLoans(){
   return n;
 }
 function toast(msg){ const t=$("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), 3400); }
+
+/* 자유상환 대출: 상환하기 (이자 먼저 → 원금, 잔액 갱신, 기산일 리셋) */
+let mRepayLoan=null;
+function openRepay(loanId){
+  const loan=findAcct(loanId); if(!loan) return;
+  mRepayLoan=loanId;
+  $("rpTitle").textContent=(loan.alias||"대출")+" 상환";
+  $("rp_amount").value=""; $("rp_date").value=todayStr();
+  $("rp_acct").innerHTML=['<option value="">미지정</option>'].concat(STORE.money.accounts.filter(a=>a.kind==="account").map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>')).join("");
+  $("rp_acct").value=loan.payAcctId||"";
+  updateRepayPreview();
+  $("ovrepay").classList.add("on"); setTimeout(()=>$("rp_amount").focus(),50);
+}
+function closeRepay(){ $("ovrepay").classList.remove("on"); mRepayLoan=null; }
+function repaySplit(){
+  const loan=findAcct(mRepayLoan); if(!loan) return null;
+  const amount=mnum($("rp_amount").value), date=$("rp_date").value||todayStr();
+  const accrued=Math.round(accruedInterest(loan, date));
+  const interest=Math.min(accrued, amount), principal=Math.max(0, amount-interest);
+  return { loan, amount, date, accrued, interest, principal, newBal:Math.max(0, mnum(loan.balance)-principal) };
+}
+function updateRepayPreview(){
+  const s=repaySplit(); if(!s){ $("rp_preview").innerHTML=""; return; }
+  $("rp_preview").innerHTML='<div class="hint" style="margin:-.4rem 0 .2rem;line-height:1.7">쌓인 이자 '+fmtMoney(s.accrued,"KRW")+' → 이자 <b>'+fmtMoney(s.interest,"KRW")+'</b> · 원금 <b>'+fmtMoney(s.principal,"KRW")+'</b><br>남은 원금 '+fmtMoney(mnum(s.loan.balance),"KRW")+' → <b>'+fmtMoney(s.newBal,"KRW")+'</b></div>';
+}
+function saveRepay(){
+  const s=repaySplit(); if(!s || s.amount<=0){ $("rp_amount").focus(); return; }
+  s.loan.balance=s.newBal; s.loan.lastPaymentDate=s.date; s.loan.updated=Date.now();
+  const payAcc=$("rp_acct").value?findAcct($("rp_acct").value):null;
+  if(payAcc){ if(!Array.isArray(payAcc.tx)) payAcc.tx=[]; payAcc.tx.push({ id:uid(), created:Date.now(), date:s.date, dir:"out", desc:(s.loan.alias||"대출")+" 상환", cur:"KRW", krw:s.amount, note:"이자 "+fmtMoney(s.interest,"KRW")+" + 원금 "+fmtMoney(s.principal,"KRW"), fromLoan:s.loan.id }); }
+  closeRepay(); save(); render();
+  toast("상환 완료 · 남은 원금 "+fmtMoney(s.newBal,"KRW"));
+}
 
 /* 내역 우클릭 → 삭제 메뉴 */
 let ctxTx=null;
@@ -1634,7 +1713,12 @@ $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
 attachThousands($("ac_start")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
-attachThousands($("lo_monthly"));
+attachThousands($("lo_monthly")); attachThousands($("rp_amount"));
+$("rpCancel").addEventListener("click", closeRepay);
+$("rpSave").addEventListener("click", saveRepay);
+overlayDismiss("ovrepay", closeRepay);
+$("rp_amount").addEventListener("input", updateRepayPreview);
+$("rp_date").addEventListener("input", updateRepayPreview);
 [["ac_odday","ac_odlast"],["ac_payday","ac_paylast"],["lo_payday","lo_paylast"],["fx_day","fx_lastchk"]].forEach(p=>$(p[1]).addEventListener("change", ()=>syncLast(p[0],p[1])));
 $("tx_dir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxDir=b.dataset.v; selChips($("tx_dir"),mTxDir); });
 $("tx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxCur=b.dataset.v; selChips($("tx_cur"),mTxCur); txCurUpdate(); });
@@ -1647,7 +1731,7 @@ $("ctxmenu").querySelector('[data-ctx="del"]').innerHTML=svi('trash')+" 삭제";
 $("ctxmenu").addEventListener("click", e=>{ if(!e.target.closest('[data-ctx="del"]')) return; if(ctxTx){ const a=findAcct(ctxTx.acctId); if(a){ const i=(a.tx||[]).findIndex(t=>t.id===ctxTx.txId); if(i>=0){ a.tx.splice(i,1); save(); } } } closeCtx(); render(); });
 document.addEventListener("click", e=>{ if($("ctxmenu").style.display==="block" && !e.target.closest("#ctxmenu")) closeCtx(); });
 document.addEventListener("scroll", ()=>{ if($("ctxmenu").style.display==="block") closeCtx(); }, true);
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ctxmenu").style.display==="block") closeCtx(); } });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ovrepay").classList.contains("on")) closeRepay(); if($("ctxmenu").style.display==="block") closeCtx(); } });
 
 /* ═══ 복원 (스냅샷 목록 → 되돌리기) ═══ */
 $("restorebtn").addEventListener("click", openRestore);
