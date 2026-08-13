@@ -271,6 +271,15 @@
   .ld-k { color:var(--on-surface-variant); flex-shrink:0; }
   .ld-v { color:var(--on-surface); font-weight:600; text-align:right; }
   .acct-sub { font-size:12px; color:var(--on-surface-variant); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .acct-budget { margin-top:7px; padding-right:.5rem; }
+  .bgt-bar { height:6px; border-radius:99px; background:var(--surface-high); overflow:hidden; }
+  .bgt-bar span { display:block; height:100%; border-radius:99px; background:var(--accent-strong); transition:width .35s ease; }
+  .acct-budget.warn .bgt-bar span { background:#cf8a2e; }
+  .acct-budget.over .bgt-bar span { background:var(--danger); }
+  .bgt-lbl { display:flex; justify-content:space-between; gap:.5rem; font-size:10.5px; font-weight:700; color:var(--on-surface-variant); margin-top:4px; white-space:nowrap; }
+  .bgt-rem { flex-shrink:0; }
+  .acct-budget.warn .bgt-rem { color:#b5771f; }
+  .acct-budget.over .bgt-rem { color:var(--danger); }
   .acct-bal { font-size:15px; font-weight:800; color:var(--on-surface); white-space:nowrap; text-align:right; }
   .acct-bal.neg { color:var(--danger); }
   .acct-bal.stmt { color:var(--danger); }
@@ -510,6 +519,7 @@
   <div class="fld" id="ac_numFld"><label id="ac_numLbl">계좌번호 (선택)</label><input type="text" id="ac_num" placeholder="예: 123-45-678900" autocomplete="off"></div>
 
   <div class="fld" id="ac_startFld"><label>시작 잔액 (원)</label><input type="text" id="ac_start" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld" id="ac_budgetFld"><label>월 예산 (선택)</label><input type="text" id="ac_budget" placeholder="예: 2,000,000 (이번 달 쓴 금액을 막대로 표시)" inputmode="numeric" autocomplete="off"></div>
   <div class="fld" id="ac_conduitFld"><label class="chkline"><input type="checkbox" id="ac_conduit"> 지출 통로 (잔액 추적 안 함 · 이번 달 나갈 총액만 표시)</label></div>
   <div id="ac_odBlk">
     <div class="fld"><label class="chkline"><input type="checkbox" id="ac_od"> 마이너스 통장이에요 (이자 자동 계산)</label></div>
@@ -1348,8 +1358,18 @@ function moneyView(){
       rightHtml='<div class="acct-bal'+(bal<0?' neg':'')+'">'+fmtMoney(bal,"KRW")+'</div>';
       sub=[isOD?"마이너스통장":"", esc(acc.bank), esc(acc.num), (isOD&&mnum(acc.odRate)>0)?(mnum(acc.odRate)+"%"):""].filter(Boolean).join(" · ");
     }
+    let budgetHtml="";
+    if(acc.kind==="account" && !acc.conduit && mnum(acc.budget)>0){
+      const bg=mnum(acc.budget), mk=todayStr().slice(0,7);
+      const spent=(acc.tx||[]).filter(t=>t.dir==="out" && String(t.date||"").slice(0,7)===mk).reduce((s,t)=>s+mnum(t.krw),0);
+      const over=spent>bg, pct=Math.min(100, bg>0?Math.round(spent/bg*100):0);
+      const lvl=over?" over":(spent>=bg*0.8?" warn":"");
+      budgetHtml='<div class="acct-budget'+lvl+'"><div class="bgt-bar"><span style="width:'+pct+'%"></span></div>'+
+        '<div class="bgt-lbl"><span>이번 달 '+fmtMoney(spent,"KRW")+' / '+fmtMoney(bg,"KRW")+'</span>'+
+        '<span class="bgt-rem">'+(over?("+"+fmtMoney(spent-bg,"KRW")+" 초과"):(fmtMoney(bg-spent,"KRW")+" 남음"))+'</span></div></div>';
+    }
     html+='<div class="mcard acct" data-id="'+acc.id+'" style="--ac:'+esc(acc.color||"#ccc")+'"><div class="acct-top">'+dragH+
-      '<div class="acct-body" data-act="toggle"><div class="acct-alias">'+svi(typeIcon,"type-ic"+typeCls)+' '+esc(acc.alias||"계좌")+' '+svi(open?"chevD":"chevR")+'</div>'+(sub?'<div class="acct-sub">'+sub+'</div>':'')+'</div>'+
+      '<div class="acct-body" data-act="toggle"><div class="acct-alias">'+svi(typeIcon,"type-ic"+typeCls)+' '+esc(acc.alias||"계좌")+' '+svi(open?"chevD":"chevR")+'</div>'+(sub?'<div class="acct-sub">'+sub+'</div>':'')+budgetHtml+'</div>'+
       rightHtml+
       '<div class="acts">'+(isLoan?'':'<button type="button" data-act="addtx" title="'+(isCard?'사용 추가':'거래 추가')+'">'+svi('plus')+'</button>')+'<button type="button" data-act="edit" title="수정">'+svi('edit')+'</button></div></div>';
     if(open){
@@ -1500,6 +1520,7 @@ function loRepayUpdate(){
 function acKindUpdate(kind){
   const card=kind==="card", loan=kind==="loan", acct=kind==="account";
   $("ac_startFld").style.display=acct?"":"none";
+  $("ac_budgetFld").style.display=acct?"":"none";
   $("ac_conduitFld").style.display=acct?"":"none";
   $("ac_odBlk").style.display=acct?"":"none";
   $("ac_cardBlk").style.display=card?"":"none";
@@ -1522,6 +1543,7 @@ function openAcct(id){
   fillIssuer(mAcctKind, a?(a.bank||""):"");
   $("ac_num").value=a?(a.num||""):"";
   $("ac_start").value=a&&(a.startBalance||a.startBalance===0)?commaFmt(String(a.startBalance)):"";
+  $("ac_budget").value=a&&mnum(a.budget)>0?commaFmt(String(a.budget)):"";
   $("ac_od").checked=!!(a&&a.overdraft);
   $("ac_conduit").checked=!!(a&&a.conduit);
   $("ac_odrate").value=a&&a.odRate?a.odRate:"";
@@ -1585,11 +1607,12 @@ function saveAcct(){
     } else { base.monthlyPay=0; base.monthlyManual=0; }
   } else {
     base.startBalance=mnum($("ac_start").value);
+    base.budget=mnum($("ac_budget").value)||0;
     base.overdraft=$("ac_od").checked;
     base.conduit=$("ac_conduit").checked;
     if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); base.odInterestDay=dayFrom("ac_odday","ac_odlast"); }
   }
-  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","graceMonths","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate","conduit","returnAtMaturity"];
+  const KEYS_ACC=["startBalance","budget","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","graceMonths","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate","conduit","returnAtMaturity"];
   if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ KEYS_ACC.forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; } }
   else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[], postedMonths:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
   closeAcct(); save(); render();
@@ -1828,7 +1851,7 @@ $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
-attachThousands($("ac_start")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
+attachThousands($("ac_start")); attachThousands($("ac_budget")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
 attachThousands($("lo_monthly")); attachThousands($("rp_amount"));
 $("rpCancel").addEventListener("click", closeRepay);
 $("rpSave").addEventListener("click", saveRepay);
