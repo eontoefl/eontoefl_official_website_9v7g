@@ -252,6 +252,11 @@
   .acct-bal.stmt.loan { color:var(--danger); }
   .fld label.chkline { display:flex; align-items:center; gap:.5rem; font-size:13.5px; font-weight:600; letter-spacing:0; color:var(--on-surface); cursor:pointer; margin-bottom:0; }
   .fld label.chkline input { width:17px; height:17px; accent-color:var(--accent-strong); }
+  .dayrow { display:flex; gap:.6rem; align-items:center; }
+  .dayrow input[type=number] { flex:1; min-width:0; }
+  .dayrow input[type=number]:disabled { opacity:.45; }
+  .fld label.daylast { display:flex; align-items:center; gap:.35rem; font-size:13px; font-weight:600; letter-spacing:0; color:var(--on-surface-variant); margin-bottom:0; white-space:nowrap; cursor:pointer; flex-shrink:0; }
+  .fld label.daylast input { width:16px; height:16px; accent-color:var(--accent-strong); }
   .loandet { padding:.3rem .2rem .2rem; }
   .ld-row { display:flex; justify-content:space-between; gap:1rem; padding:.45rem .1rem; font-size:13px; }
   .ld-row + .ld-row { border-top:1px solid var(--surface-container); }
@@ -493,13 +498,13 @@
     <div class="fld"><label class="chkline"><input type="checkbox" id="ac_od"> 마이너스 통장이에요 (이자 자동 계산)</label></div>
     <div id="ac_odFields" style="display:none">
       <div class="fld"><label>연 금리 (%)</label><input type="number" id="ac_odrate" step="0.01" placeholder="예: 6.5" inputmode="decimal"></div>
-      <div class="fld"><label>이자 납부일 (매달)</label><input type="number" id="ac_odday" min="1" max="31" placeholder="예: 17" inputmode="numeric">
+      <div class="fld"><label>이자 납부일 (매달)</label><div class="dayrow"><input type="number" id="ac_odday" min="1" max="31" placeholder="예: 17" inputmode="numeric"><label class="daylast"><input type="checkbox" id="ac_odlast"> 말일</label></div>
         <div class="hint">매달 이 날, (마이너스 잔액 × 금리 ÷ 12) 이자가 이 통장에 자동으로 붙어요.</div></div>
     </div>
   </div>
 
   <div id="ac_cardBlk">
-    <div class="fld"><label>매달 결제일</label><input type="number" id="ac_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"></div>
+    <div class="fld"><label>매달 결제일</label><div class="dayrow"><input type="number" id="ac_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"><label class="daylast"><input type="checkbox" id="ac_paylast"> 말일</label></div></div>
     <div class="fld"><label>출금 계좌</label><select id="ac_payacct"></select></div>
     <div class="fld"><label>청구 기간 (며칠 ~ 며칠 사용분)</label>
       <div class="rangerow"><input type="number" id="ac_cyc1" min="1" max="31" placeholder="시작일" inputmode="numeric"><span class="tilde">~</span><input type="number" id="ac_cyc2" min="1" max="31" placeholder="종료일" inputmode="numeric"></div>
@@ -525,7 +530,7 @@
     </div>
     <div class="fld" id="lo_graceFld" style="display:none"><label>원금상환 시작일 (거치 종료)</label><input type="date" id="lo_grace">
       <div class="hint">이 날 전까지는 이자만, 이 날부터 원리금균등으로 자동 전환돼요.</div></div>
-    <div class="fld"><label>매달 출금일</label><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"></div>
+    <div class="fld"><label>매달 출금일</label><div class="dayrow"><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"><label class="daylast"><input type="checkbox" id="lo_paylast"> 말일</label></div></div>
     <div class="fld"><label>출금 계좌</label><select id="lo_payacct"></select></div>
     <div class="fld"><label>만기일 (선택)</label><input type="date" id="lo_maturity">
       <div class="hint">원리금균등 계산에 쓰여요.</div></div>
@@ -570,7 +575,7 @@
 <!-- 고정비 폼 -->
 <div class="ov" id="ovfix"><div class="sheet">
   <h3 id="fixTitle">새 고정비</h3>
-  <div class="fld"><label>매달 며칠</label><input type="number" id="fx_day" min="1" max="31" placeholder="예: 15" inputmode="numeric"></div>
+  <div class="fld"><label>매달 며칠</label><div class="dayrow"><input type="number" id="fx_day" min="1" max="31" placeholder="예: 15" inputmode="numeric"><label class="daylast"><input type="checkbox" id="fx_lastchk"> 말일</label></div></div>
   <div class="fld"><label>내역</label><input type="text" id="fx_desc" placeholder="예: 서버 호스팅비" lang="ko" autocomplete="off"></div>
   <div class="fld"><label>통화</label>
     <div class="chips" id="fx_cur">
@@ -1191,6 +1196,9 @@ function loanMonthly(loan, onDate){
 }
 // 신용카드 청구 주기: cs~ce(매달 일자)로 오늘이 속한 청구기간 [시작일, 종료일] 반환. 미설정이면 이번 달(1일~말일).
 function ymd(y,m,day){ const last=new Date(y,m,0).getDate(); const d=Math.min(day,last); return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"); }
+// 주말(토·일)이면 다음 영업일(월요일)로 밀기 — 공휴일은 제외, 주말만
+function nextBusinessDay(s){ if(!s) return s; const d=new Date(s+"T12:00:00"); let g=d.getDay(); while(g===0||g===6){ d.setDate(d.getDate()+1); g=d.getDay(); } return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+const dayLabel = day => { day=+day; return (!day)?"-":(day>=32?"말일":(day+"일")); };
 function cardCycleBounds(card, todayS){
   const cs=+card.cycleStart||0, ce=+card.cycleEnd||0;
   const [Y,M]=todayS.split("-").map(Number);
@@ -1246,12 +1254,12 @@ function moneyView(){
     if(isCard){
       const stmt=cardStatement(acc), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
       rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 청구분</span>'+fmtMoney(stmt,"KRW")+'</div>';
-      sub=["카드", acc.payDay?(acc.payDay+"일 결제"):"", payAcc?(esc(payAcc.alias)+" 출금"):""].filter(Boolean).join(" · ");
+      sub=["카드", acc.payDay?(dayLabel(acc.payDay)+" 결제"):"", payAcc?(esc(payAcc.alias)+" 출금"):""].filter(Boolean).join(" · ");
       typeIcon="card"; typeCls=" plum";
     } else if(isLoan){
       const bal=mnum(acc.balance), payAcc=acc.payAcctId?findAcct(acc.payAcctId):null;
       rightHtml='<div class="acct-bal stmt loan"><span class="bal-lbl">남은 대출</span>'+fmtMoney(bal,"KRW")+'</div>';
-      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.payDay?(acc.payDay+"일 상환"):"", payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
+      sub=[esc(acc.bank), LOANTYPES[acc.loanType]||"", acc.payDay?(dayLabel(acc.payDay)+" 상환"):"", payAcc?esc(payAcc.alias):""].filter(Boolean).join(" · ");
       typeIcon="loan"; typeCls=" danger";
     } else {
       const bal=acctBalance(acc);
@@ -1296,7 +1304,7 @@ function fixedSectionHtml(){
     const amt=foreign?fmtMoney(f.famount,f.cur):fmtMoney(f.krw,"KRW");
     const krwTag=foreign?'<span class="tx-krw">'+fmtMoney(f.krw,"KRW")+'</span>':'';
     const sub=[acc?acc.alias:"계좌 미지정", f.why].filter(Boolean).join(" · ");
-    h+='<div class="fixrow" data-fix="'+f.id+'"><div class="fix-day">'+(f.day?"매달 "+f.day+"일":"-")+'</div>'+
+    h+='<div class="fixrow" data-fix="'+f.id+'"><div class="fix-day">'+(f.day?"매달 "+dayLabel(f.day):"-")+'</div>'+
       '<div class="fix-body"><div class="fix-desc">'+esc(f.desc||"(내역 없음)")+'</div>'+(sub?'<div class="fix-sub">'+esc(sub)+'</div>':'')+'</div>'+
       '<div class="fix-amt">−'+amt+krwTag+'</div></div>';
   });
@@ -1365,6 +1373,9 @@ function acctOptionsHtml(){
 function fillPayAccts(selected){ $("ac_payacct").innerHTML=acctOptionsHtml(); $("ac_payacct").value=selected||""; }
 function fillLoanPayAccts(selected){ $("lo_payacct").innerHTML=acctOptionsHtml(); $("lo_payacct").value=selected||""; }
 function odFieldsUpdate(){ $("ac_odFields").style.display = $("ac_od").checked ? "" : "none"; }
+function dayFrom(numId, chkId){ if($(chkId).checked) return 99; const v=parseInt($(numId).value,10); return (isFinite(v)&&v>=1)?Math.min(31,v):null; }
+function setDayField(numId, chkId, day){ const last=(+day>=32); $(chkId).checked=last; $(numId).value=(day&&!last)?day:""; $(numId).disabled=last; }
+function syncLast(numId, chkId){ $(numId).disabled=$(chkId).checked; }
 function acKindUpdate(kind){
   const card=kind==="card", loan=kind==="loan", acct=kind==="account";
   $("ac_startFld").style.display=acct?"":"none";
@@ -1391,8 +1402,8 @@ function openAcct(id){
   $("ac_start").value=a&&(a.startBalance||a.startBalance===0)?commaFmt(String(a.startBalance)):"";
   $("ac_od").checked=!!(a&&a.overdraft);
   $("ac_odrate").value=a&&a.odRate?a.odRate:"";
-  $("ac_odday").value=a&&a.odInterestDay?a.odInterestDay:"";
-  $("ac_payday").value=a&&a.payDay&&mAcctKind==="card"?a.payDay:"";
+  setDayField("ac_odday","ac_odlast", a?a.odInterestDay:0);
+  setDayField("ac_payday","ac_paylast", (a&&mAcctKind==="card")?a.payDay:0);
   fillPayAccts(a&&mAcctKind==="card"?(a.payAcctId||""):"");
   $("ac_cyc1").value=a&&a.cycleStart?a.cycleStart:"";
   $("ac_cyc2").value=a&&a.cycleEnd?a.cycleEnd:"";
@@ -1403,7 +1414,7 @@ function openAcct(id){
   mLoanRepay=a&&a.repayType?a.repayType:"interest"; selChips($("lo_repay"),mLoanRepay);
   $("lo_graceFld").style.display=(mLoanRepay==="amortize")?"":"none";
   $("lo_grace").value=a&&a.graceEndDate?a.graceEndDate:"";
-  $("lo_payday").value=a&&a.payDay&&mAcctKind==="loan"?a.payDay:"";
+  setDayField("lo_payday","lo_paylast", (a&&mAcctKind==="loan")?a.payDay:0);
   fillLoanPayAccts(a&&mAcctKind==="loan"?(a.payAcctId||""):"");
   $("lo_maturity").value=a&&a.maturityDate?a.maturityDate:"";
   mAcctColor=a&&a.color?a.color:ACCT_COLORS[STORE.money.accounts.length%ACCT_COLORS.length];
@@ -1417,7 +1428,7 @@ function saveAcct(){
   const alias=$("ac_alias").value.trim(); if(!alias){ $("ac_alias").focus(); return; }
   const base={ kind:mAcctKind, alias, bank:$("ac_bank").value.trim(), num:$("ac_num").value.trim(), color:mAcctColor };
   if(mAcctKind==="card"){
-    const pd=parseInt($("ac_payday").value,10); base.payDay=(isFinite(pd)&&pd>=1)?Math.min(31,pd):null;
+    base.payDay=dayFrom("ac_payday","ac_paylast");
     base.payAcctId=$("ac_payacct").value||"";
     const c1=parseInt($("ac_cyc1").value,10), c2=parseInt($("ac_cyc2").value,10);
     base.cycleStart=(isFinite(c1)&&c1>=1)?Math.min(31,c1):null;
@@ -1429,7 +1440,7 @@ function saveAcct(){
     base.rate=mnum($("lo_rate").value);
     base.repayType=mLoanRepay;
     base.graceEndDate = mLoanRepay==="amortize" ? ($("lo_grace").value||"") : "";
-    const lpd=parseInt($("lo_payday").value,10); base.payDay=(isFinite(lpd)&&lpd>=1)?Math.min(31,lpd):null;
+    base.payDay=dayFrom("lo_payday","lo_paylast");
     base.payAcctId=$("lo_payacct").value||"";
     base.maturityDate=$("lo_maturity").value||"";
     if(mLoanRepay==="amortize"){ const repayStart=(base.graceEndDate||todayStr()).slice(0,7)+"-01"; const N=base.maturityDate?monthsBetween(repayStart, base.maturityDate):0; base.monthlyPay = N>0 ? Math.round(amortM(base.principal, base.rate, N)) : 0; }
@@ -1437,7 +1448,7 @@ function saveAcct(){
   } else {
     base.startBalance=mnum($("ac_start").value);
     base.overdraft=$("ac_od").checked;
-    if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); const od=parseInt($("ac_odday").value,10); base.odInterestDay=(isFinite(od)&&od>=1)?Math.min(31,od):null; }
+    if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); base.odInterestDay=dayFrom("ac_odday","ac_odlast"); }
   }
   const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","maturityDate","monthlyPay"];
   if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ KEYS_ACC.forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; } }
@@ -1508,7 +1519,7 @@ function fillFixAccts(){
 function openFix(id){
   mFixEdit=id||null; const f=id?STORE.money.fixed.find(x=>x.id===id):null;
   $("fixTitle").textContent=id?"고정비 수정":"새 고정비";
-  $("fx_day").value=f&&f.day?f.day:"";
+  setDayField("fx_day","fx_lastchk", f?f.day:0);
   $("fx_desc").value=f?(f.desc||""):"";
   mFixCur=f?(f.cur||"KRW"):"KRW"; selChips($("fx_cur"),mFixCur);
   $("fx_krw").value=f&&(f.krw||f.krw===0)?commaFmt(String(f.krw)):"";
@@ -1522,7 +1533,7 @@ function openFix(id){
 function closeFix(){ $("ovfix").classList.remove("on"); mFixEdit=null; }
 function saveFix(){
   const desc=$("fx_desc").value.trim(); if(!desc){ $("fx_desc").focus(); return; }
-  const dv=parseInt($("fx_day").value,10), day=(isFinite(dv)&&dv>=1)?Math.min(31,dv):null;
+  const day=dayFrom("fx_day","fx_lastchk");
   const foreign=mFixCur!=="KRW";
   const data={ day, desc, cur:mFixCur, krw:mnum($("fx_krw").value), famount:foreign?mnum($("fx_famt").value):null, acctId:$("fx_acct").value||"", why:$("fx_why").value.trim() };
   if(mFixEdit){ const f=STORE.money.fixed.find(x=>x.id===mFixEdit); if(f) Object.assign(f, data, { updated:Date.now() }); }
@@ -1556,7 +1567,7 @@ function autoPostLoans(){
     // 마이너스통장 이자 → 통장 자신에 붙음(빚 증가)
     if(acc.kind==="account" && acc.overdraft && mnum(acc.odRate)>0 && acc.odInterestDay){
       const key="od"+mk; if(acc.postedMonths.includes(key)) return;
-      const d=ymd(Y,M,acc.odInterestDay); if(today<d) return;
+      const d=nextBusinessDay(ymd(Y,M,acc.odInterestDay)); if(today<d) return;
       const bal=acctBalance(acc);
       if(bal<0){ const interest=Math.round(Math.abs(bal)*(mnum(acc.odRate)/100/12));
         if(interest>0){ if(!Array.isArray(acc.tx)) acc.tx=[]; acc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:"마이너스통장 이자",cur:"KRW",krw:interest,note:"",fromLoan:acc.id }); n++; } }
@@ -1566,7 +1577,7 @@ function autoPostLoans(){
     if(acc.kind==="loan" && acc.payDay && acc.payAcctId){
       if(acc.postedMonths.includes(mk)) return;
       const payAcc=findAcct(acc.payAcctId); if(!payAcc) return;
-      const d=ymd(Y,M,acc.payDay); if(today<d) return;
+      const d=nextBusinessDay(ymd(Y,M,acc.payDay)); if(today<d) return;
       const r=mnum(acc.rate)/100/12, bal=mnum(acc.balance);
       let interest=Math.round(bal*r), principal=0, pay=interest, note="이자";
       const amort = acc.repayType==="amortize" && (!acc.graceEndDate || d>=acc.graceEndDate);
@@ -1607,6 +1618,7 @@ $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
 attachThousands($("ac_start")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
+[["ac_odday","ac_odlast"],["ac_payday","ac_paylast"],["lo_payday","lo_paylast"],["fx_day","fx_lastchk"]].forEach(p=>$(p[1]).addEventListener("change", ()=>syncLast(p[0],p[1])));
 $("tx_dir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxDir=b.dataset.v; selChips($("tx_dir"),mTxDir); });
 $("tx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxCur=b.dataset.v; selChips($("tx_cur"),mTxCur); txCurUpdate(); });
 $("fixCancel").addEventListener("click", closeFix);
