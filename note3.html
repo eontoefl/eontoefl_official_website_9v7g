@@ -311,6 +311,12 @@
   .ledger-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.7; padding:.3rem .3rem .2rem; }
   .conduit-sum { font-size:12.5px; color:var(--on-surface-variant); padding:.2rem .3rem .6rem; line-height:1.7; }
   .conduit-sum b { color:var(--on-surface); font-weight:700; }
+  .conduit-heads { flex-shrink:0; display:flex; flex-direction:column; gap:2px; }
+  .ch-row { display:flex; gap:.4rem; justify-content:flex-end; align-items:baseline; white-space:nowrap; }
+  .ch-lbl { font-size:9.5px; font-weight:700; color:var(--on-surface-variant); }
+  .ch-amt { font-size:14px; font-weight:800; color:var(--danger); }
+  .ch-row.next .ch-amt { font-size:11.5px; font-weight:700; color:var(--on-surface-variant); }
+  .ch-row.next .ch-lbl { opacity:.8; }
   .msec { margin-top:1.7rem; }
   .msec-h { display:flex; align-items:center; gap:.6rem; margin:0 .15rem .75rem; }
   .msec-h .mt { font-size:16px; font-weight:800; color:var(--on-surface); }
@@ -1335,7 +1341,7 @@ function moneyView(){
       typeIcon="loan"; typeCls=" danger";
     } else if(acc.conduit){
       const bd=conduitBreakdown(acc.id);
-      rightHtml='<div class="acct-bal stmt"><span class="bal-lbl">이번 달 남은 (보낼 금액)</span>−'+fmtMoney(bd.remaining,"KRW")+'</div>';
+      rightHtml='<div class="conduit-heads"><div class="ch-row"><span class="ch-lbl">이번 달 남은</span><span class="ch-amt">−'+fmtMoney(bd.remaining,"KRW")+'</span></div><div class="ch-row next"><span class="ch-lbl">다음 달</span><span class="ch-amt">−'+fmtMoney(bd.total,"KRW")+'</span></div></div>';
       sub=["지출 통로", esc(acc.bank)].filter(Boolean).join(" · ");
     } else {
       const bal=acctBalance(acc);
