@@ -1718,6 +1718,26 @@ function autoPostLoans(){
   });
   return n;
 }
+// 카드 결제일 자동 출금: 결제일에 지난 청구분을 출금계좌에서 −. 잔액 부족이면 알림
+function autoPostCards(){
+  const today=todayStr(), mk=today.slice(0,7), [Y,M]=mk.split("-").map(Number); let n=0; const short=[];
+  STORE.money.accounts.forEach(acc=>{
+    if(acc.kind!=="card" || !acc.payDay || !acc.payAcctId) return;
+    if(!Array.isArray(acc.postedMonths)) acc.postedMonths=[];
+    const key="cp"+mk; if(acc.postedMonths.includes(key)) return;
+    const d=nextBusinessDay(ymd(Y,M,acc.payDay)); if(today<d) return;
+    const curStart=cardCycleBounds(acc, d)[0], prevEnd=shiftDay(curStart,-1), prevStart=cardCycleBounds(acc, prevEnd)[0];
+    const stmt=Math.round((acc.tx||[]).filter(t=>t.date>=prevStart && t.date<=prevEnd).reduce((s,t)=>s+(t.dir==="out"?1:-1)*mnum(t.krw),0));
+    const payAcc=findAcct(acc.payAcctId);
+    if(stmt>0 && payAcc){ if(!Array.isArray(payAcc.tx)) payAcc.tx=[];
+      payAcc.tx.push({ id:uid(),created:Date.now(),date:d,dir:"out",desc:(acc.alias||"카드")+" 대금",cur:"KRW",krw:stmt,note:"카드값 "+fmtDShort(prevStart)+"~"+fmtDShort(prevEnd),fromCard:acc.id });
+      n++;
+      if(!payAcc.conduit && !payAcc.overdraft && acctBalance(payAcc)<0) short.push((payAcc.alias||"계좌")+" 잔액 부족");
+    }
+    acc.postedMonths.push(key); trimPosted(acc);
+  });
+  return { n, short };
+}
 function toast(msg){ const t=$("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), 3400); }
 
 /* 자유상환 대출: 상환하기 (이자 먼저 → 원금, 잔액 갱신, 기산일 리셋) */
@@ -1841,7 +1861,13 @@ async function restoreTo(snapId){
   await pushState(); render(); setDot(true,"복원됨 ✓");
 }
 
-async function start(){ setDot(true,"여는 중…"); await loadStore(); const n=autoPostFixed()+autoPostLoans(); if(n>0) save(); render(); if(n>0) toast(n+"건이 이번 달 내역에 자동 반영됐어요"); setDot(true,"준비됨"); }
+async function start(){
+  setDot(true,"여는 중…"); await loadStore();
+  const nBase=autoPostFixed()+autoPostLoans(), cp=autoPostCards(), n=nBase+cp.n;
+  if(n>0) save(); render();
+  if(n>0 || cp.short.length) toast((n>0?n+"건 자동 반영":"")+(cp.short.length?(n>0?" · ":"")+"⚠️ "+cp.short.join(", "):""));
+  setDot(true,"준비됨");
+}
 (async ()=>{
   const saved=localStorage.getItem(PWKEY);
   if(saved){ const r=await tryUnlock(saved); if(r.ok){ PW=saved; $("gate").style.display="none"; $("app").style.display=""; await start(); return; } localStorage.removeItem(PWKEY); }
