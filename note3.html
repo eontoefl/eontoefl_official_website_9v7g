@@ -528,8 +528,8 @@
         <button type="button" data-v="amortize">원리금균등</button>
       </div>
     </div>
-    <div class="fld" id="lo_graceFld" style="display:none"><label>거치 종료일 = 원금상환 시작 (선택)</label><input type="date" id="lo_grace">
-      <div class="hint">비우면 지금부터 원금+이자 상환. 거치기간(이자만 내는 기간)이 있으면 그 종료일을 넣으면 그때부터 원금이 붙어요.</div></div>
+    <div class="fld" id="lo_graceFld" style="display:none"><label>거치기간 (개월, 선택)</label><input type="number" id="lo_graceMonths" min="0" max="120" placeholder="예: 12" inputmode="numeric">
+      <div class="hint">이자만 내는 기간. <b>대출 시작일 + 이 개월수 = 원금상환 시작</b>. 0/비움이면 처음부터 원금+이자.<span id="lo_graceCalc"></span></div></div>
     <div class="fld" id="lo_paydayFld"><label>매달 출금일</label><div class="dayrow"><input type="number" id="lo_payday" min="1" max="31" placeholder="예: 25" inputmode="numeric"><label class="daylast"><input type="checkbox" id="lo_paylast"> 말일</label></div></div>
     <div class="fld"><label>출금 계좌</label><select id="lo_payacct"></select></div>
     <div class="fld" id="lo_lastpayFld" style="display:none"><label>마지막으로 낸 날 (이자 기산일)</label><input type="date" id="lo_lastpay">
@@ -605,7 +605,8 @@
 <div class="ov" id="ovrepay"><div class="sheet">
   <h3 id="rpTitle">상환하기</h3>
   <div class="fld"><label>상환 금액 (원)</label><input type="text" id="rp_amount" placeholder="0" inputmode="numeric" autocomplete="off"></div>
-  <div class="fld"><label>날짜</label><input type="date" id="rp_date"></div>
+  <div class="fld"><label>날짜</label><input type="date" id="rp_date">
+    <div class="hint">정규 결제면 <b>약정일</b>(주말이어도 그날), 조기상환이면 <b>실제 낸 날</b>로 넣어요.</div></div>
   <div class="fld"><label>출금 계좌</label><select id="rp_acct"></select></div>
   <div id="rp_preview"></div>
   <div class="row">
@@ -1204,6 +1205,7 @@ const LOAN_ORGS = ["국민은행","신한은행","우리은행","하나은행","
 const LOANTYPES = { credit:"신용대출", mortgage:"담보대출", jeonse:"전세대출", cardloan:"카드론", cash:"현금서비스", insurance:"보험약관대출", other:"기타" };
 const REPAYTYPES = { interest:"이자만", free:"자유상환", amortize:"원리금균등" };
 function monthsBetween(fromS, toS){ if(!fromS||!toS) return 0; const [fy,fm]=fromS.split("-").map(Number),[ty,tm]=toS.split("-").map(Number); return (ty-fy)*12+(tm-fm); }
+function addMonths(dateStr, m){ if(!dateStr) return ""; const d=new Date(dateStr+"T12:00:00"); d.setMonth(d.getMonth()+(+m||0)); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 // 원리금균등 월 상환액 = P·r·(1+r)^n / ((1+r)^n − 1)  (P=원금, r=월이율, n=총 상환개월)
 function amortM(P, ratePct, n){ P=mnum(P); const r=mnum(ratePct)/100/12; if(n<=0) return P; if(r===0) return P/n; return P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
 // 자유상환(일할): 하루 이자·경과일수·지금까지 쌓인 이자
@@ -1330,6 +1332,7 @@ function loanDetailHtml(acc){
     ["이번 달 "+(amortNow?"상환액":"이자")+(grace?" (거치·이자만)":""), fmtMoney(monthly,"KRW")]
   ];
   if(amortNow){ rows.push(["　└ 이자", fmtMoney(interest,"KRW")]); rows.push(["　└ 원금", fmtMoney(principal,"KRW")]); }
+  if(acc.repayType==="amortize" && acc.graceMonths) rows.push(["거치기간", acc.graceMonths+"개월"]);
   if(acc.repayType==="amortize" && acc.graceEndDate) rows.push(["원금상환 시작", fmtD(acc.graceEndDate)]);
   if(acc.maturityDate) rows.push(["만기", fmtD(acc.maturityDate)]);
   return '<div class="loandet">'+rows.map(kv=>'<div class="ld-row"><span class="ld-k">'+kv[0]+'</span><span class="ld-v">'+kv[1]+'</span></div>').join("")+
@@ -1419,6 +1422,7 @@ function odFieldsUpdate(){ $("ac_odFields").style.display = $("ac_od").checked ?
 function dayFrom(numId, chkId){ if($(chkId).checked) return 99; const v=parseInt($(numId).value,10); return (isFinite(v)&&v>=1)?Math.min(31,v):null; }
 function setDayField(numId, chkId, day){ const last=(+day>=32); $(chkId).checked=last; $(numId).value=(day&&!last)?day:""; $(numId).disabled=last; }
 function syncLast(numId, chkId){ $(numId).disabled=$(chkId).checked; }
+function updateGraceCalc(){ const m=parseInt($("lo_graceMonths").value,10)||0, s=$("lo_start").value; $("lo_graceCalc").textContent = (m>0)?(" → 원금상환 시작: "+(s?addMonths(s,m):"(시작일 넣으면 계산)")):""; }
 function loRepayUpdate(){
   const am=(mLoanRepay==="amortize"), free=(mLoanRepay==="free");
   $("lo_graceFld").style.display=am?"":"none";
@@ -1465,7 +1469,7 @@ function openAcct(id){
   $("lo_balance").value=a&&(a.balance||a.balance===0)?commaFmt(String(a.balance)):"";
   $("lo_rate").value=a&&a.rate?a.rate:"";
   mLoanRepay=a&&a.repayType?a.repayType:"interest"; selChips($("lo_repay"),mLoanRepay); loRepayUpdate();
-  $("lo_grace").value=a&&a.graceEndDate?a.graceEndDate:"";
+  $("lo_graceMonths").value=a&&a.graceMonths?a.graceMonths:"";
   setDayField("lo_payday","lo_paylast", (a&&mAcctKind==="loan")?a.payDay:0);
   fillLoanPayAccts(a&&mAcctKind==="loan"?(a.payAcctId||""):"");
   $("lo_maturity").value=a&&a.maturityDate?a.maturityDate:"";
@@ -1474,7 +1478,7 @@ function openAcct(id){
   $("lo_lastpay").value=a&&a.lastPaymentDate?a.lastPaymentDate:"";
   mAcctColor=a&&a.color?a.color:ACCT_COLORS[STORE.money.accounts.length%ACCT_COLORS.length];
   renderSwatches();
-  acKindUpdate(mAcctKind);
+  acKindUpdate(mAcctKind); updateGraceCalc();
   $("acctDelete").style.display=id?"":"none";
   $("ovacct").classList.add("on"); setTimeout(()=>$("ac_alias").focus(),50);
 }
@@ -1495,11 +1499,12 @@ function saveAcct(){
     base.balance = $("lo_balance").value.trim()!=="" ? mnum($("lo_balance").value) : mnum($("lo_principal").value);
     base.rate=mnum($("lo_rate").value);
     base.repayType=mLoanRepay;
-    base.graceEndDate = mLoanRepay==="amortize" ? ($("lo_grace").value||"") : "";
+    base.startDate=$("lo_start").value||"";
+    base.graceMonths = mLoanRepay==="amortize" ? (parseInt($("lo_graceMonths").value,10)||0) : 0;
+    base.graceEndDate = base.graceMonths>0 ? addMonths(base.startDate||todayStr(), base.graceMonths) : "";
     base.payDay=dayFrom("lo_payday","lo_paylast");
     base.payAcctId=$("lo_payacct").value||"";
     base.maturityDate=$("lo_maturity").value||"";
-    base.startDate=$("lo_start").value||"";
     base.lastPaymentDate = mLoanRepay==="free" ? ($("lo_lastpay").value||"") : "";
     if(mLoanRepay==="free") base.payDay=null;
     if(mLoanRepay==="amortize"){
@@ -1512,7 +1517,7 @@ function saveAcct(){
     base.overdraft=$("ac_od").checked;
     if(base.overdraft){ base.odRate=mnum($("ac_odrate").value); base.odInterestDay=dayFrom("ac_odday","ac_odlast"); }
   }
-  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate"];
+  const KEYS_ACC=["startBalance","payDay","payAcctId","cycleStart","cycleEnd","overdraft","odRate","odInterestDay","loanType","principal","balance","rate","repayType","graceEndDate","graceMonths","maturityDate","monthlyPay","startDate","monthlyManual","lastPaymentDate"];
   if(mAcctEdit){ const a=findAcct(mAcctEdit); if(a){ KEYS_ACC.forEach(k=>delete a[k]); Object.assign(a, base, { updated:Date.now() }); if(!Array.isArray(a.tx)) a.tx=[]; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; } }
   else { const acc=Object.assign({ id:uid(), created:Date.now(), tx:[], postedMonths:[] }, base); STORE.money.accounts.push(acc); openAccounts.add(acc.id); }
   closeAcct(); save(); render();
@@ -1719,6 +1724,8 @@ $("rpSave").addEventListener("click", saveRepay);
 overlayDismiss("ovrepay", closeRepay);
 $("rp_amount").addEventListener("input", updateRepayPreview);
 $("rp_date").addEventListener("input", updateRepayPreview);
+$("lo_graceMonths").addEventListener("input", updateGraceCalc);
+$("lo_start").addEventListener("input", updateGraceCalc);
 [["ac_odday","ac_odlast"],["ac_payday","ac_paylast"],["lo_payday","lo_paylast"],["fx_day","fx_lastchk"]].forEach(p=>$(p[1]).addEventListener("change", ()=>syncLast(p[0],p[1])));
 $("tx_dir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxDir=b.dataset.v; selChips($("tx_dir"),mTxDir); });
 $("tx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mTxCur=b.dataset.v; selChips($("tx_cur"),mTxCur); txCurUpdate(); });
