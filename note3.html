@@ -642,9 +642,11 @@
 <!-- 비유동자산 폼 -->
 <div class="ov" id="ovasset"><div class="sheet">
   <h3 id="assetTitle">새 비유동자산</h3>
-  <div class="fld"><label>자산 이름</label><input type="text" id="as_name" placeholder="예: 전세보증금, 부동산, 자동차" lang="ko" autocomplete="off"></div>
-  <div class="fld"><label>현재 평가액 (원)</label><input type="text" id="as_value" placeholder="예: 650,000,000" inputmode="numeric" autocomplete="off"></div>
-  <div class="fld"><label>설명 (선택)</label><textarea id="as_note" placeholder="예: 전세보증금 6.5억 (전세대출 5억 + 내 돈 1.5억). 만기에 돌려받는 자산." lang="ko"></textarea></div>
+  <div class="fld"><label>자산 이름</label><input type="text" id="as_name" placeholder="예: 전세 순지분, 부동산, 자동차" lang="ko" autocomplete="off"></div>
+  <div class="fld"><label>내 지분 금액 (원)</label><input type="text" id="as_value" placeholder="예: 150,000,000" inputmode="numeric" autocomplete="off">
+    <div style="font-size:11.5px;color:var(--on-surface-variant);margin-top:5px;line-height:1.5">대출이 낀 자산이면 <b>대출을 뺀 "내 돈(지분)"만</b> 적으세요. 예: 전세보증금 6.5억이 전세대출 5억 + 내 돈 1.5억이면 → <b>1.5억</b>.</div>
+  </div>
+  <div class="fld"><label>설명 (선택)</label><textarea id="as_note" placeholder="예: 전세 6.5억 중 내 돈 1.5억 (전세대출 5억은 만기에 보증금으로 상환)." lang="ko"></textarea></div>
   <div class="row">
     <button type="button" class="cancel" id="assetDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
     <button type="button" class="cancel" id="assetCancel">취소</button>
@@ -1360,7 +1362,7 @@ function financeDocHtml(){
   const loanDebt=realLoans.reduce((s,a)=>s+mnum(a.balance),0);
   const debt=odDebt+loanDebt;
   const matDebt=matLoans.reduce((s,a)=>s+mnum(a.balance),0);
-  const net=asset+illiquid-debt-matDebt;
+  const net=asset+illiquid-debt;
   const fixedM=fixed.reduce((s,f)=>s+mnum(f.krw),0);
   const loanIntM=Math.round(loans.reduce((s,a)=>s+mrate(a),0));
   const stamp=todayStr(); const P=[];
@@ -1369,14 +1371,14 @@ function financeDocHtml(){
   P.push('<h2>0. 한눈에 보는 요약</h2>');
   P.push('<div class="tw"><table><tbody>'+
     '<tr><td>💰 현금성 자산 (계좌 잔액 합계)</td><td><b>'+won(asset)+'</b></td></tr>'+
-    (illiquid>0?'<tr><td>🏛 비유동자산 (전세보증금·부동산 등)</td><td><b>'+won(illiquid)+'</b></td></tr>':'')+
+    (illiquid>0?'<tr><td>🏛 비유동자산 (내 지분 — 전세 지분·부동산 등)</td><td><b>'+won(illiquid)+'</b></td></tr>':'')+
     '<tr><td>🔴 부채 (실부담: 마통 + 만기반환 아닌 대출)</td><td><b>'+won(debt)+'</b></td></tr>'+
-    (matDebt>0?'<tr><td>🏠 만기반환 대출 (전세 등)</td><td><b>'+won(matDebt)+'</b></td></tr>':'')+
-    '<tr><td>⭐ 순자산 (총자산 − 총부채)</td><td><b>'+won(net)+'</b></td></tr>'+
+    '<tr><td>⭐ 순자산 (현금성 + 비유동자산 − 실부담 부채)</td><td><b>'+won(net)+'</b></td></tr>'+
     '<tr><td>📄 월 고정비 합계</td><td>'+won(fixedM)+'</td></tr>'+
     '<tr><td>🏦 월 대출이자 합계(현재 잔액 기준, 근사)</td><td>'+won(loanIntM)+'</td></tr>'+
+    (matDebt>0?'<tr><td>🏠 (참고) 만기반환 대출 — 순자산에서 제외</td><td>'+won(matDebt)+'</td></tr>':'')+
     '</tbody></table></div>');
-  P.push('<p class="muted">※ 순자산 = (현금성 자산 + 비유동자산) − (실부담 부채 + 만기반환 대출). 전세보증금 같은 자산과 전세대출이 서로 상쇄되어 실제 순자산이 나옵니다.</p>');
+  P.push('<p class="muted">※ 순자산 = 현금성 자산 + 비유동자산(내 지분) − 실부담 부채. 만기반환 대출(전세대출 등 '+won(matDebt)+')은 보증금으로 그대로 상환되는 통과 자금이라 순자산에서 제외했고, 비유동자산엔 대출 뺀 내 지분만 넣었습니다.</p>');
   if(matLoans.length) P.push('<div class="warn">📌 <b>이 문서를 읽는 분께 (중요)</b><br>"만기반환" 대출('+matLoans.map(a=>esc(a.alias)).join(", ")+' · 합계 '+won(matDebt)+')은 <b>갚아야 할 급한 빚이 아닙니다.</b> 예를 들어 전세대출은 <b>전세보증금(만기에 돌려받는 자산)</b>을 마련하려고 받은 것으로, 만기에 그 보증금으로 한 번에 상환됩니다. 매달 나가는 것은 <b>이자뿐</b>이고 원금은 조기상환 대상이 아닙니다. 따라서 <b>상환 우선순위에서 제외</b>하고 판단해 주세요. (아래 7번 우선순위 표에도 일부러 넣지 않았습니다.)</div>');
   P.push('<h2>1. 현금성 계좌 (자산)</h2>');
   cash.forEach(a=>{
@@ -1387,8 +1389,8 @@ function financeDocHtml(){
     else P.push('<p class="muted">거래 내역 없음</p>');
   });
   if(illiquidList.length){
-    P.push('<h2>1-2. 비유동자산 (전세보증금·부동산 등)</h2>');
-    P.push('<p>합계 '+won(illiquid)+'. 바로 현금화하긴 어렵지만 순자산에 포함되는 자산.</p>');
+    P.push('<h2>1-2. 비유동자산 (내 지분 — 전세 지분·부동산 등)</h2>');
+    P.push('<p>합계 '+won(illiquid)+'. 대출을 뺀 "내 지분"만 기록. 바로 현금화하긴 어렵지만 순자산에 포함되는 자산.</p>');
     P.push('<div class="tw"><table><thead><tr><th>자산</th><th>평가액</th><th>설명</th></tr></thead><tbody>'+illiquidList.map(a=>'<tr><td>'+esc(a.name)+'</td><td>'+won(a.value)+'</td><td>'+(esc(a.note)||"—")+'</td></tr>').join('')+'</tbody></table></div>');
   }
   P.push('<h2>2. 지출 통로 계좌</h2>');
@@ -1467,14 +1469,13 @@ function moneyView(){
   const loanDebt=accts.filter(a=>a.kind==="loan" && !a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
   const debt=odDebt+loanDebt;
   const returnLoans=accts.filter(a=>a.kind==="loan" && a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
-  const net=assets+illiquid-debt-returnLoans;
+  const net=assets+illiquid-debt;
   html+='<div class="msum">'+
     '<div class="msum-row"><span>현금성 자산</span><b>'+fmtMoney(assets,"KRW")+'</b></div>'+
-    (illiquid>0?'<div class="msum-row"><span>비유동자산</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
+    (illiquid>0?'<div class="msum-row"><span>비유동자산 (내 지분)</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
     '<div class="msum-row"><span>부채 (실부담)</span><b class="neg">'+(debt>0?"−":"")+fmtMoney(debt,"KRW")+'</b></div>'+
-    (returnLoans>0?'<div class="msum-row"><span>만기반환 대출</span><b class="neg">−'+fmtMoney(returnLoans,"KRW")+'</b></div>':'')+
     '<div class="msum-row net"><span>순자산</span><b'+(net<0?' class="neg"':'')+'>'+fmtMoney(net,"KRW")+'</b></div>'+
-    (returnLoans>0&&illiquid<=0?'<div class="msum-note">만기반환 대출(전세 등)은 전세보증금 같은 자산으로 상환돼요. 아래 <b>비유동자산</b>에 그 보증금을 넣으면 순자산이 정확해져요.</div>':'')+
+    (returnLoans>0?'<div class="msum-note">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 그대로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>':'')+
     '</div><div id="acctList">';
   accts.forEach(acc=>{
     const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
@@ -1571,7 +1572,7 @@ function assetSectionHtml(){
   const list=STORE.money.assets.slice();
   const total=list.reduce((s,a)=>s+mnum(a.value),0);
   let h='<div class="msec"><div class="msec-h"><span class="mt">비유동자산</span>'+(list.length?'<span class="msec-total">합계 '+fmtMoney(total,"KRW")+'</span>':'')+'<button class="secadd-btn" type="button" id="assetAdd">+ 자산</button></div>';
-  if(!list.length) return h+'<div class="ledger-empty" style="padding:.5rem .2rem">전세보증금·부동산 등 바로 현금화하기 어려운 자산을 여기에 넣어요. (순자산에 반영됩니다)</div></div>';
+  if(!list.length) return h+'<div class="ledger-empty" style="padding:.5rem .2rem">전세 지분·부동산 등 바로 현금화하기 어려운 자산을 여기에. 대출이 낀 자산이면 대출 뺀 <b>내 지분</b>만 넣어요. (순자산에 반영)</div></div>';
   h+='<div class="fixlist">';
   list.forEach(a=>{
     h+='<div class="fixrow" data-asset="'+a.id+'"><div class="fix-body"><div class="fix-desc">'+esc(a.name||"(이름 없음)")+'</div>'+(a.note?'<div class="fix-sub">'+esc(a.note)+'</div>':'')+'</div>'+
