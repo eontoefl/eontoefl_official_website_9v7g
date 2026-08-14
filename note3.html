@@ -391,6 +391,8 @@
   .pboard { display:grid; grid-template-columns:1fr 1fr; gap:13px; align-items:start; margin-top:2px; }
   .pcol { display:flex; flex-direction:column; gap:13px; }
   @media(max-width:640px){ .pboard { grid-template-columns:1fr; } }
+  .sectog { border:none; background:none; color:var(--on-surface-variant); opacity:.32; width:24px; height:24px; padding:0; margin-left:7px; cursor:pointer; display:inline-grid; place-items:center; vertical-align:middle; }
+  .sectog:hover { opacity:.6; } .sectog .svic { width:16px; height:16px; }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -899,6 +901,7 @@ const IC = {
   restore:'<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4h4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   download:'<path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>',
+  eye:'<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>',
   chevR:'<path d="M9 6l6 6-6 6"/>', chevD:'<path d="M6 9l6 6 6-6"/>',
   lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   check:'<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
@@ -1503,6 +1506,8 @@ function attachThousands(el){
 const fmtDShort = s => { if(!s) return ""; const p=String(s).split("-"); return p.length<3?s:(+p[1])+"/"+(+p[2]); };
 const openAccounts = new Set();
 function findAcct(id){ return STORE.money.accounts.find(a=>a.id===id); }
+let hideSecret = (function(){ try { return localStorage.getItem("note3-hs")==="1"; } catch(_){ return false; } })();
+function mAccts(){ return hideSecret ? (STORE.money.accounts||[]).filter(a=>!a.secret) : (STORE.money.accounts||[]); }
 function ledgerRows(acc){
   const list=(acc.tx||[]).slice().sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.created||0)-(b.created||0));
   let bal=mnum(acc.startBalance);
@@ -1525,7 +1530,7 @@ function conduitBreakdown(acctId){
 }
 
 function financeDocHtml(){
-  const m=STORE.money||{}, accts=m.accounts||[], fixed=m.fixed||[];
+  const m=STORE.money||{}, accts=mAccts(), fixed=m.fixed||[];
   const won=v=>fmtMoney(v,"KRW");
   const nm=id=>{const a=accts.find(x=>x.id===id);return a?esc(a.alias||"(이름없음)"):(id?"삭제된 계좌":"미지정");};
   const REPAY={free:"자유상환(수시상환)",interest:"이자만",amortize:"원리금균등",principal:"원금균등"};
@@ -1649,8 +1654,8 @@ function downloadFinanceDoc(){
   }catch(e){ toast("문서 생성 오류: "+e.message); }
 }
 function moneyView(){
-  const accts=STORE.money.accounts;
-  let html='<div class="vhead"><span class="t">돈관리</span><button class="addbtn ghost" id="finDl" type="button" style="margin-left:auto">'+svi("download")+' 문서 저장</button><button class="addbtn" id="acctAdd" type="button" style="margin-left:.5rem">+ 추가</button></div>';
+  const accts=mAccts();
+  let html='<div class="vhead"><span class="t">돈관리</span><button class="sectog" id="secToggle" type="button" title="보기 전환">'+svi("eye")+'</button><button class="addbtn ghost" id="finDl" type="button" style="margin-left:auto">'+svi("download")+' 문서 저장</button><button class="addbtn" id="acctAdd" type="button" style="margin-left:.5rem">+ 추가</button></div>';
   if(!accts.length) return html+emergencyCardHtml()+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
   const assets=accts.filter(a=>a.kind==="account" && !a.conduit && !a.overdraft).reduce((s,a)=>s+acctBalance(a),0);
   const illiquid=(STORE.money.assets||[]).reduce((s,a)=>s+mnum(a.value),0);
@@ -1784,7 +1789,7 @@ function acctNeedInfo(acc){
   const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
   let upcoming=0;   // 이번 달 아직 안 나간 것
   (STORE.money.fixed||[]).forEach(f=>{ if(f.acctId===acc.id && due(f.day)>td) upcoming+=mnum(f.krw); });
-  (STORE.money.accounts||[]).forEach(a=>{ if(a.payAcctId!==acc.id) return;
+  mAccts().forEach(a=>{ if(a.payAcctId!==acc.id) return;
     if(a.kind==="loan"){ if(due(a.payDay)>td) upcoming+=Math.round(loanConfirmedMonthly(a,t)); }
     else if(a.kind==="card"){ if(due(a.payDay)>td) upcoming+=Math.max(0,cardStatement(a)); } });
   const bg=mnum(acc.budget); let remBudget=0;
@@ -1797,21 +1802,21 @@ function acctNextDue(acc){
   const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate();
   const days=[];
   (STORE.money.fixed||[]).forEach(f=>{ if(f.acctId===acc.id){ let d=+f.day; if(!d||d>=32)d=last; days.push(d); } });
-  (STORE.money.accounts||[]).forEach(a=>{ if(a.payAcctId===acc.id && a.payDay){ let d=+a.payDay; if(d>=32)d=last; days.push(d); } });
+  mAccts().forEach(a=>{ if(a.payAcctId===acc.id && a.payDay){ let d=+a.payDay; if(d>=32)d=last; days.push(d); } });
   if(!days.length) return { day:null, until:99 };
   let best=null, bestU=100;
   days.forEach(d=>{ const u=(d>=td)?(d-td):(d+last-td); if(u<bestU){ bestU=u; best=d; } });
   return { day:best, until:bestU };
 }
 function distTargets(){
-  return (STORE.money.accounts||[]).filter(a=>a.kind==="account" && !a.overdraft).map(a=>{
+  return mAccts().filter(a=>a.kind==="account" && !a.overdraft).map(a=>{
     const info=acctNeedInfo(a);
     return { acc:a, out:info.totalNeed, bal:info.bal, need:info.need, due:acctNextDue(a) };
   }).filter(x=>x.out>0);
 }
 function topDebts(){
   const list=[];
-  (STORE.money.accounts||[]).forEach(a=>{
+  mAccts().forEach(a=>{
     if(a.kind==="loan" && !a.returnAtMaturity && mnum(a.balance)>0) list.push({ name:a.alias||"대출", rate:mnum(a.rate), bal:mnum(a.balance) });
     if(a.kind==="account" && a.overdraft){ const used=Math.max(0,-acctBalance(a)); if(used>0) list.push({ name:a.alias||"마통", rate:mnum(a.odRate), bal:used }); }
   });
@@ -1835,7 +1840,7 @@ function confirmedItems(){
   const acc=id=>{ const x=(STORE.money.accounts||[]).find(y=>y.id===id); return x?(x.alias||"계좌"):"미지정"; };
   const items=[];
   (STORE.money.fixed||[]).forEach(f=>{ const d=due(f.day); items.push({ name:f.desc||"고정비", day:d, amount:mnum(f.krw), paid:d<=td, acct:acc(f.acctId) }); });
-  (STORE.money.accounts||[]).forEach(a=>{
+  mAccts().forEach(a=>{
     if(a.kind==="loan"){ const d=due(a.payDay); items.push({ name:(a.alias||"대출")+" 상환", day:d, amount:Math.round(loanConfirmedMonthly(a,t)), paid:d<=td, acct:acc(a.payAcctId) }); }
     else if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=(a.tx||[]).filter(x=>x.dir==="out"&&String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0);
       if(spent>0) items.push({ name:"생활비 (이미 쓴 것)", day:0, amount:Math.min(bg,spent), paid:true, acct:(a.alias||"생활비") });
@@ -1848,7 +1853,7 @@ function confirmedBreakdown(){
   const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
   let paid=0, remain=0;
   (STORE.money.fixed||[]).forEach(f=>{ const amt=mnum(f.krw); if(due(f.day)<=td) paid+=amt; else remain+=amt; });
-  (STORE.money.accounts||[]).forEach(a=>{
+  mAccts().forEach(a=>{
     if(a.kind==="loan"){ const amt=Math.round(loanConfirmedMonthly(a,t)); if(due(a.payDay)<=td) paid+=amt; else remain+=amt; }
     else if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget); const spent=(a.tx||[]).filter(x=>x.dir==="out" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0); paid+=Math.min(bg,spent); remain+=Math.max(0,bg-spent); }
   });
@@ -1968,6 +1973,7 @@ function wireMoney(){
   document.querySelectorAll("#view .fixrow[data-asset]").forEach(r=> r.addEventListener("click", ()=> openAsset(r.dataset.asset)));
   const eadd=$("emgAdd"); if(eadd) eadd.addEventListener("click", (e)=>{ e.stopPropagation(); openEmg(); });
   const ecard=$("emgCard"); if(ecard) ecard.addEventListener("click", openEmg);
+  const stg=$("secToggle"); if(stg) stg.addEventListener("click", ()=>{ hideSecret=!hideSecret; try{ localStorage.setItem("note3-hs", hideSecret?"1":"0"); }catch(_){}; render(); });
   const ct=$("confToggle"); if(ct) ct.addEventListener("click", ()=>{ confExpanded=!confExpanded; render(); });
   const et=$("emgTile"); if(et) et.addEventListener("click", openEmg);
   const dbtn=$("distBtn"); if(dbtn) dbtn.addEventListener("click", runDistribute);
