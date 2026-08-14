@@ -258,11 +258,17 @@
   .em-ha { font-weight:800; color:var(--accent-strong); flex:0 0 auto; }
   .em-hn { color:var(--on-surface-variant); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .em-del { flex:0 0 auto; border:none; background:transparent; color:var(--danger); font-size:11.5px; font-weight:700; cursor:pointer; padding:2px 4px; }
-  .distcard { background:var(--surface-lowest); box-shadow:var(--lift); border-radius:var(--r-lg); padding:1rem 1.1rem 1.05rem; margin:0 0 1.2rem; }
-  .distcard .msec-h { margin:0 0 .7rem; }
-  .dist-in { display:flex; gap:.5rem; margin:.2rem 0 .6rem; }
-  .dist-in input { flex:1; min-width:0; border:1px solid var(--surface-container); background:var(--field); border-radius:var(--r); padding:11px 13px; font-size:14px; font-weight:700; color:var(--on-surface); }
-  .dist-in button { flex:0 0 auto; border:none; border-radius:var(--r); background:var(--sgrad); color:#fff; padding:0 18px; font-size:13.5px; font-weight:700; }
+  .distcard { background:#fff; box-shadow:0 10px 30px rgba(26,26,46,.07); border-radius:22px; padding:20px; margin:0 0 1.2rem; }
+  .distcard .msec-h { margin:0 0 .8rem; }
+  .distcard .mt { font-size:16px; font-weight:800; color:#1A1A2E; }
+  .distcard .msec-total { font-size:12.5px; font-weight:700; color:#6C5CE7; background:#EEE9FE; padding:5px 11px; border-radius:99px; }
+  .dist-in { display:flex; gap:10px; margin:.2rem 0 .5rem; }
+  .dist-in input { flex:1; min-width:0; border:2px solid transparent; background:#F4F3FA; border-radius:14px; padding:13px 15px; font-size:15px; font-weight:700; color:#1A1A2E; outline:none; }
+  .dist-in input:focus { border-color:#6C5CE7; background:#fff; }
+  .dist-in button { flex:0 0 auto; border:none; border-radius:14px; background:#6C5CE7; color:#fff; padding:0 24px; font-size:15px; font-weight:800; box-shadow:0 8px 18px rgba(108,92,231,.30); }
+  .dist-n { color:#1A1A2E !important; } .dist-a { color:#F0416B !important; }
+  .dist-plan { background:#F4F3FA !important; border-radius:14px; }
+  .dp-h { color:#6C5CE7 !important; }
   .dist-board { display:flex; flex-direction:column; gap:.35rem; }
   .dist-row { display:flex; align-items:baseline; gap:.6rem; padding:7px 2px; border-top:1px solid var(--surface-container); font-size:13.5px; }
   .dist-row:first-child { border-top:none; }
@@ -306,6 +312,38 @@
   .cd-n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--on-surface); }
   .cd-c { flex:0 0 auto; font-size:10px; font-weight:700; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:1.5px 8px; white-space:nowrap; }
   .cd-a { flex:0 0 auto; font-weight:700; color:var(--on-surface); min-width:74px; text-align:right; }
+  /* ===== 돈관리 대시보드 리디자인 ===== */
+  .mhero { position:relative; overflow:hidden; background:linear-gradient(135deg,#6A5AE0 0%,#9B54DE 52%,#E8579F 100%); border-radius:22px; padding:24px 24px 22px; color:#fff; box-shadow:0 16px 40px rgba(108,92,231,.26); margin-bottom:14px; }
+  .mhero::before { content:""; position:absolute; top:-60px; right:-30px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.26),transparent 70%); }
+  .mh-k { font-size:13px; font-weight:600; opacity:.9; }
+  .mh-v { font-size:34px; font-weight:800; letter-spacing:-.03em; margin:7px 0 6px; }
+  .mh-m { font-size:12px; opacity:.86; font-weight:500; }
+  .mh-tags { display:flex; gap:8px; margin-top:15px; flex-wrap:wrap; }
+  .mh-tag { font-size:11.5px; font-weight:600; background:rgba(255,255,255,.18); padding:6px 12px; border-radius:99px; }
+  .mtiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:14px; }
+  .mtile { background:#fff; border-radius:16px; padding:15px 16px; box-shadow:0 2px 8px rgba(26,26,46,.05); }
+  .mtile.tap { cursor:pointer; transition:box-shadow .15s, transform .15s; }
+  .mtile.tap:hover { box-shadow:0 9px 24px rgba(26,26,46,.10); transform:translateY(-1px); }
+  .mt-ic { width:30px; height:30px; border-radius:10px; display:grid; place-items:center; font-size:15px; margin-bottom:10px; }
+  .mt-ic.amber { background:#FEF1DC; } .mt-ic.violet { background:#EEE9FE; } .mt-ic.rose { background:#FCE7ED; }
+  .mt-k { font-size:12px; font-weight:600; color:#71718A; }
+  .mt-v { font-size:18px; font-weight:800; letter-spacing:-.02em; margin-top:3px; color:#1A1A2E; }
+  .mt-v.rose { color:#F0416B; } .mt-v small { font-size:12px; color:#9A9AB0; font-weight:700; }
+  .mt-bar { height:6px; border-radius:99px; background:#EDECF4; overflow:hidden; margin-top:10px; }
+  .mt-bar span { display:block; height:100%; border-radius:99px; }
+  .mt-m { font-size:10.5px; color:#9A9AB0; margin-top:8px; font-weight:500; }
+  .conf-detail-card { background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 2px 8px rgba(26,26,46,.05); margin-bottom:14px; }
+  .mnote { font-size:11.5px; color:#71718A; background:#fff; border-radius:14px; padding:12px 15px; margin-bottom:14px; line-height:1.55; box-shadow:0 2px 8px rgba(26,26,46,.05); }
+  @media(max-width:600px){ .mtiles { grid-template-columns:1fr; } .mh-v { font-size:30px; } }
+  /* 하위 목록 톤 통일 */
+  #view .mcard, #view .fixrow { box-shadow:0 2px 8px rgba(26,26,46,.05) !important; border-radius:16px; }
+  #view .mcard:hover, #view .fixrow:hover { box-shadow:0 9px 24px rgba(26,26,46,.10) !important; }
+  #view .mcard::before { width:4px; }
+  #view .msec-h .mt { font-size:15px; font-weight:800; color:#1A1A2E; }
+  #view .msec-total { color:#71718A; }
+  #view .secadd-btn { background:#6C5CE7; box-shadow:0 6px 14px rgba(108,92,231,.28); }
+  #view .acct-alias { color:#1A1A2E; } #view .acct-bal { color:#1A1A2E; }
+  #view .fix-desc { color:#1A1A2E; }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -1556,24 +1594,25 @@ function moneyView(){
   const returnLoans=accts.filter(a=>a.kind==="loan" && a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
   const net=assets+illiquid-debt;
   const confMonthly = (STORE.money.fixed||[]).reduce((s,f)=>s+mnum(f.krw),0) + accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+loanConfirmedMonthly(a, todayStr()), 0) + accts.filter(a=>a.kind==="account").reduce((s,a)=>s+mnum(a.budget),0);
-  html+='<div class="msum">'+
-    '<div class="msum-row"><span>현금성 자산</span><b>'+fmtMoney(assets,"KRW")+'</b></div>'+
-    (illiquid>0?'<div class="msum-row"><span>비유동자산 (내 지분)</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
-    '<div class="msum-row"><span>부채 (실부담)</span><b class="neg">'+(debt>0?"−":"")+fmtMoney(debt,"KRW")+'</b></div>'+
-    '<div class="msum-row net"><span>순자산</span><b'+(net<0?' class="neg"':'')+'>'+fmtMoney(net,"KRW")+'</b></div>'+
-    (function(){ const cb=confirmedBreakdown(), pct=cb.total>0?Math.round(cb.paid/cb.total*100):0;
-      let h='<div class="msum-conf'+(confExpanded?' open':'')+'"><div class="mc-top" id="confToggle"><span>📌 '+(+todayStr().slice(5,7))+'월 확정지출 <em>한 달 전체</em> '+svi(confExpanded?"chevD":"chevR")+'</span><b>'+fmtMoney(cb.total,"KRW")+'</b></div>'+
-        '<div class="conf-bar"><span style="width:'+pct+'%"></span></div>'+
-        '<div class="conf-lbl"><span>✅ 이미 냄 '+fmtMoney(cb.paid,"KRW")+'</span><span class="cl-rem">⬜ 남음 '+fmtMoney(cb.remain,"KRW")+'</span></div>';
-      if(confExpanded){
-        const its=confirmedItems();
-        const dl=d=>(d===0||d>=99)?"상시":("매달 "+d+"일");
-        const grp=(title,cls,arr)=>'<div class="cd-grp"><div class="cd-h '+cls+'">'+title+' · '+arr.length+'건 '+fmtMoney(arr.reduce((s,i)=>s+i.amount,0),"KRW")+'</div>'+(arr.length?arr.map(i=>'<div class="cd-row"><span class="cd-d">'+dl(i.day)+'</span><span class="cd-n">'+esc(i.name)+'</span><span class="cd-c">'+esc(i.acct||"")+'</span><span class="cd-a">'+fmtMoney(i.amount,"KRW")+'</span></div>').join(''):'<div class="cd-row"><span class="cd-n" style="color:var(--on-surface-variant)">없음</span></div>')+'</div>';
-        h+='<div class="conf-detail">'+grp("⬜ 앞으로 낼 것","rem",its.filter(i=>!i.paid).sort((a,b)=>a.day-b.day))+grp("✅ 이미 냄","paid",its.filter(i=>i.paid).sort((a,b)=>a.day-b.day))+'</div>';
-      }
-      return h+'</div>'; })()+
-    (returnLoans>0?'<div class="msum-note">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 그대로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>':'')+
-    '</div>'+distributeSectionHtml()+emergencyCardHtml()+'<div id="acctList">';
+  const cb=confirmedBreakdown(), cpct=cb.total>0?Math.round(cb.paid/cb.total*100):0;
+  const emg=STORE.money.emergency||{goal:2000000,tx:[]}, esaved=(emg.tx||[]).reduce((s,t)=>s+mnum(t.amount),0), egoal=mnum(emg.goal), epct=egoal>0?Math.min(100,Math.round(esaved/egoal*100)):0;
+  const MM=(+todayStr().slice(5,7));
+  html+='<div class="mhero"><div class="mh-k">순자산</div><div class="mh-v">'+fmtMoney(net,"KRW")+'</div>'+
+    '<div class="mh-m">현금성 '+fmtMoney(assets,"KRW")+(illiquid>0?' · 내 지분 '+fmtMoney(illiquid,"KRW"):'')+'</div>'+
+    '<div class="mh-tags"><span class="mh-tag">💵 자산 '+fmtMoney(assets+illiquid,"KRW")+'</span><span class="mh-tag">📉 부채 '+fmtMoney(debt,"KRW")+'</span></div></div>';
+  html+='<div class="mtiles">'+
+    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+cpct+'%;background:#F5A524"></span></div><div class="mt-m">이미 냄 '+cpct+'% · 남음 '+fmtMoney(cb.remain,"KRW")+'</div></div>'+
+    '<div class="mtile tap" id="emgTile"><div class="mt-ic violet">🛟</div><div class="mt-k">비상금</div><div class="mt-v">'+fmtMoney(esaved,"KRW")+' <small>/ '+fmtMoney(egoal,"KRW")+'</small></div><div class="mt-bar"><span style="width:'+epct+'%;background:#6C5CE7"></span></div><div class="mt-m">'+(egoal>0&&esaved>=egoal?'목표 달성 🎉':'채우기 먼저 · '+fmtMoney(Math.max(0,egoal-esaved),"KRW")+' 남음')+'</div></div>'+
+    '<div class="mtile"><div class="mt-ic rose">🔻</div><div class="mt-k">실부담 부채</div><div class="mt-v rose">'+fmtMoney(debt,"KRW")+'</div><div class="mt-bar"><span style="width:100%;background:#F0416B"></span></div><div class="mt-m">마통·대출 (전세 제외)</div></div>'+
+    '</div>';
+  if(confExpanded){
+    const its=confirmedItems();
+    const dl=d=>(d===0||d>=99)?"상시":("매달 "+d+"일");
+    const grp=(title,clsn,arr)=>'<div class="cd-grp"><div class="cd-h '+clsn+'">'+title+' · '+arr.length+'건 '+fmtMoney(arr.reduce((s,i)=>s+i.amount,0),"KRW")+'</div>'+(arr.length?arr.map(i=>'<div class="cd-row"><span class="cd-d">'+dl(i.day)+'</span><span class="cd-n">'+esc(i.name)+'</span><span class="cd-c">'+esc(i.acct||"")+'</span><span class="cd-a">'+fmtMoney(i.amount,"KRW")+'</span></div>').join(''):'')+'</div>';
+    html+='<div class="conf-detail-card">'+grp("⬜ 앞으로 낼 것","rem",its.filter(i=>!i.paid).sort((a,b)=>a.day-b.day))+grp("✅ 이미 냄","paid",its.filter(i=>i.paid).sort((a,b)=>a.day-b.day))+'</div>';
+  }
+  if(returnLoans>0) html+='<div class="mnote">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>';
+  html+=distributeSectionHtml()+'<div id="acctList">';
   accts.forEach(acc=>{
     const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
     let rightHtml, sub, typeIcon="bank", typeCls="";
@@ -1864,6 +1903,7 @@ function wireMoney(){
   const eadd=$("emgAdd"); if(eadd) eadd.addEventListener("click", (e)=>{ e.stopPropagation(); openEmg(); });
   const ecard=$("emgCard"); if(ecard) ecard.addEventListener("click", openEmg);
   const ct=$("confToggle"); if(ct) ct.addEventListener("click", ()=>{ confExpanded=!confExpanded; render(); });
+  const et=$("emgTile"); if(et) et.addEventListener("click", openEmg);
   const dbtn=$("distBtn"); if(dbtn) dbtn.addEventListener("click", runDistribute);
   const din=$("distIncome"); if(din){ attachThousands(din); din.addEventListener("keydown", e=>{ if(e.key==="Enter") runDistribute(); }); }
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
