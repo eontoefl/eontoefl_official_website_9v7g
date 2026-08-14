@@ -1436,7 +1436,7 @@ function financeDocHtml(){
     '<tr><td>⭐ 순자산 (현금성 + 비유동자산 − 실부담 부채)</td><td><b>'+won(net)+'</b></td></tr>'+
     '<tr><td>📄 월 고정비 합계</td><td>'+won(fixedM)+'</td></tr>'+
     '<tr><td>🏦 월 대출이자 합계(현재 잔액 기준, 근사)</td><td>'+won(loanIntM)+'</td></tr>'+
-    '<tr><td>📌 이번 달 확정지출 (고정비 + 대출 상환액)</td><td><b>'+won(confirmedM)+'</b></td></tr>'+
+    '<tr><td>📌 '+(+stamp.slice(5,7))+'월 확정지출 (한 달 전체 · 고정비 + 대출 + 생활비예산 · 이미 낸 것 포함)</td><td><b>'+won(confirmedM)+'</b></td></tr>'+
     ((emgGoal>0||emgSaved>0)?'<tr><td>🛟 비상금 (모은 금액 / 목표)</td><td>'+won(emgSaved)+' / '+won(emgGoal)+'</td></tr>':'')+
     (matDebt>0?'<tr><td>🏠 (참고) 만기반환 대출 — 순자산에서 제외</td><td>'+won(matDebt)+'</td></tr>':'')+
     '</tbody></table></div>');
@@ -1540,7 +1540,7 @@ function moneyView(){
     (illiquid>0?'<div class="msum-row"><span>비유동자산 (내 지분)</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
     '<div class="msum-row"><span>부채 (실부담)</span><b class="neg">'+(debt>0?"−":"")+fmtMoney(debt,"KRW")+'</b></div>'+
     '<div class="msum-row net"><span>순자산</span><b'+(net<0?' class="neg"':'')+'>'+fmtMoney(net,"KRW")+'</b></div>'+
-    '<div class="msum-row"><span>📌 이번 달 확정지출</span><b>'+fmtMoney(confMonthly,"KRW")+'</b></div>'+
+    '<div class="msum-row"><span>📌 '+(+todayStr().slice(5,7))+'월 확정지출 <em style="font-style:normal;font-size:10.5px;color:var(--on-surface-variant)">(한 달 전체·이미 낸 것 포함)</em></span><b>'+fmtMoney(confMonthly,"KRW")+'</b></div>'+
     (returnLoans>0?'<div class="msum-note">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 그대로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>':'')+
     '</div>'+distributeSectionHtml()+'<div id="acctList">';
   accts.forEach(acc=>{
