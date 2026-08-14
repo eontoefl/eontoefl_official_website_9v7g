@@ -1363,6 +1363,8 @@ function ledgerRows(acc){
   return list.map(t=>{ bal += (t.dir==="in"?1:-1)*mnum(t.krw); return { t, bal }; });
 }
 function acctBalance(acc){ const r=ledgerRows(acc); return r.length ? r[r.length-1].bal : mnum(acc.startBalance); }
+// 대출 이번 달 확정 상환액: 자유상환은 직접입력한 예상 월상환액(monthlyManual), 그 외는 loanMonthly
+function loanConfirmedMonthly(loan, today){ return loan.repayType==="free" ? mnum(loan.monthlyManual) : Math.round(loanMonthly(loan, today)); }
 // 지출 통로 계좌: 이번 달 여기서 나갈 총액(고정비 + 대출 월납) = 보내줄 금액
 function conduitMonthly(acctId){ return conduitBreakdown(acctId).total; }
 // 지출 통로: 결제일 기준으로 이번 달 이미 나간 것 / 앞으로 나갈 것 분해
@@ -1372,6 +1374,7 @@ function conduitBreakdown(acctId){
   let already=0, upcoming=0;
   (STORE.money.fixed||[]).filter(f=>f.acctId===acctId).forEach(f=>{ const amt=mnum(f.krw); if(dueDay(f.day)<=td) already+=amt; else upcoming+=amt; });
   (STORE.money.accounts||[]).filter(a=>a.kind==="loan" && a.repayType!=="free" && a.payAcctId===acctId).forEach(a=>{ const amt=Math.round(loanMonthly(a,t)); if(dueDay(a.payDay)<=td) already+=amt; else upcoming+=amt; });
+  (STORE.money.accounts||[]).filter(a=>a.kind==="loan" && a.repayType==="free" && mnum(a.monthlyManual)>0 && a.payAcctId===acctId).forEach(a=>{ const amt=mnum(a.monthlyManual); if(dueDay(a.payDay)<=td) already+=amt; else upcoming+=amt; });
   return { total:already+upcoming, already, remaining:upcoming };
 }
 
@@ -1400,6 +1403,8 @@ function financeDocHtml(){
   const loanIntM=Math.round(loans.reduce((s,a)=>s+mrate(a),0));
   const emg=m.emergency||{goal:0,tx:[]}; const emgGoal=mnum(emg.goal); const emgSaved=(emg.tx||[]).reduce((s,t)=>s+mnum(t.amount),0);
   const stamp=todayStr(); const P=[];
+  const loanPayM = loans.reduce((s,a)=>s+loanConfirmedMonthly(a, stamp), 0);
+  const confirmedM = fixedM + loanPayM;
   P.push('<h1>이온토플 대표 부부 — 재정 현황 문서</h1>');
   P.push('<blockquote>김비서 v3 돈관리 데이터 전체를 그대로 옮긴 문서입니다. 조언용 자료.<br>생성: <b>'+stamp+'</b><br>수입원: <b>수강료 → 사업자계좌 입금</b>, 금액·시기 불규칙. (이 외 수입원 없음)</blockquote>');
   P.push('<h2>0. 한눈에 보는 요약</h2>');
@@ -1410,6 +1415,7 @@ function financeDocHtml(){
     '<tr><td>⭐ 순자산 (현금성 + 비유동자산 − 실부담 부채)</td><td><b>'+won(net)+'</b></td></tr>'+
     '<tr><td>📄 월 고정비 합계</td><td>'+won(fixedM)+'</td></tr>'+
     '<tr><td>🏦 월 대출이자 합계(현재 잔액 기준, 근사)</td><td>'+won(loanIntM)+'</td></tr>'+
+    '<tr><td>📌 이번 달 확정지출 (고정비 + 대출 상환액)</td><td><b>'+won(confirmedM)+'</b></td></tr>'+
     ((emgGoal>0||emgSaved>0)?'<tr><td>🛟 비상금 (모은 금액 / 목표)</td><td>'+won(emgSaved)+' / '+won(emgGoal)+'</td></tr>':'')+
     (matDebt>0?'<tr><td>🏠 (참고) 만기반환 대출 — 순자산에서 제외</td><td>'+won(matDebt)+'</td></tr>':'')+
     '</tbody></table></div>');
@@ -1507,11 +1513,13 @@ function moneyView(){
   const debt=odDebt+loanDebt;
   const returnLoans=accts.filter(a=>a.kind==="loan" && a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
   const net=assets+illiquid-debt;
+  const confMonthly = (STORE.money.fixed||[]).reduce((s,f)=>s+mnum(f.krw),0) + accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+loanConfirmedMonthly(a, todayStr()), 0);
   html+='<div class="msum">'+
     '<div class="msum-row"><span>현금성 자산</span><b>'+fmtMoney(assets,"KRW")+'</b></div>'+
     (illiquid>0?'<div class="msum-row"><span>비유동자산 (내 지분)</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
     '<div class="msum-row"><span>부채 (실부담)</span><b class="neg">'+(debt>0?"−":"")+fmtMoney(debt,"KRW")+'</b></div>'+
     '<div class="msum-row net"><span>순자산</span><b'+(net<0?' class="neg"':'')+'>'+fmtMoney(net,"KRW")+'</b></div>'+
+    '<div class="msum-row"><span>📌 이번 달 확정지출</span><b>'+fmtMoney(confMonthly,"KRW")+'</b></div>'+
     (returnLoans>0?'<div class="msum-note">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 그대로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>':'')+
     '</div><div id="acctList">';
   accts.forEach(acc=>{
@@ -1731,7 +1739,7 @@ function updateGraceCalc(){ const m=parseInt($("lo_graceMonths").value,10)||0, s
 function loRepayUpdate(){
   const am=(mLoanRepay==="amortize"), pr=(mLoanRepay==="principal"), free=(mLoanRepay==="free"), sched=am||pr;
   $("lo_graceFld").style.display=sched?"":"none";
-  $("lo_monthlyFld").style.display=am?"":"none";
+  $("lo_monthlyFld").style.display=(am||free)?"":"none";
   $("lo_paydayFld").style.display=free?"none":"";
   $("lo_matFld").style.display=free?"none":"";
   $("lo_lastpayFld").style.display=free?"":"none";
@@ -1826,7 +1834,8 @@ function saveAcct(){
       const manual=mnum($("lo_monthly").value); base.monthlyManual=manual>0?Math.round(manual):0;
       if(manual>0){ base.monthlyPay=Math.round(manual); }
       else { const repayStart=(base.graceEndDate||base.startDate||todayStr()).slice(0,7)+"-01"; const N=base.maturityDate?monthsBetween(repayStart, base.maturityDate):0; base.monthlyPay = N>0 ? Math.round(amortM(base.principal, base.rate, N)) : 0; }
-    } else { base.monthlyPay=0; base.monthlyManual=0; }
+    } else if(mLoanRepay==="free"){ base.monthlyPay=0; base.monthlyManual=mnum($("lo_monthly").value)>0?Math.round(mnum($("lo_monthly").value)):0; }
+    else { base.monthlyPay=0; base.monthlyManual=0; }
   } else {
     base.startBalance=mnum($("ac_start").value);
     base.budget=mnum($("ac_budget").value)||0;
