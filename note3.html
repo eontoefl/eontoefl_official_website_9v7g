@@ -1567,7 +1567,7 @@ function moneyView(){
         const its=confirmedItems();
         const dl=d=>(d===0||d>=99)?"상시":("매달 "+d+"일");
         const grp=(title,cls,arr)=>'<div class="cd-grp"><div class="cd-h '+cls+'">'+title+' · '+arr.length+'건 '+fmtMoney(arr.reduce((s,i)=>s+i.amount,0),"KRW")+'</div>'+(arr.length?arr.map(i=>'<div class="cd-row"><span class="cd-d">'+dl(i.day)+'</span><span class="cd-n">'+esc(i.name)+'</span><span class="cd-a">'+fmtMoney(i.amount,"KRW")+'</span></div>').join(''):'<div class="cd-row"><span class="cd-n" style="color:var(--on-surface-variant)">없음</span></div>')+'</div>';
-        h+='<div class="conf-detail">'+grp("✅ 이미 냄","paid",its.filter(i=>i.paid).sort((a,b)=>a.day-b.day))+grp("⬜ 앞으로 낼 것","rem",its.filter(i=>!i.paid).sort((a,b)=>a.day-b.day))+'</div>';
+        h+='<div class="conf-detail">'+grp("⬜ 앞으로 낼 것","rem",its.filter(i=>!i.paid).sort((a,b)=>a.day-b.day))+grp("✅ 이미 냄","paid",its.filter(i=>i.paid).sort((a,b)=>a.day-b.day))+'</div>';
       }
       return h+'</div>'; })()+
     (returnLoans>0?'<div class="msum-note">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 그대로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>':'')+
