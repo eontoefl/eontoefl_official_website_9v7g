@@ -384,6 +384,10 @@
   #view .wsec { background:#fff; border-radius:16px; box-shadow:0 2px 8px rgba(26,26,46,.05); padding:15px 16px; }
   #view .wsec .wsec-h { margin-bottom:4px; }
   @media(max-width:640px){ .wboard { grid-template-columns:1fr; } }
+  /* 개인 2열 */
+  .pboard { display:grid; grid-template-columns:1fr 1fr; gap:13px; align-items:start; margin-top:2px; }
+  .pcol { display:flex; flex-direction:column; gap:13px; }
+  @media(max-width:640px){ .pboard { grid-template-columns:1fr; } }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -1070,12 +1074,13 @@ function personalView(){
   const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) || (i.type==="reminder"&&reminderPast(i)) );
   const head='<div class="vhead"><span class="t">개인</span>'+(remaining?'<span class="c">'+remaining+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
   if(!items.length) return head+'<div class="empty"><div class="big">'+svi('note')+'</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
-  let html=head;
-  if(goals.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('target')+'</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
-  if(reminders.length) html += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('pin')+'</span>리마인드<span class="n">'+reminders.length+'</span></div><div class="list" id="prem">'+reminders.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(reminderCard).join("")+'</div></div>';
-  html += active.length ? '<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .3rem">앞으로 할 일이 없어요 🎉</div>';
-  html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("proutine",svi('repeat'),"반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
-  if(archived.length) html += '<div class="fold">'+foldHeader("pdone",svi('check'),"완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
+  let html=head, left='', right='';
+  if(reminders.length) left += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('pin')+'</span>리마인드<span class="n">'+reminders.length+'</span></div><div class="list" id="prem">'+reminders.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(reminderCard).join("")+'</div></div>';
+  left += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('cal')+'</span>할 일 · 약속<span class="n">'+active.length+'</span></div>'+(active.length?'<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>':'<div class="wsec-empty">앞으로 할 일이 없어요 🎉</div>')+'</div>';
+  if(goals.length) right += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('target')+'</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
+  right += '<div class="fold">'+foldHeader("proutine",svi('repeat'),"반복 루틴", routines.length)+(fold.proutine?'<div class="fold-body">'+(routines.length?'<div class="list" id="proutines">'+routines.map(routineCard).join("")+'</div>':'<div class="wsec-empty">등록된 루틴이 없어요.</div>')+'</div>':'')+'</div>';
+  html += '<div class="pboard"><div class="pcol">'+left+'</div><div class="pcol">'+right+'</div></div>';
+  if(archived.length) html += '<div class="fold" style="margin-top:1.4rem">'+foldHeader("pdone",svi('check'),"완료·지난 것", archived.length)+(fold.pdone?'<div class="fold-body"><div class="list donelist">'+archived.map(personalCard).join("")+'</div></div>':'')+'</div>';
   return html;
 }
 const mmdd = s => { const p=s.split("-"); return (+p[1])+"/"+(+p[2]); };
