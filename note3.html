@@ -344,6 +344,32 @@
   #view .secadd-btn { background:#6C5CE7; box-shadow:0 6px 14px rgba(108,92,231,.28); }
   #view .acct-alias { color:#1A1A2E; } #view .acct-bal { color:#1A1A2E; }
   #view .fix-desc { color:#1A1A2E; }
+  /* 홈 탭 */
+  .mhero.home { margin-bottom:0; } .mh-v.hv2 { font-size:28px; }
+  .hlab { font-size:12px; font-weight:700; color:#71718A; margin:20px 4px 11px; }
+  #view .hcal { background:#fff; border-radius:20px; padding:16px 16px 12px; box-shadow:0 2px 8px rgba(26,26,46,.05); }
+  #view .calhead { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:8px; }
+  #view .calhead div { text-align:center; font-size:11px; font-weight:700; color:#9A9AB0; }
+  #view .calhead .sun { color:#F0416B; }
+  #view .calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  #view .calcell { aspect-ratio:1/.82; border-radius:11px; background:#F4F3FA; padding:7px 0 0 9px; font-size:12.5px; font-weight:700; color:#71718A; display:block; }
+  #view .calcell.past { color:#C4C3D2; }
+  #view .calcell.today { background:#6C5CE7; color:#fff; }
+  #view .calcell.has::after { content:""; display:block; width:5px; height:5px; border-radius:50%; background:#6C5CE7; margin-top:4px; }
+  #view .calcell.today.has::after { background:#fff; }
+  .hcols { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+  #view .hcard { background:#fff; border-radius:20px; padding:16px 18px; box-shadow:0 2px 8px rgba(26,26,46,.05); }
+  .hcard-h { display:flex; align-items:center; gap:9px; margin-bottom:2px; }
+  .hcard-t { font-size:15px; font-weight:800; color:#1A1A2E; }
+  .hcard-c { font-size:11.5px; font-weight:700; color:#9A9AB0; background:#F1F0F7; padding:2px 9px; border-radius:99px; margin-left:auto; }
+  .hcard-empty { font-size:12.5px; color:#9A9AB0; padding:10px 2px; }
+  #view .hitem { display:flex; align-items:center; gap:11px; padding:11px 0 3px; }
+  .hbdg { width:36px; height:36px; border-radius:11px; background:#E3F7F0; display:grid; place-items:center; font-size:15px; flex-shrink:0; }
+  .hitem .hb { flex:1; min-width:0; display:flex; flex-direction:column; }
+  #view .hitem .ht { font-size:14px; font-weight:700; color:#1A1A2E; }
+  #view .hitem .hs { font-size:11px; color:#9A9AB0; margin-top:1px; }
+  .hitem .hwhen { font-size:11px; font-weight:700; color:#0FB981; background:#E3F7F0; padding:4px 9px; border-radius:99px; flex-shrink:0; }
+  @media(max-width:600px){ .hcols { grid-template-columns:1fr; } }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -1100,24 +1126,27 @@ function homeCalendar(){
   let cells="";
   for(let i=0;i<21;i++){
     const d=shiftDay(start,i), ev=itemsForDate(d), isT=d===today;
-    cells+='<div class="calcell'+(isT?' today':'')+(d<today?' past':'')+(ev.length?' has':'')+'"><div class="caldd">'+(+d.slice(8))+'</div>'+
-      ev.map(x=>'<div class="calev">'+svi(x.ic)+' <span>'+esc(x.t)+'</span></div>').join("")+'</div>';
+    cells+='<div class="calcell'+(isT?' today':'')+(d<today?' past':'')+(ev.length?' has':'')+'">'+(+d.slice(8))+'</div>';
   }
   return '<div class="hcal"><div class="calhead">'+wk.map((w,i)=>'<div'+(i===0?' class="sun"':'')+'>'+w+'</div>').join("")+'</div><div class="calgrid">'+cells+'</div></div>';
 }
 function homeDayCard(label, D){
-  // 김비서 소환 전 — 규칙이 확실한 루틴만 자동 표시. 나머지(단발·약속·마감 등)는 소환해야 큐레이션됨.
+  const dd=new Date(D+"T12:00:00"), chip=(dd.getMonth()+1)+'/'+dd.getDate()+' '+DOW[dd.getDay()];
   let ev=[];
-  STORE.personal.forEach(it=>{ if(it.type==="routine" && recurOnDate(it,D)) ev.push({ ic:"repeat", t:it.title }); });
-  STORE.work.recurring.forEach(it=>{ if(recurOnDate(it,D)) ev.push({ ic:"repeat", t:it.title }); });
-  const body = ev.length ? '<div class="hlist">'+ev.map(x=>'<div class="hitem"><span class="hic">'+svi(x.ic, x.danger?'danger':'')+'</span><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</div>').join("")+'</div>' : '<div class="wsec-empty" style="padding:.3rem 0 0 .2rem">루틴 없음 · 김비서 소환 전</div>';
-  return '<div class="hcard"><div class="hcard-h">'+esc(label)+'</div>'+body+'</div>';
+  STORE.personal.forEach(it=>{ if(it.type==="routine" && recurOnDate(it,D)) ev.push({ t:it.title, s:it.memo||"" }); });
+  STORE.work.recurring.forEach(it=>{ if(recurOnDate(it,D)) ev.push({ t:it.title, s:"업무 반복" }); });
+  const body = ev.length ? ev.map(x=>'<div class="hitem"><span class="hbdg">🔁</span><span class="hb"><span class="ht">'+esc(x.t)+'</span>'+(x.s?'<span class="hs">'+esc(x.s)+'</span>':'')+'</span><span class="hwhen">루틴</span></div>').join("") : '<div class="hcard-empty">여유로운 하루예요 🍃</div>';
+  return '<div class="hcard"><div class="hcard-h"><span class="hcard-t">'+esc(label)+'</span><span class="hcard-c">'+chip+'</span></div>'+body+'</div>';
 }
 function homeView(){
-  const today=todayStr(), tmr=shiftDay(today,1);
-  return '<div class="vhead"><span class="t">홈</span><span class="c">'+fmtD(today)+'</span></div>'+
-    homeCalendar()+
-    '<div class="hcols">'+homeDayCard("오늘 · "+fmtD(today), today)+homeDayCard("내일 · "+fmtD(tmr), tmr)+'</div>';
+  const today=todayStr(), tmr=shiftDay(today,1), dt=new Date(today+"T12:00:00");
+  const appts=STORE.personal.filter(it=>it.type==="appt" && !apptPast(it)).length;
+  const routines=STORE.personal.filter(it=>it.type==="routine").length + ((STORE.work&&STORE.work.recurring)||[]).length;
+  return '<div class="vhead"><span class="t">홈</span></div>'+
+    '<div class="mhero home"><div class="mh-k">'+DOW[dt.getDay()]+'요일</div><div class="mh-v hv2">'+(dt.getMonth()+1)+'월 '+dt.getDate()+'일</div>'+
+      '<div class="mh-tags">'+(appts?'<span class="mh-tag">📅 다가오는 약속 '+appts+'</span>':'')+(routines?'<span class="mh-tag">🔁 루틴 '+routines+'</span>':'')+'</div></div>'+
+    '<div class="hlab">이번 달</div>'+homeCalendar()+
+    '<div class="hlab">오늘 & 내일</div><div class="hcols">'+homeDayCard("오늘", today)+homeDayCard("내일", tmr)+'</div>';
 }
 function personalCard(it){
   if(it.type==="appt"){
