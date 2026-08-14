@@ -1801,7 +1801,7 @@ function acctNeedInfo(acc){
   const bg=mnum(acc.budget); let remBudget=0;
   if(bg>0){ const spent=(acc.tx||[]).filter(x=>x.dir==="out" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0); remBudget=Math.max(0,bg-spent); }
   const totalNeed=upcoming+remBudget;
-  const bal=acc.conduit?0:acctBalance(acc);
+  const bal=acc.conduit ? (acc.tx||[]).filter(x=>x.dir==="in" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0) : acctBalance(acc);
   return { totalNeed, need:Math.max(0,totalNeed-bal), bal };
 }
 function acctNextDue(acc){
@@ -1909,7 +1909,7 @@ function applyDistribution(){
   const inn=(acc,amt,desc)=>{ if(!acc) return; if(!Array.isArray(acc.tx)) acc.tx=[]; acc.tx.push({ id:uid(), created:Date.now(), date:today, dir:"in", cur:"KRW", krw:amt, desc, note:"배분" }); };
   if($("distIncChk") && $("distIncChk").checked && src) inn(src, mnum(window._distIncome), "수강료 입금");
   steps.forEach(s=>{ const amt=mnum(s.amount); if(amt<=0) return;
-    if(s.type==="acct"){ const acc=findAcct(s.id); if(acc && !s.conduit) inn(acc, amt, "배분 입금"); out(src, amt, (acc?(acc.alias||"계좌"):"계좌")+" 보냄"); }
+    if(s.type==="acct"){ const acc=findAcct(s.id); if(acc) inn(acc, amt, "배분 입금"); out(src, amt, (acc?(acc.alias||"계좌"):"계좌")+" 보냄"); }
     else if(s.type==="emg"){ if(!STORE.money.emergency) STORE.money.emergency={goal:2000000,tx:[]}; STORE.money.emergency.tx.push({ id:uid(), created:Date.now(), date:today, amount:amt, note:"배분 적립" }); out(src, amt, "비상금 적립"); }
     else if(s.type==="debt"){ const d=findAcct(s.id); if(d){ if(s.dk==="loan"){ d.balance=Math.max(0, mnum(d.balance)-amt); out(d, amt, "조기상환 (배분)"); } else { inn(d, amt, "마통 상환 (배분)"); } } out(src, amt, (d?(d.alias||"빚"):"빚")+" 상환"); }
   });
