@@ -1186,6 +1186,11 @@ function actPersonal(id, act){
 const WMETA = { quick:{ic:"bolt",name:"단발"}, deadline:{ic:"pin",name:"약속·마감"}, project:{ic:"layers",name:"프로젝트"}, someday:{ic:"moon",name:"백로그"} };
 function workView(){
   let html='<div class="vhead"><span class="t">업무</span><button class="addbtn" id="wadd" type="button">+ 추가</button></div>';
+  const nProj=(STORE.work.project||[]).length, nDead=(STORE.work.deadline||[]).filter(x=>!x.done).length, nQuick=(STORE.work.quick||[]).filter(x=>!oldDone(x)).length;
+  html+='<div class="mtiles wtiles">'+
+    '<div class="mtile"><div class="mt-ic violet">📁</div><div class="mt-k">프로젝트</div><div class="mt-v">'+nProj+'</div></div>'+
+    '<div class="mtile"><div class="mt-ic rose">📌</div><div class="mt-k">약속·마감</div><div class="mt-v">'+nDead+'</div></div>'+
+    '<div class="mtile"><div class="mt-ic amber">⚡</div><div class="mt-k">단발</div><div class="mt-v">'+nQuick+'</div></div></div>';
   ["quick","deadline","project","someday"].forEach(k=>{ html += sectionHtml(k); });
   // 반복: 별도 접이식 참고 목록 (그날 뜨는 건 나중에 캘린더에서)
   const rec=STORE.work.recurring;
