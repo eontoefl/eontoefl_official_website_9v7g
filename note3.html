@@ -284,6 +284,14 @@
   .msum-row.net span { font-weight:700; color:var(--on-surface); font-size:14px; }
   .msum-row.net b { font-size:18px; }
   .msum-note { font-size:11.5px; color:var(--on-surface-variant); opacity:.85; padding-top:.45rem; }
+  .msum-conf { padding:.5rem 0 .2rem; }
+  .mc-top { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; font-size:13.5px; color:var(--on-surface-variant); }
+  .mc-top b { font-size:15px; font-weight:800; color:var(--on-surface); }
+  .mc-top em { font-style:normal; font-size:10.5px; color:var(--on-surface-variant); }
+  .conf-bar { height:9px; border-radius:99px; background:var(--surface-high); overflow:hidden; margin:7px 0 5px; }
+  .conf-bar span { display:block; height:100%; border-radius:99px; background:var(--accent-strong); transition:width .35s ease; }
+  .conf-lbl { display:flex; justify-content:space-between; gap:.5rem; font-size:11px; font-weight:700; color:var(--accent-strong); }
+  .conf-lbl .cl-rem { color:var(--danger); }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -1540,7 +1548,10 @@ function moneyView(){
     (illiquid>0?'<div class="msum-row"><span>비유동자산 (내 지분)</span><b>'+fmtMoney(illiquid,"KRW")+'</b></div>':'')+
     '<div class="msum-row"><span>부채 (실부담)</span><b class="neg">'+(debt>0?"−":"")+fmtMoney(debt,"KRW")+'</b></div>'+
     '<div class="msum-row net"><span>순자산</span><b'+(net<0?' class="neg"':'')+'>'+fmtMoney(net,"KRW")+'</b></div>'+
-    '<div class="msum-row"><span>📌 '+(+todayStr().slice(5,7))+'월 확정지출 <em style="font-style:normal;font-size:10.5px;color:var(--on-surface-variant)">(한 달 전체·이미 낸 것 포함)</em></span><b>'+fmtMoney(confMonthly,"KRW")+'</b></div>'+
+    (function(){ const cb=confirmedBreakdown(), pct=cb.total>0?Math.round(cb.paid/cb.total*100):0;
+      return '<div class="msum-conf"><div class="mc-top"><span>📌 '+(+todayStr().slice(5,7))+'월 확정지출 <em>한 달 전체</em></span><b>'+fmtMoney(cb.total,"KRW")+'</b></div>'+
+        '<div class="conf-bar"><span style="width:'+pct+'%"></span></div>'+
+        '<div class="conf-lbl"><span>✅ 이미 냄 '+fmtMoney(cb.paid,"KRW")+'</span><span class="cl-rem">⬜ 남음 '+fmtMoney(cb.remain,"KRW")+'</span></div></div>'; })()+
     (returnLoans>0?'<div class="msum-note">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 그대로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>':'')+
     '</div>'+distributeSectionHtml()+'<div id="acctList">';
   accts.forEach(acc=>{
@@ -1691,6 +1702,17 @@ function distributionPlan(income){
   const debts=topDebts(); let i=0;
   while(left>0 && i<debts.length){ const d=debts[i]; const give=Math.min(left,d.bal); if(give>0){ steps.push({ type:"debt", name:d.name, rate:d.rate, amount:give }); left-=give; } i++; }
   return { steps, leftover:Math.max(0,left) };
+}
+function confirmedBreakdown(){
+  const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate(), mk=t.slice(0,7);
+  const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
+  let paid=0, remain=0;
+  (STORE.money.fixed||[]).forEach(f=>{ const amt=mnum(f.krw); if(due(f.day)<=td) paid+=amt; else remain+=amt; });
+  (STORE.money.accounts||[]).forEach(a=>{
+    if(a.kind==="loan"){ const amt=Math.round(loanConfirmedMonthly(a,t)); if(due(a.payDay)<=td) paid+=amt; else remain+=amt; }
+    else if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget); const spent=(a.tx||[]).filter(x=>x.dir==="out" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0); paid+=Math.min(bg,spent); remain+=Math.max(0,bg-spent); }
+  });
+  return { paid, remain, total:paid+remain };
 }
 function distributeSectionHtml(){
   const targets=distTargets().sort((a,b)=>a.due.until-b.due.until);
