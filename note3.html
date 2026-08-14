@@ -302,7 +302,8 @@
   .cd-row:first-of-type { border-top:none; }
   .cd-d { flex:0 0 auto; width:62px; color:var(--on-surface-variant); font-size:11px; }
   .cd-n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--on-surface); }
-  .cd-a { flex:0 0 auto; font-weight:700; color:var(--on-surface); }
+  .cd-c { flex:0 0 auto; font-size:10px; font-weight:700; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:1.5px 8px; white-space:nowrap; }
+  .cd-a { flex:0 0 auto; font-weight:700; color:var(--on-surface); min-width:74px; text-align:right; }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -1566,7 +1567,7 @@ function moneyView(){
       if(confExpanded){
         const its=confirmedItems();
         const dl=d=>(d===0||d>=99)?"상시":("매달 "+d+"일");
-        const grp=(title,cls,arr)=>'<div class="cd-grp"><div class="cd-h '+cls+'">'+title+' · '+arr.length+'건 '+fmtMoney(arr.reduce((s,i)=>s+i.amount,0),"KRW")+'</div>'+(arr.length?arr.map(i=>'<div class="cd-row"><span class="cd-d">'+dl(i.day)+'</span><span class="cd-n">'+esc(i.name)+'</span><span class="cd-a">'+fmtMoney(i.amount,"KRW")+'</span></div>').join(''):'<div class="cd-row"><span class="cd-n" style="color:var(--on-surface-variant)">없음</span></div>')+'</div>';
+        const grp=(title,cls,arr)=>'<div class="cd-grp"><div class="cd-h '+cls+'">'+title+' · '+arr.length+'건 '+fmtMoney(arr.reduce((s,i)=>s+i.amount,0),"KRW")+'</div>'+(arr.length?arr.map(i=>'<div class="cd-row"><span class="cd-d">'+dl(i.day)+'</span><span class="cd-n">'+esc(i.name)+'</span><span class="cd-c">'+esc(i.acct||"")+'</span><span class="cd-a">'+fmtMoney(i.amount,"KRW")+'</span></div>').join(''):'<div class="cd-row"><span class="cd-n" style="color:var(--on-surface-variant)">없음</span></div>')+'</div>';
         h+='<div class="conf-detail">'+grp("⬜ 앞으로 낼 것","rem",its.filter(i=>!i.paid).sort((a,b)=>a.day-b.day))+grp("✅ 이미 냄","paid",its.filter(i=>i.paid).sort((a,b)=>a.day-b.day))+'</div>';
       }
       return h+'</div>'; })()+
@@ -1725,13 +1726,14 @@ let confExpanded=false;
 function confirmedItems(){
   const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate(), mk=t.slice(0,7);
   const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
+  const acc=id=>{ const x=(STORE.money.accounts||[]).find(y=>y.id===id); return x?(x.alias||"계좌"):"미지정"; };
   const items=[];
-  (STORE.money.fixed||[]).forEach(f=>{ const d=due(f.day); items.push({ name:f.desc||"고정비", day:d, amount:mnum(f.krw), paid:d<=td }); });
+  (STORE.money.fixed||[]).forEach(f=>{ const d=due(f.day); items.push({ name:f.desc||"고정비", day:d, amount:mnum(f.krw), paid:d<=td, acct:acc(f.acctId) }); });
   (STORE.money.accounts||[]).forEach(a=>{
-    if(a.kind==="loan"){ const d=due(a.payDay); items.push({ name:(a.alias||"대출")+" 상환", day:d, amount:Math.round(loanConfirmedMonthly(a,t)), paid:d<=td }); }
+    if(a.kind==="loan"){ const d=due(a.payDay); items.push({ name:(a.alias||"대출")+" 상환", day:d, amount:Math.round(loanConfirmedMonthly(a,t)), paid:d<=td, acct:acc(a.payAcctId) }); }
     else if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=(a.tx||[]).filter(x=>x.dir==="out"&&String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0);
-      if(spent>0) items.push({ name:(a.alias||"생활비")+" 생활비 (이미 쓴 것)", day:0, amount:Math.min(bg,spent), paid:true });
-      if(bg-spent>0) items.push({ name:(a.alias||"생활비")+" 생활비 (남은 예산)", day:99, amount:bg-spent, paid:false }); }
+      if(spent>0) items.push({ name:"생활비 (이미 쓴 것)", day:0, amount:Math.min(bg,spent), paid:true, acct:(a.alias||"생활비") });
+      if(bg-spent>0) items.push({ name:"생활비 (남은 예산)", day:99, amount:bg-spent, paid:false, acct:(a.alias||"생활비") }); }
   });
   return items;
 }
