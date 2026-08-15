@@ -401,11 +401,18 @@
   .sectog:hover { opacity:.6; } .sectog .svic { width:16px; height:16px; }
   /* 선행업무(종속) */
   #view .card.blocked { opacity:.52; }
-  .wlock { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:#F0416B; background:#FCE7ED; border-radius:99px; padding:3px 10px; margin-top:6px; }
-  .dep-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .wlock { display:inline-block; font-size:11px; font-weight:700; color:#F0416B; background:#FCE7ED; border-radius:11px; padding:4px 10px; margin-top:6px; line-height:1.55; }
+  .wlock-why { color:#B0567A; font-weight:600; }
+  .dep-chips { display:flex; flex-direction:column; gap:7px; }
   .dep-chips:not(:empty) { margin-bottom:7px; }
-  .dep-chip { display:inline-flex; align-items:center; gap:6px; background:#EEE9FE; color:#6C5CE7; border-radius:99px; padding:5px 9px 5px 11px; font-size:12.5px; font-weight:700; }
-  .dep-chip .x { opacity:.55; cursor:pointer; font-weight:800; }
+  .dep-item { background:#F6F5FC; border-radius:12px; padding:9px 10px 10px; }
+  .dep-item-h { display:flex; align-items:center; gap:7px; }
+  .dep-item-h .dep-ico { flex-shrink:0; }
+  .dep-item-h .dep-t { flex:1; font-size:13px; font-weight:800; color:#6C5CE7; }
+  .dep-item-h .x { opacity:.5; cursor:pointer; font-weight:800; color:var(--on-surface-variant); padding:0 2px; }
+  .dep-note { width:100%; margin-top:7px; background:#fff; border:1.5px solid var(--outline, #E4E2EF); border-radius:9px; padding:7px 10px; font-family:inherit; font-size:12.5px; font-weight:600; color:var(--on-surface); outline:none; }
+  .dep-note:focus { border-color:#6C5CE7; }
+  .dep-note::placeholder { color:var(--on-surface-variant); font-weight:500; }
   .dep-results { margin-top:6px; }
   .dep-opt { display:flex; align-items:center; gap:9px; padding:10px 12px; font-size:13.5px; font-weight:600; cursor:pointer; border-radius:10px; }
   .dep-opt:hover { background:var(--surface-high); }
@@ -1415,9 +1422,9 @@ function openForm(ctx){
   $("g_start").value = it && ctx.type==="goal" && it.start ? it.start : ""; $("g_end").value = it && ctx.type==="goal" && it.end ? it.end : ""; $("g_per").value = it && ctx.type==="goal" && it.perDay ? it.perDay : "";
   $("r_date").value = it && ctx.type==="reminder" && it.date ? it.date : ""; $("r_end").value = it && ctx.type==="reminder" && it.endDate ? it.endDate : ""; $("r_lead").value = it && ctx.type==="reminder" && it.lead ? it.lead : "";
   draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
-  draftDeps = (ctx.tab==="work" && it && Array.isArray(it.deps)) ? it.deps.slice() : [];
+  draftDeps = (ctx.tab==="work" && it && Array.isArray(it.deps)) ? it.deps.map(d=> typeof d==="string"?{id:d,note:""}:{id:d.id,note:d.note||""}) : [];
   if($("depSearch")) $("depSearch").value="";
-  configForm(); renderDraft(); renderDepChips(); renderDepResults(""); updateSave();
+  configForm(); renderDraft(); renderDeps(); renderDepResults(""); updateSave();
   $("ov").classList.add("on"); setTimeout(()=>$("f_title").focus(), 50);
 }
 function closeForm(){ $("ov").classList.remove("on"); curCtx.id=null; }
@@ -1437,11 +1444,11 @@ function buildItem(){
     if(type==="reminder") return { type:"reminder", title, memo, date:$("r_date").value, endDate:$("r_end").value, lead:(+$("r_lead").value||0), updated:now };
     return { type:"task", title, why, memo, dueChip:pickChip, due:pickChip?"":$("f_date").value, updated:now };
   }
-  if(type==="quick") return { bucket:"quick", title, memo, deps:draftDeps.slice(), updated:now };
-  if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, deps:draftDeps.slice(), updated:now };
+  if(type==="quick") return { bucket:"quick", title, memo, deps:draftDeps.map(function(d){return {id:d.id,note:d.note||""};}), updated:now };
+  if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, deps:draftDeps.map(function(d){return {id:d.id,note:d.note||""};}), updated:now };
   if(type==="recurring") return { bucket:"recurring", title, memo, wday:pickWday, updated:now };
-  if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, deps:draftDeps.slice(), updated:now };
-  if(type==="project") return { bucket:"project", title, desc:memo, hope:$("p_due").value?"":pickHope, due:$("p_due").value, who:$("p_who").value.trim(), subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), deps:draftDeps.slice(), updated:now };
+  if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, deps:draftDeps.map(function(d){return {id:d.id,note:d.note||""};}), updated:now };
+  if(type==="project") return { bucket:"project", title, desc:memo, hope:$("p_due").value?"":pickHope, due:$("p_due").value, who:$("p_who").value.trim(), subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), deps:draftDeps.map(function(d){return {id:d.id,note:d.note||""};}), updated:now };
 }
 const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","start","end","perDay","lead","memo","desc","deps"];
 function saveForm(){
@@ -1478,16 +1485,20 @@ const WBK_NAME = { quick:"단발", deadline:"약속·마감", project:"프로젝
 function allWorkTasks(){ const w=STORE.work||{}, out=[]; ["quick","deadline","project","someday"].forEach(b=>{ (w[b]||[]).forEach(it=> out.push({ id:it.id, title:it.title, bucket:b })); }); return out; }
 function workItemById(id){ const w=STORE.work||{}; for(const b of ["quick","deadline","project","someday","recurring"]){ const f=(w[b]||[]).find(x=>x.id===id); if(f) return Object.assign({ _bucket:b }, f); } return null; }
 function isItemDone(it){ if(!it) return false; if(it.done===true) return true; if(Array.isArray(it.subtasks) && it.subtasks.length && it.subtasks.every(s=>s.done)) return true; return false; }
-function unmetDeps(it){ return (it&&Array.isArray(it.deps)?it.deps:[]).map(id=>workItemById(id)).filter(d=>d && !isItemDone(d)); }
-function lockBadge(it){ const u=unmetDeps(it); if(!u.length) return ""; return '<div class="wlock">🔒 '+u.map(d=>esc(d.title)).join(", ")+' 먼저</div>'; }
-function renderDepChips(){ const box=$("depChips"); if(!box) return;
-  box.innerHTML = draftDeps.map(id=>{ const w=workItemById(id); const t=w?w.title:"(삭제됨)"; const ic=w?(WBK_ICON[w._bucket]||"📄"):"📄"; return '<span class="dep-chip">'+ic+' '+esc(t)+'<span class="x" data-dep="'+id+'">✕</span></span>'; }).join('');
-  box.querySelectorAll("[data-dep]").forEach(x=> x.addEventListener("click", ()=>{ draftDeps=draftDeps.filter(d=>d!==x.dataset.dep); renderDepChips(); renderDepResults($("depSearch")?$("depSearch").value:""); })); }
+function normDeps(it){ return (it&&Array.isArray(it.deps)?it.deps:[]).map(d=> typeof d==="string" ? {id:d,note:""} : {id:d.id,note:d.note||""}); }
+function unmetDeps(it){ return normDeps(it).map(d=>({ id:d.id, note:d.note, item:workItemById(d.id) })).filter(x=>x.item && !isItemDone(x.item)); }
+function lockBadge(it){ const u=unmetDeps(it); if(!u.length) return ""; return '<div class="wlock">🔒 '+u.map(x=>esc(x.item.title)+' 먼저'+(x.note?' <span class="wlock-why">· '+esc(x.note)+'</span>':'')).join('<br>')+'</div>'; }
+function renderDeps(){ const box=$("depChips"); if(!box) return;
+  box.innerHTML = draftDeps.map(d=>{ const w=workItemById(d.id); const t=w?w.title:"(삭제됨)"; const ic=w?(WBK_ICON[w._bucket]||"📄"):"📄";
+    return '<div class="dep-item"><div class="dep-item-h"><span class="dep-ico">'+ic+'</span><span class="dep-t">'+esc(t)+'</span><span class="x" data-rm="'+d.id+'">✕</span></div>'+
+      '<input class="dep-note" data-note="'+d.id+'" placeholder="왜 이게 먼저? (선택)" value="'+esc(d.note||"")+'" lang="ko" autocomplete="off"></div>'; }).join('');
+  box.querySelectorAll("[data-rm]").forEach(x=> x.addEventListener("click", ()=>{ draftDeps=draftDeps.filter(d=>d.id!==x.dataset.rm); renderDeps(); renderDepResults($("depSearch")?$("depSearch").value:""); }));
+  box.querySelectorAll("[data-note]").forEach(inp=> inp.addEventListener("input", ()=>{ const d=draftDeps.find(x=>x.id===inp.dataset.note); if(d) d.note=inp.value; })); }
 function renderDepResults(q){ const box=$("depResults"); if(!box) return; q=(q||"").trim().toLowerCase();
   if(!q){ box.innerHTML=""; return; }
-  const selfId=curCtx.id, list=allWorkTasks().filter(t=> t.id!==selfId && !draftDeps.includes(t.id) && (t.title||"").toLowerCase().includes(q)).slice(0,8);
+  const selfId=curCtx.id, list=allWorkTasks().filter(t=> t.id!==selfId && !draftDeps.some(d=>d.id===t.id) && (t.title||"").toLowerCase().includes(q)).slice(0,8);
   box.innerHTML = list.length ? list.map(t=>'<div class="dep-opt" data-add="'+t.id+'"><span class="dep-oic">'+(WBK_ICON[t.bucket]||"📄")+'</span><span class="dep-ot">'+esc(t.title)+'</span><span class="dep-otp">'+(WBK_NAME[t.bucket]||"")+'</span></div>').join('') : '<div class="dep-opt none">검색 결과 없어요</div>';
-  box.querySelectorAll("[data-add]").forEach(o=> o.addEventListener("click", ()=>{ draftDeps.push(o.dataset.add); if($("depSearch")) $("depSearch").value=""; renderDepChips(); renderDepResults(""); })); }
+  box.querySelectorAll("[data-add]").forEach(o=> o.addEventListener("click", ()=>{ draftDeps.push({id:o.dataset.add, note:""}); if($("depSearch")) $("depSearch").value=""; renderDeps(); renderDepResults(""); })); }
 
 /* ═══ 돈관리 (계좌 + 거래, 잔액은 원화 기준) ═══ */
 const ACCT_COLORS = ["#F6A6A6","#F7C08A","#F3DE8A","#CDE88A","#A6E0A6","#8FE0D2","#8FD3F0","#9FB8F5","#B3A6F0","#D0A6EE","#F0A6D8","#F5A6BE"];
