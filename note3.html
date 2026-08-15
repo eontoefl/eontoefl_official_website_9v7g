@@ -54,9 +54,9 @@
   #gate button { width:100%; margin-top:.7rem; background:var(--sgrad); color:#fff; border:none; border-radius:var(--r); padding:14px; font-size:15px; font-weight:700; box-shadow:var(--lift); }
   #gate .msg { font-size:13px; color:var(--danger); margin-top:.7rem; min-height:20px; font-weight:500; }
 
-  .shell { display:grid; grid-template-columns:238px 1fr; height:100vh; overflow:hidden; }
-  .sidebar { height:100vh; overflow-y:auto; display:flex; flex-direction:column; padding:22px 16px; background:var(--surface-lowest); border-right:1px solid var(--outline, #E7E5F0); }
-  .content { max-width:1440px; margin:0 auto; padding:26px 34px 60px; width:100%; height:100vh; overflow-y:auto; }
+  .shell { padding-left:238px; }
+  .sidebar { position:fixed; top:0; left:0; width:238px; height:100vh; overflow-y:auto; display:flex; flex-direction:column; padding:22px 16px; background:var(--surface-lowest); border-right:1px solid var(--outline, #E7E5F0); z-index:30; }
+  .content { max-width:1440px; margin:0 auto; padding:26px 34px 60px; }
   .brand { font-size:17px; font-weight:800; padding:6px 10px 2px; }
   .brand small { display:block; font-size:10px; font-weight:600; letter-spacing:.16em; color:var(--on-surface-variant); margin-top:3px; }
   .side-foot { margin-top:auto; padding-top:12px; border-top:1px solid var(--surface-high); display:flex; align-items:center; gap:10px; }
@@ -65,10 +65,10 @@
   #restorebtn { border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:var(--r); padding:7px 12px; font-size:12.5px; font-weight:600; flex-shrink:0; margin-left:auto; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
   #restorebtn:hover { background:var(--surface-highest); }
   @media (max-width:860px){
-    .shell { grid-template-columns:1fr; height:auto; overflow:visible; }
-    .sidebar { position:sticky; top:0; height:auto; overflow-y:visible; flex-direction:row; align-items:center; gap:10px; padding:9px 12px; border-right:none; border-bottom:1px solid var(--surface-high); z-index:40; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+    .shell { padding-left:0; }
+    .sidebar { position:sticky; top:0; left:auto; width:auto; height:auto; overflow-y:visible; flex-direction:row; align-items:center; gap:10px; padding:9px 12px; border-right:none; border-bottom:1px solid var(--surface-high); z-index:40; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
     .sidebar .brand { display:none; }
-    .content { padding:18px 15px 50px; height:auto; overflow-y:visible; }
+    .content { padding:18px 15px 50px; }
     .side-foot { margin-top:0; margin-left:auto; padding-top:0; border-top:none; }
   }
   .snap-row { display:flex; align-items:center; gap:.6rem; padding:.75rem .2rem; }
