@@ -124,10 +124,25 @@
   /* 작업 순서 (선행 흐름) 타임라인 */
   .wchainfold { background:var(--surface-lowest); border-radius:16px; box-shadow:0 2px 8px rgba(26,26,46,.05); padding:4px 16px; margin:18px 0 6px; }
   .wchainfold .fold-h { color:var(--on-surface); font-size:14px; padding:13px 4px; }
-  .wchainfold .fold-body { padding:2px 4px 12px; }
+  .wchainfold .fold-body { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; padding:2px 4px 12px; }
+  .chaincard { flex:0 0 322px; max-width:340px; background:var(--surface-low); border-radius:14px; padding:12px 12px 10px; }
+  .chaincard.cyclic { background:#FCE7ED; }
+  .cc-h { display:flex; align-items:center; gap:8px; margin:0 2px 10px; }
+  .cc-name { font-size:13.5px; font-weight:800; color:var(--on-surface); }
+  .cc-name[data-rename] { cursor:pointer; border-radius:6px; padding:2px 5px; margin:-2px -5px; }
+  .cc-name[data-rename]:hover { background:var(--surface-high); }
+  .cc-name[data-rename]::after { content:"✎"; font-size:11px; opacity:.45; margin-left:5px; }
+  .cc-name.warn { color:#F0416B; }
+  .cc-n { font-size:11px; font-weight:700; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:1px 8px; margin-left:auto; }
   .chain { position:relative; }
-  .chain + .chain { margin-top:14px; padding-top:12px; border-top:1px solid var(--surface-high); }
-  .chain-sub { font-size:11.5px; font-weight:700; color:var(--on-surface-variant); margin:2px 4px 8px; }
+  .seedcard { background:var(--accent-lightest); outline:1.5px dashed var(--accent-strong); outline-offset:-1px; }
+  .seed-x { margin-left:auto; cursor:pointer; color:var(--on-surface-variant); font-weight:800; font-size:12px; padding:0 3px; }
+  .seed-hint { font-size:11.5px; color:var(--accent-strong); font-weight:600; margin:6px 4px 2px; }
+  .chain-new { flex:0 0 210px; align-self:stretch; min-height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; text-align:center; background:transparent; border:2px dashed var(--outline,#D9D7E6); color:var(--on-surface-variant); border-radius:14px; padding:12px; }
+  .chain-new.drop-hot { border-color:var(--accent-strong); background:var(--accent-lightest); color:var(--accent-strong); }
+  .cn-plus { font-size:26px; font-weight:800; color:var(--accent-strong); line-height:1; }
+  .cn-t { font-size:13px; font-weight:800; }
+  .cn-sub { font-size:11px; line-height:1.45; }
   .chain-warn { font-size:12px; font-weight:700; color:#F0416B; background:#FCE7ED; border-radius:10px; padding:9px 12px; margin-bottom:8px; }
   .cstep { position:relative; display:flex; align-items:center; gap:11px; padding:6px 8px; border-radius:10px; cursor:pointer; }
   .cstep:hover { background:var(--surface-high); }
@@ -146,6 +161,16 @@
   .cstep.ready .cs-num { background:var(--accent-strong); color:#fff; box-shadow:0 4px 10px rgba(108,92,231,.3); }
   .cstep.ready .cs-tag { color:var(--accent-strong); font-weight:700; }
   .cstep.waiting .cs-tag { color:#F0416B; }
+  .cs-ctrl { display:flex; align-items:center; gap:4px; flex-shrink:0; margin-left:6px; z-index:1; }
+  .cs-ctrl .svic { width:13px; height:13px; }
+  .cs-exp { border:none; background:transparent; color:var(--on-surface-variant); cursor:pointer; padding:3px; border-radius:6px; display:grid; place-items:center; }
+  .cs-exp:hover { background:var(--surface-high); }
+  .cs-cb { width:17px; height:17px; cursor:pointer; accent-color:var(--accent-strong); flex-shrink:0; }
+  .cs-subs { margin:1px 0 7px 30px; display:flex; flex-direction:column; gap:1px; }
+  .cs-sub { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; padding:4px 7px; border-radius:8px; cursor:pointer; }
+  .cs-sub:hover { background:var(--surface-high); }
+  .cs-sub input { width:15px; height:15px; accent-color:var(--accent-strong); cursor:pointer; flex-shrink:0; }
+  .cs-sub.done span { text-decoration:line-through; color:var(--on-surface-variant); }
   #view .card.flash { animation:flashcard 1.4s ease; }
   @keyframes flashcard { 0%,100%{ box-shadow:var(--lift); } 25%,55%{ box-shadow:0 0 0 3px var(--accent-strong), var(--lift-hi); } }
   .chain-drop-line { height:3px; background:var(--accent-strong); border-radius:99px; margin:4px 8px; box-shadow:0 0 0 3px rgba(108,92,231,.16); }
@@ -1084,6 +1109,7 @@ function normalizeStore(){
   if(Array.isArray(STORE.work)){ const old=STORE.work; STORE.work={ quick:[],deadline:[],recurring:[],someday:[],project:[] }; old.forEach(x=>STORE.work.quick.push(Object.assign({ bucket:"quick" }, x))); }
   else if(!STORE.work || typeof STORE.work!=="object"){ STORE.work={}; }
   ["quick","deadline","recurring","someday","project"].forEach(k=>{ if(!Array.isArray(STORE.work[k])) STORE.work[k]=[]; });
+  if(!STORE.work.chainNames || typeof STORE.work.chainNames!=="object" || Array.isArray(STORE.work.chainNames)) STORE.work.chainNames={};
   if(!STORE.money || typeof STORE.money!=="object" || Array.isArray(STORE.money)) STORE.money={ accounts:[] };
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
@@ -1127,6 +1153,8 @@ let TAB="home";
 const TABNAME = { home:"홈", money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
 const openProjects = new Set();
 let fold = { recur:false, wdone:false, pdone:false, proutine:false, chains:false };   // 접힘 상태 (기본 접힘)
+let seedChain = null;   // "새 순서" 만드는 중 씨앗 업무 id (임시, 저장 안 됨)
+let chainExpanded = new Set();   // 순서줄에서 서브태스크 펼친 프로젝트 id
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); const c=document.querySelector(".content"); if(c) c.scrollTop=0; window.scrollTo({ top:0 }); }));
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===TAB));
@@ -1161,12 +1189,13 @@ function enableDrag(container, arr, onDone){
       card.classList.add("dragging"); document.body.classList.add("dragging-lock"); let moved=false;
       const isWorkList = container.matches && container.matches('.list[data-bucket]');
       let dropTarget=null, dropLine=null;
-      const clearDrop=()=>{ if(dropLine){ dropLine.remove(); dropLine=null; } dropTarget=null; card.classList.remove('to-chain'); };
+      const clearDrop=()=>{ if(dropLine){ dropLine.remove(); dropLine=null; } const nz0=document.querySelector('#view .wchainfold .chain-new'); if(nz0) nz0.classList.remove('drop-hot'); dropTarget=null; card.classList.remove('to-chain'); };
       const move=ev=>{ ev.preventDefault(); moved=true;
         card.style.left=(ev.clientX-offX)+"px"; card.style.top=(ev.clientY-offY)+"px";
         let overChain=false;
         if(isWorkList){
           const cb=document.querySelector('#view .wchainfold .fold-body');
+          const nz=cb&&cb.querySelector('.chain-new'); if(nz) nz.classList.remove('drop-hot');
           if(cb){
             const chainEl=[...cb.querySelectorAll('.chain:not(.cyclic)')].find(ce=>{ const r=ce.getBoundingClientRect(); return ev.clientX>=r.left-6 && ev.clientX<=r.right+6 && ev.clientY>=r.top-12 && ev.clientY<=r.bottom+12; });
             if(chainEl){
@@ -1177,7 +1206,8 @@ function enableDrag(container, arr, onDone){
               if(!dropLine){ dropLine=document.createElement('div'); dropLine.className='chain-drop-line'; }
               if(idx<steps.length) chainEl.insertBefore(dropLine, steps[idx]); else chainEl.appendChild(dropLine);
               dropTarget={ steps, idx };
-            }
+            } else if(nz){ const r=nz.getBoundingClientRect(); if(ev.clientX>=r.left && ev.clientX<=r.right && ev.clientY>=r.top && ev.clientY<=r.bottom){
+              overChain=true; ph.style.display='none'; card.classList.add('to-chain'); nz.classList.add('drop-hot'); if(dropLine){ dropLine.remove(); dropLine=null; } dropTarget={ newSeed:true }; } }
           }
         }
         if(!overChain){ ph.style.display=''; clearDrop();
@@ -1190,6 +1220,8 @@ function enableDrag(container, arr, onDone){
         card.style.position=""; card.style.left=""; card.style.top=""; card.style.width=""; card.style.height=""; card.style.margin=""; card.style.zIndex=""; card.style.pointerEvents="";
         card.classList.remove("dragging"); document.body.classList.remove("dragging-lock");
         if(dropLine){ dropLine.remove(); dropLine=null; }
+        const nz1=document.querySelector('#view .wchainfold .chain-new'); if(nz1) nz1.classList.remove('drop-hot');
+        if(dt && dt.newSeed){ ph.remove(); startSeed(dragId); return; }   // + 새 순서 → 씨앗 만들기
         if(dt){ ph.remove();   // 순서줄에 떨어뜨림 → 선행만 설정
           const prevId = dt.idx>0 ? dt.steps[dt.idx-1].dataset.goto : null;
           const nextId = dt.idx<dt.steps.length ? dt.steps[dt.idx].dataset.goto : null;
@@ -1438,6 +1470,11 @@ function wireWork(){
   });
   document.querySelectorAll("#view .list[data-bucket]").forEach(list=>{ enableDrag(list, STORE.work[list.dataset.bucket]); });
   document.querySelectorAll("#view .cstep[data-goto]").forEach(el=> el.addEventListener("click", ()=> gotoWork(el.dataset.goto)));
+  document.querySelectorAll("#view .wchainfold [data-rename]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); renameChain(el.dataset.rename); }));
+  document.querySelectorAll("#view .wchainfold [data-seedcancel]").forEach(el=> el.addEventListener("click", ()=>{ seedChain=null; render(); }));
+  document.querySelectorAll("#view .wchainfold [data-cstep-done]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); actWork(el.dataset.cstepDone, "done"); }));
+  document.querySelectorAll("#view .wchainfold [data-cstep-exp]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); const id=el.dataset.cstepExp; if(chainExpanded.has(id)) chainExpanded.delete(id); else chainExpanded.add(id); render(); }));
+  document.querySelectorAll("#view .wchainfold [data-cssub]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); const p=el.dataset.cssub.split("|"); actSub(p[0], p[1], "done"); }));
   wireFolds();
 }
 function actWork(id, act){
@@ -1635,32 +1672,70 @@ function depChains(){
     return { steps, cyclic, size: comp.length };
   }).sort((a,b)=> b.size-a.size);
 }
+function chainStepsHtml(steps){
+  return steps.map((s,i)=>{
+    const cls=s.done?'done':(s.ready?'ready':'waiting');
+    const tag=s.done?'완료':(s.ready?'▶ 지금 할 수 있어요':('🔒 '+esc((s.waiting||[]).join(', '))+' 먼저'));
+    const it=workItemById(s.id); const isProj=it&&it._bucket==="project"; const subs=isProj?(it.subtasks||[]):[];
+    const exp=isProj && chainExpanded.has(s.id);
+    let h='<div class="cstep '+cls+'" data-goto="'+s.id+'"><span class="cs-num">'+(i+1)+'</span>'+
+      '<span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span>'+(tag?'<span class="cs-tag">'+tag+'</span>':'')+'</span>'+
+      '<span class="cs-ctrl">'+(subs.length?'<button type="button" class="cs-exp" data-cstep-exp="'+s.id+'" title="서브태스크 펼치기">'+svi(exp?'chevD':'chevR')+'</button>':'')+
+      '<input type="checkbox" class="cs-cb" data-cstep-done="'+s.id+'"'+(s.done?' checked':'')+'></span></div>';
+    if(exp && subs.length){
+      h+='<div class="cs-subs">'+subs.map(st=>'<label class="cs-sub'+(st.done?' done':'')+'"><input type="checkbox" data-cssub="'+s.id+'|'+st.id+'"'+(st.done?' checked':'')+'><span>'+esc(st.title)+'</span></label>').join('')+'</div>';
+    }
+    return h;
+  }).join('');
+}
+function chainLabel(ch, autoNo){
+  const map=STORE.work.chainNames||{};
+  const custom = ch.steps.map(s=>map[s.id]).find(Boolean);
+  return custom || ('작업 순서 '+autoNo);
+}
 function chainFoldHtml(){
-  const chains=depChains(); if(!chains.length) return '';
-  let body='';
+  const chains=depChains();
+  const hasSeed = seedChain && workItemById(seedChain);
+  if(!chains.length && !hasSeed) return '';
+  let cards='', autoNo=0;
   chains.forEach(ch=>{
     if(ch.cyclic){
-      body+='<div class="chain cyclic"><div class="chain-warn">⚠ 이 업무들이 서로 선행으로 물려 있어서 순서를 만들 수 없어요. 선행을 하나 풀어주세요.</div>'+
-        ch.steps.map(s=>'<div class="cstep waiting" data-goto="'+s.id+'"><span class="cs-num">•</span><span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span></span></div>').join('')+'</div>';
+      cards+='<div class="chaincard cyclic"><div class="cc-h"><span class="cc-name warn">⚠ 서로 물림</span></div>'+
+        '<div class="chain cyclic"><div class="chain-warn">서로 선행으로 물려 있어서 순서를 못 만들어요. 선행을 하나 풀어주세요.</div>'+
+        ch.steps.map(s=>'<div class="cstep waiting" data-goto="'+s.id+'"><span class="cs-num">•</span><span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span></span></div>').join('')+'</div></div>';
       return;
     }
-    body+='<div class="chain"><div class="chain-sub">순서 '+ch.steps.length+'단계</div>';
-    body+=ch.steps.map((s,i)=>{
-      const cls=s.done?'done':(s.ready?'ready':'waiting');
-      const tag=s.done?'완료':(s.ready?'▶ 지금 할 수 있어요':('🔒 '+esc(s.waiting.join(', '))+' 먼저'));
-      return '<div class="cstep '+cls+'" data-goto="'+s.id+'"><span class="cs-num">'+(i+1)+'</span><span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span><span class="cs-tag">'+tag+'</span></span></div>';
-    }).join('');
-    body+='</div>';
+    autoNo++; const head=ch.steps[0]?ch.steps[0].id:"";
+    cards+='<div class="chaincard"><div class="cc-h"><span class="cc-name" data-rename="'+head+'" title="이름 바꾸기">'+esc(chainLabel(ch,autoNo))+'</span><span class="cc-n">'+ch.steps.length+'단계</span></div>'+
+      '<div class="chain">'+chainStepsHtml(ch.steps)+'</div></div>';
   });
+  if(hasSeed){
+    const it=workItemById(seedChain);
+    cards+='<div class="chaincard seedcard"><div class="cc-h"><span class="cc-name">새 순서 (만드는 중)</span><span class="seed-x" data-seedcancel="1" title="취소">✕</span></div>'+
+      '<div class="chain">'+chainStepsHtml([{id:seedChain, title:it.title, done:isItemDone(it), ready:true, waiting:[]}])+'</div>'+
+      '<div class="seed-hint">여기 뒤에 업무를 하나 더 놓으면 순서가 만들어져요</div></div>';
+  } else {
+    cards+='<div class="chaincard chain-new"><div class="cn-plus">＋</div><div class="cn-t">새 순서 만들기</div><div class="cn-sub">여기에 업무를 놓으면<br>새 순서가 시작돼요</div></div>';
+  }
   const total=chains.reduce((s,c)=>s+c.steps.length,0);
-  return '<div class="fold wchainfold">'+foldHeader("chains", svi('layers'), "작업 순서 (선행 흐름)", total)+(fold.chains?'<div class="fold-body">'+body+'</div>':'')+'</div>';
+  return '<div class="fold wchainfold">'+foldHeader("chains", svi('layers'), "작업 순서 (선행 흐름)", total)+(fold.chains?'<div class="fold-body">'+cards+'</div>':'')+'</div>';
 }
+function renameChain(headId){
+  const map=STORE.work.chainNames=STORE.work.chainNames||{};
+  const v=prompt("이 순서(기차)의 이름을 정해주세요.\n(비우면 자동 번호로 돌아갑니다)", map[headId]||"");
+  if(v===null) return;
+  const t=v.trim(); if(t) map[headId]=t; else delete map[headId];
+  save(); render();
+}
+function startSeed(id){ seedChain=id; render();
+  setTimeout(()=>{ const el=document.querySelector('#view .seedcard'); if(el) try{ el.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"}); }catch(_){}; },20); }
 function gotoWork(id){ const it=workItemById(id); if(!it) return; if(it._bucket==="project") openProjects.add(id); render();
   const card=document.querySelector('#view .card[data-id="'+id+'"]'); if(card){ try{ card.scrollIntoView({behavior:"smooth",block:"center"}); }catch(_){ card.scrollIntoView(); } card.classList.add("flash"); setTimeout(()=>{ card.classList.remove("flash"); },1500); } }
 function workRef(id){ for(const b of ["quick","deadline","project","someday","recurring"]){ const f=(STORE.work[b]||[]).find(x=>x.id===id); if(f) return f; } return null; }
 // 순서줄의 특정 위치에 끼워넣기 → 선행만 재배선(카드 위치는 그대로). prev 다음, next 앞.
 function insertIntoChain(dragId, prevId, nextId){
   const drag=workRef(dragId); if(!drag) return;
+  seedChain=null;   // 씨앗이 실제 연결되면 임시 상태 해제
   const oldDeps=normDeps(drag).map(d=>d.id);
   ["quick","deadline","project","someday","recurring"].forEach(b=>(STORE.work[b]||[]).forEach(t=>{
     if(t.id===dragId) return;
