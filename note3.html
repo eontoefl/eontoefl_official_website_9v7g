@@ -338,6 +338,9 @@
   .mt-bar { height:6px; border-radius:99px; background:#EDECF4; overflow:hidden; margin-top:10px; }
   .mt-bar span { display:block; height:100%; border-radius:99px; }
   .mt-m { font-size:10.5px; color:#9A9AB0; margin-top:8px; font-weight:500; }
+  .mt-chip { display:inline-block; margin-top:7px; font-size:10.5px; font-weight:700; border-radius:8px; padding:3px 8px; }
+  .mt-chip.warn { color:#C7361B; background:#FDEAE4; }
+  .mt-chip.ok { color:#0F9D6E; background:#E3F7F0; }
   .conf-detail-card { background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 2px 8px rgba(26,26,46,.05); margin-bottom:14px; }
   .mnote { font-size:11.5px; color:#71718A; background:#fff; border-radius:14px; padding:12px 15px; margin-bottom:14px; line-height:1.55; box-shadow:0 2px 8px rgba(26,26,46,.05); }
   @media(max-width:600px){ .mtiles { grid-template-columns:1fr; } .mh-v { font-size:30px; } }
@@ -928,6 +931,7 @@ function setDot(ok,msg){ const d=$("savedot"); d.textContent=msg; d.className=ok
 const IC = {
   home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
   trash:'<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
   grip:'<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
   restore:'<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4h4"/>',
@@ -1078,22 +1082,26 @@ function soonView(name){ return '<div class="soon"><div class="big">'+svi('tools
 function enableDrag(container, arr, onDone){
   container.querySelectorAll(":scope > [data-id] > .drag, :scope > [data-id] > .proj-top > .drag, :scope > [data-id] > .acct-top > .drag").forEach(handle=>{
     handle.addEventListener("pointerdown", e=>{
+      if(e.button!==undefined && e.button!==0) return;   // 좌클릭(터치/펜 포함)만
       e.preventDefault(); const card=handle.closest("[data-id]"); if(!card) return;
-      try { handle.setPointerCapture(e.pointerId); } catch(_){}   // 모든 이동 이벤트를 핸들로 (contenteditable 등이 가로채지 못하게)
+      try { handle.setPointerCapture(e.pointerId); } catch(_){}
       card.classList.add("dragging"); document.body.classList.add("dragging-lock"); let moved=false;
       const move=ev=>{ ev.preventDefault(); moved=true; const others=[...container.querySelectorAll(":scope > [data-id]:not(.dragging)")]; let placed=false;
         for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(card,o); placed=true; break; } } if(!placed) container.appendChild(card); };
-      const up=()=>{ handle.removeEventListener("pointermove",move); handle.removeEventListener("pointerup",up); handle.removeEventListener("pointercancel",up);
+      const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); document.removeEventListener("pointercancel",up);
+        try { handle.releasePointerCapture(e.pointerId); } catch(_){}
         card.classList.remove("dragging"); document.body.classList.remove("dragging-lock");
         if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id);
           const inDom=ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); const rest=arr.filter(x=>!ids.includes(x.id));
           arr.length=0; arr.push(...inDom, ...rest); if(onDone) onDone(); else { save(); render(); } } };
-      handle.addEventListener("pointermove",move); handle.addEventListener("pointerup",up); handle.addEventListener("pointercancel",up);
+      // 이동/뗌은 document에 붙인다 — 실제 마우스에선 커서가 핸들을 벗어나므로 핸들 리스너로는 못 잡음
+      document.addEventListener("pointermove",move); document.addEventListener("pointerup",up); document.addEventListener("pointercancel",up);
     });
   });
 }
 const dragH = '<span class="drag" title="드래그해서 순서 이동">'+svi('grip')+'</span>';
 const actsH = '<div class="acts"><button type="button" data-act="edit" title="수정">'+svi('edit')+'</button><button type="button" class="del" data-act="del" title="삭제">'+svi('trash')+'</button></div>';
+const actsHW = '<div class="acts"><button type="button" data-act="dup" title="복제">'+svi('copy')+'</button><button type="button" data-act="edit" title="수정">'+svi('edit')+'</button><button type="button" class="del" data-act="del" title="삭제">'+svi('trash')+'</button></div>';
 function foldHeader(key, ic, label, n, addBucket){ return '<div class="fold-h" data-fold="'+key+'"><span class="ic">'+ic+'</span>'+esc(label)+' <span class="n">'+n+'</span>'+(addBucket?'<button class="secadd" type="button" data-add="'+addBucket+'" data-addtab="work">'+svi('plus')+'</button>':'')+'<span class="chev">'+svi(fold[key]?'chevD':'chevR')+'</span></div>'; }
 function wireFolds(){ document.querySelectorAll("#view [data-fold]").forEach(h=> h.addEventListener("click", ()=>{ fold[h.dataset.fold]=!fold[h.dataset.fold]; render(); })); }
 function wireBtns(){
@@ -1280,7 +1288,7 @@ function workCard(it){
   if(b==="deadline"){ const w=deadlineWhen(it), over=it.due&&it.due<todayStr()&&!it.done; if(w) meta+='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(w)+'</span>'; if(it.who) meta+='<span class="badge soft">'+svi('user')+' '+esc(it.who)+'</span>'; if(over) meta+=postBtn; }
   else if(b==="someday" && it.hope){ meta='<span class="badge soft">'+svi('moon')+' '+esc(HOPE[it.hope]||"")+'</span>'; }
   const blk=unmetDeps(it).length>0;
-  return '<div class="card'+(it.done?' done':'')+(blk?' blocked':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div>'+lockBadge(it)+'</div>'+actsH+'</div>';
+  return '<div class="card'+(it.done?' done':'')+(blk?' blocked':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div>'+lockBadge(it)+'</div>'+actsHW+'</div>';
 }
 function recurCard(it){
   return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('repeat')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('repeat')+' '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
@@ -1292,7 +1300,7 @@ function projectCard(p){
     dm='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(deadlineWhen(p))+'</span>'+(p.who?'<span class="badge soft">'+svi('user')+' '+esc(p.who)+'</span>':'')+(over?postBtn:''); }
   else if(p.hope){ dm='<span class="badge soft">'+svi('hourglass')+' '+esc(HOPE[p.hope]||"")+'</span>'; }
   const blk=unmetDeps(p).length>0;
-  let html='<div class="card proj'+(blk?' blocked':'')+'" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(dm?'<div class="meta">'+dm+'</div>':'')+lockBadge(p)+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' '+svi('chevD'):' '+svi('chevR'))+'</div></div>'+actsH+'</div>';
+  let html='<div class="card proj'+(blk?' blocked':'')+'" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+(dm?'<div class="meta">'+dm+'</div>':'')+lockBadge(p)+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' '+svi('chevD'):' '+svi('chevR'))+'</div></div>'+actsHW+'</div>';
   if(open){
     html+='<div class="proj-sub" data-proj="'+p.id+'">';
     html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">'+svi('grip')+'</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">'+svi('trash')+'</button></div>').join("");
@@ -1325,6 +1333,8 @@ function actWork(id, act){
   else if(act==="toggle"){ if(openProjects.has(id)) openProjects.delete(id); else openProjects.add(id); }
   else if(act==="edit" || act==="postpone"){ openForm({tab:"work", type:bucket, id}); return; }
   else if(act==="del"){ if(!confirm('이 항목을 지웁니다.\n\n"'+it.title+'"\n\n계속할까요?')) return; arr.splice(i,1); openProjects.delete(id); }
+  else if(act==="dup"){ const c=JSON.parse(JSON.stringify(it)); c.id=uid(); c.title=(it.title||"")+" - 복제본"; c.done=false; c.doneAt=""; c.swept=false; c.updated=Date.now();
+    if(Array.isArray(c.subtasks)) c.subtasks=c.subtasks.map(s=>({ ...s, id:uid() })); arr.splice(i+1,0,c); }
   else return;
   save(); render();
 }
@@ -1726,13 +1736,14 @@ function moneyView(){
   const net=assets+illiquid-debt;
   const confMonthly = (STORE.money.fixed||[]).reduce((s,f)=>s+mnum(f.krw),0) + accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+loanConfirmedMonthly(a, todayStr()), 0) + accts.filter(a=>a.kind==="account").reduce((s,a)=>s+mnum(a.budget),0);
   const cb=confirmedBreakdown(), cpct=cb.total>0?Math.round(cb.paid/cb.total*100):0;
+  const unsec=distTargets().reduce((s,t)=>s+mnum(t.need),0);   // 미확보 = 배분에서 아직 채워야 할 돈
   const emg=STORE.money.emergency||{goal:2000000,tx:[]}, esaved=(emg.tx||[]).reduce((s,t)=>s+mnum(t.amount),0), egoal=mnum(emg.goal), epct=egoal>0?Math.min(100,Math.round(esaved/egoal*100)):0;
   const MM=(+todayStr().slice(5,7));
   html+='<div class="mhero"><div class="mh-k">순자산</div><div class="mh-v">'+fmtMoney(net,"KRW")+'</div>'+
     '<div class="mh-m">현금성 '+fmtMoney(assets,"KRW")+(illiquid>0?' · 내 지분 '+fmtMoney(illiquid,"KRW"):'')+'</div>'+
     '<div class="mh-tags"><span class="mh-tag">💵 자산 '+fmtMoney(assets+illiquid,"KRW")+'</span><span class="mh-tag">📉 부채 '+fmtMoney(debt,"KRW")+'</span></div></div>';
   html+='<div class="mtiles">'+
-    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+cpct+'%;background:#F5A524"></span></div><div class="mt-m">이미 냄 '+cpct+'% · 남음 '+fmtMoney(cb.remain,"KRW")+'</div></div>'+
+    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+cpct+'%;background:#F5A524"></span></div><div class="mt-m">이미 냄 '+cpct+'% · 남음 '+fmtMoney(cb.remain,"KRW")+'</div>'+(cb.remain>0?'<div class="mt-chip '+(unsec>0?'warn':'ok')+'">'+(unsec>0?('미확보 '+fmtMoney(unsec,"KRW")):'✓ 통장에 다 있음')+'</div>':'')+'</div>'+
     '<div class="mtile tap" id="emgTile"><div class="mt-ic violet">🛟</div><div class="mt-k">비상금</div><div class="mt-v">'+fmtMoney(esaved,"KRW")+' <small>/ '+fmtMoney(egoal,"KRW")+'</small></div><div class="mt-bar"><span style="width:'+epct+'%;background:#6C5CE7"></span></div><div class="mt-m">'+(egoal>0&&esaved>=egoal?'목표 달성 🎉':'채우기 먼저 · '+fmtMoney(Math.max(0,egoal-esaved),"KRW")+' 남음')+'</div></div>'+
     '<div class="mtile"><div class="mt-ic rose">🔻</div><div class="mt-k">실부담 부채</div><div class="mt-v rose">'+fmtMoney(debt,"KRW")+'</div><div class="mt-bar"><span style="width:100%;background:#F0416B"></span></div><div class="mt-m">마통·대출 (전세 제외)</div></div>'+
     '</div>';
