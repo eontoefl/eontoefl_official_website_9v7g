@@ -165,11 +165,17 @@
   .cs-ctrl .svic { width:13px; height:13px; }
   .cs-exp { border:none; background:transparent; color:var(--on-surface-variant); cursor:pointer; padding:3px; border-radius:6px; display:grid; place-items:center; }
   .cs-exp:hover { background:var(--surface-high); }
-  .cs-cb { width:17px; height:17px; cursor:pointer; accent-color:var(--accent-strong); flex-shrink:0; }
+  .rdot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent-strong); margin-right:6px; vertical-align:middle; }
+  .cs-cb, .cs-sub input { appearance:none; -webkit-appearance:none; border-radius:6px; border:1.5px solid var(--outline,#DAD8E6); background:var(--surface-lowest); cursor:pointer; position:relative; flex-shrink:0; transition:background .15s, border-color .15s; }
+  .cs-cb { width:18px; height:18px; }
+  .cs-sub input { width:16px; height:16px; border-radius:5px; }
+  .cs-cb:hover, .cs-sub input:hover { border-color:var(--accent-strong); }
+  .cs-cb:checked, .cs-sub input:checked { background:var(--accent-strong); border-color:var(--accent-strong); }
+  .cs-cb:checked::after, .cs-sub input:checked::after { content:""; position:absolute; left:50%; top:46%; width:4px; height:8px; border:solid #fff; border-width:0 2px 2px 0; transform:translate(-50%,-50%) rotate(45deg); }
+  .cs-sub input:checked::after { height:7px; }
   .cs-subs { margin:1px 0 7px 30px; display:flex; flex-direction:column; gap:1px; }
   .cs-sub { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; padding:4px 7px; border-radius:8px; cursor:pointer; }
   .cs-sub:hover { background:var(--surface-high); }
-  .cs-sub input { width:15px; height:15px; accent-color:var(--accent-strong); cursor:pointer; flex-shrink:0; }
   .cs-sub.done span { text-decoration:line-through; color:var(--on-surface-variant); }
   #view .card.flash { animation:flashcard 1.4s ease; }
   @keyframes flashcard { 0%,100%{ box-shadow:var(--lift); } 25%,55%{ box-shadow:0 0 0 3px var(--accent-strong), var(--lift-hi); } }
@@ -1675,7 +1681,7 @@ function depChains(){
 function chainStepsHtml(steps){
   return steps.map((s,i)=>{
     const cls=s.done?'done':(s.ready?'ready':'waiting');
-    const tag=s.done?'완료':(s.ready?'▶ 지금 할 수 있어요':('🔒 '+esc((s.waiting||[]).join(', '))+' 먼저'));
+    const tag=s.done?'완료':(s.ready?'<span class="rdot"></span>지금 할 수 있어요':('🔒 '+esc((s.waiting||[]).join(', '))+' 먼저'));
     const it=workItemById(s.id); const isProj=it&&it._bucket==="project"; const subs=isProj?(it.subtasks||[]):[];
     const exp=isProj && chainExpanded.has(s.id);
     let h='<div class="cstep '+cls+'" data-goto="'+s.id+'"><span class="cs-num">'+(i+1)+'</span>'+
