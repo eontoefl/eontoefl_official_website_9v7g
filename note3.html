@@ -56,7 +56,7 @@
 
   .shell { display:grid; grid-template-columns:238px 1fr; min-height:100vh; align-items:start; }
   .sidebar { position:sticky; top:0; height:100vh; display:flex; flex-direction:column; padding:22px 16px; background:var(--surface-lowest); border-right:1px solid var(--outline, #E7E5F0); }
-  .content { max-width:1280px; margin:0 auto; padding:26px 34px 60px; width:100%; }
+  .content { max-width:1440px; margin:0 auto; padding:26px 34px 60px; width:100%; }
   .brand { font-size:17px; font-weight:800; padding:6px 10px 2px; }
   .brand small { display:block; font-size:10px; font-weight:600; letter-spacing:.16em; color:var(--on-surface-variant); margin-top:3px; }
   .side-foot { margin-top:auto; padding-top:12px; border-top:1px solid var(--surface-high); display:flex; align-items:center; gap:10px; }
@@ -170,10 +170,19 @@
   .card .acts button:hover { background:var(--surface-high); }
   .card .acts button.del:hover { background:var(--danger-soft); color:var(--danger); }
 
-  .card.proj { flex-direction:column; align-items:stretch; gap:0; padding:1rem 1.05rem 1rem .7rem; }
+  .card.proj { flex-direction:column; align-items:stretch; gap:0; padding:.85rem 1rem .9rem .6rem; }
   .proj-top { display:flex; align-items:flex-start; gap:.6rem; }
   .proj-top .body { flex:1; min-width:0; cursor:pointer; }
-  .proj-top .prog { font-size:12px; font-weight:600; color:var(--on-surface-variant); margin-top:.3rem; }
+  .pbar { height:7px; border-radius:99px; background:#EDECF4; overflow:hidden; margin-top:.7rem; }
+  .pbar span { display:block; height:100%; background:linear-gradient(90deg,#6C5CE7,#9B54DE); border-radius:99px; transition:width .3s; }
+  .pmeta { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-top:.55rem; font-size:11.5px; font-weight:600; color:var(--on-surface-variant); }
+  .pmeta .pm-sub { display:inline-flex; align-items:center; gap:4px; min-width:0; }
+  .pmeta .svic { width:12px; height:12px; flex-shrink:0; }
+  .pmeta .pm-r { display:inline-flex; align-items:center; gap:7px; flex-shrink:0; }
+  .pm-due { color:#F0416B; background:#FDECEF; border-radius:99px; padding:2px 9px; font-weight:700; }
+  .pm-due.over { color:#fff; background:#F0416B; }
+  .pm-hope { color:var(--on-surface-variant); }
+  .pm-who { color:var(--on-surface-variant); display:inline-flex; align-items:center; gap:3px; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .proj-sub { margin:.8rem 0 0 1.9rem; display:flex; flex-direction:column; gap:.4rem; }
   .sub { display:flex; align-items:center; gap:.5rem; background:var(--surface-low); border-radius:var(--r); padding:.5rem .6rem; transition:box-shadow .15s, transform .12s; }
   .sub.done { opacity:.55; }
@@ -1334,12 +1343,18 @@ function recurCard(it){
 }
 function projectCard(p){
   const subs=p.subtasks||[]; const doneN=subs.filter(s=>s.done).length; const open=openProjects.has(p.id);
-  let dm="";
-  if(p.due){ const allDone=subs.length>0 && doneN===subs.length; const over=p.due<todayStr() && !allDone;
-    dm='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(deadlineWhen(p))+'</span>'+(p.who?'<span class="badge soft">'+svi('user')+' '+esc(p.who)+'</span>':'')+(over?postBtn:''); }
-  else if(p.hope){ dm='<span class="badge soft">'+svi('hourglass')+' '+esc(HOPE[p.hope]||"")+'</span>'; }
+  const pct = subs.length ? Math.round(doneN/subs.length*100) : 0;
   const blk=unmetDeps(p).length>0;
-  let html='<div class="card proj'+(blk?' blocked':'')+'" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+(dm?'<div class="meta">'+dm+'</div>':'')+lockBadge(p)+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' '+svi('chevD'):' '+svi('chevR'))+'</div></div>'+actsHW+'</div>';
+  let dueH="";
+  if(p.due){ const allDone=subs.length>0 && doneN===subs.length; const over=p.due<todayStr() && !allDone;
+    dueH='<span class="pm-due'+(over?' over':'')+'">'+esc(deadlineWhen(p))+'</span>'; }
+  else if(p.hope){ dueH='<span class="pm-hope">'+esc(HOPE[p.hope]||"")+'</span>'; }
+  const whoH = p.who ? '<span class="pm-who">'+svi('user')+' '+esc(p.who)+'</span>' : '';
+  let html='<div class="card proj'+(blk?' blocked':'')+'" data-id="'+p.id+'"><div class="proj-top">'+dragH+
+    '<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+lockBadge(p)+
+    '<div class="pbar"><span style="width:'+pct+'%"></span></div>'+
+    '<div class="pmeta"><span class="pm-sub">서브태스크 '+doneN+'/'+subs.length+' '+(open?svi('chevD'):svi('chevR'))+'</span><span class="pm-r">'+whoH+dueH+'</span></div>'+
+    '</div>'+actsHW+'</div>';
   if(open){
     html+='<div class="proj-sub" data-proj="'+p.id+'">';
     html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">'+svi('grip')+'</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">'+svi('trash')+'</button></div>').join("");
