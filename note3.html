@@ -54,9 +54,9 @@
   #gate button { width:100%; margin-top:.7rem; background:var(--sgrad); color:#fff; border:none; border-radius:var(--r); padding:14px; font-size:15px; font-weight:700; box-shadow:var(--lift); }
   #gate .msg { font-size:13px; color:var(--danger); margin-top:.7rem; min-height:20px; font-weight:500; }
 
-  .shell { display:grid; grid-template-columns:238px 1fr; min-height:100vh; align-items:start; }
-  .sidebar { position:sticky; top:0; height:100vh; display:flex; flex-direction:column; padding:22px 16px; background:var(--surface-lowest); border-right:1px solid var(--outline, #E7E5F0); }
-  .content { max-width:1440px; margin:0 auto; padding:26px 34px 60px; width:100%; }
+  .shell { display:grid; grid-template-columns:238px 1fr; height:100vh; overflow:hidden; }
+  .sidebar { height:100vh; overflow-y:auto; display:flex; flex-direction:column; padding:22px 16px; background:var(--surface-lowest); border-right:1px solid var(--outline, #E7E5F0); }
+  .content { max-width:1440px; margin:0 auto; padding:26px 34px 60px; width:100%; height:100vh; overflow-y:auto; }
   .brand { font-size:17px; font-weight:800; padding:6px 10px 2px; }
   .brand small { display:block; font-size:10px; font-weight:600; letter-spacing:.16em; color:var(--on-surface-variant); margin-top:3px; }
   .side-foot { margin-top:auto; padding-top:12px; border-top:1px solid var(--surface-high); display:flex; align-items:center; gap:10px; }
@@ -65,10 +65,10 @@
   #restorebtn { border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:var(--r); padding:7px 12px; font-size:12.5px; font-weight:600; flex-shrink:0; margin-left:auto; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
   #restorebtn:hover { background:var(--surface-highest); }
   @media (max-width:860px){
-    .shell { grid-template-columns:1fr; }
-    .sidebar { position:sticky; top:0; height:auto; flex-direction:row; align-items:center; gap:10px; padding:9px 12px; border-right:none; border-bottom:1px solid var(--surface-high); z-index:40; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+    .shell { grid-template-columns:1fr; height:auto; overflow:visible; }
+    .sidebar { position:sticky; top:0; height:auto; overflow-y:visible; flex-direction:row; align-items:center; gap:10px; padding:9px 12px; border-right:none; border-bottom:1px solid var(--surface-high); z-index:40; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
     .sidebar .brand { display:none; }
-    .content { padding:18px 15px 50px; }
+    .content { padding:18px 15px 50px; height:auto; overflow-y:visible; }
     .side-foot { margin-top:0; margin-left:auto; padding-top:0; border-top:none; }
   }
   .snap-row { display:flex; align-items:center; gap:.6rem; padding:.75rem .2rem; }
@@ -121,6 +121,31 @@
   .fold-h .n { background:var(--surface-high); font-size:11.5px; font-weight:700; border-radius:99px; padding:1px 9px; }
   .fold-h .chev { margin-left:auto; opacity:.55; font-size:12px; }
   .fold-body { padding-top:.5rem; }
+  /* 작업 순서 (선행 흐름) 타임라인 */
+  .wchainfold .fold-body { padding-top:.4rem; }
+  .chain { position:relative; }
+  .chain + .chain { margin-top:14px; padding-top:12px; border-top:1px solid var(--surface-high); }
+  .chain-sub { font-size:11.5px; font-weight:700; color:var(--on-surface-variant); margin:2px 4px 8px; }
+  .chain-warn { font-size:12px; font-weight:700; color:#F0416B; background:#FCE7ED; border-radius:10px; padding:9px 12px; margin-bottom:8px; }
+  .cstep { position:relative; display:flex; align-items:center; gap:11px; padding:6px 8px; border-radius:10px; cursor:pointer; }
+  .cstep:hover { background:var(--surface-high); }
+  .cstep::before { content:""; position:absolute; left:20px; top:0; bottom:0; width:2px; background:var(--surface-high); transform:translateX(-50%); z-index:0; }
+  .cstep:first-child::before { top:50%; }
+  .cstep:last-child::before { bottom:50%; }
+  .chain.cyclic .cstep::before { display:none; }
+  .cs-num { position:relative; z-index:1; flex-shrink:0; width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:800; background:var(--surface-high); color:var(--on-surface-variant); }
+  .cs-body { display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .cs-t { font-size:13.5px; font-weight:700; color:var(--on-surface); }
+  .cs-tag { font-size:11px; font-weight:600; color:var(--on-surface-variant); }
+  .cstep.done .cs-num { background:#0FB981; color:#fff; }
+  .cstep.done .cs-t { color:var(--on-surface-variant); text-decoration:line-through; }
+  .cstep.done .cs-tag { color:#0F9D6E; }
+  .cstep.ready { background:var(--accent-lightest); }
+  .cstep.ready .cs-num { background:var(--accent-strong); color:#fff; box-shadow:0 4px 10px rgba(108,92,231,.3); }
+  .cstep.ready .cs-tag { color:var(--accent-strong); font-weight:700; }
+  .cstep.waiting .cs-tag { color:#F0416B; }
+  #view .card.flash { animation:flashcard 1.4s ease; }
+  @keyframes flashcard { 0%,100%{ box-shadow:var(--lift); } 25%,55%{ box-shadow:0 0 0 3px var(--accent-strong), var(--lift-hi); } }
   .donelist .card { opacity:.6; }
 
   /* 목표 스티커판 */
@@ -1095,8 +1120,8 @@ async function loadStore(){
 let TAB="home";
 const TABNAME = { home:"홈", money:"돈관리", work:"업무", personal:"개인", marketing:"마케팅" };
 const openProjects = new Set();
-let fold = { recur:false, wdone:false, pdone:false, proutine:false };   // 접힘 상태 (기본 접힘)
-document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); window.scrollTo({ top:0 }); }));
+let fold = { recur:false, wdone:false, pdone:false, proutine:false, chains:false };   // 접힘 상태 (기본 접힘)
+document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", ()=>{ TAB=b.dataset.tab; render(); const c=document.querySelector(".content"); if(c) c.scrollTop=0; window.scrollTo({ top:0 }); }));
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===TAB));
   const v=$("view");
@@ -1303,6 +1328,7 @@ function workView(){
     '<span class="wstats"><span class="wstat">📁 프로젝트 <b>'+nProj+'</b></span><span class="wstat">📌 약속·마감 <b>'+nDead+'</b></span><span class="wstat">⚡ 단발 <b>'+nQuick+'</b></span></span>'+
     '<button class="addbtn" id="wadd" type="button">+ 추가</button></div>';
   html += workFocusHtml();
+  html += chainFoldHtml();
   const rec=STORE.work.recurring;
   const done = ["quick","deadline","someday"].flatMap(k=>STORE.work[k].filter(oldDone));
   const recFold = '<div class="fold">'+foldHeader("recur",svi('repeat'),"반복 업무", rec.length, "recurring")+(fold.recur?'<div class="fold-body">'+(rec.length?'<div class="list" data-bucket="recurring">'+rec.map(recurCard).join("")+'</div>':'<div class="wsec-empty">등록된 반복 업무가 없어요.</div>')+'</div>':'')+'</div>';
@@ -1379,6 +1405,7 @@ function wireWork(){
     const subwrap=card.querySelector(".proj-sub"); if(subwrap){ const p=STORE.work.project.find(x=>x.id===id); if(p) enableDrag(subwrap, p.subtasks); }
   });
   document.querySelectorAll("#view .list[data-bucket]").forEach(list=>{ enableDrag(list, STORE.work[list.dataset.bucket]); });
+  document.querySelectorAll("#view .cstep[data-goto]").forEach(el=> el.addEventListener("click", ()=> gotoWork(el.dataset.goto)));
   wireFolds();
 }
 function actWork(id, act){
@@ -1551,6 +1578,53 @@ function workItemById(id){ const w=STORE.work||{}; for(const b of ["quick","dead
 function isItemDone(it){ if(!it) return false; if(it.done===true) return true; if(Array.isArray(it.subtasks) && it.subtasks.length && it.subtasks.every(s=>s.done)) return true; return false; }
 function normDeps(it){ return (it&&Array.isArray(it.deps)?it.deps:[]).map(d=> typeof d==="string" ? {id:d,note:""} : {id:d.id,note:d.note||""}); }
 function unmetDeps(it){ return normDeps(it).map(d=>({ id:d.id, note:d.note, item:workItemById(d.id) })).filter(x=>x.item && !isItemDone(x.item)); }
+// 선행관계를 체인(순서 흐름)으로 묶기. 각 덩어리를 위상정렬해서 순서대로 반환. 서로 물리면 cyclic:true
+function depChains(){
+  const tasks=allWorkTasks(); const byId={}; tasks.forEach(t=>byId[t.id]=t);
+  const prereqOf={}; const involved=new Set();
+  tasks.forEach(t=>{ const it=workItemById(t.id); const deps=normDeps(it).map(d=>d.id).filter(id=>byId[id]);
+    if(deps.length){ prereqOf[t.id]=deps; involved.add(t.id); deps.forEach(id=>involved.add(id)); } });
+  if(!involved.size) return [];
+  const adj={}, dependentsOf={};
+  involved.forEach(id=>{ adj[id]=new Set(); });
+  Object.keys(prereqOf).forEach(tid=>{ prereqOf[tid].forEach(pid=>{ (adj[tid]=adj[tid]||new Set()).add(pid); (adj[pid]=adj[pid]||new Set()).add(tid); (dependentsOf[pid]=dependentsOf[pid]||[]).push(tid); }); });
+  const seen=new Set(), comps=[];
+  involved.forEach(id=>{ if(seen.has(id))return; const q=[id],comp=[]; seen.add(id);
+    while(q.length){ const x=q.shift(); comp.push(x); (adj[x]||new Set()).forEach(y=>{ if(!seen.has(y)){seen.add(y);q.push(y);} }); } comps.push(comp); });
+  return comps.map(comp=>{
+    const inC=new Set(comp), indeg={};
+    comp.forEach(id=>{ indeg[id]=(prereqOf[id]||[]).filter(p=>inC.has(p)).length; });
+    const q=comp.filter(id=>indeg[id]===0), order=[];
+    while(q.length){ const x=q.shift(); order.push(x); (dependentsOf[x]||[]).forEach(t=>{ if(inC.has(t)){ if(--indeg[t]===0) q.push(t); } }); }
+    const cyclic = order.length<comp.length;
+    const ids = cyclic ? comp : order;
+    const steps = ids.map(id=>{ const it=workItemById(id); const done=isItemDone(it); const um=unmetDeps(it);
+      return { id, title: it?it.title:"(삭제된 업무)", done, ready: !done && um.length===0, waiting: um.map(u=>u.item.title) }; });
+    return { steps, cyclic, size: comp.length };
+  }).sort((a,b)=> b.size-a.size);
+}
+function chainFoldHtml(){
+  const chains=depChains(); if(!chains.length) return '';
+  let body='';
+  chains.forEach(ch=>{
+    if(ch.cyclic){
+      body+='<div class="chain cyclic"><div class="chain-warn">⚠ 이 업무들이 서로 선행으로 물려 있어서 순서를 만들 수 없어요. 선행을 하나 풀어주세요.</div>'+
+        ch.steps.map(s=>'<div class="cstep waiting" data-goto="'+s.id+'"><span class="cs-num">•</span><span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span></span></div>').join('')+'</div>';
+      return;
+    }
+    body+='<div class="chain"><div class="chain-sub">순서 '+ch.steps.length+'단계</div>';
+    body+=ch.steps.map((s,i)=>{
+      const cls=s.done?'done':(s.ready?'ready':'waiting');
+      const tag=s.done?'완료':(s.ready?'▶ 지금 할 수 있어요':('🔒 '+esc(s.waiting.join(', '))+' 먼저'));
+      return '<div class="cstep '+cls+'" data-goto="'+s.id+'"><span class="cs-num">'+(i+1)+'</span><span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span><span class="cs-tag">'+tag+'</span></span></div>';
+    }).join('');
+    body+='</div>';
+  });
+  const total=chains.reduce((s,c)=>s+c.steps.length,0);
+  return '<div class="fold wchainfold">'+foldHeader("chains", svi('layers'), "작업 순서 (선행 흐름)", total)+(fold.chains?'<div class="fold-body">'+body+'</div>':'')+'</div>';
+}
+function gotoWork(id){ const it=workItemById(id); if(!it) return; if(it._bucket==="project") openProjects.add(id); render();
+  const card=document.querySelector('#view .card[data-id="'+id+'"]'); if(card){ try{ card.scrollIntoView({behavior:"smooth",block:"center"}); }catch(_){ card.scrollIntoView(); } card.classList.add("flash"); setTimeout(()=>{ card.classList.remove("flash"); },1500); } }
 function lockBadge(it){ const u=unmetDeps(it); if(!u.length) return ""; return '<div class="wlock">🔒 '+u.map(x=>esc(x.item.title)+' 먼저'+(x.note?' <span class="wlock-why">· '+esc(x.note)+'</span>':'')).join('<br>')+'</div>'; }
 function renderDeps(){ const box=$("depChips"); if(!box) return;
   box.innerHTML = draftDeps.map(d=>{ const w=workItemById(d.id); const t=w?w.title:"(삭제됨)"; const ic=w?(WBK_ICON[w._bucket]||"📄"):"📄";
