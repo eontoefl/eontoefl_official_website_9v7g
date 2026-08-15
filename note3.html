@@ -128,10 +128,11 @@
   .sticker.on { background:#f3e2ec; }
 
   .list { display:flex; flex-direction:column; gap:.7rem; }
-  .card { display:flex; align-items:flex-start; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:1rem 1.05rem 1rem .7rem; box-shadow:var(--lift); transition:box-shadow .15s, opacity .15s; }
+  .card { display:flex; align-items:flex-start; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:1rem 1.05rem 1rem .7rem; box-shadow:var(--lift); transition:box-shadow .15s, opacity .15s, transform .12s; }
   .card:hover { box-shadow:var(--lift-hi); }
   .card.done, .card.past { opacity:.55; }
-  .card.dragging { box-shadow:var(--lift-hi); opacity:.9; }
+  .card.dragging, .mcard.dragging, .sub.dragging { box-shadow:0 18px 40px rgba(26,26,46,.24); opacity:.98; transform:rotate(-1.2deg) scale(1.03); cursor:grabbing; }
+  .drag-ph { box-sizing:border-box; border-radius:var(--r-lg); background:rgba(108,92,231,.07); border:2px dashed rgba(108,92,231,.42); }
   .drag { flex-shrink:0; width:22px; align-self:stretch; display:flex; align-items:center; justify-content:center; color:var(--on-surface-variant); opacity:.4; cursor:grab; touch-action:none; font-size:15px; line-height:1; user-select:none; }
   .drag:hover { opacity:.8; } .drag:active { cursor:grabbing; }
   .card > input[type=checkbox] { width:22px; height:22px; margin-top:1px; accent-color:var(--accent-line); cursor:pointer; flex-shrink:0; }
@@ -161,7 +162,7 @@
   .proj-top .body { flex:1; min-width:0; cursor:pointer; }
   .proj-top .prog { font-size:12px; font-weight:600; color:var(--on-surface-variant); margin-top:.3rem; }
   .proj-sub { margin:.8rem 0 0 1.9rem; display:flex; flex-direction:column; gap:.4rem; }
-  .sub { display:flex; align-items:center; gap:.5rem; background:var(--surface-low); border-radius:var(--r); padding:.5rem .6rem; }
+  .sub { display:flex; align-items:center; gap:.5rem; background:var(--surface-low); border-radius:var(--r); padding:.5rem .6rem; transition:box-shadow .15s, transform .12s; }
   .sub.done { opacity:.55; }
   .sub .drag { align-self:center; width:18px; font-size:13px; }
   .sub input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent-line); cursor:pointer; }
@@ -423,7 +424,7 @@
   .dep-oic { font-size:15px; }
   .dep-ot { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--on-surface); }
   .dep-otp { font-size:10.5px; font-weight:700; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:1px 8px; }
-  .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
+  .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s, transform .12s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
   .mcard::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--ac,#ccc); }
@@ -1084,13 +1085,29 @@ function enableDrag(container, arr, onDone){
     handle.addEventListener("pointerdown", e=>{
       if(e.button!==undefined && e.button!==0) return;   // 좌클릭(터치/펜 포함)만
       e.preventDefault(); const card=handle.closest("[data-id]"); if(!card) return;
+      const rect=card.getBoundingClientRect(), cs=getComputedStyle(card);
+      const offX=e.clientX-rect.left, offY=e.clientY-rect.top;
       try { handle.setPointerCapture(e.pointerId); } catch(_){}
+      // 들어갈 자리 표시용 빈칸(placeholder)
+      const ph=document.createElement("div"); ph.className="drag-ph";
+      ph.style.height=rect.height+"px"; ph.style.marginTop=cs.marginTop; ph.style.marginBottom=cs.marginBottom;
+      card.parentNode.insertBefore(ph, card.nextSibling);
+      const addRow=container.querySelector(":scope > .subadd");   // 서브태스크 추가칸은 항상 맨 아래로
+      // 잡은 카드를 화면에 띄워 커서를 따라오게
+      card.style.width=rect.width+"px"; card.style.height=rect.height+"px";
+      card.style.position="fixed"; card.style.left=rect.left+"px"; card.style.top=rect.top+"px"; card.style.margin="0";
+      card.style.zIndex="1000"; card.style.pointerEvents="none";
       card.classList.add("dragging"); document.body.classList.add("dragging-lock"); let moved=false;
-      const move=ev=>{ ev.preventDefault(); moved=true; const others=[...container.querySelectorAll(":scope > [data-id]:not(.dragging)")]; let placed=false;
-        for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(card,o); placed=true; break; } } if(!placed) container.appendChild(card); };
+      const move=ev=>{ ev.preventDefault(); moved=true;
+        card.style.left=(ev.clientX-offX)+"px"; card.style.top=(ev.clientY-offY)+"px";
+        const others=[...container.querySelectorAll(":scope > [data-id]")].filter(o=>o!==card); let placed=false;
+        for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(ph,o); placed=true; break; } }
+        if(!placed){ if(addRow) container.insertBefore(ph,addRow); else container.appendChild(ph); } };
       const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); document.removeEventListener("pointercancel",up);
         try { handle.releasePointerCapture(e.pointerId); } catch(_){}
+        card.style.position=""; card.style.left=""; card.style.top=""; card.style.width=""; card.style.height=""; card.style.margin=""; card.style.zIndex=""; card.style.pointerEvents="";
         card.classList.remove("dragging"); document.body.classList.remove("dragging-lock");
+        container.insertBefore(card, ph); ph.remove();
         if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id);
           const inDom=ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); const rest=arr.filter(x=>!ids.includes(x.id));
           arr.length=0; arr.push(...inDom, ...rest); if(onDone) onDone(); else { save(); render(); } } };
