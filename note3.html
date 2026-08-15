@@ -148,6 +148,10 @@
   .cstep.waiting .cs-tag { color:#F0416B; }
   #view .card.flash { animation:flashcard 1.4s ease; }
   @keyframes flashcard { 0%,100%{ box-shadow:var(--lift); } 25%,55%{ box-shadow:0 0 0 3px var(--accent-strong), var(--lift-hi); } }
+  .chain-drop-line { height:3px; background:var(--accent-strong); border-radius:99px; margin:4px 8px; box-shadow:0 0 0 3px rgba(108,92,231,.16); }
+  .card.dragging.to-chain { outline:2px solid var(--accent-strong); outline-offset:1px; }
+  .cstep.cs-flash { animation:csflash 1.3s ease; }
+  @keyframes csflash { 0%,100%{ background:transparent; } 30%{ background:var(--accent-lightest); } }
   .donelist .card { opacity:.6; }
 
   /* 목표 스티커판 */
@@ -1155,15 +1159,41 @@ function enableDrag(container, arr, onDone){
       card.style.position="fixed"; card.style.left=rect.left+"px"; card.style.top=rect.top+"px"; card.style.margin="0";
       card.style.zIndex="1000"; card.style.pointerEvents="none";
       card.classList.add("dragging"); document.body.classList.add("dragging-lock"); let moved=false;
+      const isWorkList = container.matches && container.matches('.list[data-bucket]');
+      let dropTarget=null, dropLine=null;
+      const clearDrop=()=>{ if(dropLine){ dropLine.remove(); dropLine=null; } dropTarget=null; card.classList.remove('to-chain'); };
       const move=ev=>{ ev.preventDefault(); moved=true;
         card.style.left=(ev.clientX-offX)+"px"; card.style.top=(ev.clientY-offY)+"px";
-        const others=[...container.querySelectorAll(":scope > [data-id]")].filter(o=>o!==card); let placed=false;
-        for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(ph,o); placed=true; break; } }
-        if(!placed){ if(addRow) container.insertBefore(ph,addRow); else container.appendChild(ph); } };
+        let overChain=false;
+        if(isWorkList){
+          const cb=document.querySelector('#view .wchainfold .fold-body');
+          if(cb){
+            const chainEl=[...cb.querySelectorAll('.chain:not(.cyclic)')].find(ce=>{ const r=ce.getBoundingClientRect(); return ev.clientX>=r.left-6 && ev.clientX<=r.right+6 && ev.clientY>=r.top-12 && ev.clientY<=r.bottom+12; });
+            if(chainEl){
+              overChain=true; ph.style.display='none'; card.classList.add('to-chain');
+              const steps=[...chainEl.querySelectorAll('.cstep')];
+              let idx=steps.length;
+              for(let i=0;i<steps.length;i++){ const r=steps[i].getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ idx=i; break; } }
+              if(!dropLine){ dropLine=document.createElement('div'); dropLine.className='chain-drop-line'; }
+              if(idx<steps.length) chainEl.insertBefore(dropLine, steps[idx]); else chainEl.appendChild(dropLine);
+              dropTarget={ steps, idx };
+            }
+          }
+        }
+        if(!overChain){ ph.style.display=''; clearDrop();
+          const others=[...container.querySelectorAll(":scope > [data-id]")].filter(o=>o!==card); let placed=false;
+          for(const o of others){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ container.insertBefore(ph,o); placed=true; break; } }
+          if(!placed){ if(addRow) container.insertBefore(ph,addRow); else container.appendChild(ph); } } };
       const up=()=>{ document.removeEventListener("pointermove",move); document.removeEventListener("pointerup",up); document.removeEventListener("pointercancel",up);
         try { handle.releasePointerCapture(e.pointerId); } catch(_){}
+        const dragId=card.dataset.id, dt=dropTarget;
         card.style.position=""; card.style.left=""; card.style.top=""; card.style.width=""; card.style.height=""; card.style.margin=""; card.style.zIndex=""; card.style.pointerEvents="";
         card.classList.remove("dragging"); document.body.classList.remove("dragging-lock");
+        if(dropLine){ dropLine.remove(); dropLine=null; }
+        if(dt){ ph.remove();   // 순서줄에 떨어뜨림 → 선행만 설정
+          const prevId = dt.idx>0 ? dt.steps[dt.idx-1].dataset.goto : null;
+          const nextId = dt.idx<dt.steps.length ? dt.steps[dt.idx].dataset.goto : null;
+          dropOntoChain(dragId, prevId, nextId); return; }
         container.insertBefore(card, ph); ph.remove();
         if(moved){ const ids=[...container.querySelectorAll(":scope > [data-id]")].map(c=>c.dataset.id);
           const inDom=ids.map(id=>arr.find(x=>x.id===id)).filter(Boolean); const rest=arr.filter(x=>!ids.includes(x.id));
@@ -1627,6 +1657,34 @@ function chainFoldHtml(){
 }
 function gotoWork(id){ const it=workItemById(id); if(!it) return; if(it._bucket==="project") openProjects.add(id); render();
   const card=document.querySelector('#view .card[data-id="'+id+'"]'); if(card){ try{ card.scrollIntoView({behavior:"smooth",block:"center"}); }catch(_){ card.scrollIntoView(); } card.classList.add("flash"); setTimeout(()=>{ card.classList.remove("flash"); },1500); } }
+function workRef(id){ for(const b of ["quick","deadline","project","someday","recurring"]){ const f=(STORE.work[b]||[]).find(x=>x.id===id); if(f) return f; } return null; }
+// 순서줄의 특정 위치에 끼워넣기 → 선행만 재배선(카드 위치는 그대로). prev 다음, next 앞.
+function insertIntoChain(dragId, prevId, nextId){
+  const drag=workRef(dragId); if(!drag) return;
+  const oldDeps=normDeps(drag).map(d=>d.id);
+  ["quick","deadline","project","someday","recurring"].forEach(b=>(STORE.work[b]||[]).forEach(t=>{
+    if(t.id===dragId) return;
+    const dd=normDeps(t);
+    if(dd.some(d=>d.id===dragId)){   // 이 업무를 선행으로 갖던 애 → 이 업무의 옛 선행으로 이어붙여 구멍 메움
+      let nd=dd.filter(d=>d.id!==dragId);
+      oldDeps.forEach(pid=>{ if(pid!==t.id && !nd.some(d=>d.id===pid)) nd.push({id:pid,note:""}); });
+      t.deps=nd;
+    }
+  }));
+  drag.deps = prevId ? [{id:prevId, note:""}] : [];
+  if(nextId){ const nx=workRef(nextId); if(nx){ let nd=normDeps(nx).filter(d=>d.id!==prevId && d.id!==dragId); nd.push({id:dragId, note:""}); nx.deps=nd; } }
+  save(); render();
+  setTimeout(()=>{ const el=document.querySelector('#view .wchainfold .cstep[data-goto="'+dragId+'"]'); if(el){ try{ el.scrollIntoView({behavior:"smooth",block:"center"}); }catch(_){}; el.classList.add("cs-flash"); setTimeout(()=>el.classList.remove("cs-flash"),1400); } },30);
+}
+function dropOntoChain(dragId, prevId, nextId){
+  if(dragId===prevId || dragId===nextId){ render(); return; }   // 자기 바로 옆 = 변화 없음
+  const dName=(workItemById(dragId)||{}).title||"이 업무";
+  const pName=prevId?((workItemById(prevId)||{}).title||""):null;
+  const nName=nextId?((workItemById(nextId)||{}).title||""):null;
+  const where = (pName&&nName) ? ('"'+pName+'" 다음, "'+nName+'" 앞') : pName ? ('"'+pName+'" 맨 뒤 다음') : nName ? ('"'+nName+'" 맨 앞') : '여기';
+  if(!confirm('"'+dName+'"을(를)\n'+where+'에 넣을까요?\n\n(카드 위치는 그대로예요. 선행 순서만 정해집니다.)')){ render(); return; }
+  insertIntoChain(dragId, prevId, nextId);
+}
 function lockBadge(it){ const u=unmetDeps(it); if(!u.length) return ""; return '<div class="wlock">🔒 '+u.map(x=>esc(x.item.title)+' 먼저'+(x.note?' <span class="wlock-why">· '+esc(x.note)+'</span>':'')).join('<br>')+'</div>'; }
 function renderDeps(){ const box=$("depChips"); if(!box) return;
   box.innerHTML = draftDeps.map(d=>{ const w=workItemById(d.id); const t=w?w.title:"(삭제됨)"; const ic=w?(WBK_ICON[w._bucket]||"📄"):"📄";
