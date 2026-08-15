@@ -399,6 +399,20 @@
   @media(max-width:640px){ .pboard { grid-template-columns:1fr; } }
   .sectog { border:none; background:none; color:var(--on-surface-variant); opacity:.32; width:24px; height:24px; padding:0; margin-left:7px; cursor:pointer; display:inline-grid; place-items:center; vertical-align:middle; }
   .sectog:hover { opacity:.6; } .sectog .svic { width:16px; height:16px; }
+  /* 선행업무(종속) */
+  #view .card.blocked { opacity:.52; }
+  .wlock { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:#F0416B; background:#FCE7ED; border-radius:99px; padding:3px 10px; margin-top:6px; }
+  .dep-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .dep-chips:not(:empty) { margin-bottom:7px; }
+  .dep-chip { display:inline-flex; align-items:center; gap:6px; background:#EEE9FE; color:#6C5CE7; border-radius:99px; padding:5px 9px 5px 11px; font-size:12.5px; font-weight:700; }
+  .dep-chip .x { opacity:.55; cursor:pointer; font-weight:800; }
+  .dep-results { margin-top:6px; }
+  .dep-opt { display:flex; align-items:center; gap:9px; padding:10px 12px; font-size:13.5px; font-weight:600; cursor:pointer; border-radius:10px; }
+  .dep-opt:hover { background:var(--surface-high); }
+  .dep-opt.none { color:var(--on-surface-variant); cursor:default; }
+  .dep-oic { font-size:15px; }
+  .dep-ot { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--on-surface); }
+  .dep-otp { font-size:10.5px; font-weight:700; color:var(--on-surface-variant); background:var(--surface-high); border-radius:99px; padding:1px 8px; }
   .mcard { position:relative; overflow:hidden; background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); margin-bottom:.7rem; transition:box-shadow .15s, opacity .15s; }
   .mcard:hover { box-shadow:var(--lift-hi); }
   .mcard.dragging { box-shadow:var(--lift-hi); opacity:.9; }
@@ -649,6 +663,11 @@
 
   <div class="fld" id="blk_memo"><label id="lbl_memo">메모 (선택)</label>
     <textarea id="f_memo" placeholder="자세한 내용"></textarea></div>
+
+  <div class="fld" id="blk_deps" style="display:none"><label>🔗 선행업무 <span style="font-weight:600;color:var(--on-surface-variant)">— 이거 전에 끝낼 것 (종류 상관없이)</span></label>
+    <div id="depChips" class="dep-chips"></div>
+    <input type="text" id="depSearch" placeholder="선행으로 걸 업무 검색…" lang="ko" autocomplete="off">
+    <div id="depResults" class="dep-results"></div></div>
 
   <div id="blk_projsub">
     <div class="fld"><label>서브태스크 (지금 넣어도 되고 나중에 추가해도 돼요)</label>
@@ -1253,7 +1272,8 @@ function workCard(it){
   const b=it.bucket; let meta="";
   if(b==="deadline"){ const w=deadlineWhen(it), over=it.due&&it.due<todayStr()&&!it.done; if(w) meta+='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(w)+'</span>'; if(it.who) meta+='<span class="badge soft">'+svi('user')+' '+esc(it.who)+'</span>'; if(over) meta+=postBtn; }
   else if(b==="someday" && it.hope){ meta='<span class="badge soft">'+svi('moon')+' '+esc(HOPE[it.hope]||"")+'</span>'; }
-  return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
+  const blk=unmetDeps(it).length>0;
+  return '<div class="card'+(it.done?' done':'')+(blk?' blocked':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div>'+lockBadge(it)+'</div>'+actsH+'</div>';
 }
 function recurCard(it){
   return '<div class="card" data-id="'+it.id+'">'+dragH+'<div class="cal">'+svi('repeat')+'</div><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta"><span class="badge when">'+svi('repeat')+' '+esc(recurLabel(it))+'</span></div></div>'+actsH+'</div>';
@@ -1264,7 +1284,8 @@ function projectCard(p){
   if(p.due){ const allDone=subs.length>0 && doneN===subs.length; const over=p.due<todayStr() && !allDone;
     dm='<span class="badge due'+(over?' over':'')+'">'+svi('cal')+' '+esc(deadlineWhen(p))+'</span>'+(p.who?'<span class="badge soft">'+svi('user')+' '+esc(p.who)+'</span>':'')+(over?postBtn:''); }
   else if(p.hope){ dm='<span class="badge soft">'+svi('hourglass')+' '+esc(HOPE[p.hope]||"")+'</span>'; }
-  let html='<div class="card proj" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(dm?'<div class="meta">'+dm+'</div>':'')+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' '+svi('chevD'):' '+svi('chevR'))+'</div></div>'+actsH+'</div>';
+  const blk=unmetDeps(p).length>0;
+  let html='<div class="card proj'+(blk?' blocked':'')+'" data-id="'+p.id+'"><div class="proj-top">'+dragH+'<div class="body" data-act="toggle"><div class="title">'+svi('layers')+' '+esc(p.title)+'</div>'+(p.desc?'<div class="memo">'+esc(p.desc)+'</div>':'')+(dm?'<div class="meta">'+dm+'</div>':'')+lockBadge(p)+'<div class="prog">서브태스크 '+doneN+'/'+subs.length+(open?' '+svi('chevD'):' '+svi('chevR'))+'</div></div>'+actsH+'</div>';
   if(open){
     html+='<div class="proj-sub" data-proj="'+p.id+'">';
     html+=subs.map(s=>'<div class="sub'+(s.done?' done':'')+'" data-id="'+s.id+'"><span class="drag">'+svi('grip')+'</span><input type="checkbox" '+(s.done?'checked':'')+' data-sub="done"><span class="st" contenteditable="true" spellcheck="false">'+esc(s.title)+'</span><button class="x" type="button" data-sub="del">'+svi('trash')+'</button></div>').join("");
@@ -1334,6 +1355,7 @@ function configForm(){
   show("blk_goal", isGoal);
   show("blk_reminder", isRem);
   show("blk_projsub", isProj);
+  show("blk_deps", tab==="work" && type!=="recurring");
   show("blk_memo", true);
   $("lbl_title").textContent = isProj?"프로젝트 이름" : isGoal?"목표 이름" : isRoutine?"루틴 이름" : isRem?"리마인드 내용" : "제목";
   $("lbl_memo").textContent = isProj ? "설명 (선택)" : "메모 (선택)";
@@ -1346,6 +1368,7 @@ function configForm(){
 
 $("f_pkind").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
 $("f_bucket").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; curCtx.type=b.dataset.v; configForm(); updateSave(); });
+$("depSearch").addEventListener("input", e=>renderDepResults(e.target.value));
 $("f_chip").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickChip=b.dataset.v; selChips($("f_chip"),pickChip); if(pickChip) $("f_date").value=""; });
 $("f_date").addEventListener("input", ()=>{ if($("f_date").value){ pickChip=""; selChips($("f_chip"),""); } });
 $("a_tbd").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; pickTbd=b.dataset.v; selChips($("a_tbd"),pickTbd); $("a_timewrap").style.display=pickTbd==="tbd"?"none":"flex"; });
@@ -1392,7 +1415,9 @@ function openForm(ctx){
   $("g_start").value = it && ctx.type==="goal" && it.start ? it.start : ""; $("g_end").value = it && ctx.type==="goal" && it.end ? it.end : ""; $("g_per").value = it && ctx.type==="goal" && it.perDay ? it.perDay : "";
   $("r_date").value = it && ctx.type==="reminder" && it.date ? it.date : ""; $("r_end").value = it && ctx.type==="reminder" && it.endDate ? it.endDate : ""; $("r_lead").value = it && ctx.type==="reminder" && it.lead ? it.lead : "";
   draftSubs = (ctx.type==="project" && it && Array.isArray(it.subtasks)) ? it.subtasks.map(s=>({ id:s.id||uid(), title:s.title, done:!!s.done })) : [];
-  configForm(); renderDraft(); updateSave();
+  draftDeps = (ctx.tab==="work" && it && Array.isArray(it.deps)) ? it.deps.slice() : [];
+  if($("depSearch")) $("depSearch").value="";
+  configForm(); renderDraft(); renderDepChips(); renderDepResults(""); updateSave();
   $("ov").classList.add("on"); setTimeout(()=>$("f_title").focus(), 50);
 }
 function closeForm(){ $("ov").classList.remove("on"); curCtx.id=null; }
@@ -1412,13 +1437,13 @@ function buildItem(){
     if(type==="reminder") return { type:"reminder", title, memo, date:$("r_date").value, endDate:$("r_end").value, lead:(+$("r_lead").value||0), updated:now };
     return { type:"task", title, why, memo, dueChip:pickChip, due:pickChip?"":$("f_date").value, updated:now };
   }
-  if(type==="quick") return { bucket:"quick", title, memo, updated:now };
-  if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, updated:now };
+  if(type==="quick") return { bucket:"quick", title, memo, deps:draftDeps.slice(), updated:now };
+  if(type==="deadline") return { bucket:"deadline", title, memo, who:$("w_who").value.trim(), due:$("w_due").value, dtime:$("w_time").value, deps:draftDeps.slice(), updated:now };
   if(type==="recurring") return { bucket:"recurring", title, memo, wday:pickWday, updated:now };
-  if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, updated:now };
-  if(type==="project") return { bucket:"project", title, desc:memo, hope:$("p_due").value?"":pickHope, due:$("p_due").value, who:$("p_who").value.trim(), subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), updated:now };
+  if(type==="someday") return { bucket:"someday", title, memo, hope:pickHope, deps:draftDeps.slice(), updated:now };
+  if(type==="project") return { bucket:"project", title, desc:memo, hope:$("p_due").value?"":pickHope, due:$("p_due").value, who:$("p_who").value.trim(), subtasks:draftSubs.map(s=>({ id:s.id, title:s.title, done:!!s.done })), deps:draftDeps.slice(), updated:now };
 }
-const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","start","end","perDay","lead","memo","desc"];
+const KEYS = ["why","dueChip","due","date","endDate","time","endTime","timeTBD","who","place","dtime","wday","hope","target","start","end","perDay","lead","memo","desc","deps"];
 function saveForm(){
   if($("shsave").disabled) return;
   const data=buildItem();
@@ -1445,6 +1470,24 @@ function saveForm(){
   }
   closeForm(); save(); render();
 }
+
+/* ── 선행업무(종속) ── */
+let draftDeps=[];
+const WBK_ICON = { quick:"⚡", deadline:"📌", project:"📁", someday:"🌙", recurring:"🔁" };
+const WBK_NAME = { quick:"단발", deadline:"약속·마감", project:"프로젝트", someday:"백로그", recurring:"반복" };
+function allWorkTasks(){ const w=STORE.work||{}, out=[]; ["quick","deadline","project","someday"].forEach(b=>{ (w[b]||[]).forEach(it=> out.push({ id:it.id, title:it.title, bucket:b })); }); return out; }
+function workItemById(id){ const w=STORE.work||{}; for(const b of ["quick","deadline","project","someday","recurring"]){ const f=(w[b]||[]).find(x=>x.id===id); if(f) return Object.assign({ _bucket:b }, f); } return null; }
+function isItemDone(it){ if(!it) return false; if(it.done===true) return true; if(Array.isArray(it.subtasks) && it.subtasks.length && it.subtasks.every(s=>s.done)) return true; return false; }
+function unmetDeps(it){ return (it&&Array.isArray(it.deps)?it.deps:[]).map(id=>workItemById(id)).filter(d=>d && !isItemDone(d)); }
+function lockBadge(it){ const u=unmetDeps(it); if(!u.length) return ""; return '<div class="wlock">🔒 '+u.map(d=>esc(d.title)).join(", ")+' 먼저</div>'; }
+function renderDepChips(){ const box=$("depChips"); if(!box) return;
+  box.innerHTML = draftDeps.map(id=>{ const w=workItemById(id); const t=w?w.title:"(삭제됨)"; const ic=w?(WBK_ICON[w._bucket]||"📄"):"📄"; return '<span class="dep-chip">'+ic+' '+esc(t)+'<span class="x" data-dep="'+id+'">✕</span></span>'; }).join('');
+  box.querySelectorAll("[data-dep]").forEach(x=> x.addEventListener("click", ()=>{ draftDeps=draftDeps.filter(d=>d!==x.dataset.dep); renderDepChips(); renderDepResults($("depSearch")?$("depSearch").value:""); })); }
+function renderDepResults(q){ const box=$("depResults"); if(!box) return; q=(q||"").trim().toLowerCase();
+  if(!q){ box.innerHTML=""; return; }
+  const selfId=curCtx.id, list=allWorkTasks().filter(t=> t.id!==selfId && !draftDeps.includes(t.id) && (t.title||"").toLowerCase().includes(q)).slice(0,8);
+  box.innerHTML = list.length ? list.map(t=>'<div class="dep-opt" data-add="'+t.id+'"><span class="dep-oic">'+(WBK_ICON[t.bucket]||"📄")+'</span><span class="dep-ot">'+esc(t.title)+'</span><span class="dep-otp">'+(WBK_NAME[t.bucket]||"")+'</span></div>').join('') : '<div class="dep-opt none">검색 결과 없어요</div>';
+  box.querySelectorAll("[data-add]").forEach(o=> o.addEventListener("click", ()=>{ draftDeps.push(o.dataset.add); if($("depSearch")) $("depSearch").value=""; renderDepChips(); renderDepResults(""); })); }
 
 /* ═══ 돈관리 (계좌 + 거래, 잔액은 원화 기준) ═══ */
 const ACCT_COLORS = ["#F6A6A6","#F7C08A","#F3DE8A","#CDE88A","#A6E0A6","#8FE0D2","#8FD3F0","#9FB8F5","#B3A6F0","#D0A6EE","#F0A6D8","#F5A6BE"];
