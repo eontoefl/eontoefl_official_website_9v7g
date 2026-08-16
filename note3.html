@@ -362,6 +362,14 @@
   .dist-d { flex:0 0 auto; font-size:11.5px; color:var(--on-surface-variant); }
   .dist-a { flex:0 0 auto; font-weight:800; color:var(--danger); min-width:92px; text-align:right; }
   .dist-a.ok { color:#2f9e6b; }
+  .dist-split { font-size:12px; color:var(--on-surface-variant); font-weight:600; margin:2px 2px 12px; }
+  .dist-split b { font-weight:800; color:var(--on-surface); }
+  .dist-split .ds-short { color:#F0416B; } .dist-split .ds-ok { color:#0F9D6E; }
+  .dist-tags { flex:0 0 auto; display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+  .dtag { font-size:11px; font-weight:700; border-radius:99px; padding:3px 9px; white-space:nowrap; }
+  .dtag.m-ok { color:#0F9D6E; background:#E3F7F0; }
+  .dtag.m-short { color:#F0416B; background:#FDECEF; }
+  .dtag.next { color:#8a6d1e; background:#FEF3D6; }
   .dist-plan { background:var(--accent-lightest); border-radius:var(--r-lg); padding:.7rem .9rem; margin:.2rem 0 .7rem; }
   .dp-h { font-size:12px; font-weight:800; color:var(--accent-ink); margin-bottom:.4rem; }
   .dp-row { display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; padding:5px 0; font-size:13.5px; color:var(--on-surface); border-top:1px solid rgba(255,255,255,.5); }
@@ -2181,7 +2189,8 @@ function obligations(from, to){
   const res=[];
   const occ=(day, cb)=>{ let [Y,M]=from.split("-").map(Number); const [tY,tM]=to.split("-").map(Number); const dd=(!day||day>=32)?99:+day;
     while(Y<tY || (Y===tY && M<=tM)){ const d=ymd(Y,M,dd); if(d>=from && d<=to) cb(d); M++; if(M>12){M=1;Y++;} } };
-  (STORE.money.fixed||[]).forEach(f=> occ(f.day, d=> res.push({ date:d, amount:mnum(f.krw), acctId:f.acctId||"", type:"fixed", name:f.desc||"고정비" })));
+  (STORE.money.fixed||[]).forEach(f=>{ const ac=findAcct(f.acctId); if(hideSecret && ac && ac.secret) return;   // 숨김: 숨긴 계좌 결제분 제외
+    occ(f.day, d=> res.push({ date:d, amount:mnum(f.krw), acctId:f.acctId||"", type:"fixed", name:f.desc||"고정비" })); });
   mAccts().forEach(a=>{
     if(a.kind==="loan" && mnum(a.balance)>0 && Math.round(loanConfirmedMonthly(a,from))>0) occ(a.payDay, d=> res.push({ date:d, amount:Math.round(loanConfirmedMonthly(a,d)), acctId:a.payAcctId||"", type:"loan", name:(a.alias||"대출")+" 상환" }));
     else if(a.kind==="card" && a.payDay && a.payAcctId){ const stmt=Math.max(0,cardStatement(a)); if(stmt>0) occ(a.payDay, d=> res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" })); }
@@ -2263,11 +2272,17 @@ function confirmedBreakdown(){
 function distributeSectionHtml(){
   const targets=distTargets().sort((a,b)=>a.due.until-b.due.until);
   const totalNeed=targets.reduce((s,t)=>s+t.need,0);
+  const monthTot=monthUnsecured(), nextTot=Math.max(0,totalNeed-monthTot);
   let h='<div class="msec distcard"><div class="msec-h"><span class="mt">💧 배분 <em style="font-style:normal;font-weight:600;color:var(--on-surface-variant);font-size:11.5px">· 앞으로 한 달</em></span>'+(totalNeed>0?'<span class="msec-total">채울 것 '+fmtMoney(totalNeed,"KRW")+'</span>':'')+'</div>';
+  if(totalNeed>0) h+='<div class="dist-split">이번 달 '+(monthTot>0?('<b class="ds-short">'+fmtMoney(monthTot,"KRW")+'</b>'):'<b class="ds-ok">✅ 확보</b>')+' · 다음 달 <b>'+fmtMoney(nextTot,"KRW")+'</b></div>';
   h+='<div class="dist-in"><input type="text" id="distIncome" placeholder="들어온 금액 입력 (예: 5,000,000)" inputmode="numeric" autocomplete="off"><button type="button" id="distBtn">배분</button></div>';
   h+='<div id="distResult"></div>';
   if(targets.length){ h+='<div class="dist-board">';
-    targets.forEach(t=>{ h+='<div class="dist-row"><span class="dist-n">'+esc(t.acc.alias||"계좌")+(t.acc.conduit?' <em>통로</em>':'')+'</span><span class="dist-d">'+(t.due.day?('매달 '+t.due.day+'일'):'상시')+'</span><span class="dist-a'+(t.need>0?'':' ok')+'">'+(t.need>0?('−'+fmtMoney(t.need,"KRW")):'충분')+'</span></div>'; });
+    targets.forEach(t=>{ const mneed=Math.max(0,acctNeedInfo(t.acc,{month:true}).need), nneed=Math.max(0,t.need-mneed);
+      h+='<div class="dist-row"><span class="dist-n">'+esc(t.acc.alias||"계좌")+(t.acc.conduit?' <em>통로</em>':'')+'</span><span class="dist-tags">'+
+        '<span class="dtag '+(mneed>0?'m-short':'m-ok')+'">이번 달 '+(mneed>0?('−'+fmtMoney(mneed,"KRW")):'✅')+'</span>'+
+        (nneed>0?'<span class="dtag next">다음 달 −'+fmtMoney(nneed,"KRW")+'</span>':'')+
+        '</span></div>'; });
     h+='</div>'; }
   return h+'</div>';
 }
@@ -2281,7 +2296,7 @@ function runDistribute(){
   let h='<div class="dist-plan"><div class="dp-h">배분안 · 금액 눌러서 수정 가능</div>';
   if(!steps.length) h+='<div class="dp-row"><span>이번 달 채울 곳이 없어요 — 전부 여유</span><b>'+fmtMoney(income,"KRW")+'</b></div>';
   steps.forEach((s,i)=>{
-    const label = s.type==="acct" ? (esc(s.name)+(s.day?(' · '+s.day+'일 결제'):'')) : s.type==="emg" ? "비상금 채우기" : ("빚 갚기 — "+esc(s.name)+" "+s.rate+"%");
+    const label = s.type==="acct" ? esc(s.name) : s.type==="emg" ? "비상금 채우기" : ("빚 갚기 — "+esc(s.name)+" "+s.rate+"%");
     h+='<div class="dp-row"><span>'+ic[s.type]+' '+label+'</span><input class="dp-amt" data-i="'+i+'" value="'+fmtMoney(s.amount,"KRW").replace("₩","")+'" inputmode="numeric" autocomplete="off"></div>';
   });
   if(leftover>0) h+='<div class="dp-row leftover"><span>💰 남는 여유돈</span><b>'+fmtMoney(leftover,"KRW")+'</b></div>';
