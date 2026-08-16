@@ -2633,10 +2633,8 @@ function renderDayRows(){
   box.innerHTML = dayRows.map((r,i)=>'<div class="dl-row" data-i="'+i+'">'+
     '<div class="dr-top"><input class="dr-amt" inputmode="numeric" placeholder="금액" autocomplete="off" value="'+esc(r.amt||"")+'">'+
     '<select class="dr-acct">'+accs.map(a=>'<option value="'+a.id+'"'+(a.id===r.acctId?' selected':'')+'>'+esc(a.alias)+'</option>').join('')+'</select>'+
-    '<div class="dr-dir"><button type="button" data-dir="out"'+(r.dir!=="in"?' class="on"':'')+'>지출</button><button type="button" data-dir="in"'+(r.dir==="in"?' class="on"':'')+'>입금</button></div>'+
     '<button type="button" class="dr-x">✕</button></div>'+
     '<input class="dr-desc" placeholder="내용 (선택)" lang="ko" autocomplete="off" value="'+esc(r.desc||"")+'"></div>').join('');
-  box.querySelectorAll('.dr-dir button').forEach(b=> b.addEventListener('click', ()=>{ b.parentNode.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
   box.querySelectorAll('.dr-x').forEach(b=> b.addEventListener('click', ()=>{ syncDayRows(); dayRows.splice(+b.closest('.dl-row').dataset.i,1); renderDayRows(); renderDayChips(); }));
   box.querySelectorAll('.dr-amt').forEach(el=> el.addEventListener('input', ()=>{ el.value=commaFmt(el.value); syncDayRows(); renderDayChips(); }));
   box.querySelectorAll('.dr-acct').forEach(el=> el.addEventListener('change', ()=>{ syncDayRows(); renderDayChips(); }));
@@ -2646,7 +2644,7 @@ function syncDayRows(){
     amt:(r.querySelector('.dr-amt').value||"").replace(/[^0-9]/g,""),
     desc:(r.querySelector('.dr-desc').value||"").trim(),
     acctId:r.querySelector('.dr-acct').value,
-    dir:(r.querySelector('.dr-dir .on')||{dataset:{dir:'out'}}).dataset.dir
+    dir:'out'
   }));
 }
 function addDayRow(){ syncDayRows(); const accs=dTracked(), pend=accs.find(a=>chipStatus(a.id)==='pending'); dayRows.push({ amt:"", desc:"", acctId:(pend||accs[0]||{}).id||"", dir:"out" }); renderDayRows(); renderDayChips(); setTimeout(()=>{ const rs=document.querySelectorAll('#dayRows .dr-amt'); if(rs.length) rs[rs.length-1].focus(); },30); }
