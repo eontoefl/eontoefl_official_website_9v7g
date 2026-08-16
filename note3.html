@@ -431,6 +431,8 @@
   .mt-bar { height:6px; border-radius:99px; background:#EDECF4; overflow:hidden; margin-top:10px; }
   .mt-bar span { display:block; height:100%; border-radius:99px; }
   .mt-m { font-size:10.5px; color:#9A9AB0; margin-top:8px; font-weight:500; }
+  .mt-conf { font-size:12px; font-weight:800; }
+  .mt-conf.ok { color:#0F9D6E; } .mt-conf.short { color:#F0416B; }
   .mt-chip { display:inline-block; margin-top:7px; font-size:10.5px; font-weight:700; border-radius:8px; padding:3px 8px; }
   .mt-chip.warn { color:#C7361B; background:#FDEAE4; }
   .mt-chip.ok { color:#0F9D6E; background:#E3F7F0; }
@@ -2063,15 +2065,16 @@ function moneyView(){
   const returnLoans=accts.filter(a=>a.kind==="loan" && a.returnAtMaturity).reduce((s,a)=>s+mnum(a.balance),0);
   const net=assets+illiquid-debt;
   const confMonthly = (STORE.money.fixed||[]).reduce((s,f)=>s+mnum(f.krw),0) + accts.filter(a=>a.kind==="loan").reduce((s,a)=>s+loanConfirmedMonthly(a, todayStr()), 0) + accts.filter(a=>a.kind==="account").reduce((s,a)=>s+mnum(a.budget),0);
-  const cb=confirmedBreakdown(), cpct=cb.total>0?Math.round(cb.paid/cb.total*100):0;
-  const unsec=monthUnsecured();   // 이번 달 미확보(카드용). 배분은 별도 롤링.
+  const cb=confirmedBreakdown();
+  const unsec=monthUnsecured();   // 이번 달 미확보
+  const secPct=cb.total>0?Math.round((cb.total-unsec)/cb.total*100):100;   // 확보율
   const emg=STORE.money.emergency||{goal:2000000,tx:[]}, esaved=(emg.tx||[]).reduce((s,t)=>s+mnum(t.amount),0), egoal=mnum(emg.goal), epct=egoal>0?Math.min(100,Math.round(esaved/egoal*100)):0;
   const MM=(+todayStr().slice(5,7));
   html+='<div class="mhero"><div class="mh-k">순자산</div><div class="mh-v">'+fmtMoney(net,"KRW")+'</div>'+
     '<div class="mh-m">현금성 '+fmtMoney(assets,"KRW")+(illiquid>0?' · 내 지분 '+fmtMoney(illiquid,"KRW"):'')+'</div>'+
     '<div class="mh-tags"><span class="mh-tag">💵 자산 '+fmtMoney(assets+illiquid,"KRW")+'</span><span class="mh-tag">📉 부채 '+fmtMoney(debt,"KRW")+'</span></div></div>';
   html+='<div class="mtiles">'+
-    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+cpct+'%;background:#F5A524"></span></div><div class="mt-m">이미 냄 '+cpct+'% · 남음 '+fmtMoney(cb.remain,"KRW")+'</div>'+(cb.remain>0?'<div class="mt-chip '+(unsec>0?'warn':'ok')+'" title="이번 달 확정지출 중 통장에 아직 없는 돈">'+(unsec>0?('미확보 '+fmtMoney(unsec,"KRW")):'✓ 통장에 다 있음')+'</div>':'')+'</div>'+
+    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+secPct+'%;background:#0FB981"></span></div><div class="mt-m mt-conf '+(unsec>0?'short':'ok')+'">'+(unsec>0?('⚠ 미확보 '+fmtMoney(unsec,"KRW")):'✅ 다 확보됨')+'</div></div>'+
     '<div class="mtile tap" id="emgTile"><div class="mt-ic violet">🛟</div><div class="mt-k">비상금</div><div class="mt-v">'+fmtMoney(esaved,"KRW")+' <small>/ '+fmtMoney(egoal,"KRW")+'</small></div><div class="mt-bar"><span style="width:'+epct+'%;background:#6C5CE7"></span></div><div class="mt-m">'+(egoal>0&&esaved>=egoal?'목표 달성 🎉':'채우기 먼저 · '+fmtMoney(Math.max(0,egoal-esaved),"KRW")+' 남음')+'</div></div>'+
     '<div class="mtile"><div class="mt-ic rose">🔻</div><div class="mt-k">실부담 부채</div><div class="mt-v rose">'+fmtMoney(debt,"KRW")+'</div><div class="mt-bar"><span style="width:100%;background:#F0416B"></span></div><div class="mt-m">마통·대출 (전세 제외)</div></div>'+
     '</div>';
