@@ -594,6 +594,22 @@
   .dr-x { border:none; background:transparent; color:var(--on-surface-variant); font-weight:800; cursor:pointer; padding:4px 6px; flex-shrink:0; }
   .dr-desc { width:100%; margin-top:7px; background:var(--field); border:none; border-radius:10px; padding:10px 12px; font-family:inherit; font-size:13.5px; color:var(--on-surface); outline:none; }
   .dl-addrow { width:100%; border:1.5px dashed var(--outline,#D9D7E6); background:transparent; color:var(--accent-strong); border-radius:11px; padding:11px; font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; margin-bottom:6px; }
+  .dl-guide { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--on-surface-variant); margin:8px 2px 10px; }
+  .dl-guide button { margin-left:auto; border:none; background:var(--surface-high); color:var(--on-surface-variant); border-radius:8px; padding:5px 11px; font-family:inherit; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0; }
+  .dl-chips { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:13px; }
+  .dchip { border:1.5px solid var(--outline,#DAD8E6); background:var(--surface-lowest); color:var(--on-surface); border-radius:99px; padding:8px 13px; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .dchip:hover { border-color:var(--accent-strong); }
+  .dchip .dc-ic { color:#fff; background:#0FB981; width:16px; height:16px; border-radius:50%; display:inline-grid; place-items:center; font-size:10px; }
+  .dchip.rec { border-color:#8fe0c6; background:#E3F7F0; color:#0b7a58; }
+  .dchip.skip { border-style:dashed; color:var(--on-surface-variant); background:var(--surface-low); }
+  .dchip.skip .dc-ic { background:var(--on-surface-variant); }
+  .dchip .dc-sk { font-size:10.5px; font-weight:600; opacity:.85; }
+  .chipmenu { position:fixed; z-index:80; display:none; min-width:172px; background:var(--surface-lowest); border-radius:12px; box-shadow:0 12px 34px rgba(26,26,46,.2); padding:6px; }
+  .chipmenu.on { display:block; }
+  .chipmenu .cm-h { font-size:12px; font-weight:800; color:var(--on-surface); padding:6px 8px 4px; }
+  .chipmenu button { display:block; width:100%; text-align:left; border:none; background:transparent; border-radius:8px; padding:10px; font-family:inherit; font-size:13.5px; font-weight:600; color:var(--on-surface); cursor:pointer; }
+  .chipmenu button:hover { background:var(--surface-high); }
+  .chipmenu .cm-note { font-size:11.5px; color:#0b7a58; padding:6px 10px; font-weight:700; }
   .tx-r { text-align:right; white-space:nowrap; flex-shrink:0; }
   .tx-amt { font-size:13.5px; font-weight:700; }
   .tx-amt.in { color:#2f8f6b; }
@@ -913,7 +929,8 @@
 <!-- 매일 돈기록 -->
 <div class="ov" id="ovday"><div class="sheet">
   <div class="sh-top"><h3 id="dayTitle">기록</h3><span id="dayProg" class="dl-prog"></span></div>
-  <label class="dl-nospend"><input type="checkbox" id="dayNoSpend"><span>이 날은 한푼도 안 썼어요</span></label>
+  <div class="dl-guide"><span>이 6개를 모두 처리해요 — 기록하거나 · 안 씀</span><button type="button" id="daySkipAll">전부 안 씀</button></div>
+  <div id="dayChips" class="dl-chips"></div>
   <div id="dayRows"></div>
   <button type="button" id="dayAddRow" class="dl-addrow">+ 줄 추가</button>
   <div class="row">
@@ -921,6 +938,7 @@
     <button type="button" class="save" id="daySave">기록하기</button>
   </div>
 </div></div>
+<div id="chipMenu" class="chipmenu"></div>
 
 <!-- 고정비 폼 -->
 <div class="ov" id="ovfix"><div class="sheet">
@@ -2563,34 +2581,65 @@ function moneyBacklog(){
   for(let d=start; d<=today && days.length<40; d=shiftDay(d,1)){ if(!(dl[d] && dl[d].closed)) days.push(d); }
   return days;
 }
-let dayLogDate=null, dayRows=[];
+let dayLogDate=null, dayRows=[], daySkip=new Set();
 function openDayLog(date){
   const bl=moneyBacklog(); if(!bl.length){ closeDay(); return; }
   dayLogDate = (date && bl.includes(date)) ? date : bl[0];
-  dayRows = [{ amt:"", desc:"", acctId:(dTracked()[0]||{}).id||"", dir:"out" }];
-  $("dayNoSpend").checked=false;
-  renderDayHead(); renderDayRows();
+  dayRows=[]; daySkip=new Set();
+  renderDayHead(); renderDayChips(); renderDayRows();
   $("ovday").classList.add("on");
-  setTimeout(()=>{ const el=document.querySelector('#dayRows .dr-amt'); if(el) el.focus(); },60);
 }
 function renderDayHead(){
   const d=new Date(dayLogDate+"T12:00:00"), bl=moneyBacklog(), pos=bl.indexOf(dayLogDate);
   $("dayTitle").textContent = (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+") 기록";
   $("dayProg").textContent = bl.length>1 ? ((pos>=0?pos+1:1)+" / "+bl.length+"일") : "";
 }
+function chipStatus(id){ if(daySkip.has(id)) return 'skip'; if(dayRows.some(r=>r.acctId===id && mnum(r.amt)>0)) return 'rec'; return 'pending'; }
+function renderDayChips(){
+  const box=$("dayChips"); if(!box) return;
+  box.innerHTML = dTracked().map(a=>{ const st=chipStatus(a.id);
+    return '<button type="button" class="dchip '+st+'" data-cid="'+a.id+'">'+((st==='rec'||st==='skip')?'<span class="dc-ic">✓</span>':'')+esc(a.alias)+(st==='skip'?' <span class="dc-sk">안 씀</span>':'')+'</button>';
+  }).join('');
+  box.querySelectorAll('.dchip').forEach(c=> c.addEventListener('click', (e)=>{ e.stopPropagation(); openChipMenu(c); }));
+}
+function openChipMenu(chip){
+  const id=chip.dataset.cid, st=chipStatus(id), m=$("chipMenu");
+  const acc=(STORE.money.accounts||[]).find(a=>a.id===id);
+  let btns;
+  if(st==='pending') btns='<button type="button" data-cm="rec">＋ 이 계좌로 기록</button><button type="button" data-cm="skip">✕ 오늘 안 씀</button>';
+  else if(st==='skip') btns='<button type="button" data-cm="unskip">↩ 안 씀 취소</button>';
+  else btns='<button type="button" data-cm="rec">＋ 한 줄 더</button><div class="cm-note">✓ 이미 기록됨</div>';
+  m.innerHTML='<div class="cm-h">'+esc(acc?acc.alias:"")+'</div>'+btns;
+  const r=chip.getBoundingClientRect(), mw=190;
+  m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-mw-8))+'px';
+  m.style.top=(r.bottom+6)+'px';
+  m.classList.add('on');
+  m.querySelectorAll('[data-cm]').forEach(b=> b.addEventListener('click', ()=>{ chipAction(id, b.dataset.cm); closeChipMenu(); }));
+}
+function closeChipMenu(){ $("chipMenu").classList.remove('on'); }
+function chipAction(id, act){
+  if(act==='skip'){ daySkip.add(id); renderDayChips(); }
+  else if(act==='unskip'){ daySkip.delete(id); renderDayChips(); }
+  else if(act==='rec'){ daySkip.delete(id); syncDayRows();
+    let idx=dayRows.findIndex(r=>r.acctId===id && !mnum(r.amt));
+    if(idx<0){ dayRows.push({ amt:"", desc:"", acctId:id, dir:"out" }); idx=dayRows.length-1; }
+    renderDayRows(); renderDayChips();
+    setTimeout(()=>{ const rows=document.querySelectorAll('#dayRows .dl-row'); const el=rows[idx]&&rows[idx].querySelector('.dr-amt'); if(el) el.focus(); },30);
+  }
+}
+function daySkipAll(){ dTracked().forEach(a=>{ if(chipStatus(a.id)==='pending') daySkip.add(a.id); }); renderDayChips(); }
 function renderDayRows(){
-  const ns=$("dayNoSpend").checked, box=$("dayRows");
-  box.style.display = ns?'none':''; $("dayAddRow").style.display = ns?'none':'';
-  const accs=dTracked();
+  const box=$("dayRows"), accs=dTracked();
   box.innerHTML = dayRows.map((r,i)=>'<div class="dl-row" data-i="'+i+'">'+
     '<div class="dr-top"><input class="dr-amt" inputmode="numeric" placeholder="금액" autocomplete="off" value="'+esc(r.amt||"")+'">'+
     '<select class="dr-acct">'+accs.map(a=>'<option value="'+a.id+'"'+(a.id===r.acctId?' selected':'')+'>'+esc(a.alias)+'</option>').join('')+'</select>'+
     '<div class="dr-dir"><button type="button" data-dir="out"'+(r.dir!=="in"?' class="on"':'')+'>지출</button><button type="button" data-dir="in"'+(r.dir==="in"?' class="on"':'')+'>입금</button></div>'+
-    (dayRows.length>1?'<button type="button" class="dr-x">✕</button>':'')+'</div>'+
+    '<button type="button" class="dr-x">✕</button></div>'+
     '<input class="dr-desc" placeholder="내용 (선택)" lang="ko" autocomplete="off" value="'+esc(r.desc||"")+'"></div>').join('');
   box.querySelectorAll('.dr-dir button').forEach(b=> b.addEventListener('click', ()=>{ b.parentNode.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
-  box.querySelectorAll('.dr-x').forEach(b=> b.addEventListener('click', ()=>{ syncDayRows(); dayRows.splice(+b.closest('.dl-row').dataset.i,1); renderDayRows(); }));
-  box.querySelectorAll('.dr-amt').forEach(el=> el.addEventListener('input', ()=>{ el.value=commaFmt(el.value); }));
+  box.querySelectorAll('.dr-x').forEach(b=> b.addEventListener('click', ()=>{ syncDayRows(); dayRows.splice(+b.closest('.dl-row').dataset.i,1); renderDayRows(); renderDayChips(); }));
+  box.querySelectorAll('.dr-amt').forEach(el=> el.addEventListener('input', ()=>{ el.value=commaFmt(el.value); syncDayRows(); renderDayChips(); }));
+  box.querySelectorAll('.dr-acct').forEach(el=> el.addEventListener('change', ()=>{ syncDayRows(); renderDayChips(); }));
 }
 function syncDayRows(){
   dayRows = [...document.querySelectorAll('#dayRows .dl-row')].map(r=>({
@@ -2600,25 +2649,22 @@ function syncDayRows(){
     dir:(r.querySelector('.dr-dir .on')||{dataset:{dir:'out'}}).dataset.dir
   }));
 }
-function addDayRow(){ syncDayRows(); dayRows.push({ amt:"", desc:"", acctId:(dTracked()[0]||{}).id||"", dir:"out" }); renderDayRows(); setTimeout(()=>{ const rs=document.querySelectorAll('#dayRows .dr-amt'); if(rs.length) rs[rs.length-1].focus(); },30); }
+function addDayRow(){ syncDayRows(); const accs=dTracked(), pend=accs.find(a=>chipStatus(a.id)==='pending'); dayRows.push({ amt:"", desc:"", acctId:(pend||accs[0]||{}).id||"", dir:"out" }); renderDayRows(); renderDayChips(); setTimeout(()=>{ const rs=document.querySelectorAll('#dayRows .dr-amt'); if(rs.length) rs[rs.length-1].focus(); },30); }
 function saveDayLog(){
   if(!dayLogDate) return;
-  const dl = STORE.money.dayLog = STORE.money.dayLog || {};
-  if($("dayNoSpend").checked){ dl[dayLogDate]={ closed:true, noSpend:true }; }
-  else {
-    syncDayRows();
-    const valid=dayRows.filter(r=>mnum(r.amt)>0);
-    if(!valid.length){ alert("금액을 입력하거나 '이 날은 한푼도 안 썼어요'를 체크해주세요."); return; }
-    valid.forEach(r=>{ const a=(STORE.money.accounts||[]).find(x=>x.id===r.acctId); if(!a) return; if(!Array.isArray(a.tx)) a.tx=[];
-      a.tx.push({ id:uid(), created:Date.now(), date:dayLogDate, dir:r.dir==="in"?"in":"out", cur:"KRW", krw:mnum(r.amt), desc:r.desc||"", note:"", m:1 }); });
-    dl[dayLogDate]={ closed:true, noSpend:false };
-  }
+  syncDayRows();
+  const pending=dTracked().filter(a=>chipStatus(a.id)==='pending');
+  if(pending.length){ alert("아직 처리 안 한 계좌가 있어요:\n\n"+pending.map(a=>"· "+a.alias).join("\n")+"\n\n각 계좌를 눌러 '이 계좌로 기록' 또는 '오늘 안 씀'으로 처리해주세요."); return; }
+  const dl=STORE.money.dayLog=STORE.money.dayLog||{};
+  dayRows.filter(r=>mnum(r.amt)>0).forEach(r=>{ const a=(STORE.money.accounts||[]).find(x=>x.id===r.acctId); if(!a) return; if(!Array.isArray(a.tx)) a.tx=[];
+    a.tx.push({ id:uid(), created:Date.now(), date:dayLogDate, dir:r.dir==="in"?"in":"out", cur:"KRW", krw:mnum(r.amt), desc:r.desc||"", note:"", m:1 }); });
+  dl[dayLogDate]={ closed:true };
   save();
   const bl=moneyBacklog();
   if(bl.length) openDayLog(bl[0]); else closeDay();
   render();
 }
-function closeDay(){ $("ovday").classList.remove("on"); }
+function closeDay(){ closeChipMenu(); $("ovday").classList.remove("on"); }
 function renderMoneyFloat(){
   const el=$("moneyFloat"); if(!el) return;
   const bl=moneyBacklog();
@@ -2886,7 +2932,8 @@ $("moneyFloat").addEventListener("click", ()=>openDayLog());
 $("dayAddRow").addEventListener("click", addDayRow);
 $("daySave").addEventListener("click", saveDayLog);
 $("dayCancel").addEventListener("click", closeDay);
-$("dayNoSpend").addEventListener("change", renderDayRows);
+$("daySkipAll").addEventListener("click", daySkipAll);
+document.addEventListener("click", e=>{ if($("chipMenu").classList.contains("on") && !e.target.closest("#chipMenu") && !e.target.closest(".dchip")) closeChipMenu(); });
 overlayDismiss("ovday", closeDay);
 attachThousands($("ac_start")); attachThousands($("ac_budget")); attachThousands($("ac_odlimit")); attachThousands($("as_value")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
 attachThousands($("lo_monthly")); attachThousands($("rp_amount"));
