@@ -2211,14 +2211,20 @@ function obligations(from, to){
 // opts.month=true면 "이번 달"만(카드/타일용), 기본은 "오늘~한 달 롤링"(배분용)
 function acctNeedInfo(acc, opts){
   const t=todayStr(), mk=t.slice(0,7), month=!!(opts&&opts.month);
-  const to = month ? monthWindow().mend : addMonth(t);
-  let upcoming=0;
-  obligations(shiftDay(t,1), to).forEach(o=>{ if(o.acctId===acc.id) upcoming+=o.amount; });
-  const bg=mnum(acc.budget);            // 생활비: 롤링=1달치 유지 / 이번달=이달 남은 예산
-  const budgetNeed = bg>0 ? (month ? Math.max(0, bg-budgetSpent(acc,mk)) : bg) : 0;
-  const totalNeed=upcoming+budgetNeed;
+  const w=monthWindow(), wn=monthAheadWindow();
+  const bg=mnum(acc.budget);
   const bal=acc.conduit ? (acc.tx||[]).filter(x=>x.dir==="in" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0) : acctBalance(acc);
-  return { totalNeed, need:Math.max(0,totalNeed-bal), bal };
+  // 이번 달: 내일~이달말 확정분 + (생활비면 이달 남은 예산). 잔액이 먼저 여기를 덮는다.
+  let tmObl=0; obligations(shiftDay(t,1), w.mend).forEach(o=>{ if(o.acctId===acc.id) tmObl+=o.amount; });
+  const tmGross = tmObl + (bg>0 ? Math.max(0, bg-budgetSpent(acc,mk)) : 0);
+  const thisMonth = Math.max(0, tmGross - bal);
+  if(month) return { totalNeed:tmGross, need:thisMonth, bal, thisMonth, nextMonth:0 };
+  // 다음 달: 다음달 확정분 + (생활비면 1달치 통째). 이번 달 쓰고 "남은" 잔액만 넘어온다(0이면 통째 필요).
+  let nmObl=0; obligations(wn.mstart, wn.mend).forEach(o=>{ if(o.acctId===acc.id) nmObl+=o.amount; });
+  const nmGross = nmObl + (bg>0 ? bg : 0);
+  const leftBal = Math.max(0, bal - tmGross);
+  const nextMonth = Math.max(0, nmGross - leftBal);
+  return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth };
 }
 function monthUnsecured(){ return mAccts().filter(a=>a.kind==="account"&&!a.overdraft).reduce((s,a)=>s+acctNeedInfo(a,{month:true}).need,0); }
 function acctNextDue(acc){
@@ -2289,11 +2295,13 @@ function monthAheadCard(){
   mAccts().filter(a=>a.kind==="account" && !a.overdraft).forEach(a=>{
     const bg=mnum(a.budget);
     const bal=a.conduit?(a.tx||[]).filter(x=>x.dir==="in"&&String(x.date||"").slice(0,7)===w0.mk).reduce((s,x)=>s+mnum(x.krw),0):acctBalance(a);
+    // 이번 달 몫(내일~이달말 + 이달 남은 예산)을 잔액이 먼저 덮고, 남은 잔액만 9월로 넘긴다.
     let augObl=0; obligations(shiftDay(t,1), w0.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) augObl+=o.amount; });
-    const augNeed=Math.max(0,(augObl+(bg>0?Math.max(0,bg-budgetSpent(a,w0.mk)):0))-bal);
-    let cumObl=0; obligations(shiftDay(t,1), wn.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) cumObl+=o.amount; });
-    const cumNeed=Math.max(0,(cumObl+(bg>0?bg:0))-bal);
-    unsec += Math.max(0, cumNeed-augNeed);
+    const augGross=augObl+(bg>0?Math.max(0,bg-budgetSpent(a,w0.mk)):0);
+    const leftBal=Math.max(0, bal-augGross);
+    let sepObl=0; obligations(wn.mstart, wn.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) sepObl+=o.amount; });
+    const sepGross=sepObl+(bg>0?bg:0);
+    unsec += Math.max(0, sepGross-leftBal);
   });
   return { total:Math.round(total), unsec:Math.round(unsec), MM:wn.MM };
 }
@@ -2308,7 +2316,7 @@ function distributeSectionHtml(){
   const targets=distTargets().sort((a,b)=>a.due.until-b.due.until);
   const totalNeed=targets.reduce((s,t)=>s+t.need,0);
   const monthTot=monthUnsecured(), nextTot=Math.max(0,totalNeed-monthTot);
-  let h='<div class="msec distcard"><div class="msec-h"><span class="mt">💧 배분 <em style="font-style:normal;font-weight:600;color:var(--on-surface-variant);font-size:11.5px">· 앞으로 한 달</em></span>'+(totalNeed>0?'<span class="msec-total">채울 것 '+fmtMoney(totalNeed,"KRW")+'</span>':'')+'</div>';
+  let h='<div class="msec distcard"><div class="msec-h"><span class="mt">💧 배분 <em style="font-style:normal;font-weight:600;color:var(--on-surface-variant);font-size:11.5px">· 이번 달 + 다음 달</em></span>'+(totalNeed>0?'<span class="msec-total">채울 것 '+fmtMoney(totalNeed,"KRW")+'</span>':'')+'</div>';
   if(totalNeed>0) h+='<div class="dist-split">이번 달 '+(monthTot>0?('<b class="ds-short">'+fmtMoney(monthTot,"KRW")+'</b>'):'<b class="ds-ok">✅ 확보</b>')+' · 다음 달 <b>'+fmtMoney(nextTot,"KRW")+'</b></div>';
   h+='<div class="dist-in"><input type="text" id="distIncome" placeholder="들어온 금액 입력 (예: 5,000,000)" inputmode="numeric" autocomplete="off"><button type="button" id="distBtn">배분</button></div>';
   h+='<div id="distResult"></div>';
