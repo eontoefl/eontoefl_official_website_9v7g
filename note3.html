@@ -2063,7 +2063,7 @@ function moneyView(){
     '<div class="mh-m">현금성 '+fmtMoney(assets,"KRW")+(illiquid>0?' · 내 지분 '+fmtMoney(illiquid,"KRW"):'')+'</div>'+
     '<div class="mh-tags"><span class="mh-tag">💵 자산 '+fmtMoney(assets+illiquid,"KRW")+'</span><span class="mh-tag">📉 부채 '+fmtMoney(debt,"KRW")+'</span></div></div>';
   html+='<div class="mtiles">'+
-    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+cpct+'%;background:#F5A524"></span></div><div class="mt-m">이미 냄 '+cpct+'% · 남음 '+fmtMoney(cb.remain,"KRW")+'</div>'+(cb.remain>0?'<div class="mt-chip '+(unsec>0?'warn':'ok')+'">'+(unsec>0?('미확보 '+fmtMoney(unsec,"KRW")):'✓ 통장에 다 있음')+'</div>':'')+'</div>'+
+    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+cpct+'%;background:#F5A524"></span></div><div class="mt-m">이미 냄 '+cpct+'% · 남음 '+fmtMoney(cb.remain,"KRW")+'</div>'+(cb.total>0?'<div class="mt-chip '+(unsec>0?'warn':'ok')+'" title="앞으로 한 달 배분에서 채워야 할 돈">'+(unsec>0?('채울 것 '+fmtMoney(unsec,"KRW")):'✓ 통장에 다 있음')+'</div>':'')+'</div>'+
     '<div class="mtile tap" id="emgTile"><div class="mt-ic violet">🛟</div><div class="mt-k">비상금</div><div class="mt-v">'+fmtMoney(esaved,"KRW")+' <small>/ '+fmtMoney(egoal,"KRW")+'</small></div><div class="mt-bar"><span style="width:'+epct+'%;background:#6C5CE7"></span></div><div class="mt-m">'+(egoal>0&&esaved>=egoal?'목표 달성 🎉':'채우기 먼저 · '+fmtMoney(Math.max(0,egoal-esaved),"KRW")+' 남음')+'</div></div>'+
     '<div class="mtile"><div class="mt-ic rose">🔻</div><div class="mt-k">실부담 부채</div><div class="mt-v rose">'+fmtMoney(debt,"KRW")+'</div><div class="mt-bar"><span style="width:100%;background:#F0416B"></span></div><div class="mt-m">마통·대출 (전세 제외)</div></div>'+
     '</div>';
@@ -2175,17 +2175,26 @@ function loanDetailHtml(acc){
     '<div class="hint" style="padding:.55rem .2rem 0">매달 출금일에 위 금액이 자동 반영돼요. 여윳돈으로 원금을 더 갚으려면 "조기상환".</div></div>';
 }
 /* ── 계좌별 분배 (수입 들어오면 어디에 얼마) ── */
+function addMonth(d){ const dt=new Date(d+"T12:00:00"); dt.setMonth(dt.getMonth()+1); return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0"); }
+// 확정 지출의 단일 원천: 기간 [from,to] 안에 실제로 떨어지는 고정비·대출·카드 발생분(반복분은 그 기간의 발생일로 투영). 모든 확정지출 계산은 여기서 파생.
+function obligations(from, to){
+  const res=[];
+  const occ=(day, cb)=>{ let [Y,M]=from.split("-").map(Number); const [tY,tM]=to.split("-").map(Number); const dd=(!day||day>=32)?99:+day;
+    while(Y<tY || (Y===tY && M<=tM)){ const d=ymd(Y,M,dd); if(d>=from && d<=to) cb(d); M++; if(M>12){M=1;Y++;} } };
+  (STORE.money.fixed||[]).forEach(f=> occ(f.day, d=> res.push({ date:d, amount:mnum(f.krw), acctId:f.acctId||"", type:"fixed", name:f.desc||"고정비" })));
+  mAccts().forEach(a=>{
+    if(a.kind==="loan" && mnum(a.balance)>0 && Math.round(loanConfirmedMonthly(a,from))>0) occ(a.payDay, d=> res.push({ date:d, amount:Math.round(loanConfirmedMonthly(a,d)), acctId:a.payAcctId||"", type:"loan", name:(a.alias||"대출")+" 상환" }));
+    else if(a.kind==="card" && a.payDay && a.payAcctId){ const stmt=Math.max(0,cardStatement(a)); if(stmt>0) occ(a.payDay, d=> res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" })); }
+  });
+  return res;
+}
+// 계좌별 "앞으로 한 달 확보 필요" = (내일~한 달 뒤 이 계좌에서 나갈 확정분) + (생활비면 1달치) − 현재 잔액
 function acctNeedInfo(acc){
-  const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate(), mk=t.slice(0,7);
-  const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
-  let upcoming=0;   // 이번 달 아직 안 나간 것
-  (STORE.money.fixed||[]).forEach(f=>{ if(f.acctId===acc.id && due(f.day)>td) upcoming+=mnum(f.krw); });
-  mAccts().forEach(a=>{ if(a.payAcctId!==acc.id) return;
-    if(a.kind==="loan"){ if(due(a.payDay)>td) upcoming+=Math.round(loanConfirmedMonthly(a,t)); }
-    else if(a.kind==="card"){ if(due(a.payDay)>td) upcoming+=Math.max(0,cardStatement(a)); } });
-  const bg=mnum(acc.budget); let remBudget=0;
-  if(bg>0){ const spent=(acc.tx||[]).filter(x=>x.dir==="out" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0); remBudget=Math.max(0,bg-spent); }
-  const totalNeed=upcoming+remBudget;
+  const t=todayStr(), mk=t.slice(0,7);
+  let upcoming=0;
+  obligations(shiftDay(t,1), addMonth(t)).forEach(o=>{ if(o.acctId===acc.id) upcoming+=o.amount; });
+  const bg=mnum(acc.budget);            // 생활비 예산: 항상 1달치 유지 (예산 − 잔액)
+  const totalNeed=upcoming+(bg>0?bg:0);
   const bal=acc.conduit ? (acc.tx||[]).filter(x=>x.dir==="in" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0) : acctBalance(acc);
   return { totalNeed, need:Math.max(0,totalNeed-bal), bal };
 }
@@ -2225,35 +2234,28 @@ function distributionPlan(income){
   return { steps, leftover:Math.max(0,left) };
 }
 let confExpanded=false;
+function monthWindow(){ const t=todayStr(), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate(), mk=t.slice(0,7); return { mk, mstart:mk+"-01", mend:mk+"-"+String(last).padStart(2,"0") }; }
+function budgetSpent(a, mk){ return (a.tx||[]).filter(x=>x.dir==="out" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0); }
 function confirmedItems(){
-  const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate(), mk=t.slice(0,7);
-  const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
+  const t=todayStr(), w=monthWindow();
   const acc=id=>{ const x=(STORE.money.accounts||[]).find(y=>y.id===id); return x?(x.alias||"계좌"):"미지정"; };
-  const items=[];
-  (STORE.money.fixed||[]).forEach(f=>{ const d=due(f.day); items.push({ name:f.desc||"고정비", day:d, amount:mnum(f.krw), paid:d<=td, acct:acc(f.acctId) }); });
-  mAccts().forEach(a=>{
-    if(a.kind==="loan"){ const d=due(a.payDay); items.push({ name:(a.alias||"대출")+" 상환", day:d, amount:Math.round(loanConfirmedMonthly(a,t)), paid:d<=td, acct:acc(a.payAcctId) }); }
-    else if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=(a.tx||[]).filter(x=>x.dir==="out"&&String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0);
-      if(spent>0) items.push({ name:"생활비 (이미 쓴 것)", day:0, amount:Math.min(bg,spent), paid:true, acct:(a.alias||"생활비") });
-      if(bg-spent>0) items.push({ name:"생활비 (남은 예산)", day:99, amount:bg-spent, paid:false, acct:(a.alias||"생활비") }); }
-  });
+  const items=obligations(w.mstart, w.mend).filter(o=>o.type!=="card").map(o=>({ name:o.name, day:+o.date.slice(8), amount:o.amount, paid:o.date<=t, acct:acc(o.acctId) }));
+  mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=budgetSpent(a,w.mk);
+    if(spent>0) items.push({ name:"생활비 (이미 쓴 것)", day:0, amount:Math.min(bg,spent), paid:true, acct:(a.alias||"생활비") });
+    if(bg-spent>0) items.push({ name:"생활비 (남은 예산)", day:99, amount:bg-spent, paid:false, acct:(a.alias||"생활비") }); } });
   return items;
 }
 function confirmedBreakdown(){
-  const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate(), mk=t.slice(0,7);
-  const due=d=>{ d=+d; if(!d||d>=32) d=last; return d; };
+  const t=todayStr(), w=monthWindow();
   let paid=0, remain=0;
-  (STORE.money.fixed||[]).forEach(f=>{ const amt=mnum(f.krw); if(due(f.day)<=td) paid+=amt; else remain+=amt; });
-  mAccts().forEach(a=>{
-    if(a.kind==="loan"){ const amt=Math.round(loanConfirmedMonthly(a,t)); if(due(a.payDay)<=td) paid+=amt; else remain+=amt; }
-    else if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget); const spent=(a.tx||[]).filter(x=>x.dir==="out" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0); paid+=Math.min(bg,spent); remain+=Math.max(0,bg-spent); }
-  });
+  obligations(w.mstart, w.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.date<=t) paid+=o.amount; else remain+=o.amount; });
+  mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=budgetSpent(a,w.mk); paid+=Math.min(bg,spent); remain+=Math.max(0,bg-spent); } });
   return { paid, remain, total:paid+remain };
 }
 function distributeSectionHtml(){
   const targets=distTargets().sort((a,b)=>a.due.until-b.due.until);
   const totalNeed=targets.reduce((s,t)=>s+t.need,0);
-  let h='<div class="msec distcard"><div class="msec-h"><span class="mt">💧 이번 달 배분</span>'+(totalNeed>0?'<span class="msec-total">채울 것 '+fmtMoney(totalNeed,"KRW")+'</span>':'')+'</div>';
+  let h='<div class="msec distcard"><div class="msec-h"><span class="mt">💧 배분 <em style="font-style:normal;font-weight:600;color:var(--on-surface-variant);font-size:11.5px">· 앞으로 한 달</em></span>'+(totalNeed>0?'<span class="msec-total">채울 것 '+fmtMoney(totalNeed,"KRW")+'</span>':'')+'</div>';
   h+='<div class="dist-in"><input type="text" id="distIncome" placeholder="들어온 금액 입력 (예: 5,000,000)" inputmode="numeric" autocomplete="off"><button type="button" id="distBtn">배분</button></div>';
   h+='<div id="distResult"></div>';
   if(targets.length){ h+='<div class="dist-board">';
