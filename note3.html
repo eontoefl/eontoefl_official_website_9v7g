@@ -576,6 +576,24 @@
   .tx-l { flex:1; min-width:0; }
   .tx-desc { font-size:13.5px; color:var(--on-surface); word-break:break-word; }
   .tx-meta { font-size:11px; color:var(--on-surface-variant); margin-top:1px; }
+  /* 매일 돈기록 플로팅 + 모달 */
+  .mfloat { position:fixed; right:22px; bottom:22px; z-index:55; border:none; background:linear-gradient(135deg,#6A5AE0,#9B54DE); color:#fff; border-radius:99px; padding:13px 19px; font-family:inherit; font-size:13px; font-weight:800; box-shadow:0 12px 30px rgba(108,92,231,.42); cursor:pointer; animation:mfpulse 2.6s ease-in-out infinite; }
+  .mfloat:hover { filter:brightness(1.06); }
+  @keyframes mfpulse { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-4px); box-shadow:0 18px 36px rgba(108,92,231,.52); } }
+  @media(max-width:860px){ .mfloat { right:12px; bottom:12px; padding:11px 15px; font-size:12px; } }
+  .dl-prog { font-size:12px; font-weight:700; color:var(--on-surface-variant); margin-left:auto; }
+  .dl-nospend { display:flex; align-items:center; gap:9px; background:var(--surface-low); border-radius:12px; padding:11px 13px; font-size:13.5px; font-weight:700; cursor:pointer; margin:8px 0 12px; }
+  .dl-nospend input { width:18px; height:18px; accent-color:var(--accent-strong); }
+  .dl-row { background:var(--surface-low); border-radius:12px; padding:10px; margin-bottom:9px; }
+  .dr-top { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+  .dr-amt { flex:1 1 90px; min-width:80px; background:var(--field); border:none; border-radius:10px; padding:11px 12px; font-family:inherit; font-size:15px; font-weight:700; color:var(--on-surface); outline:none; }
+  .dr-acct { flex:1 1 100px; min-width:90px; background:var(--field); border:none; border-radius:10px; padding:11px 10px; font-family:inherit; font-size:13px; font-weight:600; color:var(--on-surface); outline:none; -webkit-appearance:none; appearance:none; }
+  .dr-dir { display:flex; background:var(--field); border-radius:10px; overflow:hidden; flex-shrink:0; }
+  .dr-dir button { border:none; background:transparent; padding:9px 11px; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--on-surface-variant); cursor:pointer; }
+  .dr-dir button.on { background:var(--accent-strong); color:#fff; }
+  .dr-x { border:none; background:transparent; color:var(--on-surface-variant); font-weight:800; cursor:pointer; padding:4px 6px; flex-shrink:0; }
+  .dr-desc { width:100%; margin-top:7px; background:var(--field); border:none; border-radius:10px; padding:10px 12px; font-family:inherit; font-size:13.5px; color:var(--on-surface); outline:none; }
+  .dl-addrow { width:100%; border:1.5px dashed var(--outline,#D9D7E6); background:transparent; color:var(--accent-strong); border-radius:11px; padding:11px; font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; margin-bottom:6px; }
   .tx-r { text-align:right; white-space:nowrap; flex-shrink:0; }
   .tx-amt { font-size:13.5px; font-weight:700; }
   .tx-amt.in { color:#2f8f6b; }
@@ -648,6 +666,7 @@
     <main class="content">
       <div id="view"></div>
       <p class="foot">eonfl.com/note3 · 김비서 v3</p>
+      <button type="button" id="moneyFloat" class="mfloat hide"></button>
     </main>
   </div>
 </div>
@@ -891,6 +910,18 @@
   </div>
 </div></div>
 
+<!-- 매일 돈기록 -->
+<div class="ov" id="ovday"><div class="sheet">
+  <div class="sh-top"><h3 id="dayTitle">기록</h3><span id="dayProg" class="dl-prog"></span></div>
+  <label class="dl-nospend"><input type="checkbox" id="dayNoSpend"><span>이 날은 한푼도 안 썼어요</span></label>
+  <div id="dayRows"></div>
+  <button type="button" id="dayAddRow" class="dl-addrow">+ 줄 추가</button>
+  <div class="row">
+    <button type="button" class="cancel" id="dayCancel">나중에</button>
+    <button type="button" class="save" id="daySave">기록하기</button>
+  </div>
+</div></div>
+
 <!-- 고정비 폼 -->
 <div class="ov" id="ovfix"><div class="sheet">
   <h3 id="fixTitle">새 고정비</h3>
@@ -1119,6 +1150,7 @@ function normalizeStore(){
   if(!STORE.money || typeof STORE.money!=="object" || Array.isArray(STORE.money)) STORE.money={ accounts:[] };
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
+  if(!STORE.money.dayLog || typeof STORE.money.dayLog!=="object" || Array.isArray(STORE.money.dayLog)) STORE.money.dayLog={};
   STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; });
 }
@@ -1171,6 +1203,7 @@ function render(){
   else if(TAB==="money"){ v.innerHTML=moneyView(); wireMoney(); }
   else v.innerHTML=soonView(TABNAME[TAB]);
   wireBtns();
+  renderMoneyFloat();
 }
 function soonView(name){ return '<div class="soon"><div class="big">'+svi('tools')+'</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
 
@@ -2517,6 +2550,83 @@ function openTx(acctId, txId){
   $("ovtx").classList.add("on"); setTimeout(()=>$("tx_desc").focus(),50);
 }
 function closeTx(){ $("ovtx").classList.remove("on"); mTxAcct=null; mTxEdit=null; }
+
+/* ── 매일 돈기록 알림 ── */
+const DTRACK = ["토스생활비","카뱅파랑이","카뱅노랑이","사업자계좌","신한카드","아멕스"];
+function dTracked(){ return (STORE.money.accounts||[]).filter(a=>DTRACK.includes(a.alias)); }
+function moneyBacklog(){
+  const today=todayStr(); const dl=STORE.money.dayLog||{};
+  let lastTx=""; dTracked().forEach(a=>(a.tx||[]).forEach(t=>{ if(t.date && t.date>lastTx) lastTx=t.date; }));
+  let start = lastTx ? shiftDay(lastTx,1) : today;
+  const floor = shiftDay(today,-30); if(start<floor) start=floor;
+  const days=[];
+  for(let d=start; d<=today && days.length<40; d=shiftDay(d,1)){ if(!(dl[d] && dl[d].closed)) days.push(d); }
+  return days;
+}
+let dayLogDate=null, dayRows=[];
+function openDayLog(date){
+  const bl=moneyBacklog(); if(!bl.length){ closeDay(); return; }
+  dayLogDate = (date && bl.includes(date)) ? date : bl[0];
+  dayRows = [{ amt:"", desc:"", acctId:(dTracked()[0]||{}).id||"", dir:"out" }];
+  $("dayNoSpend").checked=false;
+  renderDayHead(); renderDayRows();
+  $("ovday").classList.add("on");
+  setTimeout(()=>{ const el=document.querySelector('#dayRows .dr-amt'); if(el) el.focus(); },60);
+}
+function renderDayHead(){
+  const d=new Date(dayLogDate+"T12:00:00"), bl=moneyBacklog(), pos=bl.indexOf(dayLogDate);
+  $("dayTitle").textContent = (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+") 기록";
+  $("dayProg").textContent = bl.length>1 ? ((pos>=0?pos+1:1)+" / "+bl.length+"일") : "";
+}
+function renderDayRows(){
+  const ns=$("dayNoSpend").checked, box=$("dayRows");
+  box.style.display = ns?'none':''; $("dayAddRow").style.display = ns?'none':'';
+  const accs=dTracked();
+  box.innerHTML = dayRows.map((r,i)=>'<div class="dl-row" data-i="'+i+'">'+
+    '<div class="dr-top"><input class="dr-amt" inputmode="numeric" placeholder="금액" autocomplete="off" value="'+esc(r.amt||"")+'">'+
+    '<select class="dr-acct">'+accs.map(a=>'<option value="'+a.id+'"'+(a.id===r.acctId?' selected':'')+'>'+esc(a.alias)+'</option>').join('')+'</select>'+
+    '<div class="dr-dir"><button type="button" data-dir="out"'+(r.dir!=="in"?' class="on"':'')+'>지출</button><button type="button" data-dir="in"'+(r.dir==="in"?' class="on"':'')+'>입금</button></div>'+
+    (dayRows.length>1?'<button type="button" class="dr-x">✕</button>':'')+'</div>'+
+    '<input class="dr-desc" placeholder="내용 (선택)" lang="ko" autocomplete="off" value="'+esc(r.desc||"")+'"></div>').join('');
+  box.querySelectorAll('.dr-dir button').forEach(b=> b.addEventListener('click', ()=>{ b.parentNode.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }));
+  box.querySelectorAll('.dr-x').forEach(b=> b.addEventListener('click', ()=>{ syncDayRows(); dayRows.splice(+b.closest('.dl-row').dataset.i,1); renderDayRows(); }));
+  box.querySelectorAll('.dr-amt').forEach(el=> el.addEventListener('input', ()=>{ el.value=commaFmt(el.value); }));
+}
+function syncDayRows(){
+  dayRows = [...document.querySelectorAll('#dayRows .dl-row')].map(r=>({
+    amt:(r.querySelector('.dr-amt').value||"").replace(/[^0-9]/g,""),
+    desc:(r.querySelector('.dr-desc').value||"").trim(),
+    acctId:r.querySelector('.dr-acct').value,
+    dir:(r.querySelector('.dr-dir .on')||{dataset:{dir:'out'}}).dataset.dir
+  }));
+}
+function addDayRow(){ syncDayRows(); dayRows.push({ amt:"", desc:"", acctId:(dTracked()[0]||{}).id||"", dir:"out" }); renderDayRows(); setTimeout(()=>{ const rs=document.querySelectorAll('#dayRows .dr-amt'); if(rs.length) rs[rs.length-1].focus(); },30); }
+function saveDayLog(){
+  if(!dayLogDate) return;
+  const dl = STORE.money.dayLog = STORE.money.dayLog || {};
+  if($("dayNoSpend").checked){ dl[dayLogDate]={ closed:true, noSpend:true }; }
+  else {
+    syncDayRows();
+    const valid=dayRows.filter(r=>mnum(r.amt)>0);
+    if(!valid.length){ alert("금액을 입력하거나 '이 날은 한푼도 안 썼어요'를 체크해주세요."); return; }
+    valid.forEach(r=>{ const a=(STORE.money.accounts||[]).find(x=>x.id===r.acctId); if(!a) return; if(!Array.isArray(a.tx)) a.tx=[];
+      a.tx.push({ id:uid(), created:Date.now(), date:dayLogDate, dir:r.dir==="in"?"in":"out", cur:"KRW", krw:mnum(r.amt), desc:r.desc||"", note:"", m:1 }); });
+    dl[dayLogDate]={ closed:true, noSpend:false };
+  }
+  save();
+  const bl=moneyBacklog();
+  if(bl.length) openDayLog(bl[0]); else closeDay();
+  render();
+}
+function closeDay(){ $("ovday").classList.remove("on"); }
+function renderMoneyFloat(){
+  const el=$("moneyFloat"); if(!el) return;
+  const bl=moneyBacklog();
+  if(!bl.length){ el.classList.add("hide"); return; }
+  el.classList.remove("hide");
+  const past=bl.filter(d=>d<todayStr()).length;
+  el.innerHTML='<span class="mf-t">'+(past>0 ? ('💸 돈 기록 '+bl.length+'일 밀렸어요') : '💸 오늘 돈 기록하셨나요?')+'</span>';
+}
 function saveTx(){
   const a=findAcct(mTxAcct); if(!a) return;
   const desc=$("tx_desc").value.trim(); if(!desc){ $("tx_desc").focus(); return; }
@@ -2772,6 +2882,12 @@ $("txCancel").addEventListener("click", closeTx);
 $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
+$("moneyFloat").addEventListener("click", ()=>openDayLog());
+$("dayAddRow").addEventListener("click", addDayRow);
+$("daySave").addEventListener("click", saveDayLog);
+$("dayCancel").addEventListener("click", closeDay);
+$("dayNoSpend").addEventListener("change", renderDayRows);
+overlayDismiss("ovday", closeDay);
 attachThousands($("ac_start")); attachThousands($("ac_budget")); attachThousands($("ac_odlimit")); attachThousands($("as_value")); attachThousands($("tx_krw")); attachThousands($("fx_krw")); attachThousands($("lo_principal")); attachThousands($("lo_balance"));
 attachThousands($("lo_monthly")); attachThousands($("rp_amount"));
 $("rpCancel").addEventListener("click", closeRepay);
