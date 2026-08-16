@@ -2222,7 +2222,7 @@ function acctNeedInfo(acc, opts){
   // 다음 달: 다음달 확정분 + (생활비면 1달치 통째). 이번 달 쓰고 "남은" 잔액만 넘어온다(0이면 통째 필요).
   let nmObl=0; obligations(wn.mstart, wn.mend).forEach(o=>{ if(o.acctId===acc.id) nmObl+=o.amount; });
   const nmGross = nmObl + (bg>0 ? bg : 0);
-  const leftBal = Math.max(0, bal - tmGross);
+  const leftBal = acc.conduit ? 0 : Math.max(0, bal - tmGross); // 통로는 매달 새로 채워 내보내니 이월 잔액 없음
   const nextMonth = Math.max(0, nmGross - leftBal);
   return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth };
 }
@@ -2298,7 +2298,7 @@ function monthAheadCard(){
     // 이번 달 몫(내일~이달말 + 이달 남은 예산)을 잔액이 먼저 덮고, 남은 잔액만 9월로 넘긴다.
     let augObl=0; obligations(shiftDay(t,1), w0.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) augObl+=o.amount; });
     const augGross=augObl+(bg>0?Math.max(0,bg-budgetSpent(a,w0.mk)):0);
-    const leftBal=Math.max(0, bal-augGross);
+    const leftBal=a.conduit ? 0 : Math.max(0, bal-augGross); // 통로는 이월 잔액 없음
     let sepObl=0; obligations(wn.mstart, wn.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) sepObl+=o.amount; });
     const sepGross=sepObl+(bg>0?bg:0);
     unsec += Math.max(0, sepGross-leftBal);
