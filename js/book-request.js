@@ -627,6 +627,12 @@ async function saveApplication(user) {
         if (isNaN(targetScore)) targetScore = null;
     }
 
+    // 지금 상황: 막히는 영역(주관식) / 목표 시점(드롭다운)
+    const stuckAreaInput = document.getElementById('stuckArea');
+    const stuckArea = stuckAreaInput ? (stuckAreaInput.value.trim() || null) : null;
+    const goalTimeframeInput = document.getElementById('goalTimeframe');
+    const goalTimeframe = goalTimeframeInput ? (goalTimeframeInput.value || null) : null;
+
     // 유입 경로
     const referralSource = document.getElementById('referralSource').value;
     const referralSourceDetailInput = document.querySelector('input[name="referral_source_detail"]');
@@ -654,6 +660,8 @@ async function saveApplication(user) {
         current_score: currentScore,
         target_score: targetScore,
         no_target_score: false,
+        stuck_area: stuckArea,
+        goal_timeframe: goalTimeframe,
         referral_source: referralSource,
         referral_source_detail: referralSourceDetail,
         privacy_agreement: true,
@@ -700,6 +708,22 @@ function validateBookForm() {
     if (targetScoreInput.value.trim() === '') {
         showToast('목표 토플 점수를 입력해주세요.', 'error');
         targetScoreInput.focus();
+        return false;
+    }
+
+    // 지금 상황: 막히는 영역(필수 주관식)
+    const stuckAreaInput = document.getElementById('stuckArea');
+    if (stuckAreaInput && stuckAreaInput.value.trim() === '') {
+        showToast('지금 제일 막히거나 답답한 점을 적어주세요.', 'error');
+        stuckAreaInput.focus();
+        return false;
+    }
+
+    // 지금 상황: 목표 시점(필수 드롭다운)
+    const goalTimeframeInput = document.getElementById('goalTimeframe');
+    if (goalTimeframeInput && !goalTimeframeInput.value) {
+        showToast('목표 점수가 언제까지 필요한지 선택해주세요.', 'error');
+        goalTimeframeInput.focus();
         return false;
     }
 

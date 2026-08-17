@@ -1474,6 +1474,8 @@ function downloadExcel() {
                 '전화번호': app.phone || '',
                 '현재점수': app.current_score != null ? app.current_score : (app.no_score ? '없음' : ''),
                 '목표점수': app.no_target_score ? '미정' : (app.target_score != null ? app.target_score : ''),
+                '목표시점': app.goal_timeframe || '',
+                '막히는 영역': app.stuck_area || '',
                 '유입경로(자가응답)': referralSource,
                 '카카오 채널 추가': app.kakao_channel_clicked ? 'O' : 'X',
                 '신청일시': formatDate(app.submitted_date || app.created_at),
@@ -1890,6 +1892,11 @@ function displayBookApplications() {
             targetScoreDisplay = '<span style="color:#94a3b8;">-</span>';
         }
 
+        // 목표 시점 (한 달/3개월/6개월/미정 버킷)
+        const timeframeDisplay = app.goal_timeframe
+            ? escapeHtml(app.goal_timeframe)
+            : '<span style="color:#cbd5e1;">-</span>';
+
         // 유입 경로
         let sourceDisplay = app.referral_source || '-';
         if (app.referral_source === '기타' && app.referral_source_detail) {
@@ -1936,12 +1943,13 @@ function displayBookApplications() {
                     </div>
                 </td>
                 <td>
-                    <div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}${kakaoIcon}</div>
+                    <div style="font-weight:600; line-height:1.3; color:#4c3d70; cursor:pointer;" onclick="openBookDetailModal('${app.id}')" title="상세 보기">${escapeHtml(app.name)}<i class="fas fa-magnifying-glass" style="font-size:10px; color:#b7a7dd; margin-left:5px;"></i>${kakaoIcon}</div>
                     <div style="font-size:11px; color:#94a3b8; line-height:1.3; margin-top:1px;">${escapeHtml(app.email)}</div>
                 </td>
                 <td style="font-size: 13px;">${escapeHtml(app.phone || '-')}</td>
                 <td style="font-size: 13px; font-weight: 600;">${scoreDisplay}</td>
                 <td style="font-size: 13px; font-weight: 600; color:#7c3aed;">${targetScoreDisplay}</td>
+                <td style="font-size: 12px; white-space:nowrap;">${timeframeDisplay}</td>
                 <td style="font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(sourceDisplay)}">
                     ${escapeHtml(sourceDisplay)}
                     ${hasReferrerInfo ? `<i class="fas fa-info-circle" style="color:#9480c5; margin-left:4px; cursor:help;" title="${escapeHtml(referrerTooltip)}"></i>` : ''}
@@ -1966,19 +1974,59 @@ function displayBookApplications() {
     }).join('');
     
     document.getElementById('bookTableBody').innerHTML = tableHTML;
-    
+
     // 카운트 업데이트
     document.getElementById('totalCount').textContent = filteredApplications.length;
     document.getElementById('displayCount').textContent = pageApplications.length;
-    
+
     // 페이지네이션 업데이트
     updatePagination();
-    
+
     // 선택 카운트 업데이트
     updateSelectionCount();
-    
+
     // 화면 표시
     document.getElementById('loading').style.display = 'none';
     document.getElementById('applicationsTable').style.display = 'block';
     document.getElementById('emptyState').style.display = 'none';
+}
+
+// ===== 입문서 신청 상세 보기 모달 (읽기 전용) =====
+function openBookDetailModal(appId) {
+    const app = allApplications.find(a => String(a.id) === String(appId));
+    if (!app) return;
+
+    // 유입 경로 (기타면 상세)
+    let sourceDisplay = app.referral_source || '-';
+    if (app.referral_source === '기타' && app.referral_source_detail) {
+        sourceDisplay = app.referral_source_detail;
+    }
+
+    // 목표 점수 (미정/빈값 처리)
+    let targetText;
+    if (app.no_target_score) targetText = '미정';
+    else if (app.target_score != null) targetText = String(app.target_score);
+    else targetText = '-';
+
+    const setText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = (val == null || val === '') ? '-' : val;
+    };
+
+    setText('bdName', app.name || '-');
+    setText('bdCurrent', app.current_score != null ? app.current_score : '없음');
+    setText('bdTarget', targetText);
+    setText('bdTimeframe', app.goal_timeframe || '-');
+    setText('bdReferral', sourceDisplay);
+    setText('bdStuck', app.stuck_area || '(작성 안 함)');
+    setText('bdEmail', app.email || '-');
+    setText('bdPhone', app.phone || '-');
+    setText('bdDate', formatDate(app.submitted_date || app.created_at));
+
+    document.getElementById('bookDetailModal').style.display = 'block';
+}
+
+function closeBookDetailModal() {
+    const modal = document.getElementById('bookDetailModal');
+    if (modal) modal.style.display = 'none';
 }

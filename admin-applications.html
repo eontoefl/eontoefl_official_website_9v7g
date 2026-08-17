@@ -234,6 +234,7 @@
                             <th>전화번호</th>
                             <th>현재점수</th>
                             <th>목표점수</th>
+                            <th style="white-space:nowrap;">목표시점</th>
                             <th>유입경로</th>
                             <th>신청일시</th>
                             <th>읽기 진도</th>
@@ -261,6 +262,34 @@
                 <i class="fas fa-inbox"></i>
                 <p class="admin-empty-title">신청서가 없습니다</p>
                 <p class="admin-empty-text">검색 조건을 변경하거나 필터를 초기화해보세요</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 입문서 신청 상세 보기 모달 (읽기 전용) -->
+    <div id="bookDetailModal" style="display:none; position:fixed; inset:0; z-index:1000;">
+        <div onclick="closeBookDetailModal()" style="position:absolute; inset:0; background:rgba(15,23,42,0.5);"></div>
+        <div style="position:relative; max-width:520px; margin:8vh auto 0; background:#fff; border-radius:14px; box-shadow:0 20px 50px rgba(0,0,0,0.25); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:#f5f3fb; border-bottom:1px solid #ece7f6;">
+                <h2 style="margin:0; font-size:16px; color:#4c3d70;"><i class="fas fa-book-open" style="color:#7c3aed; margin-right:6px;"></i> 입문서 신청 상세 — <span id="bdName"></span></h2>
+                <button onclick="closeBookDetailModal()" style="border:none; background:none; font-size:18px; color:#94a3b8; cursor:pointer;"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:20px; max-height:66vh; overflow-y:auto;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; margin-bottom:18px;">
+                    <div><div style="font-size:11px; color:#94a3b8; margin-bottom:2px;">현재 점수</div><div id="bdCurrent" style="font-size:14px; font-weight:600;">-</div></div>
+                    <div><div style="font-size:11px; color:#94a3b8; margin-bottom:2px;">목표 점수</div><div id="bdTarget" style="font-size:14px; font-weight:600; color:#7c3aed;">-</div></div>
+                    <div><div style="font-size:11px; color:#94a3b8; margin-bottom:2px;">목표 시점</div><div id="bdTimeframe" style="font-size:14px; font-weight:600;">-</div></div>
+                    <div><div style="font-size:11px; color:#94a3b8; margin-bottom:2px;">유입 경로</div><div id="bdReferral" style="font-size:14px;">-</div></div>
+                </div>
+                <div style="border-top:1px dashed #e2e0ea; padding-top:16px;">
+                    <div style="font-size:12px; color:#7c3aed; font-weight:600; margin-bottom:6px;"><i class="fas fa-comment-dots"></i> 지금 제일 막히거나 답답한 점</div>
+                    <div id="bdStuck" style="font-size:14px; line-height:1.7; color:#334155; white-space:pre-wrap; background:#faf9fd; border:1px solid #eee7f7; border-radius:8px; padding:12px 14px; min-height:48px;">-</div>
+                </div>
+                <div style="display:flex; gap:18px; margin-top:16px; font-size:12px; color:#64748b;">
+                    <div><i class="fas fa-envelope" style="color:#9480c5;"></i> <span id="bdEmail">-</span></div>
+                    <div><i class="fas fa-phone" style="color:#9480c5;"></i> <span id="bdPhone">-</span></div>
+                </div>
+                <div style="margin-top:6px; font-size:12px; color:#94a3b8;"><i class="fas fa-clock"></i> <span id="bdDate">-</span></div>
             </div>
         </div>
     </div>
