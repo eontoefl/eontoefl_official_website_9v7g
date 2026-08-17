@@ -30,9 +30,15 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
-    <link rel="stylesheet" href="css/book-request.css">
+    <!-- 내챌 신청서와 동일한 디자인 톤 (지면·섹션·입력·버튼·모달) -->
+    <link rel="stylesheet" href="css/application-form.css?v=10">
+    <!-- 입문서 전용 조각(토스트·차단화면·카카오 등)만 덧입힘 -->
+    <link rel="stylesheet" href="css/book-request.css?v=4">
 </head>
 <body>
+    <!-- 상단 진행 표시 (폼 스크롤 진행도) -->
+    <div class="form-progress"><div class="form-progress-fill" id="formProgressFill"></div></div>
+
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
@@ -150,7 +156,7 @@
                 </p>
             </div>
 
-            <form id="bookRequestForm">
+            <form id="bookRequestForm" class="application-form">
 
                 <!-- Section 1-A: 계정 만들기 (비로그인 신규) -->
                 <div class="form-section" id="accountSection" style="display:none;">
@@ -473,6 +479,26 @@
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script src="js/book-request.js"></script>
+
+    <!-- 진행 표시: 폼 영역 스크롤 진행도만 계산 (폼 로직·필드와 무관) -->
+    <script>
+    (function () {
+        var fill = document.getElementById('formProgressFill');
+        var form = document.getElementById('bookRequestForm');
+        if (!fill || !form) return;
+        function update() {
+            var top = form.getBoundingClientRect().top + window.scrollY;
+            var start = top - 140;
+            var end = top + form.offsetHeight - window.innerHeight + 40;
+            var p = (window.scrollY - start) / Math.max(1, end - start);
+            p = Math.max(0, Math.min(1, p));
+            fill.style.width = (p * 100).toFixed(1) + '%';
+        }
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        update();
+    })();
+    </script>
 
     <!-- Floating Kakao Talk Button -->
     <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
