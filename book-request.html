@@ -33,7 +33,7 @@
     <!-- 내챌 신청서와 동일한 디자인 톤 (지면·섹션·입력·버튼·모달) -->
     <link rel="stylesheet" href="css/application-form.css?v=10">
     <!-- 입문서 전용 조각(토스트·차단화면·카카오 등)만 덧입힘 -->
-    <link rel="stylesheet" href="css/book-request.css?v=4">
+    <link rel="stylesheet" href="css/book-request.css?v=11">
 </head>
 <body>
     <!-- 상단 진행 표시 (폼 스크롤 진행도) -->
@@ -146,14 +146,49 @@
         <!-- 신청 폼 (상태 판정 후 표시) -->
         <div id="formWrap" style="display:none;">
 
-            <!-- 상단 안내 (임시 카피) -->
+            <!-- 상단 안내 -->
             <div class="form-header">
-                <h1>상위 1%의 토플 졸업 비법,<br>이온토플 가입하기</h1>
+                <h1>학원 갈까, 독학할까<br>— 아직 고민 중이시죠?</h1>
                 <p class="form-description">
-                    단 1분만 투자해 이온토플의 회원이 되어보세요.<br>
-                    남들은 수십만 원의 학원비를 내고 배우는
-                    <strong>'수험 기간 3개월 단축의 핵심 노하우'</strong>를 즉시 확인할 수 있습니다.
+                    혼자 방향을 잘못 잡으면, 그 3개월이 통째로 날아갑니다.<br>
+                    지금, 제대로 된 독학 로드맵을 <strong>무료로</strong> 받아보세요.
                 </p>
+            </div>
+
+            <!-- 입문서 배너 (학습자료 페이지 배너 재활용) -->
+            <div class="book-banner">
+                <div class="book-banner-inner">
+                    <div class="book-banner-left">
+                        <div class="book-banner-label">
+                            <i class="fas fa-sparkles"></i> AUTHOR'S EXCLUSIVE MESSAGE
+                        </div>
+                        <div class="book-banner-quote">
+                            이 입문서는 제가 12년에 걸쳐 정리한 토플 이론을 약 300페이지에 눌러담은 자료입니다.<br>기존에 29만 원에 판매되었고, 현재 중고 시장에서도 15-20만 원에 거래될 만큼 그 가치를 인정받고 있습니다.
+                        </div>
+                        <div style="font-size: 15px; line-height: 1.75; color: #334155; word-break: keep-all;">
+                            솔직히 후기만 자세히 읽어보셔도 점수는 달라질 수 있습니다. 반드시 먼저 읽어보세요. 급하게 먹으면 체하니까요.
+                            <br><br>
+                            그래도 입문서 전권이 필요하시다면 아래 신청서를 작성해주세요. 경쟁업체 강사분들이 학생을 가장해서 가져가는 일이 너무 많았기 때문에 간단한 신청서를 받고 있습니다. 신청하시면 바로 읽어보실 수 있어요.
+                        </div>
+                        <div class="book-banner-social" style="margin-top: 20px;">
+                            <div class="book-banner-avatars">
+                                <div class="avatar avatar-1"><i class="fas fa-user" style="font-size:12px;"></i></div>
+                                <div class="avatar avatar-2"><i class="fas fa-user" style="font-size:12px;"></i></div>
+                                <div class="avatar avatar-3"><i class="fas fa-user" style="font-size:12px;"></i></div>
+                                <div class="avatar-count">3K+</div>
+                            </div>
+                            <div class="book-banner-social-text">
+                                이미 <strong>3,421명</strong>의 학생들이 무료로 경험하고 검증했습니다.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="book-banner-right">
+                        <div class="book-banner-image-wrap">
+                            <img src="logo/naver_store.png" alt="이온토플 입문서 세트" class="book-img-store">
+                            <img src="logo/naver_reviews.png" alt="이온토플 입문서 후기" class="book-img-reviews">
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <form id="bookRequestForm" class="application-form">
@@ -255,8 +290,18 @@
                         <h2>지금 상황</h2>
                     </div>
                     <div class="form-group">
-                        <label for="stuckArea">토플 공부에서 지금 제일 막히거나 답답한 점</label>
-                        <textarea name="stuck_area" id="stuckArea" rows="3" placeholder="예: 리스닝은 들리는데 노트테이킹만 하면 흐름을 놓쳐요 / 스피킹은 무슨 말을 해야 할지부터 막막합니다" required></textarea>
+                        <label for="stuckArea">토플 공부에서 지금 제일 막히는 영역</label>
+                        <select name="stuck_area" id="stuckArea" required>
+                            <option value="">선택해주세요</option>
+                            <option value="리딩">리딩</option>
+                            <option value="리스닝">리스닝</option>
+                            <option value="라이팅">라이팅</option>
+                            <option value="스피킹">스피킹</option>
+                            <option value="기타">기타</option>
+                        </select>
+                        <div id="stuckAreaDetail" class="other-detail-input" style="display: none;">
+                            <input type="text" name="stuck_area_detail" placeholder="어떤 점이 제일 막히거나 답답한지 적어주세요">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="goalTimeframe">목표 점수, 언제까지 필요하세요?</label>
@@ -292,7 +337,7 @@
                 </div>
 
                 <!-- Section 3-1: 호주/뉴질랜드 직접 제출 여부 (입문서 종류 결정) -->
-                <div style="margin: 1.5rem 0; padding: 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;">
+                <div style="margin: 0 0 2.5rem; padding: 16px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
                         <label style="margin: 0; font-weight: 600; font-size: 0.95rem; color: #333;">호주/뉴질랜드 기관에 직접 점수를 제출하시나요?</label>
                         <span style="color: #ff4444; font-weight: 700;">*</span>
@@ -343,20 +388,7 @@
                     </div>
                 </div>
 
-                <!-- Section 5: 카카오 채널 추가 (필수) -->
-                <div class="form-section kakao-section">
-                    <div class="section-header">
-                        <span class="section-number">5</span>
-                        <h2>카카오 채널 추가</h2>
-                    </div>
-                    <p class="kakao-simple-desc">'광고 문자 오는 거 아니야?'라고 걱정하실 수 있습니다. 노파심에 말씀드리건대, 저는 스팸성 문자를 보내지 않습니다. 다만 채널을 추가해 주셔야 입문서를 보내드릴 수 있으니, 꼭 추가해 주세요!</p>
-                    <a href="http://pf.kakao.com/_FWxcZC/friend" target="_blank" id="kakaoChannelBtn" class="kakao-channel-btn">
-                        <span class="kakao-icon">💬</span>
-                        <span>이온토플 카카오 채널 추가하기</span>
-                    </a>
-                </div>
-
-                <!-- Section 5: 약관 동의 -->
+                <!-- 약관 동의 -->
                 <div class="form-section privacy-section no-auto-required">
                     <div class="checkbox-group">
                         <!-- 전체 동의 -->
@@ -392,7 +424,7 @@
                 <!-- Submit Button -->
                 <div class="form-actions">
                     <button type="submit" class="btn-primary" id="submitBtn">
-                        <i class="fas fa-check"></i> 완료
+                        <i class="fas fa-book-open"></i> 무료 입문서 받기
                     </button>
                 </div>
 

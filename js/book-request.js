@@ -53,8 +53,6 @@ let isComposing = false;
 let emailAvailable = false;
 let emailCheckTimer = null;
 
-// 카카오 채널 추가 클릭 여부
-let kakaoChannelClicked = false;
 
 document.addEventListener('DOMContentLoaded', async function () {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
@@ -160,7 +158,7 @@ function initForm(mode, userData) {
     // 공통 설정
     setupNoScoreCheckbox('noScoreCheck', 'currentScore', '예: 75 혹은 4.0');
     setupReferralSelect();
-    setupKakaoTracking();
+    setupStuckAreaSelect();
     setupAgreements();
     setupModals();
     loadLegalContent();
@@ -357,11 +355,22 @@ function setupReferralSelect() {
     });
 }
 
-// ===== 카카오 채널 추가 클릭 추적 =====
-function setupKakaoTracking() {
-    const btn = document.getElementById('kakaoChannelBtn');
-    if (!btn) return;
-    btn.addEventListener('click', function () { kakaoChannelClicked = true; });
+// ===== 지금 상황 "기타" 직접 입력 (유입경로와 동일 패턴) =====
+function setupStuckAreaSelect() {
+    const sel = document.getElementById('stuckArea');
+    const detail = document.getElementById('stuckAreaDetail');
+    if (!sel || !detail) return;
+
+    sel.addEventListener('change', function () {
+        const input = detail.querySelector('input');
+        if (this.value === '기타') {
+            detail.style.display = 'block';
+            if (input) input.required = true;
+        } else {
+            detail.style.display = 'none';
+            if (input) { input.required = false; input.value = ''; }
+        }
+    });
 }
 
 // ===== 약관 동의 (전체동의 연동) =====
@@ -490,7 +499,7 @@ function showSuccess(bookGranted) {
 
 function resetSubmitBtn(btn) {
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-check"></i> 완료';
+    btn.innerHTML = '<i class="fas fa-book-open"></i> 무료 입문서 받기';
 }
 
 // ===== 토스트 알림 (스크롤 위치와 무관하게 상단 중앙 고정) =====
@@ -627,9 +636,13 @@ async function saveApplication(user) {
         if (isNaN(targetScore)) targetScore = null;
     }
 
-    // 지금 상황: 막히는 영역(주관식) / 목표 시점(드롭다운)
-    const stuckAreaInput = document.getElementById('stuckArea');
-    const stuckArea = stuckAreaInput ? (stuckAreaInput.value.trim() || null) : null;
+    // 지금 상황: 막히는 영역(드롭다운, '기타'면 서술칸 내용) / 목표 시점(드롭다운)
+    const stuckSelect = document.getElementById('stuckArea');
+    const stuckDetailInput = document.querySelector('input[name="stuck_area_detail"]');
+    let stuckArea = stuckSelect ? (stuckSelect.value || null) : null;
+    if (stuckArea === '기타') {
+        stuckArea = (stuckDetailInput && stuckDetailInput.value.trim()) ? stuckDetailInput.value.trim() : '기타';
+    }
     const goalTimeframeInput = document.getElementById('goalTimeframe');
     const goalTimeframe = goalTimeframeInput ? (goalTimeframeInput.value || null) : null;
 
@@ -667,7 +680,6 @@ async function saveApplication(user) {
         privacy_agreement: true,
         submitted_date: new Date().toISOString(),
         current_step: 10,
-        kakao_channel_clicked: kakaoChannelClicked,
         referrer_url: referrerInfo.referrer_url || null,
         landing_url: referrerInfo.landing_url || null,
         utm_data: referrerInfo.utm_data || null,
@@ -711,12 +723,20 @@ function validateBookForm() {
         return false;
     }
 
-    // 지금 상황: 막히는 영역(필수 주관식)
-    const stuckAreaInput = document.getElementById('stuckArea');
-    if (stuckAreaInput && stuckAreaInput.value.trim() === '') {
-        showToast('지금 제일 막히거나 답답한 점을 적어주세요.', 'error');
-        stuckAreaInput.focus();
+    // 지금 상황: 막히는 영역(필수 드롭다운, '기타'면 서술칸 필수)
+    const stuckSelect = document.getElementById('stuckArea');
+    if (stuckSelect && !stuckSelect.value) {
+        showToast('지금 제일 막히는 영역을 선택해주세요.', 'error');
+        stuckSelect.focus();
         return false;
+    }
+    if (stuckSelect && stuckSelect.value === '기타') {
+        const stuckDetail = document.querySelector('input[name="stuck_area_detail"]');
+        if (stuckDetail && !stuckDetail.value.trim()) {
+            showToast('막히는 점을 직접 적어주세요.', 'error');
+            stuckDetail.focus();
+            return false;
+        }
     }
 
     // 지금 상황: 목표 시점(필수 드롭다운)
@@ -742,8 +762,6 @@ function validateBookForm() {
             return false;
         }
     }
-
-    // 카카오 채널 추가는 선택 항목 (제출을 막지 않음)
 
     // 호주/뉴질랜드 직접 제출 여부 (입문서 종류 결정)
     if (!document.querySelector('input[name="is_au_nz_direct_submit"]:checked')) {

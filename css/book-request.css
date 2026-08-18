@@ -95,41 +95,6 @@
     box-shadow: 0 0 0 3px rgba(148, 128, 197, 0.22);
 }
 
-/* ===== 카카오 채널 섹션 ===== */
-.kakao-simple-desc {
-    font-size: 0.88rem;
-    color: #64748b;
-    margin: 0 0 0.85rem 0;
-    line-height: 1.6;
-}
-
-.kakao-channel-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.8rem 1.25rem;
-    background: #FEE500;
-    color: #181600;
-    font-weight: 600;
-    font-size: 0.95rem;
-    text-decoration: none;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    font-family: 'Noto Sans KR', sans-serif;
-}
-
-.kakao-channel-btn:hover {
-    background: #fdd835;
-}
-
-.kakao-icon {
-    font-size: 1.1rem;
-}
-
 /* ===== 토스트 (스크롤 위치와 무관하게 상단 중앙 고정) ===== */
 .br-toast {
     position: fixed;
@@ -208,5 +173,241 @@
 
     .block-screen h2 {
         font-size: 1.3rem;
+    }
+}
+
+/* ==================== 입문서 배너 (학습자료 페이지에서 가져옴) ====================
+   회색 지면 위에서 폼 시트와 같은 흰 카드로 떠 보이게. */
+.book-banner {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 2px 24px rgba(25, 28, 29, 0.05);
+    padding: 32px 36px;
+    margin: 0 0 2.5rem;
+    position: relative;
+}
+
+.book-banner-inner {
+    display: flex;
+    gap: 36px;
+    align-items: stretch;
+}
+
+.book-banner-left {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.book-banner-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #f3eeff 0%, #ece5ff 100%);
+    color: #7c6ab5;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    letter-spacing: 1.2px;
+    width: fit-content;
+}
+
+.book-banner-label i {
+    font-size: 10px;
+}
+
+.book-banner-quote {
+    font-size: 15px;
+    line-height: 1.75;
+    color: #334155;
+    margin-bottom: 20px;
+    word-break: keep-all;
+}
+
+.book-banner-quote .price-highlight {
+    font-weight: 800;
+    color: #1e293b;
+    text-decoration: line-through;
+    text-decoration-color: #ef4444;
+}
+
+.book-banner-social {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 0;
+    padding-top: 4px;
+}
+
+.book-banner-avatars {
+    display: flex;
+    align-items: center;
+}
+
+.book-banner-avatars .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid white;
+    margin-left: -8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+.book-banner-avatars .avatar:first-child {
+    margin-left: 0;
+}
+
+.book-banner-avatars .avatar-1 { background: #a78bfa; color: white; }
+.book-banner-avatars .avatar-2 { background: #60a5fa; color: white; }
+.book-banner-avatars .avatar-3 { background: #34d399; color: white; }
+
+.book-banner-avatars .avatar-count {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #1e293b;
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -8px;
+    border: 2px solid white;
+}
+
+.book-banner-social-text {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.book-banner-social-text strong {
+    color: #334155;
+    font-weight: 700;
+}
+
+.book-banner-right {
+    width: 420px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
+}
+
+.book-banner-image-wrap {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* 가로로 긴 텍스트 스크린샷(가격·후기)이라 자르지 않고 통짜로, 위아래로 쌓아 크게 */
+.book-banner-image-wrap .book-img-store,
+.book-banner-image-wrap .book-img-reviews {
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 6px 16px rgba(0,0,0,0.12));
+    border-radius: 8px;
+    border: 1px solid #eef0f3;
+}
+
+.book-banner-cta-wrap {
+    width: 100%;
+    text-align: center;
+}
+
+.book-banner-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #9480c5 0%, #7d6aad 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s;
+    box-shadow: 0 4px 16px rgba(148, 128, 197, 0.35);
+    letter-spacing: -0.3px;
+}
+
+.book-banner-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(148, 128, 197, 0.5);
+}
+
+.book-banner-cta i {
+    font-size: 16px;
+}
+
+.book-banner-cta-sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 8px;
+}
+
+@media (max-width: 860px) {
+    .book-banner {
+        padding: 24px 22px;
+    }
+
+    .book-banner-inner {
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .book-banner-right {
+        width: 100%;
+    }
+
+    .book-banner-image-wrap .book-img-store,
+    .book-banner-image-wrap .book-img-reviews {
+        height: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .book-banner {
+        padding: 20px 16px;
+        border-radius: 16px;
+    }
+
+    .book-banner-quote {
+        font-size: 13.5px;
+    }
+
+    .book-banner-image-wrap .book-img-store,
+    .book-banner-image-wrap .book-img-reviews {
+        height: auto;
+    }
+
+    .book-banner-social {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .book-banner-social-text {
+        font-size: 12px;
+    }
+
+    .book-banner-cta {
+        font-size: 15px;
+        padding: 12px 16px;
     }
 }
