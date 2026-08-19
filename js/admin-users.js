@@ -47,9 +47,20 @@ function displayUsers(users) {
     
     tbody.innerHTML = users.map((user, index) => {
         const levelBadge = getLevelBadge(user.level);
-        const statusBadge = user.blocked ? 
-            '<span style="background: #fee2e2; color: #dc2626; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">🚫 차단</span>' : 
-            '<span style="background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">✅ 정상</span>';
+        const wReq = user.withdrawal_requested_at;
+        let statusBadge;
+        if (wReq) {
+            const daysLeft = Math.max(0, 7 - Math.floor((Date.now() - new Date(wReq).getTime()) / 86400000));
+            statusBadge = `<span style="background: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">⏳ 탈퇴예정 D-${daysLeft}</span>`;
+        } else if (user.blocked) {
+            statusBadge = '<span style="background: #fee2e2; color: #dc2626; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">🚫 차단</span>';
+        } else {
+            statusBadge = '<span style="background: #dcfce7; color: #16a34a; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">✅ 정상</span>';
+        }
+        // 탈퇴예정이면 복구 버튼, 아니면 탈퇴 처리 버튼
+        const withdrawBtn = wReq
+            ? `<button onclick="restoreUser('${user.id}', '${escapeHtml(user.name)}')" class="admin-btn admin-btn-sm" style="background: #22c55e; color: white;" title="탈퇴 복구"><i class="fas fa-undo"></i></button>`
+            : `<button onclick="withdrawUser('${user.id}', '${escapeHtml(user.name)}')" class="admin-btn admin-btn-sm" style="background: #64748b; color: white;" title="탈퇴 처리"><i class="fas fa-user-slash"></i></button>`;
         
         const joinDate = new Date(user.created_at).toLocaleString('ko-KR', {
             year: 'numeric',
@@ -83,11 +94,12 @@ function displayUsers(users) {
                                 title="비밀번호 초기화">
                             <i class="fas fa-key"></i>
                         </button>
-                        <button onclick="toggleBlock('${user.id}', ${user.blocked})" 
+                        <button onclick="toggleBlock('${user.id}', ${user.blocked})"
                                 class="admin-btn admin-btn-sm ${user.blocked ? 'admin-btn-success' : 'admin-btn-danger'}"
                                 title="${user.blocked ? '차단 해제' : '차단'}">
                             <i class="fas fa-${user.blocked ? 'check' : 'ban'}"></i>
                         </button>
+                        ${withdrawBtn}
                     </div>
                 </td>
             </tr>
@@ -198,6 +210,68 @@ async function confirmResetPassword() {
     } catch (error) {
         console.error('Error resetting password:', error);
         alert('❌ 비밀번호 초기화에 실패했습니다.');
+    }
+}
+
+// 관리자 강제 탈퇴 처리 (모달 열기)
+function withdrawUser(userId, userName) {
+    selectedUserId = userId;
+    document.getElementById('withdrawUserName').textContent = userName;
+    document.getElementById('withdrawUserModal').style.display = 'flex';
+}
+
+// 탈퇴 처리 모달 닫기
+function closeWithdrawUserModal() {
+    document.getElementById('withdrawUserModal').style.display = 'none';
+    selectedUserId = null;
+}
+
+// 탈퇴 처리 확정 (7일 유예 시작 — 실제 파기는 서버 cron이 수행)
+async function confirmWithdrawUser() {
+    if (!selectedUserId) return;
+
+    try {
+        const result = await supabaseAPI.patch('users', selectedUserId, {
+            withdrawal_requested_at: new Date().toISOString(),
+            withdrawal_reason: '관리자 처리',
+            withdrawal_reason_detail: null
+        });
+
+        if (result) {
+            alert('✅ 탈퇴 처리되었습니다.\n\n7일 후 데이터가 영구 삭제됩니다.');
+            closeWithdrawUserModal();
+            loadUsers();
+        } else {
+            throw new Error('Failed to withdraw user');
+        }
+    } catch (error) {
+        console.error('Error withdrawing user:', error);
+        alert('❌ 탈퇴 처리에 실패했습니다.');
+    }
+}
+
+// 관리자 탈퇴 복구 (탈퇴 예정 → 정상)
+async function restoreUser(userId, userName) {
+    if (!confirm(`${userName} 회원의 탈퇴 처리를 취소(복구)하시겠습니까?`)) {
+        return;
+    }
+
+    try {
+        const result = await supabaseAPI.patch('users', userId, {
+            withdrawal_requested_at: null,
+            withdrawal_reason: null,
+            withdrawal_reason_detail: null
+        });
+
+        if (result) {
+            alert('✅ 복구되었습니다.');
+            loadUsers();
+        } else {
+            throw new Error('Failed to restore user');
+        }
+    } catch (error) {
+        console.error('Error restoring user:', error);
+        alert('❌ 복구에 실패했습니다.');
     }
 }
 
