@@ -183,6 +183,15 @@
   .card.dragging.to-chain { outline:2px solid var(--accent-strong); outline-offset:1px; }
   .cstep.cs-flash { animation:csflash 1.3s ease; }
   @keyframes csflash { 0%,100%{ background:transparent; } 30%{ background:var(--accent-lightest); } }
+  .cs-drag, .cs-sub-drag { flex-shrink:0; display:grid; place-items:center; color:var(--outline,#CFCDDE); cursor:grab; touch-action:none; z-index:1; }
+  .cs-drag { width:15px; margin-left:-3px; }
+  .cs-drag .svic { width:13px; height:13px; }
+  .cs-sub-drag { width:13px; margin-left:-2px; } .cs-sub-drag .svic { width:11px; height:11px; }
+  .cstep:hover .cs-drag, .cs-sub:hover .cs-sub-drag { color:var(--on-surface-variant); }
+  .cs-drag:hover, .cs-sub-drag:hover { color:var(--accent-strong); }
+  .cs-sub-t { min-width:0; }
+  .reorder-dragging { box-shadow:var(--lift-hi,0 12px 30px rgba(26,26,46,.18)); background:var(--surface-lowest); outline:2px solid var(--accent-strong); outline-offset:-1px; border-radius:10px; opacity:.97; }
+  .reorder-ph { border:2px dashed var(--accent-strong); background:var(--accent-lightest); border-radius:10px; margin:2px 0; opacity:.65; box-sizing:border-box; }
   .donelist .card { opacity:.6; }
 
   /* 목표 스티커판 */
@@ -1543,6 +1552,15 @@ function wireWork(){
   document.querySelectorAll("#view .wchainfold [data-cstep-done]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); actWork(el.dataset.cstepDone, "done"); }));
   document.querySelectorAll("#view .wchainfold [data-cstep-exp]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); const id=el.dataset.cstepExp; if(chainExpanded.has(id)) chainExpanded.delete(id); else chainExpanded.add(id); render(); }));
   document.querySelectorAll("#view .wchainfold [data-cssub]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); const p=el.dataset.cssub.split("|"); actSub(p[0], p[1], "done"); }));
+  document.querySelectorAll("#view .wchainfold .chain:not(.cyclic)").forEach(ch=>{
+    if(ch.querySelectorAll('.cstep').length<2) return;   // 스텝 2개 이상일 때만 재정렬
+    wireReorder(ch, '.cstep', '.cs-drag', el=>el.dataset.goto, (id,prev,next)=>insertIntoChain(id,prev,next));
+  });
+  document.querySelectorAll("#view .wchainfold .cs-subs").forEach(subs=>{
+    if(subs.querySelectorAll('.cs-sub').length<2) return;
+    const first=subs.querySelector('.cs-sub'); const projId=first.dataset.sub.split('|')[0];
+    wireReorder(subs, '.cs-sub', '.cs-sub-drag', el=>el.dataset.sub.split('|')[1], (subId,prev,next)=>reorderSub(projId, subId, prev, next));
+  });
   wireFolds();
 }
 function actWork(id, act){
@@ -1746,12 +1764,12 @@ function chainStepsHtml(steps){
     const tag=s.done?'완료':(s.ready?'<span class="rdot"></span>지금 할 수 있어요':('🔒 '+esc((s.waiting||[]).join(', '))+' 먼저'));
     const it=workItemById(s.id); const isProj=it&&it._bucket==="project"; const subs=isProj?(it.subtasks||[]):[];
     const exp=isProj && chainExpanded.has(s.id);
-    let h='<div class="cstep '+cls+'" data-goto="'+s.id+'"><span class="cs-num">'+(i+1)+'</span>'+
+    let h='<div class="cstep '+cls+'" data-goto="'+s.id+'"><span class="cs-drag" title="드래그해서 순서 이동">'+svi('grip')+'</span><span class="cs-num">'+(i+1)+'</span>'+
       '<span class="cs-body"><span class="cs-t">'+esc(s.title)+'</span>'+(tag?'<span class="cs-tag">'+tag+'</span>':'')+'</span>'+
       '<span class="cs-ctrl">'+(subs.length?'<button type="button" class="cs-exp" data-cstep-exp="'+s.id+'" title="서브태스크 펼치기">'+svi(exp?'chevD':'chevR')+'</button>':'')+
       '<input type="checkbox" class="cs-cb" data-cstep-done="'+s.id+'"'+(s.done?' checked':'')+'></span></div>';
     if(exp && subs.length){
-      h+='<div class="cs-subs">'+subs.map(st=>'<label class="cs-sub'+(st.done?' done':'')+'"><input type="checkbox" data-cssub="'+s.id+'|'+st.id+'"'+(st.done?' checked':'')+'><span>'+esc(st.title)+'</span></label>').join('')+'</div>';
+      h+='<div class="cs-subs">'+subs.map(st=>'<div class="cs-sub'+(st.done?' done':'')+'" data-sub="'+s.id+'|'+st.id+'"><span class="cs-sub-drag" title="드래그해서 순서 이동">'+svi('grip')+'</span><input type="checkbox" data-cssub="'+s.id+'|'+st.id+'"'+(st.done?' checked':'')+'><span class="cs-sub-t" data-cssub="'+s.id+'|'+st.id+'">'+esc(st.title)+'</span></div>').join('')+'</div>';
     }
     return h;
   }).join('');
@@ -1827,6 +1845,47 @@ function dropOntoChain(dragId, prevId, nextId){
   const where = (pName&&nName) ? ('"'+pName+'" 다음, "'+nName+'" 앞') : pName ? ('"'+pName+'" 맨 뒤 다음') : nName ? ('"'+nName+'" 맨 앞') : '여기';
   if(!confirm('"'+dName+'"을(를)\n'+where+'에 넣을까요?\n\n(카드 위치는 그대로예요. 선행 순서만 정해집니다.)')){ render(); return; }
   insertIntoChain(dragId, prevId, nextId);
+}
+// 프로젝트 서브태스크 순서 재배치 (prevSubId 뒤 / nextSubId 앞)
+function reorderSub(projId, subId, prevSubId, nextSubId){
+  const p=STORE.work.project.find(x=>x.id===projId); if(!p||!Array.isArray(p.subtasks)) return;
+  const item=p.subtasks.find(s=>s.id===subId); if(!item) return;
+  const rest=p.subtasks.filter(s=>s!==item);
+  let idx = prevSubId ? rest.findIndex(s=>s.id===prevSubId)+1 : (nextSubId ? rest.findIndex(s=>s.id===nextSubId) : rest.length);
+  if(idx<0) idx=rest.length;
+  rest.splice(idx,0,item); p.subtasks=rest; save(); render();
+}
+// 세로 리스트 안에서 핸들로 항목 재정렬 → commit(draggedId, prevId, nextId). 실제 마우스 대응 위해 이동/뗌은 document에.
+function wireReorder(listEl, itemSel, handleSel, idOf, commit){
+  listEl.querySelectorAll(':scope > '+itemSel).forEach(item=>{
+    const handle=item.querySelector(handleSel); if(!handle) return;
+    handle.addEventListener('click', ev=>{ ev.stopPropagation(); ev.preventDefault(); });
+    handle.addEventListener('pointerdown', e=>{
+      if(e.button!==undefined && e.button!==0) return;
+      e.preventDefault(); e.stopPropagation();
+      const rect=item.getBoundingClientRect(), offX=e.clientX-rect.left, offY=e.clientY-rect.top;
+      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+      const ph=document.createElement('div'); ph.className='reorder-ph'; ph.style.height=rect.height+'px';
+      item.parentNode.insertBefore(ph, item.nextSibling);
+      const s=item.style; s.width=rect.width+'px'; s.position='fixed'; s.left=rect.left+'px'; s.top=rect.top+'px'; s.margin='0'; s.zIndex='1000'; s.pointerEvents='none';
+      item.classList.add('reorder-dragging'); document.body.classList.add('dragging-lock'); let moved=false;
+      const sibs=()=>[...listEl.children].filter(c=>c!==item && c!==ph && c.matches && c.matches(itemSel));
+      const move=ev=>{ ev.preventDefault(); moved=true; s.left=(ev.clientX-offX)+'px'; s.top=(ev.clientY-offY)+'px';
+        let placed=false;
+        for(const o of sibs()){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ listEl.insertBefore(ph,o); placed=true; break; } }
+        if(!placed){ const last=sibs().slice(-1)[0]; if(last) listEl.insertBefore(ph, last.nextSibling); else listEl.appendChild(ph); } };
+      const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.removeEventListener('pointercancel',up);
+        try{ handle.releasePointerCapture(e.pointerId); }catch(_){}
+        item.style.cssText=''; item.classList.remove('reorder-dragging'); document.body.classList.remove('dragging-lock');
+        const seq=[...listEl.children].filter(c=> c===ph || (c!==item && c.matches && c.matches(itemSel)));
+        const pi=seq.indexOf(ph);
+        const prevId = pi>0 ? idOf(seq[pi-1]) : null;
+        const nextId = pi<seq.length-1 ? idOf(seq[pi+1]) : null;
+        ph.remove();
+        if(moved) commit(idOf(item), prevId, nextId); else render(); };
+      document.addEventListener('pointermove',move); document.addEventListener('pointerup',up); document.addEventListener('pointercancel',up);
+    });
+  });
 }
 function lockBadge(it){ const u=unmetDeps(it); if(!u.length) return ""; return '<div class="wlock">🔒 '+u.map(x=>esc(x.item.title)+' 먼저'+(x.note?' <span class="wlock-why">· '+esc(x.note)+'</span>':'')).join('<br>')+'</div>'; }
 function renderDeps(){ const box=$("depChips"); if(!box) return;
