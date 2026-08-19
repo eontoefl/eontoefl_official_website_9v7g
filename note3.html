@@ -443,6 +443,19 @@
   .mt-m { font-size:10.5px; color:#9A9AB0; margin-top:8px; font-weight:500; }
   .mt-conf { font-size:12px; font-weight:800; }
   .mt-conf.ok { color:#0F9D6E; } .mt-conf.short { color:#F0416B; }
+  .mt-conf2 { display:flex; flex-direction:column; gap:2px; margin-top:3px; }
+  .mt-conf2 .mc-ok { font-size:11.5px; font-weight:800; color:#0F9D6E; }
+  .mt-conf2 .mc-short { font-size:11.5px; font-weight:800; color:#F0416B; }
+  .distlog-body { display:flex; flex-direction:column; gap:8px; }
+  .dl-row { background:var(--surface-lowest); border:1px solid var(--outline,#E7E5F0); border-radius:12px; padding:9px 12px; }
+  .dl-top { display:flex; align-items:center; gap:9px; }
+  .dl-date { font-size:12px; font-weight:700; color:var(--on-surface-variant); }
+  .dl-sum { font-size:13px; font-weight:800; color:var(--accent-strong); }
+  .dl-x { margin-left:auto; border:none; background:transparent; color:var(--on-surface-variant); opacity:.5; cursor:pointer; font-size:12px; padding:2px 5px; border-radius:6px; }
+  .dl-x:hover { opacity:1; background:var(--surface-high); color:#F0416B; }
+  .dl-items { margin-top:6px; display:flex; flex-direction:column; gap:2px; }
+  .dl-item { display:flex; justify-content:space-between; gap:10px; font-size:12px; font-weight:600; color:var(--on-surface); }
+  .dl-item b { font-weight:800; }
   .mt-chip { display:inline-block; margin-top:7px; font-size:10.5px; font-weight:700; border-radius:8px; padding:3px 8px; }
   .mt-chip.warn { color:#C7361B; background:#FDEAE4; }
   .mt-chip.ok { color:#0F9D6E; background:#E3F7F0; }
@@ -2174,8 +2187,8 @@ function moneyView(){
     '<div class="mh-tags"><span class="mh-tag">💵 자산 '+fmtMoney(assets+illiquid,"KRW")+'</span><span class="mh-tag">📉 부채 '+fmtMoney(debt,"KRW")+'</span></div></div>';
   const ma=monthAheadCard(), maPct=ma.total>0?Math.round((ma.total-ma.unsec)/ma.total*100):100;
   html+='<div class="mtiles">'+
-    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+secPct+'%;background:#0FB981"></span></div><div class="mt-m mt-conf '+(unsec>0?'short':'ok')+'">'+(unsec>0?('⚠ 미확보 '+fmtMoney(unsec,"KRW")):'✅ 다 확보됨')+'</div></div>'+
-    '<div class="mtile tap" id="conf9Toggle"><div class="mt-ic sky">🗓️</div><div class="mt-k">'+ma.MM+'월 확정지출 <span class="mt-tag">다음 달</span></div><div class="mt-v">'+fmtMoney(ma.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+maPct+'%;background:#0FB981"></span></div><div class="mt-m mt-conf '+(ma.unsec>0?'short':'ok')+'">'+(ma.unsec>0?('⚠ 미확보 '+fmtMoney(ma.unsec,"KRW")):'✅ 다 확보됨')+'</div></div>'+
+    '<div class="mtile tap" id="confToggle"><div class="mt-ic amber">📌</div><div class="mt-k">'+MM+'월 확정지출</div><div class="mt-v">'+fmtMoney(cb.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+secPct+'%;background:#0FB981"></span></div><div class="mt-conf2">'+(unsec>0?('<span class="mc-ok">✅ 확보 '+fmtMoney(cb.total-unsec,"KRW")+'</span><span class="mc-short">⚠ 미확보 '+fmtMoney(unsec,"KRW")+'</span>'):'<span class="mc-ok">✅ 다 확보됨</span>')+'</div></div>'+
+    '<div class="mtile tap" id="conf9Toggle"><div class="mt-ic sky">🗓️</div><div class="mt-k">'+ma.MM+'월 확정지출 <span class="mt-tag">다음 달</span></div><div class="mt-v">'+fmtMoney(ma.total,"KRW")+'</div><div class="mt-bar"><span style="width:'+maPct+'%;background:#0FB981"></span></div><div class="mt-conf2">'+(ma.unsec>0?('<span class="mc-ok">✅ 확보 '+fmtMoney(ma.total-ma.unsec,"KRW")+'</span><span class="mc-short">⚠ 미확보 '+fmtMoney(ma.unsec,"KRW")+'</span>'):'<span class="mc-ok">✅ 다 확보됨</span>')+'</div></div>'+
     '<div class="mtile tap" id="emgTile"><div class="mt-ic violet">🛟</div><div class="mt-k">비상금</div><div class="mt-v">'+fmtMoney(esaved,"KRW")+' <small>/ '+fmtMoney(egoal,"KRW")+'</small></div><div class="mt-bar"><span style="width:'+epct+'%;background:#6C5CE7"></span></div><div class="mt-m">'+(egoal>0&&esaved>=egoal?'목표 달성 🎉':'채우기 먼저 · '+fmtMoney(Math.max(0,egoal-esaved),"KRW")+' 남음')+'</div></div>'+
     '<div class="mtile"><div class="mt-ic rose">🔻</div><div class="mt-k">실부담 부채</div><div class="mt-v rose">'+fmtMoney(debt,"KRW")+'</div><div class="mt-bar"><span style="width:100%;background:#F0416B"></span></div><div class="mt-m">마통·대출 (전세 제외)</div></div>'+
     '</div>';
@@ -2190,7 +2203,7 @@ function moneyView(){
     html+='<div class="conf-detail-card"><div class="cd-grp"><div class="cd-h rem">🗓️ '+ma.MM+'월 예정 · '+its.length+'건 '+fmtMoney(its.reduce((s,i)=>s+i.amount,0),"KRW")+'</div>'+its.map(i=>'<div class="cd-row"><span class="cd-d">'+dl(i.day)+'</span><span class="cd-n">'+esc(i.name)+'</span><span class="cd-c">'+esc(i.acct||"")+'</span><span class="cd-a">'+fmtMoney(i.amount,"KRW")+'</span></div>').join('')+'</div></div>';
   }
   if(returnLoans>0) html+='<div class="mnote">만기반환 대출 '+fmtMoney(returnLoans,"KRW")+'(전세대출 등)은 보증금으로 상환돼 <b>순자산에서 제외</b>했어요. 비유동자산엔 대출 뺀 <b>내 지분</b>만 넣으세요.</div>';
-  html+=distributeSectionHtml()+'<div id="acctList">';
+  html+=distributeSectionHtml()+distLogHtml()+'<div id="acctList">';
   accts.forEach(acc=>{
     const open=openAccounts.has(acc.id), isCard=acc.kind==="card", isLoan=acc.kind==="loan", isOD=(acc.kind==="account"&&acc.overdraft);
     let rightHtml, sub, typeIcon="bank", typeCls="";
@@ -2456,9 +2469,23 @@ function applyDistribution(){
     else if(s.type==="emg"){ if(!STORE.money.emergency) STORE.money.emergency={goal:2000000,tx:[]}; STORE.money.emergency.tx.push({ id:uid(), created:Date.now(), date:today, amount:amt, note:"배분 적립" }); out(src, amt, "비상금 적립"); }
     else if(s.type==="debt"){ const d=findAcct(s.id); if(d){ if(s.dk==="loan"){ d.balance=Math.max(0, mnum(d.balance)-amt); out(d, amt, "조기상환 (배분)"); } else { inn(d, amt, "마통 상환 (배분)"); } } out(src, amt, (d?(d.alias||"빚"):"빚")+" 상환"); }
   });
+  const _logItems = steps.filter(s=>mnum(s.amount)>0).map(s=>({ type:s.type, name:(s.type==="acct"?s.name:(s.type==="emg"?"비상금":s.name)), amount:mnum(s.amount) }));
+  if(_logItems.length){ STORE.money.distLog = STORE.money.distLog||[];
+    STORE.money.distLog.unshift({ id:uid(), date:today, created:Date.now(), income:mnum(window._distIncome), src:(src?(src.alias||"계좌"):""), items:_logItems });
+    if(STORE.money.distLog.length>80) STORE.money.distLog.length=80; }
   if($("distIncome")) $("distIncome").value="";
   save(); render(); toast("배분안을 반영했어요 ✅");
 }
+function distLogHtml(){
+  const log=STORE.money.distLog||[]; if(!log.length) return '';
+  const rows=log.map(e=>{
+    const total=(e.items||[]).reduce((s,i)=>s+mnum(i.amount),0);
+    const detail=(e.items||[]).map(i=>{ const ic=i.type==="acct"?"💳":(i.type==="emg"?"🛟":"🔻"); return '<div class="dl-item"><span>'+ic+' '+esc(i.name||"")+'</span><b>'+fmtMoney(i.amount,"KRW")+'</b></div>'; }).join('');
+    return '<div class="dl-row"><div class="dl-top"><span class="dl-date">'+mmdd(e.date)+'</span><span class="dl-sum">'+fmtMoney(total,"KRW")+' 배분</span><button type="button" class="dl-x" data-distdel="'+e.id+'" title="이 기록만 삭제">✕</button></div><div class="dl-items">'+detail+'</div></div>';
+  }).join('');
+  return '<div class="fold" style="margin-top:14px">'+foldHeader("distlog", svi('layers'), "배분 이력", log.length)+(fold.distlog?'<div class="fold-body distlog-body">'+rows+'</div>':'')+'</div>';
+}
+function distLogDel(id){ if(!confirm("이 배분 기록만 목록에서 지울까요?\n(실제 계좌 입출금 내역은 그대로 남아요.)")) return; STORE.money.distLog=(STORE.money.distLog||[]).filter(e=>e.id!==id); save(); render(); }
 function emergencyCardHtml(){
   if(!STORE.money.emergency) STORE.money.emergency={ goal:2000000, tx:[] };
   const e=STORE.money.emergency;
@@ -2553,6 +2580,8 @@ function wireMoney(){
   const dbtn=$("distBtn"); if(dbtn) dbtn.addEventListener("click", runDistribute);
   const din=$("distIncome"); if(din){ attachThousands(din); din.addEventListener("keydown", e=>{ if(e.key==="Enter") runDistribute(); }); }
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
+  document.querySelectorAll("#view [data-distdel]").forEach(b=> b.addEventListener("click", (e)=>{ e.stopPropagation(); distLogDel(b.dataset.distdel); }));
+  wireFolds();
 }
 function actAcct(id, act){
   if(act==="toggle"){ openAccounts.has(id)?openAccounts.delete(id):openAccounts.add(id); render(); return; }
