@@ -2325,7 +2325,7 @@ function acctNeedInfo(acc, opts){
   const t=todayStr(), mk=t.slice(0,7), month=!!(opts&&opts.month);
   const w=monthWindow(), wn=monthAheadWindow();
   const bg=mnum(acc.budget);
-  const bal=acc.conduit ? (acc.tx||[]).filter(x=>x.dir==="in" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0) : acctBalance(acc);
+  const bal=acc.conduit ? (acc.tx||[]).filter(x=>String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+(x.dir==="in"?1:-1)*mnum(x.krw),0) : acctBalance(acc);   // 통로: 이번 달 순액(입금−출금)
   // 이번 달: 내일~이달말 확정분 + (생활비면 이달 남은 예산). 잔액이 먼저 여기를 덮는다.
   let tmObl=0; obligations(shiftDay(t,1), w.mend).forEach(o=>{ if(o.acctId===acc.id) tmObl+=o.amount; });
   const tmGross = tmObl + (bg>0 ? Math.max(0, bg-budgetSpent(acc,mk)) : 0);
@@ -2334,7 +2334,7 @@ function acctNeedInfo(acc, opts){
   // 다음 달: 다음달 확정분 + (생활비면 1달치 통째). 이번 달 쓰고 "남은" 잔액만 넘어온다(0이면 통째 필요).
   let nmObl=0; obligations(wn.mstart, wn.mend).forEach(o=>{ if(o.acctId===acc.id) nmObl+=o.amount; });
   const nmGross = nmObl + (bg>0 ? bg : 0);
-  const leftBal = acc.conduit ? 0 : Math.max(0, bal - tmGross); // 통로는 매달 새로 채워 내보내니 이월 잔액 없음
+  const leftBal = Math.max(0, bal - tmGross); // 이번 달 쓰고 남은 잔액만 다음 달로(통로도 순액 기준이라 동일). 순액 음수면 0
   const nextMonth = Math.max(0, nmGross - leftBal);
   return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth };
 }
