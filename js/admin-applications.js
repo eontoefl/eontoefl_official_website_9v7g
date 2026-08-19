@@ -705,7 +705,7 @@ function displayApplications() {
                     </div>
                 </td>
                 <td>
-                    <div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}</div>
+                    <div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}${app.withdrawn_at ? ' <span style="background:#f1f5f9; color:#94a3b8; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; vertical-align:middle;">탈퇴</span>' : ''}</div>
                     <div style="font-size:11px; color:#94a3b8; line-height:1.3; margin-top:1px;">${escapeHtml(app.email)}</div>
                 </td>
                 <td style="font-size: 13px; white-space:nowrap;">
