@@ -1552,9 +1552,16 @@ function wireWork(){
   document.querySelectorAll("#view .wchainfold [data-cstep-done]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); actWork(el.dataset.cstepDone, "done"); }));
   document.querySelectorAll("#view .wchainfold [data-cstep-exp]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); const id=el.dataset.cstepExp; if(chainExpanded.has(id)) chainExpanded.delete(id); else chainExpanded.add(id); render(); }));
   document.querySelectorAll("#view .wchainfold [data-cssub]").forEach(el=> el.addEventListener("click", (e)=>{ e.stopPropagation(); const p=el.dataset.cssub.split("|"); actSub(p[0], p[1], "done"); }));
+  const chainExtra = {
+    onMove: (ev)=>{ const nz=document.querySelector('#view .wchainfold .chain-new'); if(!nz) return null;
+      const r=nz.getBoundingClientRect(); const over = ev.clientX>=r.left-8 && ev.clientX<=r.right+8 && ev.clientY>=r.top-8 && ev.clientY<=r.bottom+8;
+      nz.classList.toggle('drop-hot', over); return over ? 'newseed' : null; },
+    clear: ()=>{ const nz=document.querySelector('#view .wchainfold .chain-new'); if(nz) nz.classList.remove('drop-hot'); },
+    onDrop: (id, zone)=>{ if(zone==='newseed') extractToSeed(id); }
+  };
   document.querySelectorAll("#view .wchainfold .chain:not(.cyclic)").forEach(ch=>{
     if(ch.querySelectorAll('.cstep').length<2) return;   // 스텝 2개 이상일 때만 재정렬
-    wireReorder(ch, '.cstep', '.cs-drag', el=>el.dataset.goto, (id,prev,next)=>insertIntoChain(id,prev,next));
+    wireReorder(ch, '.cstep', '.cs-drag', el=>el.dataset.goto, (id,prev,next)=>insertIntoChain(id,prev,next), chainExtra);
   });
   document.querySelectorAll("#view .wchainfold .cs-subs").forEach(subs=>{
     if(subs.querySelectorAll('.cs-sub').length<2) return;
@@ -1855,8 +1862,22 @@ function reorderSub(projId, subId, prevSubId, nextSubId){
   if(idx<0) idx=rest.length;
   rest.splice(idx,0,item); p.subtasks=rest; save(); render();
 }
-// 세로 리스트 안에서 핸들로 항목 재정렬 → commit(draggedId, prevId, nextId). 실제 마우스 대응 위해 이동/뗌은 document에.
-function wireReorder(listEl, itemSel, handleSel, idOf, commit){
+// 체인 스텝을 현재 순서에서 빼내 새 순서 씨앗으로. (구멍은 insertIntoChain과 같게 메움: 이 업무를 선행으로 갖던 애 → 이 업무의 옛 선행으로 이어붙임)
+function extractToSeed(dragId){
+  const drag=workRef(dragId); if(!drag) return;
+  const oldDeps=normDeps(drag).map(d=>d.id);
+  ["quick","deadline","project","someday","recurring"].forEach(b=>(STORE.work[b]||[]).forEach(t=>{
+    if(t.id===dragId) return;
+    const dd=normDeps(t);
+    if(dd.some(d=>d.id===dragId)){ let nd=dd.filter(d=>d.id!==dragId);
+      oldDeps.forEach(pid=>{ if(pid!==t.id && !nd.some(d=>d.id===pid)) nd.push({id:pid,note:""}); });
+      t.deps=nd; }
+  }));
+  drag.deps=[];
+  save(); startSeed(dragId);   // 씨앗 상태로 전환 + 렌더
+}
+// 세로 리스트 안에서 핸들로 항목 재정렬 → commit(draggedId, prevId, nextId). extra={onMove,onDrop,clear}로 외부 존(새 순서 만들기 등) 처리. 실제 마우스 대응 위해 이동/뗌은 document에.
+function wireReorder(listEl, itemSel, handleSel, idOf, commit, extra){
   listEl.querySelectorAll(':scope > '+itemSel).forEach(item=>{
     const handle=item.querySelector(handleSel); if(!handle) return;
     handle.addEventListener('click', ev=>{ ev.stopPropagation(); ev.preventDefault(); });
@@ -1868,15 +1889,19 @@ function wireReorder(listEl, itemSel, handleSel, idOf, commit){
       const ph=document.createElement('div'); ph.className='reorder-ph'; ph.style.height=rect.height+'px';
       item.parentNode.insertBefore(ph, item.nextSibling);
       const s=item.style; s.width=rect.width+'px'; s.position='fixed'; s.left=rect.left+'px'; s.top=rect.top+'px'; s.margin='0'; s.zIndex='1000'; s.pointerEvents='none';
-      item.classList.add('reorder-dragging'); document.body.classList.add('dragging-lock'); let moved=false;
+      item.classList.add('reorder-dragging'); document.body.classList.add('dragging-lock'); let moved=false, zone=null;
       const sibs=()=>[...listEl.children].filter(c=>c!==item && c!==ph && c.matches && c.matches(itemSel));
       const move=ev=>{ ev.preventDefault(); moved=true; s.left=(ev.clientX-offX)+'px'; s.top=(ev.clientY-offY)+'px';
+        zone = extra ? extra.onMove(ev) : null;
+        if(zone){ ph.style.display='none'; return; } ph.style.display='';
         let placed=false;
         for(const o of sibs()){ const r=o.getBoundingClientRect(); if(ev.clientY < r.top+r.height/2){ listEl.insertBefore(ph,o); placed=true; break; } }
         if(!placed){ const last=sibs().slice(-1)[0]; if(last) listEl.insertBefore(ph, last.nextSibling); else listEl.appendChild(ph); } };
       const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.removeEventListener('pointercancel',up);
         try{ handle.releasePointerCapture(e.pointerId); }catch(_){}
         item.style.cssText=''; item.classList.remove('reorder-dragging'); document.body.classList.remove('dragging-lock');
+        if(extra && extra.clear) extra.clear();
+        if(moved && zone && extra){ ph.remove(); extra.onDrop(idOf(item), zone); return; }
         const seq=[...listEl.children].filter(c=> c===ph || (c!==item && c.matches && c.matches(itemSel)));
         const pi=seq.indexOf(ph);
         const prevId = pi>0 ? idOf(seq[pi-1]) : null;
