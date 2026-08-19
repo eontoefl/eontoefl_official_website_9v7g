@@ -1973,6 +1973,20 @@ function cardCycleBounds(card, todayS){
   }
 }
 function cardStatement(card){ const [s,e]=cardCycleBounds(card, todayStr()); return (card.tx||[]).filter(t=>t.date>=s && t.date<=e).reduce((sum,t)=>sum+(t.dir==="out"?1:-1)*mnum(t.krw),0); }
+// 특정 결제일(payDate)에 실제 나가는 청구서 = 그 결제일 직전에 마감된 청구주기의 사용분. (미래/과거 결제일 모두 정확)
+function cardStatementForPayDate(card, payDate){
+  const cs=+card.cycleStart||0, ce=+card.cycleEnd||0, [Y,M]=payDate.split("-").map(Number);
+  let s, e;
+  if(!cs||!ce){ const pm=M-1>=1?M-1:12, py=M-1>=1?Y:Y-1, last=new Date(py,pm,0).getDate(); s=ymd(py,pm,1); e=ymd(py,pm,last); }
+  else {
+    e=ymd(Y,M,ce);
+    if(e>=payDate){ const pm=M-1>=1?M-1:12, py=M-1>=1?Y:Y-1; e=ymd(py,pm,ce); }
+    const [ey,em]=e.split("-").map(Number);
+    if(cs<=ce){ s=ymd(ey,em,cs); }
+    else { const sm=em-1>=1?em-1:12, sy=em-1>=1?ey:ey-1; s=ymd(sy,sm,cs); }
+  }
+  return (card.tx||[]).filter(t=>t.date>=s && t.date<=e).reduce((sum,t)=>sum+(t.dir==="out"?1:-1)*mnum(t.krw),0);
+}
 const CUR = { KRW:{sym:"₩",dec:0}, USD:{sym:"$",dec:2}, EUR:{sym:"€",dec:2} };
 const mnum = v => { const n=parseFloat(String(v==null?"":v).replace(/[^0-9.\-]/g,"")); return isFinite(n)?n:0; };
 function fmtMoney(v, cur){ const c=CUR[cur]||CUR.KRW; return c.sym + mnum(v).toLocaleString("ko-KR",{ minimumFractionDigits:c.dec, maximumFractionDigits:c.dec }); }
@@ -2284,10 +2298,11 @@ function obligations(from, to){
   const occ=(day, cb)=>{ let [Y,M]=from.split("-").map(Number); const [tY,tM]=to.split("-").map(Number); const dd=(!day||day>=32)?99:+day;
     while(Y<tY || (Y===tY && M<=tM)){ const d=ymd(Y,M,dd); if(d>=from && d<=to) cb(d); M++; if(M>12){M=1;Y++;} } };
   (STORE.money.fixed||[]).forEach(f=>{ const ac=findAcct(f.acctId); if(hideSecret && ac && ac.secret) return;   // 숨김: 숨긴 계좌 결제분 제외
+    if(ac && ac.kind==="card") return;   // 카드에 걸린 고정비는 카드 대금(청구서)에 이미 포함 → 개별로 안 셈(이중 방지)
     occ(f.day, d=> res.push({ date:d, amount:mnum(f.krw), acctId:f.acctId||"", type:"fixed", name:f.desc||"고정비" })); });
   mAccts().forEach(a=>{
     if(a.kind==="loan" && mnum(a.balance)>0 && Math.round(loanConfirmedMonthly(a,from))>0) occ(a.payDay, d=> res.push({ date:d, amount:Math.round(loanConfirmedMonthly(a,d)), acctId:a.payAcctId||"", type:"loan", name:(a.alias||"대출")+" 상환" }));
-    else if(a.kind==="card" && a.payDay && a.payAcctId){ const stmt=Math.max(0,cardStatement(a)); if(stmt>0) occ(a.payDay, d=> res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" })); }
+    else if(a.kind==="card" && a.payDay && a.payAcctId){ occ(a.payDay, d=>{ const stmt=Math.max(0,cardStatementForPayDate(a,d)); if(stmt>0) res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" }); }); }
   });
   return res;
 }
@@ -2356,7 +2371,7 @@ function budgetSpent(a, mk){ return (a.tx||[]).filter(x=>x.dir==="out" && String
 function confirmedItems(){
   const t=todayStr(), w=monthWindow();
   const acc=id=>{ const x=(STORE.money.accounts||[]).find(y=>y.id===id); return x?(x.alias||"계좌"):"미지정"; };
-  const items=obligations(w.mstart, w.mend).filter(o=>o.type!=="card").map(o=>({ name:o.name, day:+o.date.slice(8), amount:o.amount, paid:o.date<=t, acct:acc(o.acctId) }));
+  const items=obligations(w.mstart, w.mend).map(o=>({ name:o.name, day:+o.date.slice(8), amount:o.amount, paid:o.date<=t, acct:acc(o.acctId) }));
   mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=budgetSpent(a,w.mk);
     if(spent>0) items.push({ name:"생활비 (이미 쓴 것)", day:0, amount:Math.min(bg,spent), paid:true, acct:(a.alias||"생활비") });
     if(bg-spent>0) items.push({ name:"생활비 (남은 예산)", day:99, amount:bg-spent, paid:false, acct:(a.alias||"생활비") }); } });
@@ -2365,34 +2380,25 @@ function confirmedItems(){
 function confirmedBreakdown(){
   const t=todayStr(), w=monthWindow();
   let paid=0, remain=0;
-  obligations(w.mstart, w.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.date<=t) paid+=o.amount; else remain+=o.amount; });
+  obligations(w.mstart, w.mend).forEach(o=>{ if(o.date<=t) paid+=o.amount; else remain+=o.amount; });
   mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0){ const bg=mnum(a.budget), spent=budgetSpent(a,w.mk); paid+=Math.min(bg,spent); remain+=Math.max(0,bg-spent); } });
   return { paid, remain, total:paid+remain };
 }
 function monthAheadWindow(){ const nm=addMonth(monthWindow().mstart), [Y,M]=nm.split("-").map(Number), last=new Date(Y,M,0).getDate(); return { mk:nm.slice(0,7), mstart:nm.slice(0,7)+"-01", mend:nm.slice(0,7)+"-"+String(last).padStart(2,"0"), MM:M }; }
 // 다음 달 확정지출 카드 (8월 카드와 동일 관점: 고정비+대출+생활비, 카드는 배분에서). 미확보 = 이번 달까지 필요분을 뺀 "다음 달 추가로 확보할 것"
 function monthAheadCard(){
-  const t=todayStr(), w0=monthWindow(), wn=monthAheadWindow();
-  let total=0; obligations(wn.mstart, wn.mend).filter(o=>o.type!=="card").forEach(o=>total+=o.amount);
+  const wn=monthAheadWindow();
+  // 총액 = 다음 달 나갈 모든 확정분(카드 대금 포함) + 생활비 예산
+  let total=0; obligations(wn.mstart, wn.mend).forEach(o=>total+=o.amount);
   mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0) total+=mnum(a.budget); });
-  let unsec=0;
-  mAccts().filter(a=>a.kind==="account" && !a.overdraft).forEach(a=>{
-    const bg=mnum(a.budget);
-    const bal=a.conduit?(a.tx||[]).filter(x=>x.dir==="in"&&String(x.date||"").slice(0,7)===w0.mk).reduce((s,x)=>s+mnum(x.krw),0):acctBalance(a);
-    // 이번 달 몫(내일~이달말 + 이달 남은 예산)을 잔액이 먼저 덮고, 남은 잔액만 9월로 넘긴다.
-    let augObl=0; obligations(shiftDay(t,1), w0.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) augObl+=o.amount; });
-    const augGross=augObl+(bg>0?Math.max(0,bg-budgetSpent(a,w0.mk)):0);
-    const leftBal=a.conduit ? 0 : Math.max(0, bal-augGross); // 통로는 이월 잔액 없음
-    let sepObl=0; obligations(wn.mstart, wn.mend).filter(o=>o.type!=="card").forEach(o=>{ if(o.acctId===a.id) sepObl+=o.amount; });
-    const sepGross=sepObl+(bg>0?bg:0);
-    unsec += Math.max(0, sepGross-leftBal);
-  });
+  // 미확보 = 배분의 "다음 달 채울 것"과 동일 (계좌별 다음달 필요분 = 잔액 반영)
+  const unsec = mAccts().filter(a=>a.kind==="account" && !a.overdraft).reduce((s,a)=>s+acctNeedInfo(a,{}).nextMonth, 0);
   return { total:Math.round(total), unsec:Math.round(unsec), MM:wn.MM };
 }
 function monthAheadItems(){
   const wn=monthAheadWindow();
   const acc=id=>{ const x=(STORE.money.accounts||[]).find(y=>y.id===id); return x?(x.alias||"계좌"):"미지정"; };
-  const items=obligations(wn.mstart, wn.mend).filter(o=>o.type!=="card").map(o=>({ name:o.name, day:+o.date.slice(8), amount:o.amount, acct:acc(o.acctId) }));
+  const items=obligations(wn.mstart, wn.mend).map(o=>({ name:o.name, day:+o.date.slice(8), amount:o.amount, acct:acc(o.acctId) }));
   mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0) items.push({ name:"생활비 예산", day:99, amount:mnum(a.budget), acct:(a.alias||"생활비") }); });
   return items.sort((a,b)=>a.day-b.day);
 }
