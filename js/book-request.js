@@ -569,6 +569,21 @@ async function createAccount() {
         // 조회 실패 시에도 계정 생성은 시도 (DB UNIQUE 제약이 있으면 거기서 막힘)
     }
 
+    // 탈퇴 후 30일 재가입 제한 (이메일 또는 전화번호 일치)
+    try {
+        const wd = await supabaseAPI.query('withdrawal_records', {
+            'or': `(email.ilike.${email},phone.eq.${phone})`,
+            'identity_purge_after': `gt.${new Date().toISOString()}`,
+            'limit': '1'
+        });
+        if (wd && wd.length > 0) {
+            showToast('탈퇴 후 30일 동안은 다시 가입할 수 없어요. 30일이 지나면 재가입하실 수 있습니다.', 'error');
+            return null;
+        }
+    } catch (e) {
+        console.warn('탈퇴 이력 조회 실패(계속 진행):', e);
+    }
+
     const marketingChecked = document.getElementById('agreeMarketing').checked;
 
     const newUser = {
