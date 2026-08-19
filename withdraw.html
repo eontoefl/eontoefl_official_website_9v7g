@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원탈퇴 - 이온토플</title>
+    <link rel="icon" type="image/png" href="https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div style="min-height: 100vh; background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%); display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: white; padding: 44px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); max-width: 560px; width: 100%;">
+
+            <!-- ===== 로딩 상태 ===== -->
+            <div id="loadingState" style="text-align: center; padding: 40px 0; color: #64748b;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #9480c5;"></i>
+                <p style="margin-top: 16px; font-size: 15px;">확인 중입니다...</p>
+            </div>
+
+            <!-- ===== 차단 화면 (진행 중 수강/첨삭/정산) ===== -->
+            <div id="blockedState" style="display: none; text-align: center;">
+                <div style="width: 72px; height: 72px; background: #fff7ed; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <i class="fas fa-circle-info" style="font-size: 32px; color: #ea9a3c;"></i>
+                </div>
+                <h1 style="font-size: 22px; font-weight: 700; color: #1e293b; margin-bottom: 14px;">지금은 탈퇴를 진행할 수 없어요</h1>
+                <p style="color: #475569; font-size: 15px; line-height: 1.7; margin-bottom: 8px;">
+                    진행 중인 수강·첨삭 또는 처리 중인 정산이 있습니다.
+                </p>
+                <p style="color: #475569; font-size: 15px; line-height: 1.7; margin-bottom: 28px;">
+                    수강·환불 관련 문의는 카카오톡 채널로 연락 주시면<br>확인 후 도와드릴게요.
+                </p>
+                <div style="display: flex; gap: 12px;">
+                    <a href="dashboard.html"
+                       style="flex: 1; padding: 15px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; background: #efeaf7; color: #5b4a7d;">
+                        <i class="fas fa-arrow-left"></i> 대시보드로 돌아가기
+                    </a>
+                    <a href="http://pf.kakao.com/_FWxcZC" target="_blank"
+                       style="flex: 1; padding: 15px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; background: #fee500; color: #3c1e1e;">
+                        <i class="fas fa-comment"></i> 카카오톡 채널 문의
+                    </a>
+                </div>
+            </div>
+
+            <!-- ===== 본 화면 ===== -->
+            <div id="withdrawMain" style="display: none;">
+                <!-- Header -->
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div style="width: 72px; height: 72px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px;">
+                        <i class="fas fa-user-slash" style="font-size: 30px; color: #94a3b8;"></i>
+                    </div>
+                    <h1 style="font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">회원탈퇴</h1>
+                    <p style="color: #64748b; font-size: 14px;">탈퇴 전 아래 안내를 꼭 확인해주세요</p>
+                </div>
+
+                <!-- 섹션 A: 안내 -->
+                <div style="background: #f8fafc; border: 1px solid #eef2f7; border-radius: 12px; padding: 20px 22px; margin-bottom: 24px;">
+                    <div style="margin-bottom: 16px;">
+                        <p style="font-size: 14px; font-weight: 700; color: #334155; margin-bottom: 8px;">
+                            <i class="fas fa-trash-can" style="color: #94a3b8;"></i> 탈퇴 시 삭제되는 것
+                        </p>
+                        <ul style="margin: 0; padding-left: 18px; color: #475569; font-size: 13.5px; line-height: 1.9;">
+                            <li>계정 정보</li>
+                            <li>학습 기록 (과제·첨삭·인증·진도·메모)</li>
+                            <li>시험 일정·성적 기록</li>
+                            <li>입문서 열람 권한</li>
+                        </ul>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <p style="font-size: 14px; font-weight: 700; color: #334155; margin-bottom: 8px;">
+                            <i class="fas fa-shield-halved" style="color: #94a3b8;"></i> 법령에 따라 보존되는 것
+                        </p>
+                        <ul style="margin: 0; padding-left: 18px; color: #475569; font-size: 13.5px; line-height: 1.9;">
+                            <li>계약·결제·환불 관련 기록은 전자상거래법에 따라 5년간 보관 후 파기</li>
+                        </ul>
+                    </div>
+                    <div style="border-top: 1px solid #eef2f7; padding-top: 14px;">
+                        <p style="font-size: 13.5px; color: #475569; line-height: 1.8; margin: 0;">
+                            <i class="fas fa-clock" style="color: #94a3b8;"></i>
+                            <b>7일 유예</b> — 탈퇴 신청 후 7일간은 로그인하면 탈퇴를 취소할 수 있어요. 7일이 지나면 모든 데이터가 영구 삭제되며 복구할 수 없습니다.
+                        </p>
+                        <p style="font-size: 13.5px; color: #475569; line-height: 1.8; margin: 10px 0 0;">
+                            <i class="fas fa-ban" style="color: #94a3b8;"></i>
+                            <b>30일 제한</b> — 탈퇴 완료 후 30일 동안은 같은 이메일·전화번호로 재가입할 수 없어요.
+                        </p>
+                        <p style="font-size: 12px; color: #94a3b8; line-height: 1.7; margin: 12px 0 0;">
+                            작성하신 게시물(후기·공부인증 글)은 닉네임과 함께 유지됩니다.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="withdrawForm">
+                    <!-- 섹션 B: 사유 -->
+                    <div style="margin-bottom: 22px;">
+                        <label style="display: block; font-weight: 600; color: #1e293b; margin-bottom: 8px; font-size: 14px;">
+                            탈퇴 사유 <span style="color: #dc2626;">*</span>
+                        </label>
+                        <select id="withdrawReason" required
+                                style="width: 100%; padding: 13px 14px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 15px; color: #1e293b; background: white; cursor: pointer;">
+                            <option value="" disabled selected>사유를 선택해주세요</option>
+                            <option value="목표 점수를 달성했어요">목표 점수를 달성했어요</option>
+                            <option value="더 이상 토플을 준비하지 않아요">더 이상 토플을 준비하지 않아요</option>
+                            <option value="다른 서비스를 이용하기로 했어요">다른 서비스를 이용하기로 했어요</option>
+                            <option value="이용을 잘 안 하게 돼요">이용을 잘 안 하게 돼요</option>
+                            <option value="개인정보를 정리하고 싶어요">개인정보를 정리하고 싶어요</option>
+                            <option value="서비스가 불만족스러워요">서비스가 불만족스러워요</option>
+                            <option value="기타">기타</option>
+                        </select>
+                        <textarea id="withdrawReasonDetail" rows="3"
+                                  placeholder="남기고 싶은 말씀이 있다면 적어주세요 (선택)"
+                                  style="width: 100%; margin-top: 10px; padding: 13px 14px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #1e293b; resize: vertical; font-family: inherit;"></textarea>
+                    </div>
+
+                    <!-- 섹션 C: 최종 확인 -->
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; color: #334155; line-height: 1.5;">
+                            <input type="checkbox" id="agreeCheck" style="margin-top: 3px; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
+                            <span>위 안내 사항을 모두 확인했습니다.</span>
+                        </label>
+                    </div>
+                    <div style="margin-bottom: 28px;">
+                        <label style="display: block; font-weight: 600; color: #1e293b; margin-bottom: 8px; font-size: 14px;">
+                            <i class="fas fa-lock" style="color: #94a3b8;"></i> 현재 비밀번호 확인 <span style="color: #dc2626;">*</span>
+                        </label>
+                        <input type="password" id="withdrawPassword" autocomplete="current-password"
+                               placeholder="현재 비밀번호를 입력하세요"
+                               style="width: 100%; padding: 13px 14px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 15px;">
+                    </div>
+
+                    <!-- 버튼 -->
+                    <div style="display: flex; gap: 12px;">
+                        <button type="button" onclick="window.location.href='my-profile.html'"
+                                style="flex: 1.3; padding: 15px; border: none; background: #efeaf7; color: #5b4a7d; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;">
+                            <i class="fas fa-arrow-left"></i> 돌아가기
+                        </button>
+                        <button type="submit" id="withdrawBtn"
+                                style="flex: 1; padding: 15px; border: none; background: #f1f5f9; color: #64748b; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                            탈퇴 신청
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="footer-title">이온토플</h3>
+                    <p class="footer-desc">사교육도, 독학도 다 해본 사람이 만든<br>토플 공부법입니다.</p>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">바로가기</h4>
+                    <ul class="footer-links">
+                        <li><a href="about.html">소개</a></li>
+                        <li><a href="programs.html">프로그램</a></li>
+                        <li><a href="pricing.html">가격</a></li>
+                        <li><a href="reviews.html">후기</a></li>
+                        <li><a href="faq.html">FAQ</a></li>
+                        <li><a href="application.html">수강 신청</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-heading">문의</h4>
+                    <ul class="footer-contact">
+                        <li><a href="mailto:messijessi@naver.com" style="color: inherit; text-decoration: none;"><i class="fas fa-envelope"></i> messijessi@naver.com</a></li>
+                        <li><a href="http://pf.kakao.com/_FWxcZC" target="_blank" style="color: inherit; text-decoration: none;"><i class="fas fa-comment"></i> 카카오톡 채널 문의</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2019-2026 이온. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Floating Kakao Talk Button -->
+    <a href="http://pf.kakao.com/_FWxcZC" target="_blank" class="kakao-float-btn" title="카카오톡 문의">
+        <i class="fas fa-comment"></i>
+    </a>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/withdraw.js"></script>
+</body>
+</html>
