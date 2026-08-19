@@ -33,6 +33,7 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
         const applications = await supabaseAPI.query('applications', {
             'name': `ilike.*${searchName}*`,
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'order': 'created_at.desc',
             'limit': '100'
         });

@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             const result = await supabaseAPI.query('applications', {
                 'email': `eq.${userData.email}`,
                 'deleted': 'neq.true',
+                'withdrawn_at': 'is.null',
                 'order': 'created_at.desc',
                 'limit': '100'
             });

@@ -323,7 +323,7 @@ async function loadApplicationsList() {
 
         if (appResult.data && appResult.data.length > 0) {
             // 삭제된 신청서 및 입문서 무료 신청(book_only) 필터링
-            allApplications = appResult.data.filter(app => !app.deleted && app.application_type !== 'book_only');
+            allApplications = appResult.data.filter(app => !app.deleted && !app.withdrawn_at && app.application_type !== 'book_only');
             
             // Update total count
             document.getElementById('totalCount').textContent = allApplications.length;

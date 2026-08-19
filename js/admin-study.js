@@ -47,6 +47,7 @@ async function loadStudyData() {
         // 1. 진행 중인 학생 조회: 입금 확인 완료
         const apps = await supabaseAPI.query('applications', {
             'deposit_confirmed_by_admin': 'eq.true',
+            'withdrawn_at': 'is.null',
             'limit': '500'
         });
 

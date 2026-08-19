@@ -106,6 +106,7 @@ async function getFunnelSegment() {
         const result = await supabaseAPI.query('applications', {
             'email': `eq.${userData.email}`,
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'limit': '100'
         });
         const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
@@ -335,6 +336,7 @@ async function goToMyApplication(event) {
         const result = await supabaseAPI.query('applications', {
             'email': `eq.${userData.email}`,
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'order': 'created_at.desc',
             'limit': '20'
         });

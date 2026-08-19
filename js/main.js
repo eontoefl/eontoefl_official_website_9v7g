@@ -298,6 +298,7 @@ async function createFloatingButtons() {
         const myApplications = await supabaseAPI.query('applications', {
             'email': `eq.${user.email}`,
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'limit': '10'
         });
         
