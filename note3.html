@@ -380,6 +380,23 @@
   .dtag.m-short { color:#F0416B; background:#FDECEF; }
   .dtag.next { color:#8a6d1e; background:#FEF3D6; }
   .dtag.carry { color:#2b7a9e; background:#E4F3FA; }
+  .dist-item { border-top:1px solid var(--surface-container); }
+  .dist-item:first-child { border-top:none; }
+  .dist-item .dist-row { border-top:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .dist-caret { flex:0 0 auto; display:inline-block; font-size:10px; color:var(--on-surface-variant); transition:transform .15s; align-self:center; }
+  .dist-item.open > .dist-row .dist-caret { transform:rotate(90deg); }
+  .dist-detail { display:none; padding:2px 0 10px 15px; }
+  .dist-item.open > .dist-detail { display:block; }
+  .dd-sec { background:var(--surface-high); border-radius:12px; padding:8px 11px; margin-top:7px; }
+  .dd-h { font-size:11.5px; font-weight:800; color:var(--on-surface-variant); margin-bottom:5px; }
+  .dd-line { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; font-size:12.5px; color:var(--on-surface); padding:2px 0; }
+  .dd-name { flex:1; min-width:0; color:var(--on-surface-variant); word-break:break-word; }
+  .dd-amt { flex:0 0 auto; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .dd-empty { font-size:12px; color:var(--on-surface-variant); padding:2px 0; }
+  .dd-sub { border-top:1px dashed rgba(120,120,140,.35); margin-top:3px; padding-top:4px; }
+  .dd-sub .dd-name, .dd-sub .dd-amt { font-weight:800; color:var(--on-surface); }
+  .dd-total { border-top:2px solid rgba(120,120,140,.5); margin-top:3px; padding-top:5px; }
+  .dd-total .dd-name, .dd-total .dd-amt { font-weight:800; color:var(--on-surface); }
   .dist-plan { background:var(--accent-lightest); border-radius:var(--r-lg); padding:.7rem .9rem; margin:.2rem 0 .7rem; }
   .dp-h { font-size:12px; font-weight:800; color:var(--accent-ink); margin-bottom:.4rem; }
   .dp-row { display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; padding:5px 0; font-size:13.5px; color:var(--on-surface); border-top:1px solid rgba(255,255,255,.5); }
@@ -2362,12 +2379,15 @@ function acctNeedInfo(acc, opts){
   // 이번 달: 내일~이달말 확정분 + (생활비면 이달 남은 예산). 잔액이 먼저 여기를 덮는다.
   // 통로 계좌는 잔액을 '이달 입금 합'으로 보므로(이미 나간 건 잔고에 안 남음), 지출도 이달 전체(1일~말일)를 세야 정합이 맞는다. 일반 계좌는 잔액에 과거 지출이 이미 반영돼 있어 내일~말일만.
   const oblFrom = acc.conduit ? w.mstart : shiftDay(t,1);
-  let tmObl=0; obligations(oblFrom, w.mend).forEach(o=>{ if(o.acctId===acc.id) tmObl+=o.amount; });
-  const tmGross = tmObl + (bg>0 ? Math.max(0, bg-budgetSpent(acc,mk)) : 0);
+  // 분해 표시용 항목 수집(계산엔 영향 없음, 합계만 그대로 씀 — 단일 원천).
+  const tmItems=[]; let tmObl=0; obligations(oblFrom, w.mend).forEach(o=>{ if(o.acctId===acc.id){ tmObl+=o.amount; tmItems.push({date:o.date, name:o.name, amount:o.amount, type:o.type}); } });
+  const bgRemain = bg>0 ? Math.max(0, bg-budgetSpent(acc,mk)) : 0;
+  const tmGross = tmObl + bgRemain;
   const thisMonth = Math.max(0, tmGross - bal);
-  if(month) return { totalNeed:tmGross, need:thisMonth, bal, thisMonth, nextMonth:0 };
+  const tmDetail = { items:tmItems, budgetRemain:bgRemain, bal, conduit:!!acc.conduit, tmGross, need:thisMonth };
+  if(month) return { totalNeed:tmGross, need:thisMonth, bal, thisMonth, nextMonth:0, tmDetail };
   // 다음 달: 다음달 확정분 + (생활비면 1달치 통째). 이번 달 쓰고 "남은" 잔액만 넘어온다(0이면 통째 필요).
-  let nmObl=0; obligations(wn.mstart, wn.mend).forEach(o=>{ if(o.acctId===acc.id) nmObl+=o.amount; });
+  const nmItems=[]; let nmObl=0; obligations(wn.mstart, wn.mend).forEach(o=>{ if(o.acctId===acc.id){ nmObl+=o.amount; nmItems.push({date:o.date, name:o.name, amount:o.amount, type:o.type}); } });
   const nmGross = nmObl + (bg>0 ? bg : 0);
   const carry = Math.max(0, bal - tmGross); // 이번 달 쓰고 월말에 남을 잔여(표시·관리용)
   // 생활비(예산)·통로 계좌는 매달 그 달치를 "새로" 채우는 개념 → 잔여를 다음 달에서 자동 차감하지 않음(잔여는 따로 관리).
@@ -2375,7 +2395,8 @@ function acctNeedInfo(acc, opts){
   const isFresh = (bg>0) || acc.conduit;
   const leftBal = isFresh ? 0 : carry;
   const nextMonth = Math.max(0, nmGross - leftBal);
-  return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth, carry };
+  const nmDetail = { items:nmItems, budget:(bg>0?bg:0), leftBal, isFresh, conduit:!!acc.conduit, nmGross, need:nextMonth };
+  return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth, carry, tmDetail, nmDetail };
 }
 function monthUnsecured(){ return mAccts().filter(a=>a.kind==="account"&&!a.overdraft).reduce((s,a)=>s+acctNeedInfo(a,{month:true}).need,0); }
 function acctNextDue(acc){
@@ -2465,14 +2486,44 @@ function distributeSectionHtml(){
   if(targets.length){ h+='<div class="dist-board">';
     targets.forEach(t=>{ const info=acctNeedInfo(t.acc,{}); const mneed=Math.max(0,acctNeedInfo(t.acc,{month:true}).need), nneed=Math.max(0,info.nextMonth);
       const carry=(mnum(t.acc.budget)>0)?Math.round(info.carry||0):0;   // 이월 잔여는 생활비(예산) 계좌만 표시. 통로는 잔고를 추적 안 하므로 제외.
-      h+='<div class="dist-row"><span class="dist-n">'+esc(t.acc.alias||"계좌")+(t.acc.conduit?' <em>통로</em>':'')+'</span><span class="dist-tags">'+
+      h+='<div class="dist-item">'+
+        '<div class="dist-row" onclick="toggleDistDetail(this)"><span class="dist-caret">▸</span><span class="dist-n">'+esc(t.acc.alias||"계좌")+(t.acc.conduit?' <em>통로</em>':'')+'</span><span class="dist-tags">'+
         '<span class="dtag '+(mneed>0?'m-short':'m-ok')+'">이번 달 '+(mneed>0?('−'+fmtMoney(mneed,"KRW")):'✅')+'</span>'+
         (nneed>0?'<span class="dtag next">다음 달 −'+fmtMoney(nneed,"KRW")+'</span>':'')+
         (carry>0?'<span class="dtag carry" title="이번 달 쓰고 남을 잔여. 다음 달 배정에서 자동으로 안 빼요 — 이만큼 덜 넣거나 비상금으로 옮겨도 돼요.">이월 +'+fmtMoney(carry,"KRW")+'</span>':'')+
-        '</span></div>'; });
+        '</span></div>'+
+        '<div class="dist-detail">'+distDetailHtml(info, t.acc, mneed, nneed)+'</div>'+
+      '</div>'; });
     h+='</div>'; }
   return h+'</div>';
 }
+// 배분 칩 금액 산정 내역(표시 전용). 칩 값은 acctNeedInfo의 tmDetail/nmDetail에서 그대로 나온 것 — 합계가 칩과 구조적으로 항상 일치.
+function distDetailHtml(info, acc, mneed, nneed){
+  const tm=info.tmDetail, nm=info.nmDetail;
+  const mdName=d=>d.slice(5).replace("-","/");
+  const line=(name, amt, sign, cls)=> '<div class="dd-line'+(cls?' '+cls:'')+'"><span class="dd-name">'+esc(name)+'</span><span class="dd-amt">'+(sign||'')+fmtMoney(Math.abs(amt),"KRW")+'</span></div>';
+  const itemsHtml=(items, emptyMsg)=>{ if(!items.length) return '<div class="dd-empty">'+emptyMsg+'</div>';
+    return items.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(it=>line(mdName(it.date)+' '+it.name, it.amount, '+')).join(''); };
+  let h='';
+  // [이번 달]
+  h+='<div class="dd-sec"><div class="dd-h">📅 이번 달 필요 산정</div>';
+  h+=itemsHtml(tm.items, '이번 달 이 계좌에서 나갈 확정 지출 없음');
+  if(tm.budgetRemain>0) h+=line('생활비 남은 예산', tm.budgetRemain, '+');
+  h+=line('합계 (나갈 것)', tm.tmGross, '', 'dd-sub');
+  h+=line(tm.conduit?'이번 달 넣은 돈':'현재 잔액', tm.bal, '−');
+  h+='<div class="dd-line dd-total"><span class="dd-name">= 이번 달 필요</span><span class="dd-amt">'+(mneed>0?fmtMoney(mneed,"KRW"):'₩0 · 잔액이 덮어서 0 ✅')+'</span></div>';
+  h+='</div>';
+  // [다음 달]
+  h+='<div class="dd-sec"><div class="dd-h">📆 다음 달 필요 산정</div>';
+  h+=itemsHtml(nm.items, '다음 달 이 계좌에서 나갈 확정 지출 없음');
+  if(nm.budget>0) h+=line('생활비 예산 (한 달치)', nm.budget, '+');
+  h+=line('합계 (나갈 것)', nm.nmGross, '', 'dd-sub');
+  h+=line(nm.conduit?'이월 잔액 (통로는 0)':'이월 잔액', nm.leftBal, '−');
+  h+='<div class="dd-line dd-total"><span class="dd-name">= 다음 달 필요</span><span class="dd-amt">'+(nneed>0?fmtMoney(nneed,"KRW"):'₩0')+'</span></div>';
+  h+='</div>';
+  return h;
+}
+function toggleDistDetail(rowEl){ const it=rowEl.closest('.dist-item'); if(it) it.classList.toggle('open'); }
 function runDistribute(){
   const box=$("distResult"); if(!box) return;
   const income=mnum(($("distIncome")||{}).value);
