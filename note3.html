@@ -379,6 +379,7 @@
   .dtag.m-ok { color:#0F9D6E; background:#E3F7F0; }
   .dtag.m-short { color:#F0416B; background:#FDECEF; }
   .dtag.next { color:#8a6d1e; background:#FEF3D6; }
+  .dtag.carry { color:#2b7a9e; background:#E4F3FA; }
   .dist-plan { background:var(--accent-lightest); border-radius:var(--r-lg); padding:.7rem .9rem; margin:.2rem 0 .7rem; }
   .dp-h { font-size:12px; font-weight:800; color:var(--accent-ink); margin-bottom:.4rem; }
   .dp-row { display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; padding:5px 0; font-size:13.5px; color:var(--on-surface); border-top:1px solid rgba(255,255,255,.5); }
@@ -2240,6 +2241,14 @@ function moneyView(){
         '<div class="bgt-lbl sub2"><span>예산 '+fmtMoney(bg,"KRW")+'</span>'+
         '<span class="bgt-rem">'+(over?("+"+fmtMoney(spent-bg,"KRW")+" 초과"):(fmtMoney(bg-spent,"KRW")+" 남음"))+'</span></div></div>';
     }
+    if(isCard && mnum(acc.budget)>0){
+      const bg=mnum(acc.budget), used=Math.max(0,cardStatement(acc));
+      const over=used>bg, pct=Math.min(100, bg>0?Math.round(used/bg*100):0);
+      const lvl=over?" over":(used>=bg*0.8?" warn":"");
+      budgetHtml='<div class="acct-budget'+lvl+'"><div class="bgt-bar"><span style="width:'+pct+'%"></span></div>'+
+        '<div class="bgt-lbl"><span>배정 '+fmtMoney(bg,"KRW")+'</span><span>이번 주기 '+fmtMoney(used,"KRW")+'</span></div>'+
+        '<div class="bgt-lbl sub2"><span></span><span class="bgt-rem">'+(over?("+"+fmtMoney(used-bg,"KRW")+" 초과"):(fmtMoney(bg-used,"KRW")+" 남음"))+'</span></div></div>';
+    }
     let odHtml="";
     if(acc.kind==="account" && acc.overdraft && mnum(acc.odLimit)>0){
       const lim=mnum(acc.odLimit), used=Math.max(0, -acctBalance(acc));
@@ -2315,7 +2324,8 @@ function obligations(from, to){
     occ(f.day, d=> res.push({ date:d, amount:mnum(f.krw), acctId:f.acctId||"", type:"fixed", name:f.desc||"고정비" })); });
   mAccts().forEach(a=>{
     if(a.kind==="loan" && mnum(a.balance)>0 && Math.round(loanConfirmedMonthly(a,from))>0) occ(a.payDay, d=> res.push({ date:d, amount:Math.round(loanConfirmedMonthly(a,d)), acctId:a.payAcctId||"", type:"loan", name:(a.alias||"대출")+" 상환" }));
-    else if(a.kind==="card" && a.payDay && a.payAcctId){ occ(a.payDay, d=>{ const stmt=Math.max(0,cardStatementForPayDate(a,d)); if(stmt>0) res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" }); }); }
+    else if(a.kind==="card" && a.payDay && a.payAcctId){ const bg=mnum(a.budget); occ(a.payDay, d=>{ const act=Math.max(0,cardStatementForPayDate(a,d)); const stmt=(d<=todayStr())?act:Math.max(act,bg);   // 미래 결제분은 실제 사용액이 배정액보다 적으면 배정액으로 계획(코스트코 등). 과거/오늘 결제분은 실제대로.
+      if(stmt>0) res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" }); }); }
   });
   return res;
 }
@@ -2334,9 +2344,13 @@ function acctNeedInfo(acc, opts){
   // 다음 달: 다음달 확정분 + (생활비면 1달치 통째). 이번 달 쓰고 "남은" 잔액만 넘어온다(0이면 통째 필요).
   let nmObl=0; obligations(wn.mstart, wn.mend).forEach(o=>{ if(o.acctId===acc.id) nmObl+=o.amount; });
   const nmGross = nmObl + (bg>0 ? bg : 0);
-  const leftBal = Math.max(0, bal - tmGross); // 이번 달 쓰고 남은 잔액만 다음 달로(통로도 순액 기준이라 동일). 순액 음수면 0
+  const carry = Math.max(0, bal - tmGross); // 이번 달 쓰고 월말에 남을 잔여(표시·관리용)
+  // 생활비(예산)·통로 계좌는 매달 그 달치를 "새로" 채우는 개념 → 잔여를 다음 달에서 자동 차감하지 않음(잔여는 따로 관리).
+  // 그 외(보험료 등 모으는 계좌)는 잔액이 실제 그 용도 돈이라 잔여만큼 덜 채움.
+  const isFresh = (bg>0) || acc.conduit;
+  const leftBal = isFresh ? 0 : carry;
   const nextMonth = Math.max(0, nmGross - leftBal);
-  return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth };
+  return { totalNeed:tmGross+nmGross, need:thisMonth+nextMonth, bal, thisMonth, nextMonth, carry };
 }
 function monthUnsecured(){ return mAccts().filter(a=>a.kind==="account"&&!a.overdraft).reduce((s,a)=>s+acctNeedInfo(a,{month:true}).need,0); }
 function acctNextDue(acc){
@@ -2424,10 +2438,13 @@ function distributeSectionHtml(){
   h+='<div class="dist-in"><input type="text" id="distIncome" placeholder="들어온 금액 입력 (예: 5,000,000)" inputmode="numeric" autocomplete="off"><button type="button" id="distBtn">배분</button></div>';
   h+='<div id="distResult"></div>';
   if(targets.length){ h+='<div class="dist-board">';
-    targets.forEach(t=>{ const mneed=Math.max(0,acctNeedInfo(t.acc,{month:true}).need), nneed=Math.max(0,t.need-mneed);
+    targets.forEach(t=>{ const info=acctNeedInfo(t.acc,{}); const mneed=Math.max(0,acctNeedInfo(t.acc,{month:true}).need), nneed=Math.max(0,info.nextMonth);
+      const isFresh=(mnum(t.acc.budget)>0)||t.acc.conduit;   // 이월 잔여는 매달 새로 채우는 계좌(생활비·통로)만 표시. 그 외는 이미 다음달에서 자동 차감됨.
+      const carry=isFresh?Math.round(info.carry||0):0;
       h+='<div class="dist-row"><span class="dist-n">'+esc(t.acc.alias||"계좌")+(t.acc.conduit?' <em>통로</em>':'')+'</span><span class="dist-tags">'+
         '<span class="dtag '+(mneed>0?'m-short':'m-ok')+'">이번 달 '+(mneed>0?('−'+fmtMoney(mneed,"KRW")):'✅')+'</span>'+
         (nneed>0?'<span class="dtag next">다음 달 −'+fmtMoney(nneed,"KRW")+'</span>':'')+
+        (carry>0?'<span class="dtag carry" title="이번 달 쓰고 남을 잔여. 다음 달 배정에서 자동으로 안 빼요 — 이만큼 덜 넣거나 비상금으로 옮겨도 돼요.">이월 +'+fmtMoney(carry,"KRW")+'</span>':'')+
         '</span></div>'; });
     h+='</div>'; }
   return h+'</div>';
@@ -2623,7 +2640,10 @@ function loRepayUpdate(){
 function acKindUpdate(kind){
   const card=kind==="card", loan=kind==="loan", acct=kind==="account";
   $("ac_startFld").style.display=acct?"":"none";
-  $("ac_budgetFld").style.display=acct?"":"none";
+  $("ac_budgetFld").style.display=(acct||card)?"":"none";
+  { const bl=$("ac_budgetFld").querySelector("label"), bi=$("ac_budget");
+    if(bl) bl.textContent = card?"월 배정액 (선택)":"월 예산 (선택)";
+    if(bi) bi.placeholder = card?"예: 500,000 (매달 이 카드로 쓸 생활비 배정. 배분 계획에 반영)":"예: 2,000,000 (이번 달 쓴 금액을 막대로 표시)"; }
   $("ac_conduitFld").style.display=acct?"":"none";
   $("ac_odBlk").style.display=acct?"":"none";
   $("ac_cardBlk").style.display=card?"":"none";
@@ -2685,6 +2705,7 @@ function saveAcct(){
   if(mAcctKind==="card"){
     base.payDay=dayFrom("ac_payday","ac_paylast");
     base.payAcctId=$("ac_payacct").value||"";
+    base.budget=mnum($("ac_budget").value)||0;
     const c1=parseInt($("ac_cyc1").value,10), c2=parseInt($("ac_cyc2").value,10);
     base.cycleStart=(isFinite(c1)&&c1>=1)?Math.min(31,c1):null;
     base.cycleEnd=(isFinite(c2)&&c2>=1)?Math.min(31,c2):null;
