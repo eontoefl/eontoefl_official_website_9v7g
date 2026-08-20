@@ -2335,7 +2335,7 @@ function acctNeedInfo(acc, opts){
   const t=todayStr(), mk=t.slice(0,7), month=!!(opts&&opts.month);
   const w=monthWindow(), wn=monthAheadWindow();
   const bg=mnum(acc.budget);
-  const bal=acc.conduit ? (acc.tx||[]).filter(x=>String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+(x.dir==="in"?1:-1)*mnum(x.krw),0) : acctBalance(acc);   // 통로: 이번 달 순액(입금−출금)
+  const bal=acc.conduit ? (acc.tx||[]).filter(x=>x.dir==="in" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0) : acctBalance(acc);   // 통로: 이번 달 넣은 것(입금)만. 잔고는 추적 안 함 — 이번 달 남은 나갈 것과 비교해 확보 여부 판단(이미 나간 건 안 셈)
   // 이번 달: 내일~이달말 확정분 + (생활비면 이달 남은 예산). 잔액이 먼저 여기를 덮는다.
   let tmObl=0; obligations(shiftDay(t,1), w.mend).forEach(o=>{ if(o.acctId===acc.id) tmObl+=o.amount; });
   const tmGross = tmObl + (bg>0 ? Math.max(0, bg-budgetSpent(acc,mk)) : 0);
@@ -2439,8 +2439,7 @@ function distributeSectionHtml(){
   h+='<div id="distResult"></div>';
   if(targets.length){ h+='<div class="dist-board">';
     targets.forEach(t=>{ const info=acctNeedInfo(t.acc,{}); const mneed=Math.max(0,acctNeedInfo(t.acc,{month:true}).need), nneed=Math.max(0,info.nextMonth);
-      const isFresh=(mnum(t.acc.budget)>0)||t.acc.conduit;   // 이월 잔여는 매달 새로 채우는 계좌(생활비·통로)만 표시. 그 외는 이미 다음달에서 자동 차감됨.
-      const carry=isFresh?Math.round(info.carry||0):0;
+      const carry=(mnum(t.acc.budget)>0)?Math.round(info.carry||0):0;   // 이월 잔여는 생활비(예산) 계좌만 표시. 통로는 잔고를 추적 안 하므로 제외.
       h+='<div class="dist-row"><span class="dist-n">'+esc(t.acc.alias||"계좌")+(t.acc.conduit?' <em>통로</em>':'')+'</span><span class="dist-tags">'+
         '<span class="dtag '+(mneed>0?'m-short':'m-ok')+'">이번 달 '+(mneed>0?('−'+fmtMoney(mneed,"KRW")):'✅')+'</span>'+
         (nneed>0?'<span class="dtag next">다음 달 −'+fmtMoney(nneed,"KRW")+'</span>':'')+
