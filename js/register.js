@@ -144,6 +144,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         console.error('Registration error:', error);
         if (error.message && error.message.includes('nickname')) {
             showAlert('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.', 'error');
+        } else if (error.message && error.message.includes('users_email_key')) {
+            showAlert('이미 가입된 이메일입니다. 로그인해주세요.', 'error');
         } else {
             showAlert('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
         }

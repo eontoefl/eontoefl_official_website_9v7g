@@ -217,8 +217,9 @@ function checkNickname(val) {
     clearTimeout(nicknameCheckTimer);
     nicknameCheckTimer = setTimeout(async () => {
         try {
+            // 값 인코딩은 supabaseAPI.query()가 한 번 수행함 — 여기서 또 하면 이중 인코딩으로 조회가 항상 빗나감
             const result = await supabaseAPI.query('users', {
-                'nickname': `eq.${encodeURIComponent(val)}`,
+                'nickname': `eq.${val}`,
                 'limit': '1'
             });
             if (result && result.length > 0) {
@@ -256,6 +257,11 @@ function setupNicknameCheck() {
 }
 
 // ===== 이메일 중복 체크 (닉네임과 동일 패턴) =====
+// ilike 패턴에서 % _ \ 는 와일드카드로 해석되므로 문자 그대로 취급하게 이스케이프
+function escapeIlike(val) {
+    return val.replace(/[\\%_]/g, '\\$&');
+}
+
 function checkEmailDup(val) {
     const status = document.getElementById('emailStatus');
     emailAvailable = false;
@@ -273,9 +279,9 @@ function checkEmailDup(val) {
     clearTimeout(emailCheckTimer);
     emailCheckTimer = setTimeout(async () => {
         try {
-            // 대소문자 무시 정확 매칭 (UNIQUE 인덱스 lower(email)과 일치, % 와일드카드 없음)
+            // 대소문자 무시 정확 매칭 — 인코딩은 query()가 수행, 와일드카드 문자만 이스케이프
             const result = await supabaseAPI.query('users', {
-                'email': `ilike.${encodeURIComponent(val)}`,
+                'email': `ilike.${escapeIlike(val)}`,
                 'limit': '1'
             });
             if (result && result.length > 0) {
@@ -470,7 +476,15 @@ function setupSubmit() {
             showLoading(false);
             resetSubmitBtn(submitBtn);
 
-            if (state.user) {
+            // DB UNIQUE 제약 위반 = 중복 확인을 통과했지만 서버가 거부한 경우 (동시 가입 등)
+            const errMsg = String((error && error.message) || '');
+            if (errMsg.includes('users_nickname_key')) {
+                showToast('이미 사용 중인 닉네임이에요. 다른 닉네임으로 다시 시도해주세요.', 'error');
+                focusEl('nickname');
+            } else if (errMsg.includes('users_email_key')) {
+                showToast('이미 가입된 이메일이에요. 로그인 후 신청해주세요.', 'error');
+                focusEl('email');
+            } else if (state.user) {
                 // 계정은 있고 입문서 신청만 실패한 경우 (재시도 = ② 모드)
                 showToast('계정은 정상적으로 만들어졌어요. 입문서 신청만 다시 시도해주세요.', 'error');
             } else {
@@ -552,7 +566,7 @@ async function createAccount() {
     // 이메일 중복 확인 (register.js에는 없던 신규 안전장치)
     try {
         const existing = await supabaseAPI.query('users', {
-            'email': `ilike.${encodeURIComponent(email)}`,
+            'email': `ilike.${escapeIlike(email)}`,
             'limit': '1'
         });
         if (existing && existing.length > 0) {
