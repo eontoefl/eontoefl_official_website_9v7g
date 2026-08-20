@@ -628,3 +628,10 @@ body {
 .mypage-content .empty-state {
     min-height: 300px;
 }
+
+/* 회원탈퇴 링크 — 의도적으로 눈에 안 띄게 (정책: 마찰 유지) */
+.profile-withdraw-link { margin-top: 28px; text-align: center; }
+.profile-withdraw-link a {
+    font-size: 12px; color: #b6bec9; text-decoration: none;
+}
+.profile-withdraw-link a:hover { color: #64748b; text-decoration: underline; }

@@ -94,6 +94,21 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul'
     };
 
+    // 탈퇴 후 30일 재가입 제한 (이메일 또는 전화번호 일치)
+    try {
+        const wd = await supabaseAPI.query('withdrawal_records', {
+            'or': `(email.ilike.${formData.email},phone.eq.${formData.phone})`,
+            'identity_purge_after': `gt.${new Date().toISOString()}`,
+            'limit': '1'
+        });
+        if (wd && wd.length > 0) {
+            showAlert('탈퇴 후 30일 동안은 다시 가입할 수 없어요. 30일이 지나면 재가입하실 수 있습니다.', 'error');
+            return;
+        }
+    } catch (e) {
+        console.warn('탈퇴 이력 조회 실패(계속 진행):', e);
+    }
+
     showLoading(true);
     submitBtn.disabled = true;
 

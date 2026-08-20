@@ -169,6 +169,26 @@
         </div>
     </div>
 
+    <!-- 회원 탈퇴 처리 모달 -->
+    <div id="withdrawUserModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 32px; border-radius: 16px; max-width: 500px; width: 90%;">
+            <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 16px;">⏳ 회원 탈퇴 처리</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">
+                <strong id="withdrawUserName"></strong> 회원을 탈퇴 처리하시겠습니까?<br>
+                <strong style="color: #d97706;">7일 후</strong> 데이터가 영구 삭제됩니다.<br>
+                <span style="font-size: 13px; color: #94a3b8;">7일 안에는 회원 로그인 또는 이 목록의 '복구'로 되돌릴 수 있습니다.</span>
+            </p>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="closeWithdrawUserModal()" class="admin-btn" style="flex: 1;">
+                    취소
+                </button>
+                <button onclick="confirmWithdrawUser()" class="admin-btn" style="flex: 1; background: #64748b; color: white;">
+                    탈퇴 처리
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/admin-utils.js"></script>

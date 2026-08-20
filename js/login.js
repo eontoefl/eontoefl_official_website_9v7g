@@ -57,7 +57,26 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 showAlert('🚫 차단된 계정입니다.\n\n관리자에게 문의해주세요.', 'error');
                 return;
             }
-            
+
+            // 3-1. 탈퇴 유예 기간(7일) 내 복구
+            if (user && user.withdrawal_requested_at) {
+                const restore = confirm(
+                    '탈퇴 처리 중인 계정입니다.\n\n' +
+                    '지금 복구하면 탈퇴가 취소되고 그대로 이용하실 수 있어요.\n' +
+                    '복구하시겠습니까?'
+                );
+                if (!restore) {
+                    showAlert('탈퇴 처리 중인 계정입니다. 7일 경과 시 영구 삭제됩니다.', 'error');
+                    return;
+                }
+                await supabaseAPI.patch('users', user.id, {
+                    withdrawal_requested_at: null,
+                    withdrawal_reason: null,
+                    withdrawal_reason_detail: null
+                });
+                user.withdrawal_requested_at = null;
+            }
+
             if (user) {
                 // Login successful
                 const loginData = {

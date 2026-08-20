@@ -41,11 +41,12 @@ async function loadDashboard() {
         await checkNicknameSetup(currentUser);
         
         // 사용자의 신청서 로드 (Supabase API 사용) — 삭제되지 않은 것만, 최신순
-        const result = await supabaseAPI.query('applications', { 
-            'email': `eq.${currentUser.email}`, 
+        const result = await supabaseAPI.query('applications', {
+            'email': `eq.${currentUser.email}`,
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'order': 'created_at.desc',
-            'limit': '100' 
+            'limit': '100'
         });
         
         // 정확한 이메일 매칭 필터링 + 삭제되지 않은 것만
@@ -1782,6 +1783,7 @@ async function handleUnlockGuide() {
             'user_id': `eq.${userId}`,
             'application_type': 'eq.book_only',
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'limit': '1'
         });
         if (!existingBook || existingBook.length === 0) {

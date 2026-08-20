@@ -365,6 +365,7 @@ async function guardFormAccess(userData) {
         const result = await supabaseAPI.query('applications', {
             'email': `eq.${userData.email}`,
             'deleted': 'neq.true',
+            'withdrawn_at': 'is.null',
             'limit': '100'
         });
         const apps = (result || []).filter(a => a.deleted !== true && a.deleted !== 'true');
