@@ -632,6 +632,36 @@
   .mfloat:hover { filter:brightness(1.06); }
   @keyframes mfpulse { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-4px); box-shadow:0 18px 36px rgba(108,92,231,.52); } }
   @media(max-width:860px){ .mfloat { right:12px; bottom:12px; padding:11px 15px; font-size:12px; } }
+  /* 월간 리포트 도착 버블 (연하늘 강조색) */
+  .rbubble { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:56; display:flex; align-items:stretch; gap:0; border-radius:99px; box-shadow:0 12px 30px rgba(14,165,233,.42); animation:rbfloat 2.6s ease-in-out infinite; overflow:hidden; }
+  .rbubble.hide { display:none; }
+  .rbubble .rb-main { border:none; background:linear-gradient(135deg,#4FC3F7,#0EA5E9); color:#fff; padding:13px 18px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; }
+  .rbubble .rb-main:hover { filter:brightness(1.05); }
+  .rbubble .rb-x { border:none; background:#0EA5E9; color:#fff; padding:0 14px 0 10px; font-size:13px; font-weight:800; cursor:pointer; opacity:.9; }
+  .rbubble .rb-x:hover { opacity:1; }
+  @keyframes rbfloat { 0%,100%{ transform:translateX(-50%) translateY(0); } 50%{ transform:translateX(-50%) translateY(-4px); } }
+  @media(max-width:860px){ .rbubble .rb-main { padding:11px 14px; font-size:12px; } }
+  /* 월간 리포트 전체화면 뷰어 */
+  .rv-ov { position:fixed; inset:0; z-index:100; background:var(--surface-lowest,#fff); display:none; flex-direction:column; }
+  .rv-ov.on { display:flex; }
+  .rv-top { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--surface-high,#EAE8F2); flex-shrink:0; }
+  .rv-title { font-size:15px; font-weight:800; color:var(--on-surface,#2A2431); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rv-close { border:none; background:var(--surface-high,#EAE8F2); color:var(--on-surface,#2A2431); border-radius:99px; padding:9px 18px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; flex-shrink:0; }
+  .rv-close:hover { filter:brightness(.97); }
+  .rv-body { flex:1; min-height:0; }
+  #rvFrame { width:100%; height:100%; border:0; background:#fff; }
+  /* 월간 리포트 보관함 목록 */
+  .rp-list { padding:2px 0; }
+  .rp-row { display:flex; align-items:center; gap:10px; padding:12px 6px; border-radius:12px; cursor:pointer; }
+  .rp-row:hover { background:var(--surface-low,#F6F4FB); }
+  .rp-row + .rp-row { box-shadow:inset 0 1px 0 rgba(109,98,112,.12); }
+  .rp-dot { width:8px; height:8px; border-radius:50%; background:transparent; flex-shrink:0; }
+  .rp-dot.on { background:#0EA5E9; box-shadow:0 0 0 3px rgba(14,165,233,.18); }
+  .rp-lbl { flex:1; font-size:14px; font-weight:600; color:var(--on-surface,#2A2431); }
+  .rp-lbl em { font-style:normal; font-weight:600; color:var(--danger,#F0416B); font-size:12.5px; }
+  .rp-row.bad { opacity:.75; }
+  .rp-open { opacity:.45; display:inline-flex; }
+  .rp-open .svic { width:15px; height:15px; }
   .dl-prog { font-size:12px; font-weight:700; color:var(--on-surface-variant); margin-left:auto; }
   .dl-nospend { display:flex; align-items:center; gap:9px; background:var(--surface-low); border-radius:12px; padding:11px 13px; font-size:13.5px; font-weight:700; cursor:pointer; margin:8px 0 12px; }
   .dl-nospend input { width:18px; height:18px; accent-color:var(--accent-strong); }
@@ -734,8 +764,15 @@
       <div id="view"></div>
       <p class="foot">eonfl.com/note3 · 김비서 v3</p>
       <button type="button" id="moneyFloat" class="mfloat hide"></button>
+      <div id="reportBubble" class="rbubble hide"></div>
     </main>
   </div>
+</div>
+
+<!-- 월간 재정 리포트 뷰어 (전체화면, 정적 HTML만 렌더) -->
+<div id="reportViewer" class="rv-ov">
+  <div class="rv-top"><span class="rv-title" id="rvTitle"></span><button type="button" class="rv-close" id="rvClose">닫기</button></div>
+  <div class="rv-body"><iframe id="rvFrame" title="월간 재정 리포트" sandbox="" referrerpolicy="no-referrer"></iframe></div>
 </div>
 
 <!-- 입력 폼 -->
@@ -1126,6 +1163,8 @@ async function unlockText(pw, blob) {
 }
 
 let PW=null, STORE=null, saveTimer=null, storeSrc="local";
+let reportList=[];                 // [{id, month}] 최신순 — 로그인 후 1회 가볍게 조회
+const reportFailed=new Set();      // 복호화/열람 실패한 month (목록에 '열 수 없음' 표시)
 const $ = id => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
@@ -1237,6 +1276,7 @@ function normalizeStore(){
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
   if(!Array.isArray(STORE.money.oneoff)) STORE.money.oneoff=[];
   if(!STORE.money.dayLog || typeof STORE.money.dayLog!=="object" || Array.isArray(STORE.money.dayLog)) STORE.money.dayLog={};
+  if(!Array.isArray(STORE.money.reportsRead)) STORE.money.reportsRead=[];
   STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; });
 }
@@ -1290,6 +1330,7 @@ function render(){
   else v.innerHTML=soonView(TABNAME[TAB]);
   wireBtns();
   renderMoneyFloat();
+  renderReportBubble();
 }
 function soonView(name){ return '<div class="soon"><div class="big">'+svi('tools')+'</div><div class="t">'+esc(name)+' 영역은 곧 만듭니다</div><div class="d">지금 만든 탭을 먼저 써보고, 필요한 걸 하나씩 붙여갈 거예요.</div></div>'; }
 
@@ -2203,7 +2244,7 @@ function downloadFinanceDoc(){
 function moneyView(){
   const accts=mAccts();
   let html='<div class="vhead"><span class="t">돈관리</span><button class="sectog" id="secToggle" type="button" title="보기 전환">'+svi("eye")+'</button><button class="addbtn ghost" id="finDl" type="button" style="margin-left:auto">'+svi("download")+' 문서 저장</button><button class="addbtn" id="acctAdd" type="button" style="margin-left:.5rem">+ 추가</button></div>';
-  if(!accts.length) return html+emergencyCardHtml()+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>';
+  if(!accts.length) return html+emergencyCardHtml()+'<div class="empty">아직 등록한 게 없어요.<br><b>+ 추가</b>로 계좌·신용카드·대출을 등록해 보세요.</div>'+reportArchiveHtml();
   const assets=accts.filter(a=>a.kind==="account" && !a.conduit && !a.overdraft).reduce((s,a)=>s+acctBalance(a),0);
   const illiquid=(STORE.money.assets||[]).reduce((s,a)=>s+mnum(a.value),0);
   const odDebt=accts.filter(a=>a.kind==="account" && a.overdraft).reduce((s,a)=>s+Math.max(0,-acctBalance(a)),0);   // 마통 사용액
@@ -2305,7 +2346,7 @@ function moneyView(){
     html+='</div>';
   });
   html+='</div>';
-  return html+assetSectionHtml()+fixedSectionHtml()+oneoffSectionHtml();
+  return html+assetSectionHtml()+fixedSectionHtml()+oneoffSectionHtml()+reportArchiveHtml();
 }
 function loanDetailHtml(acc){
   const today=todayStr(), r=mnum(acc.rate);
@@ -2695,6 +2736,7 @@ function wireMoney(){
   const din=$("distIncome"); if(din){ attachThousands(din); din.addEventListener("keydown", e=>{ if(e.key==="Enter") runDistribute(); }); }
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
   document.querySelectorAll("#view [data-distdel]").forEach(b=> b.addEventListener("click", (e)=>{ e.stopPropagation(); distLogDel(b.dataset.distdel); }));
+  document.querySelectorAll("#view .rp-row[data-report]").forEach(r=> r.addEventListener("click", ()=> openReport(r.dataset.report)));
   wireFolds();
 }
 function actAcct(id, act){
@@ -2976,6 +3018,70 @@ function renderMoneyFloat(){
   el.classList.remove("hide");
   const past=bl.filter(d=>d<todayStr()).length;
   el.innerHTML='<span class="mf-t">'+(past>0 ? ('💸 돈 기록 '+bl.length+'일 밀렸어요') : '💸 오늘 돈 기록하셨나요?')+'</span>';
+}
+
+/* ── 월간 재정 리포트: 도착 버블 · 뷰어 · 보관함 (표시만, AI 호출 없음) ── */
+const RP_SNOOZE_KEY="note3-rp-snooze";
+async function loadReports(){   // 로그인 후 1회, id만 가볍게. 실패는 조용히 무시.
+  try {
+    const r=await fetch(SB+"?id=like.report-*&select=id&order=id.desc",{headers:HDR,cache:"no-store"});
+    if(!r.ok) return;
+    const rows=await r.json();
+    if(!Array.isArray(rows)) return;
+    reportList=rows.map(x=>({ id:x.id, month:String(x.id).replace(/^report-/,"") }))
+      .filter(x=>/^\d{4}-\d{2}$/.test(x.month))
+      .sort((a,b)=> a.month<b.month?1:a.month>b.month?-1:0);
+  } catch(e){}
+}
+function reportsReadSet(){ return new Set((STORE&&STORE.money&&STORE.money.reportsRead)||[]); }
+function renderReportBubble(){
+  const el=$("reportBubble"); if(!el) return;
+  const hide=()=>{ el.classList.add("hide"); el.innerHTML=""; };
+  if(hideSecret){ hide(); return; }                         // 숨김 모드: 재정 전체가 보이므로 숨김
+  if(!reportList.length){ hide(); return; }
+  const latest=reportList[0];
+  if(reportsReadSet().has(latest.month)){ hide(); return; }  // 이미 읽음 → 영구 소멸
+  let snooze=null; try { snooze=localStorage.getItem(RP_SNOOZE_KEY); } catch(_){}
+  if(snooze===todayStr()){ hide(); return; }                // ✕로 오늘 하루만 숨김
+  const m=+latest.month.slice(5,7);
+  el.classList.remove("hide");
+  el.innerHTML='<button type="button" class="rb-main">📊 '+m+'월 리포트가 도착했어요!</button>'+
+    '<button type="button" class="rb-x" aria-label="오늘 하루 숨기기">✕</button>';
+  const money=$("moneyFloat");
+  el.style.bottom=(money && !money.classList.contains("hide")) ? "84px" : "22px";
+  el.querySelector(".rb-main").addEventListener("click", ()=>openReport(latest.month));
+  el.querySelector(".rb-x").addEventListener("click", e=>{ e.stopPropagation(); try{ localStorage.setItem(RP_SNOOZE_KEY, todayStr()); }catch(_){}; hide(); });
+}
+async function openReport(month){
+  const row=reportList.find(r=>r.month===month); if(!row) return;
+  const title=(+month.slice(5,7))+"월 재정 리포트";
+  let rec=null;
+  try {
+    const r=await fetch(SB+"?id=eq."+encodeURIComponent(row.id)+"&select=data",{headers:HDR,cache:"no-store"});
+    if(r.ok){ const j=await r.json(); if(Array.isArray(j)&&j[0]&&j[0].data) rec=await unlockText(PW, j[0].data); }
+  } catch(e){}
+  if(!rec || typeof rec.html!=="string"){ reportFailed.add(month); toast("리포트를 열 수 없어요"); render(); return; }
+  reportFailed.delete(month);
+  $("rvTitle").textContent=rec.title||title;
+  $("rvFrame").srcdoc=rec.html;
+  $("reportViewer").classList.add("on");
+  // 뷰어가 정상 표시됨 → 읽음 기록 + 저장 → 버블 영구 소멸
+  if(!Array.isArray(STORE.money.reportsRead)) STORE.money.reportsRead=[];
+  if(!STORE.money.reportsRead.includes(month)){ STORE.money.reportsRead.push(month); save(); }
+  render();
+}
+function closeReport(){ const v=$("reportViewer"); if(!v) return; v.classList.remove("on"); const f=$("rvFrame"); if(f) f.srcdoc=""; }
+function reportArchiveHtml(){
+  if(hideSecret) return "";           // 숨김 모드: 보관함도 숨김
+  if(!reportList.length) return "";    // 리포트가 하나도 없으면 섹션 자체를 숨김
+  const read=reportsReadSet();
+  const rows=reportList.map(r=>{
+    const y=r.month.slice(0,4), m=+r.month.slice(5,7), bad=reportFailed.has(r.month), unread=!bad && !read.has(r.month);
+    return '<div class="rp-row'+(bad?' bad':'')+'" data-report="'+esc(r.month)+'"><span class="rp-dot'+(unread?' on':'')+'"></span>'+
+      '<span class="rp-lbl">'+esc(y)+'년 '+m+'월'+(bad?' <em>· 열 수 없음</em>':'')+'</span>'+
+      '<span class="rp-open">'+svi('chevR')+'</span></div>';
+  }).join("");
+  return '<div class="fold" style="margin-top:14px">'+foldHeader("mreports", '📊', "월간 리포트", reportList.length)+(fold.mreports?'<div class="fold-body rp-list">'+rows+'</div>':'')+'</div>';
 }
 function saveTx(){
   const a=findAcct(mTxAcct); if(!a) return;
@@ -3279,6 +3385,7 @@ $("txSave").addEventListener("click", saveTx);
 $("txDelete").addEventListener("click", delTx);
 overlayDismiss("ovtx", closeTx);
 $("moneyFloat").addEventListener("click", ()=>openDayLog());
+$("rvClose").addEventListener("click", closeReport);
 $("dayAddRow").addEventListener("click", addDayRow);
 $("daySave").addEventListener("click", saveDayLog);
 $("dayCancel").addEventListener("click", closeDay);
@@ -3321,7 +3428,7 @@ $("ctxmenu").querySelector('[data-ctx="del"]').innerHTML=svi('trash')+" 삭제";
 $("ctxmenu").addEventListener("click", e=>{ if(!e.target.closest('[data-ctx="del"]')) return; if(ctxTx){ const a=findAcct(ctxTx.acctId); if(a){ const i=(a.tx||[]).findIndex(t=>t.id===ctxTx.txId); if(i>=0){ a.tx.splice(i,1); save(); } } } closeCtx(); render(); });
 document.addEventListener("click", e=>{ if($("ctxmenu").style.display==="block" && !e.target.closest("#ctxmenu")) closeCtx(); });
 document.addEventListener("scroll", ()=>{ if($("ctxmenu").style.display==="block") closeCtx(); }, true);
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ovoneoff").classList.contains("on")) closeOne(); if($("ovrepay").classList.contains("on")) closeRepay(); if($("ctxmenu").style.display==="block") closeCtx(); } });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("reportViewer").classList.contains("on")) closeReport(); if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ovoneoff").classList.contains("on")) closeOne(); if($("ovrepay").classList.contains("on")) closeRepay(); if($("ctxmenu").style.display==="block") closeCtx(); } });
 
 /* ═══ 복원 (스냅샷 목록 → 되돌리기) ═══ */
 $("restorebtn").addEventListener("click", openRestore);
@@ -3354,6 +3461,7 @@ async function start(){
   if(n>0) save(); render();
   if(n>0 || cp.short.length) toast((n>0?n+"건 자동 반영":"")+(cp.short.length?(n>0?" · ":"")+"⚠️ "+cp.short.join(", "):""));
   setDot(true,"준비됨");
+  loadReports().then(()=>{ renderReportBubble(); if(TAB==="money") render(); });
 }
 (async ()=>{
   const saved=localStorage.getItem(PWKEY);
