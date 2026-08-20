@@ -997,6 +997,22 @@
   </div>
 </div></div>
 
+<!-- 특수비용 폼 (그 달만 나가는 일회성 지출) -->
+<div class="ov" id="ovoneoff"><div class="sheet">
+  <h3 id="oneTitle">새 특수비용</h3>
+  <div class="fld"><label>날짜</label><input type="date" id="one_date"></div>
+  <div class="fld"><label>내용</label><input type="text" id="one_desc" placeholder="예: 명절 부모님 용돈" lang="ko" autocomplete="off"></div>
+  <div class="fld"><label>금액 (원)</label><input type="text" id="one_krw" placeholder="0" inputmode="numeric" autocomplete="off"></div>
+  <div class="fld"><label>나가는 계좌</label><select id="one_acct"></select></div>
+  <div class="fld"><label>메모 (선택)</label><textarea id="one_note" placeholder="왜 나가는 돈인지 — 나중에 볼 때 도움돼요." lang="ko"></textarea></div>
+  <div class="hint" style="padding:.2rem .2rem 0">카드로 긁는 일회성(예: 큰 카드 결제)은 여기 말고 그 카드 사용내역에 적으면 다음 결제일 대금으로 자동 반영돼요.</div>
+  <div class="row">
+    <button type="button" class="cancel" id="oneDelete" style="display:none;background:var(--danger-soft);color:var(--danger);flex:0 0 auto;padding:13px 18px">삭제</button>
+    <button type="button" class="cancel" id="oneCancel">취소</button>
+    <button type="button" class="save" id="oneSave">저장</button>
+  </div>
+</div></div>
+
 <!-- 비유동자산 폼 -->
 <div class="ov" id="ovasset"><div class="sheet">
   <h3 id="assetTitle">새 비유동자산</h3>
@@ -1202,6 +1218,7 @@ function normalizeStore(){
   if(!STORE.money || typeof STORE.money!=="object" || Array.isArray(STORE.money)) STORE.money={ accounts:[] };
   if(!Array.isArray(STORE.money.accounts)) STORE.money.accounts=[];
   if(!Array.isArray(STORE.money.fixed)) STORE.money.fixed=[];
+  if(!Array.isArray(STORE.money.oneoff)) STORE.money.oneoff=[];
   if(!STORE.money.dayLog || typeof STORE.money.dayLog!=="object" || Array.isArray(STORE.money.dayLog)) STORE.money.dayLog={};
   STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; });
@@ -2271,7 +2288,7 @@ function moneyView(){
     html+='</div>';
   });
   html+='</div>';
-  return html+assetSectionHtml()+fixedSectionHtml();
+  return html+assetSectionHtml()+fixedSectionHtml()+oneoffSectionHtml();
 }
 function loanDetailHtml(acc){
   const today=todayStr(), r=mnum(acc.rate);
@@ -2327,6 +2344,12 @@ function obligations(from, to){
     else if(a.kind==="card" && a.payDay && a.payAcctId){ const bg=mnum(a.budget); occ(a.payDay, d=>{ const act=Math.max(0,cardStatementForPayDate(a,d)); const stmt=(d<=todayStr())?act:Math.max(act,bg);   // 미래 결제분은 실제 사용액이 배정액보다 적으면 배정액으로 계획(코스트코 등). 과거/오늘 결제분은 실제대로.
       if(stmt>0) res.push({ date:d, amount:stmt, acctId:a.payAcctId, type:"card", name:(a.alias||"카드")+" 대금" }); }); }
   });
+  // 특수비용(그 달만 나가는 일회성): 기간 안 date인 것만 해당 계좌 지출로 집계. 그 달에만 잡히고 다음 달엔 안 나타난다.
+  (STORE.money.oneoff||[]).forEach(o=>{ const ac=findAcct(o.acctId);
+    if(hideSecret && ac && ac.secret) return;   // 숨김 계좌 제외
+    if(ac && ac.kind==="card") return;   // 카드 일회성은 카드 대금에 포함 → 개별로 안 셈
+    if(!o.date || o.date<from || o.date>to) return;
+    res.push({ date:o.date, amount:mnum(o.krw), acctId:o.acctId||"", type:"oneoff", name:o.desc||"특수비용" }); });
   return res;
 }
 // 계좌별 "앞으로 한 달 확보 필요" = (내일~한 달 뒤 이 계좌에서 나갈 확정분) + (생활비면 1달치) − 현재 잔액
@@ -2337,7 +2360,9 @@ function acctNeedInfo(acc, opts){
   const bg=mnum(acc.budget);
   const bal=acc.conduit ? (acc.tx||[]).filter(x=>x.dir==="in" && String(x.date||"").slice(0,7)===mk).reduce((s,x)=>s+mnum(x.krw),0) : acctBalance(acc);   // 통로: 이번 달 넣은 것(입금)만. 잔고는 추적 안 함 — 이번 달 남은 나갈 것과 비교해 확보 여부 판단(이미 나간 건 안 셈)
   // 이번 달: 내일~이달말 확정분 + (생활비면 이달 남은 예산). 잔액이 먼저 여기를 덮는다.
-  let tmObl=0; obligations(shiftDay(t,1), w.mend).forEach(o=>{ if(o.acctId===acc.id) tmObl+=o.amount; });
+  // 통로 계좌는 잔액을 '이달 입금 합'으로 보므로(이미 나간 건 잔고에 안 남음), 지출도 이달 전체(1일~말일)를 세야 정합이 맞는다. 일반 계좌는 잔액에 과거 지출이 이미 반영돼 있어 내일~말일만.
+  const oblFrom = acc.conduit ? w.mstart : shiftDay(t,1);
+  let tmObl=0; obligations(oblFrom, w.mend).forEach(o=>{ if(o.acctId===acc.id) tmObl+=o.amount; });
   const tmGross = tmObl + (bg>0 ? Math.max(0, bg-budgetSpent(acc,mk)) : 0);
   const thisMonth = Math.max(0, tmGross - bal);
   if(month) return { totalNeed:tmGross, need:thisMonth, bal, thisMonth, nextMonth:0 };
@@ -2545,6 +2570,24 @@ function fixedSectionHtml(){
   });
   return h+'</div></div>';
 }
+function oneoffSectionHtml(){
+  if(!Array.isArray(STORE.money.oneoff)) STORE.money.oneoff=[];
+  const t=todayStr(), mk=t.slice(0,7);
+  // 목록: 이번 달 이후(이번 달 포함) 것만 노출 — 지난 달 일회성은 이미 반영돼 끝난 것이므로 숨김
+  const list=STORE.money.oneoff.filter(o=> String(o.date||"").slice(0,7)>=mk).slice().sort((a,b)=>(a.date<b.date?-1:a.date>b.date?1:0));
+  const monthSum=STORE.money.oneoff.filter(o=> String(o.date||"").slice(0,7)===mk).reduce((s,o)=>s+mnum(o.krw),0);
+  let h='<div class="msec"><div class="msec-h"><span class="mt">특수비용 <em style="font-style:normal;font-weight:600;color:var(--on-surface-variant);font-size:11.5px">· 그 달만</em></span>'+(monthSum>0?'<span class="msec-total">이달 '+fmtMoney(monthSum,"KRW")+'</span>':'')+'<button class="secadd-btn" type="button" id="oneAdd">+ 특수비용</button></div>';
+  if(!list.length) return h+'<div class="ledger-empty" style="padding:.5rem .2rem">이번 달만 나가는 일회성 지출(명절 용돈, 경조사비 등)을 여기에 적어요. 카드로 긁는 건 그 카드 내역에 적으면 돼요.</div></div>';
+  h+='<div class="fixlist">';
+  list.forEach(o=>{
+    const acc=findAcct(o.acctId);
+    const sub=[acc?acc.alias:"계좌 미지정", (o.posted?"반영됨":(o.date>=t?"예정":"대기")), o.note].filter(Boolean).join(" · ");
+    h+='<div class="fixrow" data-oneoff="'+o.id+'"><div class="fix-day">'+fmtDShort(o.date)+'</div>'+
+      '<div class="fix-body"><div class="fix-desc">'+esc(o.desc||"(내역 없음)")+'</div><div class="fix-sub">'+esc(sub)+'</div></div>'+
+      '<div class="fix-amt">−'+fmtMoney(o.krw,"KRW")+'</div></div>';
+  });
+  return h+'</div></div>';
+}
 function fmtDayLabel(s){ if(!s) return "날짜없음"; const p=String(s).split("-"); if(p.length<3) return s; const d=new Date(s+"T12:00:00"); return (+p[1])+"/"+(+p[2])+'<span>'+DOW[d.getDay()]+'</span>'; }
 function ledgerHtml(acc){
   const isCard=acc.kind==="card";
@@ -2585,6 +2628,8 @@ function wireMoney(){
   document.querySelectorAll("#view [data-repay]").forEach(b=> b.addEventListener("click", ()=> openRepay(b.dataset.repay)));
   const fadd=$("fixAdd"); if(fadd) fadd.addEventListener("click", ()=>openFix(null));
   document.querySelectorAll("#view .fixrow[data-fix]").forEach(r=> r.addEventListener("click", ()=> openFix(r.dataset.fix)));
+  const oadd=$("oneAdd"); if(oadd) oadd.addEventListener("click", ()=>openOne(null));
+  document.querySelectorAll("#view .fixrow[data-oneoff]").forEach(r=> r.addEventListener("click", ()=> openOne(r.dataset.oneoff)));
   const aadd=$("assetAdd"); if(aadd) aadd.addEventListener("click", ()=>openAsset(null));
   document.querySelectorAll("#view .fixrow[data-asset]").forEach(r=> r.addEventListener("click", ()=> openAsset(r.dataset.asset)));
   const eadd=$("emgAdd"); if(eadd) eadd.addEventListener("click", (e)=>{ e.stopPropagation(); openEmg(); });
@@ -2931,6 +2976,37 @@ function saveFix(){
   closeFix(); save(); render();
 }
 function delFix(){ if(!mFixEdit) return; const i=STORE.money.fixed.findIndex(x=>x.id===mFixEdit); if(i>=0) STORE.money.fixed.splice(i,1); closeFix(); save(); render(); }
+
+/* 특수비용 폼 (그 달만 나가는 일회성 지출) */
+let mOneEdit=null;
+function fillOneAccts(){
+  $("one_acct").innerHTML=['<option value="">계좌 미지정</option>'].concat(STORE.money.accounts.filter(a=>a.kind==="account").map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>')).join("");
+}
+function openOne(id){
+  if(!Array.isArray(STORE.money.oneoff)) STORE.money.oneoff=[];
+  mOneEdit=id||null; const o=id?STORE.money.oneoff.find(x=>x.id===id):null;
+  $("oneTitle").textContent=id?"특수비용 수정":"새 특수비용";
+  $("one_date").value=o?(o.date||todayStr()):todayStr();
+  $("one_desc").value=o?(o.desc||""):"";
+  $("one_krw").value=o&&(o.krw||o.krw===0)?commaFmt(String(o.krw)):"";
+  fillOneAccts(); $("one_acct").value=o?(o.acctId||""):"";
+  $("one_note").value=o?(o.note||""):"";
+  $("oneDelete").style.display=id?"":"none";
+  $("ovoneoff").classList.add("on"); setTimeout(()=>$("one_desc").focus(),50);
+}
+function closeOne(){ $("ovoneoff").classList.remove("on"); mOneEdit=null; }
+function saveOne(){
+  const desc=$("one_desc").value.trim(); if(!desc){ $("one_desc").focus(); return; }
+  if(!Array.isArray(STORE.money.oneoff)) STORE.money.oneoff=[];
+  const data={ date:$("one_date").value||todayStr(), desc, krw:mnum($("one_krw").value), acctId:$("one_acct").value||"", note:$("one_note").value.trim() };
+  if(mOneEdit){ const o=STORE.money.oneoff.find(x=>x.id===mOneEdit);
+    if(o){ const dateChanged=(o.date!==data.date); Object.assign(o, data, { updated:Date.now() });
+      // 날짜를 미래로 바꾸면 아직 안 나간 것 → 다시 자동반영 대상으로. (이미 tx가 생겼던 건 사용자가 내역에서 정리)
+      if(dateChanged && data.date>todayStr()) o.posted=false; } }
+  else { STORE.money.oneoff.push({ id:uid(), created:Date.now(), posted:false, date:data.date, desc:data.desc, krw:data.krw, acctId:data.acctId, note:data.note }); }
+  closeOne(); save(); render();
+}
+function delOne(){ if(!mOneEdit) return; const i=STORE.money.oneoff.findIndex(x=>x.id===mOneEdit); if(i>=0) STORE.money.oneoff.splice(i,1); closeOne(); save(); render(); }
 let mAssetEdit=null;
 function openAsset(id){
   if(!Array.isArray(STORE.money.assets)) STORE.money.assets=[];
@@ -2999,6 +3075,21 @@ function autoPostFixed(){
     if(!Array.isArray(acc.tx)) acc.tx=[];
     acc.tx.push({ id:uid(), created:Date.now(), date:chargeDate, dir:"out", desc:f.desc, cur:f.cur||"KRW", krw:mnum(f.krw), famount:(f.cur&&f.cur!=="KRW"&&f.famount!=null)?f.famount:null, note:"", fromFixed:f.id });
     f.postedMonths.push(mk); if(f.postedMonths.length>24) f.postedMonths=f.postedMonths.slice(-24);
+    n++;
+  });
+  return n;
+}
+// 특수비용 자동 반영: 앱 열 때, 날짜가 도래한 미반영 일회성 지출을 해당 계좌 내역에 1회 생성. posted 플래그로 멱등(여러 번 열어도 한 번만).
+function autoPostOneoff(){
+  const today=todayStr(); let n=0;
+  (STORE.money.oneoff||[]).forEach(o=>{
+    if(o.posted) return;                       // 이미 반영됨
+    if(!o.acctId || !o.date) return;
+    if(today<o.date) return;                    // 아직 날짜 안 됨
+    const acc=findAcct(o.acctId); if(!acc || acc.kind!=="account") return;
+    if(!Array.isArray(acc.tx)) acc.tx=[];
+    acc.tx.push({ id:uid(), created:Date.now(), date:o.date, dir:"out", desc:o.desc||"특수비용", cur:"KRW", krw:mnum(o.krw), famount:null, note:o.note||"", fromOneoff:o.id });
+    o.posted=true;
     n++;
   });
   return n;
@@ -3162,6 +3253,11 @@ $("assetCancel").addEventListener("click", closeAsset);
 $("assetSave").addEventListener("click", saveAsset);
 $("assetDelete").addEventListener("click", delAsset);
 overlayDismiss("ovasset", closeAsset);
+$("oneCancel").addEventListener("click", closeOne);
+$("oneSave").addEventListener("click", saveOne);
+$("oneDelete").addEventListener("click", delOne);
+overlayDismiss("ovoneoff", closeOne);
+attachThousands($("one_krw"));
 $("emCancel").addEventListener("click", closeEmg);
 $("emSave").addEventListener("click", saveEmg);
 overlayDismiss("ovemg", closeEmg);
@@ -3172,7 +3268,7 @@ $("ctxmenu").querySelector('[data-ctx="del"]').innerHTML=svi('trash')+" 삭제";
 $("ctxmenu").addEventListener("click", e=>{ if(!e.target.closest('[data-ctx="del"]')) return; if(ctxTx){ const a=findAcct(ctxTx.acctId); if(a){ const i=(a.tx||[]).findIndex(t=>t.id===ctxTx.txId); if(i>=0){ a.tx.splice(i,1); save(); } } } closeCtx(); render(); });
 document.addEventListener("click", e=>{ if($("ctxmenu").style.display==="block" && !e.target.closest("#ctxmenu")) closeCtx(); });
 document.addEventListener("scroll", ()=>{ if($("ctxmenu").style.display==="block") closeCtx(); }, true);
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ovrepay").classList.contains("on")) closeRepay(); if($("ctxmenu").style.display==="block") closeCtx(); } });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ovoneoff").classList.contains("on")) closeOne(); if($("ovrepay").classList.contains("on")) closeRepay(); if($("ctxmenu").style.display==="block") closeCtx(); } });
 
 /* ═══ 복원 (스냅샷 목록 → 되돌리기) ═══ */
 $("restorebtn").addEventListener("click", openRestore);
@@ -3201,7 +3297,7 @@ async function restoreTo(snapId){
 
 async function start(){
   setDot(true,"여는 중…"); await loadStore();
-  const nBase=autoPostFixed()+autoPostLoans(), cp=autoPostCards(), n=nBase+cp.n;
+  const nBase=autoPostFixed()+autoPostLoans()+autoPostOneoff(), cp=autoPostCards(), n=nBase+cp.n;
   if(n>0) save(); render();
   if(n>0 || cp.short.length) toast((n>0?n+"건 자동 반영":"")+(cp.short.length?(n>0?" · ":"")+"⚠️ "+cp.short.join(", "):""));
   setDot(true,"준비됨");
