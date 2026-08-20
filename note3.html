@@ -2401,9 +2401,11 @@ function acctNeedInfo(acc, opts){
 function monthUnsecured(){ return mAccts().filter(a=>a.kind==="account"&&!a.overdraft).reduce((s,a)=>s+acctNeedInfo(a,{month:true}).need,0); }
 function acctNextDue(acc){
   const t=todayStr(), td=+t.slice(8), Y=+t.slice(0,4), M=+t.slice(5,7), last=new Date(Y,M,0).getDate();
-  const days=[];
+  const days=[], mk=t.slice(0,7);
   (STORE.money.fixed||[]).forEach(f=>{ if(f.acctId===acc.id){ let d=+f.day; if(!d||d>=32)d=last; days.push(d); } });
   mAccts().forEach(a=>{ if(a.payAcctId===acc.id && a.payDay){ let d=+a.payDay; if(d>=32)d=last; days.push(d); } });
+  // 이번 달 아직 안 나간 특수비용(일회성)도 "곧 나갈 돈"으로 순서에 반영(금액이 아니라 우선순위만).
+  (STORE.money.oneoff||[]).forEach(o=>{ if(o.acctId===acc.id && o.date && o.date.slice(0,7)===mk && o.date>=t){ days.push(+o.date.slice(8)); } });
   if(!days.length) return { day:null, until:99 };
   let best=null, bestU=100;
   days.forEach(d=>{ const u=(d>=td)?(d-td):(d+last-td); if(u<bestU){ bestU=u; best=d; } });
