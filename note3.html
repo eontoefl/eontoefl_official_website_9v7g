@@ -666,7 +666,8 @@
   .dl-nospend { display:flex; align-items:center; gap:9px; background:var(--surface-low); border-radius:12px; padding:11px 13px; font-size:13.5px; font-weight:700; cursor:pointer; margin:8px 0 12px; }
   .dl-nospend input { width:18px; height:18px; accent-color:var(--accent-strong); }
   .dl-row { background:var(--surface-low); border-radius:12px; padding:10px; margin-bottom:9px; }
-  .dr-top { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+  .dr-top { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:7px; }
+  .dr-title { width:100%; background:var(--field); border:none; border-radius:10px; padding:11px 12px; font-family:inherit; font-size:14.5px; font-weight:600; color:var(--on-surface); outline:none; }
   .dr-amt { flex:1 1 90px; min-width:80px; background:var(--field); border:none; border-radius:10px; padding:11px 12px; font-family:inherit; font-size:15px; font-weight:700; color:var(--on-surface); outline:none; }
   .dr-acct { flex:1 1 100px; min-width:90px; background:var(--field); border:none; border-radius:10px; padding:11px 10px; font-family:inherit; font-size:13px; font-weight:600; color:var(--on-surface); outline:none; -webkit-appearance:none; appearance:none; }
   .dr-dir { display:flex; background:var(--field); border-radius:10px; overflow:hidden; flex-shrink:0; }
@@ -2970,19 +2971,20 @@ function chipAction(id, act){
   else if(act==='unskip'){ daySkip.delete(id); renderDayChips(); }
   else if(act==='rec'){ daySkip.delete(id); syncDayRows();
     let idx=dayRows.findIndex(r=>r.acctId===id && !mnum(r.amt));
-    if(idx<0){ dayRows.push({ amt:"", desc:"", acctId:id, dir:"out" }); idx=dayRows.length-1; }
+    if(idx<0){ dayRows.push({ amt:"", desc:"", note:"", acctId:id, dir:"out" }); idx=dayRows.length-1; }
     renderDayRows(); renderDayChips();
-    setTimeout(()=>{ const rows=document.querySelectorAll('#dayRows .dl-row'); const el=rows[idx]&&rows[idx].querySelector('.dr-amt'); if(el) el.focus(); },30);
+    setTimeout(()=>{ const rows=document.querySelectorAll('#dayRows .dl-row'); const el=rows[idx]&&rows[idx].querySelector('.dr-title'); if(el) el.focus(); },30);
   }
 }
 function daySkipAll(){ dTracked().forEach(a=>{ if(chipStatus(a.id)==='pending') daySkip.add(a.id); }); renderDayChips(); }
 function renderDayRows(){
   const box=$("dayRows"), accs=dTracked();
   box.innerHTML = dayRows.map((r,i)=>'<div class="dl-row" data-i="'+i+'">'+
+    '<input class="dr-title" placeholder="내역" lang="ko" autocomplete="off" value="'+esc(r.desc||"")+'">'+
+    '<input class="dr-desc" placeholder="설명 (선택)" lang="ko" autocomplete="off" value="'+esc(r.note||"")+'">'+
     '<div class="dr-top"><input class="dr-amt" inputmode="numeric" placeholder="금액" autocomplete="off" value="'+esc(r.amt||"")+'">'+
     '<select class="dr-acct">'+accs.map(a=>'<option value="'+a.id+'"'+(a.id===r.acctId?' selected':'')+'>'+esc(a.alias)+'</option>').join('')+'</select>'+
-    '<button type="button" class="dr-x">✕</button></div>'+
-    '<input class="dr-desc" placeholder="내용 (선택)" lang="ko" autocomplete="off" value="'+esc(r.desc||"")+'"></div>').join('');
+    '<button type="button" class="dr-x">✕</button></div></div>').join('');
   box.querySelectorAll('.dr-x').forEach(b=> b.addEventListener('click', ()=>{ syncDayRows(); dayRows.splice(+b.closest('.dl-row').dataset.i,1); renderDayRows(); renderDayChips(); }));
   box.querySelectorAll('.dr-amt').forEach(el=> el.addEventListener('input', ()=>{ el.value=commaFmt(el.value); syncDayRows(); renderDayChips(); }));
   box.querySelectorAll('.dr-acct').forEach(el=> el.addEventListener('change', ()=>{ syncDayRows(); renderDayChips(); }));
@@ -2990,12 +2992,13 @@ function renderDayRows(){
 function syncDayRows(){
   dayRows = [...document.querySelectorAll('#dayRows .dl-row')].map(r=>({
     amt:(r.querySelector('.dr-amt').value||"").replace(/[^0-9]/g,""),
-    desc:(r.querySelector('.dr-desc').value||"").trim(),
+    desc:(r.querySelector('.dr-title').value||"").trim(),
+    note:(r.querySelector('.dr-desc').value||"").trim(),
     acctId:r.querySelector('.dr-acct').value,
     dir:'out'
   }));
 }
-function addDayRow(){ syncDayRows(); const accs=dTracked(), pend=accs.find(a=>chipStatus(a.id)==='pending'); dayRows.push({ amt:"", desc:"", acctId:(pend||accs[0]||{}).id||"", dir:"out" }); renderDayRows(); renderDayChips(); setTimeout(()=>{ const rs=document.querySelectorAll('#dayRows .dr-amt'); if(rs.length) rs[rs.length-1].focus(); },30); }
+function addDayRow(){ syncDayRows(); const accs=dTracked(); let acctId; if(dayRows.length){ acctId=dayRows[dayRows.length-1].acctId; } else { const pend=accs.find(a=>chipStatus(a.id)==='pending'); acctId=(pend||accs[0]||{}).id||""; } dayRows.push({ amt:"", desc:"", note:"", acctId:acctId, dir:"out" }); renderDayRows(); renderDayChips(); setTimeout(()=>{ const rs=document.querySelectorAll('#dayRows .dr-title'); if(rs.length) rs[rs.length-1].focus(); },30); }
 function saveDayLog(){
   if(!dayLogDate) return;
   syncDayRows();
@@ -3003,7 +3006,7 @@ function saveDayLog(){
   if(pending.length){ alert("아직 처리 안 한 계좌가 있어요:\n\n"+pending.map(a=>"· "+a.alias).join("\n")+"\n\n각 계좌를 눌러 '이 계좌로 기록' 또는 '오늘 안 씀'으로 처리해주세요."); return; }
   const dl=STORE.money.dayLog=STORE.money.dayLog||{};
   dayRows.filter(r=>mnum(r.amt)>0).forEach(r=>{ const a=(STORE.money.accounts||[]).find(x=>x.id===r.acctId); if(!a) return; if(!Array.isArray(a.tx)) a.tx=[];
-    a.tx.push({ id:uid(), created:Date.now(), date:dayLogDate, dir:r.dir==="in"?"in":"out", cur:"KRW", krw:mnum(r.amt), desc:r.desc||"", note:"", m:1 }); });
+    a.tx.push({ id:uid(), created:Date.now(), date:dayLogDate, dir:r.dir==="in"?"in":"out", cur:"KRW", krw:mnum(r.amt), desc:r.desc||"", note:r.note||"", m:1 }); });
   dl[dayLogDate]={ closed:true };
   save();
   const bl=moneyBacklog();
