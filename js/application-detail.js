@@ -2856,6 +2856,11 @@ async function loadPaymentTab(app) {
     // 입금 정보 HTML 미리 생성
     const paymentInfoHtml = await getPaymentInfo(app);
 
+    // 카톡으로 보낼 인사 메시지 (프로그램 트랙명 " - Fast/Standard"은 제외).
+    // 메인 상태(신규)·레거시 입금확인대기 상태 두 곳에서 공유하므로 함수 상단에서 1회 정의한다.
+    const progBase = (app.assigned_program || app.program || '').split(' - ')[0].trim();
+    const kakaoMsg = `안녕하세요! ${progBase ? progBase + ' ' : ''}신청한 ${app.name || ''}입니다 :)`;
+
     // STEP 2·3와 같은 라벤더 카드/배너/타이머 언어. 선·큰 그라데이션·2px 테두리 없음.
     const s4style = `
         <style>
@@ -2931,11 +2936,8 @@ async function loadPaymentTab(app) {
         return;
     }
 
-    // 학생이 입금 완료 버튼을 눌렀으면
+    // 학생이 입금 완료 버튼을 눌렀으면 (레거시: 과거에 버튼을 눌렀던 학생용. 신규 학생은 도달 안 함)
     if (app.deposit_confirmed_by_student) {
-        // 카톡으로 보낼 인사 메시지 (프로그램 트랙명 " - Fast/Standard"은 제외)
-        const progBase = (app.assigned_program || app.program || '').split(' - ')[0].trim();
-        const kakaoMsg = `안녕하세요! ${progBase ? progBase + ' ' : ''}신청한 ${app.name || ''}입니다 :)`;
         paymentContent.innerHTML = `
             ${s4style}
             <div class="s4-banner" style="background:#fbf6ec;">
@@ -2990,7 +2992,7 @@ async function loadPaymentTab(app) {
                         <div class="s4-banner-tile" style="background:#f6ddd6;"><i class="fas fa-triangle-exclamation" style="color:#a53b22; font-size:18px;"></i></div>
                         <div>
                             <div class="s4-banner-title">등록 확정 기한 초과</div>
-                            <div class="s4-banner-sub">등록 확정 기한이 지났습니다. 빠른 입금 부탁드립니다.</div>
+                            <div class="s4-banner-sub">등록 확정 기한이 지났어요. 입금은 지금도 가능해요. 입금이 확인되면 시작일을 다시 확인해 안내드릴게요.</div>
                         </div>
                     </div>
                 </div>
@@ -3010,28 +3012,45 @@ async function loadPaymentTab(app) {
         }
     }
 
-    paymentContent.innerHTML = s4style + deadlineHTML + paymentInfoHtml + `
+    // 입금 후 진행 순서(타임라인). 마지막 줄 시작일은 자기주도(self_paced)이거나 시작일이 없으면 "시작일에 시작"으로 대체.
+    const startLabel = (app.self_paced === true || !app.schedule_start)
+        ? '시작일에 시작'
+        : `${formatKstDateKo(app.schedule_start)} 시작`;
+    const timelineSteps = ['입금 확인 (당일)', '이용 방법 안내', '교재 출고 (늦어도 금요일)', '토요일까지 도착', startLabel];
+    const timelineHtml = `
         <div class="s4-card">
-            <div class="s4-card-title"><i class="fas fa-circle-check"></i> 입금 완료 확인</div>
-            <p style="font-size:13px; color:#64748b; margin:0 0 18px 0; line-height:1.7;">
-                위 계좌로 입금을 완료하셨다면 입금자명을 확인하고 버튼을 눌러 주세요. 관리자가 입금을 확인한 후 이용 방법 안내를 보내드립니다.
-            </p>
-            <label for="depositorName" style="display:block; font-size:13px; font-weight:600; color:#1e293b; margin-bottom:8px;">
-                입금자명 <span style="color:#a53b22;">*</span>
-            </label>
-            <input type="text" id="depositorName" value="${app.name || ''}" placeholder="실제 입금하신 분의 성함" class="s4-input">
-            <p class="s4-note" style="margin:8px 0 18px 0;">
-                본인이 직접 입금하셨으면 그대로 두시고, 다른 분(부모님·배우자 등)이 입금하셨으면 실제 입금자명으로 수정해 주세요.
-            </p>
-            <button onclick="confirmDeposit()" class="s4-btn">
-                <i class="fas fa-circle-check" style="margin-right:7px;"></i> 입금 완료했습니다
-            </button>
-            <p class="s4-note" style="text-align:center; margin:14px 0 0 0;">
-                관리자가 입금을 확인하면 이용 방법 안내가 발송됩니다.<br>
-                입금 관련 문의는 <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener" style="color:#5b4a7d; font-weight:600; text-decoration:underline;">카카오톡</a>으로 해주세요.
-            </p>
+            <div class="s4-card-title"><i class="fas fa-route"></i> 입금 후 진행 순서</div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 6px;">
+                ${timelineSteps.map((s, i) => `
+                    ${i > 0 ? '<i class="fas fa-chevron-right" style="font-size:10px; color:#c3b6d9;"></i>' : ''}
+                    <span style="display:inline-flex; align-items:center; padding:7px 13px; border-radius:999px; font-size:13px; font-weight:${i === timelineSteps.length - 1 ? '700' : '500'}; background:${i === timelineSteps.length - 1 ? '#efeaf7' : '#f6f4fb'}; color:${i === timelineSteps.length - 1 ? '#5b4a7d' : '#64748b'};">${s}</span>
+                `).join('')}
+            </div>
         </div>
     `;
+
+    // 입금 후 카카오톡에 성함 남기기 카드(신규 학생용): 안내 문구 + 미리채운 인사 메시지 + 카톡 노란 버튼.
+    const kakaoCardHtml = `
+        <div class="s4-card">
+            <div class="s4-card-title"><i class="fas fa-comment"></i> 입금 후, 카카오톡에 성함 남기기</div>
+            <p style="font-size:14px; color:#64748b; margin:0 0 18px 0; line-height:1.75;">
+                입금을 마치셨다면, 카카오톡 채널에 성함을 남겨주세요.<br>
+                다른 분(부모님 등) 명의로 입금하셨다면 입금자명도 함께 적어주세요.<br>
+                입금이 확인되면 바로 이용 안내를 드릴게요.
+            </p>
+            <div style="font-size:12px; font-weight:600; color:#64748b; margin-bottom:8px;">보낼 내용</div>
+            <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:18px;">
+                <div style="flex:1; background:#f6f4fb; border-radius:10px; padding:14px 16px; font-size:14px; color:#1e293b; line-height:1.5;">${kakaoMsg}</div>
+                <button type="button" onclick="copyKakaoMsg(this)" data-msg="${kakaoMsg.replace(/"/g, '&quot;')}" style="flex-shrink:0; background:#efeaf7; border:none; border-radius:10px; padding:0 18px; font-size:13px; font-weight:600; color:#5b4a7d; cursor:pointer; white-space:nowrap; font-family:inherit;">복사</button>
+            </div>
+            <a href="http://pf.kakao.com/_FWxcZC" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; box-sizing:border-box; background:#FEE500; color:#3c1e1e; font-size:15px; font-weight:700; padding:15px; border-radius:12px; text-decoration:none;">
+                <i class="fas fa-comment"></i> 카카오톡으로 성함 남기기
+            </a>
+        </div>
+    `;
+
+    // 배치: 등록확정기한 배너 → 계좌 정보 → 타임라인 → 카톡 성함 카드
+    paymentContent.innerHTML = s4style + deadlineHTML + paymentInfoHtml + timelineHtml + kakaoCardHtml;
     // 등록 확정 기한은 배너에 절대 일시로 고정 표기(초시계 없음).
 }
 
@@ -3100,54 +3119,8 @@ async function getPaymentInfo(app) {
     `;
 }
 
-// 입금 완료 확인
-async function confirmDeposit() {
-    // 입금자명 입력 확인
-    const depositorName = document.getElementById('depositorName')?.value.trim();
-    
-    if (!depositorName) {
-        alert('⚠️ 입금자명을 입력해주세요.\n\n실제 입금하신 분의 성함을 입력해야 합니다.');
-        document.getElementById('depositorName')?.focus();
-        return;
-    }
-    
-    if (!confirm(`입금을 완료하셨습니까?\n\n입금자명: ${depositorName}\n\n확인 버튼을 누르시면 관리자에게 알림이 전송됩니다.`)) {
-        return;
-    }
-
-    try {
-        const updateData = {
-            deposit_confirmed_by_student: true,
-            deposit_confirmed_by_student_at: Date.now(),
-            depositor_name: depositorName,
-            current_step: 7  // STEP 7: 입금 대기 중
-        };
-
-        const updatedApp = await supabaseAPI.patch('applications', globalApplication.id, updateData);
-
-        if (!updatedApp) throw new Error('Failed to update');
-
-        globalApplication = updatedApp;
-
-        // 텔레그램 알림: 4번 - 입금 완료 (콜백 버튼 포함)
-        try {
-            await sendEdgeFunctionNotify('deposit_claimed', {
-                name: globalApplication.name,
-                depositor_name: depositorName,
-                app_id: globalApplication.id
-            });
-        } catch (e) { console.warn('텔레그램 알림 실패:', e); }
-
-        alert('✅ 입금 완료 알림이 전송되었습니다!\n\n📩 이제 정식 수강생이 되셨어요! 카카오톡 채널에 성함을 보내주시면 신청이 완료돼요.\n\n바로 이어서 도와드릴게요!');
-
-        // 페이지 새로고침
-        location.reload();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('입금 완료 알림 전송 중 오류가 발생했습니다.');
-    }
-}
+// (C-4) 학생 '입금 완료했습니다' 버튼/함수는 제거됨. 이제 학생은 입금 후 카카오톡 채널에 성함을 남긴다.
+//   deposit_confirmed_by_student 필드/크론(deadline_reminders.sql)은 유지(관리자 confirmDepositFromModal이 계속 사용).
 
 // 입금 대기 카드: 카톡 인사 메시지 복사
 function copyKakaoMsg(btn) {
