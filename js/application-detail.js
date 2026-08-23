@@ -68,6 +68,10 @@ function formatDate(timestamp) {
     });
 }
 
+// KST 절대 일시/날짜 포맷 헬퍼(formatKstDateTimeKo, formatKstDateKo)는
+// js/supabase-config.js로 이동해 상세 화면·대시보드가 공통으로 쓴다.
+// (application-detail.html은 supabase-config.js를 먼저 로드하므로 전역 함수로 사용 가능)
+
 // Check if user is admin
 function isAdmin() {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
@@ -1267,81 +1271,8 @@ function getAnalysisSection(app) {
     `;
 }
 
-// 남은 시간 포맷팅: 일반 24:00:00 / 유도 4일 12:00:00
-function formatCountdown(remainingMs, isIncentive) {
-    if (remainingMs <= 0) return '00:00:00';
-    
-    const totalSeconds = Math.floor(remainingMs / 1000);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    
-    const hh = String(hours).padStart(2, '0');
-    const mm = String(minutes).padStart(2, '0');
-    const ss = String(seconds).padStart(2, '0');
-    
-    if (isIncentive) {
-        return `${days}일 ${hh}:${mm}:${ss}`;
-    }
-    return `${hh}:${mm}:${ss}`;
-}
-
-// 실시간 카운트다운 인터벌 관리
-let analysisCountdownInterval = null;
-
-function startAnalysisCountdown(completedAt, isIncentive) {
-    if (analysisCountdownInterval) clearInterval(analysisCountdownInterval);
-    
-    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    const completedTime = new Date(completedAt).getTime();
-    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
-    
-    function tick() {
-        const remaining = deadlineMs - (Date.now() - completedTime);
-        const el = document.getElementById('analysisCountdownTimer');
-        const containerEl = document.getElementById('analysisCountdownContainer');
-        if (!el || !containerEl) { clearInterval(analysisCountdownInterval); return; }
-        
-        if (remaining <= 0) {
-            clearInterval(analysisCountdownInterval);
-            el.textContent = '00:00:00';
-            // 만료: 타이머 칩을 코랄로 (칩 배경은 부모 span)
-            el.style.color = '#a53b22';
-            const chip = el.parentElement;
-            if (chip) chip.style.background = '#f6ddd6';
-            const msgEl = document.getElementById('analysisCountdownMsg');
-            if (msgEl) {
-                msgEl.innerHTML = '<i class="fas fa-triangle-exclamation"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.';
-                msgEl.style.color = '#a53b22';
-                msgEl.style.fontSize = '13px';
-                msgEl.style.fontWeight = '600';
-                msgEl.style.marginTop = '4px';
-            }
-            return;
-        }
-
-        el.textContent = formatCountdown(remaining, isIncentive);
-
-        // 임박: 타이머 칩을 주황으로
-        if (remaining <= urgentThresholdMs) {
-            el.style.color = '#b45309';
-            const chip = el.parentElement;
-            if (chip) chip.style.background = '#fbecd2';
-            const msgEl = document.getElementById('analysisCountdownMsg');
-            if (msgEl) {
-                msgEl.innerHTML = '<i class="fas fa-circle-exclamation"></i> 동의 기한이 얼마 남지 않았습니다!';
-                msgEl.style.color = '#b45309';
-                msgEl.style.fontSize = '13px';
-                msgEl.style.fontWeight = '600';
-                msgEl.style.marginTop = '4px';
-            }
-        }
-    }
-    
-    tick();
-    analysisCountdownInterval = setInterval(tick, 1000);
-}
+// (동의 기한 초시계 제거) 매초 갱신 카운트다운(formatCountdown/startAnalysisCountdown)은
+// 절대 일시 고정 표기로 대체되어 삭제됨. 마감 표기는 getAgreementSection에서 formatKstDateTimeKo로 처리.
 
 // 동의 섹션 HTML
 function getAgreementSection(app) {
@@ -1355,8 +1286,7 @@ function getAgreementSection(app) {
         ? (Date.now() - new Date(analysisTimestamp).getTime())
         : 0;
     const remainingMs = deadlineMs - elapsedMs;
-    const initialCountdown = formatCountdown(remainingMs, isIncentive);
-    
+
     // 긴급 기준: 유도학생은 남은 1일 미만, 일반은 6시간 미만
     const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     const isExpired = remainingMs <= 0;
@@ -1420,40 +1350,61 @@ function getAgreementSection(app) {
         </div>
     `;
 
-    // 자동 승인불가 경고: 프로모션(유도) 학생이 아닐 때만. 문구는 정책이라 그대로 유지한다.
+    // 조건 보장 안내: 프로모션(유도) 학생이 아닐 때만 렌더(프로모 경로는 지금처럼 박스 없음).
+    // 겁주는 빨간 경고 대신, 24시간 동안 조건이 그대로 보장된다는 차분한 라벤더 안내로 대체.
+    // 마감 절대시각 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 24h.
+    //   (admin-applications.js getAnalysisAgreeDeadlineMs / analysis-view.js와 동일 기준)
+    const assuranceDeadlineMs = app.analysis_deadline_override
+        ? new Date(app.analysis_deadline_override).getTime()
+        : (analysisTimestamp ? new Date(analysisTimestamp).getTime() + (24 * 60 * 60 * 1000) : NaN);
+    const assuranceDeadlineLabel = !isNaN(assuranceDeadlineMs) ? formatKstDateTimeKo(assuranceDeadlineMs) : '';
+    const assuranceStartLabel = app.schedule_start ? formatKstDateKo(app.schedule_start) : '';
+    // 마지막 줄(시작일 확정)은 자기주도(self_paced)이거나 시작일이 없으면 표시하지 않는다.
+    const assuranceShowStartLine = app.self_paced !== true && !!app.schedule_start;
     const autoRejectWarning = !isIncentive ? `
-        <div style="background: #f9edea; border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;">
-            <div style="display: flex; align-items: flex-start; gap: 10px;">
-                <i class="fas fa-triangle-exclamation" style="font-size: 15px; color: #a53b22; margin-top: 3px; flex-shrink: 0;"></i>
-                <div>
-                    <div style="font-size: 14px; font-weight: 700; color: #a53b22; margin-bottom: 6px;">⏰ 필독! 자동 승인불가 처리 안내</div>
-                    <div style="font-size: 13px; color: #7a3423; line-height: 1.7;">
-                        토플 일대일 진단서 업로드 시간으로부터 <strong>24시간 이내에 댓글이 없을 시</strong>, 알림 없이 자동으로 <strong style="text-decoration: underline;">승인불가 처리</strong>가 됩니다.
-                        토플이 최우선이고, 열심히 하실 마음, 절박함과 의지가 있으신 분들이라고 판단되지 않기 때문에 내린 결정입니다.
-                        또한, 이후 <strong>만 5일간 새로운 신청서를 업로드 하실 수 없으니</strong> 반드시 참고해주시기 바랍니다.
-                    </div>
-                </div>
+        <div style="background: #efeaf7; border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;">
+            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;">이 조건은 24시간 동안 보장돼요</div>
+            <div style="font-size: 13px; color: #5b4a7d; line-height: 1.8;">
+                지금 보신 프로그램·가격·시작일은 ${assuranceDeadlineLabel ? `<strong>${assuranceDeadlineLabel}</strong>까지` : '안내드린 기한까지'} 그대로 확정할 수 있어요.<br>
+                안내드린 시작일과 일정은 지금 상황을 기준으로 짜드린 것이라,<br>
+                이 시간이 지나면 시작일부터 다시 확인한 뒤 진행하게 돼요.
+                ${assuranceShowStartLine ? `<div style="margin-top: 10px; font-weight: 600;">지금 동의하시면 ${assuranceStartLabel} 시작이 확정돼요.</div>` : ''}
             </div>
         </div>
     ` : '';
 
+    // 증거 한 줄: 결제가 가장 마지막에 일어난다는 안심 문구(비프로모 경로에만, 텍스트만).
+    const evidenceLine = !isIncentive ? `
+        <div style="font-size: 13px; color: #64748b; line-height: 1.8; margin-bottom: 16px; text-align: center;">
+            2019년부터 약 2,000명을 유료로 가르치며 다듬어온 과정이에요.<br>
+            결제는 계약서까지 모두 확인한 뒤 가장 마지막에 진행돼요.
+        </div>
+    ` : '';
+
+    // 마감 절대시각(assuranceDeadlineMs, 관리자 override 반영) 기준으로 색을 렌더 시 1회 계산.
+    // (매초 갱신 없이 고정. 만료=코랄 / 6시간 이하=주황 / 그 외=라벤더)
+    const chipRemainMs = assuranceDeadlineMs - Date.now();
+    const chipExpired = !isNaN(assuranceDeadlineMs) && chipRemainMs <= 0;
+    const chipUrgent = !chipExpired && !isNaN(assuranceDeadlineMs) && chipRemainMs <= (6 * 60 * 60 * 1000);
+
     // 남은 시간 뱃지: 만료/임박이면 코랄, 평상시 라벤더. 큰 노란 박스 대신 폼 헤더 옆 작은 칩.
     let timerChipBg, timerChipColor;
-    if (isExpired) { timerChipBg = '#f6ddd6'; timerChipColor = '#a53b22'; }
-    else if (isUrgent) { timerChipBg = '#fbecd2'; timerChipColor = '#b45309'; }
+    if (chipExpired) { timerChipBg = '#f6ddd6'; timerChipColor = '#a53b22'; }
+    else if (chipUrgent) { timerChipBg = '#fbecd2'; timerChipColor = '#b45309'; }
     else { timerChipBg = '#ece4f2'; timerChipColor = '#5b4a7d'; }
 
-    const timerChip = analysisTimestamp ? `
-        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: ${timerChipBg}; flex-shrink: 0;">
+    // 동의 기한을 절대 일시로 고정 표기(초시계 없음). label이 없으면 칩 자체를 숨긴다.
+    const timerChip = (analysisTimestamp && assuranceDeadlineLabel) ? `
+        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: ${timerChipBg};">
             <i class="fas fa-clock" style="font-size: 11px; color: ${timerChipColor};"></i>
-            <span id="analysisCountdownTimer" style="font-size: 15px; font-weight: 700; color: ${timerChipColor}; font-variant-numeric: tabular-nums;">${initialCountdown}</span>
+            <span id="analysisCountdownTimer" style="font-size: 13px; font-weight: 700; color: ${timerChipColor};">동의 기한: ${assuranceDeadlineLabel}까지</span>
         </span>
     ` : '';
 
     // 만료/임박 안내 한 줄 (id 유지 — 카운트다운 로직이 갱신)
-    const deadlineMsg = isExpired
+    const deadlineMsg = chipExpired
         ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #a53b22; font-weight: 600; margin-top: 4px;"><i class="fas fa-triangle-exclamation"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
-        : (isUrgent ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #b45309; font-weight: 600; margin-top: 4px;"><i class="fas fa-circle-exclamation"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : `<div id="analysisCountdownMsg"></div>`);
+        : (chipUrgent ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #b45309; font-weight: 600; margin-top: 4px;"><i class="fas fa-circle-exclamation"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : `<div id="analysisCountdownMsg"></div>`);
 
     // 경고·타이머·동의폼을 한 카드로 묶는다. (id: analysisCountdownContainer 유지)
     return `
@@ -1470,6 +1421,7 @@ function getAgreementSection(app) {
             <div style="margin-top: 18px;">
                 ${agreeSummary}
                 ${autoRejectWarning}
+                ${evidenceLine}
 
                 <div class="s2-check" onclick="toggleCheckbox(event, 'agreeProgram')">
                     <input type="checkbox" id="agreeProgram" onchange="updateAgreementButton()">
@@ -1982,13 +1934,7 @@ function loadStudentTabs(app) {
         const analysisTab = document.getElementById('tabStudentAnalysis');
         if (analysisTab) {
             analysisTab.innerHTML = getAnalysisSection(app);
-            // 실시간 카운트다운 시작 (동의 전 + 분석 완료 시점이 있을 때)
-            // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-            const needsAgreement = app.analysis_status === '승인' && !app.student_program_agreed;
-            const analysisTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-            if (needsAgreement && analysisTs) {
-                startAnalysisCountdown(analysisTs, app.is_incentive_applicant === true);
-            }
+            // 동의 기한은 getAnalysisSection에서 절대 일시로 고정 표기(초시계 없음).
         }
     } else {
         const analysisTab = document.getElementById('tabStudentAnalysis');
@@ -2371,29 +2317,17 @@ async function loadContractTab(app) {
         return;
     }
 
-    // 4. 동의 대기 → 타이머 배너 + 계약서 본문 + 동의 버튼
+    // 4. 동의 대기 → 기한 배너 + 계약서 본문 + 동의 버튼
     const hours = Math.floor(remaining / (60 * 60 * 1000));
-    const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
 
-    // 6시간 미만이면 임박(주황), 그 외 평상시(라벤더)
+    // 6시간 이하면 임박(주황), 그 외 평상시(라벤더). remaining이 렌더 시점 값이라 색은 1회 계산으로 고정.
     const urgent = hours < 6;
-    const chipBg = urgent ? '#fbecd2' : '#ece4f2';
     const chipColor = urgent ? '#b45309' : '#5b4a7d';
     const tileBg = urgent ? '#fbecd2' : '#ece4f2';
     const tileColor = urgent ? '#b45309' : '#5b4a7d';
 
-    // 기한 안내 문구 (기존 로직 유지)
-    let deadlineSubText;
-    if (isContractDeferred) {
-        const deadlineDate = new Date(app.contract_deadline_override);
-        const deadlineDateLabel = deadlineDate.toLocaleString('ko-KR', {
-            timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short',
-            hour: '2-digit', minute: '2-digit', hour12: false
-        });
-        deadlineSubText = `${deadlineDateLabel}까지`;
-    } else {
-        deadlineSubText = `${new Date(sentTime).toLocaleString('ko-KR')}부터 24시간`;
-    }
+    // 계약서 작성 기한을 절대 일시로 고정 표기(override 반영). 초시계 없음.
+    const contractDeadlineLabel = formatKstDateTimeKo(contractDeadlineMs);
 
     const contractHTML = await getContractDisplay(app);
 
@@ -2402,14 +2336,10 @@ async function loadContractTab(app) {
         <div class="s3-banner">
             <div class="s3-banner-tile" style="background: ${tileBg};"><i class="fas fa-clock" style="color: ${tileColor}; font-size: 17px;"></i></div>
             <div style="flex: 1; min-width: 0;">
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <div class="s3-banner-title">계약 동의 기한</div>
-                    <div class="s3-timer-chip" style="background: ${chipBg};">
-                        <span id="contractTimer" class="s3-timer-num" style="color: ${chipColor};">${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}</span>
-                        <span class="s3-timer-unit" style="color: ${chipColor};">남음</span>
-                    </div>
+                <div class="s3-banner-title">계약서 작성 기한</div>
+                <div class="s3-banner-sub" style="margin-top: 4px;">
+                    <strong id="contractTimer" style="color: ${chipColor};">${contractDeadlineLabel}까지</strong> — 기한 안에 작성하시면 안내드린 시작일이 그대로 확정돼요.
                 </div>
-                <div class="s3-banner-sub" style="margin-top: 4px;">${deadlineSubText}</div>
             </div>
         </div>
 
@@ -2424,8 +2354,7 @@ async function loadContractTab(app) {
         </div>
     `;
 
-    // 타이머 시작 (기존 로직 유지)
-    startContractTimer(sentTime, contractDeadlineMs);
+    // 계약서 작성 기한은 배너에 절대 일시로 고정 표기(초시계 없음).
     setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); applyStudentContractTheme(); }, 50);
 }
 
@@ -2776,38 +2705,8 @@ function getContractDisplayOld(app) {
     return contractContent;
 }
 
-// 계약서 타이머 시작
-function startContractTimer(sentTime, deadlineMs) {
-    // deadlineMs가 지정되면 절대 시각 기준, 아니면 sentTime + 24시간
-    const targetMs = deadlineMs || (sentTime + 24 * 60 * 60 * 1000);
-    const timerInterval = setInterval(() => {
-        const now = Date.now();
-        const remaining = targetMs - now;
-        const timerElem = document.getElementById('contractTimer');
-        if (!timerElem) { clearInterval(timerInterval); return; }
-        const chip = timerElem.closest('.s3-timer-chip');
-
-        if (remaining <= 0) {
-            clearInterval(timerInterval);
-            timerElem.textContent = '00:00';
-            timerElem.style.color = '#a53b22';
-            if (chip) { chip.style.background = '#f6ddd6'; chip.querySelector('.s3-timer-unit')?.style.setProperty('color', '#a53b22'); }
-            return;
-        }
-
-        const hours = Math.floor(remaining / (60 * 60 * 1000));
-        const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-        // 배너 초기값과 같은 HH:MM 포맷 유지
-        timerElem.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-
-        // 6시간 미만이면 임박(주황)으로 칩 전환
-        if (hours < 6 && chip) {
-            timerElem.style.color = '#b45309';
-            chip.style.background = '#fbecd2';
-            chip.querySelector('.s3-timer-unit')?.style.setProperty('color', '#b45309');
-        }
-    }, 1000);
-}
+// (계약서 작성 기한 초시계 제거) 매초 갱신 startContractTimer는
+// 절대 일시 고정 표기로 대체되어 삭제됨.
 
 // 계약 동의 제출
 async function submitContractAgreement() {
@@ -3069,73 +2968,42 @@ async function loadPaymentTab(app) {
         return;
     }
 
-    // 입금 안내 표시
-    // 입금 데드라인 계산: deposit_deadline_override가 있으면 해당 값, 없으면 계약 동의 후 24시간
+    // 입금(등록 확정) 기한 표시: deposit_deadline_override 있으면 그 값, 없으면 계약 동의 후 24시간.
+    // 초시계 없이 절대 일시로 고정 표기. 만료=코랄 / 6시간 이하=주황 / 그 외=라벤더 (STEP 3와 동일 톤).
     let deadlineHTML = '';
     if (app.contract_agreed_at) {
-        let deadlineMs;
-        let deadlineLabel;
-        if (app.deposit_deadline_override) {
-            // 관리자가 지정한 입금 기한
-            deadlineMs = new Date(app.deposit_deadline_override).getTime();
-            const deadlineDate = new Date(app.deposit_deadline_override);
-            deadlineLabel = deadlineDate.toLocaleString('ko-KR', {
-                timeZone: 'Asia/Seoul',
-                month: 'long', day: 'numeric',
-                weekday: 'short',
-                hour: '2-digit', minute: '2-digit', hour12: false
-            });
-        } else {
-            // 기본: 계약 동의 후 24시간
-            deadlineMs = new Date(app.contract_agreed_at).getTime() + (24 * 60 * 60 * 1000);
-            deadlineLabel = null; // 24시간 표현 사용
-        }
-
-        const now = Date.now();
-        const remaining = deadlineMs - now;
-
-        const hours = Math.floor(remaining / (60 * 60 * 1000));
-        const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-        const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
-
-        // 만료=코랄 / 임박(6h 이하)=주황 / 평상시=라벤더 (STEP 3와 동일 톤)
+        const deadlineMs = app.deposit_deadline_override
+            ? new Date(app.deposit_deadline_override).getTime()
+            : new Date(app.contract_agreed_at).getTime() + (24 * 60 * 60 * 1000);
+        const remaining = deadlineMs - Date.now();
         const isExpired = remaining <= 0;
-        const isUrgent = !isExpired && hours < 6;
+        const isUrgent = !isExpired && remaining <= (6 * 60 * 60 * 1000);
         const chipColor = isExpired ? '#a53b22' : (isUrgent ? '#b45309' : '#5b4a7d');
-        const chipBg = isExpired ? '#f6ddd6' : (isUrgent ? '#fbecd2' : '#ece4f2');
-        const tileBg = chipBg;
+        const tileBg = isExpired ? '#f6ddd6' : (isUrgent ? '#fbecd2' : '#ece4f2');
+        const deadlineLabel = formatKstDateTimeKo(deadlineMs);
 
         if (isExpired) {
-            // 만료 → 코랄 배너, 타이머 칩 없음
+            // 만료 → 코랄 배너
             deadlineHTML = `
                 <div class="s4-banner" style="background:#f9edea;">
                     <div class="s4-banner-left">
                         <div class="s4-banner-tile" style="background:#f6ddd6;"><i class="fas fa-triangle-exclamation" style="color:#a53b22; font-size:18px;"></i></div>
                         <div>
-                            <div class="s4-banner-title">입금 기한 초과</div>
-                            <div class="s4-banner-sub">입금 기한이 지났습니다. 빠른 입금 부탁드립니다.</div>
+                            <div class="s4-banner-title">등록 확정 기한 초과</div>
+                            <div class="s4-banner-sub">등록 확정 기한이 지났습니다. 빠른 입금 부탁드립니다.</div>
                         </div>
                     </div>
                 </div>
             `;
         } else {
-            // 기한 안내 텍스트: override가 있으면 날짜 표시, 없으면 24시간 표현
-            const deadlineNotice = deadlineLabel
-                ? `<strong style="color:${chipColor};">${deadlineLabel}</strong>까지 입금을 완료해주세요.`
-                : `계약 동의 후 <strong style="color:${chipColor};">24시간 이내</strong>에 입금을 완료해주세요.`;
-            // 계약서 탭(STEP 3 동의 기한 배너)과 동일 구조: 타일 + [제목+칩 한 줄] + 하단 안내
             deadlineHTML = `
                 <div class="s4-banner">
                     <div class="s4-banner-tile" style="background:${tileBg};"><i class="fas fa-clock" style="color:${chipColor}; font-size:17px;"></i></div>
                     <div style="flex:1; min-width:0;">
-                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                            <div class="s4-banner-title">입금 기한</div>
-                            <div class="s4-timer-chip" style="background:${chipBg};">
-                                <span id="paymentTimer" class="s4-timer-num" style="color:${chipColor};">${String(Math.max(0, hours)).padStart(2, '0')}:${String(Math.max(0, minutes)).padStart(2, '0')}</span>
-                                <span class="s4-timer-unit" style="color:${chipColor};">남음</span>
-                            </div>
+                        <div class="s4-banner-title">등록 확정 기한</div>
+                        <div class="s4-banner-sub" style="margin-top:4px;">
+                            <strong id="paymentTimer" style="color:${chipColor};">${deadlineLabel}까지</strong> 입금을 완료하시면 등록이 확정돼요.
                         </div>
-                        <div class="s4-banner-sub" style="margin-top:4px;">${deadlineNotice}</div>
                     </div>
                 </div>
             `;
@@ -3164,41 +3032,7 @@ async function loadPaymentTab(app) {
             </p>
         </div>
     `;
-    
-    // 실시간 카운트다운 시작
-    if (app.contract_agreed_at) {
-        // deposit_deadline_override가 있으면 해당 값, 없으면 contract_agreed_at + 24시간
-        const paymentDeadlineMs = app.deposit_deadline_override
-            ? new Date(app.deposit_deadline_override).getTime()
-            : new Date(app.contract_agreed_at).getTime() + (24 * 60 * 60 * 1000);
-        
-        const updatePaymentTimer = () => {
-            const now = Date.now();
-            const remaining = paymentDeadlineMs - now;
-            
-            const timerEl = document.getElementById('paymentTimer');
-            if (!timerEl) return;
-            
-            if (remaining <= 0) {
-                timerEl.textContent = '00:00';
-                return;
-            }
-
-            const hours = Math.floor(remaining / (60 * 60 * 1000));
-            const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-
-            // 계약서 탭과 동일하게 HH:MM 표기
-            timerEl.textContent =
-                String(Math.max(0, hours)).padStart(2, '0') + ':' +
-                String(Math.max(0, minutes)).padStart(2, '0');
-        };
-        
-        // 즉시 한 번 실행
-        updatePaymentTimer();
-        
-        // 1초마다 업데이트
-        setInterval(updatePaymentTimer, 1000);
-    }
+    // 등록 확정 기한은 배너에 절대 일시로 고정 표기(초시계 없음).
 }
 
 // 입금 정보 표시

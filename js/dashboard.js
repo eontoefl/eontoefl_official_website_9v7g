@@ -468,24 +468,22 @@ function renderActionItems(app) {
     
     // 2️⃣ 분석 등록 직후 ~ 학생 동의 직전
     if (app.analysis_saved_at && !app.student_agreed_at) {
-        const isIncentive = app.is_incentive_applicant === true;
-        const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-        // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-        const deadlineAnchor = app.analysis_first_saved_at || app.analysis_saved_at;
-        const savedTime = new Date(deadlineAnchor).getTime();
-        const remainingMs = deadlineMs - (Date.now() - savedTime);
-        
-        const initialCountdown = formatDashboardCountdown(remainingMs, isIncentive);
-        
+        // 마감 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 24시간.
+        // (상세 화면과 동일 기준 → 같은 절대일시). 초시계 없이 절대 일시로 고정 표기.
+        const deadlineAnchor = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
+        const deadlineMs = app.analysis_deadline_override
+            ? new Date(app.analysis_deadline_override).getTime()
+            : new Date(deadlineAnchor).getTime() + (24 * 60 * 60 * 1000);
+        const remainingMs = deadlineMs - Date.now();
+
         actionItems.push({
             icon: 'fa-file-signature',
             iconColor: '#f59e0b',
             title: '개별 분석 결과를 확인하고 동의해주세요',
-            deadline: `마감: <span id="dashboardAnalysisTimer" style="font-variant-numeric: tabular-nums;">${initialCountdown}</span>`,
-            urgent: remainingMs <= (isIncentive ? 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000),
+            deadline: `마감: ${formatKstDateTimeKo(deadlineMs)}까지`,
+            urgent: remainingMs <= (6 * 60 * 60 * 1000),
             link: `application-detail.html?id=${app.id}#step2`,
-            linkText: '분석 결과 보기',
-            _startCountdown: { savedTime, isIncentive, deadlineMs }
+            linkText: '분석 결과 보기'
         });
     }
     
@@ -503,15 +501,17 @@ function renderActionItems(app) {
     
     // 4️⃣ 계약서 업로드 직후 ~ 학생 계약서 동의 직전
     else if (app.contract_sent_at && !app.contract_agreed_at) {
-        const deadline = new Date(app.contract_sent_at);
-        deadline.setDate(deadline.getDate() + 1); // 24시간 = 1일
-        const hoursLeft = Math.ceil((deadline - new Date()) / (1000 * 60 * 60));
-        
+        // 마감 = contract_deadline_override 있으면 그 값, 없으면 계약서 발송 + 24시간 (상세 화면과 동일 기준).
+        const deadlineMs = app.contract_deadline_override
+            ? new Date(app.contract_deadline_override).getTime()
+            : new Date(app.contract_sent_at).getTime() + (24 * 60 * 60 * 1000);
+        const hoursLeft = Math.ceil((deadlineMs - Date.now()) / (1000 * 60 * 60));
+
         actionItems.push({
             icon: 'fa-file-contract',
             iconColor: '#9480c5',
             title: '계약서에 동의해주세요',
-            deadline: hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!',
+            deadline: `마감: ${formatKstDateTimeKo(deadlineMs)}까지`,
             urgent: hoursLeft <= 24,
             link: `application-detail.html?id=${app.id}#step3`,
             linkText: '계약서 보기'
@@ -520,26 +520,17 @@ function renderActionItems(app) {
     
     // 5️⃣ 학생 계약서 동의 직후 ~ 학생 입금 버튼 클릭 직전
     else if (app.contract_agreed_at && !app.deposit_confirmed_by_student_at) {
-        // deposit_deadline_override가 있으면 해당 값, 없으면 contract_agreed_at + 24시간
-        const deadline = app.deposit_deadline_override
-            ? new Date(app.deposit_deadline_override)
-            : (() => { const d = new Date(app.contract_agreed_at); d.setDate(d.getDate() + 1); return d; })();
-        const hoursLeft = Math.ceil((deadline - new Date()) / (1000 * 60 * 60));
-        
-        // 기한 표시: override가 있으면 날짜, 없으면 시간
-        let deadlineText;
-        if (app.deposit_deadline_override) {
-            const daysLeft = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
-            deadlineText = daysLeft > 1 ? `마감: ${daysLeft}일 남음` : (hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!');
-        } else {
-            deadlineText = hoursLeft > 0 ? `마감: ${hoursLeft}시간 남음` : '마감 임박!';
-        }
+        // 마감 = deposit_deadline_override 있으면 그 값, 없으면 contract_agreed_at + 24시간 (상세 화면과 동일 기준).
+        const deadlineMs = app.deposit_deadline_override
+            ? new Date(app.deposit_deadline_override).getTime()
+            : new Date(app.contract_agreed_at).getTime() + (24 * 60 * 60 * 1000);
+        const hoursLeft = Math.ceil((deadlineMs - Date.now()) / (1000 * 60 * 60));
 
         actionItems.push({
             icon: 'fa-credit-card',
             iconColor: '#77bf7e',
             title: '결제를 진행해주세요',
-            deadline: deadlineText,
+            deadline: `마감: ${formatKstDateTimeKo(deadlineMs)}까지`,
             urgent: hoursLeft <= 24,
             link: `application-detail.html?id=${app.id}#step4`,
             linkText: '입금 정보 보기'
@@ -654,37 +645,7 @@ function renderActionItems(app) {
             </a>
         </div>
     `).join('');
-    
-    // 실시간 카운트다운 시작 (분석 동의 타이머)
-    const countdownItem = actionItems.find(i => i._startCountdown);
-    if (countdownItem) {
-        const { savedTime, isIncentive, deadlineMs } = countdownItem._startCountdown;
-        if (window._dashboardCountdownInterval) clearInterval(window._dashboardCountdownInterval);
-        window._dashboardCountdownInterval = setInterval(() => {
-            const el = document.getElementById('dashboardAnalysisTimer');
-            if (!el) { clearInterval(window._dashboardCountdownInterval); return; }
-            const remaining = deadlineMs - (Date.now() - savedTime);
-            el.textContent = formatDashboardCountdown(remaining, isIncentive);
-            if (remaining <= 0) { clearInterval(window._dashboardCountdownInterval); el.textContent = '마감!'; }
-        }, 1000);
-    }
-}
-
-// 대시보드용 카운트다운 포맷: 일반 24:00:00 / 유도 4일 12:00:00
-function formatDashboardCountdown(remainingMs, isIncentive) {
-    if (remainingMs <= 0) return '마감!';
-    const totalSec = Math.floor(remainingMs / 1000);
-    const days = Math.floor(totalSec / 86400);
-    const hours = Math.floor((totalSec % 86400) / 3600);
-    const minutes = Math.floor((totalSec % 3600) / 60);
-    const seconds = totalSec % 60;
-    const hh = String(hours).padStart(2, '0');
-    const mm = String(minutes).padStart(2, '0');
-    const ss = String(seconds).padStart(2, '0');
-    if (isIncentive) {
-        return `${days}일 ${hh}:${mm}:${ss}`;
-    }
-    return `${hh}:${mm}:${ss}`;
+    // 동의·계약·입금 마감은 절대 일시로 고정 표기(초시계 없음).
 }
 
 /**

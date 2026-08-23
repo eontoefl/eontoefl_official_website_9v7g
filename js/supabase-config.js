@@ -309,6 +309,41 @@ async function fetchAPI(endpoint, options = {}) {
     }
 }
 
+// ===== 공통 유틸: KST 절대 일시 포맷 =====
+// "8월 20일(수) 오후 4:20" (12시간제, 요일 한글)
+// Asia/Seoul 타임존으로 포맷하므로 UTC 저장값이라도 하루/시각 밀림이 없다.
+// (상세 화면·대시보드 양쪽에서 마감 절대일시 표기에 공통 사용)
+function formatKstDateTimeKo(input) {
+    if (!input) return '';
+    const d = (input instanceof Date) ? input : new Date(input);
+    if (isNaN(d.getTime())) return '';
+    // 오전/오후·12시간제는 환경(ICU) 로케일에 의존하지 않도록 KST 24시각에서 직접 계산한다.
+    const parts = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        month: 'numeric', day: 'numeric', weekday: 'short',
+        hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(d);
+    const get = (t) => (parts.find(p => p.type === t) || {}).value || '';
+    const h24 = parseInt(get('hour'), 10) % 24;
+    const period = h24 < 12 ? '오전' : '오후';
+    const h12 = (h24 % 12) === 0 ? 12 : (h24 % 12);
+    return `${get('month')}월 ${get('day')}일(${get('weekday')}) ${period} ${h12}:${get('minute')}`;
+}
+
+// KST 날짜+요일 포맷: "8월 24일(일)" (요일 한글)
+// schedule_start는 'YYYY-MM-DD'(UTC 자정 저장)이지만 Asia/Seoul로 포맷하면 밀림이 없다.
+function formatKstDateKo(input) {
+    if (!input) return '';
+    const d = (input instanceof Date) ? input : new Date(input);
+    if (isNaN(d.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        month: 'numeric', day: 'numeric', weekday: 'short'
+    }).formatToParts(d);
+    const get = (t) => (parts.find(p => p.type === t) || {}).value || '';
+    return `${get('month')}월 ${get('day')}일(${get('weekday')})`;
+}
+
 // ===== 공통 유틸: 새벽 4시 컷오프 기반 effectiveToday =====
 function getEffectiveToday() {
     const now = new Date();
