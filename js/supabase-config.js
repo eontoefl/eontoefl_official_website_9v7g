@@ -367,6 +367,42 @@ function getEffectiveToday() {
     return new Date(Date.UTC(y, m, d));
 }
 
+// ===== 공통 유틸: 다가오는 일요일 / 목요일 컷오프 (KST) =====
+// getUpcomingSundayStr(): KST 기준 '다가오는 첫 일요일'(오늘이 일요일이면 오늘)을 'YYYY-MM-DD'로.
+//   admin-manage-modal.js의 _upcomingSundayStr(), 텔레그램 원탭 upcomingSundayKST와 같은 규칙이되,
+//   브라우저 타임존과 무관하게 Asia/Seoul 달력 기준으로 계산해 하루 밀림이 없다.
+function getUpcomingSundayStr() {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+    }).formatToParts(now);
+    const get = (t) => (parts.find(p => p.type === t) || {}).value || '';
+    const y = parseInt(get('year'), 10);
+    const m = parseInt(get('month'), 10);
+    const d = parseInt(get('day'), 10);
+    const wdMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dow = wdMap[get('weekday')];
+    const add = (7 - dow) % 7; // 오늘이 일요일이면 0 → 오늘
+    // 시각 성분 없는 UTC 날짜 산술이라 타임존 영향 없음
+    const base = new Date(Date.UTC(y, m - 1, d + add));
+    const mm = String(base.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(base.getUTCDate()).padStart(2, '0');
+    return `${base.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+// getThursdayCutoffMs(sundayYmd): 주어진 일요일('YYYY-MM-DD')의 3일 전(목요일) 23:59:59 KST 타임스탬프(ms).
+//   이 시각까지 입금이 확인돼야 그 주 일요일 시작 가능(늦어도 금요일 출고 위해).
+//   KST 23:59:59 = 같은 날 UTC 14:59:59 이므로 하루 밀림 없이 계산된다.
+function getThursdayCutoffMs(sundayYmd) {
+    if (!sundayYmd) return NaN;
+    const [y, m, d] = String(sundayYmd).split('-').map(n => parseInt(n, 10));
+    if (!y || !m || !d) return NaN;
+    // 일요일 달력날짜에서 -3일 = 목요일 (시각 없는 UTC 산술)
+    const thu = new Date(Date.UTC(y, m - 1, d - 3));
+    return Date.UTC(thu.getUTCFullYear(), thu.getUTCMonth(), thu.getUTCDate(), 14, 59, 59, 0);
+}
+
 // ===== 공통 유틸: 신청서 진행 상태 판정 =====
 // app_status가 DB에 저장되어 있으면 그 값을 우선 사용하고,
 // 없으면 schedule_start / schedule_end 기준으로 자동 판정한다.

@@ -3012,6 +3012,53 @@ async function loadPaymentTab(app) {
         }
     }
 
+    // ── Step 4b: 이번 주(다가오는 일요일) 시작 학생용 안내 / 늦은 시작 선택 ──
+    // 1층 등록확정기한 배너 바로 아래에 붙는다. 시작일이 다가오는 일요일이 아니거나,
+    // 자기주도(self_paced)이거나, 시작일이 없으면 아무것도 렌더하지 않는다.
+    //   · 목요일 컷오프 전  → 안내 문구(2층)
+    //   · 목요일 컷오프 후  → 이번주/다음주 시작 선택 카드
+    let lateStartHTML = '';
+    const isThisWeekStart = (app.self_paced !== true) && app.schedule_start
+        && (app.schedule_start === getUpcomingSundayStr());
+    if (isThisWeekStart) {
+        const thursdayCutoffMs = getThursdayCutoffMs(app.schedule_start);
+        const sundayLabel = formatKstDateKo(app.schedule_start);
+        if (Date.now() < thursdayCutoffMs) {
+            // 2층: 목요일 컷오프 전 안내
+            const thursdayLabel = formatKstDateKo(thursdayCutoffMs); // "8월 21일(목)"
+            lateStartHTML = `
+                <div class="s4-card" style="background:#f6f4fb;">
+                    <div class="s4-card-title"><i class="fas fa-truck-fast"></i> 이번 주 시작 안내</div>
+                    <p style="font-size:14px; color:#5b4a7d; margin:0; line-height:1.85;">
+                        이번 일요일(<strong>${sundayLabel}</strong>)에 시작하려면 <strong>${thursdayLabel} 밤 11:59</strong>까지 입금이 확인되어야 해요.<br>
+                        늦어도 금요일에 교재를 출고해야 토요일에 도착하거든요.<br>
+                        이후에 입금되면 다음 일요일 시작으로 안내드려요.
+                    </p>
+                </div>
+            `;
+        } else {
+            // 선택카드: 목요일 컷오프 후 — 이번주/다음주 시작 선택
+            const nextSundayLabel = formatKstDateKo(new Date(app.schedule_start).getTime() + 7 * 24 * 60 * 60 * 1000);
+            const pickNext = app.late_start_choice === '다음주'; // 그 외('이번주'/NULL)는 카드1(이번주) 기본 강조
+            const cardBase = 'border-radius:12px; padding:18px 20px; cursor:pointer; transition:0.15s;';
+            const onStyle = 'background:#efeaf7; box-shadow:0 0 0 2px #9480c5 inset;';
+            const offStyle = 'background:#f6f4fb; box-shadow:none;';
+            lateStartHTML = `
+                <div class="s4-card">
+                    <div class="s4-card-title"><i class="fas fa-calendar-check"></i> 이번 주 시작, 아직 늦지 않았어요. 언제 시작할까요?</div>
+                    <div id="lateStartCard-thisweek" onclick="selectLateStart('이번주')" style="${cardBase} margin-bottom:10px; ${pickNext ? offStyle : onStyle}">
+                        <div style="font-size:15px; font-weight:700; color:#5b4a7d; letter-spacing:-0.01em;">이번 일요일(${sundayLabel}) 바로 시작</div>
+                        <div style="font-size:13px; color:#64748b; margin-top:5px; line-height:1.6;">교재는 PDF로 먼저 받고 출발 · 종이책은 이어서 배송</div>
+                    </div>
+                    <div id="lateStartCard-nextweek" onclick="selectLateStart('다음주')" style="${cardBase} ${pickNext ? onStyle : offStyle}">
+                        <div style="font-size:15px; font-weight:700; color:#5b4a7d; letter-spacing:-0.01em;">다음 일요일(${nextSundayLabel})부터 시작</div>
+                        <div style="font-size:13px; color:#64748b; margin-top:5px; line-height:1.6;">종이 교재 받고 여유 있게</div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     // 입금 후 진행 순서(타임라인). 마지막 줄 시작일은 자기주도(self_paced)이거나 시작일이 없으면 "시작일에 시작"으로 대체.
     const startLabel = (app.self_paced === true || !app.schedule_start)
         ? '시작일에 시작'
@@ -3049,8 +3096,8 @@ async function loadPaymentTab(app) {
         </div>
     `;
 
-    // 배치: 등록확정기한 배너 → 계좌 정보 → 타임라인 → 카톡 성함 카드
-    paymentContent.innerHTML = s4style + deadlineHTML + paymentInfoHtml + timelineHtml + kakaoCardHtml;
+    // 배치: 등록확정기한 배너 → (이번주 시작 안내/선택) → 계좌 정보 → 타임라인 → 카톡 성함 카드
+    paymentContent.innerHTML = s4style + deadlineHTML + lateStartHTML + paymentInfoHtml + timelineHtml + kakaoCardHtml;
     // 등록 확정 기한은 배너에 절대 일시로 고정 표기(초시계 없음).
 }
 
@@ -3146,6 +3193,41 @@ function fallbackCopy(text, done) {
     ta.select();
     try { document.execCommand('copy'); done && done(); } catch (e) { /* ignore */ }
     document.body.removeChild(ta);
+}
+
+// Step 4b: 이번 주 시작 선택 저장('이번주'|'다음주')
+//   1) 클릭한 카드로 강조 즉시 전환, 2) currentApplication 로컬 갱신,
+//   3) applications.late_start_choice 저장(방어적: 컬럼 없거나 실패해도 화면 안 깨짐 → 콘솔 경고만).
+async function selectLateStart(choice) {
+    const app = currentApplication;
+    if (!app) return;
+
+    // 1) 화면 강조 전환
+    const pickNext = choice === '다음주';
+    const onStyle = { bg: '#efeaf7', shadow: '0 0 0 2px #9480c5 inset' };
+    const offStyle = { bg: '#f6f4fb', shadow: 'none' };
+    const thisCard = document.getElementById('lateStartCard-thisweek');
+    const nextCard = document.getElementById('lateStartCard-nextweek');
+    if (thisCard) {
+        const s = pickNext ? offStyle : onStyle;
+        thisCard.style.background = s.bg;
+        thisCard.style.boxShadow = s.shadow;
+    }
+    if (nextCard) {
+        const s = pickNext ? onStyle : offStyle;
+        nextCard.style.background = s.bg;
+        nextCard.style.boxShadow = s.shadow;
+    }
+
+    // 2) 로컬 갱신
+    app.late_start_choice = choice;
+
+    // 3) 저장(방어적)
+    try {
+        await supabaseAPI.patch('applications', app.id, { late_start_choice: choice });
+    } catch (e) {
+        console.warn('[late_start_choice] 저장 실패(마이그레이션 전이면 정상):', e);
+    }
 }
 
 // 클립보드에 복사
