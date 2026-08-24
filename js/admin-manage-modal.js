@@ -2568,6 +2568,12 @@ async function loadModalContractTab(app) {
                         </div>
                     </div>
                     <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
+                        ${app.late_start_choice ? `
+                        <div style="background: #faf7fa; border: 1px solid #ece4f2; border-radius: 10px; padding: 11px 13px; margin-bottom: 16px; font-size: 13px; color: #5b4a7d; line-height: 1.5;">
+                            <i class="fas fa-user-clock" style="font-size: 11px; margin-right: 6px;"></i>
+                            학생 시작 선택: <strong>${app.late_start_choice === '다음주' ? '다음주' : '이번주(교재 PDF 선발송)'}</strong>
+                        </div>
+                        ` : ''}
                         <div style="margin-bottom: 16px;">
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">입금자명</label>
                             <input type="text" id="modalDepositorName" value="${app.depositor_name || app.name}" readonly
@@ -2970,18 +2976,79 @@ async function sendContractFromModal(appId) {
 }
 
 // 입금 확인 (모달에서)
+// ===== 5c: 관리자 입금확인 시 시작일 이동(G-7) — KST, 하루 밀림 없이 =====
+// 재개 승인(5b, telegram-notify의 computeResumeStartShift)과 같은 '다가오는 일요일 + 목요일 컷오프' 규칙.
+//   - self_paced 이거나 schedule_start 없으면 이동 없음.
+//   - newStart = 다가오는 일요일. 그 일요일의 목요일 컷오프 전이면 그 일요일, 지났으면 +7일
+//     (= 지금 교재를 실을 수 있는 가장 이른 일요일). getUpcomingSundayStr()·getThursdayCutoffMs() 재사용.
+//   - 이동조건 = schedule_start가 KST 오늘보다 과거 OR 학생이 '다음주' 선택.
+//     ('이번주'/미선택이고 시작일이 미래면 이동 없음 = 이번주 그대로 시작, 교재만 선발송.)
+//   - 실제로 앞으로 미룰 때만(deltaDays>0) 이동. delta<=0(제자리/과거로)이면 이동 없음 — 시작일이 뒤로 당겨지는 사고 방지.
+//   - deltaDays만큼 schedule_end·correction_start_date·extension_start_date 중 값 있는 것만 함께 이동.
+function _kstTodayYmd() {
+    const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000); // KST = UTC+9 (DST 없음)
+    const y = kstNow.getUTCFullYear();
+    const m = String(kstNow.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(kstNow.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+function _shiftYmd(ymd, days) {
+    const t = new Date(ymd + 'T00:00:00Z').getTime() + days * 24 * 60 * 60 * 1000;
+    const d = new Date(t);
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${mm}-${dd}`;
+}
+function _computeDepositStartShift(app) {
+    if (!app || app.self_paced === true) return { moved: false };
+    const oldStart = app.schedule_start || null;
+    if (!oldStart) return { moved: false };
+
+    const sun = getUpcomingSundayStr();
+    const newStart = Date.now() < getThursdayCutoffMs(sun) ? sun : _shiftYmd(sun, 7);
+
+    const shouldMove = (oldStart < _kstTodayYmd()) || (app.late_start_choice === '다음주');
+    if (!shouldMove) return { moved: false };
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const deltaDays = Math.round(
+        (new Date(newStart + 'T00:00:00Z').getTime() - new Date(oldStart + 'T00:00:00Z').getTime()) / dayMs
+    );
+    if (deltaDays <= 0) return { moved: false }; // 앞으로 미룰 때만 이동
+
+    const updates = { schedule_start: newStart };
+    if (app.schedule_end) updates.schedule_end = _shiftYmd(app.schedule_end, deltaDays);
+    if (app.correction_start_date) updates.correction_start_date = _shiftYmd(app.correction_start_date, deltaDays);
+    if (app.extension_start_date) updates.extension_start_date = _shiftYmd(app.extension_start_date, deltaDays);
+
+    return { moved: true, oldStart, newStart, updates };
+}
+
 async function confirmDepositFromModal(appId) {
     const amount = document.getElementById('modalDepositAmount').value;
     if (!confirm(`${parseInt(amount).toLocaleString()}원 입금을 확인하시겠습니까?`)) {
         return;
     }
-    
+
+    // 5c: 입금 확인 저장 전에 시작일 이동(G-7) 판정 — 이동할 상황이면 관리자에게 되돌리기 가능한 확인.
+    const patchBody = {
+        deposit_confirmed_by_admin: true,
+        deposit_confirmed_by_admin_at: Date.now(),
+        current_step: 5
+    };
+    const shift = _computeDepositStartShift(currentManageApp);
+    if (shift.moved) {
+        const ok = confirm(
+            `시작일 ${shift.oldStart} → ${shift.newStart} 로 옮기고 입금 확인할까요?\n` +
+            `(취소 = 시작일 그대로 두고 입금만 확인)`
+        );
+        if (ok) {
+            Object.assign(patchBody, shift.updates);
+        }
+    }
+
     try {
-        const updatedApp = await supabaseAPI.patch('applications', appId, {
-                deposit_confirmed_by_admin: true,
-                deposit_confirmed_by_admin_at: Date.now(),
-                current_step: 5
-        });
+        const updatedApp = await supabaseAPI.patch('applications', appId, patchBody);
         
         if (updatedApp) {
             // 알림톡: 입금 확인 완료

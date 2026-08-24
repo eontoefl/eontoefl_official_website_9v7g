@@ -7,8 +7,8 @@
 -- 규칙:
 --   - 각 단계 마감 "2시간 전"에 발송.
 --   - 마감 = 각 단계 시작 시각 + 24시간.
---       개별분석 동의: analysis_first_saved_at(ms) + 24h
---       계약서 동의  : contract_sent_at(ms) + 24h
+--       개별분석 동의: analysis_deadline_override(수동 리셋/재개 승인 시) 있으면 그 값, 없으면 analysis_first_saved_at(ms) + 24h
+--       계약서 동의  : contract_sent_at(ms) + 24h  (재개=contract_deadline_override 세팅 시 미발송으로 제외)
 --       입금        : deposit_deadline_override(있으면) 또는 contract_agreed_at(ms) + 24h
 --   - 방해금지 시간(KST 자정~오전 7시)에는 발송하지 않고, 발송 시점을
 --     아침 7시 또는 전날 밤 23시로 보정 (reminder_effective_send_at 참고).
@@ -35,6 +35,8 @@
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS analysis_agree_reminder_sent_at timestamptz DEFAULT NULL;
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS contract_agree_reminder_sent_at timestamptz DEFAULT NULL;
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS deposit_reminder_sent_at timestamptz DEFAULT NULL;
+-- 개별분석 동의 마감 "수동 리셋/재개" override (add_analysis_deadline_override.sql와 동일, 방어적 재선언).
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS analysis_deadline_override timestamptz DEFAULT NULL;
 
 COMMENT ON COLUMN applications.analysis_agree_reminder_sent_at IS '개별분석 동의 마감 2시간 전 리마인드(50228) 발송 시각. NULL이면 미발송.';
 COMMENT ON COLUMN applications.contract_agree_reminder_sent_at IS '계약서 동의 마감 2시간 전 리마인드(50229) 발송 시각. NULL이면 미발송.';
@@ -103,19 +105,27 @@ BEGIN
 
     -- =================================================================
     -- (1) 개별분석 동의 마감 리마인드 (50228)
+    --     마감 = analysis_deadline_override(수동 리셋/재개 승인 시 세팅) 있으면 그 값,
+    --            없으면 analysis_first_saved_at + 24h.
+    --     재개 승인(5b)은 override 세팅 + analysis_agree_reminder_sent_at=NULL 초기화 →
+    --     새 마감 2시간 전에 리마인드가 다시 발송된다.
     -- =================================================================
     FOR rec IN
         SELECT a.id, a.name, a.phone,
-               (to_timestamp(a.analysis_first_saved_at / 1000.0) + interval '24 hours') AS deadline
+               COALESCE(a.analysis_deadline_override,
+                        to_timestamp(a.analysis_first_saved_at / 1000.0) + interval '24 hours') AS deadline
         FROM applications a
         WHERE a.analysis_status = '승인'
           AND (a.student_agreed_at IS NULL OR a.student_agreed_at = '')
-          AND a.analysis_first_saved_at IS NOT NULL
+          AND (a.analysis_first_saved_at IS NOT NULL OR a.analysis_deadline_override IS NOT NULL)
           AND COALESCE(a.is_incentive_applicant, false) = false
           AND a.analysis_agree_reminder_sent_at IS NULL
           AND a.phone IS NOT NULL AND a.phone <> ''
-          AND now() >= reminder_effective_send_at(to_timestamp(a.analysis_first_saved_at / 1000.0) + interval '24 hours')
-          AND now() <  (to_timestamp(a.analysis_first_saved_at / 1000.0) + interval '24 hours')
+          AND now() >= reminder_effective_send_at(
+                          COALESCE(a.analysis_deadline_override,
+                                   to_timestamp(a.analysis_first_saved_at / 1000.0) + interval '24 hours'))
+          AND now() <  COALESCE(a.analysis_deadline_override,
+                                to_timestamp(a.analysis_first_saved_at / 1000.0) + interval '24 hours')
         FOR UPDATE OF a SKIP LOCKED
     LOOP
         UPDATE applications SET analysis_agree_reminder_sent_at = now() WHERE id = rec.id;
@@ -241,6 +251,10 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- 4) pg_cron 등록 (매 5분 실행)
+--    ⚠️ 대표님: 함수 정의(위 CREATE OR REPLACE FUNCTION 블록)만 고쳤을 때는
+--       SQL Editor에서 "함수 정의부만" 재실행하면 됩니다.
+--       아래 cron.schedule 줄은 이미 등록돼 있으면 다시 실행하지 마세요
+--       (같은 이름으로 중복 등록/재설정을 피하기 위함).
 -- ---------------------------------------------------------------------
 SELECT cron.schedule(
     'process-deadline-reminders',
