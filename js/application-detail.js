@@ -1406,6 +1406,20 @@ function getAgreementSection(app) {
         ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #a53b22; font-weight: 600; margin-top: 4px;"><i class="fas fa-triangle-exclamation"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
         : (chipUrgent ? `<div id="analysisCountdownMsg" style="font-size: 13px; color: #b45309; font-weight: 600; margin-top: 4px;"><i class="fas fa-circle-exclamation"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : `<div id="analysisCountdownMsg"></div>`);
 
+    // 만료(chipExpired) → 체크박스+제출버튼 대신 '이어서 진행 요청' 블록(Step 5a).
+    // 만료 && 미요청 → 재개 요청 블록 / 만료 && 요청됨 → '확인 중'.
+    if (chipExpired) {
+        const isResumePending = !!app.resume_requested_at;
+        return `
+            <div id="analysisCountdownContainer" class="s2-card">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+                    <div class="s2-card-title" style="margin: 0;"><i class="fas fa-clipboard-check"></i> 프로그램 동의 (필수)</div>
+                </div>
+                ${renderResumeBlock('동의', isResumePending)}
+            </div>
+        `;
+    }
+
     // 경고·타이머·동의폼을 한 카드로 묶는다. (id: analysisCountdownContainer 유지)
     return `
         <div id="analysisCountdownContainer" class="s2-card">
@@ -1449,6 +1463,99 @@ function getAgreementSection(app) {
             </div>
         </div>
     `;
+}
+
+// ==================== 만료 후 '이어서 진행 요청' 블록 (Step 5a) ====================
+// 동의(STEP2)·계약(STEP3) 기한이 지난 뒤, 막다른 "관리자에게 문의" 대신
+// 학생이 직접 재개를 요청하도록 하는 라벤더 블록. stage = '동의' | '계약'.
+// isResumePending(=요청 후 아직 재개 안 됨)이면 '확인 중'만 보여준다.
+// 재개 승인(5b)이 *_deadline_override를 미래로 리셋하면 만료가 풀려 정상 폼이 다시 뜬다.
+
+// stage → 각 요소 id 접미사(한 화면에 동의/계약이 겹치지 않지만 명시적으로 분리)
+function resumeKey(stage) { return stage === '계약' ? 'contract' : 'agree'; }
+
+function renderResumeBlock(stage, isResumePending) {
+    const key = resumeKey(stage);
+    const wrapId = 'resumeWrap_' + key;
+
+    // 요청 완료 → '확인 중' (버튼 없음)
+    if (isResumePending) {
+        return `
+        <div id="${wrapId}" style="background: #f6f4fb; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px;">
+            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;"><i class="fas fa-hourglass-half" style="margin-right: 6px;"></i>확인하고 있어요</div>
+            <div style="font-size: 13px; color: #5b4a7d; line-height: 1.8;">
+                요청 접수됐어요. 제가 확인하고 다시 열어드릴게요 — 열리면 카카오톡으로 바로 알려드릴게요.
+            </div>
+        </div>`;
+    }
+
+    // 미요청 → 재개 요청 블록 (stage별 문구)
+    const inputId = 'resumeNote_' + key;
+    const bodyText = stage === '계약'
+        ? `계약서 작성 기한이 지났어요.<br>
+           처음부터 다시 하실 필요는 없지만, 시간이 지나서 안내드린 일정이 지금도 맞는지 제가 한 번 더 확인해야 해요.<br>
+           이어서 진행하고 싶으시면 아래로 요청을 남겨주세요. 확인하고 다시 열어드릴게요.<br>
+           <span style="color: #8a7aa8;">(시작일은 다음 일요일로 조정될 수 있어요.)</span>`
+        : `동의 기한이 지났어요.<br>
+           안내드린 프로그램·가격·시작일은 그 기한 안에서만 그대로 보장돼요. 시간이 지난 지금은, 그때 상황에 맞춰 짜드린 일정이라 지금도 맞는지 제가 한 번 더 확인해야 해요.<br>
+           이어서 진행하고 싶으시면 아래로 요청을 남겨주세요. 제가 확인하고 다시 열어드릴게요.<br>
+           <span style="color: #8a7aa8;">(시작일은 다음 일요일로 조정될 수 있어요.)</span>`;
+
+    return `
+        <div id="${wrapId}" style="background: #f6f4fb; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px;">
+            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;">${stage === '계약' ? '계약서 작성' : '동의'} 기한이 지났어요</div>
+            <div style="font-size: 13px; color: #5b4a7d; line-height: 1.8; margin-bottom: 14px;">
+                ${bodyText}
+            </div>
+            <textarea id="${inputId}" rows="2" placeholder="신청 때와 달라진 점(일정·목표)이 있으면 적어주세요"
+                style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ddd3ec; border-radius: 10px; font-size: 13px; font-family: inherit; color: #5b4a7d; resize: vertical; margin-bottom: 12px; background: #ffffff;"></textarea>
+            <button onclick="requestResume('${stage}')"
+                style="width: 100%; padding: 14px; background: #efeaf7; color: #5b4a7d; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; font-family: inherit; letter-spacing: -0.01em; cursor: pointer;">
+                <i class="fas fa-paper-plane" style="margin-right: 7px;"></i> 이어서 진행 요청하기
+            </button>
+        </div>`;
+}
+
+// 재개 요청 핸들러: 로컬 즉시 전환(중복 방지) → patch 저장(방어) → 사장님 텔레그램(방어)
+async function requestResume(stage) {
+    const app = currentApplication;
+    if (!app) return;
+
+    const key = resumeKey(stage);
+    const noteEl = document.getElementById('resumeNote_' + key);
+    const note = (noteEl && noteEl.value.trim()) ? noteEl.value.trim() : null;
+
+    // 1) 로컬 갱신 + 화면 즉시 '확인 중' 전환 (중복 클릭 방지)
+    app.resume_requested_at = new Date().toISOString();
+    app.resume_request_note = note;
+    app.resume_stage = stage;
+    const wrap = document.getElementById('resumeWrap_' + key);
+    if (wrap) wrap.outerHTML = renderResumeBlock(stage, true);
+
+    // 2) 저장(방어적: 실패해도 화면 안 깨짐)
+    try {
+        await supabaseAPI.patch('applications', app.id, {
+            resume_requested_at: app.resume_requested_at,
+            resume_request_note: note,
+            resume_stage: stage
+        });
+    } catch (e) {
+        console.warn('[resume_request] 저장 실패(마이그레이션 전이면 정상):', e);
+    }
+
+    // 3) 사장님 텔레그램(방어적). 메시지/버튼 구성은 5b에서 처리 — 여기선 호출만.
+    try {
+        await sendEdgeFunctionNotify('resume_requested', {
+            app_id: app.id,
+            name: app.name || '',
+            stage: stage,
+            note: note,
+            schedule_start: app.schedule_start || null,
+            final_price: app.final_price || null
+        });
+    } catch (e) {
+        console.warn('[resume_request] 텔레그램 발송 실패:', e);
+    }
 }
 
 // 체크박스 토글
@@ -2297,20 +2404,14 @@ async function loadContractTab(app) {
     const now = Date.now();
     const remaining = contractDeadlineMs - now;
 
-    // 3. 기한 초과 → 코랄 배너 + 계약서 본문
+    // 3. 기한 초과 → '이어서 진행 요청' 블록 + 계약서 본문(입력칸 잠금 유지) (Step 5a)
+    //    막다른 "관리자에게 문의" 대신 학생이 직접 재개를 요청. 요청됨이면 '확인 중'.
     if (remaining <= 0) {
         const contractHTML = await getContractDisplay(app);
+        const isResumePending = !!app.resume_requested_at;
         contractContent.innerHTML = `
             ${s3style}
-            <div class="s3-banner" style="background: #f9edea;">
-                <div class="s3-banner-left">
-                    <div class="s3-banner-tile" style="background: #f6ddd6;"><i class="fas fa-triangle-exclamation" style="color: #a53b22; font-size: 18px;"></i></div>
-                    <div>
-                        <div class="s3-banner-title">동의 기한 초과</div>
-                        <div class="s3-banner-sub">계약 동의 기한이 초과되었습니다. 관리자에게 문의하여 기한을 연장해 주세요.</div>
-                    </div>
-                </div>
-            </div>
+            ${renderResumeBlock('계약', isResumePending)}
             ${contractHTML}
         `;
         setTimeout(() => { if (typeof fixContractInputOverflow === 'function') fixContractInputOverflow(); applyStudentContractTheme(true); }, 50);
