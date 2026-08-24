@@ -13,9 +13,9 @@ const TESTROOM_URL = "https://testroom.eonfl.com";
 
 // ===== 템플릿 ID 매핑 =====
 const TEMPLATE_IDS: Record<string, number> = {
-  analysis_complete:  50202,  // 개별분석 완료 안내 (일반 학생)
-  contract_sent:      50203,  // 계약서 발송 안내
-  payment_request:    50204,  // 입금 안내
+  analysis_complete:  50236,  // 개별분석 완료 안내 (일반 학생)
+  contract_sent:      50237,  // 계약서 발송 안내
+  payment_request:    50238,  // 입금 안내
   payment_confirmed:  50205,  // 입금 확인 완료
   guide_uploaded:     50206,  // 이용방법 안내
   shipping_sent:      50207,  // 택배 발송 안내
@@ -30,9 +30,9 @@ const TEMPLATE_IDS: Record<string, number> = {
   contract_deferred:           50221,  // 계약서 기한 유예 안내
   contract_deferral_reminder:  50222,  // 계약서 유예 만료 24시간 전 리마인더
   weekly_check_registered:     50225,  // 주간체크 등록 안내
-  analysis_agree_reminder:     50228,  // 개별분석 동의 마감 2시간 전 리마인드 (일반 학생)
-  contract_agree_reminder:     50229,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
-  deposit_reminder:            50230,  // 입금 마감 2시간 전 리마인드 (일반 학생)
+  analysis_agree_reminder:     50239,  // 개별분석 동의 마감 2시간 전 리마인드 (일반 학생)
+  contract_agree_reminder:     50240,  // 계약서 동의 마감 2시간 전 리마인드 (일반 학생)
+  deposit_reminder:            50241,  // 입금 마감 2시간 전 리마인드 (일반 학생)
   practice_open:               50231,  // 연습코스 오픈 안내 (정규과정 종료 후 자동 활성화)
   toefl_exam_day:              50233,  // 시험 당일 회신 안내 + 리포트 참여
   correction_extension_complete: 50227,  // 첨삭 연장(13~24세션) 완료 안내
@@ -77,50 +77,39 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       return [
         "이온토플 - 개별분석 완료 안내",
         "",
-        `${data.name}님, 안녕하세요.`,
-        "이온토플입니다.",
+        `${data.name}님, 안녕하세요 :) 이온토플입니다!`,
         "",
-        "신청서에 대한 개별분석이 완료되었습니다.",
-        "아래 링크에서 분석 내용을 확인하시고, 프로그램 및 일정에 동의해주세요.",
+        "제출해주신 신청서에 대한 개별분석을 올려드렸어요",
+        "아래 버튼에서 분석 내용을 확인하시고, 프로그램 및 일정에 동의해주시면 돼요",
         "",
-        "* 24시간 이내 미확인 시 승인이 자동 취소됩니다.",
-        "",
-        link,
+        "* 안내드린 프로그램·일정은 24시간 동안 보장되며, 기한이 지나면 시작일을 다시 확인한 뒤 진행하게 됩니다.",
       ].join("\n");
 
     case "contract_sent":
       return [
         "이온토플 - 계약서 발송 안내",
         "",
-        `${data.name}님, 안녕하세요.`,
-        "이온토플입니다.",
+        `${data.name}님, 안녕하세요!`,
         "",
         `${data.program} 계약서가 발송되었습니다.`,
-        "아래 링크에서 계약 내용을 꼼꼼히 확인하신 후 동의해주세요.",
+        "아래 버튼에서 계약 내용을 꼼꼼히 확인하신 후 동의해주시면 돼요!",
         "",
-        "* 24시간 이내 미동의 시 자동 취소됩니다.",
-        "",
-        link,
+        "* 24시간 안에 동의하시면 안내드린 시작일이 그대로 확정됩니다.",
       ].join("\n");
 
     case "payment_request":
       return [
         "이온토플 - 입금 안내",
         "",
-        `${data.name}님, 안녕하세요.`,
-        "이온토플입니다.",
+        `${data.name}님, 안녕하세요!`,
         "",
         "계약이 완료되었습니다.",
         "아래 계좌로 입금을 진행해주세요.",
         "",
         `- 금액: ${data.price}원`,
-        `- 은행: ${data.bank}`,
-        `- 계좌번호: ${data.account}`,
-        `- 예금주: ${data.holder}`,
+        `- 국민은행 545601-01-233970 (황경민(이온)) / ${data.price}원`,
         "",
-        "* 24시간 이내 미입금 시 자동 취소됩니다.",
-        "",
-        link,
+        "* 24시간 안에 입금이 확인되면 등록이 확정됩니다!",
       ].join("\n");
 
     case "payment_confirmed":
@@ -367,12 +356,12 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       return [
         "이온토플 - 개별분석 동의 마감 안내",
         "",
-        `${data.name}님, 안녕하세요 :)`,
+        `${data.name}님, 안녕하세요!`,
         "",
         `요청하신 개별분석 동의 마감까지 ${data.time}시간 남았어요. (${data.deadline}까지)`,
         "",
-        "아래 링크에서 분석 결과 확인하시고 동의 여부 결정해주세요.",
-        "기한이 지나면 이 분석 건은 만료되고, 이후 5일간은 재신청이 불가해요.",
+        "아래 버튼에서 분석 결과 확인하시고 동의 여부 결정해주세요.",
+        "기한이 지나면 안내드린 시작일이 다음 일요일로 밀릴 수 있어요 :(",
       ].join("\n");
 
     case "contract_agree_reminder":
@@ -383,27 +372,23 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "",
         `${data.program} 계약서 동의 마감까지 ${data.time}시간 남았어요. (${data.deadline}까지)`,
         "",
-        "아래 링크에서 계약 내용 확인하시고 동의해주세요.",
-        "기한이 지나면 지금까지 진행된 신청은 자동 취소되어, 처음부터 다시 접수하셔야 해요.",
+        "아래 버튼에서 계약 내용 확인하시고 동의해주세요.",
+        "기한 안에 마무리하시면 시작일이 그대로 확정돼요. 지나면 일정 재확인이 필요해요!",
       ].join("\n");
 
-    case "deposit_reminder": {
-      const rawPrice = String(data.price ?? "0").replace(/[^\d.]/g, "");
-      const price = rawPrice ? Number(rawPrice).toLocaleString() : "0";
+    case "deposit_reminder":
       return [
         "이온토플 - 입금 마감 안내",
         "",
         `${data.name}님, 안녕하세요 :)`,
+        "",
         `${data.program} 입금 마감까지 ${data.time}시간 남았어요. (${data.deadline}까지)`,
         "",
-        `- ${DEPOSIT_BANK} ${DEPOSIT_ACCOUNT} (${DEPOSIT_HOLDER}) / ${price}원`,
+        `- ${DEPOSIT_BANK} ${DEPOSIT_ACCOUNT} (${DEPOSIT_HOLDER}) / ${data.price}원`,
         "",
-        "기한이 지나면 지금까지 진행된 신청은 자동 취소되어, 처음부터 다시 접수하셔야 해요.",
+        "기한이 지나면 시작일 일정을 다시 확인하게 돼요.",
         "입금이 확인되면 바로 다음 단계 안내드릴게요!",
-        "",
-        "입금을 마치신 후, 아래 버튼을 눌러 입금 완료를 알려주세요.",
       ].join("\n");
-    }
 
     case "resume_approved":
       // 승인 원문(대표 확정) — 수정 시 카카오 재검수 필요
@@ -439,11 +424,11 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
 function buildSmsContent(type: string, data: Record<string, unknown> = {}): string {
   switch (type) {
     case "analysis_complete":
-      return "[이온토플] 개별분석이 완료되었습니다. 24시간 이내에 확인해주세요.";
+      return "[이온토플] 개별분석 올렸어요. 24시간 내 확인·동의 부탁드려요";
     case "contract_sent":
-      return "[이온토플] 계약서가 발송되었습니다. 24시간 이내에 확인해주세요.";
+      return "[이온토플] 계약서 발송. 24시간 내 동의 시 시작일 확정";
     case "payment_request":
-      return "[이온토플] 입금을 진행해주세요. 24시간 이내에 완료해주세요.";
+      return "[이온토플] 계약 완료. 24시간 내 입금 시 등록 확정";
     case "payment_confirmed":
       return "[이온토플] 입금이 확인되었습니다. 이용방법 안내를 곧 보내드립니다.";
     case "guide_uploaded":
@@ -475,11 +460,11 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
     case "practice_open":
       return "[이온토플] 연습코스가 활성화되었습니다. 테스트룸에서 자유롭게 이용해주세요. https://testroom.eonfl.com";
     case "analysis_agree_reminder":
-      return `[이온토플] 개별분석 동의 기한이 ${data.time}시간 남았어요. 만료 시 5일간 재신청이 불가해요.`;
+      return `[이온토플] 동의 마감 ${data.time}시간 남음. 지나면 시작일이 다음 일요일로 밀릴 수 있어요`;
     case "contract_agree_reminder":
-      return `[이온토플] 계약서 동의 기한이 ${data.time}시간 남았어요. 미동의 시 신청이 자동취소돼요.`;
+      return `[이온토플] 계약 동의 마감 ${data.time}시간 남음. 기한 내 마무리 시 시작일 확정`;
     case "deposit_reminder":
-      return `[이온토플] 입금 기한 ${data.deadline}까지(${data.time}시간 남음). 미입금 시 신청이 자동취소돼요.`;
+      return `[이온토플] 입금 마감 ${data.time}시간 남음. 지나면 시작일 재확인`;
     case "toefl_exam_day":
       return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요. 시험 리포트도 참여 부탁드려요 https://eonfl.com/survey.html";
     case "correction_extension_complete":
@@ -520,7 +505,9 @@ function hasNoButton(templateId: number): boolean {
       // 루나소프트 확인 결과 버튼이 있으면 이 줄을 지우고 getBtnUrl()에 링크를 추가할 것.
       || templateId === TEMPLATE_IDS.correction_extension_complete
       // 50243(재개 보류): 버튼 없음 — 카톡으로 개별 안내 예정.
-      || templateId === TEMPLATE_IDS.resume_held;
+      || templateId === TEMPLATE_IDS.resume_held
+      // 50241(입금 마감 리마인드): 버튼 없음 — 본문에 계좌/기한 안내, 별도 버튼 없음.
+      || templateId === TEMPLATE_IDS.deposit_reminder;
 }
 
 // ===== 단건 메시지 객체 생성 =====
