@@ -351,6 +351,38 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
       break;
     }
 
+    // ----- 진행 재개 요청 (학생이 만료 화면에서 [이어서 진행 요청]) -----
+    // 최신값을 DB에서 조회해 표시(요청 payload가 아니라 실제 행 기준).
+    case "resume_requested": {
+      const appId = String(data.app_id || "");
+      const app = await getApplication(appId);
+      if (!app) {
+        return new Response(
+          JSON.stringify({ error: "Application not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const shift = computeResumeStartShift(app);
+      const startLabel = shift.moved ? shift.newStart : "유지";
+      text =
+        `🔄 진행 재개 요청 — ${app.name || "-"}\n\n` +
+        `단계: ${app.resume_stage || "-"} 만료\n` +
+        `원래 시작일: ${app.schedule_start || "-"}\n` +
+        `승인 시 시작일: ${startLabel}\n` +
+        `메모: ${app.resume_request_note || "없음"}\n` +
+        `가격: ${app.final_price ?? "-"}원`;
+      buttons = [
+        [
+          { text: "✅ 재개 승인", callback_data: `resume_approve:${appId}` },
+          { text: "⏸ 보류·카톡 안내", callback_data: `resume_hold:${appId}` },
+        ],
+        [
+          { text: "📄 신청서 보기", url: `${SITE_URL}/application-detail.html?id=${appId}` },
+        ],
+      ];
+      break;
+    }
+
     default:
       return new Response(
         JSON.stringify({ error: "Unknown notification type" }),
@@ -514,6 +546,102 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
         await sendTelegram("answerCallbackQuery", {
           callback_query_id: callbackId,
           text: "이용방법 전달 완료!",
+        });
+
+        break;
+      }
+
+      // ----- 진행 재개 승인 (resume_requested 알림의 버튼) -----
+      case "resume_approve": {
+        // 이미 처리됐으면(재개 요청이 비어 있으면) 중단
+        if (!app.resume_requested_at) {
+          await sendTelegram("answerCallbackQuery", {
+            callback_query_id: callbackId,
+            text: "이미 처리된 재개 요청입니다.",
+            show_alert: true,
+          });
+          return new Response("OK", { headers: corsHeaders });
+        }
+
+        const stage = app.resume_stage;
+        const nowMs = Date.now();
+        const deadlineMs = nowMs + 24 * 60 * 60 * 1000;
+        const deadlineIso = new Date(deadlineMs).toISOString();
+
+        // 1) 기한 리셋 + 리마인드 플래그 초기화 + 재개 요청 클리어
+        const updates: Record<string, unknown> = { resume_requested_at: null };
+        if (stage === "동의") {
+          updates.analysis_deadline_override = deadlineIso;
+          updates.analysis_agree_reminder_sent_at = null;
+        } else if (stage === "계약") {
+          updates.contract_deadline_override = deadlineIso;
+          updates.contract_agree_reminder_sent_at = null;
+        }
+
+        // 2) 시작일 이동(D 규칙) — self_paced/미이동이면 빈 객체
+        const shift = computeResumeStartShift(app);
+        Object.assign(updates, shift.updates);
+
+        // 3) 한 번에 저장
+        await updateApplication(appId, updates);
+
+        // 4) 알림톡(실패해도 처리 진행)
+        try {
+          await sendKakaoAlimTalk("resume_approved", {
+            name: app.name,
+            phone: app.phone,
+            app_id: appId,
+            deadline: formatDeadlineKST(deadlineMs),
+          });
+        } catch (e) {
+          console.warn("resume_approved 알림톡 발송 실패:", e);
+        }
+
+        // 5) 원 메시지 수정 + 팝업
+        const moveLine = shift.moved
+          ? `📅 시작일 ${app.schedule_start} → ${shift.newStart}`
+          : `📅 시작일 유지`;
+        await sendTelegram("editMessageText", {
+          chat_id: chatId,
+          message_id: messageId,
+          text:
+            `🔄 진행 재개 요청 — ${app.name || "-"}\n\n` +
+            `✅ 재개 승인 완료 (${now})\n` +
+            `단계: ${stage || "-"} · 기한 +24시간\n` +
+            moveLine,
+        });
+        await sendTelegram("answerCallbackQuery", {
+          callback_query_id: callbackId,
+          text: "재개 승인 완료!",
+        });
+
+        break;
+      }
+
+      // ----- 진행 재개 보류 (카톡으로 개별 안내) -----
+      case "resume_hold": {
+        // 알림톡(실패해도 계속)
+        try {
+          await sendKakaoAlimTalk("resume_held", {
+            name: app.name,
+            phone: app.phone,
+            app_id: appId,
+          });
+        } catch (e) {
+          console.warn("resume_held 알림톡 발송 실패:", e);
+        }
+
+        // resume_requested_at은 그대로 둠 → 학생 화면 '확인 중' 유지
+        await sendTelegram("editMessageText", {
+          chat_id: chatId,
+          message_id: messageId,
+          text:
+            `🔄 진행 재개 요청 — ${app.name || "-"}\n\n` +
+            `⏸ 보류 · 카톡 안내 발송 (${now})`,
+        });
+        await sendTelegram("answerCallbackQuery", {
+          callback_query_id: callbackId,
+          text: "보류 안내 발송 완료!",
         });
 
         break;
@@ -737,6 +865,65 @@ function sundayOnOrAfterUTC(d: Date): Date {
 }
 function ymdUTC(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+// ===== 재개 승인 시 시작일 이동 (5b) — KST, 하루 밀림 없이 =====
+// self_paced면 이동 없음(모든 날짜 그대로). 그 외 규칙:
+//   - '다가오는 일요일' = KST 오늘(포함) 이후 가장 가까운 일요일.
+//   - 목요일 컷오프 = (그 일요일 - 3일) 23:59:59 KST.
+//   - now < 컷오프면 newStart = 다가오는 일요일, 아니면 + 7일 (지금도 실을 수 있는 가장 이른 일요일).
+//   - 원래 시작일(schedule_start)이 이미 newStart 이상이면 이동 없음.
+//   - deltaDays 만큼 schedule_end(자기주도는 self_paced_end_date는 여기 도달 안 함)·
+//     correction_start_date·extension_start_date 중 값 있는 것만 함께 이동.
+// (5c 관리자 입금확인 이동도 같은 규칙을 쓸 것 — 이번엔 telegram-notify에 구현.)
+function computeResumeStartShift(app: Record<string, unknown>): {
+  moved: boolean;
+  newStart: string | null;
+  updates: Record<string, unknown>;
+} {
+  if (app.self_paced === true) return { moved: false, newStart: null, updates: {} };
+  const oldStart = (app.schedule_start as string) || null;
+  if (!oldStart) return { moved: false, newStart: null, updates: {} };
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  // KST 오늘(달력 날짜)을 UTC 자정 Date로
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const todayUTC = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
+  const base = sundayOnOrAfterUTC(todayUTC); // 다가오는(오늘 포함) 일요일
+
+  // 목요일 컷오프 = (그 일요일 - 3일) 23:59:59 KST → UTC epoch
+  const th = new Date(base.getTime() - 3 * dayMs);
+  const cutoffEpoch =
+    Date.UTC(th.getUTCFullYear(), th.getUTCMonth(), th.getUTCDate(), 23, 59, 59) - 9 * 60 * 60 * 1000;
+  const newStartUTC = Date.now() < cutoffEpoch ? base : new Date(base.getTime() + 7 * dayMs);
+  const newStart = ymdUTC(newStartUTC);
+
+  const oldStartUTC = new Date(oldStart + "T00:00:00Z");
+  if (oldStartUTC.getTime() >= newStartUTC.getTime()) {
+    return { moved: false, newStart: null, updates: {} }; // 이미 충분히 미래 → 이동 없음
+  }
+
+  const deltaDays = Math.round((newStartUTC.getTime() - oldStartUTC.getTime()) / dayMs);
+  const shift = (ymd: string): string =>
+    ymdUTC(new Date(new Date(ymd + "T00:00:00Z").getTime() + deltaDays * dayMs));
+
+  const updates: Record<string, unknown> = { schedule_start: newStart };
+  // 자기주도가 아니므로 종료일은 schedule_end (self_paced_end_date는 self_paced 전용 → 위에서 이미 return)
+  if (app.schedule_end) updates.schedule_end = shift(app.schedule_end as string);
+  if (app.correction_start_date) updates.correction_start_date = shift(app.correction_start_date as string);
+  if (app.extension_start_date) updates.extension_start_date = shift(app.extension_start_date as string);
+
+  return { moved: true, newStart, updates };
+}
+
+// now+ms 를 'M월 D일 HH:MM' (KST)로 포맷 (재개 승인 알림톡 deadline용)
+function formatDeadlineKST(epochMs: number): string {
+  const kst = new Date(epochMs + 9 * 60 * 60 * 1000);
+  const m = kst.getUTCMonth() + 1;
+  const d = kst.getUTCDate();
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${m}월 ${d}일 ${hh}:${mm}`;
 }
 
 // 12세션(writing·speaking) 모두 제출됐는지 = 1학기 진도 완료

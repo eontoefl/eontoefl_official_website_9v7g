@@ -36,6 +36,8 @@ const TEMPLATE_IDS: Record<string, number> = {
   practice_open:               50231,  // 연습코스 오픈 안내 (정규과정 종료 후 자동 활성화)
   toefl_exam_day:              50233,  // 시험 당일 회신 안내 + 리포트 참여
   correction_extension_complete: 50227,  // 첨삭 연장(13~24세션) 완료 안내
+  resume_approved:             50242,  // 진행 재개 승인 안내 (기한 리셋 완료)
+  resume_held:                 50243,  // 진행 재개 보류 안내 (카톡 개별 안내 예정)
 };
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
@@ -403,6 +405,31 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
     }
 
+    case "resume_approved":
+      // 승인 원문(대표 확정) — 수정 시 카카오 재검수 필요
+      return [
+        "이온토플 - 진행 재개 안내",
+        "",
+        `${data.name}님, 안녕하세요. 이온토플입니다.`,
+        "",
+        "요청하신 진행 재개가 완료되었어요.",
+        `${data.deadline}까지 이어서 진행해주세요.`,
+        "",
+        "아래 버튼에서 신청 내용을 확인하실 수 있어요.",
+      ].join("\n");
+
+    case "resume_held":
+      // 승인 원문(대표 확정) — 수정 시 카카오 재검수 필요. 버튼 없음(hasNoButton).
+      return [
+        "이온토플 - 재개 보류 안내",
+        "",
+        `${data.name}님, 안녕하세요. 이온토플입니다.`,
+        "",
+        "요청하신 진행 재개 관련해, 일정 확인이 필요해서 카카오톡으로 따로 안내드릴게요.",
+        "",
+        "잠시만 기다려주세요 :)",
+      ].join("\n");
+
     default:
       return "";
   }
@@ -457,6 +484,10 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요. 시험 리포트도 참여 부탁드려요 https://eonfl.com/survey.html";
     case "correction_extension_complete":
       return "[이온토플] 스라첨삭 연장이 완료되었습니다. 테스트룸에서 13~24세션을 확인해주세요. https://testroom.eonfl.com";
+    case "resume_approved":
+      return "[이온토플] 요청하신 진행 재개가 완료되었어요. 기한 내 이어서 진행해주세요.";
+    case "resume_held":
+      return "[이온토플] 재개 요청 관련 일정 확인이 필요해 카카오톡으로 따로 안내드릴게요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -487,7 +518,9 @@ function hasNoButton(templateId: number): boolean {
       || templateId === TEMPLATE_IDS.contract_deferred
       // 50227: 승인 원문에 버튼 없음으로 가정(발송 테스트로 검증 예정).
       // 루나소프트 확인 결과 버튼이 있으면 이 줄을 지우고 getBtnUrl()에 링크를 추가할 것.
-      || templateId === TEMPLATE_IDS.correction_extension_complete;
+      || templateId === TEMPLATE_IDS.correction_extension_complete
+      // 50243(재개 보류): 버튼 없음 — 카톡으로 개별 안내 예정.
+      || templateId === TEMPLATE_IDS.resume_held;
 }
 
 // ===== 단건 메시지 객체 생성 =====
