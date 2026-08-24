@@ -2478,22 +2478,23 @@ async function loadModalContractTab(app) {
         // 입금 기한 계산 (override 우선, 없으면 contract_agreed_at + 24시간)
         const depositDeadlineInfo = getDepositDeadlineInfo(app);
 
-        if (!app.deposit_confirmed_by_student) {
+        if (!app.deposit_confirmed_by_admin) {
             html += `
-                <div style="background: #ffffff; border-radius: 16px; padding: 24px; margin-top: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
-                    <div style="display: flex; align-items: center; gap: 14px;">
-                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef1f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="fas fa-clock" style="font-size: 16px; color: #64748b;"></i>
+                <div style="background: #fdf8ef; border-radius: 16px; padding: 24px; margin-top: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-bell" style="font-size: 16px; color: #b45309;"></i>
                         </div>
                         <div>
-                            <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">입금 대기 중</div>
+                            <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">입금 확인</div>
                             <div style="font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.6;">
-                                학생이 계약에 동의했습니다. 학생이 입금 완료 알림을 보내면 여기에서 확인하실 수 있습니다.
+                                계약 동의 후 입금 진행 중입니다. 은행 입금이 확인되면 아래에서 처리해주세요.
                             </div>
                         </div>
                     </div>
 
-                    <div style="background: #f6f8fa; padding: 18px 20px; border-radius: 12px; margin-top: 20px;">
+                    <!-- 입금 정보 -->
+                    <div style="background: #ffffff; padding: 18px 20px; border-radius: 12px; margin-bottom: 12px;">
                         <h4 style="font-size: 12px; font-weight: 600; color: #94a3b8; margin: 0 0 10px 0; letter-spacing: 0.02em;">입금 정보</h4>
                         <table style="width: 100%; font-size: 14px;">
                             <tr>
@@ -2508,7 +2509,7 @@ async function loadModalContractTab(app) {
                     </div>
 
                     <!-- 입금 기한 관리 -->
-                    <div style="background: #f6f8fa; padding: 18px 20px; border-radius: 12px; margin-top: 12px;">
+                    <div style="background: #f6f8fa; padding: 18px 20px; border-radius: 12px; margin-bottom: 12px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                             <h4 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0;">
                                 <i class="fas fa-calendar-check" style="color: #94a3b8; margin-right: 6px; font-size: 12px;"></i>입금 기한 관리
@@ -2551,22 +2552,8 @@ async function loadModalContractTab(app) {
                             💡 초기화하면 기본 24시간 로직으로 돌아갑니다.
                         </div>
                     </div>
-                </div>
-            `;
-        } else if (!app.deposit_confirmed_by_admin) {
-            html += `
-                <div style="background: #fdf8ef; border-radius: 16px; padding: 24px; margin-top: 20px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
-                    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
-                        <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbecd2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="fas fa-bell" style="font-size: 16px; color: #b45309;"></i>
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; font-size: 17px; color: #1e293b; letter-spacing: -0.01em;">입금 확인 요청</div>
-                            <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
-                                ${new Date(app.deposit_confirmed_by_student_at).toLocaleString('ko-KR')}에 학생이 입금 완료를 알렸습니다.
-                            </div>
-                        </div>
-                    </div>
+
+                    <!-- 입금 확인 처리 -->
                     <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
                         ${app.late_start_choice ? `
                         <div style="background: #faf7fa; border: 1px solid #ece4f2; border-radius: 10px; padding: 11px 13px; margin-bottom: 16px; font-size: 13px; color: #5b4a7d; line-height: 1.5;">
@@ -2579,7 +2566,7 @@ async function loadModalContractTab(app) {
                             <input type="text" id="modalDepositorName" value="${app.depositor_name || app.name}" readonly
                                    style="width: 100%; box-sizing: border-box; padding: 12px 13px; border: none; border-radius: 8px; background: #eef1f5; color: #94a3b8; outline: none; font-size: 15px; font-family: inherit;">
                             <p style="font-size: 12px; color: #94a3b8; margin: 6px 0 0 0;">
-                                💡 학생이 입력한 실제 입금자명입니다.
+                                💡 학생이 입력한 입금자명입니다. (없으면 신청자명)
                             </p>
                         </div>
                         <div style="margin-bottom: 18px;">
