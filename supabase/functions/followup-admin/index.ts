@@ -6,11 +6,14 @@
 //   - 이 함수는 "읽기(GET)만" 한다. 쓰기·상태변경·발송(Gmail)·후보스캔·초안생성 배선 없음.
 //   - 학생에게 실제 메일을 보내는 기능은 대표 명시 승인 전까지 이 코드에 절대 없다.
 //
-// 보안(설계 §3.4·§3.5):
-//   - followup_* 테이블은 RLS 로 anon/authenticated 전면 차단 → 서버(service_role)만 접근.
-//   - 호출자 검증 = 공유비밀(env FOLLOWUP_ADMIN_SECRET). 헤더 x-followup-secret 불일치 → 401.
-//     (브라우저에 비밀을 하드코딩하지 않는다. admin-followup.html 이 관리자에게 1회 입력받아
-//      localStorage 에 보관하고 헤더로 실어 보낸다. 한계는 대표 보고서에 명시.)
+// 접근 통제(★대표 결정 2026-08-25): 관리자 접근 잠금은 이 함수만 별도로 걸지 않는다.
+//   - 관리자 화면 전체(admin-*.html)가 지금은 화면단 requireAdmin() 게이트만 쓰므로,
+//     이 함수도 형제 화면과 동일하게 맞춘다(별도 공유비밀 없음). 다른 Edge Function
+//     (telegram-notify 등)과 동일한 Supabase 게이트(anon 키)만 사용.
+//   - 서버 전용 이유는 그대로: followup_* 는 RLS 로 anon 직접 조회가 막혀 있어, service_role
+//     로 읽어 주는 통로가 필요하기 때문(설계 §3.4·§3.5).
+//   - ★관리자 전용 잠금은 사이트 전체(회원DB 포함)와 함께 별도 "보안작업"에서 일괄 처리한다.
+//     (이 함수도 그 일괄 잠금 대상 — 보안작업 목록에 포함.)
 //
 // 배포(STOP-B): `supabase functions deploy followup-admin` 은 대표가. 이 파일은 코드만.
 
@@ -18,12 +21,11 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const FOLLOWUP_ADMIN_SECRET = Deno.env.get("FOLLOWUP_ADMIN_SECRET") || "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-followup-secret",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
 };
 
 function json(body: unknown, status = 200) {
@@ -88,17 +90,6 @@ Deno.serve(async (req) => {
   // 읽기 전용: GET 만 허용.
   if (req.method !== "GET") {
     return json({ error: "이 함수는 읽기(GET) 전용입니다." }, 405);
-  }
-
-  // 환경 미설정(배포 전) 방어: 비밀이 안 잡혀 있으면 명확히 알림(모두 통과 금지).
-  if (!FOLLOWUP_ADMIN_SECRET) {
-    return json({ error: "FOLLOWUP_ADMIN_SECRET 미설정(배포 시 env 설정 필요)." }, 500);
-  }
-
-  // 호출자 검증 — 공유비밀 헤더.
-  const provided = req.headers.get("x-followup-secret") || "";
-  if (provided !== FOLLOWUP_ADMIN_SECRET) {
-    return json({ error: "unauthorized" }, 401);
   }
 
   try {

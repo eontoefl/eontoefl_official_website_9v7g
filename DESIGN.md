@@ -94,7 +94,7 @@ When a component must "float" (modals, dropdowns):
 
 ### 7.1 구성 요소 (이 저장소)
 *   **`admin-followup.html`** — 관리자 전용 관측·보류 대시보드. 기존 `admin-*.html` 형제 페이지로, 동일한 `admin-nav`·`css/admin.css` 톤·`requireAdmin()` 인증 게이트를 그대로 쓴다. 후속메일 목록을 한 줄씩 펼쳐 편지 전문·선정 이유·퍼널 진행·보류 사유를 보여준다. 발송·상태변경 배선은 **없다**(보류건 '발송' 버튼은 자리표시자).
-*   **Edge Function `supabase/functions/followup-admin/`** — 서버 전용(service_role) **읽기 함수**. `followup_jobs` + `followup_messages` + 신청서(`applications`) 를 조인해 리스트 JSON 을 반환한다. `GET` 만 허용, 쓰기·발송 없음. 호출자는 공유비밀 헤더(`x-followup-secret`, env `FOLLOWUP_ADMIN_SECRET`)로 검증한다.
+*   **Edge Function `supabase/functions/followup-admin/`** — 서버 전용(service_role) **읽기 함수**. `followup_jobs` + `followup_messages` + 신청서(`applications`) 를 조인해 리스트 JSON 을 반환한다. `GET` 만 허용, 쓰기·발송 없음. 별도 접근 잠금은 이 함수에만 따로 걸지 않는다(형제 admin 화면과 동일하게 `requireAdmin()` 화면 게이트만). 관리자 전용 잠금은 사이트 전체(회원DB 포함)와 함께 별도 "보안작업"에서 일괄 처리한다(이 함수도 그 대상).
 
 ### 7.2 데이터 테이블 (Supabase, RLS 로 anon 전면 차단 → service_role 만 접근)
 *   **`followup_jobs`** — 누구에게 / 어떤 단계(`stage1`·`stage2`·`stage3a`·`stage3b`) / 언제(`scheduled_at`) 보낼지 + 상태(`scheduled`…`sent`·`canceled`·`held`).

@@ -1,1 +1,4 @@
 .playwright-mcp/
+
+# 대표 내부 지침 파일 — 공개 저장소에 올리지 않음(로컬 전용)
+CLAUDE.md
