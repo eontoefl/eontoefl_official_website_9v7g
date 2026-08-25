@@ -330,6 +330,36 @@
   #gate .mark .svic { width:24px; height:24px; color:var(--accent-ink); }
   #restorebtn .svic { width:14px; height:14px; }
 
+  /* ── 장보기 ── */
+  .shopentry { display:flex; align-items:center; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r-lg); padding:.95rem 1.05rem; box-shadow:var(--lift); cursor:pointer; margin-bottom:1.3rem; transition:box-shadow .15s; }
+  .shopentry:hover { box-shadow:var(--lift-hi); }
+  .shopentry .se-ic { font-size:19px; }
+  .shopentry .se-t { font-size:14.5px; font-weight:800; color:var(--on-surface); }
+  .shopentry .se-n { background:var(--sgrad); color:#fff; font-size:12px; font-weight:800; border-radius:99px; padding:2px 10px; }
+  .shopentry .se-z { font-size:12px; color:var(--on-surface-variant); opacity:.7; }
+  .shopentry .se-chev { margin-left:auto; opacity:.5; }
+  .shopentry .se-chev .svic { width:16px; height:16px; }
+  .shopchips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem; }
+  .shopchip { border:none; background:var(--field); color:var(--on-surface-variant); border-radius:99px; padding:8px 15px; font-size:13.5px; font-weight:700; font-family:inherit; transition:.12s; }
+  .shopchip.on { background:var(--sgrad); color:#fff; }
+  .shopchip.add { color:var(--accent-strong); font-weight:800; padding:8px 13px; }
+  .shopin { display:flex; gap:.5rem; margin-bottom:1.2rem; }
+  .shopin input { flex:1; min-width:0; background:var(--field); border:none; border-radius:var(--r); padding:12px 14px; font-family:inherit; font-size:15px; color:var(--on-surface); outline:none; }
+  .shopin input:focus { outline:2px solid var(--accent-line); }
+  .shopaddbtn { flex:0 0 auto; border:none; border-radius:var(--r); background:var(--sgrad); color:#fff; padding:0 20px; font-size:14px; font-weight:800; box-shadow:var(--lift); }
+  .shopaddbtn:disabled { opacity:.4; box-shadow:none; }
+  .shoplist { display:flex; flex-direction:column; gap:1rem; }
+  .shopgrp-h { display:flex; align-items:center; gap:.45rem; font-size:13px; font-weight:800; color:var(--on-surface); margin-bottom:.4rem; }
+  .shopgrp-h .n { background:var(--surface-high); color:var(--on-surface-variant); font-size:11px; font-weight:700; border-radius:99px; padding:1px 8px; }
+  .shopitem { display:flex; align-items:center; gap:.6rem; background:var(--surface-lowest); border-radius:var(--r); padding:11px 13px; box-shadow:var(--lift); margin-bottom:.4rem; cursor:pointer; }
+  .shopitem input { width:19px; height:19px; flex:0 0 auto; accent-color:var(--strong); }
+  .shopitem .si-t { font-size:14.5px; color:var(--on-surface); word-break:break-word; }
+  .shopitem.done .si-t { text-decoration:line-through; color:var(--on-surface-variant); opacity:.7; }
+  .shopitem .si-b { font-size:11.5px; font-weight:700; color:var(--accent-strong); flex:0 0 auto; }
+  .shop-empty { font-size:12.5px; color:var(--on-surface-variant); opacity:.6; padding:.3rem 0 .3rem .2rem; }
+  .shopfold { margin-top:1.2rem; }
+  .shopclear { margin-top:.8rem; border:none; border-radius:var(--r); background:var(--danger-soft); color:var(--danger); padding:11px; font-size:13.5px; font-weight:800; font-family:inherit; width:100%; }
+
   /* ── 돈관리 ── */
   .mtotal { font-size:13px; color:var(--on-surface-variant); margin:-.4rem 0 1rem .15rem; }
   .mtotal b { color:var(--on-surface); font-weight:800; font-size:15px; margin-left:.3rem; }
@@ -1118,6 +1148,13 @@
   </div>
 </div></div>
 
+<!-- 장보기 -->
+<div class="ov" id="ovshop"><div class="sheet">
+  <h3>🛒 장보기</h3>
+  <div id="shopBody"></div>
+  <div class="row"><button type="button" class="cancel" id="shopClose" style="flex:1">닫기</button></div>
+</div></div>
+
 <div id="toast" class="toast"></div>
 
 <!-- 내역 우클릭 메뉴 -->
@@ -1264,7 +1301,7 @@ async function pushState(){
   } catch(e){ setDot(false,"저장 안 됨"); }
 }
 function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(pushState,500); }
-function blankStore(){ return { v:3, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{ accounts:[], fixed:[] } }; }
+function blankStore(){ return { v:3, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{ accounts:[], fixed:[] }, shopping:{ stores:["다이소","쿠팡","코스트코"], items:[] } }; }
 function normalizeStore(){
   if(!Array.isArray(STORE.personal)) STORE.personal=[];
   if(!Array.isArray(STORE.marketing)) STORE.marketing=[];
@@ -1280,6 +1317,10 @@ function normalizeStore(){
   if(!Array.isArray(STORE.money.reportsRead)) STORE.money.reportsRead=[];
   STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; });
+  if(!STORE.shopping || typeof STORE.shopping!=="object" || Array.isArray(STORE.shopping)) STORE.shopping={};
+  if(!Array.isArray(STORE.shopping.stores) || !STORE.shopping.stores.length) STORE.shopping.stores=["다이소","쿠팡","코스트코"];
+  if(!Array.isArray(STORE.shopping.items)) STORE.shopping.items=[];
+  STORE.shopping.items.forEach(i=>{ if(typeof i.done!=="boolean") i.done=!!i.done; if(typeof i.doneAt!=="number") i.doneAt=0; });
 }
 
 /* ── 자동 버전 스냅샷 (별도 행 snap-<시각>, 최근 SNAP_KEEP개 유지) ── */
@@ -1422,8 +1463,8 @@ function personalView(){
   const remaining = items.filter(i=> (i.type==="task"&&!i.done) || (i.type==="appt"&&!apptPast(i)) ).length;
   const archived = items.filter(i=> (i.type==="task"&&oldDone(i)) || (i.type==="appt"&&apptPast(i)) || (i.type==="reminder"&&reminderPast(i)) );
   const head='<div class="vhead"><span class="t">개인</span>'+(remaining?'<span class="c">'+remaining+' 남음</span>':'')+'<button class="addbtn" id="padd" type="button">+ 추가</button></div>';
-  if(!items.length) return head+'<div class="empty"><div class="big">'+svi('note')+'</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
-  let html=head, left='', right='';
+  if(!items.length) return head+shopEntryCard()+'<div class="empty"><div class="big">'+svi('note')+'</div>아직 적은 게 없어요.<br>오른쪽 위 <b>+ 추가</b>로 할일·약속·루틴·목표를 적어보세요.</div>';
+  let html=head+shopEntryCard(), left='', right='';
   if(reminders.length) left += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('pin')+'</span>리마인드<span class="n">'+reminders.length+'</span></div><div class="list" id="prem">'+reminders.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(reminderCard).join("")+'</div></div>';
   left += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('cal')+'</span>할 일 · 약속<span class="n">'+active.length+'</span></div>'+(active.length?'<div class="list" id="plist">'+active.map(personalCard).join("")+'</div>':'<div class="wsec-empty">앞으로 할 일이 없어요 🎉</div>')+'</div>';
   if(goals.length) right += '<div class="wsec"><div class="wsec-h"><span class="ic">'+svi('target')+'</span>목표<span class="n">'+goals.length+'</span></div><div class="list" id="pgoals">'+goals.map(goalCard).join("")+'</div></div>';
@@ -1528,8 +1569,16 @@ function personalCard(it){
   if(d){ meta+='<span class="badge due'+(d.over?' over':'')+'">'+svi('cal')+' '+esc(d.text)+'</span>'; if(d.over) meta+=postBtn; }
   return '<div class="card'+(it.done?' done':'')+'" data-id="'+it.id+'">'+dragH+'<input type="checkbox" '+(it.done?'checked':'')+' data-act="done"><div class="body"><div class="title">'+esc(it.title)+'</div>'+(it.why?'<div class="why">'+esc(it.why)+'</div>':'')+(it.memo?'<div class="memo">'+esc(it.memo)+'</div>':'')+'<div class="meta">'+meta+'</div></div>'+actsH+'</div>';
 }
+function shopEntryCard(){
+  const sh=STORE.shopping||{items:[]};
+  const n=(sh.items||[]).filter(i=>!i.done).length;
+  return '<div class="shopentry" id="shopEntry"><span class="se-ic">🛒</span><span class="se-t">장보기</span>'+
+    (n?'<span class="se-n">'+n+'</span>':'<span class="se-z">비어 있음</span>')+
+    '<span class="se-chev">'+svi('chevR')+'</span></div>';
+}
 function wirePersonal(){
   const add=$("padd"); if(add) add.addEventListener("click", ()=>openForm({tab:"personal",type:"task",id:null}));
+  const se=$("shopEntry"); if(se) se.addEventListener("click", openShop);
   document.querySelectorAll("#view .card").forEach(card=>{ const id=card.dataset.id; card.querySelectorAll("[data-act]").forEach(el=> el.addEventListener("click", ()=>actPersonal(id, el.dataset.act))); });
   document.querySelectorAll("#view .sticker[data-cell]").forEach(st=>{ st.addEventListener("click", ()=>{ const gid=st.closest("[data-id]").dataset.id; toggleGoalCell(gid, +st.dataset.cell); }); });
   ["plist","pgoals","proutines"].forEach(pid=>{ const el=$(pid); if(el) enableDrag(el, STORE.personal); });
@@ -1746,6 +1795,81 @@ $("draftadd").addEventListener("click", draftAdd);
 $("draftinput").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); draftAdd(); } });
 
 function findItem(ctx){ return ctx.tab==="personal" ? STORE.personal.find(x=>x.id===ctx.id) : STORE.work[ctx.type].find(x=>x.id===ctx.id); }
+/* ═══ 장보기 ═══ */
+let shopSel=null, shopDoneOpen=false;
+function openShop(){
+  const sh=STORE.shopping;
+  if(!shopSel || !sh.stores.includes(shopSel)) shopSel=sh.stores[0]||null;
+  shopDoneOpen=false;
+  renderShop();
+  $("ovshop").classList.add("on");
+  setTimeout(()=>{ const inp=$("shopInput"); if(inp) inp.focus(); }, 50);
+}
+function closeShop(){ $("ovshop").classList.remove("on"); }
+function renderShop(){
+  const sh=STORE.shopping;
+  if(!shopSel || !sh.stores.includes(shopSel)) shopSel=sh.stores[0]||null;
+  let chips=sh.stores.map(s=>'<button type="button" class="shopchip'+(s===shopSel?' on':'')+'" data-store="'+esc(s)+'">'+esc(s)+'</button>').join("");
+  chips+='<button type="button" class="shopchip add" id="shopAddStore">＋</button>';
+  const inputRow='<div class="shopin"><input type="text" id="shopInput" placeholder="'+esc((shopSel||'구매처')+'에 살 것')+'" lang="ko" autocomplete="off"'+(shopSel?'':' disabled')+'><button type="button" id="shopAdd" class="shopaddbtn"'+(shopSel?'':' disabled')+'>추가</button></div>';
+  const undone=sh.items.filter(i=>!i.done);
+  let groups="";
+  sh.stores.forEach(s=>{
+    const arr=undone.filter(i=>i.store===s);
+    if(!arr.length) return;
+    groups+='<div class="shopgrp"><div class="shopgrp-h">'+esc(s)+'<span class="n">'+arr.length+'</span></div>'+
+      arr.map(i=>'<label class="shopitem"><input type="checkbox" data-toggle="'+i.id+'"><span class="si-t">'+esc(i.text)+'</span></label>').join("")+'</div>';
+  });
+  if(!groups) groups='<div class="shop-empty">아직 살 것이 없어요.</div>';
+  const done=sh.items.filter(i=>i.done).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
+  let doneHtml='<div class="fold shopfold"><div class="fold-h" id="shopDoneH"><span class="ic">'+svi('check')+'</span>완료 <span class="n">'+done.length+'</span><span class="chev">'+svi(shopDoneOpen?'chevD':'chevR')+'</span></div>';
+  if(shopDoneOpen){
+    doneHtml+='<div class="fold-body">'+
+      (done.length? done.map(i=>'<label class="shopitem done"><input type="checkbox" checked data-toggle="'+i.id+'"><span class="si-b">['+esc(i.store)+']</span> <span class="si-t">'+esc(i.text)+'</span></label>').join("")
+        : '<div class="shop-empty">완료한 게 없어요.</div>')+
+      (done.length?'<button type="button" class="shopclear" id="shopClear">완료 목록 비우기</button>':'')+
+    '</div>';
+  }
+  doneHtml+='</div>';
+  $("shopBody").innerHTML='<div class="shopchips">'+chips+'</div>'+inputRow+'<div class="shoplist">'+groups+'</div>'+doneHtml;
+  wireShop();
+}
+function wireShop(){
+  document.querySelectorAll("#shopBody .shopchip[data-store]").forEach(b=> b.addEventListener("click", ()=>{ shopSel=b.dataset.store; renderShop(); const inp=$("shopInput"); if(inp) inp.focus(); }));
+  const addStore=$("shopAddStore"); if(addStore) addStore.addEventListener("click", shopAddStore);
+  const inp=$("shopInput");
+  if(inp) inp.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); shopAddItem(); } });
+  const addBtn=$("shopAdd"); if(addBtn) addBtn.addEventListener("click", shopAddItem);
+  document.querySelectorAll("#shopBody [data-toggle]").forEach(cb=> cb.addEventListener("change", ()=>shopToggle(cb.dataset.toggle)));
+  const dh=$("shopDoneH"); if(dh) dh.addEventListener("click", ()=>{ shopDoneOpen=!shopDoneOpen; renderShop(); });
+  const clr=$("shopClear"); if(clr) clr.addEventListener("click", shopClearDone);
+}
+function shopSync(){ save(); renderShop(); if(TAB==="personal"){ const se=$("shopEntry"); if(se){ const n=STORE.shopping.items.filter(i=>!i.done).length; se.innerHTML='<span class="se-ic">🛒</span><span class="se-t">장보기</span>'+(n?'<span class="se-n">'+n+'</span>':'<span class="se-z">비어 있음</span>')+'<span class="se-chev">'+svi('chevR')+'</span>'; } } }
+function shopAddStore(){
+  const name=(prompt("추가할 구매처 이름")||"").trim();
+  if(!name) return;
+  if(STORE.shopping.stores.includes(name)){ alert("이미 있는 구매처예요."); return; }
+  STORE.shopping.stores.push(name); shopSel=name; shopSync();
+  const inp=$("shopInput"); if(inp) inp.focus();
+}
+function shopAddItem(){
+  const inp=$("shopInput"); if(!inp) return;
+  const text=inp.value.trim(); if(!text || !shopSel) return;
+  STORE.shopping.items.push({ id:uid(), created:Date.now(), text, store:shopSel, done:false, doneAt:0 });
+  inp.value=""; shopSync();
+  const ni=$("shopInput"); if(ni) ni.focus();
+}
+function shopToggle(id){
+  const it=STORE.shopping.items.find(x=>x.id===id); if(!it) return;
+  it.done=!it.done; it.doneAt=it.done?Date.now():0; shopSync();
+}
+function shopClearDone(){
+  const done=STORE.shopping.items.filter(i=>i.done);
+  if(!done.length) return;
+  if(!confirm("완료 "+done.length+"개를 영구 삭제할까요?")) return;
+  STORE.shopping.items=STORE.shopping.items.filter(i=>!i.done); shopSync();
+}
+
 function openForm(ctx){
   curCtx={ tab:ctx.tab, type:ctx.type, id:ctx.id||null, origType:ctx.type };
   const it = ctx.id ? findItem(ctx) : null;
@@ -1775,8 +1899,11 @@ $("shcancel").addEventListener("click", closeForm);
 // 배경 클릭으로 닫기 — 단, '누르기 시작'이 배경일 때만 (안에서 드래그해 배경에서 손 떼도 안 닫힘)
 function overlayDismiss(id, closeFn){ const ov=$(id); let downSelf=false; ov.addEventListener("pointerdown", e=>{ downSelf=(e.target===ov); }); ov.addEventListener("click", e=>{ if(e.target===ov && downSelf) closeFn(); }); }
 overlayDismiss("ov", closeForm);
+overlayDismiss("ovshop", closeShop);
+$("shopClose").addEventListener("click", closeShop);
 $("shsave").addEventListener("click", saveForm);
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("ov").classList.contains("on")) closeForm(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("ovshop").classList.contains("on")) closeShop(); });
 
 function buildItem(){
   const {tab,type}=curCtx, title=$("f_title").value.trim(), why=$("f_why").value.trim(), memo=$("f_memo").value.trim(), now=Date.now();
