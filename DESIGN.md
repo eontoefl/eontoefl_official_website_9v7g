@@ -85,3 +85,24 @@ When a component must "float" (modals, dropdowns):
 *   **Don't use 100% Black:** Never use #000000. Use `on-surface` (#191c1d) for text to maintain the premium, soft aesthetic.
 *   **Don't use standard Drop Shadows:** If it looks like a "box-shadow," it's too heavy. It should look like a glow or a soft atmospheric occlusion.
 *   **Don't use Dividers:** Avoid horizontal rules (`<hr>`). If you cannot distinguish items without a line, your spacing scale is likely too small.
+
+---
+
+## 7. 후속메일 시스템 (Follow-up Mail) — 관리자 관측·보류 대시보드
+
+> 신청 퍼널에서 이탈했거나 다음 단계로 넘어갈 학생에게 보내는 "후속메일"을 자동 생성·관측하는 시스템의 **공홈 측 관리자 화면**. 생성·검사·발송 파이프라인 본체는 별도 폴더(`C:\후속메일 자동화\`)에서 관리하며, 이 저장소에는 **읽어서 보여주는 관리자 화면과 서버 읽기 함수만** 들어온다.
+
+### 7.1 구성 요소 (이 저장소)
+*   **`admin-followup.html`** — 관리자 전용 관측·보류 대시보드. 기존 `admin-*.html` 형제 페이지로, 동일한 `admin-nav`·`css/admin.css` 톤·`requireAdmin()` 인증 게이트를 그대로 쓴다. 후속메일 목록을 한 줄씩 펼쳐 편지 전문·선정 이유·퍼널 진행·보류 사유를 보여준다. 발송·상태변경 배선은 **없다**(보류건 '발송' 버튼은 자리표시자).
+*   **Edge Function `supabase/functions/followup-admin/`** — 서버 전용(service_role) **읽기 함수**. `followup_jobs` + `followup_messages` + 신청서(`applications`) 를 조인해 리스트 JSON 을 반환한다. `GET` 만 허용, 쓰기·발송 없음. 호출자는 공유비밀 헤더(`x-followup-secret`, env `FOLLOWUP_ADMIN_SECRET`)로 검증한다.
+
+### 7.2 데이터 테이블 (Supabase, RLS 로 anon 전면 차단 → service_role 만 접근)
+*   **`followup_jobs`** — 누구에게 / 어떤 단계(`stage1`·`stage2`·`stage3a`·`stage3b`) / 언제(`scheduled_at`) 보낼지 + 상태(`scheduled`…`sent`·`canceled`·`held`).
+*   **`followup_messages`** — 생성된 제목·본문 + 관측 컬럼(`used_review_id`·`used_materials`·`machine_check_result`·`self_check`·`tone_score`). 재생성은 제자리 upsert(`unique(job_id)`).
+*   **`followup_activity_logs`** — 예약·수정·승인·취소·발송·실패 이력.
+*   **참조 데이터 표** — `reviews`(후기표)·`story_materials`(실화재료)·`score_table`(환산표)·`lexicon`(검사어휘표)·`review_combo`(결합 마스크)·`rule_bundles`(규칙 배포본). 모두 RLS 잠금.
+
+### 7.3 절대 규칙 (Non-negotiable)
+*   **학생에게 실제 메일을 보내는 기능(Gmail 발송)은 대표 명시 승인 전까지 금지.** 후보 스캔·초안 생성도 실발송과 묶여 승인 전엔 자동 가동하지 않는다. 이 저장소의 화면·함수는 **읽기·관측·보류 표시까지만** 한다.
+*   후속메일 테이블은 **anon 직접 조회 불가**(RLS). 반드시 서버 함수(service_role) 경유로만 읽는다.
+*   중복발송 방지(`unique(application_id, stage)` + 원자선점)·대상 신선도 상한은 파이프라인 본체의 불변 규칙이며 화면에서 건드리지 않는다.

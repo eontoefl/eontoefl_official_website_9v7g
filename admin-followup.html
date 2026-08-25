@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>후속메일 관측·보류 - 이온토플 관리자</title>
+
+    <!-- Noto Sans KR Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+
+    <!-- 후속메일 전용 컴포넌트 스타일 (이 페이지 한정 · 전역 CSS 무접촉) -->
+    <style>
+    .fu-notice{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;color:#475569;
+        background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:16px}
+    .fu-lock{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px;padding:5px 12px;
+        border-radius:999px;background:#fee2e2;border:1px solid #fecaca;color:#b91c1c}
+    .fu-legend{color:#64748b;font-size:12.5px}
+
+    /* 비밀 입력 */
+    .fu-secret{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff;border:1px solid #e2e8f0;
+        border-radius:12px;padding:14px 16px;margin-bottom:16px}
+    .fu-secret label{font-size:13px;font-weight:700;color:#1e293b}
+    .fu-secret input{flex:1;min-width:180px;font-size:13px;padding:9px 12px;border:1px solid #e2e8f0;border-radius:9px;
+        background:#f8fafc;color:#1e293b}
+    .fu-secret button{font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:none;
+        background:#9480c5;color:#fff;cursor:pointer}
+    .fu-secret .fu-hint{flex-basis:100%;font-size:11.5px;color:#94a3b8;margin-top:2px}
+    .fu-secret .fu-err{flex-basis:100%;font-size:12px;color:#b91c1c;font-weight:600}
+
+    /* 리스트 행 */
+    .fu-row{background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-top:10px;overflow:hidden;
+        border-left:4px solid #e2e8f0}
+    .fu-row.held{border-left-color:#ef4444;background:#fef6f5}
+    .fu-row summary{cursor:pointer;padding:13px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+        font-size:13px;list-style:none}
+    .fu-row summary::-webkit-details-marker{display:none}
+    .fu-row summary:hover{background:#f8fafc}
+    .fu-nm{font-weight:800;font-size:14.5px;min-width:52px;color:#1e293b}
+    .fu-stage{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;background:#ede9fe;color:#6d28d9}
+    .fu-status{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;border:1px solid #e2e8f0;
+        color:#475569;background:transparent}
+    .fu-status.held{background:#ef4444;color:#fff;border-color:#ef4444}
+    .fu-status.paid{background:#22c55e;color:#fff;border-color:#22c55e}
+    .fu-status.canceled{color:#94a3b8;text-decoration:line-through}
+    .fu-meta{color:#94a3b8;font-size:12px}
+    .fu-meta.right{margin-left:auto}
+    .fu-chev{color:#94a3b8;font-size:11px}
+    .fu-row details, .fu-row[open] .fu-chev{}
+    details.fu-row[open] .fu-chev{transform:rotate(90deg);display:inline-block}
+
+    /* 펼침 패널 */
+    .fu-panel{border-top:1px solid #e2e8f0;padding:4px 18px 20px}
+    .fu-sect{margin-top:16px}
+    .fu-sect h3{font-size:12px;font-weight:800;letter-spacing:.02em;color:#64748b;margin:0 0 7px}
+
+    /* 퍼널 */
+    .fu-funnel{display:flex;gap:0;flex-wrap:wrap;align-items:stretch}
+    .fu-fstep{flex:1 1 0;min-width:78px;text-align:center;padding:9px 6px;border:1px solid #e2e8f0;
+        border-right:none;background:#fff;font-size:12px;color:#475569}
+    .fu-fstep:last-child{border-right:1px solid #e2e8f0;border-radius:0 8px 8px 0}
+    .fu-fstep:first-child{border-radius:8px 0 0 8px}
+    .fu-fstep.done{background:#ede9fe;color:#6d28d9;font-weight:800;border-color:#c4b5fd}
+    .fu-fstep.drop{background:#fee2e2;color:#b91c1c;font-weight:800;border-color:#fecaca}
+    .fu-fstep .fl{display:block;font-size:10.5px;opacity:.8;font-weight:600}
+    .fu-dropnote{font-size:12px;color:#b91c1c;margin-top:6px}
+    .fu-donenote{font-size:12px;color:#16a34a;margin-top:6px}
+
+    /* 편지 */
+    .fu-subj{font-weight:800;font-size:15px;margin-bottom:2px;color:#1e293b}
+    .fu-letter{white-space:pre-line;font-size:14px;line-height:1.9;color:#1e293b;background:#f8fafc;
+        border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;word-break:break-word}
+
+    /* 선정이유·재료 */
+    .fu-why{font-size:13.5px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px}
+    .fu-mat{display:inline-block;font-size:11.5px;background:#fef3c7;color:#92400e;border-radius:999px;
+        padding:3px 9px;margin:3px 4px 0 0;font-weight:700}
+    .fu-matline{font-size:12.5px;color:#475569;margin-top:4px}
+    .fu-panel code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#eef2f7;
+        padding:1px 5px;border-radius:5px}
+
+    /* 보류 사유 */
+    .fu-holdbox{border:1px solid #fecaca;background:#fef6f5;border-radius:10px;padding:13px 15px}
+    .fu-holdbox h3{color:#b91c1c}
+    .fu-hitem{font-size:13px;color:#b91c1c;padding:5px 0;border-bottom:1px dashed #fecaca;display:flex;gap:8px}
+    .fu-hitem:last-child{border-bottom:none}
+    .fu-hitem .ck{font-weight:800;min-width:118px}
+    .fu-holdmeta{font-size:12px;color:#b91c1c;margin-top:8px;opacity:.9}
+    .fu-editarea{width:100%;min-height:220px;margin-top:8px;font-family:inherit;font-size:13.5px;line-height:1.8;
+        padding:12px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#1e293b;resize:vertical}
+    .fu-btnrow{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .fu-btn{font-size:13px;font-weight:800;padding:9px 16px;border-radius:9px;border:1px solid #e2e8f0;
+        background:#fff;color:#94a3b8;cursor:not-allowed}
+    .fu-btn.send{background:#fca5a5;color:#fff;border-color:#fca5a5}
+    .fu-btnnote{font-size:11.5px;color:#94a3b8}
+
+    .fu-empty{color:#94a3b8;font-size:13.5px;padding:28px 4px;text-align:center;
+        background:#fff;border:1px dashed #e2e8f0;border-radius:12px;margin-top:10px}
+    .fu-loading{color:#94a3b8;font-size:13px;padding:24px 4px;text-align:center}
+    </style>
+</head>
+<body>
+    <!-- Admin Navigation (기존 admin 페이지와 동일 · 후속메일 링크 1개 추가) -->
+    <nav class="admin-nav">
+        <div class="container">
+            <div class="admin-nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>이온토플 관리자</span>
+            </div>
+            <div class="admin-nav-menu">
+                <a href="admin-dashboard.html" class="admin-nav-link">
+                    <i class="fas fa-home"></i> 대시보드
+                </a>
+                <a href="admin-applications.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-list"></i> 신청서 관리
+                </a>
+                <a href="admin-followup.html" class="admin-nav-link active">
+                    <i class="fas fa-envelope-open-text"></i> 후속메일
+                </a>
+                <a href="admin-study-v3.html" class="admin-nav-link">
+                    <i class="fas fa-flask"></i> 학습 관리 <span id="navWeeklyCheckBadge" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; min-width:16px; text-align:center; line-height:16px;">0</span>
+                </a>
+                <a href="admin-correction.html" class="admin-nav-link">
+                    <i class="fas fa-pen-nib"></i> 첨삭 관리
+                </a>
+                <a href="admin-survey.html" class="admin-nav-link">
+                    <i class="fas fa-clipboard-check"></i> 실전 리포트
+                </a>
+                <a href="admin-questions.html" class="admin-nav-link">
+                    <i class="fas fa-puzzle-piece"></i> 문제 관리
+                </a>
+                <a href="admin-users.html" class="admin-nav-link">
+                    <i class="fas fa-users"></i> 회원 관리
+                </a>
+                <a href="admin-settings.html" class="admin-nav-link">
+                    <i class="fas fa-cog"></i> 사이트 설정
+                </a>
+                <a href="index.html" class="admin-nav-link">
+                    <i class="fas fa-globe"></i> 사이트로
+                </a>
+                <div class="admin-nav-user" id="adminUser">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="adminName">관리자</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1 class="admin-title">📮 후속메일 관측·보류</h1>
+            <p class="admin-subtitle">예약·발송된 후속메일과 보류(문제 걸림) 건을 한눈에 확인합니다.</p>
+        </div>
+
+        <div class="fu-notice">
+            <span class="fu-lock"><i class="fas fa-lock"></i> 읽기 전용 · 실제 발송 배선 없음</span>
+            <span class="fu-legend">단계: 1 = 첫 안내 · 2 = 개별분석 · 3a = 계약서 · 3b = 등록/결제 &nbsp;·&nbsp; <span style="color:#b91c1c;font-weight:700">빨간 줄 = 보류(문제 걸림)</span></span>
+        </div>
+
+        <!-- 관리자 공유비밀 입력 (브라우저 저장 · 소스에 하드코딩하지 않음) -->
+        <div class="fu-secret" id="secretBox" style="display:none;">
+            <label for="secretInput">관리자 열람 비밀</label>
+            <input type="password" id="secretInput" placeholder="후속메일 열람용 공유비밀을 입력하세요" autocomplete="off">
+            <button type="button" id="secretSave">저장하고 불러오기</button>
+            <span class="fu-hint">서버(Edge Function)가 요구하는 공유비밀입니다. 이 브라우저에만 저장되며 소스코드·저장소에는 담기지 않습니다.</span>
+            <span class="fu-err" id="secretErr" style="display:none;">비밀이 올바르지 않습니다. 다시 입력해주세요.</span>
+        </div>
+
+        <div id="list">
+            <div class="fu-loading"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <a href="#" id="resetSecret" style="font-size:12px;color:#94a3b8;">열람 비밀 재설정</a>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/supabase-config.js"></script>
+    <script src="js/admin-utils.js"></script>
+    <script>
+    // ===== 후속메일 관리자 대시보드 (읽기 전용) =====
+    // 인증: 기존 admin 페이지와 동일한 requireAdmin() 게이트(js/admin-utils.js).
+    // 데이터: Edge Function followup-admin 을 통해서만 받는다(anon 직접 조회 없음).
+    //         호출 성공/빈 데이터/미인증/실패 각각을 안내한다.
+    // 발송: 보류건 '발송' 버튼은 자리표시자 — 실제 발송 배선 없음(대표 승인 전 금지).
+    requireAdmin();
+
+    const SECRET_KEY = 'followup_admin_secret';
+    const FN_URL = `${SUPABASE_URL}/functions/v1/followup-admin`;
+
+    const $list = document.getElementById('list');
+    const $secretBox = document.getElementById('secretBox');
+    const $secretInput = document.getElementById('secretInput');
+    const $secretErr = document.getElementById('secretErr');
+
+    // ── 라벨 매핑 ──
+    const STAGE_LABEL = { stage1:'1단계', stage2:'2단계', stage3a:'3a단계', stage3b:'3b단계' };
+    const STATUS_LABEL = {
+        scheduled:'예약', sent:'발송', replied:'답장', applied:'신청',
+        agreed:'동의', contracted:'계약', paid:'결제', canceled:'취소', held:'보류',
+        draft_ready:'초안', awaiting_review:'검수대기', approved:'승인', sending:'발송중', failed:'실패', skipped:'건너뜀'
+    };
+    const FUNNEL_STEPS = [
+        { key:'apply',    label:'신청',  sub:'신청서' },
+        { key:'agree',    label:'동의',  sub:'개별분석' },
+        { key:'contract', label:'계약',  sub:'계약서' },
+        { key:'paid',     label:'결제',  sub:'등록' }
+    ];
+    // funnel 값 → {reached, dropped}. 라이브 파이프라인 전이라 stage 기반 프록시.
+    function funnelState(f){
+        const map = {
+            apply:{reached:0,dropped:false},   apply_drop:{reached:0,dropped:true},
+            agree:{reached:1,dropped:false},   agree_drop:{reached:1,dropped:true},
+            contract:{reached:2,dropped:false},contract_drop:{reached:2,dropped:true},
+            paid:{reached:3,dropped:false}
+        };
+        return map[f] || { reached:0, dropped:false };
+    }
+
+    function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    // ISO/타임스탬프 → KST 표기(공통 유틸 재사용, 실패 시 원문)
+    function whenText(w){
+        if(!w) return '';
+        try { const t = formatKstDateTimeKo(w); return t || String(w); }
+        catch(e){ return String(w); }
+    }
+
+    function funnelHTML(f){
+        const st = funnelState(f);
+        const reached = st.reached;
+        let html = '<div class="fu-funnel">';
+        FUNNEL_STEPS.forEach((s,i)=>{
+            let cls='fu-fstep';
+            if(i<=reached) cls+=' done';
+            const dropIdx = st.dropped ? reached+1 : -1;
+            if(i===dropIdx) cls='fu-fstep drop';
+            html+=`<div class="${cls}">${s.label}<span class="fl">${s.sub}</span></div>`;
+        });
+        html+='</div>';
+        if(st.dropped){
+            const dropLabel = (reached+1<FUNNEL_STEPS.length)? FUNNEL_STEPS[reached+1].label : '이후';
+            html+=`<div class="fu-dropnote">↳ '${FUNNEL_STEPS[reached].label}'까지 도달, '${dropLabel}'에서 이탈</div>`;
+        } else if(reached===FUNNEL_STEPS.length-1){
+            html+=`<div class="fu-donenote">↳ 신청→동의→계약→결제 전 단계 완주</div>`;
+        }
+        return html;
+    }
+
+    function rowHTML(j){
+        const held = j.status === 'held';
+        const scls = 'fu-status ' + (held ? 'held' : (j.status==='paid' ? 'paid' : (j.status==='canceled' ? 'canceled' : '')));
+        const mats = Array.isArray(j.materials) ? j.materials : [];
+        const matBadges = mats.length
+            ? mats.map(m=>`<span class="fu-mat">${esc(m)}</span>`).join('')
+            : '<span class="fu-matline">배정 재료 없음</span>';
+
+        // 보류 사유
+        let holdSect = '';
+        if(held){
+            const rows = (j.hold_kind === 'gate3') ? (j.failed||[]) : (j.warns||[]);
+            const items = rows.map(x=>`<div class="fu-hitem"><span class="ck">${esc(x.check)}</span><span>${esc(x.reason)}</span></div>`).join('')
+                || '<div class="fu-hitem"><span>사유 정보 없음</span></div>';
+            const kindLabel = j.hold_kind === 'gate3' ? '3종 기계검사 실패(강제 재생성 초과)' : '2종 말투·물렁 경고 임계 초과';
+            holdSect = `
+              <div class="fu-sect">
+                <div class="fu-holdbox">
+                  <h3>⛔ 왜 보류됐나 — ${esc(kindLabel)}</h3>
+                  ${items}
+                  ${j.regen ? `<div class="fu-holdmeta">누적: ${esc(j.regen)}</div>` : ''}
+                </div>
+                <div class="fu-sect">
+                  <h3>편지 원문 수정 (그 자리에서)</h3>
+                  <textarea class="fu-editarea" spellcheck="false">${esc(j.subject)}\n\n${esc(j.body)}</textarea>
+                  <div class="fu-btnrow">
+                    <button class="fu-btn send" type="button" onclick="return false" title="자리표시자 — 실제 발송 배선 없음">발송</button>
+                    <button class="fu-btn" type="button" onclick="return false">폐기</button>
+                    <span class="fu-btnnote">※ '발송'은 자리표시자입니다. 실제 발송·저장 동작은 연결돼 있지 않습니다.</span>
+                  </div>
+                </div>
+              </div>`;
+        }
+
+        return `
+        <details class="fu-row ${held?'held':''}">
+          <summary>
+            <span class="fu-chev">▸</span>
+            <span class="fu-nm">${esc(j.name)}</span>
+            <span class="fu-stage">${STAGE_LABEL[j.stage]||esc(j.stage)}</span>
+            <span class="${scls}">${STATUS_LABEL[j.status]||esc(j.status)}</span>
+            <span class="fu-meta">${esc(j.score)}${(j.progress!=null)?` · 진도 ${esc(j.progress)}%`:''}</span>
+            <span class="fu-meta right">${esc(whenText(j.when))}</span>
+          </summary>
+          <div class="fu-panel">
+            <div class="fu-sect">
+              <h3>퍼널 진행 (신청 → 동의 → 계약 → 결제)</h3>
+              ${funnelHTML(j.funnel)}
+            </div>
+            <div class="fu-sect">
+              <h3>왜 이 학생 · 이 단계인가 (선정 이유)</h3>
+              <div class="fu-why">${esc(j.why) || '<span style="color:#94a3b8">사유 없음</span>'}</div>
+            </div>
+            <div class="fu-sect">
+              <h3>사용한 후기 · 재료</h3>
+              <div class="fu-matline">후기(used_review_id): <code>${esc(j.review||'-')}</code></div>
+              <div style="margin-top:6px">${matBadges}</div>
+            </div>
+            ${holdSect}
+            <div class="fu-sect">
+              <h3>편지 ${held?'(원문)':'전문'}</h3>
+              <div class="fu-subj">${esc(j.subject)||'<span style="color:#94a3b8">제목 없음</span>'}</div>
+              <div class="fu-letter">${esc(j.body)||'<span style="color:#94a3b8">본문 없음</span>'}</div>
+            </div>
+          </div>
+        </details>`;
+    }
+
+    function showEmpty(msg){
+        $list.innerHTML = `<div class="fu-empty">${esc(msg)}</div>`;
+    }
+
+    // 공유비밀 입력 UI
+    function askSecret(showError){
+        $secretBox.style.display = 'flex';
+        $secretErr.style.display = showError ? 'block' : 'none';
+        $secretInput.focus();
+    }
+
+    async function load(){
+        const secret = localStorage.getItem(SECRET_KEY) || '';
+        if(!secret){
+            askSecret(false);
+            showEmpty('열람 비밀을 입력하면 후속메일 목록을 불러옵니다.');
+            return;
+        }
+        $secretBox.style.display = 'none';
+        $list.innerHTML = '<div class="fu-loading"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>';
+
+        let resp;
+        try {
+            resp = await fetch(FN_URL, {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'x-followup-secret': secret
+                }
+            });
+        } catch(e){
+            showEmpty('데이터를 불러오지 못했습니다(네트워크 오류). 잠시 후 다시 시도해주세요.');
+            return;
+        }
+
+        if(resp.status === 401){
+            localStorage.removeItem(SECRET_KEY);
+            askSecret(true);
+            showEmpty('열람 비밀이 올바르지 않습니다. 다시 입력해주세요.');
+            return;
+        }
+        if(!resp.ok){
+            showEmpty('데이터를 불러오지 못했습니다(서버 오류). 배포·설정 상태를 확인해주세요.');
+            return;
+        }
+
+        let data;
+        try { data = await resp.json(); }
+        catch(e){ showEmpty('데이터 형식을 해석하지 못했습니다.'); return; }
+
+        const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+        if(jobs.length === 0){
+            showEmpty('아직 표시할 후속메일이 없습니다. (스키마·파이프라인 라이브 전이라 지금은 비어 있는 것이 정상입니다.)');
+            return;
+        }
+        $list.innerHTML = jobs.map(rowHTML).join('');
+    }
+
+    // 이벤트
+    document.getElementById('secretSave').addEventListener('click', ()=>{
+        const v = $secretInput.value.trim();
+        if(!v){ return; }
+        localStorage.setItem(SECRET_KEY, v);
+        $secretInput.value = '';
+        load();
+    });
+    $secretInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ document.getElementById('secretSave').click(); } });
+    document.getElementById('resetSecret').addEventListener('click', (e)=>{
+        e.preventDefault();
+        localStorage.removeItem(SECRET_KEY);
+        askSecret(false);
+        showEmpty('열람 비밀을 입력하면 후속메일 목록을 불러옵니다.');
+    });
+
+    load();
+    </script>
+</body>
+</html>
