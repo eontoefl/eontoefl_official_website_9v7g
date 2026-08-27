@@ -88,13 +88,13 @@ When a component must "float" (modals, dropdowns):
 
 ---
 
-## 7. 후속메일 시스템 (Follow-up Mail) — 관리자 관측·보류 대시보드
+## 7. 후속메일 시스템 (Follow-up Mail) — 발송 전 검토·관리 대시보드
 
-> 신청 퍼널에서 이탈했거나 다음 단계로 넘어갈 학생에게 보내는 "후속메일"을 자동 생성·관측하는 시스템의 **공홈 측 관리자 화면**. 생성·검사·발송 파이프라인 본체는 별도 폴더(`C:\후속메일 자동화\`)에서 관리하며, 이 저장소에는 **읽어서 보여주는 관리자 화면과 서버 읽기 함수만** 들어온다.
+> 신청 퍼널에서 이탈했거나 다음 단계로 넘어갈 학생에게 보내는 "후속메일"을 원래 대상 시점에 자동 생성하고, 자동 발송 전에 대표가 확인·수정·취소할 수 있게 하는 **공홈 측 관리자 화면**. 생성·검사·발송 파이프라인 본체는 별도 폴더(`C:\후속메일 자동화\`)에서 관리한다.
 
 ### 7.1 구성 요소 (이 저장소)
-*   **`admin-followup.html`** — 관리자 전용 관측 대시보드. 전체·수동 확인·검사 보류·발송 제외 탭을 제공한다. 적절한 자동 발송 시기를 지난 건은 수동 확인 탭에 남기고, 이메일·제목·본문을 복사해 Gmail에서 직접 처리할 수 있다. 화면 자체의 발송·상태변경 배선은 **없다**.
-*   **Edge Function `supabase/functions/followup-admin/`** — 서버 전용(service_role) **읽기 함수**. `followup_jobs` + `followup_messages` + 신청서(`applications`) + 발송 제외 목록(`followup_suppressions`)을 읽어 화면용 JSON 을 반환한다. v2 관측 컬럼 적용 전 라이브 표도 읽을 수 있도록 v1 호환 조회를 둔다. `GET` 만 허용, 쓰기·발송 없음.
+*   **`admin-followup.html`** — 관리자 전용 대시보드. 최종 형태는 전체·발송 예정·검사 보류·발송 제외를 구분한다. 발송 예정 건에는 남은 시간·받는 사람·제목·본문과 `수정 저장`·`발송 취소`·`지금 발송`을 제공한다.
+*   **Edge Function `supabase/functions/followup-admin/`** — `followup_jobs` + `followup_messages` + 신청서(`applications`) + 발송 제외 목록(`followup_suppressions`)을 읽고, 최종 형태에서는 발송 예정 메일의 수정·한 통 취소·지금 발송 요청도 처리한다. v2 관측 컬럼 적용 전 라이브 표도 읽을 수 있도록 v1 호환 조회를 둔다.
 
 ### 7.2 데이터 테이블 (Supabase, RLS 로 anon 전면 차단 → service_role 만 접근)
 *   **`followup_jobs`** — 누구에게 / 어떤 단계(`stage1`·`stage2`·`stage3a`·`stage3b`) / 언제(`scheduled_at`) 보낼지 + 상태(`scheduled`…`sent`·`canceled`·`held`).
@@ -107,4 +107,6 @@ When a component must "float" (modals, dropdowns):
 *   **학생에게 실제 메일을 보내는 기능(Gmail 발송)은 대표 명시 승인 전까지 금지.** 후보 스캔·초안 생성도 실발송과 묶여 승인 전엔 자동 가동하지 않는다. 이 저장소의 화면·함수는 **읽기·관측·보류 표시까지만** 한다.
 *   후속메일 테이블은 **anon 직접 조회 불가**(RLS). 반드시 서버 함수(service_role) 경유로만 읽는다.
 *   중복발송 방지(`unique(application_id, stage)` + 원자선점)·대상 신선도 상한은 파이프라인 본체의 불변 규칙이며 화면에서 건드리지 않는다.
-*   신선도 상한을 지난 건은 자동 발송하지 않고 `skipped`로 남겨 수동 확인 탭에 표시한다.
+*   신선도 상한을 지난 건은 뒤늦게 메일을 만들지 않고 `skipped` 기록만 남긴다. 발송 예정 목록에는 표시하지 않는다.
+*   정상 대상은 원래 시점에 초안을 만든 뒤 `awaiting_review`로 발송 예정 목록에 올린다. 대표가 유예 시간 안에 아무 작업도 하지 않으면 자동 발송한다. 정확한 유예 시간은 회의에서 확정한다(현재 제안 1시간).
+*   신청서 종류는 `applications.application_type`으로 구별하고, 학생 이메일은 `applications.email`을 사용한다. 공통값 `admin`이 들어 있는 `applications.user_email`은 학생 구별에 쓰지 않는다.
