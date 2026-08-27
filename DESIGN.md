@@ -93,16 +93,18 @@ When a component must "float" (modals, dropdowns):
 > 신청 퍼널에서 이탈했거나 다음 단계로 넘어갈 학생에게 보내는 "후속메일"을 자동 생성·관측하는 시스템의 **공홈 측 관리자 화면**. 생성·검사·발송 파이프라인 본체는 별도 폴더(`C:\후속메일 자동화\`)에서 관리하며, 이 저장소에는 **읽어서 보여주는 관리자 화면과 서버 읽기 함수만** 들어온다.
 
 ### 7.1 구성 요소 (이 저장소)
-*   **`admin-followup.html`** — 관리자 전용 관측·보류 대시보드. 기존 `admin-*.html` 형제 페이지로, 동일한 `admin-nav`·`css/admin.css` 톤·`requireAdmin()` 인증 게이트를 그대로 쓴다. 후속메일 목록을 한 줄씩 펼쳐 편지 전문·선정 이유·퍼널 진행·보류 사유를 보여준다. 발송·상태변경 배선은 **없다**(보류건 '발송' 버튼은 자리표시자).
-*   **Edge Function `supabase/functions/followup-admin/`** — 서버 전용(service_role) **읽기 함수**. `followup_jobs` + `followup_messages` + 신청서(`applications`) 를 조인해 리스트 JSON 을 반환한다. `GET` 만 허용, 쓰기·발송 없음. 별도 접근 잠금은 이 함수에만 따로 걸지 않는다(형제 admin 화면과 동일하게 `requireAdmin()` 화면 게이트만). 관리자 전용 잠금은 사이트 전체(회원DB 포함)와 함께 별도 "보안작업"에서 일괄 처리한다(이 함수도 그 대상).
+*   **`admin-followup.html`** — 관리자 전용 관측 대시보드. 전체·수동 확인·검사 보류·발송 제외 탭을 제공한다. 적절한 자동 발송 시기를 지난 건은 수동 확인 탭에 남기고, 이메일·제목·본문을 복사해 Gmail에서 직접 처리할 수 있다. 화면 자체의 발송·상태변경 배선은 **없다**.
+*   **Edge Function `supabase/functions/followup-admin/`** — 서버 전용(service_role) **읽기 함수**. `followup_jobs` + `followup_messages` + 신청서(`applications`) + 발송 제외 목록(`followup_suppressions`)을 읽어 화면용 JSON 을 반환한다. v2 관측 컬럼 적용 전 라이브 표도 읽을 수 있도록 v1 호환 조회를 둔다. `GET` 만 허용, 쓰기·발송 없음.
 
 ### 7.2 데이터 테이블 (Supabase, RLS 로 anon 전면 차단 → service_role 만 접근)
 *   **`followup_jobs`** — 누구에게 / 어떤 단계(`stage1`·`stage2`·`stage3a`·`stage3b`) / 언제(`scheduled_at`) 보낼지 + 상태(`scheduled`…`sent`·`canceled`·`held`).
 *   **`followup_messages`** — 생성된 제목·본문 + 관측 컬럼(`used_review_id`·`used_materials`·`machine_check_result`·`self_check`·`tone_score`). 재생성은 제자리 upsert(`unique(job_id)`).
 *   **`followup_activity_logs`** — 예약·수정·승인·취소·발송·실패 이력.
+*   **`followup_suppressions`** — 대표·직원·시험용 계정과 연락 중단 요청자를 모든 단계에서 제외하는 영구 발송 제외 목록. 활성 회원번호 또는 정규화 이메일이 일치하면 후보에서 빠진다.
 *   **참조 데이터 표** — `reviews`(후기표)·`story_materials`(실화재료)·`score_table`(환산표)·`lexicon`(검사어휘표)·`review_combo`(결합 마스크)·`rule_bundles`(규칙 배포본). 모두 RLS 잠금.
 
 ### 7.3 절대 규칙 (Non-negotiable)
 *   **학생에게 실제 메일을 보내는 기능(Gmail 발송)은 대표 명시 승인 전까지 금지.** 후보 스캔·초안 생성도 실발송과 묶여 승인 전엔 자동 가동하지 않는다. 이 저장소의 화면·함수는 **읽기·관측·보류 표시까지만** 한다.
 *   후속메일 테이블은 **anon 직접 조회 불가**(RLS). 반드시 서버 함수(service_role) 경유로만 읽는다.
 *   중복발송 방지(`unique(application_id, stage)` + 원자선점)·대상 신선도 상한은 파이프라인 본체의 불변 규칙이며 화면에서 건드리지 않는다.
+*   신선도 상한을 지난 건은 자동 발송하지 않고 `skipped`로 남겨 수동 확인 탭에 표시한다.

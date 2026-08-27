@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>후속메일 관측·보류 - 이온토플 관리자</title>
+    <title>후속메일 관리 - 이온토플 관리자</title>
 
     <!-- Noto Sans KR Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,11 +24,20 @@
     .fu-lock{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px;padding:5px 12px;
         border-radius:999px;background:#fee2e2;border:1px solid #fecaca;color:#b91c1c}
     .fu-legend{color:#64748b;font-size:12.5px}
+    .fu-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    .fu-tab{border:1px solid #dbe2ea;background:#fff;color:#64748b;border-radius:999px;padding:8px 13px;
+        font-size:12.5px;font-weight:800;cursor:pointer}
+    .fu-tab:hover{border-color:#a78bfa;color:#6d28d9}
+    .fu-tab.active{background:#6d28d9;color:#fff;border-color:#6d28d9}
+    .fu-count{display:inline-block;min-width:19px;margin-left:4px;padding:1px 6px;border-radius:999px;
+        background:rgba(148,163,184,.18);font-size:10.5px;text-align:center}
+    .fu-tab.active .fu-count{background:rgba(255,255,255,.22)}
 
     /* 리스트 행 */
     .fu-row{background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-top:10px;overflow:hidden;
         border-left:4px solid #e2e8f0}
     .fu-row.held{border-left-color:#ef4444;background:#fef6f5}
+    .fu-row.manual{border-left-color:#f59e0b;background:#fffbeb}
     .fu-row summary{cursor:pointer;padding:13px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
         font-size:13px;list-style:none}
     .fu-row summary::-webkit-details-marker{display:none}
@@ -38,6 +47,7 @@
     .fu-status{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;border:1px solid #e2e8f0;
         color:#475569;background:transparent}
     .fu-status.held{background:#ef4444;color:#fff;border-color:#ef4444}
+    .fu-status.manual{background:#f59e0b;color:#fff;border-color:#f59e0b}
     .fu-status.paid{background:#22c55e;color:#fff;border-color:#22c55e}
     .fu-status.canceled{color:#94a3b8;text-decoration:line-through}
     .fu-meta{color:#94a3b8;font-size:12px}
@@ -89,7 +99,24 @@
     .fu-btn{font-size:13px;font-weight:800;padding:9px 16px;border-radius:9px;border:1px solid #e2e8f0;
         background:#fff;color:#94a3b8;cursor:not-allowed}
     .fu-btn.send{background:#fca5a5;color:#fff;border-color:#fca5a5}
+    .fu-btn.copy{color:#6d28d9;border-color:#c4b5fd;background:#fff;cursor:pointer}
+    .fu-btn.copy:hover{background:#f5f3ff}
+    .fu-btn.copy:disabled{color:#cbd5e1;border-color:#e2e8f0;background:#f8fafc;cursor:not-allowed}
     .fu-btnnote{font-size:11.5px;color:#94a3b8}
+
+    /* 수동 확인 · 발송 제외 */
+    .fu-manualbox{border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:13px 15px}
+    .fu-manualbox h3{color:#92400e!important}
+    .fu-manualbox p{font-size:13px;line-height:1.7;color:#78350f;margin:0}
+    .fu-copy-note{font-size:11.5px;color:#6d28d9;font-weight:700}
+    .fu-suppression{background:#fff;border:1px solid #e2e8f0;border-left:4px solid #64748b;border-radius:12px;
+        padding:14px 16px;margin-top:10px;display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,2fr) auto;
+        gap:6px 14px;align-items:center}
+    .fu-sup-label{font-weight:800;color:#1e293b}
+    .fu-sup-email{font-size:13px;color:#475569;word-break:break-all}
+    .fu-sup-reason{font-size:11px;font-weight:800;color:#475569;background:#f1f5f9;border-radius:999px;padding:4px 9px}
+    .fu-sup-note{grid-column:1/-1;font-size:12.5px;color:#64748b}
+    @media(max-width:700px){.fu-suppression{grid-template-columns:1fr}.fu-sup-note{grid-column:auto}}
 
     .fu-empty{color:#94a3b8;font-size:13.5px;padding:28px 4px;text-align:center;
         background:#fff;border:1px dashed #e2e8f0;border-radius:12px;margin-top:10px}
@@ -146,13 +173,20 @@
     <!-- Main Content -->
     <div class="admin-container">
         <div class="admin-header">
-            <h1 class="admin-title">📮 후속메일 관측·보류</h1>
-            <p class="admin-subtitle">예약·발송된 후속메일과 보류(문제 걸림) 건을 한눈에 확인합니다.</p>
+            <h1 class="admin-title">📮 후속메일 관리</h1>
+            <p class="admin-subtitle">자동 처리 현황, 수동 확인 메일, 검사 보류와 발송 제외 목록을 한눈에 확인합니다.</p>
         </div>
 
         <div class="fu-notice">
             <span class="fu-lock"><i class="fas fa-lock"></i> 읽기 전용 · 실제 발송 배선 없음</span>
-            <span class="fu-legend">단계: 1 = 첫 안내 · 2 = 개별분석 · 3a = 계약서 · 3b = 등록/결제 &nbsp;·&nbsp; <span style="color:#b91c1c;font-weight:700">빨간 줄 = 보류(문제 걸림)</span></span>
+            <span class="fu-legend">단계: 1 = 첫 안내 · 2 = 개별분석 · 3a = 계약서 · 3b = 등록/결제 &nbsp;·&nbsp; <span style="color:#b91c1c;font-weight:700">빨간 줄 = 보류</span> · <span style="color:#92400e;font-weight:700">노란 줄 = 수동 확인</span></span>
+        </div>
+
+        <div class="fu-toolbar" role="tablist" aria-label="후속메일 보기 범위">
+            <button class="fu-tab active" type="button" data-view="all" role="tab" aria-selected="true">전체 <span class="fu-count" id="countAll">0</span></button>
+            <button class="fu-tab" type="button" data-view="manual" role="tab" aria-selected="false">수동 확인 <span class="fu-count" id="countManual">0</span></button>
+            <button class="fu-tab" type="button" data-view="held" role="tab" aria-selected="false">검사 보류 <span class="fu-count" id="countHeld">0</span></button>
+            <button class="fu-tab" type="button" data-view="suppressed" role="tab" aria-selected="false">발송 제외 <span class="fu-count" id="countSuppressed">0</span></button>
         </div>
 
         <div id="list">
@@ -164,7 +198,7 @@
     <script src="js/supabase-config.js"></script>
     <script src="js/admin-utils.js"></script>
     <script>
-    // ===== 후속메일 관리자 대시보드 (읽기 전용) =====
+    // ===== 후속메일 관리자 대시보드 (관측·수동 확인·발송 제외, 읽기 전용) =====
     // 인증: 기존 admin 페이지와 동일한 requireAdmin() 게이트(js/admin-utils.js)만 사용.
     //       (별도 잠금 없음 — 관리자 전용 잠금은 사이트 전체와 함께 보안작업에서 일괄 처리.)
     // 데이터: Edge Function followup-admin 을 통해서만 받는다(anon 직접 조회 없음).
@@ -175,13 +209,20 @@
     const FN_URL = `${SUPABASE_URL}/functions/v1/followup-admin`;
 
     const $list = document.getElementById('list');
+    const $tabs = Array.from(document.querySelectorAll('.fu-tab'));
+    let jobsState = [];
+    let suppressionsState = [];
+    let activeView = 'all';
 
     // ── 라벨 매핑 ──
     const STAGE_LABEL = { stage1:'1단계', stage2:'2단계', stage3a:'3a단계', stage3b:'3b단계' };
     const STATUS_LABEL = {
         scheduled:'예약', sent:'발송', replied:'답장', applied:'신청',
         agreed:'동의', contracted:'계약', paid:'결제', canceled:'취소', held:'보류',
-        draft_ready:'초안', awaiting_review:'검수대기', approved:'승인', sending:'발송중', failed:'실패', skipped:'건너뜀'
+        draft_ready:'초안', awaiting_review:'검수대기', approved:'승인', sending:'발송중', failed:'실패', skipped:'수동 확인'
+    };
+    const SUPPRESSION_REASON = {
+        internal:'대표·직원', test:'시험용', do_not_contact:'연락 중단 요청', manual:'직접 제외'
     };
     const FUNNEL_STEPS = [
         { key:'apply',    label:'신청',  sub:'신청서' },
@@ -232,7 +273,8 @@
 
     function rowHTML(j){
         const held = j.status === 'held';
-        const scls = 'fu-status ' + (held ? 'held' : (j.status==='paid' ? 'paid' : (j.status==='canceled' ? 'canceled' : '')));
+        const manual = j.status === 'skipped';
+        const scls = 'fu-status ' + (held ? 'held' : (manual ? 'manual' : (j.status==='paid' ? 'paid' : (j.status==='canceled' ? 'canceled' : ''))));
         const mats = Array.isArray(j.materials) ? j.materials : [];
         const matBadges = mats.length
             ? mats.map(m=>`<span class="fu-mat">${esc(m)}</span>`).join('')
@@ -264,8 +306,25 @@
               </div>`;
         }
 
+        let manualSect = '';
+        if(manual){
+            manualSect = `
+              <div class="fu-sect">
+                <div class="fu-manualbox">
+                  <h3>📌 자동 발송하지 않고 수동 확인으로 남긴 메일</h3>
+                  <p>적절한 발송 시기가 지났습니다. 학생의 현재 상태를 확인한 뒤 Gmail에서 직접 보내거나, 보내지 않고 기록만 남기세요.</p>
+                  <div class="fu-btnrow">
+                    <button class="fu-btn copy" type="button" data-copy="email" data-job-id="${esc(j.job_id)}" ${j.email?'':'disabled'}>이메일 복사</button>
+                    <button class="fu-btn copy" type="button" data-copy="subject" data-job-id="${esc(j.job_id)}" ${j.subject?'':'disabled'}>제목 복사</button>
+                    <button class="fu-btn copy" type="button" data-copy="body" data-job-id="${esc(j.job_id)}" ${j.body?'':'disabled'}>본문 복사</button>
+                    <span class="fu-copy-note" aria-live="polite"></span>
+                  </div>
+                </div>
+              </div>`;
+        }
+
         return `
-        <details class="fu-row ${held?'held':''}">
+        <details class="fu-row ${held?'held':''} ${manual?'manual':''}">
           <summary>
             <span class="fu-chev">▸</span>
             <span class="fu-nm">${esc(j.name)}</span>
@@ -289,6 +348,7 @@
               <div style="margin-top:6px">${matBadges}</div>
             </div>
             ${holdSect}
+            ${manualSect}
             <div class="fu-sect">
               <h3>편지 ${held?'(원문)':'전문'}</h3>
               <div class="fu-subj">${esc(j.subject)||'<span style="color:#94a3b8">제목 없음</span>'}</div>
@@ -301,6 +361,79 @@
     function showEmpty(msg){
         $list.innerHTML = `<div class="fu-empty">${esc(msg)}</div>`;
     }
+
+    function suppressionHTML(s){
+        const label = s.label || '이름 없음';
+        const reason = SUPPRESSION_REASON[s.reason] || s.reason || '직접 제외';
+        return `
+          <div class="fu-suppression">
+            <div class="fu-sup-label">${esc(label)}</div>
+            <div class="fu-sup-email">${esc(s.email)||'회원번호 기준 제외'}</div>
+            <div class="fu-sup-reason">${esc(reason)}</div>
+            <div class="fu-sup-note">${esc(s.note)||'별도 메모 없음'}${s.created_at?` · 등록 ${esc(whenText(s.created_at))}`:''}</div>
+          </div>`;
+    }
+
+    function updateCounts(){
+        document.getElementById('countAll').textContent = jobsState.length;
+        document.getElementById('countManual').textContent = jobsState.filter(j=>j.status==='skipped').length;
+        document.getElementById('countHeld').textContent = jobsState.filter(j=>j.status==='held').length;
+        document.getElementById('countSuppressed').textContent = suppressionsState.length;
+    }
+
+    function render(){
+        $tabs.forEach(tab=>{
+            const selected = tab.dataset.view === activeView;
+            tab.classList.toggle('active', selected);
+            tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+
+        if(activeView === 'suppressed'){
+            if(suppressionsState.length === 0){
+                showEmpty('발송 제외 목록이 비어 있습니다. 대표·직원·시험용 계정과 연락 중단 요청자를 이 목록에 등록하면 모든 단계에서 자동 발송되지 않습니다.');
+                return;
+            }
+            $list.innerHTML = suppressionsState.map(suppressionHTML).join('');
+            return;
+        }
+
+        let jobs = jobsState;
+        if(activeView === 'manual') jobs = jobs.filter(j=>j.status==='skipped');
+        if(activeView === 'held') jobs = jobs.filter(j=>j.status==='held');
+
+        if(jobs.length === 0){
+            const msg = activeView === 'manual'
+                ? '현재 수동 확인이 필요한 메일이 없습니다.'
+                : activeView === 'held'
+                    ? '현재 검사에 반복해서 걸린 메일이 없습니다.'
+                    : '아직 표시할 후속메일이 없습니다.';
+            showEmpty(msg);
+            return;
+        }
+        $list.innerHTML = jobs.map(rowHTML).join('');
+    }
+
+    $tabs.forEach(tab=>tab.addEventListener('click',()=>{
+        activeView = tab.dataset.view || 'all';
+        render();
+    }));
+
+    $list.addEventListener('click', async event=>{
+        const btn = event.target.closest('[data-copy]');
+        if(!btn || btn.disabled) return;
+        const job = jobsState.find(j=>String(j.job_id)===String(btn.dataset.jobId));
+        if(!job) return;
+        const value = String(job[btn.dataset.copy] || '');
+        if(!value) return;
+
+        const note = btn.closest('.fu-btnrow')?.querySelector('.fu-copy-note');
+        try {
+            await navigator.clipboard.writeText(value);
+            if(note) note.textContent = '복사했습니다.';
+        } catch(e){
+            if(note) note.textContent = '복사하지 못했습니다. 직접 선택해주세요.';
+        }
+    });
 
     async function load(){
         $list.innerHTML = '<div class="fu-loading"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>';
@@ -328,12 +461,10 @@
         try { data = await resp.json(); }
         catch(e){ showEmpty('데이터 형식을 해석하지 못했습니다.'); return; }
 
-        const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-        if(jobs.length === 0){
-            showEmpty('아직 표시할 후속메일이 없습니다. (스키마·파이프라인 라이브 전이라 지금은 비어 있는 것이 정상입니다.)');
-            return;
-        }
-        $list.innerHTML = jobs.map(rowHTML).join('');
+        jobsState = Array.isArray(data.jobs) ? data.jobs : [];
+        suppressionsState = Array.isArray(data.suppressions) ? data.suppressions : [];
+        updateCounts();
+        render();
     }
 
     load();

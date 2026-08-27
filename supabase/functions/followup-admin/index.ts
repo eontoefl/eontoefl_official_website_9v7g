@@ -1,6 +1,7 @@
 // ===== 후속메일 관리자 대시보드 — 읽기 전용 Edge Function =====
-// 역할: 후속메일 장부(followup_jobs / followup_messages / followup_activity_logs)를
-//       service_role 로 읽어 관리자 대시보드(admin-followup.html)에 리스트 JSON 을 돌려준다.
+// 역할: 후속메일 장부(followup_jobs / followup_messages / followup_activity_logs)와
+//       발송 제외 목록(followup_suppressions)을 service_role 로 읽어
+//       관리자 대시보드(admin-followup.html)에 리스트 JSON 을 돌려준다.
 //
 // ★절대 규칙(설계 수리설계_후속메일_v2.md §6 위험모델):
 //   - 이 함수는 "읽기(GET)만" 한다. 쓰기·상태변경·발송(Gmail)·후보스캔·초안생성 배선 없음.
@@ -108,17 +109,32 @@ Deno.serve(async (req) => {
   try {
     // 1) followup_jobs (예약시각 최신순) + applications(이름·점수) + followup_messages 임베드.
     //    임베드는 PostgREST FK 기반. 메시지는 job 당 최신 1건을 코드에서 고른다(002 후 unique(job_id)).
-    const select =
+    //    라이브 v2 스키마 적용 전에도 화면이 열리도록 v1 컬럼으로 한 번 더 시도한다.
+    const selectV2 =
       "id,application_id,user_id,email,stage,reason,progress_percent,scheduled_at,status," +
+      "cancel_reason,created_at,updated_at," +
       "applications(name,score_total_old,score_total_new,target_cutoff_old,target_cutoff_new)," +
       "followup_messages(subject,body,used_review_id,used_materials,machine_check_result,tone_score,self_check,created_at)";
-    const jobsRaw = await readTable(
-      `followup_jobs?select=${encodeURIComponent(select)}&order=scheduled_at.desc.nullslast`,
+    let jobsRaw = await readTable(
+      `followup_jobs?select=${encodeURIComponent(selectV2)}&order=scheduled_at.desc.nullslast`,
     );
+
+    let schemaVersion = "v2";
+    if (jobsRaw === null) {
+      const selectV1 =
+        "id,application_id,user_id,email,stage,reason,progress_percent,scheduled_at,status," +
+        "cancel_reason,created_at,updated_at," +
+        "applications(name,score_total_old,score_total_new,target_cutoff_old,target_cutoff_new)," +
+        "followup_messages(subject,body,personalization,ref_materials,created_at)";
+      jobsRaw = await readTable(
+        `followup_jobs?select=${encodeURIComponent(selectV1)}&order=scheduled_at.desc.nullslast`,
+      );
+      schemaVersion = "v1";
+    }
 
     // 테이블 미생성/조회 실패 = 라이브 전 정상 상황 → 빈 리스트 + 안내 플래그.
     if (jobsRaw === null) {
-      return json({ jobs: [], count: 0, data_ready: false });
+      return json({ jobs: [], suppressions: [], count: 0, data_ready: false });
     }
 
     const jobs = (jobsRaw as Array<Record<string, unknown>>).map((j) => {
@@ -134,16 +150,21 @@ Deno.serve(async (req) => {
       const mcr = (msg?.machine_check_result as Record<string, unknown>) || {};
 
       const out: Record<string, unknown> = {
+        job_id: j.id || "",
         name: (app?.name as string) || "-",
+        email: (j.email as string) || "",
         stage,
         status,
         when: j.scheduled_at || "",
         score: scoreText(app),
         progress: j.progress_percent ?? null,
         funnel: funnelFor(stage, status),
-        why: j.reason || "",
-        review: (msg?.used_review_id as string) || "",
-        materials: (msg?.used_materials as unknown[]) || [],
+        why: (status === "skipped" ? j.cancel_reason : j.reason) || j.reason || "",
+        manual_review: status === "skipped",
+        review: (msg?.used_review_id as string) ||
+          ((msg?.ref_materials as Record<string, unknown> | null)?.review_id as string) || "",
+        materials: (msg?.used_materials as unknown[]) ||
+          ((msg?.ref_materials as Record<string, unknown> | null)?.materials as unknown[]) || [],
         subject: (msg?.subject as string) || "",
         body: (msg?.body as string) || "",
       };
@@ -159,7 +180,28 @@ Deno.serve(async (req) => {
       return out;
     });
 
-    return json({ jobs, count: jobs.length, data_ready: true });
+    // 2) 영구 발송 제외 목록. 아직 표가 적용되지 않은 환경은 빈 목록으로 정상 처리한다.
+    const suppressionsRaw = await readTable(
+      "followup_suppressions?select=id,user_id,email,label,reason,note,active,created_at,updated_at" +
+        "&active=eq.true&order=created_at.desc",
+    );
+    const suppressions = (suppressionsRaw || []).map((s) => ({
+      id: (s as Record<string, unknown>).id || "",
+      email: (s as Record<string, unknown>).email || "",
+      label: (s as Record<string, unknown>).label || "",
+      reason: (s as Record<string, unknown>).reason || "manual",
+      note: (s as Record<string, unknown>).note || "",
+      created_at: (s as Record<string, unknown>).created_at || "",
+    }));
+
+    return json({
+      jobs,
+      suppressions,
+      count: jobs.length,
+      suppression_count: suppressions.length,
+      data_ready: true,
+      schema_version: schemaVersion,
+    });
   } catch (error) {
     console.error("followup-admin error:", error);
     return json({ error: (error as Error).message }, 500);
