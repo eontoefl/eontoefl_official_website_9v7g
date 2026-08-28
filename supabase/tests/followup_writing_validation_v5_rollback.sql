@@ -82,6 +82,10 @@ begin
     raise exception 'public.reviews starting count is not 219: %',v_reviews_before;
   end if;
 
+  update public.followup_runtime
+  set operation_mode='draft_only', send_locked=true, test_email=null
+  where singleton_id=1;
+
   insert into public.applications(id,email,name,phone,program,deleted,application_type,current_score,target_score,
     referral_source,stuck_area,analysis_status,analysis_content)
   values
