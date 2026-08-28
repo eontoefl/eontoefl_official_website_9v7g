@@ -146,19 +146,6 @@
     .fu-empty{color:#8a949b;font-size:13.5px;padding:30px 4px;text-align:center;background:var(--fu-lowest);border-radius:14px;margin-top:10px}
     .fu-loading{color:#8a949b;font-size:13px;padding:26px 4px;text-align:center}
 
-    /* 전용 암호 게이트 — glassmorphism */
-    .fu-gate{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;
-        background:rgba(25,28,29,.28);backdrop-filter:blur(12px)}
-    .fu-gate.show{display:flex}
-    .fu-gatecard{background:rgba(255,255,255,.86);backdrop-filter:blur(14px);border-radius:20px;padding:30px 28px;
-        width:min(400px,92vw);box-shadow:0 24px 48px rgba(25,28,29,.06)}
-    .fu-gatecard h2{font-size:18px;font-weight:800;color:var(--fu-on);margin:0 0 6px;letter-spacing:-.02em}
-    .fu-gatecard p{font-size:13px;color:var(--fu-on-var);margin:0 0 18px;line-height:1.6}
-    .fu-gatecard input{width:100%;background:var(--fu-highest);border:none;border-radius:10px;padding:13px 15px;
-        font-size:15px;color:var(--fu-on);outline:2px solid transparent}
-    .fu-gatecard input:focus{outline-color:var(--fu-primary-dim)}
-    .fu-gatecard .fu-btn{width:100%;justify-content:center;margin-top:14px;padding:13px}
-    .fu-gateerr{font-size:12.5px;color:var(--fu-error);font-weight:700;margin-top:10px;min-height:16px}
     </style>
 </head>
 <body>
@@ -208,17 +195,6 @@
         </div>
     </nav>
 
-    <!-- 전용 암호 게이트 (현재 탭에서만 기억) -->
-    <div class="fu-gate" id="gate" aria-modal="true" role="dialog">
-      <div class="fu-gatecard">
-        <h2>후속메일 관리자 암호</h2>
-        <p>이 화면은 학생 정보를 다룹니다. 전용 암호를 입력하면 현재 탭에서만 기억하고, 탭을 닫으면 사라집니다.</p>
-        <input id="gateInput" type="password" autocomplete="off" placeholder="전용 암호" aria-label="전용 암호">
-        <div class="fu-gateerr" id="gateErr" aria-live="polite"></div>
-        <button class="fu-btn primary" id="gateBtn" type="button">확인</button>
-      </div>
-    </div>
-
     <!-- Main Content -->
     <div class="admin-container">
         <div class="admin-header">
@@ -250,19 +226,15 @@
     <script src="js/admin-utils.js"></script>
     <script>
     // ===== 후속메일 관리자 대시보드 =====
-    // 인증 2겹: (1) 사이트 관리자 로그인 게이트 requireAdmin(), (2) 후속메일 전용 암호(FOLLOWUP_ADMIN_SECRET).
-    //   전용 암호는 대표가 한 번 입력 → sessionStorage(현재 탭)만 기억 → x-followup-secret 헤더로 싣는다.
-    //   저장소·주소·기록·오류문구에 암호를 남기지 않는다. 전체 보안 개편은 별도 작업.
+    // 대표 결정(2026-08-28): 후속메일 전용 암호 없이 기존 사이트 관리자 로그인만 사용한다.
+    // 전체 관리자 보안 개편은 별도 작업으로 남긴다.
     // 데이터·동작: Edge Function followup-admin 을 통해서만. GET=조회, POST=수정저장/취소/지금발송.
     //   Gmail(실발송)·발송 잠금 해제는 화면에서 하지 않는다.
     requireAdmin();
 
     const FN_URL = `${SUPABASE_URL}/functions/v1/followup-admin`;
-    const SECRET_KEY = 'fu_admin_secret';
-
     const $list = document.getElementById('list');
     const $tabs = Array.from(document.querySelectorAll('.fu-tab'));
-    const $gate = document.getElementById('gate');
     let jobsState = [];
     let suppressionsState = [];
     let runtimeState = { operation_mode:'observe', send_locked:true };
@@ -277,9 +249,6 @@
     const MODE_LABEL = { observe:'관찰 중', draft_only:'초안만', test_one:'시험 발송', live:'운영 중' };
 
     function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    function getSecret(){ try{ return sessionStorage.getItem(SECRET_KEY) || ''; }catch(e){ return ''; } }
-    function setSecret(v){ try{ sessionStorage.setItem(SECRET_KEY, v); }catch(e){} }
-    function clearSecret(){ try{ sessionStorage.removeItem(SECRET_KEY); }catch(e){} }
     function uuid(){ return (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2))); }
 
     function whenText(w){
@@ -565,7 +534,7 @@
     }
 
     async function callFn(method, body){
-        const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'x-followup-secret': getSecret() };
+        const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
         if(body) headers['Content-Type'] = 'application/json';
         return fetch(FN_URL, { method, headers, body: body?JSON.stringify(body):undefined });
     }
@@ -587,8 +556,6 @@
             setBtnsDisabled(jobId, false);
             return;
         }
-
-        if(resp.status === 401){ clearSecret(); showGate('암호가 맞지 않습니다. 다시 입력해 주세요.'); return; }
 
         let data = {};
         try { data = await resp.json(); } catch(e){}
@@ -633,32 +600,14 @@
         }
     });
 
-    // ── 암호 게이트 ──
-    function showGate(errMsg){
-        $gate.classList.add('show');
-        document.getElementById('gateErr').textContent = errMsg || '';
-        const inp = document.getElementById('gateInput');
-        inp.value = ''; setTimeout(()=>inp.focus(), 50);
-    }
-    function hideGate(){ $gate.classList.remove('show'); }
-    document.getElementById('gateBtn').addEventListener('click', submitGate);
-    document.getElementById('gateInput').addEventListener('keydown', e=>{ if(e.key==='Enter') submitGate(); });
-    function submitGate(){
-        const v = document.getElementById('gateInput').value.trim();
-        if(!v){ document.getElementById('gateErr').textContent = '암호를 입력해 주세요.'; return; }
-        setSecret(v); hideGate(); load();
-    }
-
     // ── 조회 ──
     async function load(){
-        if(!getSecret()){ showGate(''); return; }
         $list.innerHTML = '<div class="fu-loading"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>';
 
         let resp;
         try { resp = await callFn('GET'); }
         catch(e){ showEmpty('데이터를 불러오지 못했습니다(네트워크 오류). 잠시 후 다시 시도해 주세요.'); return; }
 
-        if(resp.status === 401){ clearSecret(); showGate('암호가 맞지 않습니다. 다시 입력해 주세요.'); return; }
         if(!resp.ok){ showEmpty('데이터를 불러오지 못했습니다(서버 오류). 배포·설정 상태를 확인해 주세요.'); return; }
 
         let data;

@@ -11,15 +11,9 @@
 //   - 전체 발송 잠금(followup_runtime.send_locked)은 이 함수가 풀지 않는다. 실제 발송 잠금은 유지된다.
 //   - 학생에게 실제 메일을 보내는 기능은 대표 명시 승인 전까지 이 코드에 절대 없다.
 //
-// 접근 통제(★2026-08-25 브레인방 경유 대표 정합, 원상 복원): 이 함수는 service_role 로
-// RLS 를 우회해 학생 PII(followup_*)를 읽고/쓰므로, 호출자 게이트가 없으면 아무나 학생정보를
-// 읽거나 상태를 바꾸는 최대 취약점이 된다.
-//   - 호출자 검증 = 공유비밀(env FOLLOWUP_ADMIN_SECRET). 헤더 x-followup-secret 불일치/부재 → 401.
-//   - GET(조회)·POST(세 동작) 모두 이 게이트를 통과해야 한다. 실패 시 닫힘(fail-closed).
-//   - 비밀 값은 코드에 하드코딩하지 않는다(env).
-//   - ★남은 과제(클라이언트): admin-followup.html 은 이 비밀을 대표가 화면에서 한 번 입력해
-//     현재 탭(sessionStorage)에만 두고 헤더로 싣는다. 저장소·주소·기록에는 남기지 않는다.
-//     전체 관리자 보안 개편은 별도 작업으로 남긴다.
+// 접근은 공홈의 기존 관리자 화면 통로를 사용한다.
+// 후속메일 화면만의 별도 암호는 대표 결정(2026-08-28)에 따라 사용하지 않는다.
+// 전체 관리자 보안 개편은 별도 작업으로 남긴다.
 //
 // 배포(STOP-B): `supabase functions deploy followup-admin` 은 대표가. 이 파일은 코드만.
 
@@ -27,7 +21,6 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const FOLLOWUP_ADMIN_SECRET = Deno.env.get("FOLLOWUP_ADMIN_SECRET") || "";
 
 // 대표가 화면에서 부를 수 있는 장부 함수 화이트리스트. 이 셋 외에는 절대 부르지 않는다.
 const ACTION_RPC: Record<string, string> = {
@@ -39,7 +32,7 @@ const ACTION_RPC: Record<string, string> = {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, x-followup-secret",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
 };
 
 function json(body: unknown, status = 200) {
@@ -434,16 +427,6 @@ Deno.serve(async (req) => {
   }
   if (req.method !== "GET" && req.method !== "POST") {
     return json({ error: "지원하지 않는 요청이에요." }, 405);
-  }
-
-  // 환경 미설정(배포 전) 방어: 비밀이 없으면 모두 막는다(fail-closed).
-  if (!FOLLOWUP_ADMIN_SECRET) {
-    return json({ error: "FOLLOWUP_ADMIN_SECRET 미설정(배포 시 env 설정 필요)." }, 500);
-  }
-  // 호출자 검증 — 공유비밀 헤더. GET·POST 공통.
-  const provided = req.headers.get("x-followup-secret") || "";
-  if (provided !== FOLLOWUP_ADMIN_SECRET) {
-    return json({ error: "unauthorized" }, 401);
   }
 
   try {
