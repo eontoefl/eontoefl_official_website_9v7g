@@ -37,6 +37,78 @@ async function updateApplication(appId: string, data: Record<string, unknown>) {
   }
 }
 
+// ===== 후속메일 알림 중복 방지 =====
+// 보내기 전에 장부에서 한 작업자만 발송 권한을 선점한다.
+async function callFollowupAlertRpc(name: string, args: Record<string, unknown>) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(args),
+  });
+  const raw = await resp.text();
+  let result: unknown = raw;
+  try {
+    result = raw ? JSON.parse(raw) : null;
+  } catch (_e) {
+    // 오류 응답 원문을 그대로 남긴다.
+  }
+  if (!resp.ok) {
+    throw new Error(`follow-up alert ledger failed: ${resp.status} ${raw}`);
+  }
+  return result;
+}
+
+async function claimFollowupAlert(
+  alertKey: string,
+  alertType: string,
+  detail: Record<string, unknown>,
+): Promise<{ claimed: boolean; claimToken: string; status: string }> {
+  const claimToken = crypto.randomUUID();
+  const result = await callFollowupAlertRpc("followup_claim_alert", {
+    p_alert_key: alertKey,
+    p_alert_type: alertType,
+    p_detail: detail,
+    p_claim_token: claimToken,
+  }) as Record<string, unknown> | null;
+  return {
+    claimed: result?.claimed === true,
+    claimToken,
+    status: String(result?.status || "unknown"),
+  };
+}
+
+async function finishFollowupAlert(
+  alertKey: string,
+  claimToken: string,
+  success: boolean,
+  error: string | null = null,
+): Promise<boolean> {
+  const result = await callFollowupAlertRpc("followup_finish_alert", {
+    p_alert_key: alertKey,
+    p_claim_token: claimToken,
+    p_success: success,
+    p_error: error,
+  });
+  return result === true;
+}
+
+// ISO 시각 → KST 간단 표기(월-일 시:분).
+function fmtKst(iso: unknown): string {
+  if (!iso) return "-";
+  try {
+    return new Date(String(iso)).toLocaleString("ko-KR", {
+      timeZone: "Asia/Seoul",
+      month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+  } catch (_e) {
+    return String(iso);
+  }
+}
+
 // ===== 카카오 알림톡 발송 (kakaotalk-notify Edge Function 호출) =====
 async function sendKakaoAlimTalk(type: string, data: Record<string, unknown>) {
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/kakaotalk-notify`, {
@@ -239,6 +311,12 @@ Deno.serve(async (req) => {
 // ===== 알림 발송 처리 =====
 async function handleNotification(body: Record<string, unknown>, corsHeaders: Record<string, string>) {
   const { type, data } = body as { type: string; data: Record<string, unknown> };
+
+  // 후속메일 알림(묶음·즉시)은 중복 방지 게이트를 거쳐 별도 처리한다.
+  if (type === "followup_new_drafts" || type === "followup_alert") {
+    return await handleFollowupNotification(type, data || {}, corsHeaders);
+  }
+
   const now = getKSTTimeString();
 
   let text = "";
@@ -406,6 +484,92 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
     JSON.stringify({ success: true, result }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
+}
+
+// ===== 후속메일 알림 처리 (묶음·즉시) =====
+// 계약: 매시간 Codex 예약 작업이 아래 형태로 호출한다. 이 함수는 형식·중복 방지·발송만 한다.
+//   묶음:  { type:"followup_new_drafts", data:{ alert_key, count, earliest_scheduled_at } }
+//   즉시:  { type:"followup_alert", data:{ alert_key, kind, occurred_at, name?, email?, stage?, reason?,
+//                                          failure_stage?("retrying"|"final"), last_success_at? } }
+//     kind: "send_failed" | "check_failed" | "stale_target" | "missed_run"
+//   alert_key 는 사건마다 고유해야 한다(예: "drafts:2026-08-28T14", "fail:<job_id>:final",
+//   "held:<job_id>", "stale:<job_id>", "missed_run:<expected_time>"). 같은 키는 다시 보내지 않는다.
+//   학생 직접 답장·정상 발송 성공은 이 함수로 보내지 않는다.
+const FU_ADMIN_URL = `${SITE_URL}/admin-followup.html`;
+
+async function handleFollowupNotification(
+  type: string,
+  data: Record<string, unknown>,
+  corsHeaders: Record<string, string>,
+) {
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  const alertKey = String(data.alert_key || "");
+  if (!alertKey) return json({ error: "alert_key is required" }, 400);
+
+  let text = "";
+  if (type === "followup_new_drafts") {
+    const count = Number(data.count || 0);
+    text =
+      `🆕 새 후속메일 초안 ${count}건\n` +
+      `가장 빠른 발송 예정: ${fmtKst(data.earliest_scheduled_at)}\n` +
+      `검토·수정: ${FU_ADMIN_URL}`;
+  } else {
+    const kind = String(data.kind || "");
+    const who = (data.name || data.email)
+      ? `\n대상: ${data.name || "-"} (${data.email || "-"})`
+      : "";
+    const stage = data.stage ? `\n단계: ${data.stage}` : "";
+    const when = `\n발생: ${fmtKst(data.occurred_at)}`;
+    const tail = `\n확인: ${FU_ADMIN_URL}`;
+
+    if (kind === "send_failed") {
+      const head = String(data.failure_stage || "") === "final"
+        ? "🚫 후속메일 최종 발송 실패"
+        : "⚠️ 후속메일 발송 실패 — 재시도 중";
+      text = `${head}${who}${stage}\n사유: ${data.reason || "-"}${when}${tail}`;
+    } else if (kind === "check_failed") {
+      text = `⛔ 후속메일 내용 검사 반복 실패(최초 작성+재작성 3회)${who}${stage}\n사유: ${data.reason || "-"}${when}${tail}`;
+    } else if (kind === "stale_target") {
+      text = `📌 시기 지난 후속 대상 발견 — 발송하지 않음${who}${stage}\n사유: ${data.reason || "-"}${when}${tail}`;
+    } else if (kind === "missed_run") {
+      text = `🔴 후속메일 점검이 예정대로 실행되지 않음\n마지막 정상 실행: ${fmtKst(data.last_success_at)}${when}${tail}`;
+    } else {
+      return json({ error: "unknown followup alert kind" }, 400);
+    }
+  }
+
+  const alertType = type + (data.kind ? ":" + String(data.kind) : "");
+  const claim = await claimFollowupAlert(alertKey, alertType, data);
+  if (!claim.claimed) {
+    return json({
+      skipped: true,
+      reason: "duplicate_or_in_progress",
+      status: claim.status,
+      alert_key: alertKey,
+    });
+  }
+
+  const result = await sendTelegram("sendMessage", { chat_id: CHAT_ID, text });
+  if (!result || result.ok === false) {
+    const errorText = JSON.stringify(result || { error: "empty Telegram response" });
+    await finishFollowupAlert(alertKey, claim.claimToken, false, errorText);
+    return json({ error: "telegram send failed", result }, 502);
+  }
+
+  // 텔레그램이 성공했다고 답한 뒤 장부 마감만 실패한 경우에는 다시 보내지 않는다.
+  // 선점 기록이 남아 같은 사건의 중복 발송을 막는다.
+  let recorded = false;
+  try {
+    recorded = await finishFollowupAlert(alertKey, claim.claimToken, true);
+  } catch (error) {
+    console.error("follow-up alert sent but ledger finalization failed:", error);
+  }
+  return json({ success: true, recorded, alert_key: alertKey, result });
 }
 
 // ===== 콜백 버튼 처리 =====
