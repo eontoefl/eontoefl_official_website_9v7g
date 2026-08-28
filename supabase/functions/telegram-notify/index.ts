@@ -37,6 +37,37 @@ async function updateApplication(appId: string, data: Record<string, unknown>) {
   }
 }
 
+// 재개 승인은 같은 요청이 아직 남아 있을 때만 한 번 처리한다.
+// 빠르게 두 번 눌러도 첫 번째 요청만 자료를 바꾸고 알림을 보낸다.
+async function approveResumeIfPending(
+  appId: string,
+  requestedAt: string,
+  stage: string,
+  data: Record<string, unknown>,
+): Promise<boolean> {
+  const params = new URLSearchParams({
+    id: `eq.${appId}`,
+    resume_requested_at: `eq.${requestedAt}`,
+    resume_stage: `eq.${stage}`,
+  });
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/applications?${params}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+    },
+    body: JSON.stringify(data),
+  });
+  const raw = await resp.text();
+  if (!resp.ok) {
+    throw new Error(`DB conditional update failed: ${resp.status} ${raw}`);
+  }
+  const rows = raw ? JSON.parse(raw) : [];
+  return Array.isArray(rows) && rows.length === 1;
+}
+
 // ===== 후속메일 알림 중복 방지 =====
 // 보내기 전에 장부에서 한 작업자만 발송 권한을 선점한다.
 async function callFollowupAlertRpc(name: string, args: Record<string, unknown>) {
@@ -728,12 +759,24 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
         }
 
         const stage = app.resume_stage;
+        if (stage !== "동의" && stage !== "계약") {
+          await sendTelegram("answerCallbackQuery", {
+            callback_query_id: callbackId,
+            text: "재개 단계를 확인할 수 없어 처리하지 않았습니다.",
+            show_alert: true,
+          });
+          return new Response("OK", { headers: corsHeaders });
+        }
         const nowMs = Date.now();
         const deadlineMs = nowMs + 24 * 60 * 60 * 1000;
         const deadlineIso = new Date(deadlineMs).toISOString();
 
         // 1) 기한 리셋 + 리마인드 플래그 초기화 + 재개 요청 클리어
-        const updates: Record<string, unknown> = { resume_requested_at: null };
+        const updates: Record<string, unknown> = {
+          resume_requested_at: null,
+          resume_approved_at: new Date(nowMs).toISOString(),
+          resume_approved_stage: stage,
+        };
         if (stage === "동의") {
           updates.analysis_deadline_override = deadlineIso;
           updates.analysis_agree_reminder_sent_at = null;
@@ -746,8 +789,21 @@ async function handleCallback(callbackQuery: Record<string, unknown>, corsHeader
         const shift = computeResumeStartShift(app);
         Object.assign(updates, shift.updates);
 
-        // 3) 한 번에 저장
-        await updateApplication(appId, updates);
+        // 3) 같은 재개 요청이 아직 남아 있을 때만 한 번에 저장
+        const approved = await approveResumeIfPending(
+          appId,
+          String(app.resume_requested_at),
+          stage,
+          updates,
+        );
+        if (!approved) {
+          await sendTelegram("answerCallbackQuery", {
+            callback_query_id: callbackId,
+            text: "이미 처리된 재개 요청입니다.",
+            show_alert: true,
+          });
+          return new Response("OK", { headers: corsHeaders });
+        }
 
         // 4) 알림톡(실패해도 처리 진행)
         try {
