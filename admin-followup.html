@@ -143,6 +143,16 @@
     .fu-sup-note{grid-column:1/-1;font-size:12.5px;color:#7b858c}
     @media(max-width:700px){.fu-suppression{grid-template-columns:1fr}.fu-sup-note{grid-column:auto}}
 
+    /* 발송·성과 */
+    .fu-outcome-grid{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:9px;margin:10px 0 14px}
+    .fu-outcome-card{background:var(--fu-lowest);border-radius:12px;padding:13px 14px;color:var(--fu-on-var)}
+    .fu-outcome-card strong{display:block;color:var(--fu-primary);font-size:21px;margin-top:3px}
+    .fu-outcome-row{background:var(--fu-lowest);border-radius:12px;margin-top:9px;padding:13px 16px;
+        display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .fu-outcome-type{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;background:rgba(0,102,136,.1);color:var(--fu-primary)}
+    .fu-outcome-note{margin-left:auto;color:#7b858c;font-size:12px}
+    @media(max-width:800px){.fu-outcome-grid{grid-template-columns:repeat(2,minmax(110px,1fr))}.fu-outcome-note{margin-left:0;width:100%}}
+
     .fu-empty{color:#8a949b;font-size:13.5px;padding:30px 4px;text-align:center;background:var(--fu-lowest);border-radius:14px;margin-top:10px}
     .fu-loading{color:#8a949b;font-size:13px;padding:26px 4px;text-align:center}
 
@@ -214,6 +224,7 @@
             <button class="fu-tab" type="button" data-view="failed" role="tab" aria-selected="false">발송 실패 <span class="fu-count" id="countFailed">0</span></button>
             <button class="fu-tab" type="button" data-view="suppressed" role="tab" aria-selected="false">발송 제외 <span class="fu-count" id="countSuppressed">0</span></button>
             <button class="fu-tab" type="button" data-view="manual" role="tab" aria-selected="false">관리 기록 <span class="fu-count" id="countManual">0</span></button>
+            <button class="fu-tab" type="button" data-view="outcomes" role="tab" aria-selected="false">발송·성과 <span class="fu-count" id="countOutcomes">0</span></button>
         </div>
 
         <div id="list">
@@ -237,6 +248,8 @@
     const $tabs = Array.from(document.querySelectorAll('.fu-tab'));
     let jobsState = [];
     let suppressionsState = [];
+    let activitiesState = [];
+    let outcomeCountsState = { reply:0, application:0, analysis_consent:0, contract_consent:0, payment:0 };
     let runtimeState = { operation_mode:'observe', send_locked:true };
     let activeView = 'scheduled';
     let clockOffset = 0;            // Date.now() - 서버시각(ms). 남은시간 계산 보정.
@@ -471,6 +484,29 @@
           </div>`;
     }
 
+    const OUTCOME_LABEL = {
+        send_succeeded:'발송 완료', reply:'답장', application:'내챌 신청',
+        analysis_consent:'개별분석 동의', contract_consent:'계약서 동의', payment:'입금 완료'
+    };
+    function outcomeHTML(a){
+        const counted = a.event === 'send_succeeded' ? '발송 기록' : (a.attributed ? '7일 성과' : '학생 이력');
+        return `<div class="fu-outcome-row">
+          <span class="fu-outcome-type">${esc(OUTCOME_LABEL[a.event]||a.event)}</span>
+          <span class="fu-nm">${esc(a.name)||'-'}</span>
+          <span class="fu-stage">${STAGE_LABEL[a.stage]||esc(a.stage)}</span>
+          <span class="fu-meta">${esc(a.email)}</span>
+          <span class="fu-outcome-note">${esc(counted)} · ${esc(whenText(a.occurred_at))}</span>
+        </div>`;
+    }
+    function outcomesHTML(){
+        const cards = [
+          ['reply','답장'],['application','내챌 신청'],['analysis_consent','개별분석 동의'],
+          ['contract_consent','계약서 동의'],['payment','입금 완료']
+        ].map(([key,label])=>`<div class="fu-outcome-card">${esc(label)}<strong>${esc(outcomeCountsState[key]||0)}</strong></div>`).join('');
+        const rows = activitiesState.length ? activitiesState.map(outcomeHTML).join('') : '<div class="fu-empty">아직 발송·성과 기록이 없습니다.</div>';
+        return `<div class="fu-outcome-grid">${cards}</div>${rows}`;
+    }
+
     function showEmpty(msg){ $list.innerHTML = `<div class="fu-empty">${esc(msg)}</div>`; }
 
     function byStatus(st){ return jobsState.filter(j=>j.status===st); }
@@ -481,6 +517,7 @@
         document.getElementById('countFailed').textContent = byStatus('failed').length;
         document.getElementById('countManual').textContent = byStatus('skipped').length;
         document.getElementById('countSuppressed').textContent = suppressionsState.length;
+        document.getElementById('countOutcomes').textContent = activitiesState.length;
     }
 
     function renderNotice(){
@@ -504,6 +541,10 @@
         if(activeView === 'suppressed'){
             if(suppressionsState.length === 0){ showEmpty('발송 제외 목록이 비어 있습니다.'); return; }
             $list.innerHTML = suppressionsState.map(suppressionHTML).join('');
+            return;
+        }
+        if(activeView === 'outcomes'){
+            $list.innerHTML = outcomesHTML();
             return;
         }
 
@@ -615,6 +656,8 @@
 
         jobsState = Array.isArray(data.jobs) ? data.jobs : [];
         suppressionsState = Array.isArray(data.suppressions) ? data.suppressions : [];
+        activitiesState = Array.isArray(data.activities) ? data.activities : [];
+        outcomeCountsState = data.outcome_counts || outcomeCountsState;
         runtimeState = data.runtime || runtimeState;
         if(data.server_now){ const t = Date.parse(data.server_now); if(!isNaN(t)) clockOffset = Date.now() - t; }
 

@@ -143,7 +143,8 @@ const V2_JOB_COLS =
   "id,application_id,user_id,email,stage,reason,progress_percent,scheduled_at,status," +
   "cancel_reason,review_started_at,review_deadline_at,next_action_at,send_requested_at," +
   "next_retry_at,held_at,held_kind,held_reason,skipped_at,skip_reason,failed_at,last_failed_at,last_error," +
-  "send_attempt_count,send_retry_count,attachment_asset_id,rule_version,created_at,updated_at";
+  "send_attempt_count,send_retry_count,attachment_asset_id,rule_version,sent_at,gmail_message_id,gmail_thread_id," +
+  "created_at,updated_at";
 const V2_APP_EMBED =
   "applications(name,score_total_old,score_total_new,target_cutoff_old,target_cutoff_new)";
 const V2_MSG_EMBED =
@@ -220,6 +221,9 @@ function shapeJob(j: Record<string, unknown>): Record<string, unknown> {
     rule_version: (j.rule_version as string) || (msg?.rule_version as string) || "",
     review_status: (msg?.review_status as string) || "",
     validation_passed_at: msg?.validation_passed_at || "",
+    sent_at: j.sent_at || "",
+    gmail_message_id: j.gmail_message_id || "",
+    gmail_thread_id: j.gmail_thread_id || "",
   };
 
   // 검사 보류: 사람이 읽을 사유 + machine_check_result 상세.
@@ -290,6 +294,38 @@ async function handleRead(): Promise<Response> {
   }
 
   const jobs = (jobsRaw as Array<Record<string, unknown>>).map(shapeJob);
+  const jobById = new Map(jobs.map((job) => [String(job.job_id || ""), job]));
+
+  // 최근 발송과 다섯 가지 성과. 본문 전문은 내려주지 않는다.
+  const activityRaw = await readTable(
+    "followup_activity_logs?select=id,job_id,event,detail,occurred_at,created_at" +
+      "&event=in.(send_succeeded,reply,application,analysis_consent,contract_consent,payment)" +
+      "&order=occurred_at.desc.nullslast&limit=200",
+  );
+  const activities = (activityRaw || []).map((row) => {
+    const r = row as Record<string, unknown>;
+    const detail = (r.detail as Record<string, unknown>) || {};
+    const job = (jobById.get(String(r.job_id || "")) || {}) as Record<string, unknown>;
+    return {
+      id: r.id || "",
+      job_id: r.job_id || "",
+      event: r.event || "",
+      occurred_at: r.occurred_at || r.created_at || "",
+      attributed: detail.attributed === true,
+      classification: detail.classification || "",
+      name: job.name || "-",
+      email: job.email || "",
+      stage: job.stage || "",
+      sent_at: job.sent_at || detail.linked_sent_at || "",
+    };
+  });
+  const outcomeCounts: Record<string, number> = {
+    reply: 0, application: 0, analysis_consent: 0, contract_consent: 0, payment: 0,
+  };
+  for (const activity of activities) {
+    const event = String(activity.event || "");
+    if (activity.attributed && event in outcomeCounts) outcomeCounts[event] += 1;
+  }
 
   // 영구 발송 제외 목록.
   const suppressionsRaw = await readTable(
@@ -328,6 +364,8 @@ async function handleRead(): Promise<Response> {
 
   return json({
     jobs,
+    activities,
+    outcome_counts: outcomeCounts,
     suppressions,
     runtime,
     count: jobs.length,
