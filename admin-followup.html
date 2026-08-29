@@ -67,7 +67,6 @@
     .fu-status.held{background:var(--fu-error);color:#fff}
     .fu-status.failed{background:var(--fu-error);color:#fff}
     .fu-status.manual{background:#e0932a;color:#fff}
-    .fu-status.sample{background:#243b53;color:#fff}
     .fu-meta{color:#8a949b;font-size:12px}
     .fu-meta.right{margin-left:auto;text-align:right}
     .fu-cd{font-weight:700;color:var(--fu-primary)}
@@ -133,12 +132,6 @@
     .fu-manualbox{background:#fdf4e6;border-radius:12px;padding:14px 16px}
     .fu-manualbox h3{color:#9a6412}
     .fu-manualbox p{font-size:13px;line-height:1.75;color:#7a5310;margin:0}
-
-    /* 단계별 샘플 — 발송 장부와 분리된 읽기 전용 카드 */
-    .fu-row.sample::before{content:"";display:block;height:3px;background:var(--fu-grad)}
-    .fu-samplebox{background:#eaf7fd;border-radius:12px;padding:14px 16px;color:#16445a;font-size:13px;line-height:1.75}
-    .fu-samplebox strong{display:block;font-size:13px;margin-bottom:3px}
-    .fu-letter a{color:var(--fu-primary);font-weight:700;word-break:break-all}
 
     /* 발송 제외 */
     .fu-suppression{background:var(--fu-lowest);border-radius:14px;padding:15px 17px;margin-top:10px;
@@ -226,8 +219,7 @@
         </div>
 
         <div class="fu-toolbar" role="tablist" aria-label="후속메일 보기 범위">
-            <button class="fu-tab active" type="button" data-view="samples" role="tab" aria-selected="true">단계별 샘플 <span class="fu-count" id="countSamples">0</span></button>
-            <button class="fu-tab" type="button" data-view="scheduled" role="tab" aria-selected="false">발송 예정 <span class="fu-count" id="countScheduled">0</span></button>
+            <button class="fu-tab active" type="button" data-view="scheduled" role="tab" aria-selected="true">발송 예정 <span class="fu-count" id="countScheduled">0</span></button>
             <button class="fu-tab" type="button" data-view="held" role="tab" aria-selected="false">검사 보류 <span class="fu-count" id="countHeld">0</span></button>
             <button class="fu-tab" type="button" data-view="failed" role="tab" aria-selected="false">발송 실패 <span class="fu-count" id="countFailed">0</span></button>
             <button class="fu-tab" type="button" data-view="suppressed" role="tab" aria-selected="false">발송 제외 <span class="fu-count" id="countSuppressed">0</span></button>
@@ -255,12 +247,11 @@
     const $list = document.getElementById('list');
     const $tabs = Array.from(document.querySelectorAll('.fu-tab'));
     let jobsState = [];
-    let samplesState = [];
     let suppressionsState = [];
     let activitiesState = [];
     let outcomeCountsState = { reply:0, application:0, analysis_consent:0, contract_consent:0, payment:0 };
     let runtimeState = { operation_mode:'observe', send_locked:true };
-    let activeView = 'samples';
+    let activeView = 'scheduled';
     let clockOffset = 0;            // Date.now() - 서버시각(ms). 남은시간 계산 보정.
     const pendingReq = {};          // '동작:job_id' → request_id(진행 중 재사용, 성공 후 삭제).
     let ticker = null;
@@ -493,53 +484,6 @@
           </div>`;
     }
 
-    function letterHTML(body){
-        return String(body||'').split('\n').map(line=>{
-            const trimmed = line.trim();
-            if(/^https:\/\/eonfl\.com\//.test(trimmed)){
-                const safe = esc(trimmed);
-                return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`;
-            }
-            return esc(line);
-        }).join('\n');
-    }
-
-    function samplePanel(s){
-        return `
-          <div class="fu-panel">
-            <div class="fu-sect">
-              <div class="fu-samplebox">
-                <strong>읽기 전용 샘플 · 실제 발송 불가</strong>
-                실제 학생의 최신 신청서 자료로 새로 작성했습니다. 실제 주소와 필요한 첨부 표시까지 들어 있지만 발송 장부와 분리되어 어떤 동작으로도 학생에게 보내지지 않습니다.
-              </div>
-            </div>
-            <div class="fu-sect">
-              <h3>제목</h3>
-              <div class="fu-subj">${esc(s.subject)||'제목 없음'}</div>
-            </div>
-            <div class="fu-sect">
-              <h3>본문</h3>
-              <div class="fu-letter">${letterHTML(s.body)||'본문 없음'}</div>
-              ${attachmentHTML(s)}
-            </div>
-          </div>`;
-    }
-
-    function sampleRowHTML(s){
-        return `
-        <details class="fu-row sample" open>
-          <summary>
-            <span class="fu-chev">▸</span>
-            <span class="fu-nm">${esc(s.name)}</span>
-            <span class="fu-stage">${STAGE_LABEL[s.stage]||esc(s.stage)}</span>
-            <span class="fu-status sample">샘플 · 발송 불가</span>
-            <span class="fu-meta">실제 신청서 자료</span>
-            <span class="fu-meta right">${esc(whenText(s.updated_at))}</span>
-          </summary>
-          ${samplePanel(s)}
-        </details>`;
-    }
-
     const OUTCOME_LABEL = {
         send_succeeded:'발송 완료', reply:'답장', application:'내챌 신청',
         analysis_consent:'개별분석 동의', contract_consent:'계약서 동의', payment:'입금 완료'
@@ -568,7 +512,6 @@
     function byStatus(st){ return jobsState.filter(j=>j.status===st); }
 
     function updateCounts(){
-        document.getElementById('countSamples').textContent = samplesState.length;
         document.getElementById('countScheduled').textContent = byStatus('awaiting_review').length;
         document.getElementById('countHeld').textContent = byStatus('held').length;
         document.getElementById('countFailed').textContent = byStatus('failed').length;
@@ -595,11 +538,6 @@
             tab.setAttribute('aria-selected', selected ? 'true' : 'false');
         });
 
-        if(activeView === 'samples'){
-            if(samplesState.length === 0){ showEmpty('단계별 샘플을 준비 중입니다.'); return; }
-            $list.innerHTML = samplesState.map(sampleRowHTML).join('');
-            return;
-        }
         if(activeView === 'suppressed'){
             if(suppressionsState.length === 0){ showEmpty('발송 제외 목록이 비어 있습니다.'); return; }
             $list.innerHTML = suppressionsState.map(suppressionHTML).join('');
@@ -717,7 +655,6 @@
         try { data = await resp.json(); } catch(e){ showEmpty('데이터 형식을 해석하지 못했습니다.'); return; }
 
         jobsState = Array.isArray(data.jobs) ? data.jobs : [];
-        samplesState = Array.isArray(data.samples) ? data.samples : [];
         suppressionsState = Array.isArray(data.suppressions) ? data.suppressions : [];
         activitiesState = Array.isArray(data.activities) ? data.activities : [];
         outcomeCountsState = data.outcome_counts || outcomeCountsState;
