@@ -2,14 +2,15 @@
 // 역할: 후속메일 장부(followup_jobs / followup_messages / followup_activity_logs /
 //       followup_runtime)와 발송 제외 목록(followup_suppressions)을 service_role 로
 //       읽어 관리자 화면(admin-followup.html)에 리스트 JSON 을 돌려주고,
-//       대표의 세 가지 동작(수정 저장·발송 취소·지금 발송 요청)만 장부 함수로 전달한다.
+//       대표의 네 가지 동작(수정 저장·발송 취소·지금 발송 요청·자동 발송 켜기/끄기)만
+//       장부 함수로 전달한다.
 //
 // ★절대 규칙:
-//   - 쓰기는 아래 세 장부 함수 호출로만 한다: followup_save_revision / followup_cancel_job /
-//     followup_request_send_now. 그 밖의 상태 변경·후보 스캔·초안 생성 배선은 없다.
+//   - 쓰기는 아래 네 장부 함수 호출로만 한다: followup_save_revision / followup_cancel_job /
+//     followup_request_send_now / followup_set_runtime. 그 밖의 상태 변경·후보 스캔·초안 생성 배선은 없다.
 //   - Gmail(실제 발송)은 이 함수에서 절대 호출하지 않는다. `지금 발송`도 장부에 요청 시각만 남긴다.
-//   - 전체 발송 잠금(followup_runtime.send_locked)은 이 함수가 풀지 않는다. 실제 발송 잠금은 유지된다.
-//   - 학생에게 실제 메일을 보내는 기능은 대표 명시 승인 전까지 이 코드에 절대 없다.
+//   - 자동 발송 토글은 followup_runtime을 항상 live로 두고 send_locked만 바꾼다.
+//   - 대표가 2026-08-30에 운영 시작과 자동 발송 토글을 명시 승인했다.
 //
 // 접근은 공홈의 기존 관리자 화면 통로를 사용한다.
 // 후속메일 화면만의 별도 암호는 대표 결정(2026-08-28)에 따라 사용하지 않는다.
@@ -22,7 +23,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// 대표가 화면에서 부를 수 있는 장부 함수 화이트리스트. 이 셋 외에는 절대 부르지 않는다.
+// 대표가 메일 한 통에 대해 부를 수 있는 장부 함수 화이트리스트.
 const ACTION_RPC: Record<string, string> = {
   save_revision: "followup_save_revision",
   cancel: "followup_cancel_job",
@@ -386,6 +387,46 @@ async function handleAction(req: Request): Promise<Response> {
   }
 
   const action = String(payload.action || "");
+
+  if (action === "set_send_lock") {
+    if (typeof payload.send_locked !== "boolean") {
+      return json({ ok: false, error: "자동 발송 상태가 올바르지 않아요." }, 400);
+    }
+
+    const current = await readTable(
+      "followup_runtime?select=missed_run_monitor_enabled,expected_interval_minutes," +
+        "missed_after_minutes&singleton_id=eq.1",
+    );
+    const runtime = (current && current[0]) as Record<string, unknown> | undefined;
+    if (!runtime) return json({ ok: false, error: "현재 운영 상태를 찾을 수 없어요." }, 400);
+
+    const res = await callRpc("followup_set_runtime", {
+      p_operation_mode: "live",
+      p_send_locked: payload.send_locked,
+      p_missed_run_monitor_enabled: runtime.missed_run_monitor_enabled !== false,
+      p_test_email: null,
+      p_expected_interval_minutes: runtime.expected_interval_minutes ?? 60,
+      p_missed_after_minutes: runtime.missed_after_minutes ?? 90,
+    });
+    if (!res.ok) {
+      const raw = (res.data as Record<string, unknown> | null)?.message
+        ? String((res.data as Record<string, unknown>).message)
+        : JSON.stringify(res.data);
+      return json({ ok: false, error: koreanError(raw), raw }, 400);
+    }
+
+    const updated = (res.data as Record<string, unknown>) || {};
+    return json({
+      ok: true,
+      action,
+      runtime: {
+        operation_mode: updated.operation_mode || "live",
+        send_locked: updated.send_locked !== false,
+      },
+      server_now: new Date().toISOString(),
+    });
+  }
+
   const rpc = ACTION_RPC[action];
   if (!rpc) return json({ ok: false, error: "알 수 없는 요청이에요." }, 400);
 
