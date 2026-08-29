@@ -139,6 +139,24 @@ function scoreText(app: Record<string, unknown> | null): string {
   return `${c} → 목표 ${t}`;
 }
 
+// 단계별 샘플은 실제 발송 장부와 다른 표에서 읽는다.
+// 이 객체에는 job_id가 없으므로 수정·취소·지금 발송 동작에 들어갈 수 없다.
+function shapeSample(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    sample_id: row.id || "",
+    application_id: row.application_id || "",
+    name: row.name || "-",
+    stage: row.stage || "",
+    subject: row.subject || "",
+    body: row.body || "",
+    attachment_asset_id: row.attachment_asset_id || "",
+    has_attachment: !!row.attachment_asset_id,
+    source_note: row.source_note || "",
+    updated_at: row.updated_at || "",
+    send_disabled: true,
+  };
+}
+
 const V2_JOB_COLS =
   "id,application_id,user_id,email,stage,reason,progress_percent,scheduled_at,status," +
   "cancel_reason,review_started_at,review_deadline_at,next_action_at,send_requested_at," +
@@ -290,7 +308,7 @@ async function handleRead(): Promise<Response> {
   }
 
   if (jobsRaw === null) {
-    return json({ jobs: [], suppressions: [], count: 0, data_ready: false, server_now: new Date().toISOString() });
+    return json({ jobs: [], samples: [], suppressions: [], count: 0, data_ready: false, server_now: new Date().toISOString() });
   }
 
   const jobs = (jobsRaw as Array<Record<string, unknown>>).map(shapeJob);
@@ -362,8 +380,17 @@ async function handleRead(): Promise<Response> {
     }
     : { operation_mode: "observe", send_locked: true };
 
+  // 실제 자료로 만든 읽기 전용 단계별 샘플.
+  // followup_jobs와 분리되어 있어 발송 함수가 참조할 수 없다.
+  const samplesRaw = await readTable(
+    "followup_sample_previews?select=id,application_id,name,stage,subject,body," +
+      "attachment_asset_id,source_note,updated_at&order=stage.asc",
+  );
+  const samples = (samplesRaw || []).map((row) => shapeSample(row as Record<string, unknown>));
+
   return json({
     jobs,
+    samples,
     activities,
     outcome_counts: outcomeCounts,
     suppressions,
@@ -393,6 +420,9 @@ async function handleAction(req: Request): Promise<Response> {
   const requestId = String(payload.request_id || "");
   if (!jobId || !requestId) {
     return json({ ok: false, error: "요청 정보가 부족해요.(job_id·request_id)" }, 400);
+  }
+  if (jobId.startsWith("sample-")) {
+    return json({ ok: false, error: "단계별 샘플은 읽기 전용이라 발송할 수 없어요." }, 400);
   }
 
   let args: Record<string, unknown>;
