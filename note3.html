@@ -390,6 +390,13 @@
   .dist-in input { flex:1; min-width:0; border:2px solid transparent; background:#F4F3FA; border-radius:14px; padding:13px 15px; font-size:15px; font-weight:700; color:#1A1A2E; outline:none; }
   .dist-in input:focus { border-color:#6C5CE7; background:#fff; }
   .dist-in button { flex:0 0 auto; border:none; border-radius:14px; background:#6C5CE7; color:#fff; padding:0 24px; font-size:15px; font-weight:800; box-shadow:0 8px 18px rgba(108,92,231,.30); }
+  .dist-pick { display:flex; gap:9px; margin:.2rem 0 .45rem; }
+  .dist-pick select { flex:1; min-width:0; border:2px solid transparent; background:#F4F3FA; border-radius:14px; padding:12px 13px; font-family:inherit; font-size:13px; font-weight:700; color:#1A1A2E; outline:none; }
+  .dist-pick select:focus { border-color:#6C5CE7; background:#fff; }
+  .dist-pick button { flex:0 0 auto; border:none; border-radius:14px; background:#6C5CE7; color:#fff; padding:0 18px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+  .dist-new { display:flex; align-items:center; gap:8px; margin-bottom:.55rem; }
+  .dist-new select { flex:1; min-width:0; border:1px solid var(--outline); border-radius:10px; background:#fff; padding:8px 10px; font-family:inherit; font-size:12px; color:var(--on-surface); }
+  .dist-new button { border:1px solid var(--accent); border-radius:10px; background:#fff; color:var(--accent-strong); padding:8px 11px; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; }
   .dist-n { color:#1A1A2E !important; } .dist-a { color:#F0416B !important; }
   .dist-plan { background:#F4F3FA !important; border-radius:14px; }
   .dp-h { color:#6C5CE7 !important; }
@@ -440,6 +447,12 @@
   .dp-src select { flex:1; border:none; background:#fff; border-radius:9px; padding:9px 11px; font-family:inherit; font-size:13.5px; font-weight:700; color:#1A1A2E; outline:none; }
   .dp-chk { display:flex; align-items:center; gap:.4rem; margin-top:.55rem; font-size:11.5px; font-weight:600; color:var(--on-surface-variant); cursor:pointer; }
   .dp-apply { width:100%; margin-top:.7rem; border:none; border-radius:12px; background:#6C5CE7; color:#fff; padding:12px; font-family:inherit; font-size:14.5px; font-weight:800; box-shadow:0 8px 18px rgba(108,92,231,.3); cursor:pointer; }
+  .dp-apply:disabled { opacity:.55; cursor:wait; box-shadow:none; }
+  .dp-source { margin:.5rem 0 .65rem; padding:.55rem .65rem; border-radius:10px; background:#fff; font-size:11.5px; line-height:1.6; color:var(--on-surface-variant); }
+  .dp-source b { color:var(--on-surface); }
+  .dl-state { font-size:10px; font-weight:800; border-radius:999px; padding:2px 7px; background:var(--surface-container); color:var(--on-surface-variant); }
+  .dl-state.cancelled { background:#F0EEF4; color:#766D80; }
+  .dl-state.legacy { background:#FFF3D6; color:#8A6100; }
   .msum { background:var(--surface-lowest); border-radius:var(--r-lg); box-shadow:var(--lift); padding:.85rem 1.1rem; margin-bottom:1.2rem; }
   .msum-row { display:flex; justify-content:space-between; align-items:baseline; padding:.3rem 0; font-size:13.5px; color:var(--on-surface-variant); }
   .msum-row b { font-size:15px; font-weight:800; color:var(--on-surface); }
@@ -1168,6 +1181,8 @@
   <div class="row"><button type="button" class="cancel" id="restorecancel" style="flex:1">닫기</button></div>
 </div></div>
 
+<script src="js/note3-money-distribution.js"></script>
+<script src="js/note3-v4-storage.js"></script>
 <script>
 /* ═══ 김비서 v3 · note3.html ═══
    저장: Supabase note3_store(암호블롭) ↔ localStorage. 관리자 비번 게이트.
@@ -1178,9 +1193,15 @@
 const SB = "https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/note3_store";
 const AK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcWpldmVjamVqdmJldW9ndGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDAxNDEsImV4cCI6MjA4Njk3NjE0MX0.pJvY4u9oHQYa7IvAjWluHMow_4WIkONDBBasnXxF5Gc";
 const HDR = { "apikey":AK, "Authorization":"Bearer "+AK, "Content-Type":"application/json" };
-const LSKEY = "note3-data";
+const V4STORE = window.Note3V4Storage;
+const LSKEY = V4STORE.LOCAL_KEY;
+const LEGACY_LSKEY = V4STORE.LEGACY_LOCAL_KEY;
+const STORE_ROW = V4STORE.ROW_ID;
+const LEGACY_STORE_ROW = V4STORE.LEGACY_ROW_ID;
+const LOCAL_TEST = new URLSearchParams(location.search).get("note3-test")==="1";
 const PWKEY = "note3-pw";
 const VERIFIER = "V7uWulHtpDENBm/QesZjFzu2q6wWjlpWD8HO42Um/SQ+LkHXgeK+Li6z3BuWb1M3Vt9kGQlDVtzTbA==";
+const DIST = window.Note3MoneyDistribution;
 
 const enc = new TextEncoder(), dec = new TextDecoder();
 async function keyFrom(pw, salt) {
@@ -1200,7 +1221,10 @@ async function unlockText(pw, blob) {
   return JSON.parse(dec.decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:raw.slice(16,28) }, k, raw.slice(28))));
 }
 
-let PW=null, STORE=null, saveTimer=null, storeSrc="local";
+let PW=null, STORE=null, saveTimer=null, storeSrc="local", storeRevision=0, needsV4Insert=false, syncConflict=false, loadBlocked=false;
+let pushChain=Promise.resolve();
+const TAB_ID=uidSafe(), WRITER_KEY="note3-writer-v4"; let writerTimer=null, tabReadOnly=false;
+function uidSafe(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 let reportList=[];                 // [{id, month}] 최신순 — 로그인 후 1회 가볍게 조회
 const reportFailed=new Set();      // 복호화/열람 실패한 month (목록에 '열 수 없음' 표시)
 const $ = id => document.getElementById(id);
@@ -1281,27 +1305,59 @@ function recurLabel(it){ if(it.wday==="daily") return "매일"; if(it.wday!=="" 
 const freshDone = it => !!it.done && !it.swept && it.doneAt===todayStr();
 const oldDone   = it => !!it.done && (it.swept || it.doneAt!==todayStr());
 
+async function pullRow(id,select){
+  if(LOCAL_TEST)return {reachable:false,row:null};
+  try{ const r=await fetch(SB+"?id=eq."+encodeURIComponent(id)+"&select="+(select||"data"),{headers:HDR,cache:"no-store"}); if(r.ok){ const rows=await r.json(); return {reachable:true,row:Array.isArray(rows)&&rows.length?rows[0]:null}; } return {reachable:false,row:null,error:r.status}; }
+  catch(e){ return {reachable:false,row:null}; }
+}
 async function pullCloud(){
-  try { const r=await fetch(SB+"?id=eq.main&select=data",{headers:HDR,cache:"no-store"}); if(r.ok){ const j=await r.json(); return { reachable:true, blob:(Array.isArray(j)&&j.length?j[0].data:null) }; } } catch(e){}
-  return { reachable:false, blob:null };
+  const current=await pullRow(STORE_ROW,"data,revision");
+  if(current.reachable&&current.row)return {reachable:true,row:current.row,legacyBlob:null};
+  if(current.reachable){ const legacy=await pullRow(LEGACY_STORE_ROW,"data"); if(!legacy.reachable)return {reachable:false,row:null,legacyBlob:null}; return {reachable:true,row:null,legacyBlob:legacy.row&&legacy.row.data||null}; }
+  return {reachable:false,row:null,legacyBlob:null};
 }
+function writeLocalBlob(blob,pending){ localStorage.setItem(LSKEY,V4STORE.encodeLocal({blob,revision:storeRevision,pending,updatedAt:new Date().toISOString()})); }
 async function pushBlob(blob){
-  localStorage.setItem(LSKEY, blob);
-  try { const r=await fetch(SB+"?on_conflict=id",{method:"POST",headers:Object.assign({},HDR,{"Prefer":"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify({id:"main",data:blob})}); if(r.ok){ storeSrc="sb"; return; } } catch(e){}
   storeSrc="local";
+  if(LOCAL_TEST)return {synced:false,local:true};
+  if(tabReadOnly || syncConflict)return {synced:false,blocked:true};
+  writeLocalBlob(blob,true);
+  try{
+    let r,rows;
+    if(needsV4Insert){
+      r=await fetch(SB+"?on_conflict=id&select=revision",{method:"POST",headers:Object.assign({},HDR,{"Prefer":"resolution=ignore-duplicates,return=representation"}),body:JSON.stringify({id:STORE_ROW,data:blob,revision:1})});
+    }else{
+      r=await fetch(SB+"?id=eq."+encodeURIComponent(STORE_ROW)+"&revision=eq."+storeRevision+"&select=revision",{method:"PATCH",headers:Object.assign({},HDR,{"Prefer":"return=representation"}),body:JSON.stringify({data:blob,revision:storeRevision+1})});
+    }
+    if(r.ok){ rows=await r.json(); if(Array.isArray(rows)&&rows.length===1){ storeRevision=Number(rows[0].revision)||storeRevision+1; needsV4Insert=false; storeSrc="sb"; writeLocalBlob(blob,false); return {synced:true,revision:storeRevision}; } }
+    if(r.ok || r.status===409){ syncConflict=true; storeSrc="conflict"; return {synced:false,conflict:true}; }
+  }catch(e){}
+  storeSrc="local"; return {synced:false,local:true};
 }
-async function pushState(){
-  if(!STORE||!PW) return;
+async function pushStateOnce(){
+  if(!STORE||!PW) return {synced:false,blocked:true};
   try {
     STORE.updated=new Date().toLocaleString("ko-KR");
     const blob=await lock(PW,STORE);
-    await pushBlob(blob);
-    setDot(true,"저장됨 "+(storeSrc==="local"?"· 이 기기":"· 동기화"));
+    const result=await pushBlob(blob);
+    if(result&&result.conflict){ setDot(false,"다른 화면에서 먼저 바뀌었습니다 · 새로고침 필요"); toast("다른 화면의 최신 자료를 먼저 불러와야 합니다."); return result; }
+    if(result&&result.blocked){ setDot(false,tabReadOnly?"다른 탭이 편집 중입니다 · 새로고침 필요":"다른 화면에서 먼저 바뀌었습니다 · 새로고침 필요"); return result; }
+    setDot(true,storeSrc==="sb"?("동기화됨 · 수정 "+storeRevision):"이 기기에만 저장됨 · 온라인 미동기화");
     if(storeSrc==="sb"){ const now=Date.now(); if(now-lastSnapMs>=SNAP_MIN_MS){ lastSnapMs=now; writeSnapshot(blob); } }
-  } catch(e){ setDot(false,"저장 안 됨"); }
+    return result;
+  } catch(e){ setDot(false,"저장 안 됨"); return {synced:false,error:true}; }
 }
-function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(pushState,500); }
-function blankStore(){ return { v:3, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{ accounts:[], fixed:[] }, shopping:{ stores:["다이소","쿠팡","코스트코"], items:[] } }; }
+function pushState(){
+  const run=()=>pushStateOnce();
+  pushChain=pushChain.then(run,run);
+  return pushChain;
+}
+function save(){
+  if(loadBlocked){ setDot(false,"자료를 열지 못했습니다 · 편집 중단"); return false; }
+  if(tabReadOnly||syncConflict){ setDot(false,tabReadOnly?"다른 탭이 편집 중입니다 · 새로고침 필요":"다른 화면에서 먼저 바뀌었습니다 · 새로고침 필요"); clearTimeout(saveTimer); setTimeout(()=>loadStore().then(ok=>{ if(ok)render(); }),0); return false; }
+  setDot(true,"이 기기에 저장 준비 중…"); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,500); return true;
+}
+function blankStore(){ return { v:4, personal:[], work:{ quick:[], deadline:[], recurring:[], someday:[], project:[] }, marketing:[], money:{ accounts:[], fixed:[], distLog:[] }, shopping:{ stores:["다이소","쿠팡","코스트코"], items:[] } }; }
 function normalizeStore(){
   if(!Array.isArray(STORE.personal)) STORE.personal=[];
   if(!Array.isArray(STORE.marketing)) STORE.marketing=[];
@@ -1315,6 +1371,9 @@ function normalizeStore(){
   if(!Array.isArray(STORE.money.oneoff)) STORE.money.oneoff=[];
   if(!STORE.money.dayLog || typeof STORE.money.dayLog!=="object" || Array.isArray(STORE.money.dayLog)) STORE.money.dayLog={};
   if(!Array.isArray(STORE.money.reportsRead)) STORE.money.reportsRead=[];
+  if(!Array.isArray(STORE.money.distLog)) STORE.money.distLog=[];
+  if(!STORE.money.emergency || typeof STORE.money.emergency!=="object" || Array.isArray(STORE.money.emergency)) STORE.money.emergency={goal:2000000,tx:[]};
+  if(!Array.isArray(STORE.money.emergency.tx)) STORE.money.emergency.tx=[];
   STORE.money.fixed.forEach(f=>{ if(!Array.isArray(f.postedMonths)) f.postedMonths=[]; });
   STORE.money.accounts.forEach(a=>{ if(!Array.isArray(a.tx)) a.tx=[]; if(!a.kind) a.kind="account"; if(!Array.isArray(a.postedMonths)) a.postedMonths=[]; });
   if(!STORE.shopping || typeof STORE.shopping!=="object" || Array.isArray(STORE.shopping)) STORE.shopping={};
@@ -1327,9 +1386,10 @@ function normalizeStore(){
 const SNAP_KEEP=30, SNAP_MIN_MS=90000;   // 최소 90초 간격
 let lastSnapMs=0;
 async function writeSnapshot(blob){
+  if(LOCAL_TEST)return;
   try {
-    await fetch(SB, { method:"POST", headers:Object.assign({},HDR,{"Prefer":"return=minimal"}), body:JSON.stringify({ id:"snap-"+Date.now(), data:blob }) });
-    const r=await fetch(SB+"?id=like.snap-*&select=id&order=id.desc",{headers:HDR,cache:"no-store"});
+    await fetch(SB, { method:"POST", headers:Object.assign({},HDR,{"Prefer":"return=minimal"}), body:JSON.stringify({ id:"v4-snap-"+Date.now(), data:blob, revision:storeRevision }) });
+    const r=await fetch(SB+"?id=like.v4-snap-*&select=id&order=id.desc",{headers:HDR,cache:"no-store"});
     if(r.ok){ const rows=await r.json(); if(Array.isArray(rows)&&rows.length>SNAP_KEEP){ const del=rows.slice(SNAP_KEEP).map(x=>x.id); if(del.length) await fetch(SB+"?id=in.("+del.join(",")+")",{method:"DELETE",headers:HDR}); } }
   } catch(e){}
 }
@@ -1344,15 +1404,44 @@ async function doUnlock(){
   PW=pw; localStorage.setItem(PWKEY,pw); $("gate").style.display="none"; $("app").style.display=""; await start();
 }
 async function loadStore(){
-  const cloud=await pullCloud(); const local=localStorage.getItem(LSKEY);
-  let blob=null, migrate=false;
-  if(cloud.reachable){ if(cloud.blob){ blob=cloud.blob; storeSrc="sb"; } else if(local){ blob=local; storeSrc="sb"; migrate=true; } else { storeSrc="sb"; } }
-  else { blob=local; storeSrc="local"; }
+  loadBlocked=false;
+  const cloud=await pullCloud(), local=V4STORE.parseLocal(localStorage.getItem(LSKEY)), oldLocal=localStorage.getItem(LEGACY_LSKEY);
+  const chosen=V4STORE.chooseLoadSource({cloudV4:cloud.row,localV4:local,legacyBlob:cloud.legacyBlob||oldLocal,cloudReachable:cloud.reachable});
+  const blob=chosen.blob; storeRevision=chosen.revision; needsV4Insert=chosen.needsInsert; syncConflict=chosen.conflict; storeSrc=chosen.source==="cloud"?"sb":"local";
+  if(!blob&&!cloud.reachable){ STORE=null; loadBlocked=true; return false; }
+  const conflictReload=V4STORE.conflictReloadPayload(chosen);
   STORE=blankStore();
-  if(blob){ try { STORE=Object.assign(blankStore(), await unlockText(PW,blob)); } catch(e){} }
+  if(blob){ try { STORE=Object.assign(blankStore(), await unlockText(PW,blob)); } catch(e){ STORE=null; loadBlocked=true; return false; } }
+  const prepared=V4STORE.prepareLoadedStore(chosen,STORE,DIST.migrateLegacyDistributions);
+  if(!prepared.ok){ STORE=null; loadBlocked=true; return false; }
+  STORE=prepared.store;
+  if(conflictReload){ try{ localStorage.setItem(V4STORE.CONFLICT_LOCAL_KEY,conflictReload.backup); localStorage.setItem(LSKEY,conflictReload.current); }catch(_){} }
   normalizeStore();
-  if(migrate) save();
+  if(prepared.shouldSave&&!syncConflict&&!tabReadOnly) save();
+  return true;
 }
+function claimWriter(){
+  if(LOCAL_TEST)return true;
+  const now=Date.now(); let current=null;
+  try{ current=JSON.parse(localStorage.getItem(WRITER_KEY)||"null"); }catch(_){}
+  if(current&&current.id!==TAB_ID&&now-Number(current.at||0)<15000){ tabReadOnly=true; return false; }
+  localStorage.setItem(WRITER_KEY,JSON.stringify({id:TAB_ID,at:now}));
+  try{ current=JSON.parse(localStorage.getItem(WRITER_KEY)||"null"); }catch(_){}
+  tabReadOnly=!(current&&current.id===TAB_ID);
+  if(!tabReadOnly){ clearInterval(writerTimer); writerTimer=setInterval(()=>{ try{ localStorage.setItem(WRITER_KEY,JSON.stringify({id:TAB_ID,at:Date.now()})); }catch(_){} },5000); }
+  return !tabReadOnly;
+}
+function releaseWriter(){
+  if(LOCAL_TEST)return;
+  clearInterval(writerTimer);
+  try{ const current=JSON.parse(localStorage.getItem(WRITER_KEY)||"null"); if(current&&current.id===TAB_ID)localStorage.removeItem(WRITER_KEY); }catch(_){}
+}
+window.addEventListener("beforeunload",releaseWriter);
+window.addEventListener("storage",e=>{
+  if(e.key===WRITER_KEY){ try{ const current=JSON.parse(e.newValue||"null"); if(current&&current.id!==TAB_ID&&Date.now()-Number(current.at||0)<15000){ tabReadOnly=true; setDot(false,"다른 탭이 편집 중입니다 · 새로고침 필요"); } }catch(_){} }
+  if(e.key===LSKEY&&!tabReadOnly){ syncConflict=true; setDot(false,"다른 탭에서 자료가 바뀌었습니다 · 새로고침 필요"); }
+});
+window.addEventListener("online",()=>{ if(STORE&&PW&&!tabReadOnly&&!syncConflict) pushState(); });
 
 /* ═══ 탭 ═══ */
 let TAB="home";
@@ -2594,9 +2683,9 @@ function topDebts(){
   });
   return list.sort((x,y)=>y.rate-x.rate);
 }
-function distributionPlan(income){
+function distributionPlan(income,sourceAccountId){
   let left=income;
-  const rows=distTargets().map(t=>({ t, mneed:Math.max(0,acctNeedInfo(t.acc,{month:true}).need), rneed:t.need, funded:0 }));
+  const rows=distTargets().filter(t=>t.acc.id!==sourceAccountId).map(t=>({ t, mneed:Math.max(0,acctNeedInfo(t.acc,{month:true}).need), rneed:t.need, funded:0 }));
   const give=(row,amt)=>{ amt=Math.min(left,Math.max(0,amt)); if(amt<=0)return; row.funded+=amt; left-=amt; };
   // 1단계: 이번 달분 먼저 (전 계좌, 결제일 가까운 순) → 2단계: 다음 달분(롤링 나머지)
   rows.slice().sort((a,b)=>a.t.due.until-b.t.due.until).forEach(r=> give(r, r.mneed - r.funded));
@@ -2646,13 +2735,20 @@ function monthAheadItems(){
   mAccts().forEach(a=>{ if(a.kind==="account" && mnum(a.budget)>0) items.push({ name:"생활비 예산", day:99, amount:mnum(a.budget), acct:(a.alias||"생활비") }); });
   return items.sort((a,b)=>a.day-b.day);
 }
+let distSelectedIncomeId="", distApplying=false, distReturnFromTx=false;
 function distributeSectionHtml(){
   const targets=distTargets().sort((a,b)=>a.due.until-b.due.until);
   const totalNeed=targets.reduce((s,t)=>s+t.need,0);
   const monthTot=monthUnsecured(), nextTot=Math.max(0,totalNeed-monthTot);
+  const incomes=DIST.incomeCandidates(STORE);
+  if(distSelectedIncomeId && !incomes.some(x=>x.txId===distSelectedIncomeId)) distSelectedIncomeId="";
+  const incomeOpts=['<option value="">배분할 입금을 선택하세요</option>'].concat(incomes.map(x=>'<option value="'+esc(x.txId)+'"'+(x.txId===distSelectedIncomeId?' selected':'')+'>'+esc((x.date||"").slice(5).replace("-","/")+" · "+x.desc+" · "+x.accountName+" · 남음 "+fmtMoney(x.remaining,"KRW"))+'</option>')).join('');
+  const newAcctOpts=mAccts().filter(a=>a.kind==="account"&&!a.overdraft&&!a.conduit).map(a=>'<option value="'+a.id+'">'+esc(a.alias||"계좌")+'</option>').join('');
   let h='<div class="msec distcard"><div class="msec-h"><span class="mt">💧 배분 <em style="font-style:normal;font-weight:600;color:var(--on-surface-variant);font-size:11.5px">· 이번 달 + 다음 달</em></span>'+(totalNeed>0?'<span class="msec-total">채울 것 '+fmtMoney(totalNeed,"KRW")+'</span>':'')+'</div>';
   if(totalNeed>0) h+='<div class="dist-split">이번 달 '+(monthTot>0?('<b class="ds-short">'+fmtMoney(monthTot,"KRW")+'</b>'):'<b class="ds-ok">✅ 확보</b>')+' · 다음 달 <b>'+fmtMoney(nextTot,"KRW")+'</b></div>';
-  h+='<div class="dist-in"><input type="text" id="distIncome" placeholder="들어온 금액 입력 (예: 5,000,000)" inputmode="numeric" autocomplete="off"><button type="button" id="distBtn">배분</button></div>';
+  h+='<div class="dist-pick"><select id="distIncomeSelect">'+incomeOpts+'</select><button type="button" id="distBtn">배분안 보기</button></div>';
+  h+='<div class="dist-new"><select id="distNewAccount" aria-label="새 수입 입금 계좌">'+newAcctOpts+'</select><button type="button" id="distNewIncome">+ 새 수입 기록</button></div>';
+  if(!incomes.length) h+='<div class="ledger-empty">아직 배분할 수 있는 입금이 없습니다. 새 수입을 먼저 거래내역에 기록하세요.</div>';
   h+='<div id="distResult"></div>';
   if(targets.length){ h+='<div class="dist-board">';
     targets.forEach(t=>{ const info=acctNeedInfo(t.acc,{}); const mneed=Math.max(0,acctNeedInfo(t.acc,{month:true}).need), nneed=Math.max(0,info.nextMonth);
@@ -2695,14 +2791,19 @@ function distDetailHtml(info, acc, mneed, nneed){
   return h;
 }
 function toggleDistDetail(rowEl){ const it=rowEl.closest('.dist-item'); if(it) it.classList.toggle('open'); }
+function selectedDistributionIncome(){ return DIST.incomeCandidates(STORE).find(x=>x.txId===distSelectedIncomeId)||null; }
 function runDistribute(){
   const box=$("distResult"); if(!box) return;
-  const income=mnum(($("distIncome")||{}).value);
-  if(income<=0){ box.innerHTML=''; return; }
-  const { steps, leftover }=distributionPlan(income);
+  const picked=$("distIncomeSelect"); if(picked) distSelectedIncomeId=picked.value||"";
+  const selected=selectedDistributionIncome();
+  if(!selected){ box.innerHTML=''; return; }
+  const income=selected.remaining;
+  const { steps, leftover }=distributionPlan(income,selected.accountId);
   const ic={ acct:"💳", emg:"🛟", debt:"🔻" };
-  window._distSteps = steps; window._distIncome = income;
+  const old=window._distDraft;
+  window._distDraft={ id:(old&&old.sourceIncomeTxId===selected.txId?old.id:uid()), sourceAccountId:selected.accountId, sourceIncomeTxId:selected.txId, steps, income };
   let h='<div class="dist-plan"><div class="dp-h">배분안 · 금액 눌러서 수정 가능</div>';
+  h+='<div class="dp-source"><b>'+esc(selected.desc)+'</b> · '+esc(selected.accountName)+'<br>원수입 '+fmtMoney(selected.amount,"KRW")+' · 이미 배분 '+fmtMoney(selected.allocated,"KRW")+' · 이번에 사용 가능 '+fmtMoney(selected.remaining,"KRW")+'</div>';
   if(!steps.length) h+='<div class="dp-row"><span>이번 달 채울 곳이 없어요 — 전부 여유</span><b>'+fmtMoney(income,"KRW")+'</b></div>';
   steps.forEach((s,i)=>{
     const label = s.type==="acct" ? esc(s.name) : s.type==="emg" ? "비상금 채우기" : ("빚 갚기 — "+esc(s.name)+" "+s.rate+"%");
@@ -2710,9 +2811,6 @@ function runDistribute(){
   });
   if(leftover>0) h+='<div class="dp-row leftover"><span>💰 남는 여유돈</span><b>'+fmtMoney(leftover,"KRW")+'</b></div>';
   if(steps.length){
-    const srcOpts = mAccts().filter(a=>a.kind==="account" && !a.conduit && !a.overdraft).map(a=>'<option value="'+a.id+'"'+(/사업/.test(a.alias||"")?' selected':'')+'>'+esc(a.alias||"계좌")+'</option>').join('');
-    h+='<div class="dp-src"><span>보내는(출금) 계좌</span><select id="distSrc">'+srcOpts+'</select></div>';
-    h+='<label class="dp-chk"><input type="checkbox" id="distIncChk" checked> 이 수입('+fmtMoney(income,"KRW")+')을 출금계좌에 입금으로도 기록</label>';
     h+='<button type="button" class="dp-apply" id="distApply">이대로 기록하기</button>';
   }
   h+='<div class="dp-note">기록하면 각 계좌·비상금·대출에 실제로 반영돼요. 은행 이체는 직접 하세요.</div></div>';
@@ -2721,34 +2819,42 @@ function runDistribute(){
   box.querySelectorAll(".dp-amt").forEach(el=>attachThousands(el));
 }
 function applyDistribution(){
-  const steps = window._distSteps||[]; if(!steps.length) return;
+  if(distApplying) return;
+  if(tabReadOnly||syncConflict){ toast("다른 화면의 최신 자료를 먼저 새로고침해 주세요."); return; }
+  const draft=window._distDraft, steps=draft&&draft.steps||[]; if(!draft||!steps.length) return;
   document.querySelectorAll('#distResult .dp-amt').forEach(inp=>{ const i=+inp.dataset.i; if(steps[i]) steps[i].amount=mnum(inp.value); });
-  const src = findAcct(($("distSrc")||{}).value); const today=todayStr();
-  const out=(acc,amt,desc)=>{ if(!acc) return; if(!Array.isArray(acc.tx)) acc.tx=[]; acc.tx.push({ id:uid(), created:Date.now(), date:today, dir:"out", cur:"KRW", krw:amt, desc, note:"배분" }); };
-  const inn=(acc,amt,desc)=>{ if(!acc) return; if(!Array.isArray(acc.tx)) acc.tx=[]; acc.tx.push({ id:uid(), created:Date.now(), date:today, dir:"in", cur:"KRW", krw:amt, desc, note:"배분" }); };
-  if($("distIncChk") && $("distIncChk").checked && src) inn(src, mnum(window._distIncome), "수강료 입금");
-  steps.forEach(s=>{ const amt=mnum(s.amount); if(amt<=0) return;
-    if(s.type==="acct"){ const acc=findAcct(s.id); if(acc) inn(acc, amt, "배분 입금"); out(src, amt, (acc?(acc.alias||"계좌"):"계좌")+" 보냄"); }
-    else if(s.type==="emg"){ if(!STORE.money.emergency) STORE.money.emergency={goal:2000000,tx:[]}; STORE.money.emergency.tx.push({ id:uid(), created:Date.now(), date:today, amount:amt, note:"배분 적립" }); out(src, amt, "비상금 적립"); }
-    else if(s.type==="debt"){ const d=findAcct(s.id); if(d){ if(s.dk==="loan"){ d.balance=Math.max(0, mnum(d.balance)-amt); out(d, amt, "조기상환 (배분)"); } else { inn(d, amt, "마통 상환 (배분)"); } } out(src, amt, (d?(d.alias||"빚"):"빚")+" 상환"); }
-  });
-  const _logItems = steps.filter(s=>mnum(s.amount)>0).map(s=>({ type:s.type, name:(s.type==="acct"?s.name:(s.type==="emg"?"비상금":s.name)), amount:mnum(s.amount) }));
-  if(_logItems.length){ STORE.money.distLog = STORE.money.distLog||[];
-    STORE.money.distLog.unshift({ id:uid(), date:today, created:Date.now(), income:mnum(window._distIncome), src:(src?(src.alias||"계좌"):""), items:_logItems });
-    if(STORE.money.distLog.length>80) STORE.money.distLog.length=80; }
-  if($("distIncome")) $("distIncome").value="";
-  save(); render(); toast("배분안을 반영했어요 ✅");
+  const items=steps.filter(s=>mnum(s.amount)>0).map(s=>({targetType:s.type==="acct"?"account":s.type==="emg"?"emergency":s.dk==="loan"?"loan":"overdraft",targetId:s.type==="emg"?"emergency":s.id,targetNameSnapshot:s.type==="emg"?"비상금":s.name,amount:mnum(s.amount)}));
+  const button=$("distApply"); distApplying=true; if(button){ button.disabled=true; button.textContent="기록 확인 중…"; }
+  try{
+    const result=DIST.buildDistribution(STORE,{id:draft.id,sourceAccountId:draft.sourceAccountId,sourceIncomeTxId:draft.sourceIncomeTxId,date:todayStr(),created:Date.now(),items},{makeId:()=>uid()});
+    if(result.duplicate){ toast("이미 반영된 배분입니다."); return; }
+    const previous=STORE; STORE=result.store;
+    if(!save()){ STORE=previous; render(); toast("최신 자료를 다시 불러온 뒤 배분해 주세요."); return; }
+    distSelectedIncomeId=""; window._distDraft=null; render(); toast("화면에 반영했어요 · 저장 확인 중");
+  }catch(e){ toast(e.message||"배분을 기록하지 못했습니다."); if(button){button.disabled=false;button.textContent="이대로 기록하기";} }
+  finally{ distApplying=false; }
 }
 function distLogHtml(){
   const log=STORE.money.distLog||[]; if(!log.length) return '';
-  const rows=log.map(e=>{
+  const rows=log.slice(0,80).map(e=>{
     const total=(e.items||[]).reduce((s,i)=>s+mnum(i.amount),0);
-    const detail=(e.items||[]).map(i=>{ const ic=i.type==="acct"?"💳":(i.type==="emg"?"🛟":"🔻"); return '<div class="dl-item"><span>'+ic+' '+esc(i.name||"")+'</span><b>'+fmtMoney(i.amount,"KRW")+'</b></div>'; }).join('');
-    return '<div class="dl-row"><div class="dl-top"><span class="dl-date">'+mmdd(e.date)+'</span><span class="dl-sum">'+fmtMoney(total,"KRW")+' 배분</span><button type="button" class="dl-x" data-distdel="'+e.id+'" title="이 기록만 삭제">✕</button></div><div class="dl-items">'+detail+'</div></div>';
+    const status=e.status||"legacy", label=status==="active"?"진행 중":status==="cancelled"?"취소됨":"오래된 기록 · 자동 취소 불가";
+    const detail=(e.items||[]).map(i=>{ const type=i.targetType||i.type, ic=type==="account"||type==="acct"?"💳":(type==="emergency"||type==="emg"?"🛟":"🔻"); return '<div class="dl-item"><span>'+ic+' '+esc(i.targetNameSnapshot||i.name||"")+'</span><b>'+fmtMoney(i.amount,"KRW")+'</b></div>'; }).join('');
+    const cancel=status==="active"?'<button type="button" class="dl-x" data-distcancel="'+e.id+'" title="배분 취소">취소</button>':'';
+    return '<div class="dl-row"><div class="dl-top"><span class="dl-date">'+mmdd(e.date)+'</span><span class="dl-sum">'+fmtMoney(total,"KRW")+' 배분</span><span class="dl-state '+esc(status)+'">'+label+'</span>'+cancel+'</div><div class="dl-items">'+detail+'</div></div>';
   }).join('');
   return '<div class="fold" style="margin-top:14px">'+foldHeader("distlog", svi('layers'), "배분 이력", log.length)+(fold.distlog?'<div class="fold-body distlog-body">'+rows+'</div>':'')+'</div>';
 }
-function distLogDel(id){ if(!confirm("이 배분 기록만 목록에서 지울까요?\n(실제 계좌 입출금 내역은 그대로 남아요.)")) return; STORE.money.distLog=(STORE.money.distLog||[]).filter(e=>e.id!==id); save(); render(); }
+function cancelDistributionUi(id){
+  if(tabReadOnly||syncConflict){ toast("다른 화면의 최신 자료를 먼저 새로고침해 주세요."); return; }
+  const log=(STORE.money.distLog||[]).find(e=>e.id===id); if(!log)return;
+  const count=(log.items||[]).reduce((s,i)=>s+1+(i.effects||[]).length,0), total=(log.items||[]).reduce((s,i)=>s+mnum(i.amount),0);
+  if(!confirm(fmtMoney(total,"KRW")+" 배분을 취소할까요?\n연결된 "+count+"개 기록을 함께 확인한 뒤 되돌립니다.\n원래 입금은 남습니다.")) return;
+  const reason=prompt("취소 이유를 짧게 적어주세요.","사용자 요청"); if(reason===null)return;
+  if(tabReadOnly||syncConflict){ toast("다른 화면의 최신 자료를 먼저 새로고침해 주세요."); return; }
+  try{ const result=DIST.cancelDistribution(STORE,id,{cancelledAt:new Date().toISOString(),reason:reason.trim()||"사용자 요청"}), previous=STORE; STORE=result.store; if(!save()){ STORE=previous; render(); toast("최신 자료를 다시 불러온 뒤 취소해 주세요."); return; } render(); toast("화면에서 취소했어요 · 저장 확인 중"); }
+  catch(e){ toast(e.message||"배분을 자동 취소할 수 없습니다."); }
+}
 function emergencyCardHtml(){
   if(!STORE.money.emergency) STORE.money.emergency={ goal:2000000, tx:[] };
   const e=STORE.money.emergency;
@@ -2861,9 +2967,10 @@ function wireMoney(){
   const ct9=$("conf9Toggle"); if(ct9) ct9.addEventListener("click", ()=>{ conf9Expanded=!conf9Expanded; render(); });
   const et=$("emgTile"); if(et) et.addEventListener("click", openEmg);
   const dbtn=$("distBtn"); if(dbtn) dbtn.addEventListener("click", runDistribute);
-  const din=$("distIncome"); if(din){ attachThousands(din); din.addEventListener("keydown", e=>{ if(e.key==="Enter") runDistribute(); }); }
+  const dsel=$("distIncomeSelect"); if(dsel) dsel.addEventListener("change", ()=>{ distSelectedIncomeId=dsel.value||""; window._distDraft=null; runDistribute(); });
+  const dnew=$("distNewIncome"); if(dnew) dnew.addEventListener("click", openNewIncomeFromDistribution);
   const list=$("acctList"); if(list) enableDrag(list, STORE.money.accounts);
-  document.querySelectorAll("#view [data-distdel]").forEach(b=> b.addEventListener("click", (e)=>{ e.stopPropagation(); distLogDel(b.dataset.distdel); }));
+  document.querySelectorAll("#view [data-distcancel]").forEach(b=> b.addEventListener("click", (e)=>{ e.stopPropagation(); cancelDistributionUi(b.dataset.distcancel); }));
   document.querySelectorAll("#view .rp-row[data-report]").forEach(r=> r.addEventListener("click", ()=> openReport(r.dataset.report)));
   wireFolds();
 }
@@ -2966,6 +3073,11 @@ function openAcct(id){
 function closeAcct(){ $("ovacct").classList.remove("on"); mAcctEdit=null; }
 function saveAcct(){
   const alias=$("ac_alias").value.trim(); if(!alias){ $("ac_alias").focus(); return; }
+  if(mAcctEdit){ const current=findAcct(mAcctEdit), linked=DIST.canDeleteAccount(STORE,mAcctEdit); if(current&&!linked.ok){
+    if(current.kind!==mAcctKind){ toast("배분과 연결된 계좌 종류는 바꿀 수 없습니다. 연결된 배분을 먼저 취소하세요."); return; }
+    if(current.kind==="account" && (!!current.conduit!==!!$("ac_conduit").checked || !!current.overdraft!==!!$("ac_od").checked)){ toast("배분과 연결된 계좌의 지출 통로·마이너스통장 설정은 바꿀 수 없습니다. 연결된 배분을 먼저 취소하세요."); return; }
+    if(current.kind==="loan" && $("lo_balance").value.trim()!=="" && mnum($("lo_balance").value)!==mnum(current.balance)){ toast("배분과 연결된 대출 원금은 직접 바꿀 수 없습니다. 연결된 배분을 먼저 취소하세요."); return; }
+  } }
   if(mAcctKind==="loan" && mLoanRepay==="amortize" && !$("lo_monthly").value && !$("lo_maturity").value){ toast("원리금균등은 만기일 또는 월 상환액이 필요해요."); $("lo_maturity").focus(); return; }
   if(mAcctKind==="loan" && mLoanRepay==="principal" && !$("lo_maturity").value){ toast("원금균등은 만기일이 필요해요."); $("lo_maturity").focus(); return; }
   const base={ kind:mAcctKind, alias, bank:$("ac_bank").value.trim(), num:$("ac_num").value.trim(), color:mAcctColor };
@@ -3012,6 +3124,7 @@ function saveAcct(){
 }
 function delAcct(){
   const a=mAcctEdit&&findAcct(mAcctEdit); if(!a) return;
+  const guard=DIST.canDeleteAccount(STORE,a.id); if(!guard.ok){ toast(guard.reason); return; }
   if(!confirm('"'+(a.alias||"계좌")+'" 계좌를 삭제할까요? 이 계좌의 거래 기록도 함께 지워져요.')) return;
   const i=STORE.money.accounts.findIndex(x=>x.id===mAcctEdit); if(i>=0) STORE.money.accounts.splice(i,1);
   openAccounts.delete(mAcctEdit); closeAcct(); save(); render();
@@ -3019,6 +3132,10 @@ function delAcct(){
 
 /* 거래 폼 */
 let mTxAcct=null, mTxEdit=null, mTxDir="out", mTxCur="KRW";
+function openNewIncomeFromDistribution(){
+  const accountId=($("distNewAccount")||{}).value; if(!accountId){ toast("입금 계좌를 먼저 선택하세요."); return; }
+  distReturnFromTx=true; openTx(accountId,null); mTxDir="in"; selChips($("tx_dir"),mTxDir); $("txTitle").textContent="새 수입 기록";
+}
 function txCurUpdate(){
   const f=mTxCur!=="KRW";
   $("tx_fFld").style.display=f?"":"none";
@@ -3027,6 +3144,7 @@ function txCurUpdate(){
 }
 function openTx(acctId, txId){
   const a=findAcct(acctId); if(!a) return;
+  if(txId){ const link=DIST.activeLinkForTx(STORE,acctId,txId); if(link&&link.kind==="effect"){ toast("배분으로 생긴 기록은 배분 취소에서만 바꿀 수 있습니다."); return; } }
   mTxAcct=acctId; mTxEdit=txId||null;
   const t=txId?(a.tx||[]).find(x=>x.id===txId):null, isCard=a.kind==="card";
   $("txTitle").textContent=(txId?"수정 · ":"새 ")+(isCard?"카드 사용":"거래");
@@ -3043,7 +3161,7 @@ function openTx(acctId, txId){
   $("txDelete").style.display=txId?"":"none";
   $("ovtx").classList.add("on"); setTimeout(()=>$("tx_desc").focus(),50);
 }
-function closeTx(){ $("ovtx").classList.remove("on"); mTxAcct=null; mTxEdit=null; }
+function closeTx(){ $("ovtx").classList.remove("on"); mTxAcct=null; mTxEdit=null; distReturnFromTx=false; }
 
 /* ── 매일 돈기록 알림 ── */
 const DTRACK = ["토스생활비","카뱅파랑이","카뱅노랑이","사업자계좌","신한카드","아멕스"];
@@ -3219,12 +3337,14 @@ function saveTx(){
   if(!Array.isArray(a.tx)) a.tx=[];
   const foreign=mTxCur!=="KRW";
   const data={ date:$("tx_date").value||todayStr(), dir:mTxDir, desc, cur:mTxCur, krw:mnum($("tx_krw").value), famount:foreign?mnum($("tx_famt").value):null, note:$("tx_note").value.trim() };
-  if(mTxEdit){ const t=a.tx.find(x=>x.id===mTxEdit); if(t) Object.assign(t, data, { updated:Date.now() }); }
-  else { a.tx.push(Object.assign({ id:uid(), created:Date.now() }, data)); }
-  closeTx(); save(); render();
+  if(distReturnFromTx && (data.dir!=="in" || data.krw<=0)){ toast("새 수입은 1원 이상의 입금으로 기록하세요."); return; }
+  if(mTxEdit){ const guard=DIST.canEditTransaction(STORE,a.id,mTxEdit,data); if(!guard.ok){ toast(guard.reason); return; } const t=a.tx.find(x=>x.id===mTxEdit); if(t) Object.assign(t, data, { updated:Date.now() }); }
+  else { const newId=uid(), created={id:newId,created:Date.now()}; if(distReturnFromTx)created.incomeSource=true; a.tx.push(Object.assign(created,data)); if(distReturnFromTx) distSelectedIncomeId=newId; }
+  const returnToDistribution=distReturnFromTx; closeTx(); save(); render(); if(returnToDistribution) setTimeout(runDistribute,0);
 }
 function delTx(){
   const a=findAcct(mTxAcct); if(!a||!mTxEdit) return;
+  const guard=DIST.canDeleteTransaction(STORE,a.id,mTxEdit); if(!guard.ok){ toast(guard.reason); return; }
   const i=(a.tx||[]).findIndex(x=>x.id===mTxEdit); if(i>=0) a.tx.splice(i,1);
   closeTx(); save(); render();
 }
@@ -3348,6 +3468,7 @@ function saveEmg(){
 }
 function delEmgTx(id){
   const e=STORE.money.emergency; if(!e||!Array.isArray(e.tx)) return;
+  const guard=DIST.canDeleteEmergencyTx(STORE,id); if(!guard.ok){ toast(guard.reason); return; }
   const i=e.tx.findIndex(x=>x.id===id); if(i>=0) e.tx.splice(i,1);
   save(); renderEmgHist(); render();
 }
@@ -3494,6 +3615,7 @@ function saveRepay(){
 let ctxTx=null;
 function openTxCtx(x, y, acctId, txId){
   const a=findAcct(acctId); if(!a) return; const t=(a.tx||[]).find(z=>z.id===txId); if(!t) return;
+  const guard=DIST.canDeleteTransaction(STORE,acctId,txId); if(!guard.ok){ toast(guard.reason); return; }
   ctxTx={ acctId, txId };
   $("ctx_info").textContent="“"+(t.desc||"내역")+"” 삭제";
   const m=$("ctxmenu"); m.style.display="block";
@@ -3555,7 +3677,7 @@ attachThousands($("em_goal")); attachThousands($("em_amt"));
 document.querySelectorAll('#em_dir button').forEach(b=> b.addEventListener("click", ()=>{ mEmgDir=b.dataset.v; selChips($("em_dir"),mEmgDir); emDirUpdate(); }));
 $("fx_cur").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; mFixCur=b.dataset.v; selChips($("fx_cur"),mFixCur); fxCurUpdate(); });
 $("ctxmenu").querySelector('[data-ctx="del"]').innerHTML=svi('trash')+" 삭제";
-$("ctxmenu").addEventListener("click", e=>{ if(!e.target.closest('[data-ctx="del"]')) return; if(ctxTx){ const a=findAcct(ctxTx.acctId); if(a){ const i=(a.tx||[]).findIndex(t=>t.id===ctxTx.txId); if(i>=0){ a.tx.splice(i,1); save(); } } } closeCtx(); render(); });
+$("ctxmenu").addEventListener("click", e=>{ if(!e.target.closest('[data-ctx="del"]')) return; if(ctxTx){ const guard=DIST.canDeleteTransaction(STORE,ctxTx.acctId,ctxTx.txId); if(!guard.ok){ toast(guard.reason); closeCtx(); return; } const a=findAcct(ctxTx.acctId); if(a){ const i=(a.tx||[]).findIndex(t=>t.id===ctxTx.txId); if(i>=0){ a.tx.splice(i,1); save(); } } } closeCtx(); render(); });
 document.addEventListener("click", e=>{ if($("ctxmenu").style.display==="block" && !e.target.closest("#ctxmenu")) closeCtx(); });
 document.addEventListener("scroll", ()=>{ if($("ctxmenu").style.display==="block") closeCtx(); }, true);
 document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("reportViewer").classList.contains("on")) closeReport(); if($("ovacct").classList.contains("on")) closeAcct(); if($("ovtx").classList.contains("on")) closeTx(); if($("ovfix").classList.contains("on")) closeFix(); if($("ovoneoff").classList.contains("on")) closeOne(); if($("ovrepay").classList.contains("on")) closeRepay(); if($("ctxmenu").style.display==="block") closeCtx(); } });
@@ -3567,33 +3689,64 @@ overlayDismiss("restore", ()=>$("restore").classList.remove("on"));
 function openRestore(){
   $("restore").classList.add("on");
   const box=$("restorelist"); box.innerHTML='<div class="wsec-empty">불러오는 중…</div>';
-  fetch(SB+"?id=like.snap-*&select=id&order=id.desc&limit=50",{headers:HDR,cache:"no-store"})
+  if(LOCAL_TEST){ box.innerHTML='<div class="wsec-empty">로컬 화면 검사에서는 온라인 복원을 사용하지 않습니다.</div>'; return; }
+  if(tabReadOnly||syncConflict){ box.innerHTML='<div class="wsec-empty">다른 화면의 최신 자료를 먼저 새로고침한 뒤 복원하세요.</div>'; return; }
+  fetch(SB+"?id=like.v4-snap-*&select=id&order=id.desc&limit=50",{headers:HDR,cache:"no-store"})
     .then(r=>r.ok?r.json():Promise.reject()).then(rows=>{
       if(!Array.isArray(rows)||!rows.length){ box.innerHTML='<div class="wsec-empty">아직 저장된 시점이 없어요. 기록을 저장하면 자동으로 쌓여요.</div>'; return; }
-      box.innerHTML=rows.map(x=>{ const ms=+String(x.id).replace("snap-",""); const lab=isNaN(ms)?x.id:new Date(ms).toLocaleString("ko-KR"); return '<div class="snap-row"><span>'+esc(lab)+'</span><button type="button" class="snap-restore" data-snap="'+esc(x.id)+'">이 상태로</button></div>'; }).join("");
+      box.innerHTML=rows.map(x=>{ const ms=+String(x.id).replace("v4-snap-",""); const lab=isNaN(ms)?x.id:new Date(ms).toLocaleString("ko-KR"); return '<div class="snap-row"><span>'+esc(lab)+'</span><button type="button" class="snap-restore" data-snap="'+esc(x.id)+'">이 상태로</button></div>'; }).join("");
       box.querySelectorAll(".snap-restore").forEach(b=> b.addEventListener("click", ()=>restoreTo(b.dataset.snap)));
     }).catch(()=>{ box.innerHTML='<div class="wsec-empty">불러오지 못했어요 (인터넷 확인).</div>'; });
 }
 async function restoreTo(snapId){
+  if(tabReadOnly||syncConflict){ toast("다른 화면의 최신 자료를 먼저 새로고침한 뒤 복원하세요."); return; }
   if(!confirm("이 시점 상태로 전체를 되돌립니다.\n지금 상태도 스냅샷으로 남겨두니 다시 되돌릴 수 있어요.\n\n계속할까요?")) return;
   try { await writeSnapshot(await lock(PW,STORE)); } catch(e){}
   let obj=null;
   try { const r=await fetch(SB+"?id=eq."+encodeURIComponent(snapId)+"&select=data",{headers:HDR,cache:"no-store"}); const j=await r.json(); obj=await unlockText(PW, j&&j[0]&&j[0].data); }
   catch(e){ alert("복원할 데이터를 못 열었어요."); return; }
+  if(tabReadOnly||syncConflict){ toast("불러오는 동안 다른 화면에서 자료가 바뀌었습니다. 새로고침해 주세요."); return; }
   STORE=Object.assign(blankStore(), obj); normalizeStore();
   $("restore").classList.remove("on");
-  await pushState(); render(); setDot(true,"복원됨 ✓");
+  const saved=await pushState();
+  if(!saved||saved.conflict||saved.blocked||saved.error){ const loaded=await loadStore(); if(loaded)render(); return; }
+  render(); setDot(true,saved.synced?"복원됨 · 동기화":"복원됨 · 이 기기에만 저장");
 }
 
 async function start(){
-  setDot(true,"여는 중…"); await loadStore();
+  setDot(true,"여는 중…"); claimWriter(); const loaded=await loadStore();
+  if(!loaded){ setDot(false,"자료를 열지 못했습니다 · 편집 중단"); $("view").innerHTML='<div class="ledger-empty">저장된 자료를 열지 못했습니다. 이 화면에서는 저장하지 않습니다. 원본과 비밀번호를 확인해 주세요.</div>'; return; }
   const nBase=autoPostFixed()+autoPostLoans()+autoPostOneoff(), cp=autoPostCards(), n=nBase+cp.n;
   if(n>0) save(); render();
   if(n>0 || cp.short.length) toast((n>0?n+"건 자동 반영":"")+(cp.short.length?(n>0?" · ":"")+"⚠️ "+cp.short.join(", "):""));
-  setDot(true,"준비됨");
+  if(tabReadOnly)setDot(false,"다른 탭이 편집 중입니다 · 읽기 전용");
+  else if(syncConflict)setDot(false,"다른 화면에서 먼저 바뀌었습니다 · 새로고침 필요");
+  else setDot(true,storeSrc==="sb"?("동기화됨 · 수정 "+storeRevision):"준비됨 · 이 기기 저장");
   loadReports().then(()=>{ renderReportBubble(); if(TAB==="money") render(); });
 }
 (async ()=>{
+  if(LOCAL_TEST){
+    window.__note3TestLoad=obj=>{ PW="local-test"; STORE=Object.assign(blankStore(),DIST.clone(obj)); normalizeStore(); $("gate").style.display="none"; $("app").style.display=""; TAB="money"; render(); return true; };
+    window.__note3TestLoad({v:4,money:{accounts:[
+      {id:"test-source",alias:"사업계좌",kind:"account",startBalance:0,tx:[
+        {id:"test-income",created:1,date:todayStr(),dir:"in",cur:"KRW",krw:1000000,desc:"로컬 검사 수입",note:""},
+        {id:"test-16-income",date:"2026-08-16",dir:"in",cur:"KRW",krw:100000,desc:"8/16 수입",note:""},{id:"test-16-out",date:"2026-08-16",dir:"out",cur:"KRW",krw:100000,desc:"남편계좌 보냄",note:"배분",distributionId:"test-dist-16",distributionRole:"sourceOut",internalTransfer:true},
+        {id:"test-22-income",date:"2026-08-22",dir:"in",cur:"KRW",krw:200000,desc:"8/22 수입",note:""},{id:"test-22-out",date:"2026-08-22",dir:"out",cur:"KRW",krw:200000,desc:"남편계좌 보냄",note:"배분",distributionId:"test-dist-22",distributionRole:"sourceOut",internalTransfer:true},
+        {id:"test-14-out",date:"2026-08-14",dir:"out",cur:"KRW",krw:50000,desc:"남편계좌 보냄",note:"배분",distributionId:"test-dist-14",distributionRole:"sourceOut",internalTransfer:true}
+      ]},
+      {id:"test-target",alias:"일반자산",kind:"account",startBalance:0,tx:[]},
+      {id:"test-conduit",alias:"남편계좌",kind:"account",conduit:true,startBalance:0,tx:[
+        {id:"test-16-in",date:"2026-08-16",dir:"in",cur:"KRW",krw:100000,desc:"배분 입금",note:"배분",distributionId:"test-dist-16",distributionRole:"targetIn",internalTransfer:true},
+        {id:"test-22-in",date:"2026-08-22",dir:"in",cur:"KRW",krw:200000,desc:"배분 입금",note:"배분",distributionId:"test-dist-22",distributionRole:"targetIn",internalTransfer:true},
+        {id:"test-14-in",date:"2026-08-14",dir:"in",cur:"KRW",krw:50000,desc:"배분 입금",note:"배분",distributionId:"test-dist-14",distributionRole:"targetIn",internalTransfer:true}
+      ]},
+      {id:"test-loan",alias:"일반대출",kind:"loan",balance:300000,startBalance:0,rate:5,tx:[]}
+    ],fixed:[],oneoff:[],distLog:[
+      {id:"test-dist-22",status:"active",sourceAccountId:"test-source",sourceIncomeTxId:"test-22-income",date:"2026-08-22",items:[{targetType:"account",targetId:"test-conduit",targetNameSnapshot:"남편계좌",amount:200000,sourceOutTxId:"test-22-out",effects:[{kind:"accountTx",accountId:"test-conduit",recordId:"test-22-in",direction:"in",amount:200000}]}]},
+      {id:"test-dist-16",status:"active",sourceAccountId:"test-source",sourceIncomeTxId:"test-16-income",date:"2026-08-16",items:[{targetType:"account",targetId:"test-conduit",targetNameSnapshot:"남편계좌",amount:100000,sourceOutTxId:"test-16-out",effects:[{kind:"accountTx",accountId:"test-conduit",recordId:"test-16-in",direction:"in",amount:100000}]}]},
+      {id:"test-dist-14",status:"legacy",readOnly:true,legacy:true,sourceAccountId:"test-source",sourceIncomeTxId:null,date:"2026-08-14",items:[{targetType:"account",targetId:"test-conduit",targetNameSnapshot:"남편계좌",amount:50000,sourceOutTxId:"test-14-out",effects:[{kind:"accountTx",accountId:"test-conduit",recordId:"test-14-in",direction:"in",amount:50000}]}]}
+    ],emergency:{goal:200000,tx:[]},assets:[]}}); return;
+  }
   const saved=localStorage.getItem(PWKEY);
   if(saved){ const r=await tryUnlock(saved); if(r.ok){ PW=saved; $("gate").style.display="none"; $("app").style.display=""; await start(); return; } localStorage.removeItem(PWKEY); }
   $("pw").focus();

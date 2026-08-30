@@ -1,0 +1,32 @@
+"use strict";
+
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+
+const html=fs.readFileSync(path.resolve(__dirname,"../note3.html"),"utf8");
+const pushBlob=html.match(/async function pushBlob\(blob\)\{[\s\S]*?\n\}/);
+assert.ok(pushBlob,"pushBlob을 찾지 못했습니다.");
+assert.ok(pushBlob[0].indexOf("if(LOCAL_TEST)return")<pushBlob[0].indexOf("writeLocalBlob(blob,true)"),"로컬 화면검사가 실제 로컬 복구본보다 먼저 차단되지 않았습니다.");
+assert.ok(pushBlob[0].indexOf("if(tabReadOnly || syncConflict)return")<pushBlob[0].indexOf("writeLocalBlob(blob,true)"),"읽기 전용·충돌 상태가 실제 로컬 복구본보다 먼저 차단되지 않았습니다.");
+assert.match(html,/current\.kind==="account"[\s\S]{0,300}current\.conduit[\s\S]{0,300}current\.overdraft/);
+assert.match(html,/async function restoreTo\(snapId\)\{\s*if\(tabReadOnly\|\|syncConflict\)/);
+assert.match(html,/function distributionPlan\(income,sourceAccountId\)[\s\S]{0,250}t\.acc\.id!==sourceAccountId/);
+assert.match(html,/distributionPlan\(income,selected\.accountId\)/);
+assert.match(html,/function applyDistribution\(\)\{[\s\S]{0,150}tabReadOnly\|\|syncConflict/);
+assert.match(html,/function cancelDistributionUi\(id\)\{[\s\S]{0,150}tabReadOnly\|\|syncConflict/);
+assert.match(html,/const saved=await pushState\(\);\s*if\(!saved\|\|saved\.conflict\|\|saved\.blocked\|\|saved\.error\)/);
+assert.match(html,/if\(distReturnFromTx\)created\.incomeSource=true/);
+assert.match(html,/prepareLoadedStore\(chosen,STORE,DIST\.migrateLegacyDistributions\)/);
+assert.match(html,/if\(!prepared\.ok\)\{ STORE=null; loadBlocked=true; return false; \}/);
+assert.match(html,/if\(prepared\.shouldSave&&!syncConflict&&!tabReadOnly\) save\(\)/);
+assert.match(html,/const STORE_ROW\s*=\s*V4STORE\.ROW_ID/);
+assert.doesNotMatch(html,/distLog\.length\s*=\s*80/);
+assert.doesNotMatch(html,/id:\s*["']main["']\s*,\s*data:/);
+assert.doesNotMatch(html,/\?id=eq\.main(?:&|["'])/);
+assert.match(html,/return \{reachable:false,row:null,error:r\.status\}/);
+assert.match(html,/CONFLICT_LOCAL_KEY/);
+assert.match(html,/catch\(e\)\{ STORE=null; loadBlocked=true; return false; \}/);
+assert.match(html,/if\(!blob&&!cloud\.reachable\)\{ STORE=null; loadBlocked=true; return false; \}/);
+assert.match(html,/if\(!loaded\)\{ setDot\(false,"자료를 열지 못했습니다 · 편집 중단"\)/);
+console.log("PASS page contract: test mode isolation, main-v4 only, no 80-row truncation");
