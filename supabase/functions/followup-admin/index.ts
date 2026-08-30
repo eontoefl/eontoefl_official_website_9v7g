@@ -140,6 +140,37 @@ function scoreText(app: Record<string, unknown> | null): string {
   return `${c} → 목표 ${t}`;
 }
 
+// 후보 탐색기가 저장한 내부 표기(candidate:candidate 등)를 관리자용 설명으로 바꾼다.
+// 대상 판정 자체는 바꾸지 않고, 화면에 보여 주는 문장만 단계별 실제 조건에 맞춘다.
+function whyText(j: Record<string, unknown>): string {
+  const status = String(j.status || "");
+  if (status === "skipped") {
+    return String(j.skip_reason || j.cancel_reason || j.reason || "");
+  }
+
+  const reason = String(j.reason || "");
+  if (!reason.startsWith("candidate:")) return reason;
+
+  const stage = String(j.stage || "");
+  const progress = Number(j.progress_percent);
+  if (stage === "stage1") {
+    const progressText = Number.isFinite(progress)
+      ? `입문서를 신청해 ${progress}%까지 진행했고, `
+      : "입문서를 신청해 진행 중이고, ";
+    return `${progressText}아직 내챌 신청 전이라 1단계 후속메일 대상입니다.`;
+  }
+  if (stage === "stage2") {
+    return "내챌 신청 후 개별분석이 준비됐지만, 아직 개별분석 동의 전이라 2단계 후속메일 대상입니다.";
+  }
+  if (stage === "stage3a") {
+    return "개별분석에 동의하고 계약서를 받았지만, 아직 계약서 동의 전이라 3a단계 후속메일 대상입니다.";
+  }
+  if (stage === "stage3b") {
+    return "계약서에 동의했지만, 아직 등록 확정 전이라 3b단계 후속메일 대상입니다.";
+  }
+  return "현재 진행 상태가 후속 안내 시점에 도달했습니다.";
+}
+
 const V2_JOB_COLS =
   "id,application_id,user_id,email,stage,reason,progress_percent,scheduled_at,status," +
   "cancel_reason,review_started_at,review_deadline_at,next_action_at,send_requested_at," +
@@ -211,7 +242,7 @@ function shapeJob(j: Record<string, unknown>): Record<string, unknown> {
     score: scoreText(app),
     progress: j.progress_percent ?? null,
     funnel: funnelFor(stage, status),
-    why: (status === "skipped" ? (j.skip_reason || j.cancel_reason) : j.reason) || j.reason || "",
+    why: whyText(j),
     manual_review: status === "skipped",
     review: (refs.used_review_id as string) || (refs.review_id as string) || "",
     materials: (refs.used_materials as unknown[]) || (refs.materials as unknown[]) || [],
