@@ -167,6 +167,10 @@ test("12 일부만 이행된 흔적이나 중복 번호가 있으면 전체 중�
     const wrong=legacyFixture(), source=wrong.money.accounts[0].tx.find(t=>t.id===sourceId); source[marker]=marker==="internalTransfer"?true:"unexpected"; const untouched=JSON.stringify(wrong);
     assert.throws(()=>money.migrateLegacyDistributions(wrong),e=>e.code==="LEGACY_MISMATCH"); assert.equal(JSON.stringify(wrong),untouched);
   }
+  for(const mutate of [s=>{s.money.accounts[0].conduit=true;},s=>{s.money.accounts[0].overdraft=true;},s=>{s.money.accounts[1].conduit=false;},s=>{s.money.accounts[2].overdraft=true;}]){
+    const wrong=legacyFixture(); mutate(wrong); const untouched=JSON.stringify(wrong);
+    assert.throws(()=>money.migrateLegacyDistributions(wrong),e=>e.code==="LEGACY_MISMATCH"); assert.equal(JSON.stringify(wrong),untouched);
+  }
 });
 
 test("13 일반 자산 계좌 배분 순자산 불변·통로와 비상금 왕복",()=>{
