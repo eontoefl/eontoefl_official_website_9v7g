@@ -918,6 +918,11 @@ function setupFormSubmission() {
                 showEditSuccessModal();
             } else {
                 // 새 신청서: POST로 생성
+                // 주인(user_id/user_email)은 '새로 만들 때'만 로그인 계정으로 정한다.
+                //   (수정 시엔 collectFormData가 주인을 안 넣으므로 기존 주인이 그대로 유지됨)
+                const sessionUser = JSON.parse(localStorage.getItem('iontoefl_user'));
+                formData.user_id = sessionUser.id;
+                formData.user_email = sessionUser.email;
                 result = await supabaseAPI.post('applications', formData);
 
                 if (!result) {
@@ -1133,10 +1138,10 @@ function collectFormData() {
     const formData = new FormData(form);
     const data = {};
 
-    // Get user data
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user'));
-    data.user_id = userData.id;
-    data.user_email = userData.email;
+    // ※ 주인(user_id/user_email)은 여기서 넣지 않는다.
+    //    신청서를 '새로 만들 때'(아래 POST 분기)에만 로그인 계정으로 한 번 정하고,
+    //    '수정'(PATCH)에서는 손대지 않아 주인이 바뀌지 않게 한다. (관리자가 학생 신청서를
+    //    수정 저장할 때 주인이 admin-account로 덮이던 버그 방지 — 2026-09-04)
 
     // Collect all form fields
     for (let [key, value] of formData.entries()) {
