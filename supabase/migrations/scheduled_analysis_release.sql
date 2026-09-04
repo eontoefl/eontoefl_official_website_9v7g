@@ -29,7 +29,8 @@
 --                                                 discount_amount, additional_discount,
 --                                                 discount_reason, final_price,
 --                                                 correction_enabled, correction_start_date,
---                                                 correction_fee, is_incentive_applicant,
+--                                                 correction_end_date, correction_fee,
+--                                                 is_incentive_applicant,
 --                                                 is_analysis_update)
 --
 -- 실행 방법:
@@ -60,6 +61,7 @@ DECLARE
     v_is_update boolean;
     v_correction_enabled boolean;
     v_correction_start_date date;
+    v_correction_end_date date;
     v_user_id uuid;
 BEGIN
     -- Vault에서 service_role_key 조회
@@ -121,6 +123,7 @@ BEGIN
             final_price            = CASE WHEN v_payload ? 'final_price'            THEN (v_payload->>'final_price')::bigint                  ELSE applications.final_price END,
             correction_enabled     = CASE WHEN v_payload ? 'correction_enabled'     THEN (v_payload->>'correction_enabled')::boolean          ELSE applications.correction_enabled END,
             correction_start_date  = CASE WHEN v_payload ? 'correction_start_date'  THEN v_payload->>'correction_start_date'                  ELSE applications.correction_start_date END,
+            correction_end_date    = CASE WHEN v_payload ? 'correction_end_date'    THEN NULLIF(v_payload->>'correction_end_date','')::date   ELSE applications.correction_end_date END,
             correction_fee         = CASE WHEN v_payload ? 'correction_fee'         THEN (v_payload->>'correction_fee')::bigint               ELSE applications.correction_fee END,
             is_incentive_applicant = CASE WHEN v_payload ? 'is_incentive_applicant' THEN (v_payload->>'is_incentive_applicant')::boolean      ELSE applications.is_incentive_applicant END,
 
@@ -138,13 +141,15 @@ BEGIN
         -- 첨삭 포함 시 correction_schedules UPSERT (즉시 발송 흐름과 동등하게 처리)
         v_correction_enabled := COALESCE((v_payload->>'correction_enabled')::boolean, false);
         v_correction_start_date := NULLIF(v_payload->>'correction_start_date', '')::date;
+        v_correction_end_date := NULLIF(v_payload->>'correction_end_date', '')::date;
         v_user_id := rec.user_id;
         IF v_correction_enabled AND v_correction_start_date IS NOT NULL AND v_user_id IS NOT NULL THEN
-            INSERT INTO correction_schedules (user_id, start_date, duration_weeks)
-            VALUES (v_user_id, v_correction_start_date, 4)
+            INSERT INTO correction_schedules (user_id, start_date, duration_weeks, end_date)
+            VALUES (v_user_id, v_correction_start_date, 4, v_correction_end_date)
             ON CONFLICT (user_id) DO UPDATE
                 SET start_date = EXCLUDED.start_date,
-                    duration_weeks = EXCLUDED.duration_weeks;
+                    duration_weeks = EXCLUDED.duration_weeks,
+                    end_date = EXCLUDED.end_date;
         END IF;
 
         -- 알림톡 유형 결정: 수정이면 analysis_updated, 조건부승인/거부면 analysis_registered(50226), 그 외 기존 분기

@@ -237,13 +237,12 @@ async function renderCorrectionProgressSection(app) {
     if (!app.correction_enabled) { section.style.display = 'none'; return; }
     section.style.display = '';
 
-    const DAY = 24 * 60 * 60 * 1000;
     const today = (typeof getEffectiveToday === 'function') ? getEffectiveToday() : new Date();
     const cStart = app.correction_start_date ? new Date(app.correction_start_date) : null;
-    const cEnd = cStart ? new Date(cStart.getTime() + 27 * DAY) : null;
+    const cEnd = cStart ? getCorrectionWindow(app, 1).endMoment : null;
     const hasExt = !!(app.extension_enabled && app.extension_start_date);
     const eStart = hasExt ? new Date(app.extension_start_date) : null;
-    const eEnd = eStart ? new Date(eStart.getTime() + 27 * DAY) : null;
+    const eEnd = eStart ? getCorrectionWindow(app, 2).endMoment : null;
 
     const steps = [
         { name: '첨삭\n시작', icon: 'fa-play',            completed: !!(cStart && today >= cStart), locked: false },
@@ -295,7 +294,7 @@ async function renderCorrectionProgressSection(app) {
                 </div>`;
             } else {
                 // 신청 전 → 세션9 완료 + 마감 전이면 연장 버튼 노출 (테스트룸 업셀과 동일 조건)
-                const dl = cStart ? _corrExtDeadline(app.correction_start_date) : null;
+                const dl = cStart ? _corrExtDeadline(app) : null;
                 const beforeDeadline = dl ? (today <= dl) : false;
                 if (beforeDeadline) {
                     // 세션9 이상(9~12) 중 하나라도 완료면 노출. 세션9만 보면 세션9 건너뛴 학생을 놓침.
@@ -375,10 +374,12 @@ function _corrFmtYmd(ymd) {
     return (d.getMonth() + 1) + '/' + d.getDate() + '(' + days[d.getDay()] + ')';
 }
 
-// 첨삭 연장 신청 마감일: correction_start_date 기준 세션12(+25일)이 속한 주의 토요일
-function _corrExtDeadline(startYmd) {
-    const start = new Date(startYmd + 'T00:00:00');
-    const s12 = new Date(start.getTime() + 25 * 24 * 60 * 60 * 1000);
+// 첨삭 연장 신청 마감일: 세션12 날짜가 속한 주의 토요일.
+//   세션12 날짜 = 첨삭 종료일(correction_end_date)이 있으면 그 날, 없으면 시작일+25일(기존).
+function _corrExtDeadline(app) {
+    const s12 = app.correction_end_date
+        ? new Date(app.correction_end_date + 'T00:00:00')
+        : new Date(new Date(app.correction_start_date + 'T00:00:00').getTime() + 25 * 24 * 60 * 60 * 1000);
     const d = new Date(s12);
     d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));   // 이후 첫 토요일
     d.setHours(23, 59, 59, 999);
@@ -395,7 +396,7 @@ async function requestExtensionFromDashboard(btn) {
     btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> 신청 중...';
 
     const AGREE = '기존 첨삭과 동일한 조건·규정으로 진행되는 것에 동의합니다.';
-    const deadline = _corrExtDeadline(app.correction_start_date);
+    const deadline = _corrExtDeadline(app);
     const deadlineYmd = deadline.getFullYear() + '-' +
         String(deadline.getMonth() + 1).padStart(2, '0') + '-' + String(deadline.getDate()).padStart(2, '0');
     const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -1373,13 +1374,12 @@ async function renderProgramInfo(app) {
         console.warn('사이트 설정 로드 실패, 기본값 사용:', e);
     }
 
-    // 첨삭 기간 계산 (각 학기 시작일 + 27일). 연장 시 1~12세션·13~24세션을 각각 한 줄로 표시.
-    const _DAY = 24 * 60 * 60 * 1000;
+    // 첨삭 기간 계산 (첨삭 종료일 출처 1개 = getCorrectionWindow). 연장 시 1~12세션·13~24세션을 각각 한 줄로 표시.
     const c1Start = (app.correction_enabled && app.correction_start_date) ? new Date(app.correction_start_date) : null;
-    const c1End = c1Start ? new Date(c1Start.getTime() + 27 * _DAY) : null;
+    const c1End = c1Start ? new Date(getCorrectionWindow(app, 1).endYmd) : null;
     const hasCorrExt = !!(app.extension_enabled && app.extension_start_date);
     const c2Start = hasCorrExt ? new Date(app.extension_start_date) : null;
-    const c2End = c2Start ? new Date(c2Start.getTime() + 27 * _DAY) : null;
+    const c2End = c2Start ? new Date(getCorrectionWindow(app, 2).endYmd) : null;
 
     // 첨삭 상태 텍스트
     let correctionStatusHtml = '';

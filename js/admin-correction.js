@@ -1089,13 +1089,13 @@ async function openDeadlineExtendModal() {
     try {
         // Fetch all correction_schedules
         const schedules = await supabaseAPI.query('correction_schedules', {
-            'select': 'id,user_id,start_date,duration_weeks,extension_enabled,extension_start_date',
+            'select': 'id,user_id,start_date,duration_weeks,end_date,extension_enabled,extension_start_date,extension_end_date',
             'order': 'start_date.desc',
             'limit': '500'
         });
         extModalSchedules = schedules || [];
 
-        // Filter active: 1학기(start_date + duration_weeks*7) OR 연장(extension_start_date + 27일) 둘 중 하나라도 진행 중/임박
+        // Filter active: 1학기(첨삭 종료일 or start_date + duration_weeks*7) OR 연장(연장 종료일 or ext_start + 27일) 둘 중 하나라도 진행 중/임박
         const now = new Date();
         const BUFFER_MS = 7 * 24 * 60 * 60 * 1000;
         const activeSchedules = extModalSchedules.filter(s => {
@@ -1103,13 +1103,15 @@ async function openDeadlineExtendModal() {
             if (s.start_date) {
                 const start = new Date(s.start_date);
                 const weeks = s.duration_weeks || 4;
-                const endDate = new Date(start.getTime() + weeks * 7 * 24 * 60 * 60 * 1000 + BUFFER_MS);
+                const baseEnd = s.end_date ? new Date(s.end_date) : new Date(start.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
+                const endDate = new Date(baseEnd.getTime() + BUFFER_MS);
                 if (endDate >= now) active = true;
             }
-            // 연장 학생: 13~24세션 창(연장 시작일 + 27일 + 버퍼)
+            // 연장 학생: 13~24세션 창(연장 종료일 or 연장 시작일 + 27일, + 버퍼)
             if (!active && s.extension_enabled && s.extension_start_date) {
                 const extStart = new Date(s.extension_start_date);
-                const extEnd = new Date(extStart.getTime() + 27 * 24 * 60 * 60 * 1000 + BUFFER_MS);
+                const baseExtEnd = s.extension_end_date ? new Date(s.extension_end_date) : new Date(extStart.getTime() + 27 * 24 * 60 * 60 * 1000);
+                const extEnd = new Date(baseExtEnd.getTime() + BUFFER_MS);
                 if (extEnd >= now) active = true;
             }
             return active;

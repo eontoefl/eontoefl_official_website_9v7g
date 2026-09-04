@@ -1131,7 +1131,9 @@ function computeResumeStartShift(app: Record<string, unknown>): {
   // 자기주도가 아니므로 종료일은 schedule_end (self_paced_end_date는 self_paced 전용 → 위에서 이미 return)
   if (app.schedule_end) updates.schedule_end = shift(app.schedule_end as string);
   if (app.correction_start_date) updates.correction_start_date = shift(app.correction_start_date as string);
+  if (app.correction_end_date) updates.correction_end_date = shift(app.correction_end_date as string);
   if (app.extension_start_date) updates.extension_start_date = shift(app.extension_start_date as string);
+  if (app.extension_end_date) updates.extension_end_date = shift(app.extension_end_date as string);
 
   return { moved: true, newStart, updates };
 }

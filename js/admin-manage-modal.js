@@ -644,6 +644,15 @@ function loadModalAnalysisTab(app) {
         ? (pendingPayload.self_paced === true)
         : !!app.self_paced;
     const fillSelfPacedEndDate = hasPendingDraft ? (pendingPayload.self_paced_end_date || '') : (app.self_paced_end_date || '');
+    // 첨삭 종료일: 비어 있으면 4주 고정(기존 학생 무영향). 챌린지 자기주도 학생이고 챌린지 종료일이
+    // 첨삭 시작일 기준 12일 이상이면 기본값으로 미리 채워 운영자가 확인만 하면 되게 한다(수정 가능, 저장 강제 아님).
+    let fillCorrectionEndDate = hasPendingDraft ? (pendingPayload.correction_end_date || '') : (app.correction_end_date || '');
+    if (!fillCorrectionEndDate && fillSelfPaced && fillSelfPacedEndDate && fillCorrectionStartDate) {
+        const _spEnd = new Date(fillSelfPacedEndDate + 'T00:00:00');
+        const _cStart = new Date(fillCorrectionStartDate + 'T00:00:00');
+        const _days = Math.round((_spEnd - _cStart) / (24 * 60 * 60 * 1000)) + 1;
+        if (_days >= 12) fillCorrectionEndDate = fillSelfPacedEndDate;
+    }
     // 연장(13~24세션)은 개별분석 발행과 무관한 별도 즉시 액션 → 항상 실제 app 값 사용(pending 미사용)
     // 아직 연장 적용 전이면 시작일 칸을 '다가오는 일요일'로 미리 채워 운영자가 확인만 하면 되게 한다.
     // (원탭 처리와 동일 규칙. 다른 날짜가 필요하면 그대로 수정 가능.)
@@ -954,6 +963,11 @@ function loadModalAnalysisTab(app) {
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일 권장) <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span></label>
                         <input type="date" name="correction_start_date" id="correction_start_date"
                                value="${fillCorrectionStartDate}"
+                               ${readOnly}
+                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
+                        <label style="font-size: 13px; color: #64748b; display: block; margin: 10px 0 6px;">첨삭 종료일 <span style="color:#3b82f6;font-size:11px;">(비우면 4주 고정 · 최소 12일)</span></label>
+                        <input type="date" name="correction_end_date" id="correction_end_date"
+                               value="${fillCorrectionEndDate}"
                                ${readOnly}
                                style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                     </div>
@@ -1343,8 +1357,8 @@ async function _computeExtStartForModal(app) {
         }
     } catch (e) { console.warn('세션12 조회 실패(무시):', e); }
     if (done) return base;
-    const cStart = new Date(app.correction_start_date + 'T00:00:00');
-    const cEnd = new Date(cStart.getTime() + 27 * 24 * 60 * 60 * 1000);
+    // 1학기 종료 = 첨삭 종료일 출처 1개(getCorrectionWindow). 종료일 없으면 시작+27일 폴백.
+    const cEnd = new Date(getCorrectionWindow(app, 1).endYmd + 'T00:00:00');
     const endSun = new Date(cEnd);
     endSun.setDate(endSun.getDate() + ((7 - endSun.getDay()) % 7));   // 종료 이후 첫 일요일
     const baseD = new Date(base + 'T00:00:00');
@@ -1485,9 +1499,10 @@ async function maybeSendExtensionAlimTalk(userId, extStart) {
         return;
     }
 
-    // 2) 일정 계산: 시작일 ~ +27일(연장 4주차 마지막 날)
+    // 2) 일정 계산: 연장 시작일 ~ 종료일. 종료 = 첨삭 종료일 출처 1개(getCorrectionWindow, phase 2).
+    //    ①단계에서는 extension_end_date가 항상 null이라 결과 동일(시작+27일). 출처만 통일.
     const startD = new Date(extStart + 'T00:00:00');
-    const endD = new Date(startD.getTime() + 27 * 24 * 60 * 60 * 1000);
+    const endD = new Date(getCorrectionWindow({ extension_start_date: extStart, extension_end_date: currentManageApp.extension_end_date }, 2).endYmd + 'T00:00:00');
     const fmt = (d) => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 
     // 3) 발송 (회차: 첫 연장 = 1회차. 다회 연장 도입 시 회차 카운터로 교체)
@@ -1593,6 +1608,7 @@ function setRejectionUIState(isRejected) {
     const fieldNames = [
         'schedule_start',
         'correction_start_date',
+        'correction_end_date',
         'self_paced_end_date',
         'additional_discount',
         'discount_reason'
@@ -1664,9 +1680,10 @@ function calculateModalEndDate() {
 }
 
 // correction_schedules UPSERT (첨삭 스케줄 자동 생성/업데이트)
-async function upsertCorrectionSchedule(userId, startDate, durationWeeks) {
+// endDate = 첨삭 종료일(비우면 null → 테스트룸/공홈에서 4주 고정 폴백).
+async function upsertCorrectionSchedule(userId, startDate, endDate) {
     const url = `${SUPABASE_URL}/rest/v1/correction_schedules?on_conflict=user_id`;
-    
+
     const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -1678,7 +1695,8 @@ async function upsertCorrectionSchedule(userId, startDate, durationWeeks) {
         body: JSON.stringify({
             user_id: userId,
             start_date: startDate,
-            duration_weeks: durationWeeks
+            duration_weeks: 4,
+            end_date: endDate || null
         })
     });
     
@@ -1781,6 +1799,43 @@ async function saveModalAnalysis(event) {
         }
     }
 
+    // 첨삭 종료일(자기주도형): 시작일·종료일이 둘 다 있을 때만 검증. 비우면 4주 고정(무영향).
+    const correctionStartVal = formData.get('correction_start_date') || null;
+    const correctionEndVal = formData.get('correction_end_date') || null;
+    if (correctionEnabled && !blankProgramFields && correctionStartVal && correctionEndVal) {
+        const _cs = new Date(correctionStartVal + 'T00:00:00');
+        const _ce = new Date(correctionEndVal + 'T00:00:00');
+        if (_ce <= _cs) {
+            alert('⚠️ 첨삭 종료일은 시작일보다 뒤여야 합니다.');
+            return;
+        }
+        const _corrDays = Math.round((_ce - _cs) / (24 * 60 * 60 * 1000)) + 1;
+        if (_corrDays < 12) {
+            alert('첨삭 기간은 시작일·종료일 포함 최소 12일이어야 합니다.');
+            return;
+        }
+        // 종료일을 기존과 다르게(특히 앞으로 당길 때) 바꾸면, 남은 세션이 [오늘~새 종료일]에 들어가는지 확인.
+        if (correctionEndVal !== (currentManageApp && currentManageApp.correction_end_date)) {
+            try {
+                const uid = currentManageApp && currentManageApp.user_id;
+                const rows = uid ? await supabaseAPI.query('correction_schedules',
+                    { 'user_id': `eq.${uid}`, 'select': 'session_dates' }) : null;
+                const raw = Array.isArray(rows) && rows[0] ? rows[0].session_dates : null;
+                const sd = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
+                if (sd && Array.isArray(sd.dates)) {
+                    const todayYmd = _kstTodayYmd();
+                    const remaining = sd.dates.filter(x => x > todayYmd).length;
+                    const _td = new Date(todayYmd + 'T00:00:00');
+                    const win = Math.round((_ce - _td) / (24 * 60 * 60 * 1000)) + 1;
+                    if (win < remaining) {
+                        alert(`남은 세션 ${remaining}개를 넣기엔 기간이 부족합니다(오늘~종료일 ${win}일).`);
+                        return;
+                    }
+                }
+            } catch (e) { console.warn('첨삭 종료일 남은 창 검증 조회 실패(무시):', e); }
+        }
+    }
+
     const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
     const nowMs = Date.now();
 
@@ -1793,6 +1848,7 @@ async function saveModalAnalysis(event) {
             course_track: (assignedProgramVal && assignedProgramVal.includes('Australia')) ? 'australia' : 'regular',
             correction_enabled: blankProgramFields ? false : correctionEnabled,
             correction_start_date: blankProgramFields ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+            correction_end_date: (blankProgramFields || !correctionEnabled || !formData.get('correction_start_date')) ? null : (formData.get('correction_end_date') || null),
             correction_fee: blankProgramFields ? 0 : correctionFee,
             program_price: blankProgramFields ? null : basePrice,
             discount_amount: blankProgramFields ? null : examSupport,
@@ -1846,6 +1902,7 @@ async function saveModalAnalysis(event) {
         course_track: (immediateProgram && immediateProgram.includes('Australia')) ? 'australia' : 'regular',
         correction_enabled: blankProgramFields ? false : correctionEnabled,
         correction_start_date: blankProgramFields ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
+        correction_end_date: (blankProgramFields || !correctionEnabled || !formData.get('correction_start_date')) ? null : (formData.get('correction_end_date') || null),
         // 첨삭을 끄면 연장(13~24세션)도 함께 해제 (고아 데이터 방지)
         ...((blankProgramFields || !correctionEnabled) ? { extension_enabled: false, extension_start_date: null } : {}),
         correction_fee: blankProgramFields ? 0 : correctionFee,
@@ -1885,7 +1942,7 @@ async function saveModalAnalysis(event) {
             if (correctionEnabled && updateData.correction_start_date) {
                 try {
                     const userId = updatedApp.user_id || currentManageApp.user_id;
-                    await upsertCorrectionSchedule(userId, updateData.correction_start_date, 4);
+                    await upsertCorrectionSchedule(userId, updateData.correction_start_date, updateData.correction_end_date);
                     console.log('✅ correction_schedules UPSERT 완료');
                 } catch (e) {
                     console.error('correction_schedules UPSERT 실패:', e);
@@ -2971,7 +3028,7 @@ async function sendContractFromModal(appId) {
 //   - 이동조건 = schedule_start가 KST 오늘보다 과거 OR 학생이 '다음주' 선택.
 //     ('이번주'/미선택이고 시작일이 미래면 이동 없음 = 이번주 그대로 시작, 교재만 선발송.)
 //   - 실제로 앞으로 미룰 때만(deltaDays>0) 이동. delta<=0(제자리/과거로)이면 이동 없음 — 시작일이 뒤로 당겨지는 사고 방지.
-//   - deltaDays만큼 schedule_end·correction_start_date·extension_start_date 중 값 있는 것만 함께 이동.
+//   - deltaDays만큼 schedule_end·correction_start_date·correction_end_date·extension_start_date·extension_end_date 중 값 있는 것만 함께 이동.
 function _kstTodayYmd() {
     const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000); // KST = UTC+9 (DST 없음)
     const y = kstNow.getUTCFullYear();
@@ -3006,7 +3063,9 @@ function _computeDepositStartShift(app) {
     const updates = { schedule_start: newStart };
     if (app.schedule_end) updates.schedule_end = _shiftYmd(app.schedule_end, deltaDays);
     if (app.correction_start_date) updates.correction_start_date = _shiftYmd(app.correction_start_date, deltaDays);
+    if (app.correction_end_date) updates.correction_end_date = _shiftYmd(app.correction_end_date, deltaDays);
     if (app.extension_start_date) updates.extension_start_date = _shiftYmd(app.extension_start_date, deltaDays);
+    if (app.extension_end_date) updates.extension_end_date = _shiftYmd(app.extension_end_date, deltaDays);
 
     return { moved: true, oldStart, newStart, updates };
 }

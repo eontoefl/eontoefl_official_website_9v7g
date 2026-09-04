@@ -443,10 +443,38 @@ function isCorrectionActive(app) {
 }
 
 // 시작일 + 27일 10:00 KST(= 01:00 UTC) 종료 시점 헬퍼
+// (getCorrectionWindow 안에서만 호출 — 종료 시점 계산 출처를 하나로 합침)
 function _correctionEndKST(startDate) {
     const end = new Date(startDate);
     end.setDate(end.getDate() + 27);
     return new Date(end.getFullYear(), end.getMonth(), end.getDate(), 1, 0, 0);
+}
+
+// ===== 첨삭 종료 시점 출처 1개 =====
+// phase 1 = 1학기(1~12세션), phase 2 = 연장(13~24세션).
+//   종료일(correction_end_date / extension_end_date)이 지정돼 있으면
+//     그 날짜가 "마지막 1차 제출 가능일" → 종료는 그 다음날부터.
+//     endYmd = 종료일, endMoment = (종료일 + 1일) 01:00(로컬 = 10:00 KST와 같은 관례 오프셋).
+//   비어 있으면 기존 4주 고정: endYmd = 시작일+27일, endMoment = _correctionEndKST(시작일).
+// 반환: { endYmd, endMoment }. 시작일이 없으면 null.
+function getCorrectionWindow(app, phase) {
+    if (!app) return null;
+    const startYmd = phase === 2 ? app.extension_start_date : app.correction_start_date;
+    if (!startYmd) return null;
+    const endCol = phase === 2 ? app.extension_end_date : app.correction_end_date;
+    if (endCol) {
+        const e = new Date(endCol);
+        const endMoment = new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1, 1, 0, 0);
+        return { endYmd: endCol, endMoment };
+    }
+    const start = new Date(startYmd);
+    const endMoment = _correctionEndKST(start);
+    const e2 = new Date(start);
+    e2.setDate(e2.getDate() + 27);
+    const endYmd = e2.getFullYear() + '-' +
+        String(e2.getMonth() + 1).padStart(2, '0') + '-' +
+        String(e2.getDate()).padStart(2, '0');
+    return { endYmd, endMoment };
 }
 
 // 스라첨삭 상태 정보 반환
@@ -463,13 +491,13 @@ function getCorrectionStatus(app) {
 
     const today = getEffectiveToday();
     const start = new Date(app.correction_start_date);
-    const end1KST = _correctionEndKST(start); // 1학기 종료
+    const end1KST = getCorrectionWindow(app, 1).endMoment; // 1학기 종료
 
     // ===== 연장(13~24세션) 활성 학생 =====
     const hasExt = !!(app.extension_enabled && app.extension_start_date);
     if (hasExt) {
         const extStart = new Date(app.extension_start_date);
-        const extEndKST = _correctionEndKST(extStart);
+        const extEndKST = getCorrectionWindow(app, 2).endMoment;
 
         // 연장 종료
         if (today >= extEndKST) {
