@@ -1824,7 +1824,9 @@ async function saveModalAnalysis(event) {
                 const sd = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
                 if (sd && Array.isArray(sd.dates)) {
                     const todayYmd = _kstTodayYmd();
-                    const remaining = sd.dates.filter(x => x > todayYmd).length;
+                    // 오늘 포함(테스트룸 재배분 규칙과 동일): 테스트룸 생성기는 '오늘보다 이른 날짜(< today)'만
+                    // 보존하고 오늘 포함 나머지를 [오늘~종료일]에 재배분한다. 오늘 배정 세션도 재배분 대상이라 카운트 포함.
+                    const remaining = sd.dates.filter(x => x >= todayYmd).length;
                     const _td = new Date(todayYmd + 'T00:00:00');
                     const win = Math.round((_ce - _td) / (24 * 60 * 60 * 1000)) + 1;
                     if (win < remaining) {

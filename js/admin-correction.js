@@ -1089,7 +1089,7 @@ async function openDeadlineExtendModal() {
     try {
         // Fetch all correction_schedules
         const schedules = await supabaseAPI.query('correction_schedules', {
-            'select': 'id,user_id,start_date,duration_weeks,end_date,extension_enabled,extension_start_date,extension_end_date',
+            'select': '*',
             'order': 'start_date.desc',
             'limit': '500'
         });

@@ -125,4 +125,31 @@ test("d2. 종료일 없는 학생: correction_end_date 키 미생성", () => {
     assert.equal("correction_end_date" in res.updates, false, "종료일 없으면 키 자체가 없어야 함");
 });
 
+// (e) 남은 창 검증: 오늘 세션도 재배분 대상 → remaining은 x >= todayYmd 로 세어야 함.
+//     실제 검증은 saveModalAnalysis 안 인라인 로직이라 (1) 소스 부등호를 텍스트로 고정하고
+//     (2) 소스와 동일한 공식으로 경계 동작을 재현한다.
+test("e. 남은 창 검증 부등호가 소스에서 x >= todayYmd (옛 x > todayYmd 잔존 금지)", () => {
+    assert.ok(modalSrc.includes("x >= todayYmd"), "남은 세션 카운트는 오늘 포함(x >= todayYmd)이어야 함");
+    assert.ok(!modalSrc.includes("x > todayYmd"), "옛 부등호(x > todayYmd) 잔존 금지");
+});
+
+// 소스와 동일 공식: remaining = count(x >= today), win = (종료−오늘)/1일 + 1(양끝 포함), 차단 = win < remaining
+function corrWindowShort(dates, endYmd, todayYmd) {
+    const remaining = dates.filter(x => x >= todayYmd).length;
+    const win = Math.round((new Date(endYmd + "T00:00:00") - new Date(todayYmd + "T00:00:00")) / (24 * 60 * 60 * 1000)) + 1;
+    return win < remaining;
+}
+test("e2. 경계: 오늘1+미래6=7세션 → 창7(종료=오늘+6) 통과 / 창6(종료=오늘+5) 차단", () => {
+    const today = "2026-09-13";
+    // 오늘 포함 7세션(오늘 + 미래 6일). 종료일을 오늘보다 이른 세션은 없음 = 전부 재배분 대상.
+    const dates = ["2026-09-13", "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19"];
+    // 창 7일(종료 = 오늘+6): 7세션이 하루 1개씩 정확히 들어감 → 통과
+    assert.equal(corrWindowShort(dates, "2026-09-19", today), false);
+    // 창 6일(종료 = 오늘+5): 7세션이 6칸에 안 들어감 → 차단(하루 2세션 방지)
+    assert.equal(corrWindowShort(dates, "2026-09-18", today), true);
+    // 옛 부등호(오늘 제외 → remaining 6)였다면 창 6도 통과시켜 버그: 그 회귀를 못 잡음
+    const oldRemaining = dates.filter(x => x > today).length; // 6
+    assert.equal(6 < oldRemaining, false, "옛 로직은 창 6을 통과시켜 하루 2세션 버그를 놓침");
+});
+
 process.stdout.write("\n" + passed + " passed\n");
