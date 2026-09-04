@@ -15,6 +15,18 @@ function displayProgramName(app) {
 function effectiveScheduleEnd(app) {
     return app.self_paced ? app.self_paced_end_date : app.schedule_end;
 }
+// 첨삭 종류 라벨: correction_end_date가 있으면 '자기주도·N일'(N=시작·종료 양끝 포함 일수),
+// 없으면 '정규·4주'. 종료일 출처는 supabase-config.js의 getCorrectionWindow(app,1) 하나로 통일.
+function correctionModeLabel(app) {
+    const win = getCorrectionWindow(app, 1);
+    if (win && app.correction_end_date) {
+        const s = new Date(app.correction_start_date + 'T00:00:00');
+        const e = new Date(win.endYmd + 'T00:00:00');
+        const n = Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1;
+        return `자기주도·${n}일`;
+    }
+    return '정규·4주';
+}
 
 // ===== 신청서 삭제 (상세 페이지용) =====
 function openDetailDeleteModal() {
@@ -1194,7 +1206,7 @@ function getAnalysisSection(app) {
             ${app.correction_enabled ? `
             <div class="s2-row">
                 <span class="s2-row-label">스라첨삭</span>
-                <span class="s2-row-value" style="color: #2f855a;">포함</span>
+                <span class="s2-row-value" style="color: #2f855a;">포함 (${correctionModeLabel(app)})</span>
             </div>
             ${app.correction_start_date ? `
             <div class="s2-row">
@@ -1340,7 +1352,7 @@ function getAgreementSection(app) {
             ${app.assigned_program ? `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
                 <span style="color: #64748b;">프로그램</span>
-                <span style="font-weight: 600; color: #5b4a7d; text-align: right;">${escapeHtml(displayProgramName(app))}${app.correction_enabled ? ', 스라첨삭' : ''}</span>
+                <span style="font-weight: 600; color: #5b4a7d; text-align: right;">${escapeHtml(displayProgramName(app))}${app.correction_enabled ? ', 스라첨삭 - ' + correctionModeLabel(app) : ''}</span>
             </div>` : ''}
             ${app.schedule_start ? (app.correction_enabled ? `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
