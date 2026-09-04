@@ -674,7 +674,7 @@ function updateAlertBoard(students, v3Records, scheduleData) {
                 color: '#f59e0b',
                 icon: '⚠️',
                 title: `${s.name} - ${missedDays.length}일 연속 미제출 (${missedDays.reverse().join(', ')})`,
-                subtitle: `${s.isAustralia ? 'AU ' : ''}${s.selfPaced ? 'SELF PACED' : `${s.programType} ${s.totalWeeks}주`} | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}%`,
+                subtitle: `${s.isAustralia ? 'AU ' : ''}${s.selfPaced ? '자기주도' : `${s.programType} ${s.totalWeeks}주`} | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}%`,
                 userId: s.userId
             });
         }

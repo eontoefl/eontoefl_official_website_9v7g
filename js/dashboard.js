@@ -170,9 +170,9 @@ function renderProgressSection(app) {
     
     const progressLabel = progress === 100 ? '준비 완료' : '현재 진행률';
 
-    // 프로그램 이름 (자기주도는 'Fast' 대신 'SELF PACED'로 표시 — 표시 전용)
+    // 프로그램 이름 (자기주도는 'Fast' 대신 '자기주도'로 표시 — 표시 전용)
     const programName = app.self_paced
-        ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED')
+        ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - 자기주도')
         : (app.assigned_program || '내벨업챌린지');
 
     // HTML 생성
@@ -1402,10 +1402,10 @@ async function renderProgramInfo(app) {
         }
     }
 
-    // 자기주도: 내부 저장값은 'Fast'지만 학생 화면에는 'SELF PACED'로 표기(테스트룸·계약 파싱은 저장값 그대로 사용).
-    // 이름 자체에 SELF PACED가 들어가므로 별도 '자기주도' 딱지는 붙이지 않는다.
+    // 자기주도: 내부 저장값은 'Fast'지만 학생 화면에는 '자기주도'로 표기(테스트룸·계약 파싱은 저장값 그대로 사용).
+    // 이름 자체에 자기주도가 들어가므로 별도 '자기주도' 딱지는 붙이지 않는다.
     const programDisplayName = app.self_paced
-        ? ((app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED'))
+        ? ((app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - 자기주도'))
         : (app.assigned_program || '-');
     // 자기주도 종료일은 자기주도 전용 완료일(self_paced_end_date)에 저장되므로 그 값을 사용한다.
     const programEndDate = app.self_paced ? app.self_paced_end_date : app.schedule_end;

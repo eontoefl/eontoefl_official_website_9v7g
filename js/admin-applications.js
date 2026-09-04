@@ -717,7 +717,7 @@ function displayApplications() {
                 <td>
                     <span style="color: #9480c5; font-weight: 500; font-size: 13px;">
                         ${escapeHtml(app.self_paced
-                            ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED')
+                            ? (app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - 자기주도')
                             : (app.assigned_program || app.preferred_program || '-'))}
                     </span>
                     ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;">첨삭</span>' : ''}

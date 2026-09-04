@@ -3,11 +3,11 @@ let currentApplication = null;
 let globalApplication = null; // Phase 2: 글로벌 변수
 let _studentInfo = { name: '', phone: '', id: '' }; // 알림톡용 학생 기본정보 (변하지 않음)
 
-// 자기주도는 내부 저장값이 'Fast'지만 학생에게는 'SELF PACED'로 보여준다(표시 전용, 저장값·파싱 무변경).
+// 자기주도는 내부 저장값이 'Fast'지만 학생에게는 '자기주도'로 보여준다(표시 전용, 저장값·파싱 무변경).
 function displayProgramName(app) {
     const raw = app.assigned_program || '';
     if (app.self_paced) {
-        return (raw || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - SELF PACED');
+        return (raw || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - 자기주도');
     }
     return raw;
 }

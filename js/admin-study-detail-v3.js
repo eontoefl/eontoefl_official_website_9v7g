@@ -208,9 +208,9 @@ function renderProfileHeader() {
     document.getElementById('studentAvatar').textContent = name.charAt(0);
     document.getElementById('studentName').textContent = name;
     const auLabel = isAustraliaTrack(app) ? '내벨업챌린지 Australia' : '내벨업챌린지';
-    // 자기주도: 저장값은 'Fast'지만 헤더에는 'SELF PACED'로 표기(주차 개념 없음), 종료일은 자기주도 완료일 기준
+    // 자기주도: 저장값은 'Fast'지만 헤더에는 '자기주도'로 표기(주차 개념 없음), 종료일은 자기주도 완료일 기준
     document.getElementById('studentProgram').textContent = app.self_paced
-        ? `${auLabel} - SELF PACED`
+        ? `${auLabel} - 자기주도`
         : `${auLabel} - ${getProgram(app)} (${getTotalWeeks(app)}주)`;
 
     const start = getScheduleStart(app);
