@@ -152,4 +152,55 @@ test("e2. 경계: 오늘1+미래6=7세션 → 창7(종료=오늘+6) 통과 / 창
     assert.equal(6 < oldRemaining, false, "옛 로직은 창 6을 통과시켜 하루 2세션 버그를 놓침");
 });
 
+// ===== ③단계(연장 13~24세션) =====
+
+// (f) correctionModeLabel(app, phase): 종류 라벨. getCorrectionWindow와 함께 격리 실행.
+const detailSrc = fs.readFileSync(path.join(__dirname, "..", "js", "application-detail.js"), "utf8");
+const labelCode = winCode + "\n" + extractFn("correctionModeLabel", detailSrc);
+const { correctionModeLabel } = new Function(labelCode + "\nreturn { correctionModeLabel };")();
+
+test("f1. phase 1 무회귀: 종료일 없으면 '정규·4주', 있으면 '자기주도·N일'", () => {
+    assert.equal(correctionModeLabel({ correction_start_date: "2026-09-13" }), "정규·4주");
+    assert.equal(correctionModeLabel({ correction_start_date: "2026-09-13" }, 1), "정규·4주");
+    // 9/13~9/24 = 양끝 포함 12일
+    assert.equal(correctionModeLabel({ correction_start_date: "2026-09-13", correction_end_date: "2026-09-24" }, 1), "자기주도·12일");
+});
+
+test("f2. phase 2: extension_end_date 기준으로 N일 계산", () => {
+    // 연장 종료일 없음 → 정규·4주
+    assert.equal(correctionModeLabel({ extension_start_date: "2026-11-01" }, 2), "정규·4주");
+    // 11/01~11/20 = 양끝 포함 20일
+    assert.equal(correctionModeLabel({ extension_start_date: "2026-11-01", extension_end_date: "2026-11-20" }, 2), "자기주도·20일");
+    // phase 2인데 correction_end_date(1학기 종료)만 있는 경우는 무시(연장 종료일 아님)
+    assert.equal(correctionModeLabel({ extension_start_date: "2026-11-01", correction_end_date: "2026-09-24" }, 2), "정규·4주");
+});
+
+// (g) 연장 종료일 검증 공식(시작 이전·12일·남은 창) — applyCorrectionExtension 인라인 로직 재현.
+//     ①단계 1차와 동일 규칙·문구. 소스 텍스트로 규칙 잔존을 고정 + 경계 동작을 재현한다.
+test("g1. 소스: 연장 검증이 extension_session_dates·오늘 포함(x >= todayYmd)·연장 12일 문구를 쓴다", () => {
+    assert.ok(modalSrc.includes("extension_session_dates"), "연장 남은 창 검증은 extension_session_dates를 읽어야 함");
+    assert.ok(modalSrc.includes("연장 기간은 시작일·종료일 포함 최소 12일이어야 합니다."), "연장 12일 문구 필요");
+    assert.ok(modalSrc.includes("연장 종료일은 시작일보다 뒤여야 합니다."), "연장 시작 이전 차단 문구 필요");
+    // 남은 창 카운트는 ①단계와 같은 오늘 포함 부등호(x >= todayYmd)
+    assert.ok(modalSrc.includes("x >= todayYmd"), "남은 세션 카운트는 오늘 포함(x >= todayYmd)이어야 함");
+});
+
+// 시작 이전·12일 경계: 양끝 포함 일수 = (end − start)/1일 + 1
+function extDaysInclusive(startYmd, endYmd) {
+    return Math.round((new Date(endYmd + "T00:00:00") - new Date(startYmd + "T00:00:00")) / (24 * 60 * 60 * 1000)) + 1;
+}
+test("g2. 12일 경계: 정확히 12일 통과, 11일 차단, 시작 이전은 음수", () => {
+    assert.equal(extDaysInclusive("2026-11-01", "2026-11-12"), 12);       // 통과
+    assert.ok(extDaysInclusive("2026-11-01", "2026-11-11") < 12);          // 11일 차단
+    assert.ok(extDaysInclusive("2026-11-01", "2026-10-31") <= 1);          // 종료 ≤ 시작
+});
+
+test("g3. 남은 창(연장): 재배분 공식은 ①단계와 동일 corrWindowShort", () => {
+    const today = "2026-11-01";
+    // 오늘 포함 7세션 → 창 7(종료 = 오늘+6) 통과 / 창 6(종료 = 오늘+5) 차단
+    const dates = ["2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07"];
+    assert.equal(corrWindowShort(dates, "2026-11-07", today), false);
+    assert.equal(corrWindowShort(dates, "2026-11-06", today), true);
+});
+
 process.stdout.write("\n" + passed + " passed\n");

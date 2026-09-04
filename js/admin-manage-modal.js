@@ -657,6 +657,8 @@ function loadModalAnalysisTab(app) {
     // 아직 연장 적용 전이면 시작일 칸을 '다가오는 일요일'로 미리 채워 운영자가 확인만 하면 되게 한다.
     // (원탭 처리와 동일 규칙. 다른 날짜가 필요하면 그대로 수정 가능.)
     const fillExtensionStartDate = app.extension_start_date || app._computedExtStart || _upcomingSundayStr();
+    // 연장 종료일(자기주도형): 항상 실제 저장값만 사용. 비우면 4주 고정(자동 채움 없음).
+    const fillExtensionEndDate = app.extension_end_date || '';
     // 이 학생의 '입금 대기' 연장 신청(있으면) — 연장 칸 위에 신청 정보 한 줄 표시용.
     // admin-applications.js가 목록 로드 시 채워둔 전역 맵을 참조(같은 페이지).
     const pendingExtReq = (typeof pendingExtensionByUser !== 'undefined' && app.user_id)
@@ -985,6 +987,9 @@ function loadModalAnalysisTab(app) {
                             <button type="button" id="applyExtensionBtn" onclick="applyCorrectionExtension()"
                                     style="padding: 10px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">연장 적용</button>
                         </div>
+                        <label style="font-size: 13px; color: #64748b; display: block; margin: 10px 0 6px;">연장 종료일 <span style="color:#7c3aed;font-size:11px;">(비우면 4주 고정 · 최소 12일)</span></label>
+                        <input type="date" id="extension_end_date" value="${fillExtensionEndDate}"
+                               style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-family: 'Pretendard', -apple-system, sans-serif;">
                         <div style="font-size: 12px; color: #94a3b8; margin-top: 6px;">13~24세션 시작일을 넣고 [연장 적용]. 날짜를 비우고 적용하면 연장이 해제됩니다.</div>
                     </div>
                 </div>
@@ -1396,12 +1401,50 @@ async function _confirmExtensionRequest(userId) {
 async function applyCorrectionExtension() {
     if (!currentManageApp) return;
     const input = document.getElementById('extension_start_date');
+    const endInput = document.getElementById('extension_end_date');
     const btn = document.getElementById('applyExtensionBtn');
     const extStart = (input && input.value) ? input.value : '';
+    // 연장 해제(시작일 비움)면 종료일도 무시. 시작일이 있을 때만 종료일 유효.
+    const extEnd = extStart && endInput && endInput.value ? endInput.value : '';
     const enabled = !!extStart;
     const userId = currentManageApp.user_id;
 
     if (!userId) { alert('학생 user_id를 찾을 수 없습니다.'); return; }
+
+    // 연장 종료일(자기주도형): 시작일·종료일이 둘 다 있을 때만 검증. 비우면 4주 고정(무영향).
+    // 규칙·문구는 ①단계 1차(1~12) 종료일 검증과 동일. 단 대상 세션표는 extension_session_dates.
+    if (enabled && extEnd) {
+        const _es = new Date(extStart + 'T00:00:00');
+        const _ee = new Date(extEnd + 'T00:00:00');
+        if (_ee <= _es) {
+            alert('⚠️ 연장 종료일은 시작일보다 뒤여야 합니다.');
+            return;
+        }
+        const _extDays = Math.round((_ee - _es) / (24 * 60 * 60 * 1000)) + 1;
+        if (_extDays < 12) {
+            alert('연장 기간은 시작일·종료일 포함 최소 12일이어야 합니다.');
+            return;
+        }
+        // 종료일을 기존과 다르게(특히 앞으로 당길 때) 바꾸면, 남은 세션이 [오늘~새 종료일]에 들어가는지 확인.
+        if (extEnd !== (currentManageApp && currentManageApp.extension_end_date)) {
+            try {
+                const rows = await supabaseAPI.query('correction_schedules',
+                    { 'user_id': `eq.${userId}`, 'select': 'extension_session_dates' });
+                const raw = Array.isArray(rows) && rows[0] ? rows[0].extension_session_dates : null;
+                const sd = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
+                if (sd && Array.isArray(sd.dates)) {
+                    const todayYmd = _kstTodayYmd();
+                    const remaining = sd.dates.filter(x => x >= todayYmd).length;
+                    const _td = new Date(todayYmd + 'T00:00:00');
+                    const win = Math.round((_ee - _td) / (24 * 60 * 60 * 1000)) + 1;
+                    if (win < remaining) {
+                        alert(`남은 세션 ${remaining}개를 넣기엔 기간이 부족합니다(오늘~종료일 ${win}일).`);
+                        return;
+                    }
+                }
+            } catch (e) { console.warn('연장 종료일 남은 창 검증 조회 실패(무시):', e); }
+        }
+    }
 
     if (enabled) {
         if (!confirm(`${currentManageApp.name || '학생'}님의 13~24세션을 ${extStart}부터 열겠습니까?`)) return;
@@ -1414,13 +1457,16 @@ async function applyCorrectionExtension() {
         // 1) applications 미러 (대시보드/신청상세가 읽음)
         await supabaseAPI.patch('applications', currentManageApp.id, {
             extension_enabled: enabled,
-            extension_start_date: extStart || null
+            extension_start_date: extStart || null,
+            extension_end_date: enabled ? (extEnd || null) : null
         });
         currentManageApp.extension_enabled = enabled;
         currentManageApp.extension_start_date = extStart || null;
+        // 알림톡 함수(maybeSendExtensionAlimTalk)가 getCorrectionWindow(…,2)로 읽으므로 PATCH 직후·알림톡 전에 갱신.
+        currentManageApp.extension_end_date = enabled ? (extEnd || null) : null;
 
         // 2) correction_schedules 원본 (테스트룸이 읽음)
-        await upsertCorrectionExtensionSchedule(userId, enabled, extStart || null);
+        await upsertCorrectionExtensionSchedule(userId, enabled, extStart || null, enabled ? (extEnd || null) : null);
 
         // 3) 첨삭 연장 완료 알림톡 — 켤 때 & 아직 미발송일 때만 1회 (실패해도 연장 적용은 유지)
         if (enabled) {
@@ -1451,12 +1497,13 @@ async function applyCorrectionExtension() {
 
 // correction_schedules에 연장 필드 UPSERT (on_conflict=user_id).
 // 행이 없을 경우(신규 insert)에도 NOT NULL 제약을 만족하도록 1학기 기준값을 함께 보냄.
-async function upsertCorrectionExtensionSchedule(userId, enabled, extStartDate) {
+async function upsertCorrectionExtensionSchedule(userId, enabled, extStartDate, extEndDate) {
     const url = `${SUPABASE_URL}/rest/v1/correction_schedules?on_conflict=user_id`;
     const body = {
         user_id: userId,
         extension_enabled: enabled,
-        extension_start_date: extStartDate
+        extension_start_date: extStartDate,
+        extension_end_date: enabled ? (extEndDate || null) : null
     };
     // 행이 없을 때만 의미가 있는 안전장치(행이 있으면 동일 값 재기록)
     if (currentManageApp && currentManageApp.correction_start_date) {
@@ -1906,7 +1953,7 @@ async function saveModalAnalysis(event) {
         correction_start_date: blankProgramFields ? null : (correctionEnabled ? (formData.get('correction_start_date') || null) : null),
         correction_end_date: (blankProgramFields || !correctionEnabled || !formData.get('correction_start_date')) ? null : (formData.get('correction_end_date') || null),
         // 첨삭을 끄면 연장(13~24세션)도 함께 해제 (고아 데이터 방지)
-        ...((blankProgramFields || !correctionEnabled) ? { extension_enabled: false, extension_start_date: null } : {}),
+        ...((blankProgramFields || !correctionEnabled) ? { extension_enabled: false, extension_start_date: null, extension_end_date: null } : {}),
         correction_fee: blankProgramFields ? 0 : correctionFee,
         program_price: blankProgramFields ? null : basePrice,
         discount_amount: blankProgramFields ? null : examSupport,
@@ -1962,7 +2009,7 @@ async function saveModalAnalysis(event) {
                                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({ extension_enabled: false, extension_start_date: null })
+                            body: JSON.stringify({ extension_enabled: false, extension_start_date: null, extension_end_date: null })
                         });
                     }
                 } catch (e) {

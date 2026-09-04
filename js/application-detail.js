@@ -15,12 +15,16 @@ function displayProgramName(app) {
 function effectiveScheduleEnd(app) {
     return app.self_paced ? app.self_paced_end_date : app.schedule_end;
 }
-// 첨삭 종류 라벨: correction_end_date가 있으면 '자기주도·N일'(N=시작·종료 양끝 포함 일수),
-// 없으면 '정규·4주'. 종료일 출처는 supabase-config.js의 getCorrectionWindow(app,1) 하나로 통일.
-function correctionModeLabel(app) {
-    const win = getCorrectionWindow(app, 1);
-    if (win && app.correction_end_date) {
-        const s = new Date(app.correction_start_date + 'T00:00:00');
+// 첨삭 종류 라벨: 해당 학기의 종료일 컬럼이 있으면 '자기주도·N일'(N=시작·종료 양끝 포함 일수),
+// 없으면 '정규·4주'. 종료일 출처는 supabase-config.js의 getCorrectionWindow(app,phase) 하나로 통일.
+// phase 1 = 1~12세션(correction_*), phase 2 = 13~24세션 연장(extension_*). 기본 phase 1(기존 호출부 무변경).
+function correctionModeLabel(app, phase) {
+    const p = phase === 2 ? 2 : 1;
+    const win = getCorrectionWindow(app, p);
+    const startYmd = p === 2 ? app.extension_start_date : app.correction_start_date;
+    const endCol = p === 2 ? app.extension_end_date : app.correction_end_date;
+    if (win && endCol) {
+        const s = new Date(startYmd + 'T00:00:00');
         const e = new Date(win.endYmd + 'T00:00:00');
         const n = Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1;
         return `자기주도·${n}일`;
@@ -1220,9 +1224,19 @@ function getAnalysisSection(app) {
             </div>` : ''}
             ${app.extension_enabled && app.extension_start_date ? `
             <div class="s2-row">
+                <span class="s2-row-label">13~24세션</span>
+                <span class="s2-row-value" style="color: #5b4a7d;">포함 (${correctionModeLabel(app, 2)})</span>
+            </div>
+            <div class="s2-row">
                 <span class="s2-row-label">13~24세션 시작일</span>
                 <span class="s2-row-value" style="color: #5b4a7d;">${app.extension_start_date}</span>
+            </div>
+            ${getCorrectionWindow(app, 2) ? `
+            <div class="s2-row">
+                <span class="s2-row-label">13~24세션 종료일</span>
+                <span class="s2-row-value" style="color: #5b4a7d;">${getCorrectionWindow(app, 2).endYmd}</span>
             </div>` : ''}
+            ` : ''}
             ` : ''}
         </div>
         ` : ''}
