@@ -31,7 +31,7 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
     <!-- 내챌 신청서와 동일한 디자인 톤 (지면·섹션·입력·버튼·모달) -->
-    <link rel="stylesheet" href="css/application-form.css?v=10">
+    <link rel="stylesheet" href="css/application-form.css?v=11">
     <!-- 입문서 전용 조각(토스트·차단화면·카카오 등)만 덧입힘 -->
     <link rel="stylesheet" href="css/book-request.css?v=11">
 </head>
@@ -232,6 +232,12 @@
                             <label for="password">비밀번호</label>
                             <input type="password" id="password" name="password" placeholder="6자 이상 입력" required minlength="6">
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="passwordConfirm">비밀번호 확인</label>
+                        <input type="password" id="passwordConfirm" placeholder="비밀번호를 한 번 더 입력" required minlength="6" autocomplete="new-password">
+                        <small id="passwordConfirmStatus" class="password-match-status" aria-live="polite"></small>
                     </div>
 
                     <p style="font-size:0.82rem; color:#64748b; margin-top:0.25rem; text-align:right;">
@@ -510,7 +516,7 @@
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
-    <script src="js/book-request.js"></script>
+    <script src="js/book-request.js?v=2"></script>
 
     <!-- 진행 표시: 폼 영역 스크롤 진행도만 계산 (폼 로직·필드와 무관) -->
     <script>

@@ -23,7 +23,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
-    <link rel="stylesheet" href="css/application-form.css?v=10">
+    <link rel="stylesheet" href="css/application-form.css?v=11">
 </head>
 <body>
     <!-- 상단 진행 표시 (폼 스크롤 진행도) -->
@@ -63,7 +63,7 @@
                         </div>
                     </li>
                     <li class="nav-item has-dropdown">
-                        <a href="application.html" class="active">신청하기</a>
+                        <a href="application-form.html" class="active" aria-current="page" onclick="event.preventDefault()">내벨업챌린지 신청</a>
                         <div class="dropdown-menu">
                             <a href="application.html"><i class="fas fa-list"></i> 신청 현황</a>
                             <a href="#" onclick="goToMyApplication(event)"><i class="fas fa-user-check"></i> 내 신청서</a>
@@ -114,29 +114,59 @@
                 </div>
             </div>
 
-            <!-- Section 1: 기본 정보 -->
+            <!-- Section 1: 계정 및 기본 정보 -->
             <div class="form-section">
                 <div class="section-header">
                     <span class="section-number">1</span>
-                    <h2>기본 정보</h2>
+                    <h2>계정 및 기본 정보</h2>
                 </div>
 
                 <div class="two-column-grid">
                     <div class="form-group">
                         <label>성함</label>
-                        <input type="text" name="name" placeholder="성함" required>
+                        <input type="text" id="applicantName" name="name" placeholder="성함" required>
                     </div>
-                    <div class="form-group">
-                        <label>연락처</label>
-                        <input type="tel" name="phone" placeholder="010-1234-5678" required>
+                    <div class="form-group signup-only" id="nicknameGroup">
+                        <label>닉네임</label>
+                        <div class="field-with-status">
+                            <input type="text" id="accountNickname" name="account_nickname" placeholder="후기 등에 표시될 닉네임" minlength="2" maxlength="12" required>
+                            <span id="nicknameStatus" class="field-status"></span>
+                        </div>
+                        <small>2~12자, 한글·영문·숫자만 사용할 수 있어요.</small>
                     </div>
                 </div>
 
                 <div class="two-column-grid">
                     <div class="form-group">
                         <label>이메일</label>
-                        <input type="email" name="email" placeholder="example@email.com" required>
+                        <div class="field-with-status">
+                            <input type="email" id="applicantEmail" name="email" placeholder="example@email.com" required>
+                            <span id="emailStatus" class="field-status"></span>
+                        </div>
                     </div>
+                    <div class="form-group">
+                        <label>연락처</label>
+                        <input type="tel" id="applicantPhone" name="phone" placeholder="010-1234-5678" required>
+                    </div>
+                </div>
+
+                <div class="two-column-grid signup-only" id="passwordRow">
+                    <div class="form-group">
+                        <label>비밀번호</label>
+                        <input type="password" id="accountPassword" name="account_password" placeholder="6자 이상 입력" minlength="6" required autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label>비밀번호 확인</label>
+                        <input type="password" id="accountPasswordConfirm" placeholder="비밀번호를 한 번 더 입력" minlength="6" required autocomplete="new-password">
+                        <small id="accountPasswordConfirmStatus" class="password-match-status" aria-live="polite"></small>
+                    </div>
+                </div>
+                <div class="login-guide signup-only">
+                    <span>이미 회원이세요?</span>
+                    <a href="#" id="applicationLoginLink">로그인하고 이어서 작성하기</a>
+                </div>
+
+                <div class="two-column-grid">
                     <div class="form-group">
                         <label>주소 (택배 받을 정확한 주소)</label>
                         <input type="text" name="address" placeholder="예: 서울특별시 강남구 OO로 123, 456호" required>
@@ -842,12 +872,20 @@
                 </div>
             </div>
 
-            <!-- Section 13: 개인정보 동의 -->
+            <!-- Section 13: 약관 및 개인정보 동의 -->
             <div class="form-section privacy-section">
-                <div class="form-group checkbox-group">
+                <div class="form-group checkbox-group no-auto-required">
                     <label class="checkbox-label">
-                        <input type="checkbox" name="privacy_agreement" required>
-                        <span style="position: relative; top: 1px;">개인정보 수집 및 이용에 동의합니다. <a href="#" id="privacyPolicyLink">(개인정보 처리방침 보기)</a></span>
+                        <input type="checkbox" id="agreeTerms" name="agree_terms" required>
+                        <span style="position: relative; top: 1px;">[필수] 이용약관에 동의합니다. <a href="#" id="termsPolicyLink">(보기)</a></span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="agreePrivacy" name="privacy_agreement" required>
+                        <span style="position: relative; top: 1px;">[필수] 개인정보 수집 및 이용에 동의합니다. <a href="#" id="privacyPolicyLink">(개인정보 처리방침 보기)</a></span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="agreeMarketing" name="agree_marketing">
+                        <span style="position: relative; top: 1px;">[선택] 이온토플 학습 정보 및 혜택 알림 수신에 동의합니다.</span>
                     </label>
                 </div>
             </div>
@@ -881,6 +919,15 @@
                 <i class="fas fa-lightbulb" style="color: #f59e0b; margin-right: 4px;"></i>
                 개별분석이 등록되기 전까지는 신청 내역에서 수정할 수 있어요
             </p>
+        </div>
+    </div>
+
+    <!-- Terms Modal -->
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="closeTermsModal">&times;</span>
+            <h2>이용약관</h2>
+            <div class="privacy-content" id="termsContent">이용약관을 불러오는 중입니다...</div>
         </div>
     </div>
 
@@ -920,7 +967,7 @@
     <script src="js/supabase-config.js"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
-    <script src="js/application-form.js?v=4"></script>
+    <script src="js/application-form.js?v=6"></script>
 
     <!-- 진행 표시: 폼 영역 스크롤 진행도만 계산 (폼 로직·필드와 무관) -->
     <script>

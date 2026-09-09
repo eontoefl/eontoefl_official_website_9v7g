@@ -213,6 +213,7 @@ input[type="radio"] {
 .form-group input[type="text"],
 .form-group input[type="email"],
 .form-group input[type="tel"],
+.form-group input[type="password"],
 .form-group input[type="number"],
 .form-group input[type="date"],
 .form-group select,
@@ -229,6 +230,60 @@ input[type="radio"] {
     color: #1e293b;
     vertical-align: top;
     resize: vertical;
+}
+
+.field-with-status {
+    position: relative;
+}
+
+.field-with-status input {
+    padding-right: 6.5rem !important;
+}
+
+.field-status {
+    position: absolute;
+    right: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.password-match-status {
+    display: block;
+    min-height: 1.2em;
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    line-height: 1.2;
+}
+
+.password-match-status.match {
+    color: #2f855a;
+}
+
+.password-match-status.mismatch {
+    color: #a53b22;
+}
+
+.login-guide {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    color: #64748b;
+    font-size: 0.84rem;
+    padding-top: 1.8rem;
+}
+
+.login-guide a {
+    color: #6f5aa6;
+    font-weight: 700;
+}
+
+.account-locked {
+    background: #eef1f4 !important;
+    color: #64748b !important;
+    cursor: not-allowed;
 }
 
 .form-group input::placeholder,

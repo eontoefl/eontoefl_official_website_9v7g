@@ -146,6 +146,7 @@ function initForm(mode, userData) {
         setupNicknameCheck();
         setupEmailCheck();
         setupPhoneFormat();
+        setupPasswordConfirmation();
 
         const goLoginLink = document.getElementById('goLoginLink');
         if (goLoginLink) {
@@ -164,6 +165,37 @@ function initForm(mode, userData) {
     setupModals();
     loadLegalContent();
     setupSubmit();
+}
+
+function updatePasswordConfirmation() {
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('passwordConfirm');
+    const status = document.getElementById('passwordConfirmStatus');
+    if (!passwordInput || !confirmInput || !status) return;
+
+    const confirmation = confirmInput.value;
+    const matches = confirmation !== '' && confirmation === passwordInput.value;
+    confirmInput.setCustomValidity(confirmation && !matches ? '비밀번호가 일치하지 않습니다.' : '');
+    status.classList.remove('match', 'mismatch');
+
+    if (!confirmation) {
+        status.textContent = '';
+    } else if (matches) {
+        status.textContent = '비밀번호가 일치해요.';
+        status.classList.add('match');
+    } else {
+        status.textContent = '비밀번호가 일치하지 않아요.';
+        status.classList.add('mismatch');
+    }
+}
+
+function setupPasswordConfirmation() {
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('passwordConfirm');
+    if (!passwordInput || !confirmInput) return;
+    passwordInput.addEventListener('input', updatePasswordConfirmation);
+    confirmInput.addEventListener('input', updatePasswordConfirmation);
+    updatePasswordConfirmation();
 }
 
 // ===== 이용약관 / 개인정보 본문 DB 로드 (site_settings.default) =====
@@ -555,6 +587,7 @@ async function createAccount() {
     const email = document.getElementById('email').value.trim();
     const phone = document.getElementById('phone').value.trim();
     const password = document.getElementById('password').value;
+    const passwordConfirm = document.getElementById('passwordConfirm').value;
 
     // 닉네임 중복 최종 확인
     if (!nicknameAvailable) {
@@ -596,6 +629,22 @@ async function createAccount() {
         }
     } catch (e) {
         console.warn('탈퇴 이력 조회 실패(계속 진행):', e);
+    }
+
+    // 중복·탈퇴 조회 중 입력이 바뀌었어도 계정 저장 직전에 다시 막는다.
+    const currentPassword = document.getElementById('password').value;
+    const currentPasswordConfirm = document.getElementById('passwordConfirm').value;
+    if (!passwordConfirm || password !== passwordConfirm || currentPassword !== currentPasswordConfirm) {
+        updatePasswordConfirmation();
+        showToast('비밀번호 확인이 일치하지 않아요.', 'error');
+        focusEl('passwordConfirm');
+        return null;
+    }
+    if (currentPassword !== password || currentPasswordConfirm !== passwordConfirm) {
+        updatePasswordConfirmation();
+        showToast('확인 중 비밀번호가 바뀌었습니다. 현재 값으로 다시 제출해주세요.', 'error');
+        focusEl('passwordConfirm');
+        return null;
     }
 
     const marketingChecked = document.getElementById('agreeMarketing').checked;
@@ -728,12 +777,15 @@ function validateBookForm() {
         const email = document.getElementById('email').value.trim();
         const phone = document.getElementById('phone').value.trim();
         const password = document.getElementById('password').value;
+        const passwordConfirm = document.getElementById('passwordConfirm').value;
 
         if (!name) { showToast('이름을 입력해주세요.', 'error'); focusEl('name'); return false; }
         if (nickname.length < 2) { showToast('닉네임을 2자 이상 입력해주세요.', 'error'); focusEl('nickname'); return false; }
         if (!email || !validateEmail(email)) { showToast('올바른 이메일을 입력해주세요.', 'error'); focusEl('email'); return false; }
         if (!phone) { showToast('전화번호를 입력해주세요.', 'error'); focusEl('phone'); return false; }
         if (!password || password.length < 6) { showToast('비밀번호를 6자 이상 입력해주세요.', 'error'); focusEl('password'); return false; }
+        if (!passwordConfirm) { showToast('비밀번호 확인을 입력해주세요.', 'error'); focusEl('passwordConfirm'); return false; }
+        if (password !== passwordConfirm) { showToast('비밀번호 확인이 일치하지 않아요.', 'error'); focusEl('passwordConfirm'); return false; }
     }
 
     // 현재 점수

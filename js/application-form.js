@@ -7,6 +7,27 @@ const N8N_WEBHOOK_URL = 'https://eontoefl.app.n8n.cloud/webhook/eontoefl-applica
 let isEditMode = false;
 let editApplicationId = null;
 
+const APPLICATION_LOGIN_REDIRECT = 'login.html?redirect=' + encodeURIComponent('application-form.html');
+const APPLICATION_DRAFT_SESSION_KEY = 'iontoefl_application_draft_session';
+const APPLICATION_DRAFT_HANDOFF_KEY = 'iontoefl_application_draft_handoff';
+const APPLICATION_SIGNUP_FIELDS = new Set(['account_nickname', 'account_password', 'account_password_confirm', 'agree_terms', 'agree_marketing']);
+const APPLICATION_DRAFT_EXCLUDED_FIELDS = new Set(['account_password', 'account_password_confirm', 'agree_terms', 'privacy_agreement', 'agree_marketing']);
+const applicationState = {
+    user: null,
+    isAnonymous: true,
+    draftKey: null,
+    draftApplicationId: null,
+    checkedNickname: '',
+    nicknameAvailable: false,
+    checkedEmail: '',
+    emailAvailable: false
+};
+let nicknameCheckTimer = null;
+let emailCheckTimer = null;
+let nicknameComposing = false;
+let applicationAutoSaveTimeout = null;
+let applicationCompleted = false;
+
 // 목표점수 없음 체크박스 토글
 function toggleTargetScore(checked) {
     const allTargetInputs = document.querySelectorAll(
@@ -288,31 +309,26 @@ function restoreBankSelection(app) {
     if (acctHolderInput && accountHolder) acctHolderInput.value = accountHolder;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-
-    // Check if user is logged in
+document.addEventListener('DOMContentLoaded', async function() {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-    
-    if (!userData) {
-        alert('로그인이 필요합니다.');
-        window.location.href = 'login.html?redirect=application-form.html';
+    const urlParams = new URLSearchParams(window.location.search);
+    const editId = urlParams.get('edit');
+
+    // 기존 신청 수정은 로그인과 기존 소유권 확인을 그대로 요구한다.
+    if (editId && !userData) {
+        const returnPath = `application-form.html?edit=${encodeURIComponent(editId)}`;
+        window.location.href = 'login.html?redirect=' + encodeURIComponent(returnPath);
         return;
     }
 
-    // 신청 폼 접근 가드
-    // 로그인 회원이면 입문서 수령 여부와 무관하게 작성할 수 있다(URL 직접 진입 허용).
-    // 이미 챌린지 신청서를 제출한 경우만 본인 신청 현황으로 돌려보낸다.
-    guardFormAccess(userData);
+    applicationState.user = userData;
+    applicationState.isAnonymous = !userData;
+    setupAccountFields(userData, Boolean(editId));
 
-    // Pre-fill user information
-    if (userData.name) {
-        document.querySelector('input[name="name"]').value = userData.name;
-    }
-    if (userData.phone) {
-        document.querySelector('input[name="phone"]').value = userData.phone;
-    }
-    if (userData.email) {
-        document.querySelector('input[name="email"]').value = userData.email;
+    // 신규 로그인 회원은 기존 신청 확인이 끝난 뒤에만 제출할 수 있다.
+    if (userData && !editId) {
+        const mayContinue = await guardFormAccess(userData);
+        if (!mayContinue) return;
     }
 
     // Setup conditional field visibility handlers
@@ -323,6 +339,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Privacy policy modal
     setupPrivacyModal();
+    setupTermsModal();
+    loadTermsContent();
 
     // Form submission
     setupFormSubmission();
@@ -337,8 +355,6 @@ document.addEventListener('DOMContentLoaded', function() {
     cleanupInactiveTabRequired();
 
     // 편집 모드 확인 (URL 파라미터 ?edit=ID)
-    const urlParams = new URLSearchParams(window.location.search);
-    const editId = urlParams.get('edit');
     if (editId) {
         initEditMode(editId);
     } else {
@@ -357,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * 조회 실패 시에는 막지 않는다(사용성 우선).
  */
 async function guardFormAccess(userData) {
-    if (userData.role === 'admin') return;
+    if (userData.role === 'admin') return true;
 
     const editId = new URLSearchParams(window.location.search).get('edit');
 
@@ -372,18 +388,198 @@ async function guardFormAccess(userData) {
         const challengeApp = apps.find(a => a.application_type !== 'book_only');
 
         // 편집 모드는 본인 챌린지 신청서 수정 → 통과
-        if (editId) return;
+        if (editId) return true;
 
         // 이미 챌린지 신청서를 제출한 경우 → 본인 신청 현황으로
         if (challengeApp) {
+            applicationState.draftKey = getUserDraftKey(userData);
+            clearApplicationDraft();
             alert('이미 내벨업챌린지 신청서를 제출하셨습니다.\n내 신청 현황으로 이동합니다.');
             window.location.href = `application-detail.html?id=${challengeApp.id}`;
-            return;
+            return false;
         }
         // 그 외 로그인 회원 → 통과 (입문서 미수령자 포함, URL 직접 진입 허용)
     } catch (e) {
         console.warn('폼 접근 권한 확인 실패:', e);
     }
+    return true;
+}
+
+function setupAccountFields(userData, editing) {
+    const signupOnly = document.querySelectorAll('.signup-only');
+    const nameInput = document.getElementById('applicantName');
+    const emailInput = document.getElementById('applicantEmail');
+    const phoneInput = document.getElementById('applicantPhone');
+
+    if (userData || editing) {
+        signupOnly.forEach(el => { el.style.display = 'none'; });
+        signupOnly.forEach(el => el.querySelectorAll('input').forEach(input => {
+            input.required = false;
+            input.disabled = true;
+        }));
+        clearAccountPasswordConfirmation();
+    } else {
+        signupOnly.forEach(el => { el.style.display = ''; });
+        setupNicknameCheck();
+        setupEmailCheck();
+        setupPhoneFormat();
+        setupAccountPasswordConfirmation();
+    }
+
+    if (userData && !editing) {
+        nameInput.value = userData.name || '';
+        emailInput.value = userData.email || '';
+        phoneInput.value = userData.phone || '';
+        [nameInput, emailInput, phoneInput].forEach(input => {
+            input.readOnly = true;
+            input.classList.add('account-locked');
+        });
+    }
+
+    const loginLink = document.getElementById('applicationLoginLink');
+    if (loginLink) {
+        loginLink.addEventListener('click', function(event) {
+            event.preventDefault();
+            saveDraftNow();
+            sessionStorage.setItem(APPLICATION_DRAFT_HANDOFF_KEY, '1');
+            window.location.href = APPLICATION_LOGIN_REDIRECT;
+        });
+    }
+}
+
+function updateAccountPasswordConfirmation() {
+    const passwordInput = document.getElementById('accountPassword');
+    const confirmInput = document.getElementById('accountPasswordConfirm');
+    const status = document.getElementById('accountPasswordConfirmStatus');
+    if (!passwordInput || !confirmInput || !status) return;
+
+    const confirmation = confirmInput.value;
+    const matches = confirmation !== '' && confirmation === passwordInput.value;
+    confirmInput.setCustomValidity(confirmation && !matches ? '비밀번호가 일치하지 않습니다.' : '');
+    status.classList.remove('match', 'mismatch');
+
+    if (!confirmation) {
+        status.textContent = '';
+    } else if (matches) {
+        status.textContent = '비밀번호가 일치해요.';
+        status.classList.add('match');
+    } else {
+        status.textContent = '비밀번호가 일치하지 않아요.';
+        status.classList.add('mismatch');
+    }
+}
+
+function setupAccountPasswordConfirmation() {
+    const passwordInput = document.getElementById('accountPassword');
+    const confirmInput = document.getElementById('accountPasswordConfirm');
+    if (!passwordInput || !confirmInput) return;
+    passwordInput.addEventListener('input', updateAccountPasswordConfirmation);
+    confirmInput.addEventListener('input', updateAccountPasswordConfirmation);
+    updateAccountPasswordConfirmation();
+}
+
+function clearAccountPasswordConfirmation() {
+    const confirmInput = document.getElementById('accountPasswordConfirm');
+    const status = document.getElementById('accountPasswordConfirmStatus');
+    if (confirmInput) confirmInput.setCustomValidity('');
+    if (status) {
+        status.textContent = '';
+        status.classList.remove('match', 'mismatch');
+    }
+}
+
+function sanitizeNickname(input) {
+    input.value = input.value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]/g, '');
+}
+
+function setupNicknameCheck() {
+    const input = document.getElementById('accountNickname');
+    if (!input) return;
+    input.addEventListener('compositionstart', () => { nicknameComposing = true; });
+    input.addEventListener('compositionend', event => {
+        nicknameComposing = false;
+        sanitizeNickname(event.target);
+        scheduleNicknameCheck(event.target.value.trim());
+    });
+    input.addEventListener('input', event => {
+        if (!nicknameComposing) sanitizeNickname(event.target);
+        scheduleNicknameCheck(event.target.value.trim());
+    });
+}
+
+function scheduleNicknameCheck(value) {
+    const status = document.getElementById('nicknameStatus');
+    applicationState.nicknameAvailable = false;
+    applicationState.checkedNickname = '';
+    clearTimeout(nicknameCheckTimer);
+    if (value.length < 2) {
+        status.textContent = '';
+        return;
+    }
+    status.textContent = '확인 중...';
+    status.style.color = '#94a3b8';
+    nicknameCheckTimer = setTimeout(async () => {
+        try {
+            const rows = await supabaseAPI.query('users', { nickname: `eq.${value}`, limit: '1' });
+            const current = document.getElementById('accountNickname').value.trim();
+            if (current !== value) return;
+            applicationState.checkedNickname = value;
+            applicationState.nicknameAvailable = !rows || rows.length === 0;
+            status.textContent = applicationState.nicknameAvailable ? '사용 가능' : '이미 사용 중';
+            status.style.color = applicationState.nicknameAvailable ? '#22c55e' : '#ef4444';
+        } catch (error) {
+            console.warn('닉네임 중복 확인 실패:', error);
+            if (document.getElementById('accountNickname').value.trim() === value) status.textContent = '';
+        }
+    }, 400);
+}
+
+function escapeIlike(value) {
+    return value.replace(/[\\%_]/g, '\\$&');
+}
+
+function setupEmailCheck() {
+    const input = document.getElementById('applicantEmail');
+    if (!input) return;
+    input.addEventListener('input', event => scheduleEmailCheck(event.target.value.trim()));
+}
+
+function scheduleEmailCheck(value) {
+    const status = document.getElementById('emailStatus');
+    applicationState.emailAvailable = false;
+    applicationState.checkedEmail = '';
+    clearTimeout(emailCheckTimer);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        status.textContent = '';
+        return;
+    }
+    status.textContent = '확인 중...';
+    status.style.color = '#94a3b8';
+    emailCheckTimer = setTimeout(async () => {
+        try {
+            const rows = await supabaseAPI.query('users', { email: `ilike.${escapeIlike(value)}`, limit: '1' });
+            const current = document.getElementById('applicantEmail').value.trim();
+            if (current !== value) return;
+            applicationState.checkedEmail = value;
+            applicationState.emailAvailable = !rows || rows.length === 0;
+            status.textContent = applicationState.emailAvailable ? '사용 가능' : '이미 가입됨 · 로그인 필요';
+            status.style.color = applicationState.emailAvailable ? '#22c55e' : '#ef4444';
+        } catch (error) {
+            console.warn('이메일 중복 확인 실패:', error);
+            if (document.getElementById('applicantEmail').value.trim() === value) status.textContent = '';
+        }
+    }, 400);
+}
+
+function setupPhoneFormat() {
+    const input = document.getElementById('applicantPhone');
+    if (!input) return;
+    input.addEventListener('input', event => {
+        const value = event.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+        if (value.length <= 3) event.target.value = value;
+        else if (value.length <= 7) event.target.value = `${value.slice(0, 3)}-${value.slice(3)}`;
+        else event.target.value = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
+    });
 }
 
 // Setup conditional field visibility
@@ -879,6 +1075,286 @@ function populateFormData(app) {
     }
 }
 
+function captureFormFingerprint() {
+    return JSON.stringify(Array.from(new FormData(document.getElementById('applicationForm')).entries()));
+}
+
+function setupTermsModal() {
+    const modal = document.getElementById('termsModal');
+    const link = document.getElementById('termsPolicyLink');
+    const close = document.getElementById('closeTermsModal');
+    link.addEventListener('click', function(event) {
+        event.preventDefault();
+        modal.style.display = 'block';
+    });
+    close.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+    window.addEventListener('click', function(event) {
+        if (event.target === modal) modal.style.display = 'none';
+    });
+}
+
+async function loadTermsContent() {
+    const content = document.getElementById('termsContent');
+    try {
+        const rows = await supabaseAPI.query('site_settings', {
+            setting_key: 'eq.default',
+            select: 'terms_content',
+            limit: '1'
+        });
+        content.textContent = rows?.[0]?.terms_content
+            ? rows[0].terms_content.replace(/\r\n/g, '\n')
+            : '이용약관을 불러올 수 없습니다. 문의: messijessi@naver.com';
+    } catch (error) {
+        console.warn('이용약관 불러오기 실패:', error);
+        content.textContent = '이용약관을 불러올 수 없습니다. 문의: messijessi@naver.com';
+    }
+}
+
+function captureSignupSnapshot() {
+    return {
+        name: document.getElementById('applicantName').value.trim(),
+        nickname: document.getElementById('accountNickname').value.trim(),
+        email: document.getElementById('applicantEmail').value.trim(),
+        phone: document.getElementById('applicantPhone').value.trim(),
+        password: document.getElementById('accountPassword').value,
+        introBookTrack: selectedIntroBookTrack(),
+        marketingConsent: Boolean(document.getElementById('agreeMarketing')?.checked)
+    };
+}
+
+async function validateSignupAccount(formFingerprint) {
+    if (!applicationState.isAnonymous || isEditMode) return true;
+
+    const nicknameInput = document.getElementById('accountNickname');
+    const emailInput = document.getElementById('applicantEmail');
+    const phoneInput = document.getElementById('applicantPhone');
+    const passwordInput = document.getElementById('accountPassword');
+    const passwordConfirmInput = document.getElementById('accountPasswordConfirm');
+    const snapshot = captureSignupSnapshot();
+    const passwordConfirm = passwordConfirmInput.value;
+    const { nickname, email, phone } = snapshot;
+
+    if (nickname.length < 2 || nickname.length > 12 || /[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]/.test(nickname)) {
+        alert('닉네임은 한글·영문·숫자로 2~12자 입력해주세요.');
+        nicknameInput.focus();
+        return false;
+    }
+    if (snapshot.password.length < 6) {
+        alert('비밀번호를 6자 이상 입력해주세요.');
+        passwordInput.focus();
+        return false;
+    }
+    if (!passwordConfirm) {
+        alert('비밀번호 확인을 입력해주세요.');
+        passwordConfirmInput.focus();
+        return false;
+    }
+    if (snapshot.password !== passwordConfirm) {
+        alert('비밀번호 확인이 일치하지 않아요.');
+        passwordConfirmInput.focus();
+        return false;
+    }
+
+    try {
+        // 화면에 표시된 과거 조회 결과를 믿지 않고 현재 값으로 다시 확인한다.
+        const [nicknameRows, emailRows, withdrawalRows] = await Promise.all([
+            supabaseAPI.query('users', { nickname: `eq.${nickname}`, limit: '1' }),
+            supabaseAPI.query('users', { email: `ilike.${escapeIlike(email)}`, limit: '1' }),
+            supabaseAPI.query('withdrawal_records', {
+                or: `(email.ilike.${email},phone.eq.${phone})`,
+                identity_purge_after: `gt.${new Date().toISOString()}`,
+                limit: '1'
+            })
+        ]);
+
+        applicationState.checkedNickname = nickname;
+        applicationState.nicknameAvailable = !nicknameRows || nicknameRows.length === 0;
+        if (!applicationState.nicknameAvailable) {
+            alert('이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해주세요.');
+            nicknameInput.focus();
+            return false;
+        }
+
+        applicationState.checkedEmail = email;
+        applicationState.emailAvailable = !emailRows || emailRows.length === 0;
+        if (!applicationState.emailAvailable) {
+            saveDraftNow();
+            const goLogin = confirm('이미 가입된 이메일이에요. 로그인한 뒤 같은 신청서를 이어서 작성하시겠어요?');
+            if (goLogin) {
+                sessionStorage.setItem(APPLICATION_DRAFT_HANDOFF_KEY, '1');
+                window.location.href = APPLICATION_LOGIN_REDIRECT;
+            }
+            else emailInput.focus();
+            return false;
+        }
+
+        if (withdrawalRows && withdrawalRows.length > 0) {
+            alert('탈퇴 후 30일 동안은 다시 가입할 수 없어요. 30일이 지난 뒤 다시 신청해주세요.');
+            return false;
+        }
+
+        if (captureFormFingerprint() !== formFingerprint) {
+            alert('확인 중 입력 내용이 바뀌었습니다. 현재 내용으로 다시 제출해주세요.');
+            return false;
+        }
+        const currentPasswordConfirm = passwordConfirmInput.value;
+        if (currentPasswordConfirm !== passwordConfirm || currentPasswordConfirm !== snapshot.password) {
+            updateAccountPasswordConfirmation();
+            alert('확인 중 비밀번호 확인 값이 바뀌었습니다. 현재 내용으로 다시 제출해주세요.');
+            passwordConfirmInput.focus();
+            return false;
+        }
+    } catch (error) {
+        console.error('가입 가능 여부 최종 확인 실패:', error);
+        alert('가입 가능 여부를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+        return false;
+    }
+
+    return snapshot;
+}
+
+function sessionFromUser(user) {
+    return {
+        id: user.id,
+        name: user.name,
+        nickname: user.nickname || '',
+        email: user.email,
+        phone: user.phone,
+        level: user.level || 2,
+        role: user.role || 'user'
+    };
+}
+
+function saveUserSession(user) {
+    const session = sessionFromUser(user);
+    localStorage.setItem('iontoefl_user', JSON.stringify(session));
+    localStorage.setItem('iontoefl_login_time', Date.now().toString());
+    applicationState.user = session;
+    applicationState.isAnonymous = false;
+    migrateDraftToUser(session);
+    setupAccountFields(session, false);
+    return session;
+}
+
+function selectedIntroBookTrack() {
+    const selected = document.querySelector('input[name="is_au_nz_direct_submit"]:checked');
+    return selected && selected.value === 'yes' ? 'australia' : 'regular';
+}
+
+async function createOrRecoverAccount(snapshot) {
+    const { email, password } = snapshot;
+    const payload = {
+        name: snapshot.name,
+        nickname: snapshot.nickname,
+        email,
+        phone: snapshot.phone,
+        password,
+        level: 2,
+        blocked: false,
+        role: 'user',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
+        intro_book_track: snapshot.introBookTrack,
+        marketing_consent: snapshot.marketingConsent,
+        marketing_consent_at: snapshot.marketingConsent ? new Date().toISOString() : null
+    };
+
+    try {
+        const created = await supabaseAPI.post('users', payload);
+        if (!created) throw new Error('계정 생성 결과가 없습니다.');
+        return saveUserSession(created);
+    } catch (error) {
+        // 서버 저장 뒤 응답만 유실됐을 수 있다. 같은 이메일과 비밀번호의 방금 만든 계정만 복구한다.
+        try {
+            const rows = await supabaseAPI.query('users', { email: `ilike.${escapeIlike(email)}`, limit: '1' });
+            const recovered = rows && rows[0];
+            if (recovered && recovered.password === password && recovered.nickname === payload.nickname) {
+                return saveUserSession(recovered);
+            }
+        } catch (recoveryError) {
+            console.warn('계정 생성 응답 유실 복구 실패:', recoveryError);
+        }
+        throw error;
+    }
+}
+
+async function maybeUpdateMarketingConsent(user) {
+    if (!document.getElementById('agreeMarketing')?.checked || !user || !user.id) return;
+    try {
+        await supabaseAPI.patch('users', user.id, {
+            marketing_consent: true,
+            marketing_consent_at: new Date().toISOString()
+        });
+    } catch (error) {
+        console.warn('광고 수신 동의 갱신 실패(신청은 계속):', error);
+    }
+}
+
+async function saveApplicationIdempotently(formData, user) {
+    const existing = await supabaseAPI.getById('applications', formData.id);
+    if (existing) {
+        assertRecoveredApplicationOwner(existing, user);
+        return { application: existing, shouldSendSideEffects: false };
+    }
+
+    try {
+        const created = await supabaseAPI.post('applications', formData);
+        return { application: created, shouldSendSideEffects: true };
+    } catch (error) {
+        // 같은 UUID의 동시 제출 또는 저장 성공 뒤 응답 유실이면 기존 행을 이어 쓴다.
+        const recovered = await supabaseAPI.getById('applications', formData.id);
+        if (!recovered) throw error;
+        assertRecoveredApplicationOwner(recovered, user);
+        // 이 실행은 아직 후속을 보내기 전이므로 응답 유실 복구 뒤 한 번 이어서 보낸다.
+        return { application: recovered, shouldSendSideEffects: true };
+    }
+}
+
+async function findExistingChallengeApplication(user) {
+    const commonFilters = {
+        deleted: 'neq.true',
+        withdrawn_at: 'is.null',
+        order: 'created_at.desc',
+        limit: '100'
+    };
+    let rows = [];
+
+    if (user.id) {
+        rows = await supabaseAPI.query('applications', {
+            user_id: `eq.${user.id}`,
+            ...commonFilters
+        });
+    }
+
+    let existing = (rows || []).find(application => application.application_type !== 'book_only');
+    if (existing || !user.email) return existing || null;
+
+    // user_id가 없던 과거 신청은 기존 화면과 같은 이메일 기준으로 한 번 더 찾는다.
+    rows = await supabaseAPI.query('applications', {
+        email: `eq.${user.email}`,
+        ...commonFilters
+    });
+    existing = (rows || []).find(application => application.application_type !== 'book_only');
+    return existing || null;
+}
+
+async function withApplicationSubmissionLock(lockKey, callback) {
+    if (navigator.locks && typeof navigator.locks.request === 'function') {
+        return navigator.locks.request(`iontoefl-application-${lockKey}`, callback);
+    }
+    return callback();
+}
+
+function assertRecoveredApplicationOwner(application, user) {
+    const sameUserId = application.user_id && user.id && application.user_id === user.id;
+    const sameEmail = String(application.email || '').toLowerCase() === String(user.email || '').toLowerCase();
+    const sameOwner = application.user_id ? sameUserId : sameEmail;
+    if (!sameOwner || application.application_type !== 'challenge') {
+        throw new Error('기존 신청서의 소유자를 확인할 수 없습니다.');
+    }
+}
+
 // Setup form submission
 function setupFormSubmission() {
     const form = document.getElementById('applicationForm');
@@ -886,17 +1362,31 @@ function setupFormSubmission() {
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        // Validate form
+        // 긴 신청서 전체를 먼저 검증한다. 계정은 이 검증이 끝난 뒤에만 만든다.
         if (!validateForm()) {
             return;
         }
 
-        // Collect form data
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 확인 중...';
+
+        const formFingerprint = captureFormFingerprint();
+        const signupValidation = await validateSignupAccount(formFingerprint);
+        if (!signupValidation) {
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            return;
+        }
+
+        // 마지막 입력까지 즉시 보존한 뒤 계정/신청 저장을 시작한다.
+        if (!isEditMode) saveDraftNow();
+
+        // 신청 데이터에는 계정 전용 값과 동의 전용 값을 넣지 않는다.
         const formData = collectFormData();
 
         // Show loading state
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn.innerHTML;
         submitBtn.innerHTML = isEditMode 
             ? '<i class="fas fa-spinner fa-spin"></i> 수정 중...'
             : '<i class="fas fa-spinner fa-spin"></i> 제출 중...';
@@ -917,39 +1407,70 @@ function setupFormSubmission() {
                 // 수정 완료 모달 표시
                 showEditSuccessModal();
             } else {
-                // 새 신청서: POST로 생성
-                // 주인(user_id/user_email)은 '새로 만들 때'만 로그인 계정으로 정한다.
-                //   (수정 시엔 collectFormData가 주인을 안 넣으므로 기존 주인이 그대로 유지됨)
-                const sessionUser = JSON.parse(localStorage.getItem('iontoefl_user'));
+                let sessionUser = applicationState.user;
+                if (!sessionUser) {
+                    sessionUser = await createOrRecoverAccount(signupValidation);
+                } else {
+                    await maybeUpdateMarketingConsent(sessionUser);
+                }
+
+                if (!sessionUser || !sessionUser.id || !sessionUser.email) {
+                    throw new Error('신청 계정을 확인할 수 없습니다.');
+                }
+
+                formData.id = getStableApplicationId();
                 formData.user_id = sessionUser.id;
                 formData.user_email = sessionUser.email;
-                result = await supabaseAPI.post('applications', formData);
+                formData.name = sessionUser.name || formData.name;
+                formData.phone = sessionUser.phone || formData.phone;
+                formData.email = sessionUser.email;
+                formData.application_type = 'challenge';
+                formData.book_access_enabled = true;
 
-                if (!result) {
-                    throw new Error('신청서 제출에 실패했습니다.');
+                let existingDifferentApplication = null;
+                await withApplicationSubmissionLock(`user-${sessionUser.id}`, async () => {
+                    const existingChallenge = await findExistingChallengeApplication(sessionUser);
+                    if (existingChallenge && existingChallenge.id !== formData.id) {
+                        existingDifferentApplication = existingChallenge;
+                        return;
+                    }
+
+                    const saved = await saveApplicationIdempotently(formData, sessionUser);
+                    result = saved.application;
+
+                    if (!result) {
+                        throw new Error('신청서 제출에 실패했습니다.');
+                    }
+
+                    // 새 저장 또는 현재 POST의 응답 유실 복구에서만 후속을 한 번 실행한다.
+                    if (saved.shouldSendSideEffects) {
+                        try {
+                            await sendTelegramNotification(formData);
+                        } catch (notifyErr) {
+                            console.warn('텔레그램 알림 발송 실패:', notifyErr);
+                        }
+
+                        const appId = Array.isArray(result) ? result[0]?.id : result?.id;
+                        if (appId) {
+                            fetch(N8N_WEBHOOK_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ...formData, app_id: appId })
+                            }).catch(webhookErr => {
+                                console.warn('n8n 웹훅 호출 실패:', webhookErr);
+                            });
+                        }
+                    }
+                });
+
+                if (existingDifferentApplication) {
+                    clearApplicationDraft();
+                    alert('이미 내벨업챌린지 신청서를 제출하셨습니다. 내 신청 현황으로 이동합니다.');
+                    window.location.href = `application-detail.html?id=${existingDifferentApplication.id}`;
+                    return;
                 }
 
-                // 텔레그램 알림 발송 (실패해도 신청서 제출에는 영향 없음)
-                try {
-                    await sendTelegramNotification(formData);
-                } catch (notifyErr) {
-                    console.warn('텔레그램 알림 발송 실패:', notifyErr);
-                }
-
-                // n8n AI 자동분석 웹훅 호출 (fire-and-forget: 응답을 기다리지 않음)
-                const appId = Array.isArray(result) ? result[0]?.id : result?.id;
-                if (appId) {
-                    fetch(N8N_WEBHOOK_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...formData, app_id: appId })
-                    }).catch(webhookErr => {
-                        console.warn('n8n 웹훅 호출 실패:', webhookErr);
-                    });
-                }
-
-                // Clear auto-saved data
-                localStorage.removeItem(getDraftKey());
+                clearApplicationDraft();
 
                 // Show success modal
                 showSuccessModal();
@@ -957,7 +1478,13 @@ function setupFormSubmission() {
 
         } catch (error) {
             console.error('Error submitting application:', error);
-            alert(isEditMode ? '신청서 수정 중 오류가 발생했습니다. 다시 시도해주세요.' : '신청서 제출 중 오류가 발생했습니다. 다시 시도해주세요.');
+            if (isEditMode) {
+                alert('신청서 수정 중 오류가 발생했습니다. 다시 시도해주세요.');
+            } else if (applicationState.user) {
+                alert('계정은 확인되었습니다. 작성 내용도 보존되어 있으니 신청서 제출만 다시 시도해주세요.');
+            } else {
+                alert('신청서 제출 중 오류가 발생했습니다. 작성 내용은 보존되어 있습니다. 다시 시도해주세요.');
+            }
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
         }
@@ -966,6 +1493,19 @@ function setupFormSubmission() {
 
 // Validate form
 function validateForm() {
+    const agreeTerms = document.getElementById('agreeTerms');
+    const agreePrivacy = document.getElementById('agreePrivacy');
+    if (agreeTerms && !agreeTerms.checked) {
+        alert('이용약관에 동의해주세요.');
+        agreeTerms.focus();
+        return false;
+    }
+    if (agreePrivacy && !agreePrivacy.checked) {
+        alert('개인정보 수집 및 이용에 동의해주세요.');
+        agreePrivacy.focus();
+        return false;
+    }
+
     // 환불 계좌 정보 검증
     const bankNameInput = document.getElementById('bankNameInput');
     const acctNumInput = document.getElementById('accountNumberInput');
@@ -1145,6 +1685,9 @@ function collectFormData() {
 
     // Collect all form fields
     for (let [key, value] of formData.entries()) {
+        if (APPLICATION_SIGNUP_FIELDS.has(key)) {
+            continue;
+        }
         if (key === 'score_history' || key === 'target_note' || key === 'score_version' || key === 'target_version') {
             // 점수/목표 관련 텍스트 필드는 score_/target_ prefix지만 숫자가 아님 → 문자열 그대로
             // (score_version/target_version은 'old'/'new' 문자열이므로 parseFloat 하면 NaN→null 됨)
@@ -1308,38 +1851,141 @@ function showEditSuccessModal() {
 }
 
 // Auto-save form data to localStorage
-function getDraftKey() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
-    const email = userData?.email || 'unknown';
-    return `iontoefl_form_draft_${email}`;
+function getAnonymousDraftKey(createIfMissing = true) {
+    let token = sessionStorage.getItem(APPLICATION_DRAFT_SESSION_KEY);
+    if (!token && createIfMissing) {
+        token = crypto.randomUUID();
+        sessionStorage.setItem(APPLICATION_DRAFT_SESSION_KEY, token);
+    }
+    return token ? `iontoefl_form_draft_anon_${token}` : null;
+}
+
+function getUserDraftKey(user = applicationState.user) {
+    if (!user || !user.id) return null;
+    return `iontoefl_form_draft_user_${user.id}`;
+}
+
+function migrateLegacyUserDraft(userKey, user = applicationState.user) {
+    if (!userKey || !user?.email) return;
+
+    const legacyKey = `iontoefl_form_draft_${user.email}`;
+    const legacyDraft = localStorage.getItem(legacyKey);
+    if (!legacyDraft) return;
+
+    // 새 소유자 초안이 없을 때만 옛 이메일 초안을 한 번 옮긴다.
+    if (localStorage.getItem(userKey) === null) {
+        try {
+            const parsedDraft = JSON.parse(legacyDraft);
+            APPLICATION_DRAFT_EXCLUDED_FIELDS.forEach(field => delete parsedDraft[field]);
+            localStorage.setItem(userKey, JSON.stringify(parsedDraft));
+        } catch (error) {
+            console.warn('기존 신청서 초안 이관 실패:', error);
+        }
+    }
+
+    // 새 초안을 덮어쓰지 않으며, 옛 키는 다시 살아나지 않도록 한 번만 처리한다.
+    localStorage.removeItem(legacyKey);
+}
+
+function prepareDraftContext() {
+    const anonymousKey = getAnonymousDraftKey(applicationState.isAnonymous);
+    const userKey = getUserDraftKey();
+    const explicitHandoff = sessionStorage.getItem(APPLICATION_DRAFT_HANDOFF_KEY) === '1';
+
+    if (userKey && anonymousKey && explicitHandoff) {
+        const anonymousDraft = localStorage.getItem(anonymousKey);
+        if (anonymousDraft) {
+            // 사용자가 명시적으로 '로그인하고 이어쓰기'를 골랐으므로 지금 작성본이 우선이다.
+            localStorage.setItem(userKey, anonymousDraft);
+            localStorage.removeItem(anonymousKey);
+        }
+        sessionStorage.removeItem(APPLICATION_DRAFT_HANDOFF_KEY);
+    }
+
+    if (userKey) migrateLegacyUserDraft(userKey);
+
+    applicationState.draftKey = userKey || anonymousKey;
+    let draft = null;
+    try {
+        draft = JSON.parse(localStorage.getItem(applicationState.draftKey) || 'null');
+    } catch (error) {
+        localStorage.removeItem(applicationState.draftKey);
+    }
+    applicationState.draftApplicationId = draft?.__application_id || crypto.randomUUID();
+    return draft;
+}
+
+function getStableApplicationId() {
+    if (!applicationState.draftApplicationId) prepareDraftContext();
+    return applicationState.draftApplicationId;
+}
+
+function collectDraftData() {
+    const form = document.getElementById('applicationForm');
+    const data = { __application_id: getStableApplicationId() };
+    for (const [key, value] of new FormData(form).entries()) {
+        if (APPLICATION_DRAFT_EXCLUDED_FIELDS.has(key)) continue;
+        if (applicationState.user && ['name', 'phone', 'email', 'account_nickname'].includes(key)) continue;
+        data[key] = value;
+    }
+    return data;
+}
+
+function saveDraftNow() {
+    if (isEditMode || applicationCompleted) return;
+    if (!applicationState.draftKey) prepareDraftContext();
+    if (!applicationState.draftKey) return;
+    localStorage.setItem(applicationState.draftKey, JSON.stringify(collectDraftData()));
+}
+
+function migrateDraftToUser(user) {
+    const oldKey = applicationState.draftKey || getAnonymousDraftKey(false);
+    const newKey = getUserDraftKey(user);
+    if (!newKey) return;
+    if (oldKey && oldKey !== newKey) {
+        const draft = localStorage.getItem(oldKey);
+        if (draft) localStorage.setItem(newKey, draft);
+        localStorage.removeItem(oldKey);
+    }
+    applicationState.draftKey = newKey;
+}
+
+function clearApplicationDraft() {
+    applicationCompleted = true;
+    clearTimeout(applicationAutoSaveTimeout);
+    applicationAutoSaveTimeout = null;
+    if (applicationState.draftKey) localStorage.removeItem(applicationState.draftKey);
+    const anonymousKey = getAnonymousDraftKey(false);
+    if (anonymousKey) localStorage.removeItem(anonymousKey);
+    sessionStorage.removeItem(APPLICATION_DRAFT_SESSION_KEY);
+    sessionStorage.removeItem(APPLICATION_DRAFT_HANDOFF_KEY);
+    applicationState.draftKey = null;
+    applicationState.draftApplicationId = null;
 }
 
 function setupAutoSave() {
     const form = document.getElementById('applicationForm');
-    let autoSaveTimeout;
-    const draftKey = getDraftKey();
+    const savedDraft = prepareDraftContext();
 
     // Check for existing draft
-    const savedDraft = localStorage.getItem(draftKey);
     if (savedDraft) {
         const shouldRestore = confirm('저장된 작성 중인 신청서가 있습니다. 불러오시겠습니까?');
         if (shouldRestore) {
-            restoreFormData(JSON.parse(savedDraft));
+            restoreFormData(savedDraft);
         } else {
-            localStorage.removeItem(draftKey);
+            localStorage.removeItem(applicationState.draftKey);
+            applicationState.draftApplicationId = crypto.randomUUID();
         }
     }
 
+    // 입력 전 새로고침에서도 동일 제출 ID가 유지되도록 메타를 먼저 기록한다.
+    saveDraftNow();
+
     // Auto-save on input
     form.addEventListener('input', function() {
-        clearTimeout(autoSaveTimeout);
-        autoSaveTimeout = setTimeout(() => {
-            const formData = new FormData(form);
-            const data = {};
-            for (let [key, value] of formData.entries()) {
-                data[key] = value;
-            }
-            localStorage.setItem(draftKey, JSON.stringify(data));
+        clearTimeout(applicationAutoSaveTimeout);
+        applicationAutoSaveTimeout = setTimeout(() => {
+            saveDraftNow();
             
             // Show save indicator (optional)
             showSaveIndicator();
@@ -1350,19 +1996,35 @@ function setupAutoSave() {
 // Restore form data from object
 function restoreFormData(data) {
     for (let [key, value] of Object.entries(data)) {
-        const element = document.querySelector(`[name="${key}"]`);
-        if (element) {
-            if (element.type === 'checkbox' || element.type === 'radio') {
-                if (element.value === value || value === 'on') {
-                    element.checked = true;
-                    // Trigger change event for conditional fields
-                    element.dispatchEvent(new Event('change'));
-                }
-            } else {
-                element.value = value;
+        if (key === '__application_id' || APPLICATION_DRAFT_EXCLUDED_FIELDS.has(key)) continue;
+        if (applicationState.user && ['name', 'phone', 'email', 'account_nickname'].includes(key)) continue;
+        const elements = Array.from(document.querySelectorAll(`[name="${key}"]`));
+        if (elements.length === 0) continue;
+
+        if (elements[0].type === 'radio') {
+            const selected = elements.find(element => element.value === String(value));
+            if (selected) {
+                selected.checked = true;
+                selected.dispatchEvent(new Event('change'));
             }
+        } else if (elements[0].type === 'checkbox') {
+            if (value === 'on' || value === true) {
+                elements[0].checked = true;
+                elements[0].dispatchEvent(new Event('change'));
+            }
+        } else {
+            elements[0].value = value;
         }
     }
+
+    // 은행명은 hidden input뿐 아니라 사용자가 보는 선택 트리거도 함께 복원한다.
+    restoreBankSelection(data);
+
+    // hidden 버전값만 바꾸면 보이는 탭과 저장 대상이 어긋나므로 기존 탭 전환을 그대로 실행한다.
+    const scoreTab = data.score_version === 'new' ? 'new-score' : (data.score_version === 'old' ? 'old-score' : null);
+    const targetTab = data.target_version === 'old' ? 'old-target' : (data.target_version === 'new' ? 'new-target' : null);
+    if (scoreTab) document.querySelector(`[data-tab="${scoreTab}"]`)?.click();
+    if (targetTab) document.querySelector(`[data-tab="${targetTab}"]`)?.click();
 }
 
 // Show save indicator
