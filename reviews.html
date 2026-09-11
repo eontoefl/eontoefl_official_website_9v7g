@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
     <link rel="stylesheet" href="css/reviews.css">
+    <link rel="stylesheet" href="css/review-blog-copy.css?v=20260911-keyboard">
 </head>
 <body>
     <!-- Navigation -->
@@ -313,7 +314,7 @@
 
                         <article id="detailArticle" style="display:none;">
                             <h2 id="detailSubject" style="font-size:22px; font-weight:700; color:#1e293b; margin-bottom:16px; line-height:1.4;"></h2>
-                            <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid #e2e8f0; margin-bottom:32px;">
+                            <div class="review-detail-meta-row" style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid #e2e8f0; margin-bottom:32px;">
                                 <span id="detailAuthor" style="font-size:14px; color:#64748b;"></span>
                                 <span style="color:#e2e8f0;">|</span>
                                 <span id="detailDate" style="font-size:14px; color:#94a3b8;"></span>
@@ -325,6 +326,7 @@
                                 </button>
                                 <!-- 수정/삭제 버튼 (관리자 또는 본인) -->
                                 <div id="postActions" style="display:none; margin-left:auto; gap:6px; align-items:center;">
+                                    <div id="reviewBlogActionTop" class="eon-blog-copy-action" hidden></div>
                                     <button onclick="editPost()" title="수정" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#7a6690'; this.style.color='#7a6690'; this.style.background='#f3eef3'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'">
                                         <i class="fas fa-pen" style="font-size:13px;"></i>
                                     </button>
@@ -335,6 +337,7 @@
                             </div>
                             <div id="detailContent" class="review-detail-content" style="font-size:15px; line-height:1.8; color:#334155;"></div>
                             <div id="detailAttachments" style="display:none;"></div>
+                            <div id="reviewBlogActionBottom" class="eon-blog-copy-action" hidden></div>
                         </article>
 
                         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #e2e8f0; display:none;" id="detailNav">
@@ -696,12 +699,17 @@
 
                 // 수정/삭제 버튼 표시: 관리자 또는 본인 글
                 const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                let canManageReview = false;
                 if (userData2) {
                     const isAdmin = userData2.role === 'admin';
                     const isAuthor = review.author_email && review.author_email === userData2.email;
                     if (isAdmin || isAuthor) {
+                        canManageReview = true;
                         document.getElementById('postActions').style.display = 'flex';
                     }
+                }
+                if (window.eonReviewBlogCopy) {
+                    window.eonReviewBlogCopy.configure(review, canManageReview);
                 }
 
                 // 이전/다음 글 네비게이션
@@ -791,5 +799,6 @@
             }
         }
     </script>
+    <script src="js/review-blog-copy.js?v=20260911-review921"></script>
 </body>
 </html>

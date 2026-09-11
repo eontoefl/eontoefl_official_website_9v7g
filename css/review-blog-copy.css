@@ -1,0 +1,136 @@
+.eon-blog-copy-action[hidden]{display:none!important}
+.eon-blog-copy-action{display:flex;flex-direction:column;align-items:center}
+.eon-blog-copy-action#reviewBlogActionTop{position:relative;flex:0 0 auto;flex-direction:row;padding:0;margin-right:4px}
+.eon-blog-copy-action#reviewBlogActionBottom{padding:38px 0 4px}
+.eon-bc-speech{position:absolute;right:0;bottom:48px;display:flex;flex-direction:column;gap:2px;width:max-content;max-width:240px;word-break:keep-all;text-align:center;background:#f4f0f6;color:#544360;padding:7px 9px;border-radius:10px;box-shadow:0 5px 14px rgba(87,69,101,.09);animation:eon-bc-bounce 1.6s ease-in-out infinite}
+.eon-bc-speech:after{content:"";position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:#f4f0f6;transform:translateX(-50%) rotate(45deg)}
+.eon-bc-speech strong{font-size:12px;font-weight:600;line-height:1.35}
+.eon-bc-speech span{font-size:11px;line-height:1.35}
+.eon-bc-row{display:flex;align-items:center;gap:9px}
+.eon-bc-open,.eon-bc-primary,.eon-bc-secondary{border:0;border-radius:10px;padding:14px 20px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.eon-bc-open{background:#03a94d;color:#fff;font-weight:700;box-shadow:0 4px 10px rgba(3,169,77,.22)}
+.eon-bc-primary{background:#745f86;color:#fff}
+.eon-blog-copy-action#reviewBlogActionTop .eon-bc-open{padding:8px 12px;font-size:12px}
+.eon-bc-open:hover{background:#038f42}
+.eon-bc-primary:hover{background:#5d496f}
+.eon-bc-open:disabled,.eon-bc-primary:disabled{background:#a9afb4;cursor:wait}
+.eon-bc-badge{font-size:9px;font-weight:800;color:#745f86;background:#f4f0f6;border-radius:999px;padding:4px 6px;white-space:nowrap}
+.eon-bc-dialog{width:min(560px,calc(100% - 28px));max-height:calc(100vh - 28px);border:0;border-radius:18px;padding:0;box-shadow:0 24px 80px #0004;color:#29333b;font-family:Arial,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+.eon-bc-dialog::backdrop{background:#15171a99}
+.eon-bc-dialog h2{font-size:24px;text-align:center;margin:0 0 18px}
+.eon-bc-dialog p{font-size:15px;line-height:1.7;margin:0 0 15px}
+.eon-bc-small,.eon-bc-changed{padding:30px}
+.eon-bc-page{padding:30px}
+.eon-bc-page strong{color:#4e3a5e}
+.eon-bc-note{color:#8a939a;font-size:13px!important}
+.eon-bc-pager{display:flex;justify-content:center;gap:7px;margin:24px 30px 18px}
+.eon-bc-dot{display:block;width:8px;height:8px;border-radius:50%;background:#d6dadd}
+.eon-bc-dot.active{background:#745f86}
+.eon-bc-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 30px 28px}
+.eon-bc-actions>span{flex:1}
+.eon-bc-changed .eon-bc-actions{margin:18px 0 0}
+.eon-bc-secondary{background:#eef0f2;color:#4d5962}
+.eon-bc-changed-preview{max-height:260px;overflow:auto;border:1px solid #e5e9ec;border-radius:10px;padding:16px;margin:16px 0;background:#fafafa}
+.eon-bc-changed label{display:flex;align-items:center;gap:8px;font-size:14px}
+.eon-bc-payload{position:fixed;left:-10000px;top:0;width:760px;background:#fff;pointer-events:none}
+.eon-bc-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:#263038;color:#fff;padding:13px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:.2s;max-width:min(560px,calc(100% - 28px));text-align:center;z-index:9999}
+.eon-bc-toast.show{opacity:1;transform:translate(-50%,0)}
+.eon-bc-toast.persistent{pointer-events:auto}
+.eon-bc-toast a,.eon-bc-toast button{margin-left:10px;color:#fff;background:transparent;border:0;text-decoration:underline;cursor:pointer}
+@keyframes eon-bc-bounce{0%,100%{transform:translateY(0)}
+50%{transform:translateY(-5px)}
+}
+@media(max-width:700px){.review-detail-meta-row{flex-wrap:wrap}
+#detailArticle #postActions{width:100%;margin-left:0!important;justify-content:flex-end;margin-top:8px}
+.eon-bc-speech{width:max-content;max-width:190px;padding:6px 8px;right:0;bottom:44px}
+.eon-bc-page{padding:24px 20px}
+.eon-bc-pager{margin-left:20px;margin-right:20px}
+.eon-bc-actions{margin:0 20px 22px;flex-wrap:wrap}
+.eon-bc-actions>span{display:none}
+.eon-bc-actions button{flex:1}
+.eon-bc-small,.eon-bc-changed{padding:24px 20px}
+.eon-bc-changed .eon-bc-actions{margin:18px 0 0}
+}
+
+.eon-bc-dialog{margin:auto}
+
+/* Modal walkthroughs */
+.eon-bc-dialog{overflow:auto}
+.eon-bc-prepare-demo,.eon-bc-title-demo,.eon-bc-transfer-demo{position:relative;overflow:hidden;margin:17px 0;border:1px solid #dce5e0;border-radius:13px;background:#fff;box-shadow:0 9px 24px rgba(30,52,40,.09)}
+.eon-bc-prepare-demo{height:128px;background:linear-gradient(140deg,#f8fbf9,#eef7f1)}
+.eon-bc-prepare-pieces{position:absolute;inset:15px;animation:eon-bc-pieces 6s ease-in-out infinite}
+.eon-bc-prepare-pieces i{position:absolute;left:3%;width:42%;height:7px;border-radius:7px;background:#cdd8d2;box-shadow:0 14px 0 #dce4e0,0 28px 0 #cdd8d2}
+.eon-bc-prepare-pieces i:nth-child(2){left:10%;top:54px;width:31%}
+.eon-bc-prepare-pieces img{position:absolute;right:2%;top:0;width:44%;height:92px;border-radius:8px;object-fit:cover;transform:rotate(3deg);box-shadow:0 7px 15px rgba(24,56,38,.16)}
+.eon-bc-prepared-post{position:absolute;inset:8px 56px;padding:12px 14px;border:1px solid #dce4e0;border-radius:9px;background:#fff;text-align:left;box-shadow:0 9px 22px rgba(30,52,40,.13);opacity:0;transform:translateY(18px) scale(.88);animation:eon-bc-prepared-post 6s cubic-bezier(.2,.8,.2,1) infinite}
+.eon-bc-prepared-post strong{display:block;margin-bottom:7px;color:#253129;font-size:11px}
+.eon-bc-prepared-post i{display:block;width:52%;height:4px;margin:4px 0;border-radius:5px;background:#cfd8d3}
+.eon-bc-prepared-post i:nth-of-type(2){width:43%}.eon-bc-prepared-post i:nth-of-type(3){width:48%}
+.eon-bc-prepared-post img{position:absolute;right:13px;top:34px;width:39%;height:66px;border-radius:6px;object-fit:cover}
+.eon-bc-title-demo{height:154px}
+.eon-bc-demo-toolbar{height:35px;display:flex;align-items:center;gap:7px;padding:0 12px;border-bottom:1px solid #e4e8e6;background:#fafcfb;color:#18a754}
+.eon-bc-demo-toolbar b{display:grid;place-items:center;width:22px;height:22px;border-radius:4px;background:#03c75a;color:#fff;font-size:14px}
+.eon-bc-demo-toolbar span{font-size:15px;font-weight:800}
+.eon-bc-demo-toolbar i{width:1px;height:15px;margin:0 5px;background:#d9dfdc}
+.eon-bc-demo-toolbar small{color:#5f6d65;font-size:10px}
+.eon-bc-demo-tools{height:31px;padding:8px 12px;border-bottom:1px solid #edf0ee;color:#627068;font-size:9px}
+.eon-bc-title-label{position:absolute;left:16px;bottom:72px;color:#66736c;font-size:11px;font-weight:700;line-height:14px}
+.eon-bc-demo-title{position:absolute;left:14px;right:14px;bottom:17px;height:50px;padding:14px 12px;border:2px solid #03bd58;border-radius:7px;background:#fff;color:#17221c;font-size:12px;font-weight:700;box-shadow:0 0 0 4px rgba(3,199,90,.07)}
+.eon-bc-demo-title .eon-bc-title-text{display:inline-block;width:max-content;max-width:0;overflow:hidden;white-space:nowrap;border-right:2px solid #19221d;animation:eon-bc-type-title 6s steps(27,end) infinite}
+.eon-bc-arrow{position:absolute;z-index:6;width:27px;height:34px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.22))}
+.eon-bc-arrow path{fill:#111;stroke:#fff;stroke-width:2;stroke-linejoin:round}
+.eon-bc-title-arrow{left:calc(100% - 30px);top:13px;animation:eon-bc-title-pointer 6s ease-in-out infinite}
+.eon-bc-click-wave,.eon-bc-copy-wave,.eon-bc-transfer-wave{position:absolute;z-index:7;box-sizing:border-box;width:14px;height:14px;border:3px solid rgba(3,199,90,.45);border-radius:50%;opacity:0;pointer-events:none}
+.eon-bc-click-wave{right:24px;bottom:29px;animation:eon-bc-title-click 6s ease-out infinite}
+
+.eon-bc-transfer-demo{height:224px;background:linear-gradient(140deg,#f8fbf9,#eef7f1)}
+.eon-bc-copy-scene{position:absolute;inset:0;z-index:4;display:grid;place-items:center;align-content:center;gap:14px;background:linear-gradient(140deg,#f8fbf9,#eef7f1);animation:eon-bc-copy-scene 10s ease-in-out infinite}
+.eon-bc-copy-scene button{border:0;border-radius:10px;padding:15px 22px;background:#03a94d;color:#fff;font-family:inherit;font-size:14px;font-weight:700;box-shadow:0 8px 18px rgba(3,169,77,.24);pointer-events:none;animation:eon-bc-demo-button 10s ease-in-out infinite}
+.eon-bc-copy-scene button span{font-size:18px}
+.eon-bc-copy-done{padding:9px 15px;border-radius:10px;background:#fff;color:#1d5133;font-size:12px;font-weight:700;box-shadow:0 7px 18px rgba(25,65,42,.12);opacity:0;animation:eon-bc-copy-done 10s ease-out infinite}
+.eon-bc-transfer-browser{position:absolute;inset:8px 24px;border:1px solid #dce4e0;border-radius:10px;background:#fff;box-shadow:0 10px 25px rgba(30,52,40,.12);overflow:hidden;opacity:0;transform:translateX(60px) scale(.84);animation:eon-bc-browser-arrive 10s cubic-bezier(.2,.8,.2,1) infinite}
+.eon-bc-transfer-browser .eon-bc-demo-toolbar{height:30px}
+.eon-bc-transfer-browser .eon-bc-demo-tools{height:24px;padding:6px 12px}
+.eon-bc-transfer-title{height:24px;margin:5px 11px 3px;padding:5px 9px;border:1px solid #e5e9e7;border-radius:5px;color:#a6aeaa;font-size:9px}
+.eon-bc-transfer-body{position:relative;height:112px;margin:0 11px;border:2px solid #03bd58;border-radius:6px;padding:9px;color:#a6aeaa;font-size:9px;overflow:hidden;box-shadow:0 0 0 4px rgba(3,199,90,.06)}
+.eon-bc-result{position:absolute;inset:6px;background:#fff;text-align:center;color:#253129}
+.eon-bc-result strong,.eon-bc-result i,.eon-bc-result img{opacity:0;transform:translateY(4px);animation:eon-bc-paste-block 10s ease-out infinite}
+.eon-bc-result strong{display:block;font-size:11px;margin-bottom:5px;animation-delay:0s}
+.eon-bc-result i{display:block;width:75%;height:4px;margin:3px auto;border-radius:4px;background:#cfd6d2}
+.eon-bc-result i:nth-of-type(1){animation-delay:.16s}.eon-bc-result i:nth-of-type(2){width:64%;animation-delay:.32s}.eon-bc-result i:nth-of-type(3){width:70%;animation-delay:.48s}
+.eon-bc-result img{display:block;width:180px;height:62px;margin:5px auto 0;border-radius:5px;object-fit:cover;animation-delay:.64s}
+.eon-bc-transfer-arrow{left:78%;top:27px;animation:eon-bc-transfer-pointer 10s linear infinite}
+.eon-bc-copy-wave{left:calc(50% - 7px);top:83px;animation:eon-bc-copy-click 10s ease-out infinite}
+.eon-bc-transfer-wave{left:calc(50% - 7px);top:119px;animation:eon-bc-body-click 10s ease-out infinite}
+.eon-bc-keyboard{position:absolute;z-index:8;left:50%;bottom:9px;width:350px;max-width:calc(100% - 28px);box-sizing:border-box;padding:9px 10px 11px;border:1px solid #b9c3be;border-radius:11px;background:linear-gradient(#e8edeb,#d5dcd8);box-shadow:0 13px 25px rgba(22,43,31,.26),inset 0 1px #fff;opacity:0;transform:translateX(-50%) translateY(16px) scale(.96);animation:eon-bc-keyboard 10s ease-out infinite}
+.eon-bc-key-row{display:flex;justify-content:center;gap:4px;margin-bottom:5px}
+.eon-bc-key-row:last-child{margin-bottom:0}
+.eon-bc-key-row i{display:grid;place-items:center;flex:0 1 27px;height:22px;box-sizing:border-box;border:1px solid #bdc6c1;border-radius:4px;background:#fbfcfb;color:#39453f;font-size:8px;font-style:normal;font-weight:600;box-shadow:0 3px 0 #aeb8b3,0 4px 5px rgba(22,43,31,.15)}
+.eon-bc-home-row{padding:0 10px}
+.eon-bc-key-row i.eon-bc-wide{flex-basis:39px;font-size:7px}
+.eon-bc-bottom-row{justify-content:flex-start;padding:0 4px}
+.eon-bc-bottom-row i{flex-basis:34px}
+.eon-bc-bottom-row i.eon-bc-space{flex:1 1 130px}
+.eon-bc-keyboard .eon-bc-mac-only{display:none}
+.eon-bc-keyboard.is-mac .eon-bc-win-only{display:none}
+.eon-bc-keyboard.is-mac .eon-bc-mac-only{display:grid}
+.eon-bc-keyboard .eon-bc-mod,.eon-bc-keyboard .eon-bc-v{border-color:#028f42;background:#03a94d;color:#fff;box-shadow:0 4px 0 #027b39,0 5px 7px rgba(3,109,52,.26)}
+@keyframes eon-bc-pieces{0%,17%{opacity:1;transform:none}38%,100%{opacity:0;transform:scale(.8)}}
+@keyframes eon-bc-prepared-post{0%,24%{opacity:0;transform:translateY(18px) scale(.88)}43%,100%{opacity:1;transform:none}}
+@keyframes eon-bc-title-pointer{0%,8%{left:calc(100% - 30px);top:13px;opacity:0}14%{opacity:1}27%,34%{left:calc(100% - 34px);top:116px;opacity:1}39%,100%{left:calc(100% - 34px);top:116px;opacity:0}}
+@keyframes eon-bc-title-click{0%,25%{opacity:0;transform:scale(.25)}30%{opacity:1}39%,100%{opacity:0;transform:scale(3)}}
+@keyframes eon-bc-type-title{0%,34%{max-width:0}75%,100%{max-width:100%}}
+@keyframes eon-bc-copy-scene{0%,20%{opacity:1;visibility:visible}28%,100%{opacity:0;visibility:hidden}}
+@keyframes eon-bc-demo-button{0%,9%,15%,100%{transform:none;box-shadow:0 8px 18px rgba(3,169,77,.24)}11%,13%{transform:translateY(3px);box-shadow:0 2px 6px rgba(3,169,77,.18)}}
+@keyframes eon-bc-copy-click{0%,9%{opacity:0;transform:scale(.3)}11%{opacity:1}17%,100%{opacity:0;transform:scale(3)}}
+@keyframes eon-bc-copy-done{0%,11%{opacity:0;transform:translateY(5px)}15%,23%{opacity:1;transform:none}27%,100%{opacity:0}}
+@keyframes eon-bc-browser-arrive{0%,20%{opacity:0;transform:translateX(60px) scale(.84)}29%,100%{opacity:1;transform:none}}
+@keyframes eon-bc-transfer-pointer{0%{left:78%;top:27px;opacity:0}4%{opacity:1}10%,14%{left:calc(50% - 3px);top:88px;opacity:1}18%,28%{left:calc(50% - 3px);top:88px;opacity:0}32%{left:70%;top:62px;opacity:1}41%,46%{left:calc(50% - 3px);top:124px;opacity:1}51%,100%{left:calc(50% - 3px);top:124px;opacity:0}}
+@keyframes eon-bc-body-click{0%,41%{opacity:0;transform:scale(.3)}43%{opacity:1}49%,100%{opacity:0;transform:scale(3)}}
+@keyframes eon-bc-keyboard{0%,48%{opacity:0;transform:translateX(-50%) translateY(16px) scale(.96)}52%,65%{opacity:1;transform:translateX(-50%)}69%,100%{opacity:0;transform:translateX(-50%) translateY(8px)}}
+@keyframes eon-bc-mod-down{0%,52%,59%,100%{transform:none;box-shadow:0 4px 0 #027b39,0 5px 7px rgba(3,109,52,.26)}54%,58%{transform:translateY(4px);box-shadow:0 0 0 #027b39,0 1px 2px rgba(3,109,52,.2)}}
+@keyframes eon-bc-v-down{0%,54%,59%,100%{transform:none;box-shadow:0 4px 0 #027b39,0 5px 7px rgba(3,109,52,.26)}56%,58%{transform:translateY(4px);box-shadow:0 0 0 #027b39,0 1px 2px rgba(3,109,52,.2)}}
+@keyframes eon-bc-paste-block{0%,58%{opacity:0;transform:translateY(4px)}59.6%,100%{opacity:1;transform:none}}
+.eon-bc-keyboard .eon-bc-mod{animation:eon-bc-mod-down 10s ease-in-out infinite}.eon-bc-keyboard .eon-bc-v{animation:eon-bc-v-down 10s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.eon-bc-speech{animation:none}.eon-bc-prepare-pieces,.eon-bc-title-arrow,.eon-bc-click-wave,.eon-bc-transfer-arrow,.eon-bc-copy-wave,.eon-bc-transfer-wave{display:none}.eon-bc-prepared-post,.eon-bc-demo-title .eon-bc-title-text,.eon-bc-transfer-browser,.eon-bc-result strong,.eon-bc-result i,.eon-bc-result img{opacity:1;transform:none;animation:none}.eon-bc-demo-title .eon-bc-title-text{max-width:100%}.eon-bc-copy-scene{display:none}.eon-bc-keyboard{opacity:1;transform:translateX(-50%);animation:none}.eon-bc-keyboard .eon-bc-mod,.eon-bc-keyboard .eon-bc-v{animation:none}}
+@media(max-width:700px){.eon-bc-transfer-browser{inset:10px 18px 13px}.eon-bc-demo-title{font-size:11px}.eon-bc-keyboard{bottom:9px}}
