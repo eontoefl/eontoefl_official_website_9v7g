@@ -1,714 +1,111 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>후속메일 관리 - 이온토플 관리자</title>
-
-    <!-- Noto Sans KR Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
-
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/admin.css">
-
-    <!-- 후속메일 전용 컴포넌트 스타일 (이 페이지 한정 · 전역 CSS 무접촉) -->
-    <!-- DESIGN.md 준수: 선(border)으로 구획하지 않고 표면 톤 레이어로 구분,
-         기본 CTA=스카이블루 그라디언트(006688→50c9ff), 파괴적 동작=코랄(tertiary),
-         입력칸=무테+포커스 2px outline, 둥근 0.5rem, 100% 검정 금지(on-surface #191c1d). -->
-    <style>
-    :root{
-      --fu-surface:#f8f9fa; --fu-lowest:#ffffff; --fu-low:#f3f4f5; --fu-high:#e8ecef; --fu-highest:#eef1f4;
-      --fu-primary:#006688; --fu-primary-container:#50c9ff; --fu-primary-dim:#76d1ff;
-      --fu-on:#191c1d; --fu-on-var:#3e484f; --fu-ghost:rgba(58,72,79,.15);
-      --fu-tertiary:#a53b22; --fu-error:#ba1a1a; --fu-ok:#0f5132; --fu-ok-bg:#d9f2e2;
-      --fu-grad:linear-gradient(135deg,#006688,#50c9ff);
-    }
-
-    /* 상단 운영 상태 알림 — 선 대신 표면 톤 */
-    .fu-notice{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;color:var(--fu-on-var);
-        background:var(--fu-low);border-radius:14px;padding:13px 18px;margin-bottom:16px}
-    .fu-badge{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px;padding:5px 12px;border-radius:999px}
-    .fu-badge.lock{background:#fdecea;color:var(--fu-error)}
-    .fu-badge.mode{background:var(--fu-ok-bg);color:var(--fu-ok)}
-    .fu-legend{color:var(--fu-on-var);font-size:12.5px;opacity:.85}
-    .fu-send-toggle{margin-left:auto;border:none;border-radius:999px;padding:9px 15px;font-size:12px;font-weight:800;
-        cursor:pointer;background:var(--fu-high);color:var(--fu-primary);transition:filter .15s,opacity .15s}
-    .fu-send-toggle[aria-checked="true"]{background:var(--fu-grad);color:#fff}
-    .fu-send-toggle:hover:not(:disabled){filter:brightness(1.05)}
-    .fu-send-toggle:disabled{opacity:.5;cursor:not-allowed}
-    .fu-runtime-note{width:100%;font-size:12px;color:var(--fu-on-var);text-align:right;min-height:1em}
-    .fu-runtime-note.err{color:var(--fu-error);font-weight:700}
-
-    /* 탭 */
-    .fu-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-    .fu-tab{border:none;background:var(--fu-high);color:var(--fu-on-var);border-radius:999px;padding:9px 15px;
-        font-size:12.5px;font-weight:700;cursor:pointer;transition:background .15s,color .15s}
-    .fu-tab:hover{background:#dbe3e8}
-    .fu-tab.active{background:var(--fu-grad);color:#fff}
-    .fu-count{display:inline-block;min-width:19px;margin-left:5px;padding:1px 6px;border-radius:999px;
-        background:rgba(58,72,79,.14);font-size:10.5px;text-align:center}
-    .fu-tab.active .fu-count{background:rgba(255,255,255,.25)}
-
-    /* 리스트 행 — 선 대신 표면 대비(low 위 lowest 카드) */
-    .fu-row{background:var(--fu-lowest);border-radius:14px;margin-top:10px;overflow:hidden;
-        box-shadow:0 1px 0 rgba(25,28,29,.03)}
-    .fu-row.held::before,.fu-row.failed::before,.fu-row.manual::before{content:"";display:block;height:3px}
-    .fu-row.held::before{background:var(--fu-error)}
-    .fu-row.failed::before{background:var(--fu-error)}
-    .fu-row.manual::before{background:#e0932a}
-    .fu-row summary{cursor:pointer;padding:14px 18px;display:flex;flex-wrap:wrap;gap:9px;align-items:center;
-        font-size:13px;list-style:none}
-    .fu-row summary::-webkit-details-marker{display:none}
-    .fu-row summary:hover{background:var(--fu-low)}
-    .fu-nm{font-weight:800;font-size:14.5px;min-width:52px;color:var(--fu-on);letter-spacing:-.01em}
-    .fu-stage{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;
-        background:rgba(0,102,136,.1);color:var(--fu-primary)}
-    .fu-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;color:var(--fu-on-var);background:var(--fu-high)}
-    .fu-status.await{background:rgba(0,102,136,.12);color:var(--fu-primary)}
-    .fu-status.held{background:var(--fu-error);color:#fff}
-    .fu-status.failed{background:var(--fu-error);color:#fff}
-    .fu-status.manual{background:#e0932a;color:#fff}
-    .fu-meta{color:#8a949b;font-size:12px}
-    .fu-meta.right{margin-left:auto;text-align:right}
-    .fu-cd{font-weight:700;color:var(--fu-primary)}
-    .fu-cd.over{color:var(--fu-on-var)}
-    .fu-cd.queued{color:#0f5132}
-    .fu-chev{color:#b3bcc2;font-size:11px}
-    details.fu-row[open] .fu-chev{transform:rotate(90deg);display:inline-block}
-
-    /* 펼침 패널 */
-    .fu-panel{padding:2px 20px 22px;background:var(--fu-lowest)}
-    .fu-sect{margin-top:18px}
-    .fu-sect h3{font-size:12px;font-weight:800;letter-spacing:.02em;color:#7b858c;margin:0 0 8px}
-
-    /* 편지 보기 */
-    .fu-subj{font-weight:800;font-size:15px;margin-bottom:4px;color:var(--fu-on)}
-    .fu-letter{white-space:pre-line;font-size:14px;line-height:1.9;color:var(--fu-on);background:var(--fu-low);
-        border-radius:12px;padding:15px 17px;word-break:break-word}
-
-    /* 편집 입력칸 — 무테, 포커스 2px outline */
-    .fu-field{margin-top:10px}
-    .fu-field label{display:block;font-size:11.5px;font-weight:700;color:#7b858c;margin-bottom:5px}
-    .fu-input,.fu-textarea{width:100%;font-family:inherit;background:var(--fu-highest);border:none;border-radius:10px;
-        padding:12px 14px;color:var(--fu-on);font-size:14px;outline:2px solid transparent;transition:outline-color .15s}
-    .fu-input:focus,.fu-textarea:focus{outline-color:var(--fu-primary-dim)}
-    .fu-textarea{min-height:230px;line-height:1.85;resize:vertical}
-    .fu-att{font-size:12.5px;color:var(--fu-on-var);margin-top:9px;display:flex;align-items:center;gap:7px}
-    .fu-att .none{color:#9aa3a9}
-
-    /* 버튼 */
-    .fu-btnrow{margin-top:14px;display:flex;gap:9px;flex-wrap:wrap;align-items:center}
-    .fu-btn{font-size:13px;font-weight:700;padding:10px 18px;border-radius:8px;border:none;cursor:pointer;
-        transition:filter .15s,background .15s}
-    .fu-btn:disabled{opacity:.5;cursor:not-allowed}
-    .fu-btn.primary{background:var(--fu-grad);color:#fff}
-    .fu-btn.primary:hover:not(:disabled){filter:brightness(1.06)}
-    .fu-btn.secondary{background:var(--fu-high);color:var(--fu-primary)}
-    .fu-btn.secondary:hover:not(:disabled){background:#dbe3e8}
-    .fu-btn.danger{background:transparent;color:var(--fu-tertiary);box-shadow:inset 0 0 0 1px rgba(165,59,34,.35)}
-    .fu-btn.danger:hover:not(:disabled){background:rgba(165,59,34,.07)}
-    .fu-actionnote{font-size:12px;color:var(--fu-on-var)}
-    .fu-actionnote.err{color:var(--fu-error);font-weight:700}
-    .fu-actionnote.ok{color:var(--fu-ok);font-weight:700}
-
-    /* 취소 사유 입력 */
-    .fu-cancelbox{margin-top:12px;background:var(--fu-low);border-radius:12px;padding:14px 16px;display:none}
-    .fu-cancelbox.show{display:block}
-    .fu-cancelbox label{display:block;font-size:12px;font-weight:700;color:var(--fu-tertiary);margin-bottom:6px}
-
-    /* 검사 보류 사유 */
-    .fu-holdbox{background:#fdeeec;border-radius:12px;padding:14px 16px}
-    .fu-holdbox h3{color:var(--fu-error)}
-    .fu-hitem{font-size:13px;color:var(--fu-error);padding:6px 0;display:flex;gap:8px}
-    .fu-hitem .ck{font-weight:800;min-width:120px}
-    .fu-holdmeta{font-size:12px;color:var(--fu-error);margin-top:8px;opacity:.9}
-
-    /* 발송 실패 */
-    .fu-failbox{background:#fdeeec;border-radius:12px;padding:14px 16px}
-    .fu-failbox h3{color:var(--fu-error)}
-    .fu-failline{font-size:13px;color:var(--fu-error);margin-top:4px}
-    .fu-failmeta{font-size:12px;color:var(--fu-on-var);margin-top:8px}
-
-    /* 관리 기록(시기 지남) */
-    .fu-manualbox{background:#fdf4e6;border-radius:12px;padding:14px 16px}
-    .fu-manualbox h3{color:#9a6412}
-    .fu-manualbox p{font-size:13px;line-height:1.75;color:#7a5310;margin:0}
-
-    /* 발송 제외 */
-    .fu-suppression{background:var(--fu-lowest);border-radius:14px;padding:15px 17px;margin-top:10px;
-        display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,2fr) auto;gap:6px 14px;align-items:center;
-        box-shadow:0 1px 0 rgba(25,28,29,.03)}
-    .fu-sup-label{font-weight:800;color:var(--fu-on)}
-    .fu-sup-email{font-size:13px;color:var(--fu-on-var);word-break:break-all}
-    .fu-sup-reason{font-size:11px;font-weight:700;color:var(--fu-on-var);background:var(--fu-high);border-radius:999px;padding:4px 10px}
-    .fu-sup-note{grid-column:1/-1;font-size:12.5px;color:#7b858c}
-    @media(max-width:700px){.fu-suppression{grid-template-columns:1fr}.fu-sup-note{grid-column:auto}}
-
-    /* 발송·성과 */
-    .fu-outcome-grid{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:9px;margin:10px 0 14px}
-    .fu-outcome-card{background:var(--fu-lowest);border-radius:12px;padding:13px 14px;color:var(--fu-on-var)}
-    .fu-outcome-card strong{display:block;color:var(--fu-primary);font-size:21px;margin-top:3px}
-    .fu-outcome-row{background:var(--fu-lowest);border-radius:12px;margin-top:9px;padding:13px 16px;
-        display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .fu-outcome-type{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;background:rgba(0,102,136,.1);color:var(--fu-primary)}
-    .fu-outcome-note{margin-left:auto;color:#7b858c;font-size:12px}
-    @media(max-width:800px){.fu-outcome-grid{grid-template-columns:repeat(2,minmax(110px,1fr))}.fu-outcome-note{margin-left:0;width:100%}}
-
-    .fu-empty{color:#8a949b;font-size:13.5px;padding:30px 4px;text-align:center;background:var(--fu-lowest);border-radius:14px;margin-top:10px}
-    .fu-loading{color:#8a949b;font-size:13px;padding:26px 4px;text-align:center}
-
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="supabase-url" content="https://qpqjevecjejvbeuogtbx.supabase.co">
+  <meta name="supabase-anon-key" content="sb_publishable_1ebDQCBoDQXc2sol1XKQ1Q_TRYuW_Ev">
+  <meta name="followup-edge-url" content="https://qpqjevecjejvbeuogtbx.supabase.co/functions/v1/followup-admin">
+  <title>후속메일 관리</title>
+  <style>
+    :root{font-family:Arial,"Noto Sans KR",sans-serif;color:#1d2433;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}.shell{max-width:1120px;margin:auto;padding:28px 18px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.card{background:#fff;border:1px solid #dfe4ee;border-radius:14px;padding:20px;box-shadow:0 6px 22px #1b29400d}.auth{max-width:520px;margin:56px auto}.hidden{display:none!important}label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,button{font:inherit}input,textarea{width:100%;padding:11px;border:1px solid #b9c1d0;border-radius:8px}textarea{min-height:240px;line-height:1.55}button{border:0;border-radius:8px;padding:10px 14px;background:#1f5eea;color:#fff;cursor:pointer}button.secondary{background:#e9edf5;color:#26334a}button.danger{background:#b42318}button:disabled{opacity:.45;cursor:not-allowed}.row{display:flex;gap:8px;flex-wrap:wrap}.tabs{display:flex;gap:7px;overflow:auto;margin:18px 0}.tab{white-space:nowrap;background:#e9edf5;color:#26334a}.tab.active{background:#1f5eea;color:#fff}.status{padding:10px 12px;border-radius:8px;background:#eef3ff;margin:12px 0}.error{background:#fff0ef;color:#9c1c13}.item{margin:12px 0}.item h3{margin:0 0 5px;font-size:17px}.meta{font-size:13px;color:#5c667a;line-height:1.55}.body{white-space:pre-wrap;background:#f8f9fc;padding:12px;border-radius:8px;max-height:240px;overflow:auto;margin:12px 0}.switch{display:flex;align-items:center;gap:9px}.switch input{width:auto}.empty{padding:36px;text-align:center;color:#6b7280}.metrics{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;margin:12px 0}.metric{background:#eef3ff;border-radius:10px;padding:14px}.metric strong{display:block;font-size:24px;color:#1f5eea;margin-top:5px}.dialog{position:fixed;inset:0;background:#16213a88;display:grid;place-items:center;padding:18px}.dialog>.card{width:min(760px,100%);max-height:92vh;overflow:auto}@media(max-width:650px){.top{align-items:flex-start;flex-direction:column}.shell{padding:18px 12px}.metrics{grid-template-columns:repeat(2,minmax(120px,1fr))}}
+  </style>
 </head>
 <body>
-    <!-- Admin Navigation (기존 admin 페이지와 동일 · 후속메일 링크 1개 추가) -->
-    <nav class="admin-nav">
-        <div class="container">
-            <div class="admin-nav-brand">
-                <i class="fas fa-shield-alt"></i>
-                <span>이온토플 관리자</span>
-            </div>
-            <div class="admin-nav-menu">
-                <a href="admin-dashboard.html" class="admin-nav-link">
-                    <i class="fas fa-home"></i> 대시보드
-                </a>
-                <a href="admin-applications.html" class="admin-nav-link">
-                    <i class="fas fa-clipboard-list"></i> 신청서 관리
-                </a>
-                <a href="admin-followup.html" class="admin-nav-link active">
-                    <i class="fas fa-envelope-open-text"></i> 후속메일
-                </a>
-                <a href="admin-study-v3.html" class="admin-nav-link">
-                    <i class="fas fa-flask"></i> 학습 관리 <span id="navWeeklyCheckBadge" style="display:none; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; min-width:16px; text-align:center; line-height:16px;">0</span>
-                </a>
-                <a href="admin-correction.html" class="admin-nav-link">
-                    <i class="fas fa-pen-nib"></i> 첨삭 관리
-                </a>
-                <a href="admin-survey.html" class="admin-nav-link">
-                    <i class="fas fa-clipboard-check"></i> 실전 리포트
-                </a>
-                <a href="admin-questions.html" class="admin-nav-link">
-                    <i class="fas fa-puzzle-piece"></i> 문제 관리
-                </a>
-                <a href="admin-users.html" class="admin-nav-link">
-                    <i class="fas fa-users"></i> 회원 관리
-                </a>
-                <a href="admin-settings.html" class="admin-nav-link">
-                    <i class="fas fa-cog"></i> 사이트 설정
-                </a>
-                <a href="index.html" class="admin-nav-link">
-                    <i class="fas fa-globe"></i> 사이트로
-                </a>
-                <div class="admin-nav-user" id="adminUser">
-                    <i class="fas fa-user-circle"></i>
-                    <span id="adminName">관리자</span>
-                </div>
-            </div>
-        </div>
-    </nav>
+  <main class="shell">
+    <section id="authPanel" class="card auth">
+      <h1>후속메일 관리</h1>
+      <p>대표 이메일로 받은 6자리 인증번호를 입력해 주세요.</p>
+      <div id="authStatus" class="status hidden"></div>
+      <div id="emailStep">
+        <label for="email">대표 이메일</label><input id="email" type="email" autocomplete="email">
+        <button id="sendCode" style="margin-top:12px">인증번호 받기</button>
+      </div>
+      <div id="codeStep" class="hidden">
+        <label for="code">6자리 인증번호</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}">
+        <div class="row" style="margin-top:12px"><button id="verifyCode">확인</button><button id="changeEmail" class="secondary">이메일 다시 입력</button></div>
+      </div>
+    </section>
 
-    <!-- Main Content -->
-    <div class="admin-container">
-        <div class="admin-header">
-            <h1 class="admin-title">📮 후속메일 관리</h1>
-            <p class="admin-subtitle">발송 예정 메일을 검토·수정·취소하고, 검사 보류·발송 실패·발송 제외를 한눈에 확인합니다.</p>
-        </div>
-
-        <div class="fu-notice" id="notice">
-            <span class="fu-badge mode" id="modeBadge"><i class="fas fa-circle-notch"></i> 운영 상태 확인 중</span>
-            <span class="fu-badge lock" id="lockBadge"><i class="fas fa-lock"></i> 발송 잠금 확인 중</span>
-            <span class="fu-legend">단계: 1 = 첫 안내 · 2 = 개별분석 · 3a = 계약서 · 3b = 등록/결제</span>
-            <button class="fu-send-toggle" id="sendToggle" type="button" role="switch" aria-checked="false" disabled>자동 발송 확인 중</button>
-            <span class="fu-runtime-note" id="runtimeNote" aria-live="polite"></span>
-        </div>
-
-        <div class="fu-toolbar" role="tablist" aria-label="후속메일 보기 범위">
-            <button class="fu-tab active" type="button" data-view="scheduled" role="tab" aria-selected="true">발송 예정 <span class="fu-count" id="countScheduled">0</span></button>
-            <button class="fu-tab" type="button" data-view="held" role="tab" aria-selected="false">검사 보류 <span class="fu-count" id="countHeld">0</span></button>
-            <button class="fu-tab" type="button" data-view="failed" role="tab" aria-selected="false">발송 실패 <span class="fu-count" id="countFailed">0</span></button>
-            <button class="fu-tab" type="button" data-view="suppressed" role="tab" aria-selected="false">발송 제외 <span class="fu-count" id="countSuppressed">0</span></button>
-            <button class="fu-tab" type="button" data-view="manual" role="tab" aria-selected="false">관리 기록 <span class="fu-count" id="countManual">0</span></button>
-            <button class="fu-tab" type="button" data-view="outcomes" role="tab" aria-selected="false">발송·성과 <span class="fu-count" id="countOutcomes">0</span></button>
-        </div>
-
-        <div id="list">
-            <div class="fu-loading"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>
-        </div>
-    </div>
-
-    <!-- JavaScript -->
-    <script src="js/supabase-config.js"></script>
-    <script src="js/admin-utils.js"></script>
-    <script>
-    // ===== 후속메일 관리자 대시보드 =====
-    // 대표 결정(2026-08-28): 후속메일 전용 암호 없이 기존 사이트 관리자 로그인만 사용한다.
-    // 전체 관리자 보안 개편은 별도 작업으로 남긴다.
-    // 데이터·동작: Edge Function followup-admin 을 통해서만. GET=조회,
-    // POST=수정저장/취소/지금발송/자동발송 켜기·끄기.
-    // Gmail 실발송은 이 화면이 직접 하지 않고 매시간 운영 작업이 처리한다.
-    requireAdmin();
-
-    const FN_URL = `${SUPABASE_URL}/functions/v1/followup-admin`;
-    const $list = document.getElementById('list');
-    const $tabs = Array.from(document.querySelectorAll('.fu-tab'));
-    const $sendToggle = document.getElementById('sendToggle');
-    const $runtimeNote = document.getElementById('runtimeNote');
-    let jobsState = [];
-    let suppressionsState = [];
-    let activitiesState = [];
-    let outcomeCountsState = { reply:0, application:0, analysis_consent:0, contract_consent:0, payment:0 };
-    let runtimeState = { operation_mode:'observe', send_locked:true };
-    let activeView = 'scheduled';
-    let clockOffset = 0;            // Date.now() - 서버시각(ms). 남은시간 계산 보정.
-    const pendingReq = {};          // '동작:job_id' → request_id(진행 중 재사용, 성공 후 삭제).
-    let ticker = null;
-
-    // ── 라벨 ──
-    const STAGE_LABEL = { stage1:'1단계', stage2:'2단계', stage3a:'3a단계', stage3b:'3b단계' };
-    const SUPPRESSION_REASON = { internal:'대표·직원', test:'시험용', do_not_contact:'연락 중단 요청', manual:'직접 제외' };
-    const MODE_LABEL = { observe:'관찰 중', draft_only:'초안만', test_one:'시험 발송', live:'운영 중' };
-
-    function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    function uuid(){ return (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2))); }
-
-    function whenText(w){
-        if(!w) return '';
-        try { const t = formatKstDateTimeKo(w); return t || String(w); }
-        catch(e){ return String(w); }
+    <section id="adminPanel" class="hidden">
+      <div class="top"><div><h1>후속메일 관리</h1><div id="account" class="meta"></div></div><div class="row"><label class="switch"><input id="sendLock" type="checkbox" disabled>자동 발송 잠금</label><button id="refresh" class="secondary">새로고침</button><button id="logout" class="secondary">로그아웃</button></div></div>
+      <div id="adminStatus" class="status hidden"></div>
+      <nav id="tabs" class="tabs"></nav>
+      <section id="list"></section>
+    </section>
+  </main>
+  <section id="editor" class="dialog hidden" aria-modal="true" role="dialog">
+    <div class="card"><h2>편지 수정</h2><label for="editSubject">제목</label><input id="editSubject"><label for="editBody">본문</label><textarea id="editBody"></textarea><div class="row"><button id="saveEdit">저장하고 다시 검사</button><button id="closeEdit" class="secondary">닫기</button></div></div>
+  </section>
+  <section id="cancelDialog" class="dialog hidden" aria-modal="true" role="dialog">
+    <div class="card"><h2>발송 취소</h2><div id="cancelStatus" class="status hidden"></div><label for="cancelReason">취소 이유</label><textarea id="cancelReason" style="min-height:120px"></textarea><div class="row"><button id="confirmCancel" class="danger">취소 확정</button><button id="closeCancel" class="secondary">닫기</button></div></div>
+  </section>
+  <script src="./vendor/supabase-2.116.0.js"></script>
+  <script>
+  (()=>{'use strict';
+    const $=(id)=>document.getElementById(id),cfg=(name)=>document.querySelector(`meta[name="${name}"]`)?.content||'';
+    const configuration={url:cfg('supabase-url'),anon:cfg('supabase-anon-key'),edge:cfg('followup-edge-url')};
+    if(Object.values(configuration).some((v)=>!v||v.startsWith('__'))){$('authStatus').textContent='관리자 연결 설정이 아직 준비되지 않았습니다.';$('authStatus').className='status error';return;}
+    const client=window.supabase.createClient(configuration.url,configuration.anon,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+    const tabDefs=[['scheduled,awaiting_review','발송예정'],['held','검사보류'],['failed','실패'],['skipped,canceled','제외'],['logs','관리기록'],['sent','발송·성과']];
+    let session=null,data=null,currentTab='scheduled,awaiting_review',editing=null,canceling=null,actionInFlight=false;
+    let sessionGeneration=0,loadSequence=0,pendingRevision=null;
+    const status=(id,text,error=false)=>{const el=$(id);el.textContent=text||'';el.className=text?`status${error?' error':''}`:'status hidden'};
+    const clearPrivate=()=>{data=null;editing=null;canceling=null;pendingRevision=null;$('list').replaceChildren();$('editor').classList.add('hidden');$('cancelDialog').classList.add('hidden');$('editSubject').value='';$('editBody').value='';$('cancelReason').value='';status('cancelStatus','');$('account').textContent='';$('sendLock').checked=false;$('sendLock').indeterminate=false;$('sendLock').disabled=true};
+    const showAuth=()=>{$('adminPanel').classList.add('hidden');$('authPanel').classList.remove('hidden');clearPrivate()};
+    const showAdmin=()=>{$('authPanel').classList.add('hidden');$('adminPanel').classList.remove('hidden');$('account').textContent=session?.user?.email||''};
+    const requestId=()=>crypto.randomUUID();
+    const staleError=()=>Object.assign(new Error('stale response'),{stale:true});
+    function expireSession(message='로그인이 만료되었습니다. 인증번호를 다시 받아 주세요.'){
+      session=null;sessionGeneration++;loadSequence++;actionInFlight=false;showAuth();status('authStatus',message,true);void client.auth.signOut();
     }
-    // 서버 기준 '지금'(ms). 클라 시계 오차를 서버시각으로 보정.
-    function nowServer(){ return Date.now() - clockOffset; }
-    // 오전 7시~오후 11시 매 정시 실행 기준의 정확한 다음 처리 시각.
-    function nextProcessIso(baseMs){
-        const kst = new Date((baseMs == null ? nowServer() : baseMs) + 9*60*60*1000);
-        const y=kst.getUTCFullYear(), m=kst.getUTCMonth(), d=kst.getUTCDate(), h=kst.getUTCHours();
-        let localUtc;
-        if(h < 7) localUtc = Date.UTC(y,m,d,7,0,0,0);
-        else if(h >= 23) localUtc = Date.UTC(y,m,d+1,7,0,0,0);
-        else localUtc = Date.UTC(y,m,d,h+1,0,0,0);
-        return new Date(localUtc - 9*60*60*1000).toISOString();
+    async function api(body,generation=sessionGeneration){
+      const token=session?.access_token;if(!token)throw new Error('로그인이 필요합니다.');
+      const options={method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}};
+      if(body)options.body=JSON.stringify(body);
+      const res=await fetch(configuration.edge,options),payload=await res.json().catch(()=>({ok:false,error:'서버 응답을 읽지 못했습니다.'}));
+      if(generation!==sessionGeneration||token!==session?.access_token)throw staleError();
+      if(res.status===401){expireSession(payload?.error);throw staleError()}
+      if(!res.ok||payload?.ok===false)throw new Error(payload?.error||'요청을 처리하지 못했습니다.');return payload;
     }
-    function nextProcessText(j){
-        const iso = j && j.next_processing_at
-            ? j.next_processing_at
-            : nextProcessIso(j && j.send_requested_at ? Date.parse(j.send_requested_at) : nowServer());
-        return `${whenText(iso)} 처리 예정`;
-    }
-    function remainText(deadlineIso){
-        if(!deadlineIso) return { cls:'', text:'검토 마감 미정' };
-        const ms = Date.parse(deadlineIso) - nowServer();
-        if(isNaN(ms)) return { cls:'', text:'검토 마감 미정' };
-        if(ms <= 0) return { cls:'over', text:'발송 처리 대기' };
-        const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000);
-        if(m >= 60){ const h=Math.floor(m/60); return { cls:'', text:`${h}시간 ${m%60}분 남음` }; }
-        return { cls:'', text:`${m}분 ${s}초 남음` };
-    }
-
-    // ── 카운트다운: 행 재생성 없이 숫자만 갱신(편집 중 textarea 보존) ──
-    function tick(){
-        jobsState.filter(j=>j.status==='awaiting_review').forEach(j=>{
-            const el = document.getElementById('cd-'+j.job_id);
-            if(!el) return;
-            if(j.send_requested_at){ el.className='fu-cd queued'; el.textContent='지금 발송 요청됨 · '+nextProcessText(j); return; }
-            const r = remainText(j.review_deadline_at);
-            el.className = 'fu-cd '+r.cls;
-            el.textContent = r.text;
-        });
-    }
-    function startTicker(){ if(ticker) clearInterval(ticker); tick(); ticker = setInterval(tick, 1000); }
-
-    // ── 행 렌더 ──
-    function statusBadge(j){
-        const map = { awaiting_review:['await','발송 예정'], held:['held','검사 보류'], failed:['failed','발송 실패'], skipped:['manual','시기 지남'] };
-        const m = map[j.status] || ['','' + j.status];
-        return `<span class="fu-status ${m[0]}">${esc(m[1])}</span>`;
-    }
-    function attachmentHTML(j){
-        return j.has_attachment
-            ? `<div class="fu-att"><i class="fas fa-paperclip"></i> 첨부: <code>${esc(j.attachment_asset_id)}</code> <span style="color:#7b858c">(그대로 유지)</span></div>`
-            : `<div class="fu-att"><i class="fas fa-paperclip"></i> <span class="none">첨부 없음</span></div>`;
-    }
-
-    // 발송 예정: 편집 + 수정저장/발송취소/지금발송
-    function scheduledPanel(j){
-        return `
-          <div class="fu-panel">
-            <div class="fu-sect">
-              <h3>왜 이 학생 · 이 단계인가</h3>
-              <div class="fu-letter">${esc(j.why) || '사유 없음'}</div>
-            </div>
-            <div class="fu-sect">
-              <h3>메일 (수정본은 다시 검사하고, 통과한 시점부터 1시간 검토합니다)</h3>
-              <div class="fu-field">
-                <label>제목</label>
-                <input class="fu-input" data-edit="subject" data-job-id="${esc(j.job_id)}" value="${esc(j.subject)}">
-              </div>
-              <div class="fu-field">
-                <label>본문</label>
-                <textarea class="fu-textarea" data-edit="body" data-job-id="${esc(j.job_id)}" spellcheck="false">${esc(j.body)}</textarea>
-              </div>
-              ${attachmentHTML(j)}
-              <div class="fu-btnrow">
-                <button class="fu-btn primary" data-act="save_revision" data-job-id="${esc(j.job_id)}" type="button">수정 저장</button>
-                <button class="fu-btn secondary" data-act="send_now" data-job-id="${esc(j.job_id)}" type="button" ${j.send_requested_at?'disabled':''}>지금 발송</button>
-                <button class="fu-btn danger" data-act="cancel_open" data-job-id="${esc(j.job_id)}" type="button">발송 취소</button>
-                <span class="fu-actionnote" data-note="${esc(j.job_id)}" aria-live="polite"></span>
-              </div>
-              <div class="fu-cancelbox" data-cancelbox="${esc(j.job_id)}">
-                <label>발송 취소 사유 (필수)</label>
-                <input class="fu-input" data-cancelreason="${esc(j.job_id)}" placeholder="예: 학생이 이미 다음 단계로 진행함">
-                <div class="fu-btnrow">
-                  <button class="fu-btn danger" data-act="cancel_confirm" data-job-id="${esc(j.job_id)}" type="button">취소 확정</button>
-                  <button class="fu-btn secondary" data-act="cancel_close" data-job-id="${esc(j.job_id)}" type="button">닫기</button>
-                </div>
-              </div>
-            </div>
-          </div>`;
-    }
-
-    function heldPanel(j){
-        const rows = [...(j.failed||[]), ...(j.warns||[])];
-        const items = rows.map(x=>`<div class="fu-hitem"><span class="ck">${esc(x.check)}</span><span>${esc(x.reason)}</span></div>`).join('')
-            || `<div class="fu-hitem"><span>${esc(j.hold_reason)||'사유 정보 없음'}</span></div>`;
-        const uncertain = j.hold_kind === 'send_uncertain' || j.hold_kind === 'activity_during_sending';
-        const pendingValidation = j.review_status === 'pending_validation' ||
-            String(j.held_reason||'').includes('대표 수정본 재검사 대기');
-        const kindLabel = pendingValidation
-            ? '대표 수정본 재검사 대기'
-            : uncertain
-                ? '발송 결과 확인 필요'
-                : j.hold_kind === 'gate3'
-                    ? '기계검사 반복 실패(강제 재작성 초과)'
-                    : '말투·설득력 경고 임계 초과';
-        const actions = uncertain ? `
-            <div class="fu-actionnote err">Gmail 발송 결과를 먼저 확인해야 합니다. 자동 재발송하거나 여기서 수정하지 않습니다.</div>` : `
-            <div class="fu-field">
-              <label>제목</label>
-              <input class="fu-input" data-edit="subject" data-job-id="${esc(j.job_id)}" value="${esc(j.subject)}">
-            </div>
-            <div class="fu-field">
-              <label>본문</label>
-              <textarea class="fu-textarea" data-edit="body" data-job-id="${esc(j.job_id)}" spellcheck="false">${esc(j.body)}</textarea>
-            </div>
-            ${attachmentHTML(j)}
-            <div class="fu-btnrow">
-              <button class="fu-btn primary" data-act="save_revision" data-job-id="${esc(j.job_id)}" type="button">수정 저장·재검사 요청</button>
-              <button class="fu-btn danger" data-act="cancel_open" data-job-id="${esc(j.job_id)}" type="button">발송 취소</button>
-              <span class="fu-actionnote" data-note="${esc(j.job_id)}" aria-live="polite"></span>
-            </div>
-            <div class="fu-cancelbox" data-cancelbox="${esc(j.job_id)}">
-              <label>발송 취소 사유 (필수)</label>
-              <input class="fu-input" data-cancelreason="${esc(j.job_id)}" placeholder="예: 현재는 발송하지 않기로 결정함">
-              <div class="fu-btnrow">
-                <button class="fu-btn danger" data-act="cancel_confirm" data-job-id="${esc(j.job_id)}" type="button">취소 확정</button>
-                <button class="fu-btn secondary" data-act="cancel_close" data-job-id="${esc(j.job_id)}" type="button">닫기</button>
-              </div>
-            </div>`;
-        return `
-          <div class="fu-panel">
-            <div class="fu-sect">
-              <div class="fu-holdbox">
-                <h3>⛔ 왜 보류됐나 — ${esc(kindLabel)}</h3>
-                ${items}
-                ${j.regen ? `<div class="fu-holdmeta">누적: ${esc(j.regen)}</div>` : ''}
-              </div>
-            </div>
-            <div class="fu-sect">
-              <h3>${uncertain ? '편지 원문' : '수정 후 다시 검사'}</h3>
-              ${actions}
-            </div>
-          </div>`;
-    }
-
-    function failedPanel(j){
-        return `
-          <div class="fu-panel">
-            <div class="fu-sect">
-              <div class="fu-failbox">
-                <h3>🚫 발송 실패</h3>
-                <div class="fu-failline">${esc(j.fail_error)||'실패 사유 기록 없음'}</div>
-                <div class="fu-failmeta">${j.failed_at?`마지막 실패: ${esc(whenText(j.failed_at))} · `:''}시도 ${esc(j.attempt_count||0)}회${j.next_retry_at?` · 다음 재시도 ${esc(whenText(j.next_retry_at))}`:''}</div>
-              </div>
-            </div>
-            <div class="fu-sect">
-              <h3>편지 원문</h3>
-              <div class="fu-subj">${esc(j.subject)||'제목 없음'}</div>
-              <div class="fu-letter">${esc(j.body)||'본문 없음'}</div>
-            </div>
-          </div>`;
-    }
-
-    function manualPanel(j){
-        return `
-          <div class="fu-panel">
-            <div class="fu-sect">
-              <div class="fu-manualbox">
-                <h3>📌 발송 시기가 지나 자동 발송하지 않은 기록</h3>
-                <p>이 건은 적절한 발송 시기가 지나 초안을 만들지 않았습니다. 관리 기록으로만 남습니다.</p>
-              </div>
-            </div>
-            ${j.why?`<div class="fu-sect"><h3>기록 사유</h3><div class="fu-letter">${esc(j.why)}</div></div>`:''}
-          </div>`;
-    }
-
-    function rowHTML(j){
-        let cls = '', panel = '';
-        if(j.status==='awaiting_review'){ panel = scheduledPanel(j); }
-        else if(j.status==='held'){ cls='held'; panel = heldPanel(j); }
-        else if(j.status==='failed'){ cls='failed'; panel = failedPanel(j); }
-        else if(j.status==='skipped'){ cls='manual'; panel = manualPanel(j); }
-
-        let rightMeta;
-        if(j.status==='awaiting_review'){
-            const init = j.send_requested_at ? '지금 발송 요청됨 · '+nextProcessText(j) : remainText(j.review_deadline_at).text;
-            rightMeta = `<span class="fu-cd" id="cd-${esc(j.job_id)}">${esc(init)}</span>`;
-        } else {
-            rightMeta = `<span>${esc(whenText(j.when))}</span>`;
-        }
-
-        return `
-        <details class="fu-row ${cls}">
-          <summary>
-            <span class="fu-chev">▸</span>
-            <span class="fu-nm">${esc(j.name)}</span>
-            <span class="fu-stage">${STAGE_LABEL[j.stage]||esc(j.stage)}</span>
-            ${statusBadge(j)}
-            <span class="fu-meta">${esc(j.email)}</span>
-            <span class="fu-meta right">${rightMeta}</span>
-          </summary>
-          ${panel}
-        </details>`;
-    }
-
-    function suppressionHTML(s){
-        const reason = SUPPRESSION_REASON[s.reason] || s.reason || '직접 제외';
-        return `
-          <div class="fu-suppression">
-            <div class="fu-sup-label">${esc(s.label)||'이름 없음'}</div>
-            <div class="fu-sup-email">${esc(s.email)||'회원번호 기준 제외'}</div>
-            <div class="fu-sup-reason">${esc(reason)}</div>
-            <div class="fu-sup-note">${esc(s.note)||'별도 메모 없음'}${s.created_at?` · 등록 ${esc(whenText(s.created_at))}`:''}</div>
-          </div>`;
-    }
-
-    const OUTCOME_LABEL = {
-        send_succeeded:'발송 완료', reply:'답장', application:'내챌 신청',
-        analysis_consent:'개별분석 동의', contract_consent:'계약서 동의', payment:'입금 완료'
-    };
-    function outcomeHTML(a){
-        const counted = a.event === 'send_succeeded' ? '발송 기록' : (a.attributed ? '7일 성과' : '학생 이력');
-        return `<div class="fu-outcome-row">
-          <span class="fu-outcome-type">${esc(OUTCOME_LABEL[a.event]||a.event)}</span>
-          <span class="fu-nm">${esc(a.name)||'-'}</span>
-          <span class="fu-stage">${STAGE_LABEL[a.stage]||esc(a.stage)}</span>
-          <span class="fu-meta">${esc(a.email)}</span>
-          <span class="fu-outcome-note">${esc(counted)} · ${esc(whenText(a.occurred_at))}</span>
-        </div>`;
-    }
-    function outcomesHTML(){
-        const cards = [
-          ['reply','답장'],['application','내챌 신청'],['analysis_consent','개별분석 동의'],
-          ['contract_consent','계약서 동의'],['payment','입금 완료']
-        ].map(([key,label])=>`<div class="fu-outcome-card">${esc(label)}<strong>${esc(outcomeCountsState[key]||0)}</strong></div>`).join('');
-        const rows = activitiesState.length ? activitiesState.map(outcomeHTML).join('') : '<div class="fu-empty">아직 발송·성과 기록이 없습니다.</div>';
-        return `<div class="fu-outcome-grid">${cards}</div>${rows}`;
-    }
-
-    function showEmpty(msg){ $list.innerHTML = `<div class="fu-empty">${esc(msg)}</div>`; }
-
-    function byStatus(st){ return jobsState.filter(j=>j.status===st); }
-
-    function updateCounts(){
-        document.getElementById('countScheduled').textContent = byStatus('awaiting_review').length;
-        document.getElementById('countHeld').textContent = byStatus('held').length;
-        document.getElementById('countFailed').textContent = byStatus('failed').length;
-        document.getElementById('countManual').textContent = byStatus('skipped').length;
-        document.getElementById('countSuppressed').textContent = suppressionsState.length;
-        document.getElementById('countOutcomes').textContent = activitiesState.length;
-    }
-
-    function renderNotice(){
-        const modeEl = document.getElementById('modeBadge');
-        const lockEl = document.getElementById('lockBadge');
-        modeEl.innerHTML = `<i class="fas fa-eye"></i> 운영 상태: ${esc(MODE_LABEL[runtimeState.operation_mode]||runtimeState.operation_mode)}`;
-        if(runtimeState.send_locked){
-            lockEl.className='fu-badge lock'; lockEl.innerHTML='<i class="fas fa-pause"></i> 자동 발송: 꺼짐';
-        } else {
-            lockEl.className='fu-badge mode'; lockEl.innerHTML='<i class="fas fa-paper-plane"></i> 자동 발송: 켜짐';
-        }
-        const sendingOn = runtimeState.operation_mode === 'live' && runtimeState.send_locked === false;
-        $sendToggle.setAttribute('aria-checked', sendingOn ? 'true' : 'false');
-        $sendToggle.textContent = sendingOn ? '자동 발송 끄기' : '자동 발송 켜기';
-        $sendToggle.disabled = false;
-    }
-
+    const formatTime=(value)=>value?new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'medium',timeStyle:'short'}).format(new Date(value)):'-';
+    const escape=(v)=>String(v??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const statusLabels={scheduled:'작성 대기',awaiting_review:'검토 중',held:'검사 보류',failed:'발송 실패',skipped:'발송 제외',canceled:'취소',sent:'발송 완료',sending:'발송 중'};
+    const eventLabels={result_registered:'작성 결과 등록',result_terminal_acknowledged:'종료된 작업의 늦은 결과 확인',writing_revision_required:'부분 수정 필요',writing_final_failure:'최종 검사 실패',revision_requested:'수정 검사 요청',revision_validation_recorded:'수정 검사 결과',job_canceled:'발송 취소',send_requested:'지금 발송 요청',runtime_send_lock_changed:'자동 발송 잠금 변경',reply:'답장',application:'내챌 신청',analysis_consent:'개별분석 동의',contract_consent:'계약서 동의',payment:'입금 완료'};
+    function reasonText(value){const text=String(value||'');const known={'representative revision awaiting validation':'대표 수정본 검사 대기 중','representative revision failed validation':'대표 수정본이 검사를 통과하지 못했습니다.','final writing failure':'작성 결과가 최종 검사를 통과하지 못했습니다.','writing attempt requires revision':'작성 결과에 부분 수정이 필요합니다.',held:'검사 보류'};if(known[text])return known[text];if(/pre-review checks failed:.*machine=False/i.test(text))return `기계 검사에서 통과하지 못했습니다. (${text})`;if(/pre-review checks failed:.*source=False/i.test(text))return `출처 검사에서 통과하지 못했습니다. (${text})`;return text?`처리 기록: ${text}`:''}
+    const reviewLabels={tone:'말투',story:'내용 흐름',duplicate:'중복',date_stage:'날짜·단계',one_to_one:'학생별 맞춤'};
+    function validationHtml(x){const d=x.validation_details;if(!d)return'';const rows=[];for(const issue of d.source_issues||[])rows.push(`출처: ${typeof issue==='string'?issue:(issue.reason||issue.evidence||JSON.stringify(issue))}`);for(const failure of d.machine_failures||[])rows.push(`기계 검사 · ${failure.check||'항목'}: ${failure.evidence||'근거 없음'}`);for(const failure of d.review_failures||[])rows.push(`독립 검수 · ${reviewLabels[failure.check]||failure.check||'항목'}: ${failure.reason||''}${failure.evidence?` (${failure.evidence})`:''}`);if(!rows.length)return'';return `<details><summary>검사 실패 근거 ${rows.length}개</summary><ul>${rows.map((row)=>`<li>${escape(row)}</li>`).join('')}</ul></details>`}
+    function filtered(){const items=data?.items||[];if(currentTab==='logs')return [];const statuses=currentTab.split(',');return items.filter((x)=>statuses.includes(x.status));}
     function render(){
-        $tabs.forEach(tab=>{
-            const selected = tab.dataset.view === activeView;
-            tab.classList.toggle('active', selected);
-            tab.setAttribute('aria-selected', selected ? 'true' : 'false');
-        });
-
-        if(activeView === 'suppressed'){
-            if(suppressionsState.length === 0){ showEmpty('발송 제외 목록이 비어 있습니다.'); return; }
-            $list.innerHTML = suppressionsState.map(suppressionHTML).join('');
-            return;
-        }
-        if(activeView === 'outcomes'){
-            $list.innerHTML = outcomesHTML();
-            return;
-        }
-
-        const map = { scheduled:'awaiting_review', held:'held', failed:'failed', manual:'skipped' };
-        const jobs = byStatus(map[activeView]);
-        if(jobs.length === 0){
-            const msg = {
-                scheduled:'현재 검토를 기다리는 발송 예정 메일이 없습니다.',
-                held:'현재 검사에 반복해서 걸린 메일이 없습니다.',
-                failed:'현재 발송에 실패한 메일이 없습니다.',
-                manual:'발송 시기가 지나 관리 기록으로 남긴 메일이 없습니다.'
-            }[activeView] || '표시할 메일이 없습니다.';
-            showEmpty(msg);
-            return;
-        }
-        $list.innerHTML = jobs.map(rowHTML).join('');
+      $('tabs').innerHTML=tabDefs.map(([key,label])=>`<button class="tab ${key===currentTab?'active':''}" data-tab="${key}">${label}</button>`).join('');
+      if(currentTab==='logs'){const logs=data?.logs||[];$('list').innerHTML=logs.length?logs.map((x)=>`<article class="card item"><h3>${escape(eventLabels[x.event]||'관리 기록')}</h3><div class="meta">${escape(x.email||'')} · ${escape(x.occurrence_known===false?'발생 시각 미상 · 관측 '+formatTime(x.observed_at):formatTime(x.occurred_at))}</div>${x.summary?`<div class="body">${escape(reasonText(x.summary))}</div>`:''}</article>`).join(''):'<div class="card empty">관리 기록이 없습니다.</div>';return;}
+      const items=filtered();
+      if(currentTab==='sent'){const labels=[['reply','답장'],['application','내챌 신청'],['analysis_consent','개별분석 동의'],['contract_consent','계약서 동의'],['payment','입금 완료']];const metrics=`<div class="metrics">${labels.map(([key,label])=>`<div class="metric">${escape(label)}<strong>${escape(data?.outcomes?.[key]??0)}</strong></div>`).join('')}</div>`;const activity=(data?.outcome_activity||[]).map(outcomeHtml).join('');const rows=items.length?items.map(itemHtml).join(''):'<div class="card empty">발송 기록이 없습니다.</div>';$('list').innerHTML=metrics+activity+rows;return;}
+      if(!items.length){$('list').innerHTML='<div class="card empty">해당 항목이 없습니다.</div>';return;}$('list').innerHTML=items.map(itemHtml).join('');
     }
-
-    $tabs.forEach(tab=>tab.addEventListener('click',()=>{ activeView = tab.dataset.view || 'scheduled'; render(); }));
-
-    // ── 동작(POST) ──
-    function setNote(jobId, text, kind){
-        const el = document.querySelector(`[data-note="${CSS.escape(jobId)}"]`);
-        if(el){ el.className = 'fu-actionnote'+(kind?(' '+kind):''); el.textContent = text; }
-    }
-    function setBtnsDisabled(jobId, disabled){
-        document.querySelectorAll(`[data-act][data-job-id="${CSS.escape(jobId)}"]`).forEach(b=>{ b.disabled = disabled; });
-    }
-
-    async function callFn(method, body){
-        const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
-        if(body) headers['Content-Type'] = 'application/json';
-        return fetch(FN_URL, { method, headers, body: body?JSON.stringify(body):undefined });
-    }
-
-    $sendToggle.addEventListener('click', async ()=>{
-        if($sendToggle.disabled) return;
-        const sendingOn = runtimeState.operation_mode === 'live' && runtimeState.send_locked === false;
-        const nextLocked = sendingOn;
-        if(!sendingOn && !window.confirm('자동 발송을 켤까요? 발송 시각이 지난 메일은 다음 매시간 점검 때 발송됩니다.')) return;
-
-        $sendToggle.disabled = true;
-        $runtimeNote.className = 'fu-runtime-note';
-        $runtimeNote.textContent = '변경 중...';
-        try {
-            const resp = await callFn('POST', { action:'set_send_lock', send_locked:nextLocked, request_id:uuid() });
-            let data = {};
-            try { data = await resp.json(); } catch(e){}
-            if(!resp.ok || !data.ok) throw new Error(data.error || '자동 발송 상태를 바꾸지 못했습니다.');
-            $runtimeNote.textContent = nextLocked ? '자동 발송을 껐습니다.' : '자동 발송을 켰습니다.';
-            await load();
-        } catch(e){
-            $runtimeNote.className = 'fu-runtime-note err';
-            $runtimeNote.textContent = e.message || '자동 발송 상태를 바꾸지 못했습니다.';
-            $sendToggle.disabled = false;
-        }
-    });
-
-    async function doAction(action, jobId, extra){
-        const key = action+':'+jobId;
-        if(!pendingReq[key]) pendingReq[key] = uuid();   // 진행 중엔 같은 요청번호 재사용
-        const requestId = pendingReq[key];
-
-        setBtnsDisabled(jobId, true);
-        setNote(jobId, '처리 중...', null);
-
-        let resp;
-        try {
-            resp = await callFn('POST', Object.assign({ action, job_id: jobId, request_id: requestId }, extra||{}));
-        } catch(e){
-            // 네트워크 오류: 결과 불명 → 같은 요청번호 유지(재시도 대비). 버튼 다시 활성화.
-            setNote(jobId, '인터넷 오류로 전송하지 못했습니다. 다시 눌러 주세요.', 'err');
-            setBtnsDisabled(jobId, false);
-            return;
-        }
-
-        let data = {};
-        try { data = await resp.json(); } catch(e){}
-
-        if(resp.ok && data.ok){
-            delete pendingReq[key];        // 성공 후에만 새 요청번호
-            await load();                  // 실제 장부 결과로 화면 재동기화
-            return;
-        }
-        // 서버가 거절(검증 실패 등): 이 요청은 반영 안 됨 → 새 시도는 새 번호.
-        delete pendingReq[key];
-        setNote(jobId, (data && data.error) ? data.error : '요청을 처리하지 못했습니다.', 'err');
-        setBtnsDisabled(jobId, false);
-    }
-
-    $list.addEventListener('click', async event=>{
-        const btn = event.target.closest('[data-act]');
-        if(!btn || btn.disabled) return;
-        const act = btn.dataset.act;
-        const jobId = btn.dataset.jobId;
-
-        if(act === 'cancel_open'){ document.querySelector(`[data-cancelbox="${CSS.escape(jobId)}"]`)?.classList.add('show'); return; }
-        if(act === 'cancel_close'){ document.querySelector(`[data-cancelbox="${CSS.escape(jobId)}"]`)?.classList.remove('show'); return; }
-
-        if(act === 'save_revision'){
-            const subject = document.querySelector(`[data-edit="subject"][data-job-id="${CSS.escape(jobId)}"]`)?.value.trim() || '';
-            const body = document.querySelector(`[data-edit="body"][data-job-id="${CSS.escape(jobId)}"]`)?.value.trim() || '';
-            if(!subject || !body){ setNote(jobId, '제목과 본문을 모두 채워 주세요.', 'err'); return; }
-            await doAction('save_revision', jobId, { subject, body });
-            return;
-        }
-        if(act === 'send_now'){
-            if(!window.confirm('이 메일을 지금 발송 대기열에 올릴까요? (실제 발송은 정해진 처리 시각에 이뤄집니다)')) return;
-            await doAction('send_now', jobId);
-            return;
-        }
-        if(act === 'cancel_confirm'){
-            const reason = document.querySelector(`[data-cancelreason="${CSS.escape(jobId)}"]`)?.value.trim() || '';
-            if(!reason){ setNote(jobId, '취소 사유를 입력해 주세요.', 'err'); return; }
-            await doAction('cancel', jobId, { reason });
-            return;
-        }
-    });
-
-    // ── 조회 ──
-    async function load(){
-        $list.innerHTML = '<div class="fu-loading"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>';
-        $sendToggle.disabled = true;
-
-        let resp;
-        try { resp = await callFn('GET'); }
-        catch(e){ showEmpty('데이터를 불러오지 못했습니다(네트워크 오류). 잠시 후 다시 시도해 주세요.'); return; }
-
-        if(!resp.ok){ showEmpty('데이터를 불러오지 못했습니다(서버 오류). 배포·설정 상태를 확인해 주세요.'); return; }
-
-        let data;
-        try { data = await resp.json(); } catch(e){ showEmpty('데이터 형식을 해석하지 못했습니다.'); return; }
-
-        jobsState = Array.isArray(data.jobs) ? data.jobs : [];
-        suppressionsState = Array.isArray(data.suppressions) ? data.suppressions : [];
-        activitiesState = Array.isArray(data.activities) ? data.activities : [];
-        outcomeCountsState = data.outcome_counts || outcomeCountsState;
-        runtimeState = data.runtime || runtimeState;
-        if(data.server_now){ const t = Date.parse(data.server_now); if(!isNaN(t)) clockOffset = Date.now() - t; }
-
-        renderNotice();
-        updateCounts();
-        render();
-        startTicker();
-    }
-
-    // 첫 진입: 전용 암호 있으면 조회, 없으면 게이트.
-    load();
-    </script>
+    function outcomeHtml(x){const when=x.occurrence_known===false?`발생 시각 미상 · 관측 ${formatTime(x.observed_at)}`:formatTime(x.occurred_at);const sent=(data?.items||[]).find((item)=>item.job_id===x.linked_sent_job_id),sentAt=sent?.sent_at||x.linked_sent_at;const linked=sentAt?`성과 근거 ${sent?.subject||'과거 발송 기록'} · ${formatTime(sentAt)}`:'연결된 발송 없음';return `<article class="card item"><h3>${escape(eventLabels[x.event]||'학생 행동')}</h3><div class="meta">${escape(x.email||'')} · ${escape(when)}<br>14일 성과 ${x.attributed===true?'포함':'미포함'} · ${escape(linked)}</div></article>`}
+    function itemHtml(x){const canCancel=['scheduled','awaiting_review'].includes(x.status)||(x.status==='held'&&x.held_kind==='validation');const editable=['awaiting_review','held'].includes(x.status)&&(!x.held_kind||x.held_kind==='validation')&&x.can_edit===true;const editReason=!editable&&x.edit_unavailable_reason?`<div class="meta">${escape(x.edit_unavailable_reason)}</div>`:'';const timing=x.status==='sent'?`발송 ${formatTime(x.sent_at)}`:`예약 ${formatTime(x.scheduled_at)} · 검토 마감 ${formatTime(x.review_deadline_at)}`;return `<article class="card item" data-job="${escape(x.job_id)}"><h3>${escape(x.subject||'(제목 없음)')}</h3><div class="meta">${escape(x.email)} · ${escape(statusLabels[x.status]||'상태 확인 필요')} · 본문 ${escape(x.revision??0)}판<br>${escape(timing)}${x.held_reason?`<br>보류 이유: ${escape(reasonText(x.held_reason))}`:''}</div><div class="body">${escape(x.body||'(저장된 본문 없음)')}</div>${validationHtml(x)}${editReason}<div class="row">${editable?'<button data-action="edit">수정</button>':''}${x.status==='awaiting_review'?'<button data-action="send">지금 발송</button>':''}${canCancel?'<button data-action="cancel" class="danger">취소</button>':''}</div></article>`}
+    async function load(successMessage=''){if(!session?.access_token)return false;const generation=sessionGeneration,sequence=++loadSequence;$('refresh').disabled=true;$('sendLock').disabled=true;if(!data)$('sendLock').indeterminate=true;status('adminStatus','불러오는 중…');try{const next=await api(null,generation);if(generation!==sessionGeneration||sequence!==loadSequence)throw staleError();data=next;$('sendLock').checked=data.runtime?.send_locked===true;$('sendLock').indeterminate=false;$('sendLock').disabled=false;render();status('adminStatus',successMessage);return true}catch(e){if(e.stale||generation!==sessionGeneration||sequence!==loadSequence)return false;data=null;$('sendLock').indeterminate=true;$('sendLock').disabled=true;render();status('adminStatus',e.message,true);return false}finally{if(sequence===loadSequence)$('refresh').disabled=false}}
+    async function act(body,message){if(actionInFlight)return false;const generation=sessionGeneration;actionInFlight=true;status('adminStatus','처리 중…');try{await api(body,generation);if(generation!==sessionGeneration)throw staleError();return await load(message)}catch(e){if(!e.stale&&generation===sessionGeneration)status('adminStatus',e.message,true);return false}finally{if(generation===sessionGeneration)actionInFlight=false}}
+    $('sendCode').onclick=async()=>{const email=$('email').value.trim();status('authStatus','인증번호를 보내는 중…');try{const {error}=await client.auth.signInWithOtp({email,options:{shouldCreateUser:false}});if(error)throw error;$('emailStep').classList.add('hidden');$('codeStep').classList.remove('hidden');status('authStatus','이메일로 보낸 6자리 인증번호를 입력해 주세요.')}catch(e){status('authStatus',e.message||'인증번호를 보내지 못했습니다.',true)}};
+    $('verifyCode').onclick=async()=>{const email=$('email').value.trim(),token=$('code').value.trim();if(!/^\d{6}$/.test(token)){status('authStatus','6자리 숫자를 입력해 주세요.',true);return}status('authStatus','확인 중…');try{const {data:verified,error}=await client.auth.verifyOtp({email,token,type:'email'});if(error||!verified.session)throw error||new Error('로그인을 확인하지 못했습니다.');adoptSession(verified.session);await load()}catch(e){status('authStatus',e.message||'인증번호가 틀렸거나 만료되었습니다.',true)}};
+    $('changeEmail').onclick=()=>{$('codeStep').classList.add('hidden');$('emailStep').classList.remove('hidden');$('code').value='';status('authStatus','')};
+    $('refresh').onclick=()=>load();$('logout').onclick=async()=>{session=null;sessionGeneration++;loadSequence++;actionInFlight=false;showAuth();try{await client.auth.signOut()}finally{status('authStatus','로그아웃했습니다.')}};
+    $('sendLock').onchange=async()=>{const control=$('sendLock'),confirmed=data?.runtime?.send_locked===true,desired=control.checked;if(actionInFlight){control.checked=confirmed;return}control.disabled=true;const ok=await act({action:'set_send_lock',request_id:requestId(),send_locked:desired},'자동 발송 잠금을 바꿨습니다.');if(ok)return;const reconciled=session?.access_token?await load('서버의 현재 잠금 상태를 다시 확인했습니다.'):false;if(!reconciled){control.checked=confirmed;control.indeterminate=true;control.disabled=true;status('adminStatus','자동 발송 잠금의 현재 상태를 확인할 수 없습니다. 새로고침하기 전에는 바꿀 수 없습니다.',true)}};
+    $('tabs').onclick=(e)=>{const button=e.target.closest('[data-tab]');if(button){currentTab=button.dataset.tab;render()}};
+    $('list').onclick=(e)=>{const button=e.target.closest('[data-action]');if(!button)return;const item=data.items.find((x)=>x.job_id===button.closest('[data-job]').dataset.job);if(!item)return;
+      if(button.dataset.action==='edit'){editing=item;if(!(pendingRevision&&pendingRevision.jobId===item.job_id&&pendingRevision.subject===(item.subject||'')&&pendingRevision.body===(item.body||'')))pendingRevision=item.pending_revision_request_id?{jobId:item.job_id,subject:item.subject||'',body:item.body||'',requestId:item.pending_revision_request_id}:null;$('editSubject').value=item.subject||'';$('editBody').value=item.body||'';$('editor').classList.remove('hidden')}
+      if(button.dataset.action==='send'&&confirm('남은 검토시간만 생략하고 발송 직전 검사를 요청할까요?'))act({action:'send_now',job_id:item.job_id,request_id:requestId()},'지금 발송 요청을 기록했습니다.');
+      if(button.dataset.action==='cancel'){canceling=item;$('cancelReason').value='';status('cancelStatus','');$('cancelDialog').classList.remove('hidden')}};
+    $('closeEdit').onclick=()=>{$('editor').classList.add('hidden');editing=null};
+    $('saveEdit').onclick=async()=>{if(!editing)return;const subject=$('editSubject').value.trim(),body=$('editBody').value.trim();if(!subject||!body){alert('제목과 본문을 모두 입력해 주세요.');return}if(!(pendingRevision&&pendingRevision.jobId===editing.job_id&&pendingRevision.subject===subject&&pendingRevision.body===body))pendingRevision={jobId:editing.job_id,subject,body,requestId:editing.pending_revision_request_id&&editing.subject===subject&&editing.body===body?editing.pending_revision_request_id:requestId()};const ok=await act({action:'save_revision',job_id:editing.job_id,request_id:pendingRevision.requestId,subject,body},'수정본을 저장하고 검사를 요청했습니다.');if(ok){pendingRevision=null;$('editor').classList.add('hidden');editing=null}};
+    $('closeCancel').onclick=()=>{$('cancelDialog').classList.add('hidden');$('cancelReason').value='';status('cancelStatus','');canceling=null};
+    $('confirmCancel').onclick=async()=>{if(!canceling)return;const reason=$('cancelReason').value.trim();if(!reason){status('cancelStatus','취소 이유를 입력해 주세요.',true);return}const item=canceling,ok=await act({action:'cancel',job_id:item.job_id,request_id:requestId(),reason},'발송을 취소했습니다.');if(ok){$('cancelDialog').classList.add('hidden');$('cancelReason').value='';status('cancelStatus','');canceling=null}};
+    function adoptSession(next){const changed=(session?.access_token||'')!==(next?.access_token||'')||(session?.user?.id||'')!==(next?.user?.id||'');if(changed){sessionGeneration++;loadSequence++}session=next;if(next)showAdmin();else showAuth()}
+    client.auth.onAuthStateChange((event,next)=>{adoptSession(next);if(event==='SIGNED_OUT'){$('codeStep').classList.add('hidden');$('emailStep').classList.remove('hidden');$('code').value='';status('authStatus','로그인이 종료되었습니다. 인증번호를 다시 받아 주세요.',true)}if(next&&['SIGNED_IN','TOKEN_REFRESHED','INITIAL_SESSION'].includes(event))void load()});
+    const bootstrapGeneration=sessionGeneration;
+    client.auth.getSession().then(({data:initial,error})=>{if(bootstrapGeneration!==sessionGeneration)return;if(error){expireSession('로그인 상태를 갱신하지 못했습니다. 인증번호를 다시 받아 주세요.');return}adoptSession(initial.session);if(initial.session)void load()});
+  })();
+  </script>
 </body>
 </html>
