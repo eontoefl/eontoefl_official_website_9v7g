@@ -732,6 +732,10 @@ async function saveApplication(user) {
         ? (referralSourceDetailInput.value.trim() || null)
         : null;
 
+    // 호주/뉴질랜드 직접 제출 여부 ('yes' | 'no', validateBookForm에서 선택 필수)
+    const auNzRadio = document.querySelector('input[name="is_au_nz_direct_submit"]:checked');
+    const isAuNzDirectSubmit = auNzRadio ? auNzRadio.value : null;
+
     // referrer/UTM
     let referrerInfo = {};
     try {
@@ -756,6 +760,7 @@ async function saveApplication(user) {
         goal_timeframe: goalTimeframe,
         referral_source: referralSource,
         referral_source_detail: referralSourceDetail,
+        is_au_nz_direct_submit: isAuNzDirectSubmit,
         privacy_agreement: true,
         submitted_date: new Date().toISOString(),
         current_step: 10,
