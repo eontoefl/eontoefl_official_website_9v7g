@@ -455,6 +455,7 @@ function setupSubmit() {
         //   동의  → 회원가입 + 입문서 신청(book_only) 생성
         //   미동의 → 회원가입만 (입문서 신청 없음)
         const marketingChecked = document.getElementById('agreeMarketing').checked;
+        let accountCreatedNow = false;
 
         try {
             // ── 비로그인 신규: 계정 먼저 생성 → 자동 로그인 ──
@@ -469,6 +470,7 @@ function setupSubmit() {
                 // 계정 생성 성공 → 이후 신청 저장 실패 시 ② 모드로 전환되도록 상태 갱신
                 state.mode = 'loggedIn';
                 state.user = created;
+                accountCreatedNow = true;
                 switchToLoggedInUI(created);
             } else {
                 // ② 로그인 사용자: 마케팅 동의 체크 시 users 갱신
@@ -478,9 +480,14 @@ function setupSubmit() {
             // 호주/일반 선택 → 기본 입문서 트랙 저장 (마케팅 동의와 무관, best-effort)
             await saveIntroBookTrack(state.user);
 
-            // ── 마케팅 동의 시에만 입문서 신청 저장 ──
+            // ── 마케팅 동의 → 입문서 신청 저장 / 미동의 → 학습 답변만 회원 행에 보관 ──
+            //   (미동의 답변은 나중에 대시보드에서 동의할 때 같은 신청서로 연결된다)
             if (marketingChecked) {
                 await saveApplication(state.user);
+                // 예전에 미동의로 보관해 둔 답변이 있던 기존 회원이면 신청 저장 성공 뒤에만 정리
+                if (!accountCreatedNow) await clearPendingBookAnswers(state.user);
+            } else {
+                await savePendingBookAnswers(state.user);
             }
 
             // 성공 (입문서 지급 여부에 따라 안내 다름)
@@ -681,8 +688,11 @@ async function maybeUpdateMarketingConsent(user) {
     }
 }
 
-// ===== 입문서 신청 저장 (applications, application_type: 'book_only') =====
-async function saveApplication(user) {
+// ===== 신청 화면의 학습 답변 수집 =====
+// 입문서 신청 저장(saveApplication)과 미동의 보관(savePendingBookAnswers)이
+// 같은 값·같은 검사를 쓰도록 한 곳에서 만든다. 키는 applications의 학습 답변 컬럼과 같다.
+// 회원 정보·신청 상태·제출일은 여기 넣지 않고 각 저장 경로가 정한다.
+function collectBookAnswers() {
     // 현재 점수
     const noScoreCheck = document.getElementById('noScoreCheck');
     const scoreInput = document.getElementById('currentScore');
@@ -733,6 +743,26 @@ async function saveApplication(user) {
         referrerInfo = JSON.parse(sessionStorage.getItem('book_request_referrer_info') || '{}');
     } catch { referrerInfo = {}; }
 
+    return {
+        current_score: currentScore,
+        target_score: targetScore,
+        no_target_score: false,
+        stuck_area: stuckArea,
+        goal_timeframe: goalTimeframe,
+        referral_source: referralSource,
+        referral_source_detail: referralSourceDetail,
+        is_au_nz_direct_submit: isAuNzDirectSubmit,
+        referrer_url: referrerInfo.referrer_url || null,
+        landing_url: referrerInfo.landing_url || null,
+        utm_data: referrerInfo.utm_data || null,
+        user_agent: referrerInfo.user_agent || null
+    };
+}
+
+// ===== 입문서 신청 저장 (applications, application_type: 'book_only') =====
+async function saveApplication(user) {
+    const answers = collectBookAnswers();
+
     // 기존 book_only 레코드와 동일한 필드 구조 유지 (관리자 페이지 호환)
     const postData = {
         user_id: user.id,
@@ -744,24 +774,58 @@ async function saveApplication(user) {
         program: '입문서 무료 신청',
         status: '승인완료',
         confirmed: true,
-        current_score: currentScore,
-        target_score: targetScore,
-        no_target_score: false,
-        stuck_area: stuckArea,
-        goal_timeframe: goalTimeframe,
-        referral_source: referralSource,
-        referral_source_detail: referralSourceDetail,
-        is_au_nz_direct_submit: isAuNzDirectSubmit,
+        current_score: answers.current_score,
+        target_score: answers.target_score,
+        no_target_score: answers.no_target_score,
+        stuck_area: answers.stuck_area,
+        goal_timeframe: answers.goal_timeframe,
+        referral_source: answers.referral_source,
+        referral_source_detail: answers.referral_source_detail,
+        is_au_nz_direct_submit: answers.is_au_nz_direct_submit,
         privacy_agreement: true,
         submitted_date: new Date().toISOString(),
         current_step: 10,
-        referrer_url: referrerInfo.referrer_url || null,
-        landing_url: referrerInfo.landing_url || null,
-        utm_data: referrerInfo.utm_data || null,
-        user_agent: referrerInfo.user_agent || null
+        referrer_url: answers.referrer_url,
+        landing_url: answers.landing_url,
+        utm_data: answers.utm_data,
+        user_agent: answers.user_agent
     };
 
-    await supabaseAPI.post('applications', postData);
+    const created = await supabaseAPI.post('applications', postData);
+    // 저장 결과 확인: 반환 행이 없거나 다른 회원의 행이면 성공으로 보지 않는다 (보관 답변 정리·성공 안내 금지)
+    if (!created || !created.id || created.user_id !== user.id || created.application_type !== 'book_only') {
+        throw new Error('입문서 신청 저장 결과를 확인하지 못했어요. 잠시 후 다시 시도해주세요.');
+    }
+    return created;
+}
+
+// ===== 마케팅 미동의 제출: 학습 답변을 회원 행(users.pending_book_request)에 보관 =====
+// 나중에 내 대시보드에서 동의하면 js/dashboard.js handleUnlockGuide가 이 답변으로 신청서를 만든다.
+// 신청서(applications)는 만들지 않으므로 입문서 열람·후속메일 대상 등 기존 조건은 그대로다.
+async function savePendingBookAnswers(user) {
+    const pending = Object.assign({}, collectBookAnswers(), {
+        answered_at: new Date().toISOString()   // 기록용. 신청 일자(submitted_date)로 쓰지 않는다.
+    });
+    const saved = await supabaseAPI.patch('users', user.id, { pending_book_request: pending });
+    // 공통 wrapper는 빈 응답([])도 { id }로 돌려주므로, 실제 반환 행(같은 회원)에 보관값이 있는지 확인한다.
+    // (컬럼이 없거나 갱신된 행이 없으면 저장 실패로 보고 답변은 화면에 남긴다)
+    const savedPending = saved ? saved.pending_book_request : null;
+    const savedOk = !!saved && saved.id === user.id
+        && !!savedPending && typeof savedPending === 'object' && !Array.isArray(savedPending)
+        && Object.keys(pending).every(key => Object.prototype.hasOwnProperty.call(savedPending, key));
+    if (!savedOk) {
+        throw new Error('입력하신 내용을 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+    }
+}
+
+// 신청 저장이 끝난 뒤 남아 있는 보관 답변 정리 (best-effort, 실패해도 신청 완료는 유지)
+async function clearPendingBookAnswers(user) {
+    if (!user || !user.id) return;
+    try {
+        await supabaseAPI.patch('users', user.id, { pending_book_request: null });
+    } catch (e) {
+        console.warn('보관 답변 정리 실패(무시):', e);
+    }
 }
 
 // ===== 유효성 검증 =====

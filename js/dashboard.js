@@ -1692,8 +1692,72 @@ function showEmptyState() {
     }
 }
 
+// 신청 페이지(book-request.html)에서 마케팅 미동의로 제출했을 때 회원 행에 보관된 학습 답변
+// (users.pending_book_request) 중 신청서로 옮길 수 있는 필드. 이 목록 밖의 키는 쓰지 않는다.
+const PENDING_BOOK_ANSWER_FIELDS = [
+    'current_score', 'target_score', 'no_target_score', 'stuck_area', 'goal_timeframe',
+    'referral_source', 'referral_source_detail', 'is_au_nz_direct_submit',
+    'referrer_url', 'landing_url', 'utm_data', 'user_agent'
+];
+
+// 보관값 12개 필드의 자료형·필수 여부 (book-request.js collectBookAnswers()가 만든 값 기준).
+// 이 목록 밖의 키는 쓰지 않고, 필드 누락·자료형 불일치는 파손 값으로 본다.
+const PENDING_BOOK_ANSWER_RULES = {
+    current_score:          { type: 'number', nullable: true },
+    target_score:           { type: 'number', nullable: false },
+    no_target_score:        { type: 'boolean', nullable: false },
+    stuck_area:             { type: 'string', nullable: false },
+    goal_timeframe:         { type: 'string', nullable: false },
+    referral_source:        { type: 'string', nullable: false },
+    referral_source_detail: { type: 'string', nullable: true },
+    is_au_nz_direct_submit: { type: 'string', nullable: false },
+    referrer_url:           { type: 'string', nullable: true },
+    landing_url:            { type: 'string', nullable: true },
+    utm_data:               { type: 'object', nullable: true },
+    user_agent:             { type: 'string', nullable: true }
+};
+
+// 보관된 학습 답변 조회.
+//   - 회원 행이 조회되지 않거나 pending_book_request 필드가 응답에 없음 → 읽기 실패(오류)
+//   - 값이 null → 보관 없음(null 반환, 기존 빈 신청 경로)
+//   - 값이 객체가 아니거나 12개 필드 누락·자료형 불일치·필수값 null → 파손 값(오류, 빈 신청으로 대체하지 않음)
+//   - 정상 → 허용 12개 필드만 담은 객체
+async function loadPendingBookAnswers(userId) {
+    const rows = await supabaseAPI.query('users', {
+        'id': `eq.${userId}`,
+        'select': 'pending_book_request',
+        'limit': '1'
+    });
+    if (!rows || rows.length !== 1 || !rows[0] || typeof rows[0] !== 'object'
+        || !Object.prototype.hasOwnProperty.call(rows[0], 'pending_book_request')) {
+        throw new Error('보관된 신청 내용을 조회하지 못했습니다.');
+    }
+    const pending = rows[0].pending_book_request;
+    if (pending === null) return null;
+    if (typeof pending !== 'object' || Array.isArray(pending)) {
+        throw new Error('보관된 신청 내용을 읽을 수 없습니다.');
+    }
+    const answers = {};
+    for (const key of PENDING_BOOK_ANSWER_FIELDS) {
+        const rule = PENDING_BOOK_ANSWER_RULES[key];
+        if (!Object.prototype.hasOwnProperty.call(pending, key)) {
+            throw new Error('보관된 신청 내용에 빠진 항목이 있습니다: ' + key);
+        }
+        const value = pending[key];
+        if (value === null) {
+            if (!rule.nullable) throw new Error('보관된 신청 내용의 필수 항목이 비어 있습니다: ' + key);
+        } else if (typeof value !== rule.type || (rule.type === 'object' && Array.isArray(value))
+            || (rule.type === 'number' && !Number.isFinite(value))) {
+            throw new Error('보관된 신청 내용의 형식이 맞지 않습니다: ' + key);
+        }
+        answers[key] = value;
+    }
+    return answers;
+}
+
 /**
  * 입문서 잠금 해제: 마케팅 동의 갱신 + 입문서 신청서 생성 → 성공 팝업
+ * 신청 페이지에서 미동의로 제출하며 보관해 둔 학습 답변이 있으면 그 답변으로 신청서를 만든다.
  */
 async function handleUnlockGuide() {
     const consent = document.getElementById('unlockMarketingConsent');
@@ -1748,7 +1812,10 @@ async function handleUnlockGuide() {
             'limit': '1'
         });
         if (!existingBook || existingBook.length === 0) {
-            await supabaseAPI.post('applications', {
+            // 신청 페이지에서 미동의로 제출하며 보관해 둔 학습 답변(없으면 null → 기존 빈 신청)
+            const pendingAnswers = await loadPendingBookAnswers(userId);
+
+            const postData = {
                 user_id: userId,
                 user_email: user.email,
                 name: user.name,
@@ -1766,10 +1833,30 @@ async function handleUnlockGuide() {
                 privacy_agreement: true,
                 submitted_date: nowIso,
                 current_step: 10
-            });
+            };
+            // 보관 답변이 있으면 학습 답변 필드만 그 값으로 채운다 (회원·상태·제출일은 위 값 유지)
+            if (pendingAnswers) Object.assign(postData, pendingAnswers);
+
+            const createdApp = await supabaseAPI.post('applications', postData);
+
+            // 3) 저장 결과 확인: 반환 행이 없거나 이 회원의 입문서 신청이 아니면 성공으로 보지 않는다
+            //    (보관 답변은 그대로 두고 오류 안내. 공통 wrapper는 빈 응답이면 undefined를 돌려준다)
+            if (!createdApp || !createdApp.id || createdApp.user_id !== userId
+                || createdApp.application_type !== 'book_only') {
+                throw new Error('입문서 신청 저장 결과를 확인하지 못했습니다.');
+            }
+
+            // 보관 답변으로 만든 경우에만 정리 (정리 실패는 신청 완료를 되돌리지 않음)
+            if (pendingAnswers) {
+                try {
+                    await supabaseAPI.patch('users', userId, { pending_book_request: null });
+                } catch (cleanupErr) {
+                    console.warn('보관 답변 정리 실패(신청은 완료됨):', cleanupErr);
+                }
+            }
         }
 
-        // 3) 성공 팝업 → 확인 시 새로고침
+        // 4) 성공 팝업 → 확인 시 새로고침
         showGuideUnlockedModal();
 
     } catch (e) {
