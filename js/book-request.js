@@ -44,6 +44,10 @@ const state = {
     user: null           // 로그인/계정 생성 후의 사용자 객체
 };
 
+// 지금 상황 선택지 허용 목록 (제출 전 검사와 저장 직전 검사가 같은 목록을 쓴다)
+const STUCK_AREA_OPTIONS = ['리딩', '리스닝', '라이팅', '스피킹'];
+const GOAL_TIMEFRAME_OPTIONS = ['한 달 안에', '3개월 안에', '6개월 안에'];
+
 // 닉네임 중복 체크 상태 (비로그인 신규 전용)
 let nicknameAvailable = false;
 let nicknameCheckTimer = null;
@@ -160,7 +164,6 @@ function initForm(mode, userData) {
     // 공통 설정
     setupNoScoreCheckbox('noScoreCheck', 'currentScore', '예: 75 혹은 4.0');
     setupReferralSelect();
-    setupStuckAreaSelect();
     setupAgreements();
     setupModals();
     loadLegalContent();
@@ -389,24 +392,6 @@ function setupReferralSelect() {
             if (input) input.required = true;
         } else {
             sourceDetail.style.display = 'none';
-            if (input) { input.required = false; input.value = ''; }
-        }
-    });
-}
-
-// ===== 지금 상황 "기타" 직접 입력 (유입경로와 동일 패턴) =====
-function setupStuckAreaSelect() {
-    const sel = document.getElementById('stuckArea');
-    const detail = document.getElementById('stuckAreaDetail');
-    if (!sel || !detail) return;
-
-    sel.addEventListener('change', function () {
-        const input = detail.querySelector('input');
-        if (this.value === '기타') {
-            detail.style.display = 'block';
-            if (input) input.required = true;
-        } else {
-            detail.style.display = 'none';
             if (input) { input.required = false; input.value = ''; }
         }
     });
@@ -714,16 +699,22 @@ async function saveApplication(user) {
         targetScore = parseFloat(targetScoreInput.value);
         if (isNaN(targetScore)) targetScore = null;
     }
+    // 저장 직전 재확인: 0·빈값·숫자 아님은 저장하지 않는다 (validateBookForm 통과 후 우회 대비)
+    if (!(targetScore > 0)) {
+        throw new Error('목표 토플 점수는 0보다 큰 값으로 입력해주세요.');
+    }
 
-    // 지금 상황: 막히는 영역(드롭다운, '기타'면 서술칸 내용) / 목표 시점(드롭다운)
+    // 지금 상황: 막히는 영역 / 목표 시점 — 허용 목록 안의 값만 저장
     const stuckSelect = document.getElementById('stuckArea');
-    const stuckDetailInput = document.querySelector('input[name="stuck_area_detail"]');
-    let stuckArea = stuckSelect ? (stuckSelect.value || null) : null;
-    if (stuckArea === '기타') {
-        stuckArea = (stuckDetailInput && stuckDetailInput.value.trim()) ? stuckDetailInput.value.trim() : '기타';
+    const stuckArea = stuckSelect ? stuckSelect.value : null;
+    if (!STUCK_AREA_OPTIONS.includes(stuckArea)) {
+        throw new Error('지금 제일 막히는 영역을 선택해주세요.');
     }
     const goalTimeframeInput = document.getElementById('goalTimeframe');
-    const goalTimeframe = goalTimeframeInput ? (goalTimeframeInput.value || null) : null;
+    const goalTimeframe = goalTimeframeInput ? goalTimeframeInput.value : null;
+    if (!GOAL_TIMEFRAME_OPTIONS.includes(goalTimeframe)) {
+        throw new Error('목표 점수가 언제까지 필요한지 선택해주세요.');
+    }
 
     // 유입 경로
     const referralSource = document.getElementById('referralSource').value;
@@ -809,28 +800,26 @@ function validateBookForm() {
         targetScoreInput.focus();
         return false;
     }
-
-    // 지금 상황: 막히는 영역(필수 드롭다운, '기타'면 서술칸 필수)
-    const stuckSelect = document.getElementById('stuckArea');
-    if (stuckSelect && !stuckSelect.value) {
-        showToast('지금 제일 막히는 영역을 선택해주세요.', 'error');
-        stuckSelect.focus();
+    // 0 제출 차단 (숫자 입력·0.5 단위·구점수/신레벨 입력 방식은 그대로)
+    if (!(parseFloat(targetScoreInput.value) > 0)) {
+        showToast('목표 토플 점수는 0보다 큰 값으로 입력해주세요.', 'error');
+        targetScoreInput.focus();
         return false;
     }
-    if (stuckSelect && stuckSelect.value === '기타') {
-        const stuckDetail = document.querySelector('input[name="stuck_area_detail"]');
-        if (stuckDetail && !stuckDetail.value.trim()) {
-            showToast('막히는 점을 직접 적어주세요.', 'error');
-            stuckDetail.focus();
-            return false;
-        }
+
+    // 지금 상황: 막히는 영역(필수 드롭다운, 네 영역만 허용)
+    const stuckSelect = document.getElementById('stuckArea');
+    if (!stuckSelect || !STUCK_AREA_OPTIONS.includes(stuckSelect.value)) {
+        showToast('지금 제일 막히는 영역을 선택해주세요.', 'error');
+        if (stuckSelect) stuckSelect.focus();
+        return false;
     }
 
-    // 지금 상황: 목표 시점(필수 드롭다운)
+    // 지금 상황: 목표 시점(필수 드롭다운, 세 기간만 허용)
     const goalTimeframeInput = document.getElementById('goalTimeframe');
-    if (goalTimeframeInput && !goalTimeframeInput.value) {
+    if (!goalTimeframeInput || !GOAL_TIMEFRAME_OPTIONS.includes(goalTimeframeInput.value)) {
         showToast('목표 점수가 언제까지 필요한지 선택해주세요.', 'error');
-        goalTimeframeInput.focus();
+        if (goalTimeframeInput) goalTimeframeInput.focus();
         return false;
     }
 
