@@ -326,14 +326,11 @@
 .cl .selfpaced-next { margin-top: 2.5rem; }
 .cl #diagnosis-guide { scroll-margin-top: 100px; }
 .cl .selfpaced-next > p { margin: 0; font-size: 0.9rem; line-height: 1.85; color: #475569; word-break: keep-all; }
-.cl .selfpaced-apply { display: inline-flex; align-items: center; justify-content: center; gap: 12px; margin-top: 20px; padding: 12px 20px; min-height: 44px; border-radius: 8px; background: #5b4a7d; color: #fff; font-size: 0.9rem; font-weight: 600; text-align: center; }
-.cl .selfpaced-apply:hover { background: #493961; }
-.cl .selfpaced-jump a:focus-visible, .cl .selfpaced-apply:focus-visible { outline: 2px solid #5b4a7d; outline-offset: 4px; }
+.cl .selfpaced-jump a:focus-visible { outline: 2px solid #5b4a7d; outline-offset: 4px; }
 .cl .selfpaced-next .selfpaced-note { margin-top: 12px; font-size: 0.8rem; color: #64748b; }
 @media (max-width: 560px) {
     .cl .selfpaced-support { padding: 22px; }
     .cl .selfpaced-intro p { font-size: 0.95rem; }
-    .cl .selfpaced-apply { display: flex; width: 100%; }
 }
 
 /* Screenshot Placeholders */
