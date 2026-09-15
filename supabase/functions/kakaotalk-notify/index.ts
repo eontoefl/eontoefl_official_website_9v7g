@@ -238,19 +238,14 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
 
     case "incentive_deadline_warning": {
-      // 프로모션: 일반(analysis_agree_reminder)과 같은 형태로 실제 남은 시간 + 절대 마감을 안내.
-      // time/deadline은 DB 프로모션 예약 함수가 전달. 옛 함수(고정 '6', deadline 없음)와도 깨지지 않도록 대비.
       const hoursLeft = (data.time as string) || "6";
-      const deadlineNote = data.deadline ? ` (${data.deadline}까지)` : "";
       return [
         "이온토플 - 개별분석 동의 마감 안내",
         "",
-        `${data.name}님, 안녕하세요!`,
+        `${data.name}님, 안녕하세요 :)`,
         "",
-        `요청하신 개별분석 동의 마감까지 ${hoursLeft}시간 남았어요.${deadlineNote}`,
-        "",
-        "아래 버튼에서 분석 결과 확인하시고 동의 여부 결정해주세요.",
-        "기한이 지나면 안내드린 시작일이 다음 일요일로 밀릴 수 있어요 :(",
+        `요청하신 개별분석의 동의 가능 기간이 ${hoursLeft}시간 후 에 만료됩니다.`,
+        "만료 전에 분석 결과를 확인하시고 동의 여부를 결정해주세요!",
       ].join("\n");
     }
 
@@ -468,7 +463,7 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
     case "incentive_analysis_complete":
       return "[이온토플] 신청하신 개별분석이 완료됐어요! 공홈 로그인 후 확인해주세요 :)";
     case "incentive_deadline_warning":
-      return `[이온토플] 동의 마감 ${(data.time as string) || "6"}시간 남음. 지나면 시작일이 다음 일요일로 밀릴 수 있어요`;
+      return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
     case "analysis_updated":
       return "[이온토플] 개별분석이 수정되었습니다. 확인 부탁드려요.";
     case "analysis_registered":
@@ -856,3 +851,4 @@ async function handleBulkSend(
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 }
+
