@@ -52,7 +52,7 @@
     flex-direction: column;
     align-items: center;
     margin-top: 12px;
-    padding: 32px 16px 24px;
+    padding: 40px 16px 24px;
     border-radius: 16px;
     background: #f7f4fa;
     text-align: center;
@@ -61,13 +61,13 @@
 }
 .course-choice__option--fast .course-choice__card {
     margin-top: 0;
-    padding-top: 44px;
+    padding-top: 52px;
     background: #ece4f2;
 }
 .course-choice__option--standard .course-choice__card { background: #f3f5f7; }
 .course-choice__badge {
     position: absolute;
-    top: 12px;
+    top: 20px;
     padding: 3px 12px;
     border-radius: 999px;
     background: #5b4a7d;
@@ -132,7 +132,7 @@
     .course-choice__grid { grid-template-columns: 1fr; gap: 16px; margin-top: 24px; }
     .course-choice .course-choice__direction { display: none; }
     .course-choice__card { margin-top: 0; padding: 24px 20px; }
-    .course-choice__option--fast .course-choice__card { padding-top: 48px; }
+    .course-choice__option--fast .course-choice__card { padding-top: 56px; }
     .course-choice .course-choice__duration { margin: 12px 0; }
     .course-choice .course-choice__label { margin-bottom: 16px; }
     .course-choice .course-choice__description { margin-bottom: 16px; }
