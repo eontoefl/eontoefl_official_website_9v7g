@@ -664,13 +664,25 @@ function loadModalAnalysisTab(app) {
     const pendingExtReq = (typeof pendingExtensionByUser !== 'undefined' && app.user_id)
         ? pendingExtensionByUser[app.user_id]
         : null;
-    const fillAdditionalDiscount = hasPendingDraft
+    let fillAdditionalDiscount = hasPendingDraft
         ? (pendingPayload.additional_discount || 0)
         : (app.additional_discount || 0);
-    const fillDiscountReason = hasPendingDraft ? (pendingPayload.discount_reason || '') : (app.discount_reason || '');
+    let fillDiscountReason = hasPendingDraft ? (pendingPayload.discount_reason || '') : (app.discount_reason || '');
     const fillIsIncentive = hasPendingDraft
         ? (pendingPayload.is_incentive_applicant === true)
         : !!app.is_incentive_applicant;
+    // 프로모션 승인 제안의 빈 추가 할인 칸에만 50,000원 / 사유 '금액 조정'을 미리 채운다.
+    //  - 대상: 프로모션이며 할인 칸이 비어 있고(0/없음), 아직 승인 공개 전(신규·AI초안·예약 초안·조건부/거부에서 승인 전환).
+    //  - 제외: 이미 승인 공개된 행(과거 금액 보존), 기존 양수 할인(수동 입력 보존), 일반 학생(무영향).
+    //  - 입력칸 값이 미리보기(calculateModalPrice)·FormData·즉시/예약 저장의 단일 원천이므로 화면 금액 = 저장 금액.
+    //    값을 "설정"하지 "가산"하지 않으므로 반복 저장/리셋에서 중복 차감이 없다.
+    const promoNeedsDiscount = fillIsIncentive
+        && !(fillAdditionalDiscount > 0)
+        && (!hasAnalysis || fillStatus !== '승인');
+    if (promoNeedsDiscount) {
+        fillAdditionalDiscount = 50000;
+        fillDiscountReason = '금액 조정';
+    }
     const fillBookAccess = hasPendingDraft
         ? (pendingPayload.book_access_enabled === true)
         : !!app.book_access_enabled;
@@ -2046,7 +2058,7 @@ async function saveModalAnalysis(event) {
                     ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
                     : isConditionalOrReject
                         ? '\n\n📢 개별분석 등록 안내 알림톡(확인 필요 안내)이 발송되었습니다.'
-                        : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내)이 발송되었습니다.' : '');
+                        : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 완료 안내 · 5일 보장)이 발송되었습니다.' : '');
             }
             alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice);
 

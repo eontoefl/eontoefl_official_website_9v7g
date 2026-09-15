@@ -1343,14 +1343,15 @@ function getAgreementSection(app) {
         infoBg = '#fef3c7'; infoBorder = '#f59e0b'; infoIconColor = '#d97706'; infoTextColor = '#92400e';
     }
     
-    // 안내 문구: 유도학생은 입문서 + 할인/재신청 제한 안내 포함, 일반학생은 기본 문구
+    // 프로모션 기간 표기: 유효한 관리자 리셋(analysis_deadline_override)이 있으면 리셋 정책인 24시간, 기본이면 5일.
+    // (일반은 아래 문자열/기한 그대로. 잘못된 날짜 문자열은 유효한 리셋으로 보지 않는다.)
+    const promoOverrideValid = isIncentive && !!app.analysis_deadline_override
+        && !isNaN(new Date(app.analysis_deadline_override).getTime());
+    const promoWindowLabel = promoOverrideValid ? '24시간' : '5일';
+
+    // 안내 문구: 프로모션은 기간만 다르고 일반과 같은 안내, 일반학생은 기본 문구
     const guideText = isIncentive
-        ? `개별분석 결과와 입문서를 꼼꼼히 읽어보신 후, <strong>5일 이내</strong>에 동의해주세요.
-            <div style="margin-top: 10px; padding: 12px 14px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 13px; line-height: 1.7; color: #92400e;">
-                <div style="font-weight: 700; margin-bottom: 6px;">⚠️ 꼭 알아두세요!</div>
-                <div style="margin-bottom: 4px;">· 지금 적용된 할인 혜택은 <strong>이 5일 동의 기간에만 유효</strong>해요. 기간이 지나면 할인은 사라지고, 다시 신청하셔도 같은 할인은 적용되지 않아요.</div>
-                <div>· 동의하지 않고 기간이 지나면 <strong>5일 동안 새로 신청할 수 없어요.</strong></div>
-            </div>`
+        ? `개별분석 결과를 확인하신 후, <strong>${promoWindowLabel} 이내</strong>에 동의해주세요.`
         : '개별분석 결과를 확인하신 후, <strong>24시간 이내</strong>에 동의해주세요.';
     
     // 만료 시 경고 문구
@@ -1390,20 +1391,21 @@ function getAgreementSection(app) {
         </div>
     `;
 
-    // 조건 보장 안내: 프로모션(유도) 학생이 아닐 때만 렌더(프로모 경로는 지금처럼 박스 없음).
-    // 겁주는 빨간 경고 대신, 24시간 동안 조건이 그대로 보장된다는 차분한 라벤더 안내로 대체.
-    // 마감 절대시각 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 24h.
-    //   (admin-applications.js getAnalysisAgreeDeadlineMs / analysis-view.js와 동일 기준)
+    // 조건 보장 안내: 일반/프로모션 공통 렌더. 기간 표기만 일반 24시간 / 프로모션 5일(리셋 시 24시간).
+    // 겁주는 빨간 경고 대신, 조건이 그대로 보장된다는 차분한 라벤더 안내.
+    // 마감 절대시각 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 기본 창(일반 24h / 프로모션 5일).
+    //   (admin-applications.js getAnalysisAgreeDeadlineMs와 동일 기준)
     const assuranceDeadlineMs = app.analysis_deadline_override
         ? new Date(app.analysis_deadline_override).getTime()
-        : (analysisTimestamp ? new Date(analysisTimestamp).getTime() + (24 * 60 * 60 * 1000) : NaN);
+        : (analysisTimestamp ? new Date(analysisTimestamp).getTime() + deadlineMs : NaN);
+    const assuranceWindowLabel = isIncentive ? promoWindowLabel : '24시간';
     const assuranceDeadlineLabel = !isNaN(assuranceDeadlineMs) ? formatKstDateTimeKo(assuranceDeadlineMs) : '';
     const assuranceStartLabel = app.schedule_start ? formatKstDateKo(app.schedule_start) : '';
     // 마지막 줄(시작일 확정)은 자기주도(self_paced)이거나 시작일이 없으면 표시하지 않는다.
     const assuranceShowStartLine = app.self_paced !== true && !!app.schedule_start;
-    const autoRejectWarning = !isIncentive ? `
+    const autoRejectWarning = `
         <div style="background: #efeaf7; border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;">
-            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;">이 조건은 24시간 동안 보장돼요</div>
+            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;">이 조건은 ${assuranceWindowLabel} 동안 보장돼요</div>
             <div style="font-size: 13px; color: #5b4a7d; line-height: 1.8;">
                 지금 보신 프로그램·가격·시작일은 ${assuranceDeadlineLabel ? `<strong>${assuranceDeadlineLabel}</strong>까지` : '안내드린 기한까지'} 그대로 확정할 수 있어요.<br>
                 안내드린 시작일과 일정은 지금 상황을 기준으로 짜드린 것이라,<br>
@@ -1411,15 +1413,15 @@ function getAgreementSection(app) {
                 ${assuranceShowStartLine ? `<div style="margin-top: 10px; font-weight: 600;">지금 동의하시면 ${assuranceStartLabel} 시작이 확정돼요.</div>` : ''}
             </div>
         </div>
-    ` : '';
+    `;
 
-    // 증거 한 줄: 결제가 가장 마지막에 일어난다는 안심 문구(비프로모 경로에만, 텍스트만).
-    const evidenceLine = !isIncentive ? `
+    // 증거 한 줄: 결제가 가장 마지막에 일어난다는 안심 문구(일반/프로모션 공통, 텍스트만).
+    const evidenceLine = `
         <div style="font-size: 13px; color: #64748b; line-height: 1.8; margin-bottom: 16px; text-align: center;">
             2019년부터 약 2,000명을 유료로 가르치며 다듬어온 과정이에요.<br>
             결제는 계약서까지 모두 확인한 뒤 가장 마지막에 진행돼요.
         </div>
-    ` : '';
+    `;
 
     // 마감 절대시각(assuranceDeadlineMs, 관리자 override 반영) 기준으로 색을 렌더 시 1회 계산.
     // (매초 갱신 없이 고정. 만료=코랄 / 6시간 이하=주황 / 그 외=라벤더)

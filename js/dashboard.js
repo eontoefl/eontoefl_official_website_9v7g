@@ -469,12 +469,12 @@ function renderActionItems(app) {
     
     // 2️⃣ 분석 등록 직후 ~ 학생 동의 직전
     if (app.analysis_saved_at && !app.student_agreed_at) {
-        // 마감 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 24시간.
+        // 마감 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 기본 창(일반 24시간 / 프로모션 5일).
         // (상세 화면과 동일 기준 → 같은 절대일시). 초시계 없이 절대 일시로 고정 표기.
         const deadlineAnchor = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
         const deadlineMs = app.analysis_deadline_override
             ? new Date(app.analysis_deadline_override).getTime()
-            : new Date(deadlineAnchor).getTime() + (24 * 60 * 60 * 1000);
+            : new Date(deadlineAnchor).getTime() + (app.is_incentive_applicant === true ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000));
         const remainingMs = deadlineMs - Date.now();
 
         actionItems.push({
