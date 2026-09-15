@@ -444,13 +444,15 @@ input[type="radio"] {
 }
 
 /* Privacy Policy Link */
-#privacyPolicyLink {
+#privacyPolicyLink,
+#termsPolicyLink {
     color: #5b4a7d;
     text-decoration: underline;
     font-weight: 600;
 }
 
-#privacyPolicyLink:hover {
+#privacyPolicyLink:hover,
+#termsPolicyLink:hover {
     color: #3b2d5c;
 }
 
