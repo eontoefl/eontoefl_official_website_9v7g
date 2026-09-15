@@ -1279,18 +1279,6 @@ async function createOrRecoverAccount(snapshot) {
     }
 }
 
-async function maybeUpdateMarketingConsent(user) {
-    if (!document.getElementById('agreeMarketing')?.checked || !user || !user.id) return;
-    try {
-        await supabaseAPI.patch('users', user.id, {
-            marketing_consent: true,
-            marketing_consent_at: new Date().toISOString()
-        });
-    } catch (error) {
-        console.warn('광고 수신 동의 갱신 실패(신청은 계속):', error);
-    }
-}
-
 async function saveApplicationIdempotently(formData, user) {
     const existing = await supabaseAPI.getById('applications', formData.id);
     if (existing) {
@@ -1410,8 +1398,6 @@ function setupFormSubmission() {
                 let sessionUser = applicationState.user;
                 if (!sessionUser) {
                     sessionUser = await createOrRecoverAccount(signupValidation);
-                } else {
-                    await maybeUpdateMarketingConsent(sessionUser);
                 }
 
                 if (!sessionUser || !sessionUser.id || !sessionUser.email) {
@@ -1619,17 +1605,6 @@ function validateForm() {
             // 현재 활성 탭의 커트라인 필드에 포커스
             const activeTarget = document.querySelector('.version-content.active [name="target_cutoff_new"], .version-content.active [name="target_cutoff_old"]');
             if (activeTarget) activeTarget.focus();
-            return false;
-        }
-    }
-
-    // 희망 수업 시작 시기: 일요일만 선택 가능
-    const startDateInput = document.querySelector('input[name="preferred_start_date"]');
-    if (startDateInput && startDateInput.value) {
-        const selectedDate = new Date(startDateInput.value);
-        if (selectedDate.getDay() !== 0) {
-            alert('수업 시작일은 매주 일요일만 가능합니다. 일요일을 선택해주세요.');
-            startDateInput.focus();
             return false;
         }
     }
