@@ -159,10 +159,12 @@ BEGIN
           ON tzn.name = u.timezone
         -- 첨삭이 켜져 있고 입금 확인된, 삭제되지 않은 신청서가 "있는" 학생만 (INNER JOIN).
         -- 여러 건이면 가장 최근 신청서 하나로 트랙을 판정한다.
+        -- ⚠️ applications.user_id 는 text, correction_schedules.user_id 는 uuid 다(라이브 확인 2026-09-16).
+        --    ::text 캐스팅을 빼면 "operator does not exist: text = uuid" 로 함수 전체가 죽는다.
         JOIN LATERAL (
             SELECT a.assigned_program, a.preferred_program
             FROM public.applications a
-            WHERE a.user_id = cs.user_id
+            WHERE a.user_id = cs.user_id::text
               AND a.correction_enabled = true
               AND a.deposit_confirmed_by_admin = true
               AND a.deleted IS NOT TRUE
