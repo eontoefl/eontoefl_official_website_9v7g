@@ -23,7 +23,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   correction_start_reminder: 50213, // 스라첨삭 시작 안내
   correction_feedback_1: 50211,  // 1차 첨삭 완료 안내
   correction_feedback_2: 50212,  // 최종 첨삭 완료 안내
-  incentive_analysis_complete: 50214,  // 프로모션 학생: 개별분석 & 입문서 전송 완료 안내
+  incentive_analysis_complete: 50245,  // 프로모션 학생: 개별분석 결과 안내 (2026-09-15 승인본)
   incentive_deadline_warning:  50215,  // 프로모션 학생: 동의 마감 6시간 전 안내
   analysis_updated:            50217,  // 개별분석 수정 안내
   analysis_registered:         50226,  // 개별분석 등록 안내 (조건부승인/거부 — 확인 필요)
@@ -39,10 +39,6 @@ const TEMPLATE_IDS: Record<string, number> = {
   resume_approved:             50242,  // 진행 재개 승인 안내 (기한 리셋 완료)
   resume_held:                 50243,  // 진행 재개 보류 안내 (카톡 개별 안내 예정)
 };
-
-// ===== 임시 차단 (2026-09-15): 프로모션 개별분석 도착 알림은 새 템플릿 승인까지 대표가 수동 발송 =====
-// 아래 유형은 단건/일괄 모두 공급사 호출·DB 로그 전에 중단한다. 재연결은 새로 승인된 템플릿 ID/본문/버튼을 반영해 검증한 뒤 이 차단을 해제하는 방식으로만 한다(옛 본문 그대로 재연결 금지).
-const PAUSED_TYPE = "incentive_analysis_complete";
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
 const DEPOSIT_BANK = "국민은행";
@@ -221,17 +217,23 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
 
     case "incentive_analysis_complete":
-      // 프로모션: 일반(analysis_complete)과 같은 안내 순서. 보장 기간(5일)과 할인 적용 금액 언급만 다르다.
-      // (템플릿 50215/50214는 공급사 승인 템플릿 — 본문 변경 시 재검수 필요. 배포·실발송은 별도 승인.)
+      // 프로모션 개별분석 도착 안내 — 공급사 승인 템플릿 50245 원문(2026-09-15 승인). 변수는 #{name} 하나, 버튼은 웹링크 #{URL}(기본 application-detail 링크).
       return [
-        "이온토플 - 개별분석 완료 안내",
+        "[이온토플] 개별분석 결과 안내",
         "",
-        `${data.name}님, 안녕하세요 :) 이온토플입니다!`,
         "",
-        "제출해주신 신청서에 대한 개별분석을 올려드렸어요",
-        "아래 버튼에서 분석 내용을 확인하시고, 프로그램 및 일정에 동의해주시면 돼요",
+        `${data.name}님, 안녕하세요 :)`,
+        "신청하신 개별분석이 완료되었습니다!",
         "",
-        "* 안내드린 프로그램·일정과 할인 적용 금액은 5일 동안 보장되며, 기한이 지나면 시작일을 다시 확인한 뒤 진행하게 됩니다.",
+        "신청서에 적어주신 내용을 바탕으로 아래 내용을 정리해봤어요",
+        "",
+        "• 현재 공부에서 점검할 부분",
+        "• 앞으로의 공부 순서와 계획",
+        "• 목표 점수까지 예상되는 준비 기간",
+        "",
+        "아래 버튼에서 분석 결과를 확인해주시면 돼요 !",
+        "",
+        "분석 내용 중 궁금한 점은 문의해주세요 :)",
       ].join("\n");
 
     case "incentive_deadline_warning": {
@@ -448,7 +450,7 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
     case "correction_feedback_2":
       return "[이온토플] 최종 첨삭이 완료되었습니다. 최종 점수와 모범 답안을 확인해보세요. https://testroom.eonfl.com";
     case "incentive_analysis_complete":
-      return "[이온토플] 개별분석 올렸어요. 5일 내 확인·동의 부탁드려요";
+      return "[이온토플] 신청하신 개별분석이 완료됐어요! 공홈 로그인 후 확인해주세요 :)";
     case "incentive_deadline_warning":
       return `[이온토플] 동의 마감 ${(data.time as string) || "6"}시간 남음. 지나면 시작일이 다음 일요일로 밀릴 수 있어요`;
     case "analysis_updated":
@@ -664,14 +666,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 임시 차단: 프로모션 도착 알림은 공급사 호출/로그 전에 중단 (전화번호 검사보다 앞)
-    if (type === PAUSED_TYPE) {
-      return new Response(
-        JSON.stringify({ success: false, skipped: true, reason: "promotion_arrival_paused", msg: "프로모션 개별분석 도착 알림은 새 템플릿 승인까지 수동 발송합니다." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     if (!data.phone) {
       return new Response(
         JSON.stringify({ success: false, error: "Phone number is required" }),
@@ -748,10 +742,8 @@ async function handleBulkSend(
   // 템플릿별로 그룹핑 (LunaSoft API는 요청당 1개 template_id)
   const grouped: Record<number, { messages: Record<string, unknown>[]; logEntries: Record<string, unknown>[] }> = {};
 
-  let skipped = 0; // 임시 차단으로 제외한 항목 수
   for (let i = 0; i < items.length; i++) {
     const { type, data } = items[i];
-    if (type === PAUSED_TYPE) { skipped++; continue; } // 임시 차단: 그룹핑·공급사·로그 전에 제외
     const templateId = TEMPLATE_IDS[type];
     if (!templateId || !data.phone) continue;
 
@@ -837,7 +829,6 @@ async function handleBulkSend(
       sent: totalSuccess,
       failed: totalFail,
       results,
-      ...(skipped > 0 ? { skipped } : {}),
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
