@@ -80,7 +80,7 @@
     margin: 0;
     padding: 0;
     color: #1e293b;
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     line-height: 1.5;
 }
@@ -88,7 +88,7 @@
 .course-choice .course-choice__duration {
     margin: 16px 0;
     color: #5b4a7d;
-    font-size: clamp(30px, 5.5cqi, 46px);
+    font-size: 22px;
     font-weight: 800;
     line-height: 1.2;
     letter-spacing: -0.04em;
@@ -133,7 +133,7 @@
     .course-choice .course-choice__direction { display: none; }
     .course-choice__card { margin-top: 0; padding: 24px 20px; }
     .course-choice__option--fast .course-choice__card { padding-top: 48px; }
-    .course-choice .course-choice__duration { font-size: 38px; margin: 12px 0; }
+    .course-choice .course-choice__duration { margin: 12px 0; }
     .course-choice .course-choice__label { margin-bottom: 16px; }
     .course-choice .course-choice__description { margin-bottom: 16px; }
 }
