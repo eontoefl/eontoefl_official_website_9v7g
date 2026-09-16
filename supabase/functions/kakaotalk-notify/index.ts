@@ -1,8 +1,6 @@
 // ===== 카카오 알림톡 Edge Function (LunaSoft Jupiter API) =====
 // 역할: 프론트엔드 → Edge Function → LunaSoft API → 카카오 알림톡 발송 + DB 로그 기록
 
-import "@supabase/functions-js/edge-runtime.d.ts";
-
 // ===== 환경변수 =====
 const LUNASOFT_USERID = Deno.env.get("LUNASOFT_USERID")!;       // ghkdrudals77
 const LUNASOFT_API_KEY = Deno.env.get("LUNASOFT_API_KEY")!;      // API 키
