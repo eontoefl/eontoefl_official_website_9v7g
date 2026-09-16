@@ -36,6 +36,7 @@ const TEMPLATE_IDS: Record<string, number> = {
   practice_open:               50231,  // 연습코스 오픈 안내 (정규과정 종료 후 자동 활성화)
   toefl_exam_day:              50233,  // 시험 당일 회신 안내 + 리포트 참여
   correction_extension_complete: 50227,  // 첨삭 연장(13~24세션) 완료 안내
+  correction_session_reminder: 50244,  // 스라첨삭 세션 당일 안내
   resume_approved:             50242,  // 진행 재개 승인 안내 (기한 리셋 완료)
   resume_held:                 50243,  // 진행 재개 보류 안내 (카톡 개별 안내 예정)
 };
@@ -237,19 +238,14 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
 
     case "incentive_deadline_warning": {
-      // 프로모션: 일반(analysis_agree_reminder)과 같은 형태로 실제 남은 시간 + 절대 마감을 안내.
-      // time/deadline은 DB 프로모션 예약 함수가 전달. 옛 함수(고정 '6', deadline 없음)와도 깨지지 않도록 대비.
       const hoursLeft = (data.time as string) || "6";
-      const deadlineNote = data.deadline ? ` (${data.deadline}까지)` : "";
       return [
         "이온토플 - 개별분석 동의 마감 안내",
         "",
-        `${data.name}님, 안녕하세요!`,
+        `${data.name}님, 안녕하세요 :)`,
         "",
-        `요청하신 개별분석 동의 마감까지 ${hoursLeft}시간 남았어요.${deadlineNote}`,
-        "",
-        "아래 버튼에서 분석 결과 확인하시고 동의 여부 결정해주세요.",
-        "기한이 지나면 안내드린 시작일이 다음 일요일로 밀릴 수 있어요 :(",
+        `요청하신 개별분석의 동의 가능 기간이 ${hoursLeft}시간 후 에 만료됩니다.`,
+        "만료 전에 분석 결과를 확인하시고 동의 여부를 결정해주세요!",
       ].join("\n");
     }
 
@@ -358,6 +354,21 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "기존과 동일하게 진행되며, 회차별 마감 기한을 넘기면 해당 회차는 자동 종료되니 일정을 꼭 지켜주세요.",
       ].join("\n");
 
+    case "correction_session_reminder":
+      // 승인 원문(50244, 2026-09-15 검수 완료)과 글자 단위 일치 — 수정 시 카카오 재검수 필요.
+      // 변수 4개: #{name} / #{session} / #{tasks} / #{deadline}. 버튼: 테스트룸 바로가기.
+      return [
+        "이온토플 - 스라첨삭 세션 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `오늘은 신청하신 스라첨삭의 ${data.session}회차 진행일입니다!`,
+        `- 과제: ${data.tasks}`,
+        "",
+        `⏰ 1차 제출 마감: ${data.deadline}`,
+        "* 마감 후에는 해당 회차가 소멸되오니, 마감 전까지 테스트룸에서 제출해주세요!",
+      ].join("\n");
+
     case "analysis_agree_reminder":
       return [
         "이온토플 - 개별분석 동의 마감 안내",
@@ -452,7 +463,7 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
     case "incentive_analysis_complete":
       return "[이온토플] 신청하신 개별분석이 완료됐어요! 공홈 로그인 후 확인해주세요 :)";
     case "incentive_deadline_warning":
-      return `[이온토플] 동의 마감 ${(data.time as string) || "6"}시간 남음. 지나면 시작일이 다음 일요일로 밀릴 수 있어요`;
+      return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
     case "analysis_updated":
       return "[이온토플] 개별분석이 수정되었습니다. 확인 부탁드려요.";
     case "analysis_registered":
@@ -475,6 +486,8 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 오늘 시험 고생하셨습니다. 리딩·리스닝 점수와 출제 내용을 카톡으로 알려주시면 피드백 드릴게요. 시험 리포트도 참여 부탁드려요 https://eonfl.com/survey.html";
     case "correction_extension_complete":
       return "[이온토플] 스라첨삭 연장이 완료되었습니다. 테스트룸에서 13~24세션을 확인해주세요. https://testroom.eonfl.com";
+    case "correction_session_reminder":
+      return `[이온토플] 오늘은 스라첨삭 ${data.session}회차 진행일입니다. 1차 제출 마감 ${data.deadline}. https://testroom.eonfl.com`;
     case "resume_approved":
       return "[이온토플] 요청하신 진행 재개가 완료되었어요. 기한 내 이어서 진행해주세요.";
     case "resume_held":
@@ -495,6 +508,11 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   }
   if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open") {
     return TESTROOM_URL;
+  }
+  // 50244(세션 당일 안내) 버튼 "테스트룸 바로가기" — 템플릿에 등록된 링크가 http:// 이므로
+  // TESTROOM_URL(https://)을 쓰지 않고 등록 원문 그대로 둔다. 바꾸면 카카오 재검수 대상.
+  if (type === "correction_session_reminder") {
+    return "http://testroom.eonfl.com";
   }
   // 시험 직후 리포트 설문 — 학생별 파라미터 없이 고정 링크
   if (type === "toefl_exam_day") {
@@ -833,3 +851,4 @@ async function handleBulkSend(
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 }
+
