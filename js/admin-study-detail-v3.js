@@ -1758,6 +1758,7 @@ function renderDeadlineList() {
             <th>연장 일수</th>
             <th>사유</th>
             <th>등록일</th>
+            <th>알림톡</th>
             <th style="width:60px; text-align:center;">삭제</th>
         </tr></thead><tbody>`;
 
@@ -1768,12 +1769,17 @@ function renderDeadlineList() {
         const created = ext.created_at
             ? new Date(ext.created_at).toLocaleDateString('ko-KR')
             : '-';
+        // 연장 알림톡(50247) 발송 결과 — 행의 notify_status (빈칸 = 미발송)
+        const notify = ext.notify_status === 'sent' ? '<span style="color:#16a34a; font-weight:600;">발송됨</span>'
+                     : ext.notify_status === 'failed' ? '<span style="color:#dc2626; font-weight:600;">발송 실패</span>'
+                     : '';
 
         html += `<tr>
             <td style="font-family:monospace; font-weight:600;">${escapeHtml(date)}</td>
             <td><span style="color:#7c3aed; font-weight:700;">+${days}일</span></td>
             <td style="color:#64748b;">${escapeHtml(reason)}</td>
             <td style="color:#94a3b8; font-size:12px;">${created}</td>
+            <td style="font-size:12px;">${notify}</td>
             <td style="text-align:center;">
                 <button class="btn-deadline-del" onclick="deleteDeadlineExtension('${ext.id}')">
                     <i class="fas fa-trash"></i>
@@ -1815,21 +1821,37 @@ async function addDeadlineExtension() {
             'limit': '1'
         });
 
+        let rowId;
+        let changed;   // 값이 바뀐 PATCH 또는 INSERT 일 때만 알림톡을 보낸다
         if (existing && existing.length > 0) {
-            await supabaseAPI.patch('tr_deadline_extensions', existing[0].id, {
+            rowId = existing[0].id;
+            changed = Number(existing[0].extra_days) !== extraDays;
+            await supabaseAPI.patch('tr_deadline_extensions', rowId, {
                 extra_days: extraDays,
                 reason: reason || null
             });
             alert(`✅ ${originalDate} 연장이 +${extraDays}일로 수정되었습니다.`);
         } else {
+            rowId = crypto.randomUUID();
+            changed = true;
             await supabaseAPI.post('tr_deadline_extensions', {
-                id: crypto.randomUUID(),
+                id: rowId,
                 user_id: userId,
                 original_date: originalDate,
                 extra_days: extraDays,
                 reason: reason || null
             });
             alert(`✅ ${originalDate} +${extraDays}일 연장 등록 완료!`);
+        }
+
+        // 저장 성공 직후 → 새 마감 계산 + 알림톡(50247). 실패해도 저장은 그대로 둔다.
+        if (changed) {
+            try {
+                await notifyChallengeDeadlineExtension(rowId, originalDate, extraDays);
+            } catch (err) {
+                console.error('❌ 연장 알림톡 처리 실패:', err);
+                alert('연장은 저장됐지만 알림톡 처리 중 오류가 났어요: ' + err.message + '\n학생에게 직접 안내해주세요.');
+            }
         }
 
         dateEl.value = '';
@@ -1843,6 +1865,43 @@ async function addDeadlineExtension() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-plus"></i> 연장 등록';
+    }
+}
+
+/**
+ * 내챌 과제 연장 알림톡(50247). 새 마감 = getTaskDeadline(원래 날짜, 학생 시간대) + extra_days×24h
+ * (테스트룸 mypage.js 와 동일 규칙, js/deadline-rules.js). 결과를 행 notify_status/notified_at 에 기록.
+ * 전화번호가 없으면 발송을 건너뛰고 경고만 한다(저장은 유지).
+ */
+async function notifyChallengeDeadlineExtension(rowId, originalDate, extraDays) {
+    const user = (studentData && studentData.user) || {};
+    if (!user.phone) {
+        alert('학생 전화번호가 없어 알림톡을 보내지 않았어요. 연장은 저장됐어요.');
+        return;
+    }
+    const tz = user.timezone || 'Asia/Seoul';
+    const base = getTaskDeadline(originalDate, tz);
+    const newDeadline = new Date(base.getTime() + extraDays * 24 * 60 * 60 * 1000);
+
+    const res = await sendKakaoAlimTalk('challenge_deadline_extended', {
+        name: user.name,
+        phone: user.phone,
+        app_id: studentData.app ? studentData.app.id : undefined,
+        task_date: formatTaskDateForAlimtalk(originalDate),
+        days: String(extraDays),
+        deadline: formatDeadlineForAlimtalk(newDeadline, tz)
+    });
+    const ok = !!(res && res.success);
+    try {
+        await supabaseAPI.patch('tr_deadline_extensions', rowId, {
+            notify_status: ok ? 'sent' : 'failed',
+            notified_at: new Date().toISOString()
+        });
+    } catch (e) {
+        console.warn('연장 알림톡 결과 기록 실패:', e);
+    }
+    if (!ok) {
+        alert(`알림톡 발송 실패: ${(res && (res.error || res.message)) || '응답 없음'}\n학생(${user.name})에게 직접 안내해주세요.`);
     }
 }
 
