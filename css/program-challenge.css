@@ -311,6 +311,28 @@
     font-size: 0.95rem;
 }
 
+/* Self-paced schedule: local to the program explanation. */
+.cl .selfpaced-jump { margin: 1rem 0 2rem; font-size: 0.9rem; }
+.cl .selfpaced-jump a { color: #5b4a7d; font-weight: 600; line-height: 1.8; }
+.cl .selfpaced-jump a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.cl .section-selfpaced { background: #faf8fb; scroll-margin-top: 100px; }
+.cl .selfpaced-eyebrow { margin: 0 0 0.8rem; color: #7a6690; font-size: 0.85rem; font-weight: 600; }
+.cl .selfpaced-intro p { margin: 0 0 1.2rem; font-size: 1rem; line-height: 1.9; color: #475569; word-break: keep-all; }
+.cl .selfpaced-intro strong { color: #5b4a7d; font-weight: 600; }
+.cl .selfpaced-support { margin: 2rem 0; padding: 24px 28px; background: #fff; border-radius: 14px; }
+.cl .selfpaced-support h3, .cl .selfpaced-next h3 { margin: 0 0 0.65rem; font-size: 1rem; line-height: 1.6; font-weight: 600; color: #1e293b; }
+.cl .selfpaced-support p { margin: 0; color: #475569; font-size: 0.9rem; line-height: 1.85; word-break: keep-all; }
+.cl .section-selfpaced .course-choice { scroll-margin-top: 100px; }
+.cl .selfpaced-next { margin-top: 2.5rem; }
+.cl #diagnosis-guide { scroll-margin-top: 100px; }
+.cl .selfpaced-next > p { margin: 0; font-size: 0.9rem; line-height: 1.85; color: #475569; word-break: keep-all; }
+.cl .selfpaced-jump a:focus-visible { outline: 2px solid #5b4a7d; outline-offset: 4px; }
+.cl .selfpaced-next .selfpaced-note { margin-top: 12px; font-size: 0.8rem; color: #64748b; }
+@media (max-width: 560px) {
+    .cl .selfpaced-support { padding: 22px; }
+    .cl .selfpaced-intro p { font-size: 0.95rem; }
+}
+
 /* Screenshot Placeholders */
 .cl .screenshot-wrapper {
     margin: 2.5rem 0;

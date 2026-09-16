@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
+    <link rel="stylesheet" href="css/course-comparison.css?v=20260916d">
 </head>
 <body>
     <!-- Navigation -->
@@ -145,20 +146,10 @@
         .pr-info-muted-title { font-size: 13px; font-weight: 700; color: #64748b; margin: 0 0 8px 0; }
         .pr-info-muted p { font-size: 13px; color: #94a3b8; line-height: 1.7; margin: 0; }
 
-        /* Caption text (과정 비교 설명) */
-        .pr-caption { font-size: 13px; color: #94a3b8; line-height: 1.7; margin-top: 12px; }
-
         /* Legacy note (포함사항 하단 등) */
         .pr-note { background: #f3eef3; border-radius: 10px; padding: 18px 22px; margin-top: 16px; }
         .pr-note p { font-size: 13px; color: #64748b; line-height: 1.7; margin: 0; }
         .pr-note strong { color: #475569; }
-
-        /* Course compare */
-        .pr-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
-        .pr-compare-item { background: #f3eef3; border-radius: 10px; padding: 20px; text-align: center; }
-        .pr-compare-item h4 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 4px 0; }
-        .pr-compare-item .dur { font-size: 13px; color: #64748b; font-weight: 600; margin: 0 0 6px 0; }
-        .pr-compare-item p { font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.5; }
 
         /* Includes */
         .pr-includes { margin-top: 24px; }
@@ -216,7 +207,7 @@
 
         @media (max-width: 768px) {
             .pr-price-table, .pr-program-header, .pr-price-total { padding-left: 24px; padding-right: 24px; }
-            .pr-include-list, .pr-compare { grid-template-columns: 1fr; }
+            .pr-include-list { grid-template-columns: 1fr; }
 
             /* 사이드바 탭: 가로 스크롤 → 3등분 한 줄(스크롤 제거) */
             .sidebar-nav { overflow-x: hidden; gap: 6px; padding: 8px; }
@@ -304,20 +295,45 @@
                             <p>보증금(+10만)은 필수이며, 챌린지 종료 후 인증률에 따라 환급됩니다. 인증률에 따라 전액 환급될 수도, 일부 또는 전혀 환급되지 않을 수도 있습니다.</p>
                         </div>
 
-                        <!-- Fast vs Standard -->
-                        <div class="pr-compare">
-                            <div class="pr-compare-item">
-                                <h4>Fast 과정</h4>
-                                <p class="dur">4주 집중</p>
-                                <p>매일 높은 학습량으로 빠르게 완주</p>
+                        <section class="course-choice" id="course-options" aria-label="학습 과정 비교">
+                            <div class="course-choice__grid">
+                                <article class="course-choice__option course-choice__option--self">
+                                    <p class="course-choice__direction"><span aria-hidden="true">←</span> 더 짧게 집중</p>
+                                    <div class="course-choice__card">
+                                        <h4 class="course-choice__name">자기주도 과정</h4>
+                                        <p class="course-choice__duration">맞춤 일정</p>
+                                        <p class="course-choice__label">단기 집중</p>
+                                        <p class="course-choice__description">4주보다 빠른 완주가 필요할 때<br>시험일까지 남은 기간에 맞춰<br>하루 학습량을 개별 배분합니다.</p>
+                                        <p class="course-choice__detail">학습 기간 개별 설정</p>
+                                    </div>
+                                </article>
+                                <article class="course-choice__option course-choice__option--fast">
+                                    <p class="course-choice__direction">기본 4주</p>
+                                    <div class="course-choice__card">
+                                        <span class="course-choice__badge">기본 과정</span>
+                                        <h4 class="course-choice__name">Fast 과정</h4>
+                                        <p class="course-choice__duration">4주</p>
+                                        <p class="course-choice__label">기본 진도</p>
+                                        <p class="course-choice__description">정해진 진도를 따라<br>4주 동안 집중해서 완주합니다.</p>
+                                        <p class="course-choice__detail">집중 학습의 기본 선택</p>
+                                    </div>
+                                </article>
+                                <article class="course-choice__option course-choice__option--standard">
+                                    <p class="course-choice__direction">하루 부담을 나눠 <span aria-hidden="true">→</span></p>
+                                    <div class="course-choice__card">
+                                        <h4 class="course-choice__name">Standard 과정</h4>
+                                        <p class="course-choice__duration">8주</p>
+                                        <p class="course-choice__label">직장·학업 병행</p>
+                                        <p class="course-choice__description">다른 일과 병행할 때<br>하루 학습량을 나눠 완주합니다.</p>
+                                        <p class="course-choice__detail">하루 부담을 낮춘 일정</p>
+                                    </div>
+                                </article>
                             </div>
-                            <div class="pr-compare-item">
-                                <h4>Standard 과정</h4>
-                                <p class="dur">8주 과정</p>
-                                <p>일 학습량을 분산하여 여유 있게 완주</p>
+                            <div class="course-choice__footer">
+                                <p class="course-choice__equal">총 학습량 · 수강료 · 제공되는 관리는 동일합니다.</p>
+                                <p class="course-choice__workload">기간이 짧을수록 하루 학습량이 늘어납니다.</p>
                             </div>
-                        </div>
-                        <p class="pr-caption">두 과정의 총 학습량은 완벽하게 동일하며, 가격도 같습니다. 기간에 따라 하루 분량이 달라질 뿐이므로 자신의 스케줄에 맞는 과정을 선택하시면 됩니다.</p>
+                        </section>
 
                         <!-- 포함 사항 -->
                         <div class="pr-includes">
