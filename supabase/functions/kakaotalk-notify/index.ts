@@ -37,6 +37,8 @@ const TEMPLATE_IDS: Record<string, number> = {
   toefl_exam_day:              50233,  // 시험 당일 회신 안내 + 리포트 참여
   correction_extension_complete: 50227,  // 첨삭 연장(13~24세션) 완료 안내
   correction_session_reminder: 50244,  // 스라첨삭 세션 당일 안내
+  correction_deadline_extended: 50246,  // 스라첨삭 마감 연장 안내 (버튼 없음)
+  challenge_deadline_extended:  50247,  // 내벨업챌린지 마감 연장 안내 (버튼 없음)
   resume_approved:             50242,  // 진행 재개 승인 안내 (기한 리셋 완료)
   resume_held:                 50243,  // 진행 재개 보류 안내 (카톡 개별 안내 예정)
 };
@@ -432,6 +434,36 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "잠시만 기다려주세요 :)",
       ].join("\n");
 
+    case "correction_deadline_extended":
+      // 승인 원문(50246)과 글자 단위 일치 — 수정 시 카카오 재검수 필요. 버튼 없음(hasNoButton).
+      // 변수 6개: #{name} / #{session} / #{tasks} / #{draft} / #{hours} / #{deadline}
+      return [
+        "이온토플 - 스라첨삭 마감 연장 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `신청하신 스라첨삭 ${data.session}회차의 ${data.tasks} 과제, ${data.draft}차 제출 마감을 ${data.hours}시간 연장해드렸어요!`,
+        "",
+        `⏰ 변경된 마감: ${data.deadline}`,
+        "",
+        "위 시간까지 테스트룸에서 해당 과제를 제출해주시면 됩니다 :)",
+      ].join("\n");
+
+    case "challenge_deadline_extended":
+      // 승인 원문(50247)과 글자 단위 일치 — 수정 시 카카오 재검수 필요. 버튼 없음(hasNoButton).
+      // 변수 4개: #{name} / #{task_date} / #{days} / #{deadline}
+      return [
+        "이온토플 - 내벨업챌린지 마감 연장 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `신청하신 내벨업챌린지에서 ${data.task_date}에 배정된 과제의 마감을 ${data.days}일 연장해드렸어요!`,
+        "",
+        `⏰ 변경된 마감: ${data.deadline}`,
+        "",
+        "위 시간까지 테스트룸에서 해당 날짜의 과제를 완료해주시면 됩니다 :)",
+      ].join("\n");
+
     default:
       return "";
   }
@@ -492,6 +524,10 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 요청하신 진행 재개가 완료되었어요. 기한 내 이어서 진행해주세요.";
     case "resume_held":
       return "[이온토플] 재개 요청 관련 일정 확인이 필요해 카카오톡으로 따로 안내드릴게요.";
+    case "correction_deadline_extended":
+      return "[이온토플] 스라첨삭 마감이 연장되었습니다. 테스트룸에서 변경된 마감을 확인해주세요.";
+    case "challenge_deadline_extended":
+      return "[이온토플] 내벨업챌린지 과제 마감이 연장되었습니다. 테스트룸에서 변경된 마감을 확인해주세요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -531,7 +567,10 @@ function hasNoButton(templateId: number): boolean {
       // 50243(재개 보류): 버튼 없음 — 카톡으로 개별 안내 예정.
       || templateId === TEMPLATE_IDS.resume_held
       // 50241(입금 마감 리마인드): 버튼 없음 — 본문에 계좌/기한 안내, 별도 버튼 없음.
-      || templateId === TEMPLATE_IDS.deposit_reminder;
+      || templateId === TEMPLATE_IDS.deposit_reminder
+      // 50246/50247(마감 연장 안내): 승인 템플릿에 버튼 없음.
+      || templateId === TEMPLATE_IDS.correction_deadline_extended
+      || templateId === TEMPLATE_IDS.challenge_deadline_extended;
 }
 
 // ===== 단건 메시지 객체 생성 =====
