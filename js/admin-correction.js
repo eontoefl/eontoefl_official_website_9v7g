@@ -2,7 +2,7 @@
 
 let allCorrections = [];
 let filteredCorrections = [];
-let usersCache = {};       // user_id -> { name, email }
+let usersCache = {};       // user_id -> { name, email, phone, timezone }
 let selectedIds = new Set();
 const itemsPerPage = 20;
 let currentPage = 1;
@@ -79,13 +79,13 @@ async function loadUsersInfo(userIds) {
         const idsFilter = userIds.map(id => `"${id}"`).join(',');
         const users = await supabaseAPI.query('users', {
             'id': `in.(${idsFilter})`,
-            'select': 'id,name,email,phone',
+            'select': 'id,name,email,phone,timezone',
             'limit': '1000'
         });
 
         if (users && users.length > 0) {
             users.forEach(u => {
-                usersCache[u.id] = { name: u.name || '(이름없음)', email: u.email || '', phone: u.phone || '' };
+                usersCache[u.id] = { name: u.name || '(이름없음)', email: u.email || '', phone: u.phone || '', timezone: u.timezone || '' };
             });
         }
     } catch (e) {
@@ -930,16 +930,33 @@ async function loadDeadlineExtensions() {
 }
 
 /**
- * Find extension hours for a given user + session + task_type from cache.
- * Returns the extended_hours value, or 0 if none.
+ * 상세창 건의 차수 자동 판단.
+ * 1차 첨삭이 공개(released_1_at)됐거나 피드백(feedback_1_at)이 있으면 2차 마감을 연장하는 것이고, 아니면 1차.
  */
-function getExtendedHours(userId, sessionNumber, taskType) {
-    const match = deadlineExtensionsCache.find(e =>
+function getExtendDraftRound(item) {
+    return (item && (item.released_1_at || item.feedback_1_at)) ? 2 : 1;
+}
+
+/**
+ * (학생·세션·과제·차수) 연장 행을 캐시에서 찾는다.
+ * 차수가 같은 행 우선, 없으면 차수 없는 옛 행(NULL = 둘 다 적용). 없으면 null.
+ */
+function findDeadlineExtensionRow(userId, sessionNumber, taskType, draftRound) {
+    const same = e =>
         e.user_id === userId &&
         String(e.session_number) === String(sessionNumber) &&
-        e.task_type === taskType
-    );
-    return match ? (match.extended_hours || 0) : 0;
+        e.task_type === taskType;
+    return deadlineExtensionsCache.find(e => same(e) && e.draft_round === draftRound)
+        || deadlineExtensionsCache.find(e => same(e) && (e.draft_round ?? null) === null)
+        || null;
+}
+
+/** 연장 행의 알림톡 발송 결과 칩 문구 (' · 알림톡 발송됨' / ' · 알림톡 발송 실패' / '') */
+function extNotifyChipText(row) {
+    if (!row) return '';
+    if (row.notify_status === 'sent') return ' · 알림톡 발송됨';
+    if (row.notify_status === 'failed') return ' · 알림톡 발송 실패';
+    return '';
 }
 
 /**
@@ -965,10 +982,16 @@ function updateExtendDeadlineUI(item) {
 
     wrap.style.display = 'inline-flex';
 
-    // Show existing extension badge from separate table
-    const extHours = getExtendedHours(item.user_id, item.session_number, item.task_type);
+    // 팝업 제목에 이 건이 몇 차 마감 연장인지 표시 (차수는 자동 판단)
+    const round = getExtendDraftRound(item);
+    const titleEl = popup ? popup.querySelector('.corr-extend-popup-title') : null;
+    if (titleEl) titleEl.textContent = `${round}차 마감 연장`;
+
+    // Show existing extension badge from separate table (+ 알림톡 발송 결과 칩)
+    const extRow = findDeadlineExtensionRow(item.user_id, item.session_number, item.task_type, round);
+    const extHours = extRow ? (extRow.extended_hours || 0) : 0;
     if (extHours > 0) {
-        badgeEl.textContent = `+${extHours}h 연장됨`;
+        badgeEl.textContent = `+${extHours}h 연장됨${extNotifyChipText(extRow)}`;
         badgeEl.style.display = 'inline-flex';
     } else {
         badgeEl.style.display = 'none';
@@ -996,26 +1019,50 @@ async function confirmExtendDeadline() {
 
     const hours = parseInt(selected.value, 10);
     const user = usersCache[currentModalItem.user_id] || { name: '(알수없음)' };
+    const item = currentModalItem;
+    const draftRound = getExtendDraftRound(item);
 
-    if (!confirm(`${user.name}님의 이 건에 마감을 +${hours}시간 연장하시겠습니까?`)) return;
+    if (!confirm(`${user.name}님의 이 건 ${draftRound}차 마감을 +${hours}시간 연장하시겠습니까?`)) return;
 
+    let saved;
     try {
-        await upsertDeadlineExtension(
-            currentModalItem.user_id,
-            currentModalItem.session_number,
-            currentModalItem.task_type,
-            hours
+        saved = await upsertDeadlineExtension(
+            item.user_id,
+            item.session_number,
+            item.task_type,
+            hours,
+            draftRound
         );
 
         // Update UI
         toggleExtendPopup();
-        updateExtendDeadlineUI(currentModalItem);
+        updateExtendDeadlineUI(item);
 
-        console.log(`✅ 마감 연장 완료: ${user.name}, +${hours}h`);
+        console.log(`✅ 마감 연장 완료: ${user.name}, ${draftRound}차 +${hours}h`);
     } catch (err) {
         console.error('❌ 마감 연장 실패:', err);
         alert('마감 연장 저장에 실패했습니다: ' + err.message);
+        return;
     }
+
+    // 저장 성공 직후 → 새 마감 계산 + 알림톡(50246). 실패해도 저장은 그대로 둔다.
+    try {
+        const scheduleData = draftRound === 1 ? await loadCorrScheduleForUser(item.user_id) : null;
+        const notify = await notifyCorrDeadlineExtension({
+            userId: item.user_id,
+            sessionNumber: item.session_number,
+            draftRound,
+            hours,
+            saved: [{ taskType: item.task_type, row: saved.row, changed: saved.changed }],
+            submissionsByTask: { [item.task_type]: item },
+            scheduleData
+        });
+        if (notify.warnings.length > 0) alert(notify.warnings.join('\n'));
+    } catch (err) {
+        console.error('❌ 연장 알림톡 처리 실패:', err);
+        alert('연장은 저장됐지만 알림톡 처리 중 오류가 났어요: ' + err.message + '\n학생에게 직접 안내해주세요.');
+    }
+    if (currentModalItem === item) updateExtendDeadlineUI(item);
 }
 
 /**
@@ -1038,10 +1085,12 @@ async function upsertDeadlineExtension(userId, sessionNumber, taskType, hours, d
 
     if (existing) {
         // UPDATE existing row
+        const changed = Number(existing.extended_hours) !== Number(hours);
         await supabaseAPI.patch('correction_deadline_extensions', existing.id, {
             extended_hours: hours
         });
         existing.extended_hours = hours;
+        return { row: existing, changed };
     } else {
         // INSERT new row
         const newRow = {
@@ -1055,7 +1104,106 @@ async function upsertDeadlineExtension(userId, sessionNumber, taskType, hours, d
         if (inserted) {
             deadlineExtensionsCache.push(inserted);
         }
+        return { row: inserted || null, changed: true };
     }
+}
+
+// ===== 연장 알림톡 (50246 스라첨삭 마감 연장) =====
+
+/** 학생의 correction_schedules 행 (별도 창 캐시 우선, 없으면 최신 1건 조회). 1차 마감 계산에만 필요. */
+async function loadCorrScheduleForUser(userId) {
+    const cached = extModalSchedules.find(s => s.user_id === userId);
+    if (cached) return cached;
+    const rows = await supabaseAPI.query('correction_schedules', {
+        'user_id': `eq.${userId}`,
+        'select': '*',
+        'order': 'start_date.desc',
+        'limit': '1'
+    });
+    return (rows && rows[0]) || null;
+}
+
+/**
+ * 연장 저장 직후: 과제별 새 마감을 계산해 알림톡을 보내고 결과를 연장 행(notify_status/notified_at)에 기록한다.
+ *   - 값이 안 바뀐 재저장(changed=false)은 보내지 않는다(칩은 행의 기존 상태 유지).
+ *   - 같은 클릭에서 마감 문자열이 같은 과제끼리 한 통(tasks를 ' + '로 연결), 다르면 통을 나눈다.
+ *   - 발송 실패해도 연장 저장은 되돌리지 않는다.
+ *
+ * @param {object} p
+ * @param {string} p.userId
+ * @param {number|string} p.sessionNumber
+ * @param {number} p.draftRound - 1 | 2
+ * @param {number} p.hours
+ * @param {Array<{taskType:string,row:object|null,changed:boolean}>} p.saved - upsertDeadlineExtension 결과
+ * @param {object} p.submissionsByTask - task_type → correction_submissions 행 (2차 마감 계산용)
+ * @param {object|null} p.scheduleData - correction_schedules 행 (1차 마감 계산용)
+ * @returns {Promise<{sent:number, failed:number, warnings:string[]}>}
+ */
+async function notifyCorrDeadlineExtension(p) {
+    const result = { sent: 0, failed: 0, warnings: [] };
+    const changed = p.saved.filter(s => s.changed && s.row);
+    if (changed.length === 0) return result;   // 같은 시간 재저장 → 발송 없음
+
+    const user = usersCache[p.userId] || {};
+    if (!user.phone) {
+        result.warnings.push('학생 전화번호가 없어 알림톡을 보내지 않았어요. 연장은 저장됐어요.');
+        return result;
+    }
+    const tz = user.timezone || 'Asia/Seoul';
+    const isAus = isAusTaskType(changed[0].taskType);
+
+    // 과제별 새 마감 → 마감 문자열이 같은 과제끼리 한 통
+    const groups = {};   // deadline 문자열 → [{ taskType, row }]
+    for (const s of changed) {
+        let deadline = null;
+        if (p.draftRound === 2) {
+            const sub = p.submissionsByTask[s.taskType];
+            deadline = sub ? getCorrDraft2DeadlineFromRelease(sub.released_1_at, sub.feedback_1_at, corrExtFromRow(s.row)) : null;
+            if (!deadline) {
+                result.warnings.push(`${getCorrAlimtalkTaskLabel(s.taskType)}: 1차 첨삭이 아직 공개 전이라 2차 마감이 없어 알림톡을 보내지 않았어요. 연장은 저장됐어요.`);
+                continue;
+            }
+        } else {
+            const sessionDate = getCorrSessionDate(p.scheduleData, getCorrSessionMeta(p.sessionNumber));
+            deadline = getCorrDraft1Deadline(sessionDate, corrExtFromRow(s.row), tz);
+            if (!deadline) {
+                result.warnings.push(`${getCorrAlimtalkTaskLabel(s.taskType)}: 일정표가 없어 마감 시각을 계산할 수 없어 알림톡을 보내지 않았어요. 연장은 저장됐어요.`);
+                continue;
+            }
+        }
+        const key = formatDeadlineForAlimtalk(deadline, tz);
+        (groups[key] = groups[key] || []).push(s);
+    }
+
+    for (const deadline of Object.keys(groups)) {
+        const items = groups[deadline];
+        const res = await sendKakaoAlimTalk('correction_deadline_extended', {
+            name: user.name,
+            phone: user.phone,
+            session: String(p.sessionNumber),
+            tasks: formatCorrTasksForAlimtalk(items.map(i => i.taskType), p.sessionNumber, isAus),
+            draft: String(p.draftRound),
+            hours: String(p.hours),
+            deadline
+        });
+        const ok = !!(res && res.success);
+        const mark = { notify_status: ok ? 'sent' : 'failed', notified_at: new Date().toISOString() };
+        for (const i of items) {
+            try {
+                await supabaseAPI.patch('correction_deadline_extensions', i.row.id, mark);
+            } catch (e) {
+                console.warn('연장 알림톡 결과 기록 실패:', e);
+            }
+            Object.assign(i.row, mark);   // deadlineExtensionsCache 의 같은 객체 → 칩 갱신
+        }
+        if (ok) {
+            result.sent += items.length;
+        } else {
+            result.failed += items.length;
+            alert(`알림톡 발송 실패: ${(res && (res.error || res.message)) || '응답 없음'}\n학생(${user.name})에게 직접 안내해주세요.`);
+        }
+    }
+    return result;
 }
 
 // ===== Standalone Deadline Extension Modal =====
@@ -1346,7 +1494,8 @@ async function confirmStandaloneExtend() {
     const hours = parseInt(hoursRadio.value, 10);
     const user = usersCache[userId] || { name: '(알수없음)' };
     const taskLabel = taskTypes.map(t => getTaskTypeLabel(t)).join(' · ');
-    const draftLabel = draftRound === '2' ? '2차' : '1차';
+    const round = parseInt(draftRound, 10);
+    const draftLabel = round === 2 ? '2차' : '1차';
 
     if (!confirm(`${user.name}님의 S${sessionNumber} ${taskLabel} ${draftLabel}에 마감을 +${hours}시간 연장하시겠습니까?`)) return;
 
@@ -1357,15 +1506,59 @@ async function confirmStandaloneExtend() {
     const statusInfo = document.getElementById('extModalStatusInfo');
 
     try {
-        for (const taskType of taskTypes) {
-            await upsertDeadlineExtension(userId, sessionNumber, taskType, hours, parseInt(draftRound, 10));
+        // 2차: 1차 첨삭이 공개된 과제만 연장할 수 있다 (공개 전이면 2차 마감 자체가 없다) → 저장하지 않고 안내
+        const submissionsByTask = {};
+        if (round === 2) {
+            const typeList = taskTypes.map(t => `"${t}"`).join(',');
+            const subs = await supabaseAPI.query('correction_submissions', {
+                'user_id': `eq.${userId}`,
+                'session_number': `eq.${sessionNumber}`,
+                'task_type': `in.(${typeList})`,
+                'select': 'id,task_type,released_1_at,feedback_1_at',
+                'limit': '10'
+            });
+            (subs || []).forEach(s => { submissionsByTask[s.task_type] = s; });
+            const notReleased = taskTypes.filter(t => {
+                const s = submissionsByTask[t];
+                return !(s && (s.released_1_at || s.feedback_1_at));
+            });
+            if (notReleased.length > 0) {
+                const labels = notReleased.map(t => getTaskTypeLabel(t)).join(' · ');
+                statusInfo.className = 'corr-extend-status-info warn';
+                statusInfo.innerHTML = `<i class="fas fa-exclamation-triangle"></i> S${sessionNumber} ${labels}의 1차 첨삭이 아직 공개 전이라 2차 마감이 없어요. 공개 후 연장해주세요.`;
+                statusInfo.style.display = 'block';
+                return;
+            }
         }
 
-        statusInfo.className = 'corr-extend-status-info success';
-        statusInfo.innerHTML = `<i class="fas fa-check-circle"></i> ${user.name} S${sessionNumber} ${taskLabel} +${hours}시간 연장 완료`;
-        statusInfo.style.display = 'block';
+        const saved = [];
+        for (const taskType of taskTypes) {
+            const r = await upsertDeadlineExtension(userId, sessionNumber, taskType, hours, round);
+            saved.push({ taskType, row: r.row, changed: r.changed });
+        }
 
         console.log(`✅ 마감 연장: ${user.name}, S${sessionNumber} ${taskLabel} ${draftLabel}, +${hours}h`);
+
+        // 저장 성공 직후 → 새 마감 계산 + 알림톡(50246). 실패해도 저장은 그대로 둔다.
+        let notify = { sent: 0, failed: 0, warnings: [] };
+        try {
+            const scheduleData = round === 1 ? await loadCorrScheduleForUser(userId) : null;
+            notify = await notifyCorrDeadlineExtension({
+                userId, sessionNumber, draftRound: round, hours, saved, submissionsByTask, scheduleData
+            });
+        } catch (err) {
+            console.error('❌ 연장 알림톡 처리 실패:', err);
+            notify.warnings.push('알림톡 처리 중 오류: ' + err.message + ' — 학생에게 직접 안내해주세요.');
+        }
+
+        // 결과줄: 연장 완료 + 알림톡 칩(행의 notify_status 기준)
+        const statuses = saved.map(s => s.row && s.row.notify_status);
+        const chip = statuses.includes('failed') ? ' · 알림톡 발송 실패'
+                   : statuses.includes('sent') ? ' · 알림톡 발송됨' : '';
+        const warnHtml = notify.warnings.map(w => `<div style="margin-top:4px;">${escapeHtml(w)}</div>`).join('');
+        statusInfo.className = 'corr-extend-status-info ' + (notify.warnings.length > 0 || chip.includes('실패') ? 'warn' : 'success');
+        statusInfo.innerHTML = `<i class="fas fa-check-circle"></i> ${user.name} S${sessionNumber} ${taskLabel} +${hours}시간 연장 완료${chip}` + warnHtml;
+        statusInfo.style.display = 'block';
 
     } catch (err) {
         console.error('❌ 마감 연장 실패:', err);
