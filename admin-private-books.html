@@ -10,7 +10,7 @@
 const statusEl = document.getElementById('status');
 function safeReturn() {
   const raw = new URLSearchParams(location.search).get('next'); if (!raw) return null;
-  try { const u = new URL(raw, location.href); if (u.origin !== location.origin || u.username || u.password || !/^\/admin-book-(preview|editor)\.html$/.test(u.pathname) || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(u.searchParams.get('book') || '')) return null; u.searchParams.set('private','1'); return u.href; } catch (_) { return null; }
+  try { const u = new URL(raw, location.href); if (u.origin === location.origin && !u.username && !u.password && u.pathname === '/admin-book-list.html') return new URL('admin-book-list.html', location.href).href; if (u.origin !== location.origin || u.username || u.password || !/^\/admin-book-(preview|editor)\.html$/.test(u.pathname) || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(u.searchParams.get('book') || '')) return null; u.searchParams.set('private','1'); return u.href; } catch (_) { return null; }
 }
 window.addEventListener('privatebook:signed-out', () => loginView('로그아웃되었습니다'));
 function loginView(message) { document.getElementById('loginPanel').hidden=false; document.getElementById('booksPanel').hidden=true; document.getElementById('books').replaceChildren(); statusEl.textContent=message; }

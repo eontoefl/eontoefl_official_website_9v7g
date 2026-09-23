@@ -8,16 +8,23 @@ const TRASH_DAYS = 30;
 const BL = { books: [] };
 
 document.addEventListener("DOMContentLoaded", () => {
-  if (!checkAuth()) return;
-  load();
+  const legacyAllowed = checkAuth();
+  document.getElementById('legacyBookActions').hidden = !legacyAllowed;
+  if (legacyAllowed) load();
+  else {
+    document.getElementById('activeSection').hidden = true;
+    document.getElementById('trashSection').hidden = true;
+    document.getElementById('loading').style.display = 'none';
+  }
+  // Private books are independently verified by Supabase Auth and server RLS.
+  window.PrivateBookList.load();
 });
 
 function checkAuth() {
   const params = new URLSearchParams(location.search);
-  if (params.get("dev") === "1") return true;
-  const u = JSON.parse(localStorage.getItem("iontoefl_user") || "null");
-  if (!u || u.role !== "admin") { alert("⚠️ 관리자만 접근할 수 있습니다."); location.href = "index.html"; return false; }
-  return true;
+  if (params.get("dev") === "1" && ['localhost','127.0.0.1','[::1]'].includes(location.hostname)) return true;
+  try { return JSON.parse(localStorage.getItem("iontoefl_user") || "null")?.role === 'admin'; }
+  catch (_) { return false; }
 }
 
 async function load() {
@@ -236,6 +243,7 @@ function toggleTrash() {
   const show = t.style.display === "none";
   t.style.display = show ? "block" : "none";
   a.style.display = show ? "none" : "block";
+  document.getElementById('privateBookSection').hidden = show;
 }
 
 function goBack() { location.href = "admin-settings.html"; }

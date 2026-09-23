@@ -1,7 +1,7 @@
 /* Private books only. Authorization is enforced by Auth + server allowlist/RLS, never legacy identity. */
 (function (global) {
   'use strict';
-  const enabled = new URLSearchParams(location.search).get('private') === '1' || /admin-(private-books|book-preview)\.html$/.test(location.pathname);
+  const enabled = new URLSearchParams(location.search).get('private') === '1' || /admin-(private-books|book-preview|book-list)\.html$/.test(location.pathname);
   if (!enabled) return;
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const bucket = 'book-private';
@@ -169,5 +169,5 @@
     if (typeof global.CustomEvent === 'function') global.dispatchEvent(new global.CustomEvent('privatebook:signed-out'));
   });
   global.PrivateBook = Object.freeze({ ready, client, api, query:api.query, post:api.post, patch:api.patch, hardDelete:api.hardDelete, canonicalizeAssets, resolveAssets, resolveCached, objectPath, uploadFile, login, logout, get user() { return user; }, selectedBook, refreshInterval: 600000 });
-  if (new URLSearchParams(location.search).get('private') === '1') global.supabaseAPI = api;
+  if (new URLSearchParams(location.search).get('private') === '1' && !/\/admin-book-list\.html$/.test(location.pathname)) global.supabaseAPI = api;
 })(window);

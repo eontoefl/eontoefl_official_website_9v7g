@@ -9,17 +9,18 @@ const source = fs.readFileSync(path.join(root,'js/private-book-client.js'),'utf8
 const book='11111111-1111-4111-8111-111111111111';
 const row='22222222-2222-4222-8222-222222222222';
 const project='https://example.supabase.co';
-function setup({authenticated=true, admin=true, legacy=false}={}) {
+function setup({authenticated=true, admin=true, legacy=false, pathname='/admin-book-editor.html'}={}) {
   const calls=[];
   let config;
   let payload;
   const chain={select(){return this;},eq(k,v){calls.push(['eq',k,v]);return this;},order(){return this;},limit(){return this;},range(){return Promise.resolve({data:[],error:null});},insert(data){payload=data;calls.push(['insert',data]);return this;},update(data){payload=data;calls.push(['update',data]);return this;},delete(){calls.push(['delete']);return this;},single(){return Promise.resolve({data:{id:row,...payload},error:null});},then(resolve){resolve({data:[],error:null});}};
   const client={auth:{getUser:async()=>({data:{user:authenticated?{id:row,email:'admin@example.test'}:null}}),signInWithPassword:async()=>({error:null}),signOut:async()=>({error:null})},rpc:async name=>{calls.push(['rpc',name]);return {data:admin};},from(name){calls.push(['from',name]);return chain;},storage:{from(name){calls.push(['bucket',name]);return {createSignedUrls:async paths=>{calls.push(['sign',paths]);return {data:paths.map(p=>({path:p,signedUrl:project+'/storage/v1/object/sign/book-private/'+p+'?token=ephemeral'}))};},upload:async(p)=>{calls.push(['upload',p]);return {error:null};}};}}};
   const window={supabase:{createClient(url,key,options){config=options;return client;}}};
-  const context=vm.createContext({window,location:{pathname:'/admin-book-editor.html',search:legacy?'':'?private=1&book='+book},SUPABASE_URL:project,SUPABASE_ANON_KEY:'public-placeholder',URL,URLSearchParams,Map,Set,Date,Uint8Array,crypto:{randomUUID:()=>row}});
+  const context=vm.createContext({window,location:{pathname,search:legacy?'':'?private=1&book='+book},SUPABASE_URL:project,SUPABASE_ANON_KEY:'public-placeholder',URL,URLSearchParams,Map,Set,Date,Uint8Array,crypto:{randomUUID:()=>row}});
   vm.runInContext(source,context);
   return {api:window.PrivateBook,calls,config,window};
 }
+test('catalog enables private client without replacing the legacy API',()=>{for(const legacy of [true,false]){const x=setup({legacy,pathname:'/admin-book-list.html'});assert.ok(x.api);assert.equal(x.window.supabaseAPI,undefined);}});
 test('isolated session key and legacy page remains untouched',()=>{assert.equal(setup().config.auth.storageKey,'eontoefl-private-book-auth-v1');const x=setup({legacy:true});assert.equal(x.api,undefined);assert.equal(x.window.supabaseAPI,undefined);});
 test('unauthenticated and non-admin requests never reach database or storage',async()=>{for(const options of [{authenticated:false},{admin:false}]){const x=setup(options);await assert.rejects(x.api.query('tr_book_pages'));await assert.rejects(x.api.resolveAssets('private-book://'+book+'/a.png'));assert.equal(x.calls.some(c=>['from','bucket'].includes(c[0])),false);}});
 test('canonical image URLs batch deduplicate and reverse on write',async()=>{const x=setup();const canonical='private-book://'+book+'/page-001.png';const resolved=await x.api.resolveAssets({blocks:[{type:'image',props:{url:canonical}}],html:'<img src="'+canonical+'">'});assert.equal(x.calls.filter(c=>c[0]==='sign').length,1);assert.equal(x.calls.find(c=>c[0]==='sign')[1].length,1);assert.match(resolved.html,/token=ephemeral/);assert.equal(x.api.canonicalizeAssets(resolved).blocks[0].props.url,canonical);await x.api.patch('tr_book_pages',row,resolved);const data=x.calls.find(c=>c[0]==='update')[1];assert.equal(JSON.stringify(data).includes('token='),false);assert.equal(x.calls.some(c=>c[0]==='from'&&c[1]==='pb_book_pages'),true);});

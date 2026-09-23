@@ -132,3 +132,17 @@
   .booklist-topbar { padding: 0 14px; }
   .booklist-title { font-size: 17px; }
 }
+
+/* Separate private catalog: its cards have no publication or deletion controls. */
+[hidden] { display: none !important; }
+#privateBookSection { margin-bottom: 28px; }
+#privateBookListLogin { margin-top: 12px; }
+.private-book-card { border: 1px solid #ded5ef; }
+.private-book-badge { color: #6545ad; background: #f1ebfa; }
+.private-book-card a, #privateBookListLogin { text-decoration: none; }
+.private-book-card .book-card-titlerow { flex-wrap: wrap; }
+.private-book-card .book-card-title { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .private-book-card { align-items: stretch; flex-direction: column; }
+  .private-book-card .book-card-actions { flex-wrap: wrap; }
+}

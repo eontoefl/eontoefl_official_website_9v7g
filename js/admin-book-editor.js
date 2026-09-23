@@ -1046,7 +1046,7 @@ async function downloadBook() {
 }
 
 function goBack() {
-  location.href = privateMode ? "admin-private-books.html" : "admin-book-list.html";
+  location.href = "admin-book-list.html";
 }
 
 // Renew image URLs from canonical paths without persisting signed tokens.
