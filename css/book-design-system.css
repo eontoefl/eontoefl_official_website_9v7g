@@ -1,0 +1,821 @@
+/* =====================================================================
+   Book Design System — scoped block styles for custom book content
+   ---------------------------------------------------------------------
+   Scope contract:
+   - Everything here is scoped under ".book-content" (the common host
+     class). Never write bare element/tag selectors outside this scope
+     and never touch ids or other pages' classes.
+   - ".book-content" is added by the caller to whichever container
+     currently renders book HTML: the BlockNote editing host
+     (.bookedit-mount) and the saved-content preview host
+     (.bookedit-preview), plus the exported HTML reader wrapper.
+     Because the same selectors are used in both places, editing and
+     export stay visually identical (parity by construction).
+   - Every custom block renders BOTH a shared class "book-design" and a
+     kind class ("book-heading", "book-callout", "book-compare",
+     "book-annotated", "book-question", "book-flow", "book-media") on
+     the same element, together with "data-book-kind" carrying the same
+     value. Selectors below match on either signal so the system keeps
+     working even if only one of the two is present on the markup.
+   - No external fonts are loaded by this file (system font stack only).
+   - No selector in this file reaches outside ".book-content" except the
+     standalone ".book-design-toolbar" component, which is an admin-only
+     control bar that is not part of rendered book content.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   1. Host container
+   --------------------------------------------------------------------- */
+.book-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  /* Do not hide overflow to conceal layout bugs or clip editor controls. */
+  overflow-x: visible;
+
+  /* Neutral theme is the default until data-book-theme overrides it. */
+  --book-fg-rgb: 31, 42, 68;      /* #1F2A44 */
+  --book-bg-rgb: 238, 241, 246;   /* #EEF1F6 */
+
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Malgun Gothic", sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  color: rgb(var(--book-fg-rgb));
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.book-content,
+.book-content *,
+.book-content *::before,
+.book-content *::after {
+  box-sizing: inherit;
+}
+
+/* ---------------------------------------------------------------------
+   2. Theme tokens — data-book-theme may sit on .book-content itself
+      (whole-book theme) or on any descendant (per-block override).
+      Values propagate through inherited custom properties either way.
+   --------------------------------------------------------------------- */
+.book-content[data-book-theme="neutral"],
+.book-content [data-book-theme="neutral"] {
+  --book-fg-rgb: 31, 42, 68;      /* #1F2A44 */
+  --book-bg-rgb: 238, 241, 246;   /* #EEF1F6 */
+}
+.book-content[data-book-theme="reading"],
+.book-content [data-book-theme="reading"] {
+  --book-fg-rgb: 47, 93, 80;      /* #2F5D50 */
+  --book-bg-rgb: 230, 240, 236;   /* #E6F0EC */
+}
+.book-content[data-book-theme="listening"],
+.book-content [data-book-theme="listening"] {
+  --book-fg-rgb: 58, 95, 125;     /* #3A5F7D */
+  --book-bg-rgb: 231, 239, 246;   /* #E7EFF6 */
+}
+.book-content[data-book-theme="writing"],
+.book-content [data-book-theme="writing"] {
+  --book-fg-rgb: 85, 70, 102;     /* #554666 */
+  --book-bg-rgb: 238, 234, 244;   /* #EEEAF4 */
+}
+.book-content[data-book-theme="speaking"],
+.book-content [data-book-theme="speaking"] {
+  --book-fg-rgb: 122, 46, 58;     /* #7A2E3A */
+  --book-bg-rgb: 243, 230, 234;   /* #F3E6EA */
+}
+
+/* Tone tokens (semantic, independent of the book theme) used by
+   data-book-tone="info|tip|warning". Kept as a separate palette so
+   callouts stay legible no matter which book theme is active. */
+.book-content [data-book-tone="info"] {
+  --book-tone-fg-rgb: 29, 78, 137;   /* #1D4E89 */
+  --book-tone-bg-rgb: 227, 239, 250; /* #E3EFFA */
+}
+.book-content [data-book-tone="tip"] {
+  --book-tone-fg-rgb: 31, 107, 59;   /* #1F6B3B */
+  --book-tone-bg-rgb: 227, 243, 231; /* #E3F3E7 */
+}
+.book-content [data-book-tone="warning"] {
+  --book-tone-fg-rgb: 138, 90, 18;   /* #8A5A12 */
+  --book-tone-bg-rgb: 251, 240, 220; /* #FBF0DC */
+}
+
+/* ---------------------------------------------------------------------
+   3. Base block shell — ".book-design" is the shared card wrapper for
+      every custom block kind; kind classes add accents on top.
+   --------------------------------------------------------------------- */
+.book-content .book-design {
+  position: relative;
+  margin: 18px 0;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(var(--book-fg-rgb), 0.05);
+  border: 1px solid rgba(var(--book-fg-rgb), 0.14);
+  color: rgb(var(--book-fg-rgb));
+  max-width: 100%;
+}
+
+.book-content .book-design:first-child { margin-top: 0; }
+.book-content .book-design:last-child { margin-bottom: 0; }
+
+/* Shared inner primitives, reused across every block kind ------------ */
+
+.book-content .book-design-title {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+  color: rgb(var(--book-fg-rgb));
+  overflow-wrap: anywhere;
+}
+
+.book-content .book-design-body {
+  font-size: 0.98rem;
+  line-height: 1.8;
+  color: rgb(var(--book-fg-rgb));
+  /* preserve author line breaks in plain multi-line bodies */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.book-content .book-design-body:not(:first-child) { margin-top: 6px; }
+
+.book-content .book-design-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(var(--book-fg-rgb));
+  opacity: 0.75;
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.book-content .book-design-note {
+  font-size: 0.86rem;
+  line-height: 1.7;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(var(--book-fg-rgb), 0.06);
+  border-left: 3px solid rgba(var(--book-fg-rgb), 0.4);
+  color: rgb(var(--book-fg-rgb));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.book-content .book-design-panel {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgb(var(--book-bg-rgb));
+  border: 1px solid rgba(var(--book-fg-rgb), 0.12);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* 2-column layout used by comparisons/annotated panels, collapses at
+   the shared <=680px breakpoint (see section 9). */
+.book-content .book-design-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   4. book-heading — data-book-level = 1 | 2 | 3
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-heading,
+.book-content .book-design[data-book-kind="heading"] {
+  padding: 0;
+  margin: 26px 0 12px;
+  background: transparent;
+  border: none;
+}
+.book-content .book-design.book-heading:first-child,
+.book-content .book-design[data-book-kind="heading"]:first-child {
+  margin-top: 0;
+}
+.book-content .book-heading .book-design-title,
+.book-content [data-book-kind="heading"] .book-design-title {
+  margin: 0;
+}
+
+.book-content .book-heading[data-book-level="1"] .book-design-title,
+.book-content [data-book-kind="heading"][data-book-level="1"] .book-design-title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  padding-bottom: 8px;
+  border-bottom: 3px solid rgba(var(--book-fg-rgb), 0.35);
+}
+.book-content .book-heading[data-book-level="2"] .book-design-title,
+.book-content [data-book-kind="heading"][data-book-level="2"] .book-design-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  padding-left: 12px;
+  border-left: 5px solid rgba(var(--book-fg-rgb), 0.55);
+}
+.book-content .book-heading[data-book-level="3"] .book-design-title,
+.book-content [data-book-kind="heading"][data-book-level="3"] .book-design-title {
+  font-size: 1.12rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+/* ---------------------------------------------------------------------
+   5. book-callout — data-book-tone = info | tip | warning
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-callout,
+.book-content .book-design[data-book-kind="callout"] {
+  background: rgba(var(--book-tone-bg-rgb, var(--book-fg-rgb)), 0.55);
+  border: 1px solid rgba(var(--book-tone-fg-rgb, var(--book-fg-rgb)), 0.3);
+  border-left-width: 4px;
+  color: rgb(var(--book-tone-fg-rgb, var(--book-fg-rgb)));
+}
+.book-content .book-callout .book-design-title,
+.book-content [data-book-kind="callout"] .book-design-title,
+.book-content .book-callout .book-design-body,
+.book-content [data-book-kind="callout"] .book-design-body {
+  color: rgb(var(--book-tone-fg-rgb, var(--book-fg-rgb)));
+}
+
+/* ---------------------------------------------------------------------
+   6. book-compare — two-column comparison
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-compare,
+.book-content .book-design[data-book-kind="compare"] {
+  background: rgba(var(--book-fg-rgb), 0.03);
+}
+.book-content .book-compare .book-design-panel,
+.book-content [data-book-kind="compare"] .book-design-panel {
+  height: 100%;
+}
+.book-content .book-compare .book-design-panel .book-design-label,
+.book-content [data-book-kind="compare"] .book-design-panel .book-design-label {
+  margin-bottom: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   7. book-annotated — panel + side note
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-annotated,
+.book-content .book-design[data-book-kind="annotated"] {
+  background: rgba(var(--book-fg-rgb), 0.03);
+}
+.book-content .book-annotated .book-design-columns,
+.book-content [data-book-kind="annotated"] .book-design-columns {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+.book-content .book-annotated .book-design-note,
+.book-content [data-book-kind="annotated"] .book-design-note {
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------------
+   8. book-question — options list, data-correct on each option
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-question,
+.book-content .book-design[data-book-kind="question"] {
+  background: rgba(var(--book-fg-rgb), 0.03);
+}
+
+.book-content .book-design-options {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.book-content .book-design-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 14px 10px 16px;
+  border-radius: 9px;
+  background: rgb(var(--book-bg-rgb));
+  border: 1px solid rgba(var(--book-fg-rgb), 0.16);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgb(var(--book-fg-rgb));
+  overflow-wrap: anywhere;
+}
+
+/* data-correct is stored as the boolean string "true" / "false" */
+.book-content .book-design-option[data-correct="true"] {
+  border-color: rgba(31, 107, 59, 0.55);
+  border-left-width: 4px;
+  background: rgba(31, 107, 59, 0.08);
+}
+.book-content .book-design-option[data-correct="true"]::before {
+  content: "\2713";
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgb(31, 107, 59);
+  color: #ffffff;
+  font-size: 0.7rem;
+  line-height: 1;
+  margin-top: 2px;
+}
+.book-content .book-design-option[data-correct="false"] {
+  opacity: 0.92;
+}
+
+/* ---------------------------------------------------------------------
+   9. book-flow — start / decision / branches / branch
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-flow,
+.book-content .book-design[data-book-kind="flow"] {
+  background: rgba(var(--book-fg-rgb), 0.03);
+  text-align: center;
+}
+
+.book-content .book-design-flow-start,
+.book-content .book-design-flow-decision {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 18px;
+  margin: 0 auto;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgb(var(--book-fg-rgb));
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.book-content .book-design-flow-start {
+  border-radius: 999px;
+  background: rgba(var(--book-fg-rgb), 0.14);
+}
+
+.book-content .book-design-flow-decision {
+  border-radius: 10px;
+  border: 1px dashed rgba(var(--book-fg-rgb), 0.5);
+  background: rgb(var(--book-bg-rgb));
+}
+.book-content .book-design-flow-decision::before {
+  content: "\25C6"; /* diamond marker, keeps the decision readable as text */
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.book-content .book-design-flow-start::after,
+.book-content .book-design-flow-decision::after {
+  content: "";
+  display: block;
+  width: 2px;
+  height: 18px;
+  background: rgba(var(--book-fg-rgb), 0.35);
+  margin: 8px auto 0;
+}
+
+.book-content .book-design-flow-branches {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.book-content .book-design-flow-branch {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgb(var(--book-bg-rgb));
+  border: 1px solid rgba(var(--book-fg-rgb), 0.18);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgb(var(--book-fg-rgb));
+  overflow-wrap: anywhere;
+  white-space: normal; /* explicit branch labels are never truncated */
+  text-align: left;
+}
+.book-content .book-design-flow-branch::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 14px;
+  background: rgba(var(--book-fg-rgb), 0.3);
+}
+.book-content .book-design-flow-branch .book-design-label {
+  margin-bottom: 4px;
+}
+
+/* At <=680px branches stack vertically; explicit labels stay intact
+   because white-space stays "normal" and width becomes 100%. */
+@media (max-width: 680px) {
+  .book-content .book-design-flow-branches {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .book-content .book-design-flow-branch {
+    max-width: 100%;
+  }
+  .book-content .book-design-flow-branch::before {
+    left: 24px;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   10. book-media — media embeds and link cards
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-media,
+.book-content .book-design[data-book-kind="media"] {
+  background: rgba(var(--book-fg-rgb), 0.03);
+}
+
+.book-content .book-design.book-media img,
+.book-content .book-design.book-media video,
+.book-content .book-design.book-media iframe,
+.book-content .book-design[data-book-kind="media"] img,
+.book-content .book-design[data-book-kind="media"] video,
+.book-content .book-design[data-book-kind="media"] iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--book-fg-rgb), 0.12);
+}
+
+.book-content .book-design-media-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: rgb(var(--book-bg-rgb));
+  border: 1px solid rgba(var(--book-fg-rgb), 0.16);
+  color: rgb(var(--book-fg-rgb));
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-decoration: none;
+  /* long / mixed-language URLs must never be clipped */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+.book-content .book-design-media-link:hover {
+  background: rgba(var(--book-fg-rgb), 0.08);
+}
+.book-content .book-design-media-link::before {
+  content: "\1F517"; /* link glyph, no external icon asset needed */
+  flex: 0 0 auto;
+  font-size: 0.95em;
+}
+
+/* ---------------------------------------------------------------------
+   11. Native content rendered directly inside .book-content
+       (plain BlockNote output / exported HTML, not custom blocks)
+   --------------------------------------------------------------------- */
+
+/* Tables: allow horizontal scroll instead of crushing columns. No
+   wrapper element required — the table itself becomes the scroll box. */
+.book-content table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 0.92rem; /* never smaller — keeps table text readable */
+}
+.book-content th,
+.book-content td {
+  padding: 9px 12px;
+  vertical-align: top;
+  font-size: inherit;
+  line-height: 1.6;
+  min-width: 88px;
+  border: 1px solid rgba(var(--book-fg-rgb), 0.14);
+  overflow-wrap: anywhere;
+}
+.book-content thead th,
+.book-content tr:first-child th,
+.book-content tr:first-child td {
+  background: rgba(var(--book-fg-rgb), 0.06);
+  font-weight: 700;
+}
+
+/* Images become responsive figures with readable captions */
+.book-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.book-content figure {
+  margin: 16px 0;
+  max-width: 100%;
+}
+.book-content figcaption {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: rgba(var(--book-fg-rgb), 0.75);
+  overflow-wrap: anywhere;
+}
+
+/* Checklists: comfortable tap target + readable text */
+.book-content ul li:has(> input[type="checkbox"]),
+.book-content li.book-content-check {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 28px;
+  line-height: 1.7;
+}
+.book-content input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  accent-color: rgb(var(--book-fg-rgb));
+}
+
+/* ---------------------------------------------------------------------
+   12. book-design-controls — interactive authoring controls that may
+       live inside a custom block (e.g. an "answer" details/textarea).
+       Scoped narrowly on purpose: never style bare buttons/inputs
+       anywhere else in .book-content.
+   --------------------------------------------------------------------- */
+.book-content .book-design-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.book-content .book-design-controls > label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgb(var(--book-fg-rgb));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.book-content .book-design-controls > input,
+.book-content .book-design-controls > textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  line-height: 1.6;
+  color: rgb(var(--book-fg-rgb));
+  background: rgb(var(--book-bg-rgb));
+  border: 1px solid rgba(var(--book-fg-rgb), 0.24);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.book-content .book-design-controls > textarea {
+  min-height: 88px;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+.book-content .book-design-controls > input:focus,
+.book-content .book-design-controls > textarea:focus {
+  outline: 2px solid rgba(var(--book-fg-rgb), 0.45);
+  outline-offset: 1px;
+}
+
+.book-content .book-design-controls > button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #ffffff;
+  background: rgb(var(--book-fg-rgb));
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.book-content .book-design-controls > button:hover {
+  filter: brightness(1.1);
+}
+.book-content .book-design-controls > button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.book-content .book-design-controls > details {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--book-fg-rgb), 0.18);
+  background: rgb(var(--book-bg-rgb));
+  padding: 8px 12px;
+}
+.book-content .book-design-controls > details > summary {
+  cursor: pointer;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgb(var(--book-fg-rgb));
+}
+
+/* Hide editing-only controls when the book is printed / exported to PDF */
+@media print {
+  .book-content .book-design-controls {
+    display: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   13. Layout breakpoint — shared 680px rule for column-based blocks
+   --------------------------------------------------------------------- */
+@media (max-width: 680px) {
+  .book-content .book-design-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   14. Small-viewport hardening (down to 360px) — no block here may
+       introduce page-level horizontal overflow.
+   --------------------------------------------------------------------- */
+@media (max-width: 400px) {
+  .book-content .book-design {
+    padding: 12px 14px;
+    margin: 14px 0;
+  }
+  .book-content .book-design-title { font-size: 0.98rem; }
+  .book-content .book-heading[data-book-level="1"] .book-design-title,
+  .book-content [data-book-kind="heading"][data-book-level="1"] .book-design-title {
+    font-size: 1.4rem;
+  }
+  .book-content .book-design-option,
+  .book-content .book-design-media-link {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+/* =====================================================================
+   15. book-design-toolbar — admin-only insert bar (not book content).
+       Lives outside .book-content by design (it controls the editor,
+       it does not render inside the exported book), so it is scoped
+       purely by its own class and never touches bare element tags
+       elsewhere on the page.
+   ===================================================================== */
+.book-design-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid rgba(31, 42, 68, 0.12);
+}
+
+.book-design-toolbar .book-design-toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.book-design-toolbar label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1f2a44;
+  white-space: nowrap;
+}
+
+.book-design-toolbar select {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: #1f2a44;
+  background: #f3f5f8;
+  border: 1px solid rgba(31, 42, 68, 0.2);
+  border-radius: 8px;
+  max-width: 100%;
+}
+
+.book-design-toolbar button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 18px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #ffffff;
+  background: #1f2a44;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.book-design-toolbar button:hover { filter: brightness(1.12); }
+.book-design-toolbar button:disabled { opacity: 0.5; cursor: default; }
+
+@media print {
+  .book-design-toolbar { display: none !important; }
+}
+
+@media (max-width: 400px) {
+  .book-design-toolbar { gap: 8px; padding: 8px 10px; }
+  .book-design-toolbar select,
+  .book-design-toolbar button { width: 100%; }
+}
+
+/* BlockNote and structured item controls, scoped to this design host. */
+.book-content .bn-block,
+.book-content .bn-block-content,
+.book-content .bn-block-group { min-width: 0; max-width: 100%; }
+.book-design-toolbar label { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.book-design-toolbar-status { flex-basis: 100%; font-size: 0.78rem; line-height: 1.5; color: #475569; overflow-wrap: anywhere; }
+.book-content .book-design-controls fieldset { min-width: 0; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin: 12px 0; }
+.book-content .book-design-controls legend { font-weight: 700; font-size: 0.9rem; }
+.book-content .book-design-controls button { margin: 4px; white-space: normal; }
+@media (max-width: 680px) {
+  .book-content .bn-editor { padding-left: 12px; padding-right: 12px; }
+  .book-design-toolbar label { flex: 1 1 180px; }
+  .book-design-toolbar label select { width: 100%; }
+}
+
+/* Full admin shell: mobile outline overlays rather than narrowing the page. */
+@media (max-width: 680px) {
+  body.bookedit-body .bookedit-topbar { height: 104px; padding: 10px 12px; flex-direction: column; align-items: stretch; gap: 8px; }
+  body.bookedit-body .bookedit-topbar-left { gap: 8px; min-width: 0; }
+  body.bookedit-body .bookedit-title { font-size: 14px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  body.bookedit-body .bookedit-save-status { font-size: 10px; flex-shrink: 0; }
+  body.bookedit-body .bookedit-topbar-right { justify-content: flex-end; gap: 8px; }
+  body.bookedit-body .bookedit-main { margin-top: 104px; height: calc(100dvh - 104px); }
+  body.bookedit-body .bookedit-outline { position: fixed; left: 0; top: 104px; bottom: 0; height: auto; max-width: calc(100vw - 48px); }
+  body.bookedit-body .bookedit-outline-open { top: 112px; }
+  body.bookedit-body .bookedit-canvas { width: 100%; padding-left: 10px; padding-right: 10px; }
+  body.bookedit-body .bookedit-slidebar { top: auto; left: auto; right: 8px; bottom: 64px; flex-direction: row; gap: 4px; padding: 4px; border-radius: 8px; background: white; }
+  body.bookedit-body .bookedit-sb-group { flex-direction: row; }
+}
+
+/* Preserve semantic palette in the real admin, whose legacy heading rules are stronger. */
+.book-content .bn-editor .book-heading .book-design-title.bn-inline-content { color: rgb(var(--book-fg-rgb)); }
+.book-content [data-style-type="textColor"][data-value="#BF4141"] { color: #BF4141; }
+.book-content [data-style-type="textColor"][data-value="#2F5D50"] { color: #2F5D50; }
+
+/* Official self-hosted Paperlogy, SIL OFL 1.1. See assets/fonts/paperlogy/OFL.txt. */
+@font-face { font-family: "Paperlogy"; src: url("../assets/fonts/paperlogy/Paperlogy-4Regular.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Paperlogy"; src: url("../assets/fonts/paperlogy/Paperlogy-5Medium.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: "Paperlogy"; src: url("../assets/fonts/paperlogy/Paperlogy-7Bold.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: swap; }
+.book-content,
+.book-content .bn-container,
+.book-content .bn-editor {
+  --bn-font-family: "Paperlogy", "Malgun Gothic", sans-serif;
+  font-family: "Paperlogy", "Malgun Gothic", sans-serif;
+  font-weight: 400;
+}
+.book-content .book-design-title,
+.book-content .book-design.book-heading .book-design-title,
+.book-content .bn-editor .book-heading .book-design-title.bn-inline-content { font-weight: 500; }
+/* The source page uses Regular for both its table headings and body cells. */
+.book-content table th,
+.book-content .bn-editor table tr:first-child td,
+.book-content .bn-editor table tr:first-child th { font-weight: 400; }
+
+/* Source page 118: original English passage and handwritten final explanation. */
+@font-face { font-family: "NanumGothic"; src: url("../assets/fonts/nanumgothic/NanumGothic-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "LeeSeoyun"; src: url("../assets/fonts/leeseoyun/LeeSeoyun.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+.book-content [data-book-font="nanumGothic"] { font-family: "NanumGothic", sans-serif; font-weight: 400; }
+.book-content [data-book-font="leeSeoyun"] { font-family: "LeeSeoyun", sans-serif; font-weight: 400; font-size: 1.08em; }

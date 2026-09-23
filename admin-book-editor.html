@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
     <title>입문서 편집기 - 이온토플</title>
 
     <!-- Inter (디자인 시스템 앵커 폰트) -->
@@ -21,6 +22,7 @@
 
     <!-- 페이지 스타일 (Ethereal Dashboard) -->
     <link rel="stylesheet" href="css/admin-book-editor.css">
+    <link rel="stylesheet" href="css/book-design-system.css">
 </head>
 <body class="bookedit-body">
 
@@ -31,7 +33,7 @@
                 <i class="fas fa-arrow-left"></i> 뒤로
             </button>
             <h1 class="bookedit-title" id="editorTitle">입문서</h1>
-            <span class="bookedit-save-status" id="saveStatus">
+            <span id="privateBookBadge" hidden style="font-size:12px;font-weight:700;color:#6b46c1">ADMIN ONLY · 비공개 <a href="admin-private-books.html">관리자 목록/로그인</a> <button class="btn-ghost" onclick="privateBookLogout()">로그아웃</button></span><span class="bookedit-save-status" id="saveStatus">
                 <span class="bookedit-glint"></span> 준비됨
             </span>
         </div>
@@ -109,7 +111,7 @@
     </div>
 
     <!-- ===== 스크립트 ===== -->
-    <script src="js/supabase-config.js"></script>
+    <script src="js/supabase-config.js"></script><script src="vendor/supabase-2.116.0.js"></script><script src="js/private-book-client.js"></script>
     <script src="js/book-editor.bundle.js"></script>
     <script src="js/book-markdown.js"></script>
     <script src="js/admin-book-editor.js"></script>

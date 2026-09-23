@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>비공개 교재 관리자 | 이온토플</title>
+<style>body{margin:0;background:#f5f5fa;color:#25243b;font:16px system-ui,sans-serif}main{max-width:900px;margin:60px auto;padding:24px}section{background:white;border:1px solid #e1deed;border-radius:18px;padding:24px;margin-top:20px}h1{font-size:28px}.badge{color:#6545ad;font-weight:750}label{display:block;margin:16px 0 6px}input{box-sizing:border-box;width:100%;max-width:420px;padding:12px;border:1px solid #aaa;border-radius:8px}button,a.action{display:inline-block;background:#6545ad;color:white;padding:11px 18px;border:0;border-radius:9px;margin:12px 8px 0 0;text-decoration:none;cursor:pointer}article{padding:18px 0;border-bottom:1px solid #eee}small{color:#666}#status{white-space:pre-wrap}[hidden]{display:none!important}</style></head><body><main>
+<p class="badge">ADMIN ONLY · 비공개 교재</p><h1>비공개 교재 관리</h1><p>별도 관리자 계정으로 로그인하세요. 학생에게 공개하거나 기존 로그인 계정을 변경하지 않습니다.</p>
+<p id="status" role="status" aria-live="polite">서버 인증 확인 중...</p>
+<section id="loginPanel" hidden><h2>관리자 로그인</h2><form id="loginForm"><label for="email">이메일</label><input id="email" name="email" type="email" autocomplete="username" required><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="current-password" required><p><button id="loginButton" type="submit">로그인</button></p></form><small>등록된 비공개 교재 관리자만 이용할 수 있습니다. 회원가입은 제공하지 않습니다.</small></section>
+<section id="booksPanel" hidden><div><span id="identity"></span> <button id="logoutButton" type="button">로그아웃</button></div><h2>관리자 전용 교재</h2><p>모든 교재는 비공개 상태로 유지됩니다. 미리보기도 관리자 인증이 필요합니다.</p><div id="books"></div></section>
+</main><script src="js/supabase-config.js"></script><script src="vendor/supabase-2.116.0.js"></script><script src="js/private-book-client.js"></script><script>
+'use strict';
+const statusEl = document.getElementById('status');
+function safeReturn() {
+  const raw = new URLSearchParams(location.search).get('next'); if (!raw) return null;
+  try { const u = new URL(raw, location.href); if (u.origin !== location.origin || u.username || u.password || !/^\/admin-book-(preview|editor)\.html$/.test(u.pathname) || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(u.searchParams.get('book') || '')) return null; u.searchParams.set('private','1'); return u.href; } catch (_) { return null; }
+}
+window.addEventListener('privatebook:signed-out', () => loginView('로그아웃되었습니다'));
+function loginView(message) { document.getElementById('loginPanel').hidden=false; document.getElementById('booksPanel').hidden=true; document.getElementById('books').replaceChildren(); statusEl.textContent=message; }
+async function loadPrivateBooks() {
+  const user = await PrivateBook.ready();
+  const books = await PrivateBook.query('pb_book_documents', {kind:'eq.pages', order:'sort_order.asc'});
+  const list = document.getElementById('books'); list.replaceChildren();
+  for (const book of books) {
+    const row=document.createElement('article'); const title=document.createElement('h3'); title.textContent=book.title || '제목 없음'; row.append(title);
+    const info=document.createElement('p'); info.textContent=(book.total_pages || 0)+'페이지 · 관리자 전용 · 비공개'; row.append(info);
+    for (const [name,file] of [['편집','admin-book-editor.html'],['관리자 미리보기','admin-book-preview.html']]) { const a=document.createElement('a'); a.className='action'; a.textContent=name; a.href=file+'?private=1&book='+encodeURIComponent(book.id); row.append(a); } list.append(row);
+  }
+  if (!books.length) list.textContent='등록된 비공개 교재가 없습니다';
+  document.getElementById('identity').textContent=user.email || '관리자'; document.getElementById('loginPanel').hidden=true; document.getElementById('booksPanel').hidden=false; statusEl.textContent='서버 인증 완료 · '+books.length+'개 교재';
+}
+document.getElementById('loginForm').addEventListener('submit', async event => { event.preventDefault(); const button=document.getElementById('loginButton'); button.disabled=true; statusEl.textContent='인증 중...'; try { await PrivateBook.login(document.getElementById('email').value.trim(),document.getElementById('password').value); document.getElementById('password').value=''; await loadPrivateBooks(); const next=safeReturn(); if(next) location.replace(next); } catch (_) { document.getElementById('password').value=''; loginView('로그인 정보 또는 관리자 권한을 확인해주세요'); } finally {button.disabled=false;} });
+document.getElementById('logoutButton').addEventListener('click', async () => { if (!confirm('모든 비공개 교재 탭에서 로그아웃합니다. 편집 중인 내용은 먼저 저장해주세요. 계속할까요?')) return; try {await PrivateBook.logout(); loginView('로그아웃되었습니다');} catch (_) {statusEl.textContent='로그아웃 실패 · 다시 시도해주세요';} });
+loadPrivateBooks().catch(() => loginView('비공개 관리자 로그인이 필요합니다'));
+</script></body></html>

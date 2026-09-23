@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow,noarchive">
+<title>관리자 교재 미리보기 | 이온토플</title>
+<link rel="stylesheet" href="css/private-book-preview.css">
+</head>
+<body>
+<header class="preview-header">
+<div><strong class="admin-badge">ADMIN ONLY · 비공개 · 읽기 전용</strong><h1 id="bookTitle">교재 미리보기</h1></div>
+<nav aria-label="관리자 메뉴"><a href="admin-private-books.html">교재 목록 / 로그인</a><a id="editorLink" hidden>편집기로 돌아가기</a><button id="logout" hidden>로그아웃</button></nav>
+</header>
+<p id="status" role="status" aria-live="polite">관리자 인증을 확인하고 있습니다</p>
+<section id="reader" hidden>
+<div class="reader-tools"><button id="previous" type="button">이전</button><form id="jumpForm"><label for="pageNumber">페이지</label><input id="pageNumber" type="number" min="1" step="1" value="1" required><span id="totalPages"></span><button type="submit">이동</button></form><button id="next" type="button">다음</button><span id="sourcePage"></span><label for="zoom">확대</label><input id="zoom" type="range" min="80" max="150" step="10" value="100"><output id="zoomValue" for="zoom">100%</output></div>
+<div class="reader-layout"><aside><details open><summary>목차</summary><nav id="toc" aria-label="교재 목차"></nav></details></aside><main id="pageHost" aria-label="교재 페이지"></main></div>
+</section>
+<noscript>이 관리자 미리보기는 JavaScript와 관리자 로그인이 필요합니다</noscript>
+<script src="js/supabase-config.js"></script>
+<script src="vendor/supabase-2.116.0.js"></script>
+<script src="js/private-book-client.js"></script>
+<script src="js/private-book-preview.js"></script>
+</body>
+</html>

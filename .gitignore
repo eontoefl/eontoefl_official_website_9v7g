@@ -2,3 +2,9 @@
 
 # 대표 내부 지침 파일 — 공개 저장소에 올리지 않음(로컬 전용)
 CLAUDE.md
+
+# Private book source data must never enter a public release
+assets/book-migration/
+assets/book-samples/
+book-editor-src/samples/
+**/mango-*.json

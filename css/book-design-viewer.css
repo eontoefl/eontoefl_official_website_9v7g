@@ -1,0 +1,139 @@
+/* =====================================================================
+   Book Design System — viewer bridge (book-v2.html only)
+   ---------------------------------------------------------------------
+   Loaded AFTER css/book-v2-viewer.css and css/book-design-system.css.
+   Scope: ".bookv2-content.book-content" — the exported-book host element
+   (#content) carries BOTH classes, so every rule here targets that exact
+   compound class to guarantee it wins over same-shaped selectors in
+   either of the two files it bridges, without touching them.
+
+   Why this file exists (two problems, two fixes):
+
+   1) Zoom compatibility. V2.zoom sets an inline px font-size on
+      #content (see js/book-v2-viewer.js applyZoom()). Descendants sized
+      in "em" scale with that inline value; descendants sized in "rem"
+      do not (rem is relative to the root <html> font-size, which the
+      zoom control never touches). book-design-system.css intentionally
+      uses rem for its own host context (the editor), so every rem-based
+      font-size it defines is re-declared here in the equivalent "em"
+      value, scoped one class more specifically than the original
+      ".book-content ..." selector so it always overrides it regardless
+      of link order.
+
+   2) Legacy heading bleed. The old viewer rules ".bookv2-content h1/h2/
+      h3" (css/book-v2-viewer.css) combine a class with a tag, which is
+      MORE specific than the design system's own base ".book-content
+      .book-design-title" rule (class only). When a book-heading block's
+      title renders as a real <h1>/<h2>/<h3>, the old viewer's fixed
+      "color" and "letter-spacing" leak through and silently replace the
+      intended theme color (e.g. the green "reading" theme foreground).
+      Font-size/weight/border/margin are NOT affected, because the
+      design system's level-specific selectors are already more specific
+      than the old tag rules — only color + letter-spacing needed a
+      targeted, higher-specificity fix. Nothing here touches book-v2-
+      viewer.css or book-design-system.css.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   0. Base font-size fallback (defensive only)
+   applyZoom() always sets an inline font-size on #content on load, so
+   this rarely matters in practice — it only guards the brief instant
+   before JS runs / if JS ever fails to execute.
+   --------------------------------------------------------------------- */
+.bookv2-content.book-content {
+  font-size: 17px;
+}
+
+/* ---------------------------------------------------------------------
+   1. Heading color / letter-spacing bleed fix (see header note #2)
+   --------------------------------------------------------------------- */
+.bookv2-content.book-content .book-heading .book-design-title,
+.bookv2-content.book-content [data-book-kind="heading"] .book-design-title {
+  color: rgb(var(--book-fg-rgb));
+  letter-spacing: -0.01em;
+}
+
+/* ---------------------------------------------------------------------
+   2. rem -> em font-size bridge (see header note #1)
+   Each selector below mirrors a book-design-system.css selector 1:1,
+   just prefixed with the extra ".bookv2-content" class for precedence.
+   --------------------------------------------------------------------- */
+.bookv2-content.book-content .book-design-title { font-size: 1.05em; }
+.bookv2-content.book-content .book-design-body { font-size: 0.98em; }
+.bookv2-content.book-content .book-design-label { font-size: 0.72em; }
+.bookv2-content.book-content .book-design-note { font-size: 0.86em; }
+
+.bookv2-content.book-content .book-heading[data-book-level="1"] .book-design-title,
+.bookv2-content.book-content [data-book-kind="heading"][data-book-level="1"] .book-design-title {
+  font-size: 1.7em;
+}
+.bookv2-content.book-content .book-heading[data-book-level="2"] .book-design-title,
+.bookv2-content.book-content [data-book-kind="heading"][data-book-level="2"] .book-design-title {
+  font-size: 1.35em;
+}
+.bookv2-content.book-content .book-heading[data-book-level="3"] .book-design-title,
+.bookv2-content.book-content [data-book-kind="heading"][data-book-level="3"] .book-design-title {
+  font-size: 1.12em;
+}
+
+.bookv2-content.book-content .book-design-option { font-size: 0.95em; }
+
+.bookv2-content.book-content .book-design-flow-start,
+.bookv2-content.book-content .book-design-flow-decision { font-size: 0.92em; }
+.bookv2-content.book-content .book-design-flow-branch { font-size: 0.9em; }
+
+.bookv2-content.book-content .book-design-media-link { font-size: 0.9em; }
+
+/* Native (non-custom-block) tables — also keeps the self-scroll rule
+   (display:block + overflow-x:auto, defined in book-design-system.css)
+   winning over the old viewer's fixed-layout ".bookv2-content table". */
+.bookv2-content.book-content table { font-size: 0.92em; }
+
+.bookv2-content.book-content figcaption { font-size: 0.82em; }
+
+.bookv2-content.book-content .book-design-controls > label { font-size: 0.82em; }
+.bookv2-content.book-content .book-design-controls > input,
+.bookv2-content.book-content .book-design-controls > textarea { font-size: 0.92em; }
+.bookv2-content.book-content .book-design-controls > button { font-size: 0.9em; }
+.bookv2-content.book-content .book-design-controls > details > summary { font-size: 0.88em; }
+
+/* ---------------------------------------------------------------------
+   3. Mobile breakpoints (<=680px shared layout break, <=400px hardening)
+   Mirrors the rem values book-design-system.css uses at the same
+   breakpoints, converted to em for the same zoom reason as above.
+   --------------------------------------------------------------------- */
+@media (max-width: 680px) {
+  /* Match the old viewer's own mobile base-size intent (16px) so the
+     design-system blocks don't look oversized next to plain paragraphs. */
+  .bookv2-content.book-content { font-size: 16px; }
+}
+
+@media (max-width: 400px) {
+  .bookv2-content.book-content .book-design-title { font-size: 0.98em; }
+  .bookv2-content.book-content .book-heading[data-book-level="1"] .book-design-title,
+  .bookv2-content.book-content [data-book-kind="heading"][data-book-level="1"] .book-design-title {
+    font-size: 1.4em;
+  }
+}
+
+/* A 360px reader must not lose a third of its width to side arrows.
+   Keep the existing buttons/handlers, moving the arrows below the paper. */
+.bookv2-content.book-content { min-width: 0; }
+.bookv2-content.book-content .book-design-title:empty { display: none; }
+.bookv2-title { min-width: 0; }
+@media (max-width: 680px) {
+  .bookv2-top {
+    height: 94px; padding: 6px 12px; gap: 2px 6px;
+    display: grid; grid-template-columns: 38px 38px 38px minmax(106px, 1fr) 56px;
+    grid-template-rows: 38px 38px;
+  }
+  .bookv2-title { grid-column: 2 / -1; font-size: 13px; line-height: 1.4; }
+  .bookv2-zoom { justify-content: center; }
+  .bookv2-page-ind { white-space: nowrap; padding: 6px; }
+  .bookv2-progress { top: 94px; }
+  .bookv2-stage { padding: 112px 8px 96px; gap: 0; }
+  .bookv2-paper { min-width: 0; padding: 26px 18px 38px; border-radius: 12px; }
+  .bookv2-nav { position: fixed; top: auto; bottom: 42px; z-index: 55; }
+  #btnPrev { left: 16px; }
+  #btnNext { right: 16px; }
+}

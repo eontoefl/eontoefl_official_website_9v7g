@@ -1,0 +1,8 @@
+book-editor-src/
+tests/
+supabase/
+assets/book-migration/
+assets/book-samples/
+**/mango-*.json
+**/raw/
+**/models/
