@@ -56,7 +56,7 @@
       for (const a of [...el.attributes]) {
         if (/^on/i.test(a.name) || /^(srcset|poster|background)$/i.test(a.name) || (a.name === 'style' && /url\s*\(|expression|@import/i.test(a.value))) el.removeAttribute(a.name);
         if (a.name === 'src' && !a.value.startsWith('private-book://')) el.removeAttribute(a.name);
-        if (a.name === 'href' && !/^(https?:|mailto:|#|private-book:\/\/|admin-book-preview\.html\?)/i.test(a.value)) el.removeAttribute(a.name);
+        if (a.name === 'href' && !/^(https?:|mailto:|#|private-book:\/\/|\/?admin-book-preview\.html\?)/i.test(a.value)) el.removeAttribute(a.name);
       }
     });
     return doc.body.innerHTML;
