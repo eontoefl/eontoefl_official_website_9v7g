@@ -135,10 +135,15 @@
 
 /* Separate private catalog: its cards have no publication or deletion controls. */
 [hidden] { display: none !important; }
-#privateBookSection { margin-bottom: 28px; }
+#privateBookSection { margin-bottom: 12px; }
 #privateBookListLogin { margin-top: 12px; }
-.private-book-card { border: 1px solid #ded5ef; }
-.private-book-badge { color: #6545ad; background: #f1ebfa; }
+.private-book-card .toggle { cursor: not-allowed; opacity: .65; }
+#privateBookListStatus { font-size: 13px; }
+#privateBookLogout { margin-left: auto; }
+@media (max-width: 600px) {
+  .booklist-topbar { height: auto; min-height: 66px; flex-wrap: wrap; gap: 8px; padding: 12px; }
+  .booklist-topbar-right { flex-wrap: wrap; }
+}
 .private-book-card a, #privateBookListLogin { text-decoration: none; }
 .private-book-card .book-card-titlerow { flex-wrap: wrap; }
 .private-book-card .book-card-title { white-space: normal; overflow-wrap: anywhere; }

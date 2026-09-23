@@ -17,6 +17,7 @@
             <button class="btn-ghost" onclick="goBack()"><i class="fas fa-arrow-left"></i> 뒤로</button>
             <h1 class="booklist-title">입문서 관리</h1>
         </div>
+        <button class="btn-ghost" id="privateBookLogout" hidden>교재 로그아웃</button>
         <div class="booklist-topbar-right" id="legacyBookActions" hidden>
             <button class="btn-ghost" id="trashToggle" onclick="toggleTrash()"><i class="fas fa-trash-can"></i> 휴지통 <span id="trashCount"></span></button>
             <button class="btn-grad" onclick="createBook()"><i class="fas fa-plus"></i> 새 책 만들기</button>
@@ -24,13 +25,10 @@
     </header>
 
     <main class="booklist-main">
-        <section id="privateBookSection" aria-label="비공개 교재">
-            <div class="booklist-section-head">
-                <h2>비공개 교재 · 관리자 전용</h2>
-                <p id="privateBookListStatus" role="status">관리자 인증을 확인하고 있습니다.</p>
-            </div>
+        <section id="privateBookSection" aria-label="교재 목록">
+            <p id="privateBookListStatus" role="status">교재 인증 확인 중...</p>
             <div class="booklist-list" id="privateBookList"></div>
-            <a class="book-card-edit" id="privateBookListLogin" href="admin-private-books.html?next=%2Fadmin-book-list.html">비공개 관리자 로그인</a>
+            <a class="book-card-edit" id="privateBookListLogin" href="admin-private-books.html?next=%2Fadmin-book-list.html">교재 관리자 로그인</a>
         </section>
         <!-- 활성 책 목록 -->
         <section id="activeSection">
