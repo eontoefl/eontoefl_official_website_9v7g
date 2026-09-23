@@ -153,7 +153,7 @@
     const valid = ext === 'png' ? [137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v) : ext === 'jpg' ? bytes[0]===255 && bytes[1]===216 && bytes[2]===255 : String.fromCharCode(...bytes.slice(0,4))==='RIFF' && String.fromCharCode(...bytes.slice(8,12))==='WEBP';
     if (!valid) throw new Error('이미지 파일 형식이 올바르지 않습니다');
     const p = bookId + '/uploads/' + crypto.randomUUID() + '.' + ext;
-    const result = await client.storage.from(bucket).upload(p, file, { contentType:file.type, upsert:false });
+    const result = await client.storage.from(bucket).upload(p, file, { contentType:file.type, cacheControl:'0', upsert:false });
     if (result.error) throw result.error;
     return resolveAssets('private-book://' + p, bookId);
   }
