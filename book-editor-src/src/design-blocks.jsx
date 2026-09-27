@@ -1,3 +1,5 @@
+import { DesignText, EditorControls, designRootEvents, updateDesignProps } from "./design-editing.jsx";
+export { openDesignSettings, closeDesignSettings, getActiveDesignBlock, flushDesignEdits, subscribeDesignEdits } from "./design-editing.jsx";
 import { createReactBlockSpec } from "@blocknote/react";
 import {
   DESIGN_LEVELS,
@@ -67,29 +69,7 @@ function bookRootProps(kind, theme, extra = {}) {
   };
 }
 
-function updateBlockProps(editor, block, patch) {
-  editor.updateBlock(block.id, { props: patch });
-}
-
-function stopEditorEvent(event) {
-  event.stopPropagation();
-}
-
-function EditorControls({ children }) {
-  return (
-    <details
-      className="book-design-controls"
-      contentEditable={false}
-      onKeyDown={stopEditorEvent}
-      onKeyUp={stopEditorEvent}
-      onPointerDown={stopEditorEvent}
-      onClick={stopEditorEvent}
-    >
-      <summary>디자인 편집</summary>
-      <div>{children}</div>
-    </details>
-  );
-}
+const updateBlockProps = updateDesignProps;
 
 function TextControl({
   label,
@@ -103,6 +83,7 @@ function TextControl({
 }) {
   const field = multiline ? (
     <textarea
+      aria-label={label}
       value={value}
       rows={rows}
       inputMode={inputMode}
@@ -112,6 +93,7 @@ function TextControl({
   ) : (
     <input
       type="text"
+      aria-label={label}
       value={value}
       inputMode={inputMode}
       spellCheck={spellCheck}
@@ -133,6 +115,7 @@ function SelectControl({ label, value, options, onChange }) {
     <label>
       <span className="book-design-label">{label}</span>
       <select
+        aria-label={label}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
       >
@@ -278,13 +261,14 @@ function BookHeading({ block, editor, contentRef, editable }) {
 
   return (
     <div
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("heading", block.props.theme, {
         "data-book-level": level,
       })}
     >
       <HeadingTag className="book-design-title" ref={contentRef} />
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <SelectControl
             label="제목 단계"
@@ -301,14 +285,15 @@ function BookHeading({ block, editor, contentRef, editable }) {
 function BookCallout({ block, editor, contentRef, editable }) {
   return (
     <aside
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("callout", block.props.theme, {
         "data-book-tone": block.props.tone,
       })}
     >
-      <h3 className="book-design-title">{block.props.title}</h3>
+      <DesignText as="h3" className="book-design-title" block={block} editor={editor} editable={editable} field="title" />
       <div className="book-design-body" data-book-font={block.props.bodyFont} ref={contentRef} />
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <SelectControl
             label="강조 종류"
@@ -328,18 +313,18 @@ function BookCallout({ block, editor, contentRef, editable }) {
   );
 }
 
-function CompareBody({ block }) {
+function CompareBody({ block, editor, editable }) {
   return (
     <>
-      <h3 className="book-design-title">{block.props.title}</h3>
+      <DesignText as="h3" className="book-design-title" block={block} editor={editor} editable={editable} field="title" />
       <div className="book-design-columns">
         <section className="book-design-panel">
-          <h4 className="book-design-label">{block.props.leftTitle}</h4>
-          <div className="book-design-body">{block.props.leftBody}</div>
+          <DesignText as="h4" className="book-design-label" block={block} editor={editor} editable={editable} field="leftTitle" />
+          <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="leftBody" />
         </section>
         <section className="book-design-panel">
-          <h4 className="book-design-label">{block.props.rightTitle}</h4>
-          <div className="book-design-body">{block.props.rightBody}</div>
+          <DesignText as="h4" className="book-design-label" block={block} editor={editor} editable={editable} field="rightTitle" />
+          <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="rightBody" />
         </section>
       </div>
     </>
@@ -349,12 +334,13 @@ function CompareBody({ block }) {
 function BookCompare({ block, editor, editable }) {
   return (
     <section
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("compare", block.props.theme)}
       contentEditable={editable ? false : undefined}
     >
-      <CompareBody block={block} />
+      <CompareBody block={block} editor={editor} editable={editable} />
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <TextControl
             label="전체 제목"
@@ -402,14 +388,15 @@ function BookAnnotated({ block, editor, editable }) {
 
   return (
     <section
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("annotated", block.props.theme)}
       contentEditable={editable ? false : undefined}
     >
-      <h3 className="book-design-title">{block.props.title}</h3>
+      <DesignText as="h3" className="book-design-title" block={block} editor={editor} editable={editable} field="title" />
       <div className="book-design-panel">
         <div className="book-design-label">원문</div>
         <blockquote className="book-design-body" data-book-font={block.props.passageFont}>
-          <p>{block.props.passage}</p>
+          <DesignText as="p" block={block} editor={editor} editable={editable} field="passage" />
         </blockquote>
       </div>
       <ol aria-label="인용문 해설">
@@ -419,9 +406,9 @@ function BookAnnotated({ block, editor, editable }) {
             <li key={index} data-book-quote-matched={matched ? "true" : "false"}>
               <blockquote className="book-design-panel">
                 <div className="book-design-label">인용문 {index + 1}</div>
-                <p>{item.quote}</p>
+                <DesignText as="p" block={block} editor={editor} editable={editable} field="notes" index={index} itemKey="quote">{item.quote}</DesignText>
               </blockquote>
-              <div className="book-design-note" data-book-font={item.font || "paperlogy"}>{item.note}</div>
+              <DesignText as="div" className="book-design-note" data-book-font={item.font || "paperlogy"} block={block} editor={editor} editable={editable} field="notes" index={index} itemKey="note">{item.note}</DesignText>
               {!matched ? (
                 <p className="book-design-note" role="alert">
                   확인 필요: 이 인용문은 현재 원문에서 찾을 수 없습니다.
@@ -433,7 +420,7 @@ function BookAnnotated({ block, editor, editable }) {
       </ol>
       <DataWarnings result={parsed} />
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <TextControl
             label="제목"
@@ -452,7 +439,7 @@ function BookAnnotated({ block, editor, editable }) {
             onChange={(passageFont) => updateBlockProps(editor, block, { passageFont })} />
           {isValidEditableArray(parsed) ? (
             <ArrayControls
-              items={parsed.items}
+              items={JSON.parse(block.props.notes)}
               maxItems={MAX_ANNOTATED_NOTES}
               itemLabel="인용 메모"
               addLabel="인용 메모 추가"
@@ -502,11 +489,12 @@ function BookQuestion({ block, editor, editable }) {
 
   return (
     <section
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("question", block.props.theme)}
       contentEditable={editable ? false : undefined}
     >
-      <h3 className="book-design-title">{block.props.title}</h3>
-      <div className="book-design-body">{block.props.question}</div>
+      <DesignText as="h3" className="book-design-title" block={block} editor={editor} editable={editable} field="title" />
+      <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="question" />
       <ol className="book-design-options">
         {parsed.items.map((option, index) => (
           <li
@@ -516,23 +504,21 @@ function BookQuestion({ block, editor, editable }) {
             key={index}
           >
             <div>
-              <span className="book-design-label">
-                {option.label || String(index + 1)}
-              </span>{" "}
-              <span>{option.text}</span>
+              <DesignText as="span" className="book-design-label" block={block} editor={editor} editable={editable} field="options" index={index} itemKey="label">{option.label || String(index + 1)}</DesignText>{" "}
+              <DesignText as="span" block={block} editor={editor} editable={editable} field="options" index={index} itemKey="text">{option.text}</DesignText>
             </div>
             <div className="book-design-note">
               <strong className="book-design-label">
                 {option.correct ? "정답" : "오답"}
               </strong>
-              {option.explanation ? `: ${option.explanation}` : null}
+              {editable ? <>: <DesignText as="span" block={block} editor={editor} editable={editable} field="options" index={index} itemKey="explanation">{option.explanation}</DesignText></> : option.explanation ? `: ${option.explanation}` : null}
             </div>
           </li>
         ))}
       </ol>
       <DataWarnings result={parsed} />
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <TextControl
             label="제목"
@@ -548,7 +534,7 @@ function BookQuestion({ block, editor, editable }) {
           />
           {isValidEditableArray(parsed) ? (
             <ArrayControls
-              items={parsed.items}
+              items={JSON.parse(block.props.options)}
               maxItems={MAX_QUESTION_OPTIONS}
               itemLabel="선택지"
               addLabel="선택지 추가"
@@ -611,30 +597,31 @@ function BookQuestion({ block, editor, editable }) {
 function BookFlow({ block, editor, editable }) {
   return (
     <section
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("flow", block.props.theme)}
       contentEditable={editable ? false : undefined}
     >
-      <h3 className="book-design-title">{block.props.title}</h3>
+      <DesignText as="h3" className="book-design-title" block={block} editor={editor} editable={editable} field="title" />
       <div className="book-design-flow-start">
         <span className="book-design-label">시작</span>
-        <div className="book-design-body">{block.props.start}</div>
+        <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="start" />
       </div>
       <div className="book-design-flow-decision">
         <span className="book-design-label">판단</span>
-        <div className="book-design-body">{block.props.decision}</div>
+        <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="decision" />
       </div>
       <div className="book-design-flow-branches">
         <section className="book-design-flow-branch book-design-panel">
-          <h4 className="book-design-label">{block.props.leftLabel}</h4>
-          <div className="book-design-body">{block.props.leftBody}</div>
+          <DesignText as="h4" className="book-design-label" block={block} editor={editor} editable={editable} field="leftLabel" />
+          <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="leftBody" />
         </section>
         <section className="book-design-flow-branch book-design-panel">
-          <h4 className="book-design-label">{block.props.rightLabel}</h4>
-          <div className="book-design-body">{block.props.rightBody}</div>
+          <DesignText as="h4" className="book-design-label" block={block} editor={editor} editable={editable} field="rightLabel" />
+          <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="rightBody" />
         </section>
       </div>
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <TextControl
             label="제목"
@@ -696,11 +683,12 @@ function BookMedia({ block, editor, editable }) {
 
   return (
     <section
+      {...designRootEvents(editor, block, editable)}
       {...bookRootProps("media", block.props.theme)}
       contentEditable={editable ? false : undefined}
     >
-      <h3 className="book-design-title">{block.props.title}</h3>
-      <div className="book-design-body">{block.props.description}</div>
+      <DesignText as="h3" className="book-design-title" block={block} editor={editor} editable={editable} field="title" />
+      <DesignText as="div" className="book-design-body" block={block} editor={editor} editable={editable} field="description" />
       <div>
         <span className="book-design-label">{typeLabel}</span>{" "}
         {safeUrl ? (
@@ -721,7 +709,7 @@ function BookMedia({ block, editor, editable }) {
         )}
       </div>
       {editable ? (
-        <EditorControls>
+        <EditorControls block={block} editor={editor}>
           <ThemeControl block={block} editor={editor} />
           <TextControl
             label="제목"

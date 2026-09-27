@@ -1,12 +1,13 @@
 // Common design editor. Real book data stays in the existing page controller.
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
-import { useCreateBlockNote } from "@blocknote/react";
+import { useCreateBlockNote, SuggestionMenuController } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { ko } from "@blocknote/core/locales";
-import { designBlockSpecs, designPresets, createDesignBlock } from "./design-blocks.jsx";
+import { designBlockSpecs, designPresets, createDesignBlock, openDesignSettings, flushDesignEdits, subscribeDesignEdits, closeDesignSettings } from "./design-blocks.jsx";
 import { sourceMarkerInlineContentSpecs } from "./source-marker.jsx";
+import { bookThemes, filteredBookSlashItems } from "./book-slash-menu.jsx";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 
@@ -20,63 +21,30 @@ function normalizeInternalBookLinks(html) {
   return doc.body.innerHTML;
 }
 
-// Custom blocks (design-blocks.jsx) stay exactly as before; the only addition is the
-// bookSourceMarker inline content type alongside the default text/link inline specs.
+// Keep existing stored block/marker schemas. Authoring UI changes must not rewrite
+// saved page JSON or replace the reader's exported teaching content.
 const schema = BlockNoteSchema.create({
   blockSpecs: { ...defaultBlockSpecs, ...designBlockSpecs },
   inlineContentSpecs: { ...defaultInlineContentSpecs, ...sourceMarkerInlineContentSpecs },
 });
-const themes = [["neutral", "기본 안내"], ["reading", "리딩"], ["listening", "리스닝"], ["writing", "라이팅"], ["speaking", "스피킹"]];
-const nativePresets = [
-  { type: "table", label: "기본 비교표" },
-  { type: "image", label: "사진·캡션" },
-  { type: "checkListItem", label: "체크리스트" },
-];
-function makeBlock(type, theme) {
-  if (type === "table") return { type: "table", content: { type: "tableContent", rows: [
-    { cells: ["항목", "대상 A", "대상 B"] }, { cells: ["비교 기준", "내용을 입력하세요", "내용을 입력하세요"] },
-  ] } };
-  if (type === "image") return { type: "image", props: { caption: "사진 설명을 입력하세요" } };
-  if (type === "checkListItem") return { type: "checkListItem", content: "확인할 항목을 입력하세요" };
-  return createDesignBlock(type, theme);
-}
-function DesignToolbar({ editor }) {
-  const id = useId();
-  const [type, setType] = useState("bookCallout");
-  const [theme, setTheme] = useState("neutral");
-  const [notice, setNotice] = useState("");
-  function insert() {
-    try {
-      const target = editor.getTextCursorPosition()?.block || editor.document.at(-1);
-      const created = editor.insertBlocks([makeBlock(type, theme)], target, "after");
-      // Do not focus inline content on a content:none block: its labelled form is editable instead.
-      if (created[0]?.content !== undefined) editor.setTextCursorPosition(created[0], "start");
-      setNotice("디자인을 추가했습니다. 블록의 디자인 편집에서 내용을 바꿀 수 있습니다.");
-    } catch (err) { setNotice("추가하지 못했습니다: " + err.message); }
-  }
-  return <div className="book-design-toolbar" aria-label="공통 디자인 도구" contentEditable={false}>
-    <label htmlFor={id + "-type"}>디자인<select id={id + "-type"} value={type} onChange={e => setType(e.target.value)}>
-      {[...designPresets, ...nativePresets].map(p => <option key={p.type} value={p.type}>{p.label}</option>)}
-    </select></label>
-    <label htmlFor={id + "-theme"}>새 블록 색상<select id={id + "-theme"} value={theme} onChange={e => setTheme(e.target.value)}>
-      {themes.map(([value,label]) => <option key={value} value={value}>{label}</option>)}
-    </select></label>
-    <button type="button" onClick={insert}>디자인 추가</button>
-    <span className="book-design-toolbar-status" role="status">{notice}</span>
-  </div>;
-}
+const themes = bookThemes;
 function Editor({ editorRef, initialBlocks, uploadFile, onChange, onReady, designTools }) {
+  const [theme, setTheme] = useState("neutral");
   const editor = useCreateBlockNote({ schema, dictionary: ko,
     initialContent: initialBlocks?.length ? initialBlocks : undefined, uploadFile });
   useEffect(() => {
     editorRef.current = editor;
     const unsub = typeof editor.onChange === "function" ? editor.onChange(() => onChange?.()) : undefined;
+    const unsubDirect = subscribeDesignEdits(editor, () => onChange?.());
     onReady?.();
-    return () => { if (typeof unsub === "function") unsub(); editorRef.current = null; };
+    return () => { if (typeof unsub === "function") unsub(); unsubDirect(); closeDesignSettings(editor); editorRef.current = null; };
   }, [editor]);
-  return <div className="book-content">
-    {designTools !== false && <DesignToolbar editor={editor} />}
-    <BlockNoteView editor={editor} theme="light" />
+  return <div className="book-content bookv2-content">
+    <BlockNoteView editor={editor} theme="light" slashMenu={false}>
+      {designTools !== false && <SuggestionMenuController triggerCharacter="/"
+        getItems={async query => filteredBookSlashItems(editor, query, {theme, onTheme:setTheme,
+          onConfigure:id=>openDesignSettings(editor,id)})} />}
+    </BlockNoteView>
   </div>;
 }
 const BookEditor = {
@@ -91,16 +59,18 @@ const BookEditor = {
     const handle = {
       ready,
       getEditor: () => editorRef.current,
-      getBlocks: () => editorRef.current ? editorRef.current.document : [],
+      flush: () => !editorRef.current || flushDesignEdits(editorRef.current),
+      getBlocks: () => { const ed = editorRef.current; if (!ed) return []; if (!flushDesignEdits(ed)) throw new Error('입력 중이거나 다른 변경과 충돌한 내용이 있습니다. 입력을 마친 뒤 다시 저장해주세요.'); return ed.document; },
       setBlocks: blocks => {
         const ed = editorRef.current;
         if (!ed) throw new Error("편집기가 준비되기 전입니다.");
+        if (!flushDesignEdits(ed)) throw new Error('입력 내용을 먼저 확인해주세요.');
         const safe = Array.isArray(blocks) && blocks.length ? blocks : [{ type: "paragraph" }];
         ed.replaceBlocks(ed.document, safe);
       },
-      getHTML: async () => { await ready; const ed = editorRef.current; return ed ? normalizeInternalBookLinks(await ed.blocksToHTMLLossy(ed.document)) : ""; },
-      htmlOf: async blocks => { await ready; const ed = editorRef.current; return ed ? normalizeInternalBookLinks(await ed.blocksToHTMLLossy(blocks || [])) : ""; },
-      unmount: () => root.unmount(),
+      getHTML: async () => { await ready; const ed = editorRef.current; if (ed && !flushDesignEdits(ed)) throw new Error('입력 내용을 먼저 확인해주세요.'); return ed ? normalizeInternalBookLinks(await ed.blocksToHTMLLossy(ed.document)) : ""; },
+      htmlOf: async blocks => { await ready; const ed = editorRef.current; if (ed && !flushDesignEdits(ed)) throw new Error('입력 내용을 먼저 확인해주세요.'); return ed ? normalizeInternalBookLinks(await ed.blocksToHTMLLossy(blocks || [])) : ""; },
+      unmount: () => { if (editorRef.current && !flushDesignEdits(editorRef.current)) throw new Error('입력 내용을 먼저 확인해주세요.'); root.unmount(); },
     };
     root.render(<Editor editorRef={editorRef} initialBlocks={options.initialBlocks} uploadFile={options.uploadFile}
       designTools={options.designTools} onChange={options.onChange}

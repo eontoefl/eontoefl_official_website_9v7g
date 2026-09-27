@@ -139,7 +139,7 @@
     const assetPrefix = assetPrefixes(book).join(' ');
     const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src ${assetPrefix}; style-src 'unsafe-inline' ${styles.join(' ')}; font-src 'self';`;
     const escape = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    return '<!doctype html><html lang="ko" class="preview-page"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + escape(policy) + '"><meta name="viewport" content="width=device-width, initial-scale=1">' + styles.map(u => '<link rel="stylesheet" href="'+escape(u)+'">').join('') + '</head><body><article class="book-content" id="admin-page-content"></article></body></html>';
+    return '<!doctype html><html lang="ko" class="preview-page"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + escape(policy) + '"><meta name="viewport" content="width=device-width, initial-scale=1">' + styles.map(u => '<link rel="stylesheet" href="'+escape(u)+'">').join('') + '</head><body><article class="book-content bookv2-content" id="admin-page-content"></article></body></html>';
   }
   async function show(number, headingIndex) {
     if (stopped || !rows.length) return;

@@ -1,0 +1,28 @@
+/* Editor chrome is outside the readable page. Preserve actual teaching callouts,
+   table cells, diagrams and captions; remove only editing wrappers/selection rails. */
+.bookedit-page .bookedit-paper,
+.bookedit-page.is-current .bookedit-paper { box-shadow: none; border-radius: 0; border: 0; }
+.bookedit-stack > .bookedit-insert-zone { height: 14px; pointer-events: none; cursor: default; }
+.bookedit-stack > .bookedit-insert-zone .bookedit-insert-line,
+.bookedit-stack > .bookedit-insert-zone .bookedit-insert-plus { display: none; }
+.bookedit-mount .bn-editor { padding: 40px 48px; font-size: 17px; line-height: 1.85; }
+.bookedit-preview.book-content { padding: 40px 0; font-size: 17px; line-height: 1.85; }
+.bookedit-paper .bn-editor .bn-block-group { max-width: none; margin-left: 0; margin-right: 0; }
+.bookedit-paper .bn-editor > .bn-block-group { max-width: 640px; margin-left: auto; margin-right: auto; }
+.bookedit-mount .bn-block-group .bn-block-group > .bn-block-outer::before { border-left: none; }
+.bookedit-paper .bn-editor .bn-block-group .bn-block-outer { margin-top: 0; }
+.bookedit-paper .bn-editor > .bn-block-group > .bn-block-outer + .bn-block-outer { margin-top: 14px; }
+.bookedit-mount .bn-block-content.ProseMirror-selectednode > .book-design,
+.bookedit-mount .bn-block-content.ProseMirror-selectednode > [data-book-kind],
+.bookedit-mount .ProseMirror-selectednode > .bn-block-content > .book-design,
+.bookedit-mount .ProseMirror-selectednode > .bn-block-content > [data-book-kind] { outline: none; }
+.bookedit-mount .tableWrapper { padding-left: 0; padding-top: 0; }
+.bookedit-mount .bn-editor table td,
+.bookedit-mount .bn-editor table th { padding: 8px; }
+@media (max-width:680px) {
+  .bookedit-mount .bn-editor { padding: 20px 12px; }
+  .bookedit-preview.book-content { padding: 20px 12px; }
+}
+@media print {
+  .bookedit-topbar,.bookedit-outline,.bookedit-slidebar,.bookedit-insert-zone { display:none!important; }
+}

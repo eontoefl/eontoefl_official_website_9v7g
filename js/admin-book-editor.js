@@ -173,7 +173,7 @@ function createPageSection(p) {
   sec.dataset.id = p.id;
   sec.innerHTML =
     '<div class="bookedit-paper">' +
-      '<div class="bookedit-preview book-content"></div>' +
+      '<div class="bookedit-preview book-content bookv2-content"></div>' +
       '<div class="bookedit-mount book-content"></div>' +
     "</div>";
 
@@ -245,18 +245,18 @@ function blocksForPage(pageId) {
 }
 
 // 지금 시점의 내용 (켜져 있으면 편집기에서, 아니면 저장본에서)
-function currentBlocksFor(pageId) {
+function currentBlocksFor(pageId, flush = true) {
   const h = State.editors.get(pageId);
-  if (h) return h.getBlocks();
+  if (h) return flush ? h.getBlocks() : (h.getEditor()?.document || []);
   return blocksForPage(pageId);
 }
 
 function setBlocksQuiet(pageId, blocks) {
   const h = ensureMounted(pageId);
-  if (!h) return;
+  if (!h) throw new Error('편집기가 준비되지 않았습니다.');
   State.suppress.add(pageId);
-  h.setBlocks(blocks);
-  setTimeout(() => State.suppress.delete(pageId), 60);
+  try { h.setBlocks(blocks); }
+  finally { setTimeout(() => State.suppress.delete(pageId), 60); }
 }
 
 // ---------------------------------------------------------------------
@@ -273,7 +273,10 @@ function onEditorChange(pageId) {
   clearTimeout(State.timers.get(pageId));
   State.timers.set(pageId, setTimeout(() => {
     const h = State.editors.get(pageId);
-    if (h) saveDraft(pageId, h.getBlocks());
+    if (h) {
+      if (h.flush && !h.flush()) { setStatus('editing', '입력 중 · 아직 저장하지 않은 내용이 있습니다'); return; }
+      saveDraft(pageId, h.getBlocks());
+    }
     setStatus("saved", "임시 저장됨 (브라우저)");
   }, 800));
 }
@@ -331,6 +334,8 @@ function setCurrent(pageId) {
 
 function goToPage(pageId) {
   if (!pageId) return;
+  const currentHandle = State.editors.get(State.currentId);
+  if (currentHandle?.flush && !currentHandle.flush()) { setStatus('error', '입력을 마치거나 충돌 표시를 확인해주세요.'); return; }
   setCurrent(pageId);
   ensureMounted(pageId);
   const el = State.nodes.get(pageId);
@@ -420,7 +425,7 @@ function buildOutline() {
 
   outlineItems = [];
   State.pages.forEach((p) => {
-    collectHeadingsFromBlocks(currentBlocksFor(p.id) || [], p.id, outlineItems);
+    collectHeadingsFromBlocks(currentBlocksFor(p.id, false) || [], p.id, outlineItems);
   });
 
   if (!outlineItems.length) {
@@ -735,6 +740,10 @@ async function savePage() {
   setStatus("editing", "저장 중…");
 
   try {
+    // Commit directly edited design text before choosing dirty pages.
+    for (const h of State.editors.values()) {
+      if (h.flush && !h.flush()) throw new Error('입력을 마치거나 충돌 표시를 확인한 뒤 다시 저장해주세요.');
+    }
     // 켜져 있는 편집기의 최신 내용을 임시저장에 반영
     State.dirty.forEach((id) => {
       const h = State.editors.get(id);
@@ -931,7 +940,8 @@ async function showVersions() {
 function restoreVersion(v) {
   if (!confirm("이 버전으로 되돌릴까요?\n(지금 편집 중인 내용은 사라져요. 저장해야 서버에 반영돼요.)")) return;
   const id = State.currentId;
-  setBlocksQuiet(id, Array.isArray(v.blocks) ? v.blocks : []);
+  try { setBlocksQuiet(id, Array.isArray(v.blocks) ? v.blocks : []); }
+  catch (error) { setStatus('error', error.message); alert(error.message); return; }
   closeVersions();
   State.dirty.add(id);
   markPageDirty(id, true);
