@@ -1,5 +1,8 @@
 // Common design editor. Real book data stays in the existing page controller.
 import { useEffect, useState } from "react";
+import { PageFooterExtension } from "./page-footer.js";
+import "../../js/book-page-footer.js";
+import "../../css/book-page-footer.css";
 import { createRoot } from "react-dom/client";
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
 import { useCreateBlockNote, SuggestionMenuController } from "@blocknote/react";
@@ -18,6 +21,7 @@ function normalizeInternalBookLinks(html) {
     // existing safe new-tab behavior. This also applies after later edits.
     if (/^\/?(?:book-v2|admin-book-preview)\.html(?:\?|$)/i.test(a.getAttribute("href") || "")) a.target = "_self";
   }
+  window.BookPageFooter.decorateReader(doc.body);
   return doc.body.innerHTML;
 }
 
@@ -30,7 +34,7 @@ const schema = BlockNoteSchema.create({
 const themes = bookThemes;
 function Editor({ editorRef, initialBlocks, uploadFile, onChange, onReady, designTools }) {
   const [theme, setTheme] = useState("neutral");
-  const editor = useCreateBlockNote({ schema, dictionary: ko,
+  const editor = useCreateBlockNote({ schema, dictionary: ko, extensions:[PageFooterExtension],
     initialContent: initialBlocks?.length ? initialBlocks : undefined, uploadFile });
   useEffect(() => {
     editorRef.current = editor;

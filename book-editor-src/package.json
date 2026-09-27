@@ -7,8 +7,9 @@
   "scripts": {
     "build": "node ./node_modules/vite/bin/vite.js build",
     "watch": "node ./node_modules/vite/bin/vite.js build --watch",
-    "test:books": "node --test ../tests/book-admin-preview.test.mjs ../tests/legacy-book-workflow.test.mjs ../tests/design-inline-editing.test.mjs ../tests/book-editing-workflow.test.mjs",
-    "test:editing": "node ../tests/book-slash-browser.mjs"
+    "test:books": "node --test ../tests/book-admin-preview.test.mjs ../tests/legacy-book-workflow.test.mjs ../tests/design-inline-editing.test.mjs ../tests/book-editing-workflow.test.mjs ../tests/book-page-footer.test.mjs",
+    "test:editing": "node ../tests/book-slash-browser.mjs",
+    "test:footers": "node ../tests/book-footer-browser.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.51.4",

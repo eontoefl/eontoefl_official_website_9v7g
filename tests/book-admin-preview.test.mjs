@@ -57,7 +57,7 @@ test('image allowlist: selected migration plus future own-project book uploads',
 
 // Source contracts and VM runtime checks, not deployed authorization or a browser exploit audit.
 test('entry loads ordinary API then renamed preview; no private login/logout', () => {
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m=>m[1]),['js/supabase-config.js','js/book-admin-preview.js']);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(m=>m[1]),['js/supabase-config.js','js/book-page-footer.js','js/book-admin-preview.js']);
   assert.match(html,/href="admin-book-list.html"/);
   assert.doesNotMatch(html,/private-book-client|vendor\/supabase|id="logout"|admin-private-books/);
   assert.doesNotMatch(source,/PrivateBook|resolveAssets|canonicalizeAssets|onAuthStateChange|loginURL|서버 인증 완료/);

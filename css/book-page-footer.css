@@ -1,0 +1,30 @@
+/* Existing printed page number: small and last, with space reserved below text.
+   Flex flow expands for long pages rather than overlapping/absolutely positioning. */
+.book-content.book-numbered-page,
+.bookedit-mount .bn-editor > .bn-block-group.book-numbered-page {
+  display:flex; flex-direction:column;
+}
+.book-content.book-numbered-page > .book-page-number,
+.bookedit-paper .bn-editor > .bn-block-group > .book-page-number {
+  order:1; flex-shrink:0; margin-top:auto!important; margin-bottom:0!important;
+  padding-top:24px; text-align:center!important;
+  font-size:12px!important; line-height:1.5!important; font-weight:400!important; color:#6b7280;
+}
+.bookedit-paper .book-page-number .bn-inline-content {
+  font-size:12px!important; line-height:1.5!important; font-weight:400!important; text-align:center!important;
+}
+.bookedit-paper .book-page-number .bn-block-content { padding:0; }
+.bookedit-mount .bn-editor > .bn-block-group.book-numbered-page { min-height:calc(100vh - 296px); width:100%; }
+.bookedit-preview.book-numbered-page { box-sizing:border-box; min-height:calc(100vh - 216px); }
+.preview-page .book-content.book-numbered-page { min-height:calc(100vh - 84px); }
+.bookv2-paper > .book-content.book-numbered-page { min-height:calc(100vh - 328px); }
+@media(max-width:720px) {
+  .bookv2-paper > .book-content.book-numbered-page { min-height:calc(100vh - 296px); }
+}
+@media(max-width:680px) {
+  .bookedit-mount .bn-editor > .bn-block-group.book-numbered-page { min-height:calc(100vh - 256px); }
+  .bookv2-paper > .book-content.book-numbered-page { min-height:calc(100vh - 264px); }
+}
+@media(max-width:760px) {
+  .preview-page .book-content.book-numbered-page { min-height:calc(100vh - 40px); }
+}

@@ -180,6 +180,7 @@ function createPageSection(p) {
   // 편집기 켜지기 전엔 저장된 내용을 그대로 보여준다(높이/모양 유지)
   const prev = sec.querySelector(".bookedit-preview");
   prev.innerHTML = p.html || "";
+  window.BookPageFooter?.decorateReader(prev);
 
   sec.addEventListener("mousedown", () => setCurrent(p.id));
   return sec;
