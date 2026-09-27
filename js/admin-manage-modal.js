@@ -6,36 +6,127 @@ let currentManageApp = null;
 // ===== AI 피드백 재생성 (개별분석 다시 제작) =====
 const N8N_REGEN_WEBHOOK = 'https://eontoefl.app.n8n.cloud/webhook/eontoefl-application-webhook';
 
+// ===== 추천 일정 (n8n이 계산해 applications.analysis_schedule_suggest에 저장) =====
+// 화면 칸에만 채운다. 실제 반영은 기존 저장 버튼(saveModalAnalysis)으로만.
+const _schedSuggested = new Set(); // 추천값으로 채운 칸
+const _schedTouched = new Set();   // 이번에 관리자가 직접 바꾼 칸
+let _schedApplying = false;        // 코드가 칸을 바꾸는 중(관리자 조작으로 세지 않음)
+
+function _parseScheduleSuggest(v) {
+    if (!v) return null;
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return null; } }
+    return (v && typeof v === 'object' && v.schedule_start) ? v : null;
+}
+
+// overwrite=false: 빈칸만 채움(처음 열 때) / true: 전부 새 값으로(다시 만들기 결과)
+function applyScheduleSuggestToForm(sug, overwrite) {
+    if (!sug) return false;
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el || el.disabled) return;
+        if (!overwrite && el.value) return;
+        el.value = val || '';
+        _schedSuggested.add(id);
+    };
+    _schedApplying = true;
+    try {
+        setLearningMode(sug.self_paced ? 'selfpaced' : 'regular');
+        _schedSuggested.add('self_paced');
+        if (!sug.self_paced) {
+            setProgramSegment('duration', sug.program_duration === 'standard' ? 'standard' : 'fast', true);
+            setProgramSegment('track', sug.program_track === 'australia' ? 'australia' : 'regular', true);
+        }
+        _schedSuggested.add('program_duration');
+        setVal('schedule_start', sug.schedule_start);
+        setVal('self_paced_end_date', sug.self_paced_end_date);
+        const corrEl = document.getElementById('correction_enabled');
+        if (corrEl && (corrEl.value === 'true') !== !!sug.correction_enabled) toggleOptionSwitch('correction_enabled');
+        _schedSuggested.add('correction_enabled');
+        setVal('correction_start_date', sug.correction_start_date);
+        setVal('correction_end_date', sug.correction_end_date);
+        syncLearningModeUI();
+        if (!sug.self_paced) calculateModalEndDate();
+        toggleCorrectionStartDate();
+        calculateModalPrice();
+    } finally {
+        _schedApplying = false;
+    }
+    const msg = overwrite
+        ? '다시 만들기 결과에 맞춰 일정 칸도 새 계산값으로 바뀌었어요. 저장해야 반영돼요.'
+        : '추천 일정으로 미리 채웠어요' + (sug.plan_id ? ' (' + sug.plan_id + (sug.label ? ' · ' + sug.label : '') + ')' : '') + '. 저장해야 반영돼요.';
+    let note = document.getElementById('schedSuggestNote');
+    const group = document.getElementById('formGroup-program');
+    if (!note && group) {
+        note = document.createElement('div');
+        note.id = 'schedSuggestNote';
+        note.style.cssText = 'background:#efeaf7; color:#5b4a7d; border-radius:10px; padding:10px 14px; font-size:12px; margin-bottom:10px; line-height:1.5;';
+        const label = group.querySelector('.form-label');
+        if (label && label.nextSibling) group.insertBefore(note, label.nextSibling); else group.appendChild(note);
+    }
+    if (note) note.innerHTML = '<i class="fas fa-calendar-check" style="margin-right:6px;"></i>' + msg;
+    return true;
+}
+
+// 다시 만들기 때 n8n에 보낼 일정 칸 값.
+// 코스 선택(학습 방식·기간·첨삭 켜짐)은 추천값으로 채웠거나/관리자가 바꿨거나/DB에 저장된 값이면 보낸다.
+// 날짜 칸은 관리자가 직접 바꿨거나 DB에 저장된 값일 때만 보낸다(추천 날짜는 코스가 바뀌면 안 맞으므로 코드가 다시 계산).
+function collectScheduleOverrides(app) {
+    const ov = {};
+    const val = (id) => (document.getElementById(id)?.value || '');
+    const DATE_IDS = ['schedule_start', 'self_paced_end_date', 'correction_start_date', 'correction_end_date'];
+    const known = (id, dbHas) => _schedTouched.has(id) || dbHas || (!DATE_IDS.includes(id) && _schedSuggested.has(id));
+    const hasProgram = !!(app && app.schedule_start);
+    if (val('schedule_start') && known('schedule_start', !!(app && app.schedule_start))) ov.schedule_start = val('schedule_start');
+    if (known('self_paced', hasProgram || !!(app && app.self_paced))) ov.self_paced = val('self_paced') === 'true';
+    if (ov.self_paced === true) {
+        if (val('self_paced_end_date') && known('self_paced_end_date', !!(app && app.self_paced_end_date))) ov.self_paced_end_date = val('self_paced_end_date');
+    } else if (val('program_duration') && known('program_duration', !!(app && app.assigned_program))) {
+        ov.program_duration = val('program_duration');
+    }
+    if (known('correction_enabled', !!(app && (app.correction_enabled || app.correction_start_date)))) ov.correction_enabled = val('correction_enabled') === 'true';
+    if (ov.correction_enabled === true) {
+        if (val('correction_start_date') && known('correction_start_date', !!(app && app.correction_start_date))) ov.correction_start_date = val('correction_start_date');
+        if (val('correction_end_date') && known('correction_end_date', !!(app && app.correction_end_date))) ov.correction_end_date = val('correction_end_date');
+    }
+    if (ov.self_paced === false && !ov.program_duration) delete ov.self_paced;
+    return ov;
+}
+
 async function regenerateAnalysis() {
     if (!currentManageApp) return;
     const fb = (document.getElementById('regenFeedback')?.value || '').trim();
-    if (!fb) { alert('피드백을 입력해주세요. (예: 코스를 Fast로 바꿔줘)'); return; }
+    if (!fb) { alert('피드백을 입력해주세요. (예: 인사말을 더 짧게 / 첨삭 설득을 더 강하게)'); return; }
     const box = document.getElementById('analysis_content');
     const prev = box ? box.value : (currentManageApp.analysis_content || '');
-    if (!confirm('입력한 피드백을 반영해서 개별분석을 다시 만들까요?\n\n1~2분 걸리고, 완료되면 위 분석칸이 새 내용으로 바뀝니다. (원본은 저장 전까지 안 바뀌어요)')) return;
+    if (!confirm('입력한 피드백을 반영해서 개별분석을 다시 만들까요?\n\n1~2분 걸리고, 완료되면 위 분석칸이 새 내용으로 바뀝니다. (원본은 저장 전까지 안 바뀌어요)\n\n일정·코스는 지금 관리 화면 칸 값 기준으로 다시 계산돼요. 글 내용 수정만 피드백에 적어주세요.')) return;
 
     const appId = currentManageApp.id;
+    const scheduleOverrides = collectScheduleOverrides(currentManageApp);
     showRegenOverlay(true);
     try {
         // 1) 결과 서랍 비우기
         await supabaseAPI.patch('applications', appId, { analysis_regen_result: null });
         // 2) 재생성 요청 (fire-and-forget: 응답은 안 기다림, 결과는 서랍으로 옴)
+        const requestedAt = new Date().toISOString();
         fetch(N8N_REGEN_WEBHOOK, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...currentManageApp, mode: 'regenerate', feedback: fb, prev_analysis: prev })
+            body: JSON.stringify({ ...currentManageApp, mode: 'regenerate', feedback: fb, prev_analysis: prev, schedule_overrides: scheduleOverrides })
         }).catch(() => {});
         // 3) 서랍 폴링 (최대 8분)
         const started = Date.now();
-        let result = null;
+        let result = null, resultRow = null;
         while (Date.now() - started < 8 * 60 * 1000) {
             await new Promise(r => setTimeout(r, 5000));
             const row = await supabaseAPI.getById('applications', appId);
             const r = Array.isArray(row) ? row[0] : row;
-            if (r && r.analysis_regen_result) { result = r.analysis_regen_result; break; }
+            if (r && r.analysis_regen_result) { result = r.analysis_regen_result; resultRow = r; break; }
         }
         if (!result) throw new Error('시간 초과. 잠시 후 다시 시도해주세요.');
         // 4) 분석칸에 채우고 서랍 정리
         if (box) box.value = result;
+        // 일정 칸도 이번 다시 만들기의 추천 일정으로 갱신(저장 전이라 되돌릴 수 있음)
+        const newSug = _parseScheduleSuggest(resultRow && resultRow.analysis_schedule_suggest);
+        if (newSug && (!newSug.computed_at || newSug.computed_at >= requestedAt)) applyScheduleSuggestToForm(newSug, true);
         const fbEl = document.getElementById('regenFeedback'); if (fbEl) fbEl.value = '';
         await supabaseAPI.patch('applications', appId, { analysis_regen_result: null });
         showRegenOverlay(false);
@@ -1154,6 +1245,16 @@ function loadModalAnalysisTab(app) {
     // 학습 방식(정규/자기주도)에 맞춰 프로그램 영역·종료일 슬롯·시작일 안내 초기 반영
     syncLearningModeUI();
 
+    // 추천 일정: 아직 일정을 한 번도 안 넣은 학생(최초 저장 전·예약 초안 없음)이면 빈칸에 미리 채움
+    _schedSuggested.clear();
+    _schedTouched.clear();
+    const _sug = _parseScheduleSuggest(app.analysis_schedule_suggest);
+    if (!hasAnalysis && !hasPendingDraft && _sug && !app.schedule_start) applyScheduleSuggestToForm(_sug, false);
+    ['schedule_start', 'self_paced_end_date', 'correction_start_date', 'correction_end_date'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', function() { _schedTouched.add(id); });
+    });
+
     // 거부·조건부승인으로 저장된 경우 프로그램/일정/가격 섹션 비활성화 적용
     if (fillStatus === '거부' || fillStatus === '조건부승인') {
         setRejectionUIState(true);
@@ -1284,6 +1385,7 @@ function _setDisp(id, show) {
 
 // 학습 방식 세그먼트 클릭(정규 과정 / 자기주도) — 숨은 self_paced 값 갱신 후 UI 동기화.
 function setLearningMode(mode) {
+    if (!_schedApplying) _schedTouched.add('self_paced');
     const input = document.getElementById('self_paced');
     if (input) input.value = (mode === 'selfpaced') ? 'true' : 'false';
     syncLearningModeUI();
@@ -1324,6 +1426,7 @@ function isSelfPacedOn() {
 // 저장 시 assigned_program 문자열로 재조립되며, 기간 변경 시 종료일을 다시 계산한다.
 // skipRecalc: syncLearningModeUI 내부에서 중복 재계산을 막기 위한 플래그.
 function setProgramSegment(group, val, skipRecalc) {
+    if (!_schedApplying && group === 'duration') _schedTouched.add('program_duration');
     const input = document.getElementById('program_' + group);
     if (input) input.value = val;
     const opts = group === 'duration' ? ['fast', 'standard'] : ['regular', 'australia'];
@@ -1336,6 +1439,7 @@ function setProgramSegment(group, val, skipRecalc) {
 // 추가옵션 스위치 토글(스라첨삭) — 숨은 input(value 'true'/'false')을 갱신하고
 // 스위치 색·노브 위치 + 의존 UI(가격표·아코디언)를 함께 반영한다.
 function toggleOptionSwitch(name) {
+    if (!_schedApplying && name === 'correction_enabled') _schedTouched.add('correction_enabled');
     const input = document.getElementById(name);
     if (!input) return;
     const on = input.value !== 'true';
