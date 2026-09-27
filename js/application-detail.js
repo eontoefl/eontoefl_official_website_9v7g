@@ -325,10 +325,8 @@ function displayApplicationDetail(app) {
             statusHint = '계약서를 준비하고 있어요.';
         } else if (!app.contract_agreed) {
             statusHint = '계약서가 도착했어요. STEP 3에서 확인하고 동의해 주세요.';
-        } else if (!app.deposit_confirmed_by_student) {
-            statusHint = '입금 후 STEP 4에서 완료 버튼을 눌러 주세요.';
-        } else if (!app.deposit_confirmed_by_admin) {
-            statusHint = '입금을 확인하고 있어요.';
+        } else if (getPaymentStage(app) === 'deposit_waiting') {
+            statusHint = '입금 후 카카오톡에 성함을 남겨 주세요.';
         } else {
             statusHint = '모든 준비가 끝났어요. STEP 5에서 이용 방법을 확인해 주세요.';
         }
@@ -2046,23 +2044,20 @@ function loadStudentTabs(app) {
             return '계약서가 업로드 됐어요! 꼼꼼히 읽어보신 뒤 동의해주세요 ⚠️';
         }
         
-        // 5. 학생 계약서 동의 ~ 학생 입금 버튼 클릭 전
-        if (!app.deposit_confirmed_by_student) {
+        // 5~7. 계약 동의 이후: 공통 판정(getPaymentStage)
+        const paymentStage = getPaymentStage(app);
+        // 5. 학생 계약서 동의 ~ 관리자 입금 확인 전
+        if (paymentStage === 'deposit_waiting') {
             return '결제를 진행해주세요 💳';
         }
         
-        // 6. 학생 입금 버튼 클릭 ~ 관리자 입금 확인 전
-        if (!app.deposit_confirmed_by_admin) {
-            return '입금을 확인하는 대로 안내드릴게요 🔍';
-        }
-        
-        // 7. 관리자 입금 확인 ~ 관리자 이용방법 업로드 전
-        if (!app.guide_sent) {
+        // 6. 관리자 입금 확인 ~ 관리자 이용방법 업로드 전
+        if (paymentStage === 'guide_prep') {
             return '입금이 확인됐어요! 이용 방법을 곧 안내드릴게요 🚀';
         }
         
-        // 8. 관리자 이용방법 업로드 ~ 택배 발송 등록 전 (발송 생략 학생은 통과)
-        if (!app.shipping_completed && !app.shipping_waived) {
+        // 7. 관리자 이용방법 업로드 ~ 택배 발송 등록 전 (발송 생략 학생은 통과)
+        if (paymentStage === 'shipping_prep') {
             return '마이페이지에 이용 방법이 업로드 됐어요! 꼼꼼히 확인해주세요 📌';
         }
         
@@ -3079,40 +3074,6 @@ async function loadPaymentTab(app) {
         return;
     }
 
-    // 학생이 입금 완료 버튼을 눌렀으면 (레거시: 과거에 버튼을 눌렀던 학생용. 신규 학생은 도달 안 함)
-    if (app.deposit_confirmed_by_student) {
-        paymentContent.innerHTML = `
-            ${s4style}
-            <div class="s4-banner" style="background:#fbf6ec;">
-                <div class="s4-banner-left">
-                    <div class="s4-banner-tile" style="background:#fbecd2;"><i class="fas fa-clock" style="color:#b45309; font-size:18px;"></i></div>
-                    <div>
-                        <div class="s4-banner-title">입금 확인 대기 중</div>
-                        <div class="s4-banner-sub">${new Date(app.deposit_confirmed_by_student_at).toLocaleString('ko-KR')}에 입금 완료 알림을 보내셨습니다 · 관리자가 확인 후 이용 방법을 안내드립니다.</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="s4-card">
-                <div class="s4-card-title"><i class="fas fa-comment"></i> 마지막 단계예요!</div>
-                <p style="font-size:14px; color:#64748b; margin:0 0 18px 0; line-height:1.75;">
-                    이제 정식 수강생이 되셨어요. 앞으로는 카카오톡 채널로 소통하게 되니, 아래 <strong style="color:#1e293b;">성함을 채널로 보내 인사를 남겨주세요.</strong> 이 과정까지 마쳐야 신청이 완료됩니다.
-                </p>
-                <div style="font-size:12px; font-weight:600; color:#64748b; margin-bottom:8px;">보낼 내용</div>
-                <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:18px;">
-                    <div style="flex:1; background:#f6f4fb; border-radius:10px; padding:14px 16px; font-size:14px; color:#1e293b; line-height:1.5;">${kakaoMsg}</div>
-                    <button type="button" onclick="copyKakaoMsg(this)" data-msg="${kakaoMsg.replace(/"/g, '&quot;')}" style="flex-shrink:0; background:#efeaf7; border:none; border-radius:10px; padding:0 18px; font-size:13px; font-weight:600; color:#5b4a7d; cursor:pointer; white-space:nowrap; font-family:inherit;">복사</button>
-                </div>
-                <a href="http://pf.kakao.com/_FWxcZC" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; box-sizing:border-box; background:#FEE500; color:#3c1e1e; font-size:15px; font-weight:700; padding:15px; border-radius:12px; text-decoration:none;">
-                    <i class="fas fa-comment"></i> 카카오톡으로 성함 남기기
-                </a>
-            </div>
-
-            ${paymentInfoHtml}
-        `;
-        return;
-    }
-
     // 입금(등록 확정) 기한 표시: deposit_deadline_override 있으면 그 값, 없으면 계약 동의 후 24시간.
     // 초시계 없이 절대 일시로 고정 표기. 만료=코랄 / 6시간 이하=주황 / 그 외=라벤더 (STEP 3와 동일 톤).
     let deadlineHTML = '';
@@ -3310,7 +3271,7 @@ async function getPaymentInfo(app) {
 }
 
 // (C-4) 학생 '입금 완료했습니다' 버튼/함수는 제거됨. 이제 학생은 입금 후 카카오톡 채널에 성함을 남긴다.
-//   deposit_confirmed_by_student 필드/크론(deadline_reminders.sql)은 유지(관리자 confirmDepositFromModal이 계속 사용).
+//   deposit_confirmed_by_student 필드는 옛 기록 보존용으로만 남는다. 단계 판정은 관리자 입금 확인 기준(getPaymentStage).
 
 // 입금 대기 카드: 카톡 인사 메시지 복사
 function copyKakaoMsg(btn) {

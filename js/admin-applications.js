@@ -200,26 +200,21 @@ function getAdminActionMessage(app) {
         return { text: '계약서 동의를 기다리고 있어요', color: '#3b82f6', bgColor: '#dbeafe' };
     }
     
-    // 5. 학생 계약서 동의 ~ 학생 입금 버튼 클릭 전
-    if (!app.deposit_confirmed_by_student) {
-        return { text: '입금을 기다리고 있어요', color: '#3b82f6', bgColor: '#dbeafe' };
+    // 5~7. 계약 동의 이후: 공통 판정(getPaymentStage)
+    const paymentStage = getPaymentStage(app);
+    // 5. 학생 계약서 동의 ~ 관리자 입금 확인 전 (은행 입금 알림과 대조)
+    if (paymentStage === 'deposit_waiting') {
+        return { text: '입금 들어왔는지 확인해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
-    
-    // 6. 학생 입금 버튼 클릭 ~ 관리자 입금 확인 전
-    if (!app.deposit_confirmed_by_admin) {
-        return { text: '입금확인 해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
-    }
-    
-    // 7. 관리자 입금 확인 ~ 관리자 이용방법 업로드 전
-    if (!app.guide_sent) {
+    // 6. 관리자 입금 확인 ~ 관리자 이용방법 업로드 전
+    if (paymentStage === 'guide_prep') {
         return { text: '이용방법을 올려주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
-    
-    // 8. 관리자 이용방법 업로드 ~ 택배 발송 등록 전 (생략 처리된 학생은 통과)
-    if (!app.shipping_completed && !app.shipping_waived) {
+    // 7. 관리자 이용방법 업로드 ~ 택배 발송 등록 전 (생략 처리된 학생은 통과)
+    if (paymentStage === 'shipping_prep') {
         return { text: '택배를 발송해주세요', color: '#f59e0b', bgColor: '#fef3c7' };
     }
-    
+
     // 9. 모든 세팅 완료 → 운영 상태로 전환 (isLive로 디자인 구분)
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {
@@ -283,7 +278,7 @@ function renderStatusBadge(color, text, opts = {}) {
 // 반환: { type, days } 또는 null
 function getStallStatus(app) {
     if (app.application_type === 'book_only') return null;
-    if (app.deposit_confirmed_by_student) return null;      // 입금 눌렀으면 이탈 아님
+    if (app.deposit_confirmed_by_admin) return null;        // 입금 확인됐으면 이탈 아님
     if (app.analysis_status === '조건부승인') return null;   // 협의 단계는 제외
 
     const now = Date.now();
@@ -307,8 +302,8 @@ function getStallStatus(app) {
                 : new Date(app.contract_sent_at).getTime() + DAY;
             return now > deadline ? { type: 'warm', days: daysPast(deadline) } : null;
         }
-        // 계약 동의 + 입금 안 함
-        if (app.contract_agreed && !app.deposit_confirmed_by_student) {
+        // 계약 동의 + 입금 확인 전
+        if (getPaymentStage(app) === 'deposit_waiting') {
             const deadline = app.deposit_deadline_override
                 ? new Date(app.deposit_deadline_override).getTime()
                 : new Date(app.contract_agreed_at).getTime() + DAY;
@@ -334,14 +329,11 @@ function getAppStageFilter(app) {
     if (!app.contract_sent) return 'need_contract';
     // 4. 계약서 동의 대기
     if (!app.contract_agreed) return 'student_waiting';
-    // 5. 학생 입금 대기
-    if (!app.deposit_confirmed_by_student) return 'student_waiting';
-    // 6. 관리자 입금확인 필요
-    if (!app.deposit_confirmed_by_admin) return 'need_deposit';
-    // 7. 이용방법 전달 필요
-    if (!app.guide_sent) return 'need_guide';
-    // 8. 택배 발송 필요 (생략 처리된 학생은 통과)
-    if (!app.shipping_completed && !app.shipping_waived) return 'need_shipping';
+    // 5~7. 계약 동의 이후: 공통 판정(getPaymentStage)
+    const paymentStage = getPaymentStage(app);
+    if (paymentStage === 'deposit_waiting') return 'need_deposit';   // 은행 입금 알림과 대조
+    if (paymentStage === 'guide_prep') return 'need_guide';
+    if (paymentStage === 'shipping_prep') return 'need_shipping';     // 생략 처리된 학생은 통과
     // 9. 세팅 완료 → 운영 상태 세분화
     const liveStatus = getAppLiveStatus(app);
     if (liveStatus) {

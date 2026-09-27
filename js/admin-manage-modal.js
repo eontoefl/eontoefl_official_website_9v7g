@@ -2681,10 +2681,10 @@ async function loadModalContractTab(app) {
                         ` : ''}
                         <div style="margin-bottom: 16px;">
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">입금자명</label>
-                            <input type="text" id="modalDepositorName" value="${app.depositor_name || app.name}" readonly
-                                   style="width: 100%; box-sizing: border-box; padding: 12px 13px; border: none; border-radius: 8px; background: #eef1f5; color: #94a3b8; outline: none; font-size: 15px; font-family: inherit;">
+                            <input type="text" id="modalDepositorName" value="${app.depositor_name || app.name}"
+                                   style="width: 100%; box-sizing: border-box; padding: 12px 13px; border: none; border-radius: 8px; background: #f4f6f9; outline: none; font-size: 15px; font-family: inherit;">
                             <p style="font-size: 12px; color: #94a3b8; margin: 6px 0 0 0;">
-                                💡 학생이 입력한 입금자명입니다. (없으면 신청자명)
+                                💡 기본값은 신청자 이름이에요. 다른 분 명의로 입금됐으면 고친 뒤 확인을 눌러주세요.
                             </p>
                         </div>
                         <div style="margin-bottom: 18px;">
@@ -3138,9 +3138,12 @@ async function confirmDepositFromModal(appId) {
     }
 
     // 5c: 입금 확인 저장 전에 시작일 이동(G-7) 판정 — 이동할 상황이면 관리자에게 되돌리기 가능한 확인.
+    // 입금자명: 관리자가 은행 입금 내역·카톡을 보고 고친 값 (비우면 신청자 이름으로 표시)
+    const depositorName = (document.getElementById('modalDepositorName')?.value || '').trim();
     const patchBody = {
         deposit_confirmed_by_admin: true,
         deposit_confirmed_by_admin_at: Date.now(),
+        depositor_name: depositorName || null,
         current_step: 5
     };
     const shift = _computeDepositStartShift(currentManageApp);

@@ -149,10 +149,9 @@ function renderProgressSection(app) {
         { id: 4, name: '학생\n동의', icon: 'fa-user-check', completed: !!app.student_agreed_at },
         { id: 5, name: '계약서\n발송', icon: 'fa-file-contract', completed: !!app.contract_sent_at },
         { id: 6, name: '계약\n동의', icon: 'fa-signature', completed: !!app.contract_agreed_at },
-        { id: 7, name: '입금\n대기', icon: 'fa-credit-card', completed: !!app.deposit_confirmed_by_student_at },
-        { id: 8, name: '입금\n확인', icon: 'fa-check-double', completed: !!app.deposit_confirmed_by_admin_at },
-        { id: 9, name: '이용방법\n전달', icon: 'fa-book-open', completed: !!app.guide_sent },
-        { id: 10, name: app.shipping_waived ? '교재\n전달' : '택배\n발송', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
+        { id: 7, name: '입금\n확인', icon: 'fa-check-double', completed: !!app.deposit_confirmed_by_admin_at },
+        { id: 8, name: '이용방법\n전달', icon: 'fa-book-open', completed: !!app.guide_sent },
+        { id: 9, name: app.shipping_waived ? '교재\n전달' : '택배\n발송', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
     ];
 
     // 현재 단계 찾기
@@ -519,8 +518,8 @@ function renderActionItems(app) {
         });
     }
     
-    // 5️⃣ 학생 계약서 동의 직후 ~ 학생 입금 버튼 클릭 직전
-    else if (app.contract_agreed_at && !app.deposit_confirmed_by_student_at) {
+    // 5️⃣ 학생 계약서 동의 직후 ~ 관리자 입금 확인 직전 (학생 입금 여부는 시스템이 모르므로 한 상태)
+    else if (getPaymentStage(app) === 'deposit_waiting') {
         // 마감 = deposit_deadline_override 있으면 그 값, 없으면 contract_agreed_at + 24시간 (상세 화면과 동일 기준).
         const deadlineMs = app.deposit_deadline_override
             ? new Date(app.deposit_deadline_override).getTime()
@@ -532,54 +531,15 @@ function renderActionItems(app) {
             iconColor: '#77bf7e',
             title: '결제를 진행해주세요',
             deadline: `마감: ${formatKstDateTimeKo(deadlineMs)}까지`,
+            note: '이미 입금하셨다면 확인되는 대로 바로 안내드릴게요.',
             urgent: hoursLeft <= 24,
             link: `application-detail.html?id=${app.id}#step4`,
             linkText: '입금 정보 보기'
         });
     }
     
-    // 6️⃣ 학생 입금 버튼 클릭 직후 ~ 관리자 입금 확인 직전
-    else if (app.deposit_confirmed_by_student_at && !app.deposit_confirmed_by_admin_at) {
-        actionItemsContent.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: #64748b;">
-                <i class="fas fa-clock" style="font-size: 48px; margin-bottom: 16px; color: #64748b;"></i>
-                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">빠르게 입금확인을 체크할게요</h3>
-                <p style="font-size: 14px;">관리자가 확인 중입니다</p>
-
-                <!-- 카카오톡 채팅 안내 블록 -->
-                <div style="margin-top: 28px; border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
-                    <p style="font-size: 15px; line-height: 1.8; color: #1e293b; font-weight: 500; margin: 0 0 12px 0;">
-                        앞으로 챌린지를 진행하며 저랑 과제 피드백, 질문, 일정 조율 등<br>
-                        저와의 모든 소통을 카카오톡으로 진행할거예요!<br>
-                        아래 버튼을 눌러서 채팅방에 성함을 보내주세요!
-                    </p>
-                    <p style="font-size: 14px; color: #64748b; margin: 0 0 12px 0;">
-                        예시: <strong style="color: #1e293b;">"홍길동"</strong>
-                    </p>
-                    <p style="font-size: 14px; line-height: 1.7; color: #ef4444; font-weight: 600; margin: 0 0 8px 0;">
-                        꼭 보내주셔야 원활하게 시작할 수 있어요<br>
-                        제가 이용방법을 준비하는 동안 지금 해주세요!
-                    </p>
-                    <p style="font-size: 13px; color: #94a3b8; margin: 0 0 20px 0;">
-                        (입금하신 직후에 이미 성함을 보내셨다면 다시 안 하셔도 돼요!)
-                    </p>
-                    <a href="http://pf.kakao.com/_FWxcZC/chat" target="_blank" rel="noopener noreferrer"
-                       style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-                              background-color: #FEE500; color: #191919; border: none; border-radius: 12px;
-                              padding: 16px 36px; font-size: 17px; font-weight: 700; text-decoration: none;
-                              cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
-                              box-shadow: 0 4px 12px rgba(254, 229, 0, 0.4);">
-                        <i class="fas fa-comment" style="font-size: 20px;"></i>
-                        카카오톡 채팅 시작하기
-                    </a>
-                </div>
-            </div>
-        `;
-        return;
-    }
-    
-    // 7️⃣ 관리자 입금 확인 직후 ~ 이용방법 업로드 직전
-    else if (app.deposit_confirmed_by_admin_at && !app.guide_sent) {
+    // 6️⃣ 관리자 입금 확인 직후 ~ 이용방법 업로드 직전
+    else if (getPaymentStage(app) === 'guide_prep') {
         actionItemsContent.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #64748b;">
                 <i class="fas fa-hourglass-half" style="font-size: 48px; margin-bottom: 16px; color: #f59e0b;"></i>
@@ -590,8 +550,8 @@ function renderActionItems(app) {
         return;
     }
     
-    // 8️⃣ 이용방법 업로드 직후 ~ 택배 발송 등록 직전 (또는 이용방법을 읽지 않은 경우)
-    else if (app.guide_sent && !app.shipping_completed && !app.shipping_waived) {
+    // 7️⃣ 이용방법 업로드 직후 ~ 택배 발송 등록 직전 (또는 이용방법을 읽지 않은 경우)
+    else if (getPaymentStage(app) === 'shipping_prep') {
         actionItems.push({
             icon: 'fa-book-open',
             iconColor: '#9480c5',
@@ -603,7 +563,7 @@ function renderActionItems(app) {
         });
     }
     
-    // 9️⃣ 택배 발송 등록(또는 발송 생략) 직후 (완전 완료)
+    // 8️⃣ 택배 발송 등록(또는 발송 생략) 직후 (완전 완료)
     if (actionItems.length === 0 && (app.shipping_completed || app.shipping_waived)) {
         const shippingNote = app.shipping_waived
             ? `교재 전달 정보는 아래 '배송 정보'에서 확인하실 수 있어요.`
@@ -639,6 +599,7 @@ function renderActionItems(app) {
             <div class="action-content">
                 <h4 class="action-title">${item.title}</h4>
                 <p class="action-deadline">${item.deadline}</p>
+                ${item.note ? `<p style="font-size: 12px; color: #94a3b8; margin: 4px 0 0 0;">${item.note}</p>` : ''}
             </div>
             <a href="${item.link}" class="action-button">
                 ${item.linkText}
@@ -1078,64 +1039,6 @@ function renderWelcome(app) {
             ? `${challengeLabel} + 스라첨삭 진행 현황을 확인하고 관리하세요.`
             : `${challengeLabel} 진행 현황을 확인하고 관리하세요.`;
     }
-}
-
-/**
- * 진행 상황 렌더링
- */
-function renderProgress(app) {
-    const steps = [
-        { id: 1, name: '신청서 제출', completed: !!app.submitted_date },
-        { id: 2, name: '검토 중', completed: !!app.submitted_date }, // 제출되면 검토 시작
-        { id: 3, name: '개인 분석 완료', completed: !!app.analysis_saved_at || !!app.student_agreed_at }, // 분석 완료 또는 학생이 동의했으면 완료
-        { id: 4, name: '학생 동의 완료', completed: !!app.student_agreed_at },
-        { id: 5, name: '계약서 발송', completed: !!app.contract_sent_at },
-        { id: 6, name: '계약 동의 완료', completed: !!app.contract_agreed_at },
-        { id: 7, name: '입금 대기', completed: !!app.deposit_confirmed_by_student_at },
-        { id: 8, name: '입금 확인 완료', completed: !!app.deposit_confirmed_by_admin_at },
-        { id: 9, name: '이용방법 전달', completed: !!app.guide_sent },
-        { id: 10, name: app.shipping_waived ? '교재 전달' : '실물 교재 발송', completed: !!app.shipping_completed || !!app.shipping_waived }
-    ];
-
-    // 현재 단계 찾기
-    let currentStepIndex = steps.findIndex(step => !step.completed);
-    if (currentStepIndex === -1) currentStepIndex = steps.length;
-
-    // 진행률 계산
-    const progress = Math.round((currentStepIndex / steps.length) * 100);
-
-    // 진행률 바 업데이트
-    const progressBar = document.getElementById('progressBar');
-    progressBar.style.width = progress + '%';
-    progressBar.textContent = progress + '%';
-
-    // 현재 단계 표시
-    const currentStepText = currentStepIndex < steps.length 
-        ? `현재 단계: STEP ${currentStepIndex + 1} - ${steps[currentStepIndex].name}`
-        : '모든 단계 완료! 🎉';
-    document.getElementById('currentStep').textContent = currentStepText;
-
-    // 단계 리스트 렌더링
-    const stepList = document.getElementById('stepList');
-    stepList.innerHTML = steps.map((step, index) => {
-        let statusClass = 'step-pending';
-        let icon = 'fa-circle';
-        
-        if (step.completed) {
-            statusClass = 'step-completed';
-            icon = 'fa-check-circle';
-        } else if (index === currentStepIndex) {
-            statusClass = 'step-current';
-            icon = 'fa-spinner fa-spin';
-        }
-
-        return `
-            <li class="step-item ${statusClass}">
-                <i class="fas ${icon}"></i>
-                <span>${step.name}</span>
-            </li>
-        `;
-    }).join('');
 }
 
 /**

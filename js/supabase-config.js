@@ -403,6 +403,17 @@ function getThursdayCutoffMs(sundayYmd) {
     return Date.UTC(thu.getUTCFullYear(), thu.getUTCMonth(), thu.getUTCDate(), 14, 59, 59, 0);
 }
 
+// ===== 공통 유틸: 계약 동의 이후 단계 판정 =====
+// 학생 '입금 완료' 버튼은 없어졌으므로(2026-08-23) 입금 단계는 관리자 입금 확인 하나로만 판정한다.
+// 관리자 목록·학생 대시보드·신청서 상세가 모두 이 판정을 쓴다. 계약 동의 전 단계는 각 화면이 따로 판정.
+function getPaymentStage(app) {
+    if (!app.contract_agreed) return null;
+    if (!app.deposit_confirmed_by_admin) return 'deposit_waiting';
+    if (!app.guide_sent) return 'guide_prep';
+    if (!app.shipping_completed && !app.shipping_waived) return 'shipping_prep';
+    return 'setup_done';
+}
+
 // ===== 공통 유틸: 신청서 진행 상태 판정 =====
 // app_status가 DB에 저장되어 있으면 그 값을 우선 사용하고,
 // 없으면 schedule_start / schedule_end 기준으로 자동 판정한다.
