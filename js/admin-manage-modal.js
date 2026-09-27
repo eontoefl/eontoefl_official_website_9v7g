@@ -3143,7 +3143,7 @@ async function confirmDepositFromModal(appId) {
     const patchBody = {
         deposit_confirmed_by_admin: true,
         deposit_confirmed_by_admin_at: Date.now(),
-        depositor_name: depositorName || null,
+        depositor_name: depositorName,
         current_step: 5
     };
     const shift = _computeDepositStartShift(currentManageApp);
