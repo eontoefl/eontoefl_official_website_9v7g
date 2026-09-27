@@ -1,24 +1,13 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>교재 관리자 로그인 | 이온토플</title>
-<style>body{margin:0;background:#f5f5fa;color:#25243b;font:16px system-ui,sans-serif}main{max-width:900px;margin:60px auto;padding:24px}section{background:white;border:1px solid #e1deed;border-radius:18px;padding:24px;margin-top:20px}h1{font-size:28px}.badge{color:#6545ad;font-weight:750}label{display:block;margin:16px 0 6px}input{box-sizing:border-box;width:100%;max-width:420px;padding:12px;border:1px solid #aaa;border-radius:8px}button,a.action{display:inline-block;background:#6545ad;color:white;padding:11px 18px;border:0;border-radius:9px;margin:12px 8px 0 0;text-decoration:none;cursor:pointer}article{padding:18px 0;border-bottom:1px solid #eee}small{color:#666}#status{white-space:pre-wrap}[hidden]{display:none!important}</style></head><body><main>
-<p class="badge">ADMIN ONLY</p><h1>교재 관리자 로그인</h1><p>로그인하면 기존 입문서 관리 목록으로 이동합니다. 교재는 계속 숨김 상태로 보호됩니다.</p>
-<p id="status" role="status" aria-live="polite">서버 인증 확인 중...</p>
-<section id="loginPanel" hidden><h2>관리자 로그인</h2><form id="loginForm"><label for="email">이메일</label><input id="email" name="email" type="email" autocomplete="username" required><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="current-password" required><p><button id="loginButton" type="submit">로그인</button></p></form><small>등록된 비공개 교재 관리자만 이용할 수 있습니다. 회원가입은 제공하지 않습니다.</small></section>
-<p><a href="admin-book-list.html">입문서 관리 목록으로 돌아가기</a></p>
-</main><script src="js/supabase-config.js"></script><script src="vendor/supabase-2.116.0.js"></script><script src="js/private-book-client.js"></script><script>
-'use strict';
-const statusEl = document.getElementById('status');
-function safeReturn() {
-  const raw = new URLSearchParams(location.search).get('next'); if (!raw) return null;
-  try { const u = new URL(raw, location.href); if (u.origin === location.origin && !u.username && !u.password && u.pathname === '/admin-book-list.html') return new URL('admin-book-list.html', location.href).href; if (u.origin !== location.origin || u.username || u.password || !/^\/admin-book-(preview|editor)\.html$/.test(u.pathname) || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(u.searchParams.get('book') || '')) return null; u.searchParams.set('private','1'); return u.href; } catch (_) { return null; }
-}
-window.addEventListener('privatebook:signed-out', () => loginView('로그아웃되었습니다'));
-function loginView(message) { document.getElementById('loginPanel').hidden=false; statusEl.textContent=message; }
-async function enterWorkspace() {
-  await PrivateBook.ready();
-  statusEl.textContent = '인증 완료 · 교재 목록으로 이동합니다';
-  location.replace(safeReturn() || 'admin-book-list.html');
-}
-document.getElementById('loginForm').addEventListener('submit', async event => { event.preventDefault(); const button=document.getElementById('loginButton'); button.disabled=true; statusEl.textContent='인증 중...'; try { await PrivateBook.login(document.getElementById('email').value.trim(),document.getElementById('password').value); document.getElementById('password').value=''; await enterWorkspace(); } catch (_) { document.getElementById('password').value=''; loginView('로그인 정보 또는 관리자 권한을 확인해주세요'); } finally {button.disabled=false;} });
-enterWorkspace().catch(() => loginView('교재 관리자 로그인이 필요합니다'));
-</script></body></html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="0;url=admin-book-list.html">
+    <title>입문서 관리로 이동 | 이온토플</title>
+</head>
+<body>
+    <p><a href="admin-book-list.html">입문서 관리 목록으로 이동</a></p>
+    <script>location.replace("admin-book-list.html");</script>
+</body>
+</html>

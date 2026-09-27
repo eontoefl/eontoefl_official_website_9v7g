@@ -15,7 +15,7 @@ function normalizeInternalBookLinks(html) {
   for (const a of doc.querySelectorAll("a[href]")) {
     // Reader contents links stay in the same tab; external links retain their
     // existing safe new-tab behavior. This also applies after later edits.
-    if (/^\/?book-v2\.html(?:\?|$)/i.test(a.getAttribute("href") || "")) a.target = "_self";
+    if (/^\/?(?:book-v2|admin-book-preview)\.html(?:\?|$)/i.test(a.getAttribute("href") || "")) a.target = "_self";
   }
   return doc.body.innerHTML;
 }

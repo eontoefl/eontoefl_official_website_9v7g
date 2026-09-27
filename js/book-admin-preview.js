@@ -1,10 +1,10 @@
-/* View only. Auth/RLS is mandatory; no public adapter or progress/memo writes. */
+/* Read only. Matches legacy client-side admin UI gating, NOT server authorization. */
 (function (global) {
   'use strict';
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function bookFrom(search) {
     const p = new URLSearchParams(search);
-    if (p.getAll('book').length !== 1 || !UUID.test(p.get('book') || '')) throw new Error('올바른 비공개 교재 UUID가 필요합니다');
+    if (p.getAll('book').length !== 1 || !UUID.test(p.get('book') || '')) throw new Error('올바른 교재 UUID가 필요합니다');
     return p.get('book').toLowerCase();
   }
   function pageNumber(value, count) {
@@ -14,13 +14,33 @@
   function previewURL(base, book, page) {
     if (!UUID.test(book)) throw new Error('Invalid book');
     const u = new URL('admin-book-preview.html', base);
-    u.search = new URLSearchParams({private:'1', book, p:String(page)}).toString(); return u;
+    u.search = new URLSearchParams({book, p:String(page)}).toString();
+    if (localDev(base)) u.searchParams.set('dev', '1');
+    return u;
   }
-  function loginURL(base, book, page) {
-    const next = previewURL(base, book, page), login = new URL('admin-private-books.html', base);
-    // Construct an allowlisted destination; never forward a supplied next parameter.
-    if (next.origin !== login.origin || !/\/admin-book-preview\.html$/.test(next.pathname)) throw new Error('Unsafe return URL');
-    login.searchParams.set('next', next.pathname + next.search); return login;
+  function localDev(base) {
+    const u = new URL(base);
+    return ['http:', 'https:'].includes(u.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname) && u.searchParams.get('dev') === '1';
+  }
+  function hasAdmin(base, storage) {
+    if (localDev(base)) return true;
+    try { return JSON.parse(storage.getItem('iontoefl_user') || 'null')?.role === 'admin'; }
+    catch (_) { return false; }
+  }
+  const IMAGE_ROOT = 'https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/';
+  function assetPrefixes(book) {
+    if (!UUID.test(book)) throw new Error('Invalid book');
+    return [IMAGE_ROOT + 'book-migrations/' + book + '/', IMAGE_ROOT + 'book/'];
+  }
+  function assetURL(raw, book) {
+    try {
+      if (!raw || /[\\\s]/.test(raw)) return null;
+      const u = new URL(raw);
+      if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash) return null;
+      const decoded = decodeURIComponent(u.pathname);
+      if (/%|\\|[\x00-\x1f\x7f]/.test(decoded) || decoded.split('/').some(part => part === '.' || part === '..')) return null;
+      return assetPrefixes(book).some(prefix => u.href.startsWith(prefix) && u.href.length > prefix.length) ? u.href : null;
+    } catch (_) { return null; }
   }
   function linkTarget(raw, base, book, count) {
     if (!raw) return null;
@@ -28,31 +48,27 @@
     let u; try { u = new URL(raw, base); } catch (_) { return null; }
     if (u.username || u.password) return null;
     if (u.origin === new URL(base).origin && /\/admin-book-preview\.html$/.test(u.pathname)) {
-      if (u.searchParams.get('book')?.toLowerCase() !== book || !/^\d+$/.test(u.searchParams.get('p') || '')) return null;
+      if (u.searchParams.getAll('book').length !== 1 || u.searchParams.getAll('p').length !== 1 || u.searchParams.get('book')?.toLowerCase() !== book || !/^\d+$/.test(u.searchParams.get('p') || '')) return null;
       return {page:pageNumber(u.searchParams.get('p'), count)};
     }
     if (u.protocol === 'https:' && u.origin !== new URL(base).origin) return {external:u.href};
     return null;
   }
-  global.PrivateBookPreview = Object.freeze({bookFrom, pageNumber, previewURL, loginURL, linkTarget});
+  global.BookAdminPreview = Object.freeze({bookFrom, pageNumber, previewURL, linkTarget, localDev, hasAdmin, assetURL, assetPrefixes});
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), base = location.href;
-  let book, api, rows = [], current = 1, frame, content, generation = 0, stopped = false, refreshJob, timer;
-  function clearPrivate(message) {
+  let book, api, rows = [], current = 1, frame, content, generation = 0, stopped = false, timer;
+  function clearPreview(message) {
     stopped = true; generation++; clearInterval(timer); rows = []; content = null;
     $('pageHost').replaceChildren(); frame = null; $('toc').replaceChildren(); $('reader').hidden = true;
-    $('bookTitle').textContent = '교재 미리보기'; $('editorLink').hidden = true; $('logout').hidden = true; $('status').textContent = message;
+    $('bookTitle').textContent = '교재 미리보기'; $('editorLink').hidden = true; $('status').textContent = message;
   }
-  async function verify() {
-    try { await api.ready(); }
-    catch (error) {
-      clearPrivate('관리자 인증을 확인할 수 없습니다. 교재 목록에서 다시 로그인해주세요');
-      try {
-        const r = await api.client.auth.getUser();
-        if (!r.data?.user) location.replace(loginURL(base, book, current).href);
-      } catch (_) {}
-      throw error;
-    }
+  function verify() {
+    let allowed = false;
+    try { allowed = hasAdmin(location.href, global.localStorage); } catch (_) {}
+    if (allowed) return;
+    clearPreview('기존 관리자 로그인이 필요합니다. 사이트에서 로그인한 뒤 다시 열어주세요');
+    throw new Error('관리자만 접근할 수 있습니다');
   }
   function inert(html) { const t = document.createElement('template'); t.innerHTML = html || ''; return t.content; }
   function headingsIn(root) {
@@ -96,12 +112,18 @@
     // No DOMPurify vendor exists in this release. Script-disabled sandbox + CSP
     // is the security boundary, not these defense-in-depth resource restrictions.
     // NEVER add allow-scripts, allow-forms, allow-popups or top-navigation.
-    fragment.querySelectorAll('script,base,meta,link,iframe,object,embed,form').forEach(el => el.remove());
-    fragment.querySelectorAll('[srcset]').forEach(el => el.removeAttribute('srcset'));
-    fragment.querySelectorAll('img').forEach(img => {
-      try { api.objectPath(img.getAttribute('src') || '', book); } catch (_) { img.removeAttribute('src'); }
-      img.setAttribute('referrerpolicy','no-referrer');
+    fragment.querySelectorAll('script,base,meta,link,iframe,object,embed,form,animate,set,animateMotion,animateTransform').forEach(el => el.remove());
+    fragment.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith('on') || ['srcset','srcdoc','action','formaction','ping','xlink:href'].includes(name)) el.removeAttribute(attr.name);
+        else if (['src','poster','background'].includes(name)) {
+          const safe = assetURL(attr.value, book);
+          if (safe) el.setAttribute(attr.name, safe); else el.removeAttribute(attr.name);
+        } else if (name === 'href' && !el.matches('a,area')) el.removeAttribute(attr.name);
+      }
     });
+    fragment.querySelectorAll('img').forEach(img => img.setAttribute('referrerpolicy','no-referrer'));
     fragment.querySelectorAll('a,area').forEach(anchor => {
       const target = linkTarget(anchor.getAttribute('href'), base, book, rows.length);
       for (const attr of ['href','target','download','ping']) anchor.removeAttribute(attr);
@@ -114,87 +136,75 @@
   }
   function frameShell() {
     const styles = ['css/book-design-system.css','css/book-design-viewer.css','css/private-book-preview.css'].map(p => new URL(p,base).href);
-    const assetPrefix = new URL(SUPABASE_URL).origin + '/storage/v1/object/sign/book-private/' + book + '/';
+    const assetPrefix = assetPrefixes(book).join(' ');
     const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src ${assetPrefix}; style-src 'unsafe-inline' ${styles.join(' ')}; font-src 'self';`;
     const escape = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    return '<!doctype html><html lang="ko" class="preview-page"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + escape(policy) + '"><meta name="viewport" content="width=device-width, initial-scale=1">' + styles.map(u => '<link rel="stylesheet" href="'+escape(u)+'">').join('') + '</head><body><article class="book-content" id="private-page-content"></article></body></html>';
+    return '<!doctype html><html lang="ko" class="preview-page"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + escape(policy) + '"><meta name="viewport" content="width=device-width, initial-scale=1">' + styles.map(u => '<link rel="stylesheet" href="'+escape(u)+'">').join('') + '</head><body><article class="book-content" id="admin-page-content"></article></body></html>';
   }
   async function show(number, headingIndex) {
     if (stopped || !rows.length) return;
     const ticket = ++generation; current = pageNumber(number, rows.length); updateControls();
-    $('status').textContent = '비공개 페이지를 불러오는 중...';
+    $('status').textContent = '교재 페이지를 불러오는 중...';
     try {
-      await verify();
-      const row = await api.resolveAssets(rows[current - 1], book, true);
+      verify();
+      const row = rows[current - 1];
       if (stopped || ticket !== generation) return;
       const nextFrame = document.createElement('iframe'); nextFrame.title = '관리자 전용 교재 · 원본 페이지 ' + row.sort_order;
+      nextFrame.hidden = document.visibilityState === 'hidden';
       nextFrame.setAttribute('sandbox','allow-same-origin'); nextFrame.setAttribute('referrerpolicy','no-referrer');
       nextFrame.addEventListener('load', () => {
         if (stopped || ticket !== generation) return;
-        const doc = nextFrame.contentDocument; content = doc?.getElementById('private-page-content');
-        if (!content) { clearPrivate('미리보기 보안 프레임을 열 수 없습니다'); return; }
+        try { verify(); } catch (_) { return; }
+        const doc = nextFrame.contentDocument; content = doc?.getElementById('admin-page-content');
+        if (!content) { clearPreview('미리보기 보안 프레임을 열 수 없습니다'); return; }
         content.replaceChildren(prepareContent(row.html)); applyZoom();
         if (headingIndex !== undefined) headingsIn(content)[headingIndex]?.scrollIntoView();
-        $('status').textContent = '서버 인증 완료 · 읽기 전용 · 학습 기록은 저장하지 않습니다';
+        $('status').textContent = '기존 관리자 역할 확인 · 읽기 전용 · 학습 기록은 저장하지 않습니다';
       }, {once:true});
       nextFrame.srcdoc = frameShell(); frame = nextFrame; content = null; $('pageHost').replaceChildren(nextFrame);
       history.replaceState(null, '', previewURL(base, book, current).href);
-    } catch (_) { if (!stopped) clearPrivate('비공개 페이지를 불러오지 못했습니다. 다시 로그인하거나 새로고침해주세요'); }
+    } catch (_) { if (!stopped) clearPreview('교재 페이지를 불러오지 못했습니다. 새로고침해주세요'); }
   }
-  async function refresh() {
-    if (stopped || !rows.length || refreshJob) return refreshJob;
-    refreshJob = (async () => {
-      const ticket = generation;
-      try {
-        await verify(); const row = await api.resolveAssets(rows[current - 1], book, true);
-        if (stopped || ticket !== generation || !content) return;
-        const sources = new Map();
-        inert(row.html).querySelectorAll('img[src]').forEach(img => {
-          try { sources.set(api.objectPath(img.getAttribute('src'),book), img.getAttribute('src')); } catch (_) {}
-        });
-        // Update only image URLs. Preserve the document, scroll, zoom and current page.
-        content.querySelectorAll('img[src]').forEach(img => {
-          try { const signed = sources.get(api.objectPath(img.getAttribute('src'),book)); if (signed) img.setAttribute('src',signed); else img.removeAttribute('src'); }
-          catch (_) { img.removeAttribute('src'); }
-        });
-      } catch (_) { if (!stopped) clearPrivate('인증 또는 이미지 갱신에 실패했습니다. 새로고침해주세요'); }
-    })();
-    try { await refreshJob; } finally { refreshJob = null; }
+  function recheck() {
+    if (stopped) return;
+    try { verify(); if (frame && document.visibilityState !== 'hidden') frame.hidden = false; }
+    catch (_) { /* verify already clears the reader */ }
   }
   async function start() {
     try {
       book = bookFrom(location.search); current = pageNumber(new URLSearchParams(location.search).get('p'), Number.MAX_SAFE_INTEGER);
-      api = global.PrivateBook; if (!api) throw new Error('비공개 인증 클라이언트를 불러오지 못했습니다');
-      await verify(); // Filename enables PrivateBook even without ?private=1.
-      api.client.auth.onAuthStateChange((event, session) => {
-        // Never make async Supabase calls under the auth callback lock.
-        if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) clearPrivate('로그아웃되었습니다. 관리자 목록에서 다시 로그인해주세요');
-      });
-      const documents = await api.api.query('tr_book_documents', {id:'eq.' + book});
+      verify();
+      api = typeof supabaseAPI !== 'undefined' ? supabaseAPI : null;
+      if (!api) throw new Error('교재 데이터 API를 불러오지 못했습니다');
+      const documents = await api.query('tr_book_documents', {id:'eq.' + book});
       if (stopped) return;
-      if (documents.length !== 1 || documents[0].id?.toLowerCase() !== book) throw new Error('비공개 교재를 찾을 수 없습니다');
-      const pages = await api.api.query('tr_book_pages', {book_id:'eq.' + book, order:'sort_order.asc'});
+      verify();
+      if (documents.length !== 1 || documents[0].id?.toLowerCase() !== book) throw new Error('교재를 찾을 수 없습니다');
+      const pages = await api.query('tr_book_pages', {book_id:'eq.' + book, order:'sort_order.asc'});
       if (stopped) return;
+      verify();
       if (!pages.length) throw new Error('저장된 페이지가 없습니다');
       if (pages.some(p => p.book_id?.toLowerCase() !== book)) throw new Error('교재 페이지 범위가 올바르지 않습니다');
-      rows = api.canonicalizeAssets(pages, book); current = pageNumber(current, rows.length);
-      $('bookTitle').textContent = documents[0].title || '비공개 교재';
-      const editor = new URL('admin-book-editor.html',base); editor.search = new URLSearchParams({private:'1',book}).toString();
-      $('editorLink').href = editor.href; $('editorLink').hidden = false; $('logout').hidden = false;
+      rows = pages; current = pageNumber(current, rows.length);
+      $('bookTitle').textContent = documents[0].title || '교재';
+      const editor = new URL('admin-book-editor.html',base); editor.search = new URLSearchParams({book}).toString();
+      if (localDev(base)) editor.searchParams.set('dev', '1');
+      $('editorLink').href = editor.href; $('editorLink').hidden = false;
       buildTOC(); $('reader').hidden = false; await show(current);
-      if (!stopped) timer = setInterval(refresh, api.refreshInterval || 600000);
-    } catch (error) { if (!stopped) clearPrivate(error.message || '미리보기를 열 수 없습니다'); }
+      if (!stopped) timer = setInterval(recheck, 30000);
+    } catch (error) { if (!stopped) clearPreview(error.message || '미리보기를 열 수 없습니다'); }
   }
   $('previous').addEventListener('click', () => show(current - 1));
   $('next').addEventListener('click', () => show(current + 1));
   $('jumpForm').addEventListener('submit', event => { event.preventDefault(); show($('pageNumber').value); });
   $('zoom').addEventListener('input', applyZoom);
-  $('logout').addEventListener('click', async () => { clearPrivate('로그아웃 중...'); try { await api.logout(); $('status').textContent = '로그아웃되었습니다'; } catch (_) { $('status').textContent = '미리보기는 닫혔습니다. 관리자 목록에서 로그아웃을 다시 확인해주세요'; } });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { if (frame) frame.hidden = true; }
-    else if (!stopped) refresh().finally(() => { if (frame && !stopped) frame.hidden = false; });
+    else recheck();
   });
-  global.addEventListener('pageshow', event => { if (event.persisted && !stopped) { if (frame) frame.hidden = true; refresh().finally(() => { if (frame && !stopped) frame.hidden = false; }); } });
+  global.addEventListener('pageshow', event => { if (event.persisted && !stopped) { if (frame) frame.hidden = true; recheck(); } });
+  global.addEventListener('storage', event => { if (event.key === 'iontoefl_user' || event.key === null) recheck(); });
+  global.addEventListener('focus', recheck);
   global.addEventListener('pagehide', () => { if (frame) frame.hidden = true; });
   document.addEventListener('keydown', event => {
     if (event.altKey || event.ctrlKey || event.metaKey || /INPUT|TEXTAREA|SELECT|BUTTON/.test(event.target.tagName)) return;

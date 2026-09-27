@@ -12,9 +12,6 @@
 //   tr_book_page_versions (저장마다 스냅샷)
 // =====================================================================
 
-const privateMode = new URLSearchParams(location.search).get("private") === "1";
-const bookAPI = privateMode ? window.PrivateBook.api : supabaseAPI;
-const privateDrafts = new Map();
 const STORAGE_BUCKET = "guide-images"; // 기존 버킷 재사용, 'book/' prefix
 const BOOK_TITLE_DEFAULT = "입문서 (편집본)";
 const MOUNT_MARGIN = "1000px"; // 화면에서 이만큼 떨어져 있을 때 미리 편집기 켜기
@@ -38,20 +35,7 @@ const State = {
 // 진입
 // ---------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
-  if (privateMode) {
-    window.addEventListener('privatebook:signed-out', () => location.replace('admin-private-books.html'));
-    document.getElementById("privateBookBadge").hidden = false;
-    document.getElementById("btnSave").title = "비공개 관리자 교재 저장";
-    try {
-      await window.PrivateBook.ready();
-      if (!window.PrivateBook.selectedBook) throw new Error("관리자 목록에서 교재를 선택해주세요");
-    } catch (_) {
-      setStatus("error", "비공개 관리자 로그인 필요");
-      document.getElementById("editorLoading").innerHTML = '<p>서버 인증이 필요합니다 <a href="admin-private-books.html">비공개 관리자 로그인</a></p>';
-      document.querySelectorAll(".bookedit-topbar button").forEach(b => { b.disabled = true; });
-      return;
-    }
-  } else if (!checkAuth()) return;
+  if (!checkAuth()) return;
   if (!window.BookEditor || typeof window.BookEditor.mount !== "function") {
     setStatus("error", "에디터 로드 실패 — 새로고침 해주세요");
     return;
@@ -82,14 +66,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (loading) loading.style.display = "none";
   document.getElementById("slideBar").hidden = false;
   setCurrent(State.pages.length ? State.pages[0].id : null);
-  setStatus("saved", privateMode ? "관리자 전용 · 비공개 · 임시저장은 현재 탭에만 유지" : "준비됨");
-  if (privateMode) setupPrivateAssetRefresh();
+  setStatus("saved", "준비됨");
 });
 
 function checkAuth() {
   const params = new URLSearchParams(location.search);
   if (params.get("dev") === "1" && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)) return true;
-  const u = JSON.parse(localStorage.getItem("iontoefl_user") || "null");
+  let u = null;
+  try { u = JSON.parse(localStorage.getItem("iontoefl_user") || "null"); } catch (_) {}
   if (!u || u.role !== "admin") {
     alert("⚠️ 관리자만 접근할 수 있습니다.");
     location.href = "index.html";
@@ -99,7 +83,6 @@ function checkAuth() {
 }
 
 function currentUserEmail() {
-  if (privateMode) return window.PrivateBook.user?.email || 'private-admin';
   const u = JSON.parse(localStorage.getItem("iontoefl_user") || "null");
   return u && u.email ? u.email : "dev";
 }
@@ -107,13 +90,12 @@ function currentUserEmail() {
 // ---------------------------------------------------------------------
 // 책 + 페이지 로드 (없으면 생성)
 // ---------------------------------------------------------------------
-const CURRENT_BOOK_KEY = privateMode ? "private_bookedit_current_book" : "bookedit_current_book";
+const CURRENT_BOOK_KEY = "bookedit_current_book";
 
 async function loadBooks() {
-  let books = await bookAPI.query("tr_book_documents", { kind: "eq.pages", order: "sort_order.asc" });
-  if (privateMode && !books?.some(b => b.id === window.PrivateBook.selectedBook)) throw new Error('비공개 교재를 찾을 수 없습니다');
+  let books = await supabaseAPI.query("tr_book_documents", { kind: "eq.pages", order: "sort_order.asc" });
   if (!books || books.length === 0) {
-    const b = await bookAPI.post("tr_book_documents", { title: BOOK_TITLE_DEFAULT, kind: "pages", is_active: false, total_pages: 0, sort_order: 100 });
+    const b = await supabaseAPI.post("tr_book_documents", { title: BOOK_TITLE_DEFAULT, kind: "pages", is_active: false, total_pages: 0, sort_order: 100 });
     books = [b];
   }
   State.books = books;
@@ -125,9 +107,9 @@ async function loadBooks() {
 }
 
 async function loadPages() {
-  let pages = await bookAPI.query("tr_book_pages", { book_id: "eq." + State.book.id, order: "sort_order.asc" });
+  let pages = await supabaseAPI.query("tr_book_pages", { book_id: "eq." + State.book.id, order: "sort_order.asc" });
   if (!pages || pages.length === 0) {
-    const p1 = await bookAPI.post("tr_book_pages", { book_id: State.book.id, sort_order: 1, blocks: [], html: "" });
+    const p1 = await supabaseAPI.post("tr_book_pages", { book_id: State.book.id, sort_order: 1, blocks: [], html: "" });
     pages = [p1];
   }
   State.pages = pages;
@@ -292,7 +274,7 @@ function onEditorChange(pageId) {
   State.timers.set(pageId, setTimeout(() => {
     const h = State.editors.get(pageId);
     if (h) saveDraft(pageId, h.getBlocks());
-    setStatus("saved", privateMode ? "임시 보관됨 (현재 탭만 · 서버 저장 필요)" : "임시 저장됨 (브라우저)");
+    setStatus("saved", "임시 저장됨 (브라우저)");
   }, 800));
 }
 
@@ -770,12 +752,12 @@ async function savePage() {
       if (!blocks) continue;
       const html = await conv.htmlOf(blocks);
 
-      await bookAPI.patch("tr_book_pages", pageId, {
+      await supabaseAPI.patch("tr_book_pages", pageId, {
         blocks: blocks,
         html: html,
         updated_at: new Date().toISOString(),
       });
-      await bookAPI.post("tr_book_page_versions", {
+      await supabaseAPI.post("tr_book_page_versions", {
         page_id: pageId,
         book_id: State.book.id,
         blocks: blocks,
@@ -793,7 +775,7 @@ async function savePage() {
     // 책 수정시각도 갱신
     try {
       const now = new Date().toISOString();
-      await bookAPI.patch("tr_book_documents", State.book.id, { updated_at: now });
+      await supabaseAPI.patch("tr_book_documents", State.book.id, { updated_at: now });
       State.book.updated_at = now;
     } catch (_) {}
 
@@ -818,7 +800,7 @@ async function addPage() {
 
 async function insertPageAt(index, seed) {
   try {
-    const np = await bookAPI.post("tr_book_pages", {
+    const np = await supabaseAPI.post("tr_book_pages", {
       book_id: State.book.id,
       sort_order: 0,
       blocks: (seed && seed.blocks) || [],
@@ -863,7 +845,7 @@ async function deletePage(pageId) {
   if (!confirm("이 페이지를 삭제할까요? (되돌릴 수 없어요)")) return;
 
   try {
-    await bookAPI.hardDelete("tr_book_pages", pageId);
+    await supabaseAPI.hardDelete("tr_book_pages", pageId);
     clearDraft(pageId);
     State.dirty.delete(pageId);
     const idx = State.pages.findIndex((p) => p.id === pageId);
@@ -891,7 +873,7 @@ async function persistOrder() {
   });
   try {
     for (const p of changed) {
-      await bookAPI.patch("tr_book_pages", p.id, { sort_order: p.sort_order });
+      await supabaseAPI.patch("tr_book_pages", p.id, { sort_order: p.sort_order });
     }
     if (changed.length) setStatus("saved", "순서 변경됨");
   } catch (e) {
@@ -902,7 +884,7 @@ async function persistOrder() {
 
 async function syncTotalPages() {
   try {
-    await bookAPI.patch("tr_book_documents", State.book.id, { total_pages: State.pages.length });
+    await supabaseAPI.patch("tr_book_documents", State.book.id, { total_pages: State.pages.length });
     State.book.total_pages = State.pages.length;
   } catch (e) { /* 표시용이라 실패해도 치명적이지 않음 */ }
 }
@@ -917,7 +899,7 @@ async function showVersions() {
   listEl.innerHTML = '<div class="bookedit-empty">불러오는 중…</div>';
 
   try {
-    const rows = await bookAPI.query("tr_book_page_versions", {
+    const rows = await supabaseAPI.query("tr_book_page_versions", {
       page_id: "eq." + State.currentId,
       order: "created_at.desc",
       limit: "30",
@@ -965,7 +947,6 @@ function closeVersions() {
 // 이미지/파일 업로드 → Supabase Storage (base64 금지)
 // ---------------------------------------------------------------------
 async function uploadFile(file) {
-  if (privateMode) return window.PrivateBook.uploadFile(file, State.book.id);
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
   const path = "book/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
   const endpoint = SUPABASE_URL + "/storage/v1/object/" + STORAGE_BUCKET + "/" + path;
@@ -995,11 +976,9 @@ function draftKey(pageId) {
   return "bookedit_draft_" + (State.book ? State.book.id : "x") + "_" + pageId;
 }
 function saveDraft(pageId, blocks) {
-  if (privateMode) { privateDrafts.set(pageId, window.PrivateBook.canonicalizeAssets(blocks || [], State.book.id)); return; }
   try { localStorage.setItem(draftKey(pageId), JSON.stringify(blocks || [])); } catch (_) {}
 }
 function loadDraft(pageId) {
-  if (privateMode) { const draft = privateDrafts.get(pageId); return draft ? window.PrivateBook.resolveCached(draft, State.book.id) : null; }
   try {
     const raw = localStorage.getItem(draftKey(pageId));
     const arr = raw ? JSON.parse(raw) : null;
@@ -1007,7 +986,6 @@ function loadDraft(pageId) {
   } catch (_) { return null; }
 }
 function clearDraft(pageId) {
-  if (privateMode) { privateDrafts.delete(pageId); return; }
   try { localStorage.removeItem(draftKey(pageId)); } catch (_) {}
 }
 function hasDraft(pageId) {
@@ -1036,7 +1014,7 @@ async function downloadBook() {
     const title = State.book && State.book.title ? State.book.title : "입문서";
     // 페이지 순서대로, 각 페이지의 최신 blocks(편집기 켜져있으면 라이브, 아니면 임시저장/서버본)
     const pages = State.pages.map((p) => ({ blocks: currentBlocksFor(p.id) || [] }));
-    const md = window.BookMarkdown.buildBookMarkdown(title, privateMode ? window.PrivateBook.canonicalizeAssets(pages, State.book.id) : pages);
+    const md = window.BookMarkdown.buildBookMarkdown(title, pages);
     window.BookMarkdown.downloadMarkdown(window.BookMarkdown.filenameFor(title), md);
     setStatus("saved", "텍스트로 다운로드됨");
   } catch (e) {
@@ -1047,40 +1025,4 @@ async function downloadBook() {
 
 function goBack() {
   location.href = "admin-book-list.html";
-}
-
-// Renew image URLs from canonical paths without persisting signed tokens.
-function setupPrivateAssetRefresh() {
-  let busy = false;
-  let last = Date.now();
-  async function refresh() {
-    if (busy || document.hidden || Date.now() - last < window.PrivateBook.refreshInterval) return;
-    busy = true;
-    try {
-      await window.PrivateBook.ready();
-      const input = State.pages.map(p => ({ ...p, blocks: currentBlocksFor(p.id) }));
-      // Prime the cache, then read live blocks again: do not overwrite edits made while signing.
-      await window.PrivateBook.resolveAssets(input, State.book.id, true);
-      State.pages.forEach(p => {
-        const blocks = window.PrivateBook.resolveCached(currentBlocksFor(p.id), State.book.id);
-        const refreshed = window.PrivateBook.resolveCached(p, State.book.id);
-        p.blocks = blocks;
-        p.html = refreshed.html;
-        const h = State.editors.get(p.id);
-        if (h) setBlocksQuiet(p.id, blocks);
-        const preview = State.nodes.get(p.id)?.querySelector('.bookedit-preview');
-        if (preview) preview.innerHTML = p.html || '';
-      });
-      last = Date.now();
-    } catch (_) {
-      setStatus('error', '비공개 인증 또는 이미지 갱신 실패 · 관리자 로그인 확인');
-    } finally { busy = false; }
-  }
-  setInterval(refresh, 60000);
-  document.addEventListener('visibilitychange', refresh);
-}
-async function privateBookLogout() {
-  if (!confirm('로그아웃하면 저장하지 않은 편집 내용은 사라집니다. 계속할까요?')) return;
-  await window.PrivateBook.logout();
-  location.href = 'admin-private-books.html';
 }
