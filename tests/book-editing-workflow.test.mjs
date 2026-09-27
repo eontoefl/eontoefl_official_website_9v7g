@@ -10,7 +10,7 @@ const filterSuggestionItems=(items,query)=>items.filter(i=>i.title.includes(quer
 const insertOrUpdateBlockForSlashMenu=(editor,block)=>editor.inserted.push(block);
 const createDesignBlock=(type,theme)=>({type,props:{theme}});
 `;
-const menu = await import('data:text/javascript;base64,'+Buffer.from(stubs+slashSource.replace(/^import .*\n/gm,'')).toString('base64'));
+const menu = await import('data:text/javascript;base64,'+Buffer.from(stubs+slashSource.replace(/^import .*\r?\n/gm,'')).toString('base64'));
 function editor(cursor={block:{type:'paragraph'}}){return {defaults:[{title:'기본 제목'}],inserted:[],getTextCursorPosition:()=>cursor};}
 test('default commands are retained and all ten former toolbar presets insert',()=>{
  const ed=editor(),items=menu.bookSlashItems(ed,{theme:'reading'});
