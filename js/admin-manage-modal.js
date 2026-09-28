@@ -3,6 +3,137 @@
 
 let currentManageApp = null;
 
+// ===== 학생 유형(프로모션/일반) 직접 전환 =====
+// 유형 칸(is_incentive_applicant) 하나로 동의 기한(프로모션 5일/일반 24시간)·5만 원 할인·첫 도착 알림톡이 갈린다.
+// 개별분석 탭 스위치로 관리자가 직접 바꾼다. 분석을 이미 보낸 학생을 바꾸면 저장 순간부터 기한을 새로 시작한다.
+const PROMO_DISCOUNT = 50000;
+const PROMO_DISCOUNT_REASON = '금액 조정';
+let _promoToggleCtx = null; // { published, savedIncentive, lockReason, auto }
+
+function _agreeWindowMs(isIncentive) {
+    return isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
+}
+
+// 동의 마감(절대 ms): 리셋 기한(override) 우선, 없으면 기준 시각 + 유형별 기간. (admin-applications.js getAnalysisAgreeDeadlineMs와 같은 계산)
+function _analysisAgreeDeadlineMs(app) {
+    const o = app.analysis_deadline_override ? new Date(app.analysis_deadline_override).getTime() : NaN;
+    if (!isNaN(o)) return o;
+    const base = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
+    return base ? new Date(base).getTime() + _agreeWindowMs(!!app.is_incentive_applicant) : NaN;
+}
+
+function _formatKstShort(ms) {
+    return new Date(ms).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// 스위치를 잠가야 하는 이유(없으면 null). 보낸 분석에만 해당.
+//  - 동의 완료: 계약 단계라 유형 차이가 없음
+//  - 기한 지남(승인·미동의): 스위치가 '다시 열기' 경로가 되지 않게 먼저 기존 방법으로 기한을 다시 열도록
+function _incentiveLockReason(app, hasAnalysis) {
+    if (!hasAnalysis) return null;
+    if (app.student_agreed_at) return '동의한 학생은 바꿀 수 없어요';
+    if (app.analysis_status === '승인') {
+        const dl = _analysisAgreeDeadlineMs(app);
+        if (!isNaN(dl) && dl <= Date.now()) return '기한이 지난 학생이에요. 먼저 기한을 다시 열어 주세요';
+    }
+    return null;
+}
+
+function _currentAnalysisStatus() {
+    return document.querySelector('#statusOptionsContainer input[name="analysis_status"]:checked')?.value || '';
+}
+
+// 보낸 분석에서 스위치가 저장된 값과 달라졌는지
+function _isIncentiveTypeChanged() {
+    const el = document.getElementById('incentiveToggle');
+    return !!(_promoToggleCtx && _promoToggleCtx.published && el && el.checked !== _promoToggleCtx.savedIncentive);
+}
+
+// 유형을 바꿔 저장할 때 확인창·안내에 쓰는 한 줄
+function _incentiveChangeNotice(toIncentive, statusValue) {
+    const typeLine = `학생 유형: ${toIncentive ? '일반 → 프로모션' : '프로모션 → 일반'}`;
+    if (statusValue !== '승인') return typeLine;
+    const deadlineStr = _formatKstShort(Date.now() + _agreeWindowMs(toIncentive));
+    return `${typeLine}\n동의 기한이 지금부터 ${toIncentive ? '5일' : '24시간'}(${deadlineStr}까지)로 다시 시작돼요.`;
+}
+
+// 스위치 변경 처리 (최초 저장 전·수정 모드 공통)
+function onIncentiveToggleChange(el) {
+    const on = el.checked;
+    const slider = el.parentElement.querySelectorAll('span');
+    slider[0].style.background = on ? '#7c68a8' : '#cbd5e1';
+    slider[1].style.left = on ? '25px' : '3px';
+    const typeLabel = document.getElementById('incentiveTypeLabel');
+    if (typeLabel) typeLabel.textContent = '학생 유형: ' + (on ? '프로모션' : '일반');
+
+    // 프로모션 ON → 입문서도 자동 ON (dispatchEvent로 즉시 DB 저장 트리거, 기존 동작)
+    if (on) {
+        const bookAccessToggle = document.getElementById('bookAccessToggle');
+        if (bookAccessToggle && !bookAccessToggle.checked) {
+            bookAccessToggle.checked = true;
+            bookAccessToggle.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // 할인: 거부·조건부승인은 저장 시 어차피 비우므로 건드리지 않는다.
+    const status = _currentAnalysisStatus();
+    const discountEl = document.getElementById('additional_discount');
+    const reasonEl = document.querySelector('[name="discount_reason"]');
+    if (discountEl && reasonEl && status !== '거부' && status !== '조건부승인') {
+        const cur = parseInt(discountEl.value) || 0;
+        const ctx = _promoToggleCtx || {};
+        const isAutoValue = cur === PROMO_DISCOUNT && reasonEl.value === PROMO_DISCOUNT_REASON;
+        if (on) {
+            // 5만 원보다 적으면 5만 원으로 올림(겹쳐 더하지 않음). 끌 때 되돌릴 수 있게 원래 값을 기억.
+            if (cur < PROMO_DISCOUNT) {
+                ctx.auto = { prevAmount: cur, prevReason: reasonEl.value };
+                discountEl.value = PROMO_DISCOUNT;
+                reasonEl.value = PROMO_DISCOUNT_REASON;
+            } else {
+                ctx.auto = null;
+            }
+        } else if (ctx.auto && isAutoValue) {
+            // 이번 화면에서 켜며 올린 할인은 원래 값으로 되돌림(학생이 아직 못 본 금액)
+            discountEl.value = ctx.auto.prevAmount;
+            reasonEl.value = ctx.auto.prevReason;
+            ctx.auto = null;
+        } else if (!ctx.published && isAutoValue) {
+            // 보내기 전: 프로모션이라 자동으로 채워져 있던 5만 원만 뺀다(다른 할인은 유지)
+            discountEl.value = 0;
+            reasonEl.value = '';
+        }
+        // 보낸 학생을 일반으로: 학생이 본 할인은 유지
+        calculateModalPrice();
+    }
+
+    // 보낸 분석: 유형이 바뀌면 예약발송을 막고, 새 기한을 안내
+    if (_promoToggleCtx && _promoToggleCtx.published) {
+        const changed = _isIncentiveTypeChanged();
+        const scheduleBtn = document.getElementById('scheduleAnalysisBtn');
+        if (scheduleBtn) {
+            if (changed) scheduleBtn.setAttribute('disabled', '');
+            else scheduleBtn.removeAttribute('disabled');
+            scheduleBtn.style.opacity = changed ? '0.5' : '1';
+            scheduleBtn.style.cursor = changed ? 'not-allowed' : 'pointer';
+            scheduleBtn.title = changed ? '유형을 바꾼 경우에는 즉시발송이나 조용히수정만 쓸 수 있어요' : '';
+        }
+        const hint = document.getElementById('incentiveChangeHint');
+        if (hint) {
+            hint.style.display = changed ? 'block' : 'none';
+            hint.textContent = changed
+                ? _incentiveChangeNotice(on, status).replace(/\n/g, ' · ') + ' · 예약발송은 쓸 수 없어요.'
+                : '';
+        }
+    }
+}
+
+function bindIncentiveToggle() {
+    const el = document.getElementById('incentiveToggle');
+    if (!el || el.dataset.bound) return;
+    el.dataset.bound = '1';
+    el.addEventListener('change', function() { onIncentiveToggleChange(this); });
+}
+
 // ===== AI 피드백 재생성 (개별분석 다시 제작) =====
 const N8N_REGEN_WEBHOOK = 'https://eontoefl.app.n8n.cloud/webhook/eontoefl-application-webhook';
 
@@ -762,6 +893,13 @@ function loadModalAnalysisTab(app) {
     const fillIsIncentive = hasPendingDraft
         ? (pendingPayload.is_incentive_applicant === true)
         : !!app.is_incentive_applicant;
+    const incentiveLockReason = _incentiveLockReason(app, hasAnalysis);
+    _promoToggleCtx = {
+        published: !!hasAnalysis,
+        savedIncentive: fillIsIncentive,
+        lockReason: incentiveLockReason,
+        auto: null
+    };
     // 프로모션 승인 제안의 빈 추가 할인 칸에만 50,000원 / 사유 '금액 조정'을 미리 채운다.
     //  - 대상: 프로모션이며 할인 칸이 비어 있고(0/없음), 아직 승인 공개 전(신규·AI초안·예약 초안·조건부/거부에서 승인 전환).
     //  - 제외: 이미 승인 공개된 행(과거 금액 보존), 기존 양수 할인(수동 입력 보존), 일반 학생(무영향).
@@ -858,12 +996,8 @@ function loadModalAnalysisTab(app) {
     const canResetDeadline = app.analysis_status === '승인' && !!app.analysis_content && !app.student_agreed_at;
     let deadlineResetStrip = '';
     if (canResetDeadline) {
-        const _ovMs = app.analysis_deadline_override ? new Date(app.analysis_deadline_override).getTime() : NaN;
-        const _baseTs = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-        const _dlMs = !isNaN(_ovMs)
-            ? _ovMs
-            : (_baseTs ? new Date(_baseTs).getTime() + (app.is_incentive_applicant ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000)) : NaN);
-        const _dlStr = isNaN(_dlMs) ? '-' : new Date(_dlMs).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+        const _dlMs = _analysisAgreeDeadlineMs(app);
+        const _dlStr = isNaN(_dlMs) ? '-' : _formatKstShort(_dlMs);
         const _expired = !isNaN(_dlMs) && _dlMs <= Date.now();
         deadlineResetStrip = `
         <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:14px; padding:14px 18px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
@@ -912,25 +1046,29 @@ function loadModalAnalysisTab(app) {
         </div>
 
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
-            <!-- 0. 프로모션 유도 학생 토글 (프로모션 폐지: 숨김. 체크박스는 DOM에 남겨 저장 로직 유지 → 항상 false. 되살리려면 display:none 제거) -->
-            <div class="form-group" style="display: none; background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); padding: 16px 20px; border-radius: 12px; border: 1px solid #f59e0b; margin-bottom: 24px; ${pointerEvents}">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fas fa-bullhorn" style="font-size: 18px; color: #d97706;"></i>
+            <!-- 0. 학생 유형(프로모션/일반) 스위치: 켜짐=프로모션. 보낸 분석은 수정 모드에서만, 동의·기한 지난 학생은 잠금 -->
+            <div class="form-group" id="incentiveToggleBox" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); ${pointerEvents}">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 38px; height: 38px; border-radius: 10px; background: #ede9f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-tag" style="font-size: 14px; color: #7c68a8;"></i>
+                        </div>
                         <div>
-                            <div style="font-weight: 600; font-size: 14px; color: #92400e;">프로모션 유도 학생</div>
-                            <div style="font-size: 12px; color: #b45309; margin-top: 2px;">ON 시 동의 데드라인 5일 적용 · 프로모션 전용 알림톡 자동 발송</div>
+                            <div id="incentiveTypeLabel" style="font-weight: 600; font-size: 14px; color: #1e293b;">학생 유형: ${fillIsIncentive ? '프로모션' : '일반'}</div>
+                            <div style="font-size: 12px; color: #94a3b8; margin-top: 2px; line-height: 1.6;">켜짐: 동의 기한 5일 · 5만 원 할인 / 꺼짐: 24시간 · 할인 없음<br>(보낸 뒤 바꾸면 기한이 지금부터 다시 시작돼요)</div>
+                            ${incentiveLockReason ? `<div style="font-size: 12px; color: #a53b22; margin-top: 4px; font-weight: 600;">${incentiveLockReason}</div>` : ''}
                         </div>
                     </div>
-                    <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
+                    <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer; flex-shrink: 0;">
                         <input type="checkbox" id="incentiveToggle" name="is_incentive_applicant"
                                ${fillIsIncentive ? 'checked' : ''}
-                               ${hasAnalysis ? 'disabled' : ''}
+                               ${(hasAnalysis || incentiveLockReason) ? 'disabled' : ''}
                                style="opacity: 0; width: 0; height: 0;">
-                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillIsIncentive ? '#f59e0b' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
+                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillIsIncentive ? '#7c68a8' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
                         <span style="position: absolute; top: 3px; left: ${fillIsIncentive ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
                     </label>
                 </div>
+                <div id="incentiveChangeHint" style="display: none; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #fbecd2; color: #b45309; font-size: 12px; font-weight: 600; line-height: 1.6;"></div>
             </div>
 
             <!-- 1. 결과 선택 -->
@@ -1283,26 +1421,9 @@ function loadModalAnalysisTab(app) {
         correctionStartDate.addEventListener('change', validateCorrectionStartDate);
     }
     
-    // 프로모션 유도 학생 토글 인터랙션
-    const incentiveToggle = document.getElementById('incentiveToggle');
+    // 학생 유형 스위치: 최초 저장 전(초안·예약 대기)은 바로 조작. 보낸 분석은 수정 모드(editAnalysis)에서 연결.
     const bookAccessToggle = document.getElementById('bookAccessToggle');
-    if (incentiveToggle && !hasAnalysis) {
-        incentiveToggle.addEventListener('change', function() {
-            const slider = this.parentElement.querySelectorAll('span');
-            if (this.checked) {
-                slider[0].style.background = '#f59e0b';
-                slider[1].style.left = '25px';
-                // 프로모션 ON → 입문서도 자동 ON (dispatchEvent로 즉시 DB 저장 트리거)
-                if (bookAccessToggle && !bookAccessToggle.checked) {
-                    bookAccessToggle.checked = true;
-                    bookAccessToggle.dispatchEvent(new Event('change'));
-                }
-            } else {
-                slider[0].style.background = '#cbd5e1';
-                slider[1].style.left = '3px';
-            }
-        });
-    }
+    if (!hasAnalysis) bindIncentiveToggle();
 
     // 입문서 제공 토글 인터랙션 (즉시 DB 저장)
     if (bookAccessToggle) {
@@ -1899,6 +2020,19 @@ async function saveModalAnalysis(event) {
     window._scheduledMode = null;
     window._scheduledAtIso = null;
 
+    // 보낸 분석의 학생 유형을 바꾼 저장인지 (바꾸면 저장 순간부터 동의 기한 새로 시작)
+    const typeChanged = _isIncentiveTypeChanged();
+    const toIncentive = document.getElementById('incentiveToggle')?.checked || false;
+    if (typeChanged && _promoToggleCtx.lockReason) {
+        alert(`학생 유형을 바꿀 수 없어요.\n\n${_promoToggleCtx.lockReason}`);
+        return;
+    }
+    if (typeChanged && mode === 'scheduled') {
+        alert('유형을 바꾼 경우에는 예약발송을 쓸 수 없어요.\n즉시발송이나 조용히수정으로 저장해주세요.');
+        return;
+    }
+    const typeChangeLine = typeChanged ? '\n\n' + _incentiveChangeNotice(toIncentive, _currentAnalysisStatus()) : '';
+
     // 모드별 confirm 메시지
     let confirmMsg;
     if (mode === 'scheduled') {
@@ -1907,9 +2041,9 @@ async function saveModalAnalysis(event) {
     } else if (mode === 'update-scheduled') {
         confirmMsg = '변경사항을 저장하시겠습니까?\n\n예약 시각은 그대로 유지됩니다.';
     } else if (mode === 'silent') {
-        confirmMsg = '알림톡 없이 조용히 수정하시겠습니까?\n\n내용은 저장되지만 학생에게 알림톡이 발송되지 않습니다.';
+        confirmMsg = '알림톡 없이 조용히 수정하시겠습니까?\n\n내용은 저장되지만 학생에게 알림톡이 발송되지 않습니다.' + typeChangeLine;
     } else {
-        confirmMsg = '개별분석을 즉시 저장하고 알림톡을 발송하시겠습니까?\n\n학생이 즉시 확인하고 동의할 수 있습니다.';
+        confirmMsg = '개별분석을 즉시 저장하고 알림톡을 발송하시겠습니까?\n\n학생이 즉시 확인하고 동의할 수 있습니다.' + typeChangeLine;
     }
     if (!confirm(confirmMsg)) return;
 
@@ -2098,6 +2232,16 @@ async function saveModalAnalysis(event) {
     if (formData.get('analysis_status') === '승인' && currentManageApp.analysis_status !== '승인') {
         updateData.analysis_first_saved_at = nowMs;
     }
+    // 보낸 분석의 학생 유형을 바꾸면 지금부터 기한을 새로 시작한다(프로모션 5일 / 일반 24시간).
+    // 기준 시각을 옮기고 리셋 기한을 지워 학생 화면·목록·리마인드·후속메일 계산이 모두 같은 새 기한을 쓰게 하고,
+    // 마감 리마인드(일반·프로모션)를 다시 준비한다.
+    const deadlineRestarted = typeChanged && formData.get('analysis_status') === '승인';
+    if (deadlineRestarted) {
+        updateData.analysis_first_saved_at = nowMs;
+        updateData.analysis_deadline_override = null;
+        updateData.analysis_agree_reminder_sent_at = null;
+        updateData.incentive_warning_sent_at = null;
+    }
 
     try {
         const updatedApp = await supabaseAPI.patch('applications', currentManageApp.id, updateData);
@@ -2164,7 +2308,11 @@ async function saveModalAnalysis(event) {
                         ? '\n\n📢 개별분석 등록 안내 알림톡(확인 필요 안내)이 발송되었습니다.'
                         : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 완료 안내 · 5일 보장)이 발송되었습니다.' : '');
             }
-            alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice);
+            const typeChangeNotice = typeChanged
+                ? '\n\n🔁 학생 유형: ' + (isIncentive ? '프로모션' : '일반')
+                    + (deadlineRestarted ? ` · 동의 기한 ${_formatKstShort(nowMs + _agreeWindowMs(isIncentive))}까지로 다시 시작` : '')
+                : '';
+            alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice + typeChangeNotice);
 
             // 앱 데이터 업데이트
             currentManageApp = updatedApp;
@@ -2200,6 +2348,10 @@ function openScheduleModal() {
     // 폼 유효성 사전 체크 — 사용자가 필수 항목을 비운 채로 예약 누르는 것 방지
     const form = document.getElementById('modalAnalysisForm');
     if (!form) return;
+    if (_isIncentiveTypeChanged()) {
+        alert('유형을 바꾼 경우에는 예약발송을 쓸 수 없어요.\n즉시발송이나 조용히수정으로 저장해주세요.');
+        return;
+    }
     if (!form.reportValidity()) return;
 
     showScheduleModal({
@@ -2411,36 +2563,17 @@ function editAnalysis() {
             }
         });
 
-        // 프로모션 유도 학생 토글 활성화 (체크박스는 위 selector에서 제외돼 있어 별도 처리)
-        //  - disabled 해제 + 박스의 클릭 차단(pointer-events) 해제
-        //  - 수정 모드에서도 토글 색/노브가 즉시 반영되도록 change 핸들러를 연결
+        // 학생 유형 스위치 활성화 (체크박스는 위 selector에서 제외돼 있어 별도 처리)
+        //  - 동의 완료·기한 지난 학생은 잠금 유지(_incentiveLockReason)
         const incentiveToggle = document.getElementById('incentiveToggle');
-        if (incentiveToggle) {
+        if (incentiveToggle && !(_promoToggleCtx && _promoToggleCtx.lockReason)) {
             incentiveToggle.removeAttribute('disabled');
-            const incentiveBox = incentiveToggle.closest('.form-group');
+            const incentiveBox = document.getElementById('incentiveToggleBox');
             if (incentiveBox) {
                 incentiveBox.style.pointerEvents = 'auto';
                 incentiveBox.style.opacity = '1';
             }
-            if (!incentiveToggle.dataset.editBound) {
-                incentiveToggle.dataset.editBound = '1';
-                incentiveToggle.addEventListener('change', function() {
-                    const slider = this.parentElement.querySelectorAll('span');
-                    if (this.checked) {
-                        slider[0].style.background = '#f59e0b';
-                        slider[1].style.left = '25px';
-                        // 프로모션 ON → 입문서도 자동 ON
-                        const bookAccessToggle = document.getElementById('bookAccessToggle');
-                        if (bookAccessToggle && !bookAccessToggle.checked) {
-                            bookAccessToggle.checked = true;
-                            bookAccessToggle.dispatchEvent(new Event('change'));
-                        }
-                    } else {
-                        slider[0].style.background = '#cbd5e1';
-                        slider[1].style.left = '3px';
-                    }
-                });
-            }
+            bindIncentiveToggle();
         }
 
         // 결과 선택 컨테이너 활성화
