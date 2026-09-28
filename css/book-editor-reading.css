@@ -26,14 +26,3 @@
 @media print {
   .bookedit-topbar,.bookedit-outline,.bookedit-slidebar,.bookedit-insert-zone { display:none!important; }
 }
-
-/* Position trial: only this book's first page, pending review before rollout.
-   Keep paper/body geometry unchanged; use the existing bottom padding. */
-.bookedit-page[data-id="29e8f4be-dc14-4188-ba58-f343b9f51aeb"] .book-page-number {
-  transform:translateY(38px);
-}
-@media(max-width:680px) {
-  .bookedit-page[data-id="29e8f4be-dc14-4188-ba58-f343b9f51aeb"] .book-page-number {
-    transform:translateY(18px);
-  }
-}

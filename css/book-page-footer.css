@@ -8,10 +8,10 @@
 .bookedit-paper .bn-editor > .bn-block-group > .book-page-number {
   order:1; flex-shrink:0; margin-top:auto!important; margin-bottom:0!important;
   padding-top:24px; text-align:center!important;
-  font-size:12px!important; line-height:1.5!important; font-weight:400!important; color:#6b7280;
+  font-size:10px!important; line-height:1.5!important; font-weight:400!important; color:#6b7280;
 }
 .bookedit-paper .book-page-number .bn-inline-content {
-  font-size:12px!important; line-height:1.5!important; font-weight:400!important; text-align:center!important;
+  font-size:10px!important; line-height:1.5!important; font-weight:400!important; text-align:center!important;
 }
 .bookedit-paper .book-page-number .bn-block-content { padding:0; }
 .bookedit-mount .bn-editor > .bn-block-group.book-numbered-page { min-height:calc(100vh - 296px); width:100%; }
@@ -28,3 +28,24 @@
 @media(max-width:760px) {
   .preview-page .book-content.book-numbered-page { min-height:calc(100vh - 40px); }
 }
+
+/* BEGIN BATCH FOOTER SPACING */
+/* Approved gap: 10px. Use existing paper padding without moving body content. */
+.bookedit-paper { --book-footer-offset:38px; }
+.preview-page .book-content { --book-footer-offset:32px; }
+.bookv2-paper { --book-footer-offset:62px; }
+.book-content.book-numbered-page > .book-page-number,
+.bookedit-paper .bn-editor > .bn-block-group > .book-page-number {
+  transform:translateY(var(--book-footer-offset,0px));
+}
+@media(max-width:760px) {
+  .preview-page .book-content { --book-footer-offset:10px; }
+}
+@media(max-width:720px) {
+  .bookv2-paper { --book-footer-offset:46px; }
+}
+@media(max-width:680px) {
+  .bookedit-paper { --book-footer-offset:18px; }
+  .bookv2-paper { --book-footer-offset:28px; }
+}
+/* END BATCH FOOTER SPACING */
