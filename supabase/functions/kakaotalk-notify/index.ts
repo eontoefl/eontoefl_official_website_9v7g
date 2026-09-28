@@ -493,7 +493,7 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
     case "incentive_analysis_complete":
       return "[이온토플] 신청하신 개별분석이 완료됐어요! 공홈 로그인 후 확인해주세요 :)";
     case "incentive_deadline_warning":
-      return "[이온토플] 개별분석 동의 마감이 6시간 남았습니다. 만료 전에 확인 부탁드려요.";
+      return `[이온토플] 개별분석 동의 마감이 ${data.time || "6"}시간 남았습니다. 만료 전에 확인 부탁드려요.`;
     case "analysis_updated":
       return "[이온토플] 개별분석이 수정되었습니다. 확인 부탁드려요.";
     case "analysis_registered":

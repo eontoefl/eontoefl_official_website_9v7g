@@ -287,31 +287,103 @@ function showRegenOverlay(on) {
     } else if (ov) { ov.remove(); }
 }
 
-// ===== 개별분석 동의 기한 리셋 (지금부터 24시간 다시 시작) =====
-// 학생이 24시간을 놓쳐 화면이 잠긴 경우, 관리자가 기한을 다시 열어준다.
-// analysis_deadline_override(절대 시각)에 지금+24h를 기록하면
-// 관리자 목록·학생 화면·마감 알림톡이 모두 이 시각을 마감으로 사용한다. (일반/프로모 무관 무조건 24h)
-async function resetAnalysisDeadline() {
+// ===== 개별분석 동의 기한 다시 열기 (텔레그램 '재개 승인'과 같은 결과) =====
+// 학생이 요청하지 않아도 관리자가 열 수 있다. 누가 열든 결과는 같다:
+//  - 동의 기한: 지금부터 24시간(유형 무관) → analysis_deadline_override
+//  - 시작일이 가까우면 다가오는 일요일로(_computeStartShift). 끝나는 날·첨삭·연장 날짜 함께 이동.
+//    테스트룸 첨삭 일정표는 DB 규칙(applications_sync_correction_schedule)이 신청서 날짜를 따라 맞춘다.
+//  - 마감 리마인드(일반·프로모션) 다시 준비
+//  - 학생의 '이어서 진행 요청'(동의 단계)이 있으면 정리 + 재개 안내 알림톡(50242), 없으면 조용히
+// '재개 승인됨' 기록(resume_approved_*)은 서버 전용 칸이라 남기지 않는다(후속메일만 사용).
+async function reopenAnalysisDeadline() {
     if (!currentManageApp) return;
-    const app = currentManageApp;
+    // 텔레그램에서 먼저 처리했을 수 있으니 최신 행으로 판단
+    let app = currentManageApp;
+    try { app = (await supabaseAPI.getById('applications', currentManageApp.id)) || currentManageApp; } catch (e) { /* 화면 값으로 진행 */ }
     if (app.analysis_status !== '승인' || app.student_agreed_at) {
-        alert('지금은 기한을 리셋할 수 있는 상태가 아니에요.\n(개별분석 "승인" 발송 + 학생 미동의 상태에서만 가능합니다.)');
+        alert('지금은 기한을 다시 열 수 있는 상태가 아니에요.\n(개별분석 "승인" 발송 + 학생 미동의 상태에서만 가능합니다.)');
         return;
     }
-    if (!confirm(`${app.name || ''}님의 개별분석 동의 기한을 지금부터 24시간으로 다시 시작할까요?\n\n관리자 목록·학생 화면·마감 알림톡이 모두 새 기한으로 갱신됩니다.`)) return;
 
-    const newDeadlineIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const deadlineMs = Date.now() + 24 * 60 * 60 * 1000;
+    const shift = _computeStartShift(app);
+    const requested = !!app.resume_requested_at && app.resume_stage === '동의';
+    const confirmLines = [
+        `${app.name || ''}님의 동의 기한을 지금부터 24시간(${_formatKstShort(deadlineMs)}까지)으로 다시 열까요?`,
+        shift.moved
+            ? `시작일 ${shift.oldStart} → ${shift.newStart} (끝나는 날·첨삭 날짜도 함께 이동)`
+            : '시작일은 그대로예요.',
+        requested
+            ? '학생이 재개를 요청해 둔 상태라 "진행 재개 안내" 알림톡이 발송돼요.'
+            : '알림톡은 보내지 않아요.'
+    ];
+    if (!confirm(confirmLines.join('\n\n'))) return;
+
+    const patch = {
+        analysis_deadline_override: new Date(deadlineMs).toISOString(),
+        analysis_agree_reminder_sent_at: null,   // 일반 리마인드 재무장
+        incentive_warning_sent_at: null,         // 프로모션 리마인드 재무장
+        ...(shift.moved ? shift.updates : {})
+    };
+    if (requested) patch.resume_requested_at = null;
+
     try {
-        await supabaseAPI.patch('applications', app.id, {
-            analysis_deadline_override: newDeadlineIso,
-            analysis_agree_reminder_sent_at: null   // 리마인드 재무장 → 새 마감 2시간 전에 다시 발송
-        });
-        alert('✅ 동의 기한을 지금부터 24시간으로 다시 시작했어요.');
+        let saved;
+        if (requested) {
+            // 같은 요청이 아직 남아 있을 때만 저장(텔레그램과 동시에 처리돼도 한 번만)
+            const url = `${SUPABASE_URL}/rest/v1/applications?id=eq.${app.id}`
+                + `&resume_requested_at=eq.${encodeURIComponent(app.resume_requested_at)}`;
+            const resp = await fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(patch)
+            });
+            if (!resp.ok) throw new Error(`저장 실패: ${resp.status}`);
+            const rows = await resp.json();
+            if (!Array.isArray(rows) || rows.length === 0) {
+                alert('이 재개 요청은 이미 다른 곳(텔레그램)에서 처리됐어요. 최신 상태로 다시 불러올게요.');
+                await openManageModal(app.id);
+                switchModalTab('analysis');
+                return;
+            }
+            saved = rows[0];
+        } else {
+            saved = await supabaseAPI.patch('applications', app.id, patch);
+        }
+
+        if (requested) {
+            try {
+                await sendKakaoAlimTalk('resume_approved', {
+                    name: saved.name || app.name,
+                    phone: saved.phone || app.phone,
+                    app_id: app.id,
+                    deadline: _formatResumeDeadline(deadlineMs)
+                });
+            } catch (e) { console.warn('재개 안내 알림톡 발송 실패:', e); }
+        }
+
+        alert('✅ 동의 기한을 다시 열었어요.\n\n'
+            + `새 기한: ${_formatKstShort(deadlineMs)}`
+            + (shift.moved ? `\n시작일: ${shift.oldStart} → ${shift.newStart}` : '')
+            + (requested ? '\n📢 진행 재개 안내 알림톡을 보냈어요.' : ''));
         await openManageModal(app.id);   // 최신 데이터로 모달 재로드
         switchModalTab('analysis');
     } catch (e) {
-        alert('기한 리셋 실패: ' + (e.message || e) + '\n\n(analysis_deadline_override 컬럼 마이그레이션이 적용됐는지 확인해주세요.)');
+        alert('기한 다시 열기 실패: ' + (e.message || e));
     }
+}
+
+// 재개 안내 알림톡(50242)의 기한 표기 'M월 D일 HH:MM' (텔레그램 formatDeadlineKST와 같은 형식)
+function _formatResumeDeadline(ms) {
+    const kst = new Date(ms + 9 * 60 * 60 * 1000);
+    const hh = String(kst.getUTCHours()).padStart(2, '0');
+    const mm = String(kst.getUTCMinutes()).padStart(2, '0');
+    return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일 ${hh}:${mm}`;
 }
 
 // 모달 열기
@@ -1007,13 +1079,13 @@ function loadModalAnalysisTab(app) {
                 </div>
                 <div>
                     <div style="font-weight:600; font-size:14px; color:#1e293b;">학생 동의 대기 중${_expired ? ' · <span style="color:#dc2626;">기한 만료됨</span>' : ''}</div>
-                    <div style="font-size:12px; color:#9a6a4a; margin-top:2px;">현재 마감 <strong>${_dlStr}</strong> · 놓친 학생에게 지금부터 24시간을 다시 줄 수 있어요</div>
+                    <div style="font-size:12px; color:#9a6a4a; margin-top:2px;">현재 마감 <strong>${_dlStr}</strong> · 지금부터 24시간 · 시작일이 가까우면 다음 일요일로</div>
                 </div>
             </div>
-            <button type="button" onclick="resetAnalysisDeadline()"
+            <button type="button" onclick="reopenAnalysisDeadline()"
                     style="padding:9px 16px; background:#ea580c; color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;"
                     onmouseover="this.style.background='#c2410c';" onmouseout="this.style.background='#ea580c';">
-                <i class="fas fa-redo" style="font-size:11px;"></i> 동의 기한 24시간 리셋
+                <i class="fas fa-redo" style="font-size:11px;"></i> 기한 다시 열기
             </button>
         </div>`;
     }
@@ -3341,16 +3413,16 @@ function _shiftYmd(ymd, days) {
     const dd = String(d.getUTCDate()).padStart(2, '0');
     return `${d.getUTCFullYear()}-${mm}-${dd}`;
 }
-function _computeDepositStartShift(app) {
+// 시작일 이동 계산(순수). 입금 확인과 기한 다시 열기가 같이 쓴다.
+//   새 시작일 = 다가오는 일요일(그 주 목요일 컷오프가 지났으면 +7일). 새 시작일이 지금보다 늦을 때만 이동.
+//   자기주도이거나 시작일이 없으면 이동 없음. (텔레그램 재개 승인 computeResumeStartShift와 같은 규칙)
+function _computeStartShift(app) {
     if (!app || app.self_paced === true) return { moved: false };
     const oldStart = app.schedule_start || null;
     if (!oldStart) return { moved: false };
 
     const sun = getUpcomingSundayStr();
     const newStart = Date.now() < getThursdayCutoffMs(sun) ? sun : _shiftYmd(sun, 7);
-
-    const shouldMove = (oldStart < _kstTodayYmd()) || (app.late_start_choice === '다음주');
-    if (!shouldMove) return { moved: false };
 
     const dayMs = 24 * 60 * 60 * 1000;
     const deltaDays = Math.round(
@@ -3366,6 +3438,14 @@ function _computeDepositStartShift(app) {
     if (app.extension_end_date) updates.extension_end_date = _shiftYmd(app.extension_end_date, deltaDays);
 
     return { moved: true, oldStart, newStart, updates };
+}
+
+// 입금 확인 시: 시작일이 이미 지났거나 학생이 '다음주'를 골랐을 때만 이동
+function _computeDepositStartShift(app) {
+    if (!app || !app.schedule_start) return { moved: false };
+    const shouldMove = (app.schedule_start < _kstTodayYmd()) || (app.late_start_choice === '다음주');
+    if (!shouldMove) return { moved: false };
+    return _computeStartShift(app);
 }
 
 async function confirmDepositFromModal(appId) {
