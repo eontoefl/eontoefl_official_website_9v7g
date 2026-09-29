@@ -946,8 +946,8 @@ function selectBatchDraft(draftId) {
                 </div>
                 ${scoringHtml}
                 <div class="batch-actions">
-                    <button class="batch-btn-delete" onclick="batchDeleteDraft('${draft.id}')" title="이 초안 삭제">
-                        <i class="fas fa-trash"></i> 삭제
+                    <button class="batch-btn-delete" onclick="batchDeleteDraft('${draft.id}')" title="이 초안 숨김">
+                        <i class="fas fa-trash"></i> 숨김
                     </button>
                 </div>
             </div>`;
@@ -971,8 +971,8 @@ function selectBatchDraft(draftId) {
                 </div>
                 ${scoringHtml}
                 <div class="batch-actions">
-                    <button class="batch-btn-delete" onclick="batchDeleteDraft('${draft.id}')" title="이 초안 삭제">
-                        <i class="fas fa-trash"></i> 삭제
+                    <button class="batch-btn-delete" onclick="batchDeleteDraft('${draft.id}')" title="이 초안 숨김">
+                        <i class="fas fa-trash"></i> 숨김
                     </button>
                     <div style="flex:1;"></div>
                     <button class="batch-btn-save" id="batchSaveBtn" onclick="batchSaveDraft('${draft.id}')">
@@ -1178,10 +1178,10 @@ async function batchDeleteDraft(draftId) {
 
     const studentName = draft.student_name || '학생';
     const weekLabel = draft.week ? ` ${draft.week}주차` : '';
-    if (!confirm(`"${studentName}"${weekLabel} 주간체크 초안을 삭제하시겠습니까?`)) return;
+    if (!confirm(`"${studentName}"${weekLabel} 주간체크 초안을 숨길까요?\n숨긴 초안은 목록에서 사라지고 다시 만들어지지 않습니다.`)) return;
 
     try {
-        await supabaseAPI.hardDelete('tr_weekly_check_drafts', draftId);
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, { status: 'dismissed' });
 
         // 로컬 데이터에서 제거
         weeklyCheckPendingDrafts = weeklyCheckPendingDrafts.filter(d => d.id !== draftId);
@@ -1214,8 +1214,8 @@ async function batchDeleteDraft(draftId) {
             }
         }
     } catch (err) {
-        console.error('초안 삭제 실패:', err);
-        alert('삭제 실패: ' + err.message);
+        console.error('초안 숨김 실패:', err);
+        alert('숨김 실패: ' + err.message);
     }
 }
 

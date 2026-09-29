@@ -2334,7 +2334,7 @@ function renderDraftRows() {
                     </button>
                 </td>
                 <td style="text-align:center;">
-                    <button class="btn-notif-del" onclick="deleteDraft('${draft.id}')" title="삭제">
+                    <button class="btn-notif-del" onclick="deleteDraft('${draft.id}')" title="숨김">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -2356,7 +2356,7 @@ function renderDraftRows() {
                     </button>
                 </td>
                 <td style="text-align:center;">
-                    <button class="btn-notif-del" onclick="deleteDraft('${draft.id}')" title="삭제">
+                    <button class="btn-notif-del" onclick="deleteDraft('${draft.id}')" title="숨김">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -2633,19 +2633,19 @@ async function sendDraft(draftId) {
 }
 
 /**
- * 초안 삭제 (hardDelete)
+ * 초안 숨김 (status='dismissed')
  */
 async function deleteDraft(draftId) {
-    if (!confirm('이 주간체크 초안을 삭제하시겠습니까?')) return;
+    if (!confirm('이 주간체크 초안을 숨길까요?\n숨긴 초안은 목록에서 사라지고 다시 만들어지지 않습니다.')) return;
 
     try {
-        await supabaseAPI.hardDelete('tr_weekly_check_drafts', draftId);
+        await supabaseAPI.patch('tr_weekly_check_drafts', draftId, { status: 'dismissed' });
         weeklyCheckDrafts = weeklyCheckDrafts.filter(d => d.id !== draftId);
-        alert('✅ 초안 삭제 완료!');
+        alert('✅ 초안을 숨겼습니다.');
         await loadNotifications(); // 목록 새로고침
     } catch (err) {
-        console.error('초안 삭제 실패:', err);
-        alert('❌ 삭제 실패: ' + err.message);
+        console.error('초안 숨김 실패:', err);
+        alert('❌ 숨김 실패: ' + err.message);
     }
 }
 
