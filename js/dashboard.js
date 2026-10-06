@@ -567,7 +567,12 @@ function renderActionItems(app) {
     const pausedCh = (typeof getActivePause === 'function') ? getActivePause(app, 'challenge') : null;
     const pausedCo = (typeof getActivePause === 'function') ? getActivePause(app, 'correction') : null;
     if (actionItems.length === 0 && (pausedCh || pausedCo)) {
-        const fmtP = (ymd) => ymd ? formatDateWithDay(ymd) : '추후 안내';
+        // 'YYYY-MM-DD' → '10월 4일(일)' (UTC 자정 산술 — 일정 계산 단일 출처 도구). 재개일 없음(무기한) → '추후 안내'
+        const fmtP = (ymd) => {
+            const d = (ymd && typeof ymdToUtcDate === 'function') ? ymdToUtcDate(ymd) : null;
+            if (!d) return '추후 안내';
+            return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${['일', '월', '화', '수', '목', '금', '토'][d.getUTCDay()]})`;
+        };
         const lines = [];
         if (pausedCh) lines.push(`내벨업챌린지: ${fmtP(pausedCh.paused_from)}부터 일시정지 · 재개 예정 ${fmtP(pausedCh.resume_on)}`);
         if (pausedCo) lines.push(`스라첨삭: ${fmtP(pausedCo.paused_from)}부터 일시정지 · 재개 예정 ${fmtP(pausedCo.resume_on)}`);
