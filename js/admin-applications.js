@@ -225,6 +225,7 @@ function getAdminActionMessage(app) {
         if (liveStatus.key === 'ready') result = { text: `${nLabel}시작 대기`, color: '#3b82f6', bgColor: '#dbeafe', icon: 'fa-clock', isLive: true };
         else if (liveStatus.key === 'active') result = { text: `${nLabel}진행중`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true, glint: true };
         else if (liveStatus.key === 'completed') result = { text: `${nLabel}종료`, color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
+        else if (liveStatus.key === 'paused') result = { text: `${nLabel}정지중`, color: '#ea580c', bgColor: '#ffedd5', icon: 'fa-pause-circle', isLive: true };
         else if (liveStatus.key === 'refunded') result = { text: '환불완료', color: '#a53b22', bgColor: '#f7e7e1', icon: 'fa-undo', isLive: true };
         else if (liveStatus.key === 'dropped') result = { text: '중도포기', color: '#64748b', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
         
@@ -239,6 +240,7 @@ function getAdminActionMessage(app) {
                     'ext_active': { color: '#7c3aed', icon: 'fa-pen-nib' },
                     'ext_waiting': { color: '#3b82f6', icon: 'fa-hourglass-half' },
                     'completed': { color: '#22c55e', icon: 'fa-check-circle' },
+                    'paused': { color: '#ea580c', icon: 'fa-pause' },
                     'refunded': { color: '#a53b22', icon: 'fa-undo' }
                 };
                 const corrStyle = corrColorMap[corrStatus.key] || { color: '#94a3b8', icon: 'fa-circle' };
@@ -340,6 +342,7 @@ function getAppStageFilter(app) {
         if (liveStatus.key === 'ready') return 'live_ready';
         if (liveStatus.key === 'active') return 'live_active';
         if (liveStatus.key === 'completed') return 'live_completed';
+        if (liveStatus.key === 'paused') return 'live_paused';
         if (liveStatus.key === 'refunded') return 'live_refunded';
         if (liveStatus.key === 'dropped') return 'live_dropped';
     }

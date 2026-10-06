@@ -126,6 +126,28 @@ const supabaseAPI = {
     async put(table, id, data) {
         return this.patch(table, id, data);
     },
+
+    // RPC: 서버 함수 호출 (2026-10-06 일시정지에서 처음 사용 — 정지·재개·취소를 서버가 한 트랜잭션으로 처리)
+    async rpc(fnName, args = {}) {
+        const url = `${SUPABASE_URL}/rest/v1/rpc/${fnName}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(args || {})
+        });
+        const text = await response.text();
+        let body = null;
+        try { body = text ? JSON.parse(text) : null; } catch (e) { /* 비JSON 응답 */ }
+        if (!response.ok) {
+            // 서버 함수의 RAISE EXCEPTION 문구(message)를 그대로 보여준다
+            throw new Error((body && (body.message || body.msg || body.hint)) || `RPC ${fnName} 실패 (${response.status})`);
+        }
+        return body;
+    },
     
     // DELETE: 데이터 삭제 (소프트 삭제)
     async delete(table, id) {
@@ -437,23 +459,73 @@ function ymdAddDays(ymd, n) {
     return utcDateToYmd(d);
 }
 
-// 내챌 과제 날짜 = 시작일 + (주차−1)×7 + 요일 번호(일=0…토=6). UTC 자정 Date, 시작일 없으면 null.
+// ===== 일시정지 (2026-10-06, 2단계) =====
+// 신청서의 정지 이력(challenge_pauses / correction_pauses, 배열)을 읽어 판정·보정한다. 서버 is_paused / pause_adjusted_date와 같은 규칙.
+//   항목 = { paused_from, resume_on(무기한 null), shift_days(7의 배수), status 'open'|'resumed'|'canceled', ... }
+function getPauseEntries(app, kind) {
+    if (!app) return [];
+    let raw = kind === 'correction' ? app.correction_pauses : app.challenge_pauses;
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
+    return Array.isArray(raw) ? raw.filter(e => e && e.paused_from) : [];
+}
+function _pauseTodayYmd() { return utcDateToYmd(getEffectiveToday()); }
+// 오늘(기본 = 효력 오늘) 정지 중인 항목. 없으면 null.
+function getActivePause(app, kind, todayYmd) {
+    const t = todayYmd || _pauseTodayYmd();
+    return getPauseEntries(app, kind).find(e => e.status === 'open' && t >= e.paused_from && (!e.resume_on || t < e.resume_on)) || null;
+}
+// 아직 시작 안 한 예약 정지 항목. 없으면 null.
+function getScheduledPause(app, kind, todayYmd) {
+    const t = todayYmd || _pauseTodayYmd();
+    return getPauseEntries(app, kind).find(e => e.status === 'open' && e.paused_from > t) || null;
+}
+function isPausedNow(app, kind) { return !!getActivePause(app, kind); }
+// "시작일+오프셋"으로 계산한 날짜에 정지 기간을 더한다. 무기한 정지 구간에 걸리면 null(미정). 저장된 날짜에는 쓰지 않는다.
+function pauseAdjustedYmd(app, kind, nominalYmd) {
+    if (!nominalYmd) return nominalYmd;
+    let v = nominalYmd;
+    const entries = getPauseEntries(app, kind).filter(e => e.status !== 'canceled').sort((a, b) => (a.paused_from < b.paused_from ? -1 : 1));
+    for (const e of entries) {
+        if (v >= e.paused_from) {
+            if (e.shift_days == null || e.shift_days === '') return null;
+            v = ymdAddDays(v, Number(e.shift_days));
+        }
+    }
+    return v;
+}
+// 시작일~today 사이에 "정지로 멈춰 있던 날수" (경과일·주차 계산에서 뺀다)
+function getPausedDaysUntil(app, kind, todayYmd) {
+    const t = todayYmd || _pauseTodayYmd();
+    const tDate = ymdToUtcDate(t);
+    if (!tDate) return 0;
+    let days = 0;
+    for (const e of getPauseEntries(app, kind)) {
+        if (e.status === 'canceled' || t < e.paused_from) continue;
+        const elapsed = Math.floor((tDate.getTime() - ymdToUtcDate(e.paused_from).getTime()) / (24 * 60 * 60 * 1000));
+        days += (e.shift_days == null || e.shift_days === '') ? elapsed : Math.min(Number(e.shift_days), elapsed);
+    }
+    return days;
+}
+
+// 내챌 과제 날짜 = 시작일 + (주차−1)×7 + 요일 번호(일=0…토=6) + 정지 기간. UTC 자정 Date.
+// 시작일 없으면 null, 무기한 정지 구간에 걸린 과제도 null(미정).
 function getChallengeTaskDate(app, week, dayIndex) {
     const start = ymdToUtcDate(app && app.schedule_start);
     if (!start) return null;
     start.setUTCDate(start.getUTCDate() + (week - 1) * 7 + dayIndex);
-    return start;
+    return ymdToUtcDate(pauseAdjustedYmd(app, 'challenge', utcDateToYmd(start)));
 }
 
 function getChallengeTaskYmd(app, week, dayIndex) {
     return utcDateToYmd(getChallengeTaskDate(app, week, dayIndex));
 }
 
-// 시작일부터 today(UTC 자정 Date)까지 경과 일수 = floor((today − 시작일)/1일). 시작일 없으면 null.
+// 시작일부터 today(UTC 자정 Date)까지 경과 일수 = floor((today − 시작일)/1일) − 정지로 멈춘 날수. 시작일 없으면 null.
 function getChallengeDayDiff(app, today) {
     const start = ymdToUtcDate(app && app.schedule_start);
     if (!start || !today) return null;
-    return Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    const nominal = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    return nominal - getPausedDaysUntil(app, 'challenge', utcDateToYmd(today));
 }
 
 // 주차(보정 없음) = floor(경과일/7) + 1. 하한·상한 보정은 호출처가 한다(화면마다 규칙이 달라서).
@@ -482,13 +554,14 @@ function getChallengeEndDate(app, mode) {
     return ymdToUtcDate(getChallengeEndYmd(app, mode));
 }
 
-// 첨삭 12회차 날짜('YYYY-MM-DD'): 첨삭 종료일(correction_end_date)이 있으면 그 날, 없으면 시작일+25일.
+// 첨삭 12회차 날짜('YYYY-MM-DD'): 첨삭 종료일(correction_end_date)이 있으면 그 날(저장값 — 재개 때 이미 밀려 있음),
+// 없으면 시작일+25일에 정지 기간 보정. 무기한 정지 중이면 null.
 // (학생 대시보드 연장 신청 마감 계산 출처. 정규는 getCorrSessionDate(12)=시작+25와 같다.)
 function getCorrSession12Ymd(app) {
     if (!app) return null;
     if (app.correction_end_date) return app.correction_end_date;
     if (!app.correction_start_date) return null;
-    return ymdAddDays(app.correction_start_date, 25);
+    return pauseAdjustedYmd(app, 'correction', ymdAddDays(app.correction_start_date, 25));
 }
 
 // ===== 공통 유틸: 계약 동의 이후 단계 판정 =====
@@ -519,6 +592,9 @@ function getAppLiveStatus(app) {
 
     if (!start) return null;
 
+    // 일시정지 중 (환불·중도포기 다음, 종료 판정보다 앞 — 정지 중 종료일이 지나도 "종료"로 보지 않는다)
+    if (isPausedNow(app, 'challenge')) return { key: 'paused', label: '일시정지', color: '#ea580c', bg: '#ffedd5', icon: 'fa-pause-circle' };
+
     if (today < start) return { key: 'ready', label: '시작 대기', color: '#3b82f6', bg: '#dbeafe', icon: 'fa-clock' };
 
     if (end && today >= end) {
@@ -541,20 +617,14 @@ function isCorrectionActive(app) {
     return today >= start;
 }
 
-// 시작일 + 27일 10:00 KST(= 01:00 UTC) 종료 시점 헬퍼
-// (getCorrectionWindow 안에서만 호출 — 종료 시점 계산 출처를 하나로 합침)
-function _correctionEndKST(startDate) {
-    const end = new Date(startDate);
-    end.setDate(end.getDate() + 27);
-    return new Date(end.getFullYear(), end.getMonth(), end.getDate(), 1, 0, 0);
-}
-
 // ===== 첨삭 종료 시점 출처 1개 =====
 // phase 1 = 1학기(1~12세션), phase 2 = 연장(13~24세션).
-//   종료일(correction_end_date / extension_end_date)이 지정돼 있으면
+//   종료일(correction_end_date / extension_end_date)이 지정돼 있으면(자기주도 첨삭)
 //     그 날짜가 "마지막 1차 제출 가능일" → 종료는 그 다음날부터.
 //     endYmd = 종료일, endMoment = (종료일 + 1일) 01:00(로컬 = 10:00 KST와 같은 관례 오프셋).
-//   비어 있으면 기존 4주 고정: endYmd = 시작일+27일, endMoment = _correctionEndKST(시작일).
+//     (이 저장값은 일시정지 재개 때 이미 밀려 있으므로 여기서 다시 보정하지 않는다)
+//   비어 있으면(일반 첨삭) 4주 고정: endYmd = 시작일+27일 + 정지 기간, endMoment = 그 날 01:00(로컬).
+//     무기한 정지 중이면 endYmd·endMoment 모두 null(미정).
 // 반환: { endYmd, endMoment }. 시작일이 없으면 null.
 function getCorrectionWindow(app, phase) {
     if (!app) return null;
@@ -566,9 +636,10 @@ function getCorrectionWindow(app, phase) {
         const endMoment = new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1, 1, 0, 0);
         return { endYmd: endCol, endMoment };
     }
-    const start = new Date(startYmd);
-    const endMoment = _correctionEndKST(start);
-    const endYmd = ymdAddDays(startYmd, 27);   // 시작일+27일 (일정 계산 단일 출처)
+    const endYmd = pauseAdjustedYmd(app, 'correction', ymdAddDays(startYmd, 27));   // 시작일+27일 (일정 계산 단일 출처) + 정지 보정
+    if (!endYmd) return { endYmd: null, endMoment: null };
+    const e2 = new Date(endYmd);
+    const endMoment = new Date(e2.getFullYear(), e2.getMonth(), e2.getDate(), 1, 0, 0);   // 기존 _correctionEndKST와 같은 시각
     return { endYmd, endMoment };
 }
 
@@ -583,6 +654,9 @@ function getCorrectionStatus(app) {
     if (app.correction_status === 'refunded') return { key: 'refunded', label: '환불', color: '#ef4444', icon: 'fa-undo' };
 
     if (!app.correction_start_date) return { key: 'pending', label: '시작일 미설정', color: '#94a3b8', icon: 'fa-clock' };
+
+    // 일시정지 중 (환불 다음, 날짜 판정보다 앞)
+    if (isPausedNow(app, 'correction')) return { key: 'paused', label: '일시정지', adminLabel: '첨삭 정지중', color: '#ea580c', icon: 'fa-pause' };
 
     const today = getEffectiveToday();
     const start = new Date(app.correction_start_date);

@@ -263,7 +263,8 @@ function getFinalTaskCompletion(app) {
 }
 
 function isPracticeExcluded(app) {
-    return app.app_status === 'refunded' || app.app_status === 'dropped';
+    // 환불·중도포기 + 내챌 일시정지 중(크론 auto_enable_practice_mode의 is_paused 가드와 동일)
+    return app.app_status === 'refunded' || app.app_status === 'dropped' || isPausedNow(app, 'challenge');
 }
 
 function renderPracticeSection() {

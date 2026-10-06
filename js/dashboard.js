@@ -563,6 +563,24 @@ function renderActionItems(app) {
         });
     }
     
+    // 일시정지 중 (내챌 또는 첨삭): 할 일 대신 정지 안내 카드
+    const pausedCh = (typeof getActivePause === 'function') ? getActivePause(app, 'challenge') : null;
+    const pausedCo = (typeof getActivePause === 'function') ? getActivePause(app, 'correction') : null;
+    if (actionItems.length === 0 && (pausedCh || pausedCo)) {
+        const fmtP = (ymd) => ymd ? formatDateWithDay(ymd) : '추후 안내';
+        const lines = [];
+        if (pausedCh) lines.push(`내벨업챌린지: ${fmtP(pausedCh.paused_from)}부터 일시정지 · 재개 예정 ${fmtP(pausedCh.resume_on)}`);
+        if (pausedCo) lines.push(`스라첨삭: ${fmtP(pausedCo.paused_from)}부터 일시정지 · 재개 예정 ${fmtP(pausedCo.resume_on)}`);
+        actionItemsContent.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+                <i class="fas fa-pause-circle" style="font-size: 48px; margin-bottom: 16px; color: #ea580c;"></i>
+                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">지금은 일시정지 중이에요</h3>
+                <p style="font-size: 14px; line-height: 1.7;">${lines.join('<br>')}<br>정지 기간 동안에는 새 과제 마감과 알림이 멈추고, 재개하면 남은 일정이 정지 기간만큼 뒤로 밀려 그대로 이어집니다.</p>
+            </div>
+        `;
+        return;
+    }
+
     // 8️⃣ 택배 발송 등록(또는 발송 생략) 직후 (완전 완료)
     if (actionItems.length === 0 && (app.shipping_completed || app.shipping_waived)) {
         const shippingNote = app.shipping_waived
@@ -1279,10 +1297,12 @@ async function renderProgramInfo(app) {
 
     // 첨삭 기간 계산 (첨삭 종료일 출처 1개 = getCorrectionWindow). 연장 시 1~12세션·13~24세션을 각각 한 줄로 표시.
     const c1Start = (app.correction_enabled && app.correction_start_date) ? new Date(app.correction_start_date) : null;
-    const c1End = c1Start ? new Date(getCorrectionWindow(app, 1).endYmd) : null;
+    const c1EndYmd = c1Start ? getCorrectionWindow(app, 1).endYmd : null;   // 무기한 정지 중이면 null(미정)
+    const c1End = c1EndYmd ? new Date(c1EndYmd) : null;
     const hasCorrExt = !!(app.extension_enabled && app.extension_start_date);
     const c2Start = hasCorrExt ? new Date(app.extension_start_date) : null;
-    const c2End = c2Start ? new Date(getCorrectionWindow(app, 2).endYmd) : null;
+    const c2EndYmd = c2Start ? getCorrectionWindow(app, 2).endYmd : null;
+    const c2End = c2EndYmd ? new Date(c2EndYmd) : null;
 
     // 첨삭 상태 텍스트
     let correctionStatusHtml = '';
@@ -1296,11 +1316,12 @@ async function renderProgramInfo(app) {
                 'ext_active': { bg: '#ede9fe', color: '#7c3aed' },
                 'ext_waiting': { bg: '#dbeafe', color: '#2563eb' },
                 'completed': { bg: '#dcfce7', color: '#16a34a' },
+                'paused': { bg: '#ffedd5', color: '#ea580c' },
                 'refunded': { bg: '#fef2f2', color: '#ef4444' }
             };
             const style = statusColors[corrStatus.key] || { bg: '#f1f5f9', color: '#64748b' };
-            // active/completed/refunded는 고정 라벨, 그 외(연장 등)는 status.label 사용
-            const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? '환불' : corrStatus.label;
+            // active/completed/refunded/paused는 고정 라벨, 그 외(연장 등)는 status.label 사용
+            const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? '환불' : corrStatus.key === 'paused' ? '일시정지' : corrStatus.label;
             correctionStatusHtml = `<span style="display:inline-block; white-space:nowrap; background:${style.bg}; color:${style.color}; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">${label}</span>`;
         }
     }
@@ -1329,12 +1350,12 @@ async function renderProgramInfo(app) {
         ${c1Start ? `
         <div class="program-row">
             <span class="program-label">${hasCorrExt ? '첨삭 1~12세션' : '첨삭 기간'}</span>
-            <span class="program-value">${formatDateWithDay(c1Start)} ~ ${formatDateWithDay(c1End)}${hasCorrExt ? '' : correctionStatusHtml}</span>
+            <span class="program-value">${formatDateWithDay(c1Start)} ~ ${c1End ? formatDateWithDay(c1End) : '미정(일시정지)'}${hasCorrExt ? '' : correctionStatusHtml}</span>
         </div>
         ${hasCorrExt ? `
         <div class="program-row">
             <span class="program-label">첨삭 13~24세션</span>
-            <span class="program-value">${formatDateWithDay(c2Start)} ~ ${formatDateWithDay(c2End)}${correctionStatusHtml}</span>
+            <span class="program-value">${formatDateWithDay(c2Start)} ~ ${c2End ? formatDateWithDay(c2End) : '미정(일시정지)'}${correctionStatusHtml}</span>
         </div>
         ` : ''}
         ` : ''}

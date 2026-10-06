@@ -39,6 +39,10 @@ const TEMPLATE_IDS: Record<string, number> = {
   challenge_deadline_extended:  50247,  // 내벨업챌린지 마감 연장 안내 (버튼 없음)
   resume_approved:             50242,  // 진행 재개 승인 안내 (기한 리셋 완료)
   resume_held:                 50243,  // 진행 재개 보류 안내 (카톡 개별 안내 예정)
+  // 일시정지(2026-10-06): 템플릿 검수 전 — 번호 0이면 아래 "Unknown template type"으로 거절되어 발송되지 않는다.
+  // 검수 완료 후 번호를 넣고 본문을 승인 원문과 글자 단위로 맞출 것.
+  schedule_paused:             0,      // 일시정지 안내 (내챌/첨삭 공통, #{target})
+  schedule_resumed:            0,      // 재개 안내 (재개일·변경된 종료일·첨삭이면 다음 회차)
 };
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
@@ -462,6 +466,33 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "위 시간까지 테스트룸에서 해당 날짜의 과제를 완료해주시면 됩니다 :)",
       ].join("\n");
 
+    case "schedule_paused":
+      // [검수 전 임시 본문] 변수: #{name} / #{target} / #{paused_from} / #{resume_on}('추후 안내' 가능)
+      return [
+        "이온토플 - 일시정지 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `신청하신 ${data.target}이(가) ${data.paused_from}부터 일시정지됩니다.`,
+        `재개 예정일: ${data.resume_on}`,
+        "",
+        "정지 기간 동안에는 과제 마감과 알림이 멈추며, 재개하면 남은 일정이 정지 기간만큼 뒤로 밀려 그대로 이어집니다.",
+      ].join("\n");
+
+    case "schedule_resumed":
+      // [검수 전 임시 본문] 변수: #{name} / #{target} / #{resume_on} / #{end_date} / #{next_session}(첨삭만, 비면 빈 문자열)
+      return [
+        "이온토플 - 재개 안내",
+        "",
+        `${data.name}님, 안녕하세요 :)`,
+        "",
+        `일시정지했던 ${data.target}이(가) ${data.resume_on}부터 다시 시작됩니다.`,
+        `변경된 종료일: ${data.end_date}`,
+        ...(data.next_session ? [`다음 회차: ${data.next_session}`] : []),
+        "",
+        "테스트룸에서 이어서 진행해주세요 :)",
+      ].join("\n");
+
     default:
       return "";
   }
@@ -526,6 +557,10 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 스라첨삭 마감이 연장되었습니다. 테스트룸에서 변경된 마감을 확인해주세요.";
     case "challenge_deadline_extended":
       return "[이온토플] 내벨업챌린지 과제 마감이 연장되었습니다. 테스트룸에서 변경된 마감을 확인해주세요.";
+    case "schedule_paused":
+      return `[이온토플] ${data.target} 일시정지 ${data.paused_from}부터. 재개 예정 ${data.resume_on}`;
+    case "schedule_resumed":
+      return `[이온토플] ${data.target} ${data.resume_on}부터 재개. 변경된 종료일 ${data.end_date}. https://testroom.eonfl.com`;
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -540,7 +575,8 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "correction_start_reminder") {
     return `${SITE_URL}/my-dashboard.html`;
   }
-  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open") {
+  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open"
+      || type === "schedule_resumed") {
     return TESTROOM_URL;
   }
   // 50244(세션 당일 안내) 버튼 "테스트룸 바로가기" — 템플릿에 등록된 링크가 http:// 이므로

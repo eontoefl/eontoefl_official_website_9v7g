@@ -140,15 +140,37 @@ function _parseCorrSessionDates(raw) {
 }
 
 /**
+ * 'YYYY-MM-DD'에 첨삭 일시정지 기간을 더한다(테스트룸 timezone-utils.js pauseAdjustedYmd와 같은 규칙).
+ *   pauses = applications.correction_pauses 배열. 무기한 정지 구간에 걸리면 null(미정).
+ */
+function _corrPauseAdjustYmd(ymd, pauses) {
+    if (!ymd || !Array.isArray(pauses) || pauses.length === 0) return ymd;
+    var v = ymd;
+    var list = pauses.filter(function (e) { return e && e.paused_from && e.status !== 'canceled'; })
+                     .sort(function (a, b) { return a.paused_from < b.paused_from ? -1 : 1; });
+    for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (v >= e.paused_from) {
+            if (e.shift_days == null || e.shift_days === '') return null;
+            var d = new Date(v + 'T00:00:00');
+            d.setDate(d.getDate() + Number(e.shift_days));
+            v = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+    }
+    return v;
+}
+
+/**
  * 세션의 배정 날짜(로컬 00:00 Date) 또는 null.
- *   - phase 1이고 저장된 확정 일정표(session_dates)에 그 세션 날짜가 있으면 그 날짜(자기주도).
+ *   - phase 1이고 저장된 확정 일정표(session_dates)에 그 세션 날짜가 있으면 그 날짜(자기주도 — 재개 때 이미 밀려 있음).
  *   - phase 2이고 연장 확정 일정표(extension_session_dates)에 그 세션 날짜가 있으면 그 날짜(연장 자기주도).
- *   - 그 외: (해당 학기 시작일) + dayOffset. (기존 학생·연장·호주 전부 이 줄.)
+ *   - 그 외: (해당 학기 시작일) + dayOffset + 일시정지 기간(pauses). 무기한 정지 중이면 null.
  * @param {object} scheduleData
  * @param {object} session - CORRECTION_SCHEDULE 항목
+ * @param {Array} [pauses] - applications.correction_pauses (없으면 보정 없음)
  * @returns {Date|null}
  */
-function getCorrSessionDate(scheduleData, session) {
+function getCorrSessionDate(scheduleData, session, pauses) {
     if (session && session.phase !== 2) {
         var parsed = _parseCorrSessionDates(scheduleData && scheduleData.session_dates);
         if (parsed && parsed.dates[session.session - 1]) {
@@ -164,7 +186,9 @@ function getCorrSessionDate(scheduleData, session) {
     if (!base) return null;
     var d = new Date(base + 'T00:00:00');
     d.setDate(d.getDate() + session.dayOffset);
-    return d;
+    var ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    var adj = _corrPauseAdjustYmd(ymd, pauses);
+    return adj ? new Date(adj + 'T00:00:00') : null;
 }
 
 // ------------------------------------------------------------

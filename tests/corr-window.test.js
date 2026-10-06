@@ -27,9 +27,17 @@ function extractFn(name, text) {
 }
 
 const cfgSrc = fs.readFileSync(path.join(__dirname, "..", "js", "supabase-config.js"), "utf8");
-const winCode = extractFn("_correctionEndKST", cfgSrc) + "\n" + extractFn("getCorrectionWindow", cfgSrc);
-const winFactory = new Function(winCode + "\nreturn { getCorrectionWindow, _correctionEndKST };");
-const { getCorrectionWindow, _correctionEndKST } = winFactory();
+// getCorrectionWindow는 2026-10-06부터 일정 계산 단일 출처(ymd 도구) + 일시정지 보정(pauseAdjustedYmd)을 쓴다 → 같이 추출
+const winCode = ["ymdToUtcDate", "utcDateToYmd", "ymdAddDays", "getPauseEntries", "pauseAdjustedYmd", "getCorrectionWindow"]
+    .map(n => extractFn(n, cfgSrc)).join("\n");
+// 옛 _correctionEndKST(시작+27일 01:00 로컬) — 통합 후에도 결과가 같아야 한다는 기준값으로만 유지
+function _correctionEndKST(startDate) {
+    const end = new Date(startDate);
+    end.setDate(end.getDate() + 27);
+    return new Date(end.getFullYear(), end.getMonth(), end.getDate(), 1, 0, 0);
+}
+const winFactory = new Function(winCode + "\nreturn { getCorrectionWindow };");
+const { getCorrectionWindow } = winFactory();
 
 function ymdOf(d) {
     return d.getFullYear() + "-" +

@@ -892,6 +892,9 @@ function loadModalInfoTab(app) {
 
         <!-- 수강 상태 관리 (세팅 완료된 학생만 표시) -->
         ${renderAppStatusSection(app)}
+
+        <!-- 일시정지 (진행 중인 내챌·첨삭만 표시) -->
+        ${renderPauseSection(app)}
     `;
 }
 
@@ -4210,6 +4213,8 @@ document.addEventListener('keydown', function(e) {
 function renderAppStatusSection(app) {
     const status = getAppLiveStatus(app);
     if (!status) return ''; // 세팅 미완료면 표시 안 함
+    // 일시정지 중이면 수강 상태 버튼은 "진행중" 기준으로 보여준다(정지는 아래 일시정지 섹션에서 다룸)
+    const btnKey = status.key === 'paused' ? 'active' : status.key;
 
     const statuses = [
         { key: 'active', label: '진행중', color: '#7c3aed', bg: '#ede9fe', icon: 'fa-running' },
@@ -4247,7 +4252,7 @@ function renderAppStatusSection(app) {
                 <button onclick="selectAppStatus('${s.key}')"
                     id="appStatusBtn_${s.key}"
                     style="display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border-radius:20px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s;
-                    ${status.key === s.key
+                    ${btnKey === s.key
                         ? `background:${s.color}; color:white; border:2px solid ${s.color};`
                         : `background:white; color:${s.color}; border:2px solid #e2e8f0;`}">
                     <i class="fas ${s.icon}"></i> ${s.label}
@@ -4281,7 +4286,8 @@ let pendingAppStatus = null;
 
 function selectAppStatus(key) {
     const current = getAppLiveStatus(currentManageApp);
-    if (current && current.key === key) return; // 이미 같은 상태
+    const currentKey = current && (current.key === 'paused' ? 'active' : current.key);   // 일시정지 중은 버튼상 "진행중"
+    if (current && currentKey === key) return; // 이미 같은 상태
 
     if (key === 'refunded' || key === 'dropped') {
         pendingAppStatus = key;
@@ -4323,7 +4329,175 @@ function cancelAppStatusChange() {
     document.getElementById('appStatusForm').style.display = 'none';
     // 원래 상태로 버튼 복원
     const current = getAppLiveStatus(currentManageApp);
-    if (current) highlightAppStatusBtn(current.key);
+    if (current) highlightAppStatusBtn(current.key === 'paused' ? 'active' : current.key);
+}
+
+// ===== 일시정지 관리 섹션 (2026-10-06, 2단계) =====
+// 정지·재개·취소는 서버 함수(schedule_pause_set / _resume / _cancel)가 한 트랜잭션으로 처리한다(날짜 밀기·되돌리기 포함).
+function _pauseKrDate(ymd) {
+    if (!ymd) return '추후 안내';
+    const d = ymdToUtcDate(ymd);
+    if (!d) return String(ymd);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${days[d.getUTCDay()]})`;
+}
+function _pauseLastSundayYmd() {
+    const t = getEffectiveToday();
+    return ymdAddDays(utcDateToYmd(t), -t.getUTCDay());
+}
+// 정지 시작일과 같은 요일 중 오늘 이후 첫 날(재개일 기본값)
+function _pauseNextSameWeekday(fromYmd) {
+    const today = _pauseTodayYmd();
+    let v = ymdAddDays(fromYmd, 7);
+    while (v < today) v = ymdAddDays(v, 7);
+    return v;
+}
+function _pauseAdminName() {
+    try { const u = JSON.parse(localStorage.getItem('iontoefl_user') || 'null'); return (u && (u.name || u.email)) || 'admin'; } catch (e) { return 'admin'; }
+}
+
+function renderPauseSection(app) {
+    const live = getAppLiveStatus(app);
+    const corr = app.correction_enabled ? getCorrectionStatus(app) : null;
+    // D15·V3: 진행 중(또는 정지 중)인 것만. 종료일 없는 옛 자기주도는 미지원.
+    const chEligible = !!live && (live.key === 'active' || live.key === 'paused') && !(app.self_paced && !app.self_paced_end_date);
+    const coEligible = !!corr && (corr.key === 'active' || corr.key === 'ext_active' || corr.key === 'paused');
+    if (!chEligible && !coEligible) return '';
+
+    const blocks = [];
+    if (chEligible) blocks.push(_renderPauseBlock(app, 'challenge', '내벨업챌린지'));
+    if (coEligible) blocks.push(_renderPauseBlock(app, 'correction', '스라첨삭'));
+    return `
+    <div class="info-card" style="margin-top: 24px;">
+        <h3 class="info-card-title"><i class="fas fa-pause-circle"></i> 일시정지</h3>
+        <div style="font-size:12px; color:#94a3b8; margin:-4px 0 12px; line-height:1.6;">
+            정지 중엔 그 학생에게 가는 알림톡·자동 처리가 멈추고, 테스트룸은 읽기 전용(다시풀기만)이 됩니다.<br>
+            재개하면 정지 기간만큼 정지 이후 일정이 뒤로 밀립니다. 재개일은 정지 시작일과 <b>같은 요일(7일 단위)</b>이고, 소급 정지는 <b>최근 일요일</b>까지 가능합니다.
+        </div>
+        ${blocks.join('')}
+    </div>`;
+}
+
+function _renderPauseBlock(app, kind, label) {
+    const active = getActivePause(app, kind);
+    const scheduled = getScheduledPause(app, kind);
+    const entries = getPauseEntries(app, kind).slice().reverse();
+    const today = _pauseTodayYmd();
+    const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:none; border-radius:8px; background:#eef1f5; font-family:\'Pretendard\'; font-size:14px;';
+    const chip = (text, color, bg) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:600; background:${bg}; color:${color};">${text}</span>`;
+    let body = '';
+
+    if (active) {
+        const until = active.resume_on ? `재개 예정 ${_pauseKrDate(active.resume_on)}` : '무기한(재개일 미정)';
+        body = `
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                ${chip(`<i class="fas fa-pause-circle"></i> 정지 중 · ${_pauseKrDate(active.paused_from)}부터`, '#ea580c', '#ffedd5')}
+                <span style="font-size:13px; color:#475569;">${until}</span>
+            </div>
+            ${active.resume_on ? '' : `
+            <div style="padding:14px; background:#f8fafc; border-radius:10px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 (정지 시작일 ${_pauseKrDate(active.paused_from)}과 같은 요일)</label>
+                <input type="date" id="pauseResumeOn_${kind}" value="${_pauseNextSameWeekday(active.paused_from)}" min="${today}" step="7" style="${inputStyle}">
+                <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+                    <button onclick="pauseResumeFromModal('${kind}')" style="padding:8px 20px; background:#7c3aed; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-play"></i> 재개</button>
+                </div>
+            </div>`}`;
+    } else if (scheduled) {
+        body = `
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                ${chip(`<i class="fas fa-clock"></i> 정지 예약 · ${_pauseKrDate(scheduled.paused_from)} ~ ${scheduled.resume_on ? _pauseKrDate(scheduled.resume_on) : '무기한'}`, '#b45309', '#fef3c7')}
+                <button onclick="pauseCancelFromModal('${kind}')" style="padding:6px 14px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:12px;">예약 취소</button>
+            </div>`;
+    } else {
+        body = `
+            <div style="padding:14px; background:#f8fafc; border-radius:10px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">정지 시작일</label>
+                        <input type="date" id="pauseFrom_${kind}" value="${today}" min="${_pauseLastSundayYmd()}" max="${ymdAddDays(today, 180)}" style="${inputStyle}">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 <span style="font-weight:400; color:#94a3b8;">(비우면 무기한)</span></label>
+                        <input type="date" id="pauseResumeOn_${kind}" value="" style="${inputStyle}">
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <input type="text" id="pauseNote_${kind}" placeholder="메모 (선택) — 예: 여행, 시험 연기" style="${inputStyle}">
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+                    <button onclick="pauseSetFromModal('${kind}')" style="padding:8px 20px; background:#ea580c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-pause"></i> 정지</button>
+                </div>
+            </div>`;
+    }
+
+    const history = entries.length === 0 ? '' : `
+        <div style="margin-top:10px; font-size:12px; color:#64748b;">
+            ${entries.slice(0, 5).map(e => {
+                const st = e.status === 'canceled' ? '취소' : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
+                return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${e.shift_days ? ` · ${e.shift_days}일 밀림` : ''}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
+            }).join('')}
+        </div>`;
+
+    return `
+        <div style="padding:12px 0; border-top:1px solid #f1f5f9;">
+            <div style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:8px;">${label}</div>
+            ${body}
+            ${history}
+        </div>`;
+}
+
+async function pauseSetFromModal(kind) {
+    const app = currentManageApp; if (!app) return;
+    const from = (document.getElementById(`pauseFrom_${kind}`) || {}).value;
+    const resume = (document.getElementById(`pauseResumeOn_${kind}`) || {}).value || null;
+    const note = ((document.getElementById(`pauseNote_${kind}`) || {}).value || '').trim();
+    if (!from) { alert('정지 시작일을 입력하세요.'); return; }
+    if (resume) {
+        const diff = Math.round((ymdToUtcDate(resume) - ymdToUtcDate(from)) / 86400000);
+        if (diff <= 0) { alert('재개일은 정지 시작일 뒤여야 합니다.'); return; }
+        if (diff % 7 !== 0) { alert(`재개일은 정지 시작일과 같은 요일(7일 단위)이어야 합니다. 예: ${ymdAddDays(from, 7)}, ${ymdAddDays(from, 14)}`); return; }
+    }
+    const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
+    if (!confirm(`${label}을(를) ${_pauseKrDate(from)}부터 일시정지합니다.\n재개: ${resume ? _pauseKrDate(resume) : '무기한(나중에 재개 버튼으로)'}\n\n정지 안내 알림톡이 바로 발송됩니다(템플릿 등록 전이면 발송되지 않음). 진행할까요?`)) return;
+    try {
+        await supabaseAPI.rpc('schedule_pause_set', { p_app_id: app.id, p_kind: kind, p_paused_from: from, p_resume_on: resume, p_note: note || null, p_by: _pauseAdminName() });
+        alert('✅ 일시정지가 등록되었습니다.');
+        await openManageModal(app.id);
+    } catch (e) {
+        console.error('pause set error:', e);
+        alert('❌ 정지 실패: ' + e.message);
+    }
+}
+
+async function pauseResumeFromModal(kind) {
+    const app = currentManageApp; if (!app) return;
+    const active = getActivePause(app, kind); if (!active) { alert('정지 중이 아닙니다.'); return; }
+    const resume = (document.getElementById(`pauseResumeOn_${kind}`) || {}).value;
+    if (!resume) { alert('재개일을 입력하세요.'); return; }
+    const diff = Math.round((ymdToUtcDate(resume) - ymdToUtcDate(active.paused_from)) / 86400000);
+    if (diff <= 0 || diff % 7 !== 0) { alert(`재개일은 정지 시작일(${_pauseKrDate(active.paused_from)})과 같은 요일(7일 단위)이어야 합니다.`); return; }
+    if (!confirm(`${_pauseKrDate(resume)}부터 재개합니다. 정지 이후 일정이 ${diff}일 뒤로 밀립니다.\n재개 안내 알림톡은 재개 전날 10시(이미 지났으면 지금) 발송됩니다. 진행할까요?`)) return;
+    try {
+        await supabaseAPI.rpc('schedule_pause_resume', { p_app_id: app.id, p_kind: kind, p_resume_on: resume, p_by: _pauseAdminName() });
+        alert('✅ 재개일이 확정되었습니다.');
+        await openManageModal(app.id);
+    } catch (e) {
+        console.error('pause resume error:', e);
+        alert('❌ 재개 실패: ' + e.message);
+    }
+}
+
+async function pauseCancelFromModal(kind) {
+    const app = currentManageApp; if (!app) return;
+    if (!confirm('예약된 정지를 취소합니다. 밀어 둔 날짜가 있으면 되돌립니다. 진행할까요?')) return;
+    try {
+        await supabaseAPI.rpc('schedule_pause_cancel', { p_app_id: app.id, p_kind: kind, p_by: _pauseAdminName() });
+        alert('✅ 정지 예약이 취소되었습니다.');
+        await openManageModal(app.id);
+    } catch (e) {
+        console.error('pause cancel error:', e);
+        alert('❌ 취소 실패: ' + e.message);
+    }
 }
 
 async function confirmAppStatusChange() {

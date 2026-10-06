@@ -1164,7 +1164,13 @@ async function notifyCorrDeadlineExtension(p) {
                 continue;
             }
         } else {
-            const sessionDate = getCorrSessionDate(p.scheduleData, getCorrSessionMeta(p.sessionNumber));
+            // 일시정지 보정: 이 학생의 첨삭 정지 이력(applications.correction_pauses)을 넘긴다
+            let corrPauses = [];
+            try {
+                const apps = await supabaseAPI.query('applications', { 'user_id': `eq.${p.userId}`, 'select': 'correction_pauses', 'order': 'created_at.desc', 'limit': '1' });
+                corrPauses = (apps && apps[0] && apps[0].correction_pauses) || [];
+            } catch (e) { console.warn('정지 이력 조회 실패(보정 없이 진행):', e); }
+            const sessionDate = getCorrSessionDate(p.scheduleData, getCorrSessionMeta(p.sessionNumber), corrPauses);
             deadline = getCorrDraft1Deadline(sessionDate, corrExtFromRow(s.row), tz);
             if (!deadline) {
                 result.warnings.push(`${getCorrAlimtalkTaskLabel(s.taskType)}: 일정표가 없어 마감 시각을 계산할 수 없어 알림톡을 보내지 않았어요. 연장은 저장됐어요.`);

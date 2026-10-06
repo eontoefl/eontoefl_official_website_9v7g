@@ -327,6 +327,7 @@ async function loadStudyData() {
                 scheduleStart: app.schedule_start,
                 scheduleEnd: app.schedule_end,
                 appStatus: app.app_status || null,
+                challengePauses: app.challenge_pauses || [],   // 일시정지 이력(판정·날짜 보정용)
                 toeflCount: toeflCountMap[userId] || 0
             };
         }).filter(Boolean);
@@ -363,10 +364,10 @@ async function loadStudyData() {
 
 // ===== 통계 카드 업데이트 =====
 function updateStatCards(students, authRecords) {
-    // 통계는 진행 중인 학생만 (종료/환불/중도포기 제외)
+    // 통계는 진행 중인 학생만 (종료/환불/중도포기/일시정지 제외)
     const activeOnly = students.filter(s => {
-        const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
-        return !ls || (ls.key !== 'completed' && ls.key !== 'refunded' && ls.key !== 'dropped');
+        const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus, challenge_pauses: s.challengePauses });
+        return !ls || (ls.key !== 'completed' && ls.key !== 'refunded' && ls.key !== 'dropped' && ls.key !== 'paused');
     });
     document.getElementById('activeStudents').textContent = activeOnly.length;
 
@@ -407,8 +408,8 @@ function applyFilters() {
 
     // 정렬 (종료/환불/중도포기 → 하단, 미시작 → 그 위)
     filteredStudentData.sort((a, b) => {
-        const aLive = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: a.scheduleStart, schedule_end: a.scheduleEnd, app_status: a.appStatus });
-        const bLive = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: b.scheduleStart, schedule_end: b.scheduleEnd, app_status: b.appStatus });
+        const aLive = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: a.scheduleStart, schedule_end: a.scheduleEnd, app_status: a.appStatus, challenge_pauses: a.challengePauses });
+        const bLive = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: b.scheduleStart, schedule_end: b.scheduleEnd, app_status: b.appStatus, challenge_pauses: b.challengePauses });
         const aEnded = aLive && (aLive.key === 'completed' || aLive.key === 'refunded' || aLive.key === 'dropped');
         const bEnded = bLive && (bLive.key === 'completed' || bLive.key === 'refunded' || bLive.key === 'dropped');
 
@@ -458,26 +459,27 @@ function renderTable() {
 
     tbody.innerHTML = filteredStudentData.map(s => {
         // 운영 상태 판정
-        const sLiveStatus = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
+        const sLiveStatus = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus, challenge_pauses: s.challengePauses });
         const isEnded = sLiveStatus && (sLiveStatus.key === 'completed' || sLiveStatus.key === 'refunded' || sLiveStatus.key === 'dropped');
+        const isPaused = !!(sLiveStatus && sLiveStatus.key === 'paused');
 
         // 행 스타일
         let rowStyle = '';
         const isBeforeStart = ymdToUtcDate(s.scheduleStart) > new Date();
         if (isBeforeStart) {
             rowStyle += 'background: #f8fafc; opacity: 0.7;';
-        } else if (isEnded) {
+        } else if (isEnded || isPaused) {
             rowStyle += 'background: #f8fafc;';
         } else if (s.grade !== '-' && s.avgAuthRate < 50) {
             rowStyle += 'background: #fef2f2;';
         }
-        if (!isEnded && s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
+        if (!isEnded && !isPaused && s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
 
-        const nameWarning = (!isEnded && s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
+        const nameWarning = (!isEnded && !isPaused && s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
 
-        // 이름 옆 뱃지 (종료/환불완료/중도포기)
+        // 이름 옆 뱃지 (종료/환불완료/중도포기/일시정지)
         let statusBadge = '';
-        if (sLiveStatus && isEnded) {
+        if (sLiveStatus && (isEnded || isPaused)) {
             statusBadge = ` <span style="display:inline-block; background:${sLiveStatus.color}; color:white; font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px; margin-left:4px;"><i class="fas ${sLiveStatus.icon}" style="margin-right:2px;"></i>${sLiveStatus.label}</span>`;
         }
         // (학습관리2는 내챌 전용 — 첨삭 상태는 신청서 관리/첨삭 관리에서 다룸)
@@ -596,10 +598,10 @@ function updateAlertBoard(students, v3Records, scheduleData) {
         v3SubmittedMap[r.user_id].add(`${r.section_type}|${r.week}|${r.day}`);
     });
 
-    // 진행 중인 학생만 (종료/환불/중도포기/미시작 제외)
+    // 진행 중인 학생만 (종료/환불/중도포기/일시정지/미시작 제외)
     const activeStudents = students.filter(s => {
-        const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
-        if (ls && (ls.key === 'completed' || ls.key === 'refunded' || ls.key === 'dropped')) return false;
+        const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus, challenge_pauses: s.challengePauses });
+        if (ls && (ls.key === 'completed' || ls.key === 'refunded' || ls.key === 'dropped' || ls.key === 'paused')) return false;
         // 미시작 제외
         const startDate = ymdToUtcDate(s.scheduleStart);
         if (today < startDate) return false;
@@ -610,7 +612,7 @@ function updateAlertBoard(students, v3Records, scheduleData) {
         if (TEST_ACCOUNTS.includes(s.name)) return;
 
         const startDate = ymdToUtcDate(s.scheduleStart);
-        const sApp = { schedule_start: s.scheduleStart };   // 일정 계산 단일 출처에 넘길 최소 신청서 정보
+        const sApp = { schedule_start: s.scheduleStart, challenge_pauses: s.challengePauses };   // 일정 계산 단일 출처에 넘길 최소 신청서 정보(정지 이력 포함)
         const prog = s.programType.toLowerCase();
         const submitted = v3SubmittedMap[s.userId] || new Set();
 

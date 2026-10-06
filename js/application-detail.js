@@ -1218,7 +1218,7 @@ function getAnalysisSection(app) {
             ${app.correction_start_date && getCorrectionWindow(app, 1) ? `
             <div class="s2-row">
                 <span class="s2-row-label">첨삭 종료일</span>
-                <span class="s2-row-value">${getCorrectionWindow(app, 1).endYmd}</span>
+                <span class="s2-row-value">${getCorrectionWindow(app, 1).endYmd || '미정(일시정지)'}</span>
             </div>` : ''}
             ${app.extension_enabled && app.extension_start_date ? `
             <div class="s2-row">
@@ -1232,7 +1232,7 @@ function getAnalysisSection(app) {
             ${getCorrectionWindow(app, 2) ? `
             <div class="s2-row">
                 <span class="s2-row-label">13~24세션 종료일</span>
-                <span class="s2-row-value" style="color: #5b4a7d;">${getCorrectionWindow(app, 2).endYmd}</span>
+                <span class="s2-row-value" style="color: #5b4a7d;">${getCorrectionWindow(app, 2).endYmd || '미정(일시정지)'}</span>
             </div>` : ''}
             ` : ''}
             ` : ''}
@@ -1375,7 +1375,7 @@ function getAgreementSection(app) {
             ${app.correction_start_date ? `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
                 <span style="color: #64748b;">일정 (첨삭)</span>
-                <span style="font-weight: 600; color: #1e293b; text-align: right;">${app.correction_start_date}${getCorrectionWindow(app, 1) ? ' ~ ' + getCorrectionWindow(app, 1).endYmd : ''}</span>
+                <span style="font-weight: 600; color: #1e293b; text-align: right;">${app.correction_start_date}${getCorrectionWindow(app, 1) ? ' ~ ' + (getCorrectionWindow(app, 1).endYmd || '미정(일시정지)') : ''}</span>
             </div>` : ''}` : `
             <div style="display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px;">
                 <span style="color: #64748b;">일정</span>
@@ -3475,7 +3475,7 @@ async function loadUsageTab(app) {
             ${app.correction_enabled ? `
             <div class="s5-row">
                 <span class="s5-row-label">스라첨삭</span>
-                <span class="s5-row-value" style="color:#5b4a7d;">${getCorrectionWindow(app, 1) ? `${formatDateWithDay(app.correction_start_date)} ~ ${formatDateWithDay(getCorrectionWindow(app, 1).endYmd)}` : `${formatDateWithDay(app.correction_start_date)} 시작`}</span>
+                <span class="s5-row-value" style="color:#5b4a7d;">${getCorrectionWindow(app, 1) ? `${formatDateWithDay(app.correction_start_date)} ~ ${getCorrectionWindow(app, 1).endYmd ? formatDateWithDay(getCorrectionWindow(app, 1).endYmd) : '미정(일시정지)'}` : `${formatDateWithDay(app.correction_start_date)} 시작`}</span>
             </div>` : ''}
         </div>
 

@@ -7,7 +7,7 @@
 
 // 진행 중으로 간주해 탈퇴를 막는 상태 키
 const BLOCKING_LIVE_KEYS = ['completed', 'refunded', 'dropped']; // 이 상태여야 "통과"
-const BLOCKING_CORRECTION_KEYS = ['pending', 'waiting', 'active', 'ext_waiting', 'ext_active'];
+const BLOCKING_CORRECTION_KEYS = ['pending', 'waiting', 'active', 'ext_waiting', 'ext_active', 'paused'];   // paused: 일시정지 중도 진행 중으로 본다
 
 let currentUser = null;
 
