@@ -81,10 +81,10 @@ function displayAnalysis(app) {
                     <div class="info-value">${formatDateOnly(new Date(app.schedule_start).getTime())}</div>
                 </div>
             ` : ''}
-            ${(app.self_paced ? app.self_paced_end_date : app.schedule_end) ? `
+            ${getChallengeEndYmd(app, 'display') ? `
                 <div class="info-row">
                     <div class="info-label">종료일</div>
-                    <div class="info-value">${formatDateOnly(new Date(app.self_paced ? app.self_paced_end_date : app.schedule_end).getTime())}</div>
+                    <div class="info-value">${formatDateOnly(new Date(getChallengeEndYmd(app, 'display')).getTime())}</div>
                 </div>
             ` : ''}
             ${app.program_price ? `

@@ -3407,11 +3407,7 @@ function _kstTodayYmd() {
     return `${y}-${m}-${d}`;
 }
 function _shiftYmd(ymd, days) {
-    const t = new Date(ymd + 'T00:00:00Z').getTime() + days * 24 * 60 * 60 * 1000;
-    const d = new Date(t);
-    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(d.getUTCDate()).padStart(2, '0');
-    return `${d.getUTCFullYear()}-${mm}-${dd}`;
+    return ymdAddDays(ymd, days);   // 일정 계산 단일 출처(supabase-config.js)와 같은 UTC 산술
 }
 // 시작일 이동 계산(순수). 입금 확인과 기한 다시 열기가 같이 쓴다.
 //   새 시작일 = 다가오는 일요일(그 주 목요일 컷오프가 지났으면 +7일). 새 시작일이 지금보다 늦을 때만 이동.

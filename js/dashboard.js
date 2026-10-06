@@ -376,9 +376,9 @@ function _corrFmtYmd(ymd) {
 // 첨삭 연장 신청 마감일: 세션12 날짜가 속한 주의 토요일.
 //   세션12 날짜 = 첨삭 종료일(correction_end_date)이 있으면 그 날, 없으면 시작일+25일(기존).
 function _corrExtDeadline(app) {
-    const s12 = app.correction_end_date
-        ? new Date(app.correction_end_date + 'T00:00:00')
-        : new Date(new Date(app.correction_start_date + 'T00:00:00').getTime() + 25 * 24 * 60 * 60 * 1000);
+    // 세션12 날짜는 일정 계산 단일 출처(getCorrSession12Ymd)에서. 달력 날짜 산술이라 서머타임 전환일에도 하루가 어긋나지 않는다.
+    const s12Ymd = getCorrSession12Ymd(app);
+    const s12 = new Date(s12Ymd + 'T00:00:00');
     const d = new Date(s12);
     d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));   // 이후 첫 토요일
     d.setHours(23, 59, 59, 999);
@@ -1310,8 +1310,8 @@ async function renderProgramInfo(app) {
     const programDisplayName = app.self_paced
         ? ((app.assigned_program || '내벨업챌린지 - Fast').replace(/ - (Fast|Standard)$/, ' - 자기주도'))
         : (app.assigned_program || '-');
-    // 자기주도 종료일은 자기주도 전용 완료일(self_paced_end_date)에 저장되므로 그 값을 사용한다.
-    const programEndDate = app.self_paced ? app.self_paced_end_date : app.schedule_end;
+    // 자기주도 종료일은 자기주도 전용 완료일(self_paced_end_date)에 저장되므로 그 값을 사용한다(일정 계산 단일 출처 'display').
+    const programEndDate = getChallengeEndYmd(app, 'display');
 
     programDetails.innerHTML = `
         <div class="program-row">

@@ -177,29 +177,15 @@ function getTotalWeeks(app) {
     return getProgram(app) === 'Fast' ? 4 : 8;
 }
 
+// 날짜 계산은 supabase-config.js의 일정 계산 단일 출처(getChallengeTaskDate 등)를 쓴다.
 function getScheduleStart(app) {
-    return app.schedule_start ? new Date(app.schedule_start) : null;
+    return ymdToUtcDate(app.schedule_start);
 }
 
 function getScheduleEnd(app) {
-    return app.schedule_end ? new Date(app.schedule_end) : null;
+    return getChallengeEndDate(app, 'status');
 }
-
-function getCurrentWeek(app) {
-    const start = getScheduleStart(app);
-    if (!start) return 1;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-    return Math.max(1, Math.min(Math.floor(diff / 7) + 1, getTotalWeeks(app)));
-}
-
-function getWeekForDate(app, dateStr) {
-    const start = getScheduleStart(app);
-    if (!start) return 1;
-    const d = new Date(dateStr);
-    const diff = Math.floor((d - start) / (1000 * 60 * 60 * 24));
-    return Math.max(1, Math.floor(diff / 7) + 1);
-}
+// (getCurrentWeek / getWeekForDate 는 호출처가 없어 2026-10-06 삭제)
 
 // ===== 프로필 헤더 =====
 function renderProfileHeader() {
@@ -239,12 +225,7 @@ function renderProfileHeader() {
 
 // 자기주도 완료 종료일이 따로 있으면 늦은 쪽을 실제 종료일로 본다 (크론의 GREATEST와 동일)
 function getPracticeEndDate(app) {
-    const dates = [app.schedule_end, app.self_paced_end_date]
-        .filter(Boolean)
-        .map(d => new Date(d))
-        .filter(d => !isNaN(d));
-    if (dates.length === 0) return null;
-    return new Date(Math.max(...dates));
+    return getChallengeEndDate(app, 'practice');
 }
 
 // 커리큘럼 최종일(Fast 4주차 / Standard 8주차 금요일)의 실전 과제를 전부 완료했는지.
@@ -466,9 +447,8 @@ function renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks
         return;
     }
 
-    // 주차/요일 계산
-    const diffDays = Math.floor((effectiveToday - startDate) / (1000 * 60 * 60 * 24));
-    const weekNum = Math.floor(diffDays / 7) + 1;
+    // 주차/요일 계산 (주차는 보정 없음 — 이 카드 규칙. 요일은 달력 요일)
+    const weekNum = getChallengeWeekRaw({ schedule_start: startDate }, effectiveToday);
     const dayIndex = effectiveToday.getUTCDay(); // 0=일, 1=월...
 
     // 챌린지 종료 후
@@ -543,7 +523,7 @@ function renderCardChallenge(effectiveToday, startDate, totalDays) {
         return;
     }
 
-    const dplus = Math.floor((effectiveToday - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    const dplus = getChallengeDayDiff({ schedule_start: startDate }, effectiveToday) + 1;
     const elapsed = Math.min(dplus, totalDays);
     const remainingDays = Math.max(0, totalDays - elapsed);
     const elapsedPct = Math.min(100, Math.round((elapsed / totalDays) * 100));
@@ -690,12 +670,11 @@ function countDueTasks(effectiveToday, programType, startDate, totalWeeks) {
         const dayIndex = DAY_ENG_TO_INDEX[s.day];
         if (dayIndex === undefined) continue;
 
-        // 해당 과제의 날짜 계산
-        const taskDate = new Date(startDate);
-        taskDate.setUTCDate(taskDate.getUTCDate() + (s.week - 1) * 7 + dayIndex);
+        // 해당 과제의 날짜 계산 (일정 계산 단일 출처)
+        const taskDate = getChallengeTaskDate({ schedule_start: startDate }, s.week, dayIndex);
 
         // effectiveToday 이후면 아직 도래하지 않음
-        if (taskDate > effectiveToday) continue;
+        if (!taskDate || taskDate > effectiveToday) continue;
 
         // deadline extension 체크: 연장된 날짜의 과제는 분모에서 제외하지 않음
         // (인증률 분모는 모든 도래 과제를 포함, 연장은 마감만 늦춤)
@@ -752,11 +731,9 @@ let currentSort = { col: null, dir: 'asc' };
 let introMemoMapGlobal = {};  // 입문서 과제별 구간 메모 매핑 (모달에서 참조)
 const NO_ERROR_NOTE_TYPES = ['vocab', 'intro-book'];  // 오답노트 해당 없는 과제 유형
 
-// 과제 날짜 계산: scheduleStart + (week-1)*7 + dayIndex
+// 과제 날짜 계산: scheduleStart + (week-1)*7 + dayIndex (일정 계산 단일 출처에 위임)
 function getTaskDate(scheduleStart, week, dayEng) {
-    const d = new Date(scheduleStart);
-    d.setUTCDate(d.getUTCDate() + (week - 1) * 7 + (DAY_ENG_TO_INDEX[dayEng] || 0));
-    return d;
+    return getChallengeTaskDate({ schedule_start: scheduleStart }, week, DAY_ENG_TO_INDEX[dayEng] || 0);
 }
 
 async function renderStudyRecordTable() {

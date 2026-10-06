@@ -1244,6 +1244,9 @@ async function openDeadlineExtendModal() {
         extModalSchedules = schedules || [];
 
         // Filter active: 1학기(첨삭 종료일 or start_date + duration_weeks*7) OR 연장(연장 종료일 or ext_start + 27일) 둘 중 하나라도 진행 중/임박
+        // ※ 1학기 종료를 28일(duration_weeks*7)로 두는 것은 다른 화면(getCorrectionWindow: 27일)과 다르다.
+        //    목록에서 하루 늦게 빠지게 하는 의도적 여유로 보고 2026-10-06 일정 계산 통합 때도 그대로 둔다(동작 변경 0).
+        //    correction_schedules 행 기준 계산이라 app 기반 단일 출처를 쓰지 않는다.
         const now = new Date();
         const BUFFER_MS = 7 * 24 * 60 * 60 * 1000;
         const activeSchedules = extModalSchedules.filter(s => {

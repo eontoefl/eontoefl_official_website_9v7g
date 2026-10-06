@@ -403,6 +403,94 @@ function getThursdayCutoffMs(sundayYmd) {
     return Date.UTC(thu.getUTCFullYear(), thu.getUTCMonth(), thu.getUTCDate(), 14, 59, 59, 0);
 }
 
+// ===== 일정 계산 단일 출처 (2026-10-06, 일시정지 1단계) =====
+// 시작일에서 파생되는 날짜(내챌 과제·경과일·주차·종료일, 첨삭 12회차)는 여기서만 계산한다.
+//   - 동작 변경 0: 각 호출처가 쓰던 "오늘" 기준은 호출처가 인자로 넘긴다(여기서 통일하지 않는다).
+//   - 산술은 전부 UTC 자정('YYYY-MM-DD' ↔ Date.UTC)이라 관리자 브라우저 시간대의 영향이 없다.
+//     (기존 코드의 new Date('YYYY-MM-DD') + setDate(...)와 한국 시간 브라우저에서 결과가 같다.)
+//   - 2단계(일시정지): 정지 기간을 건너뛰는 계산은 이 함수들 안에만 들어간다. 호출처는 app을 넘긴다.
+
+// 'YYYY-MM-DD'(앞부분만 봄) → UTC 자정 Date. Date를 주면 복사본. 비어 있으면 null.
+// 형식이 다른 문자열은 기존과 같이 new Date(문자열)로 해석한다(유효하지 않으면 null).
+function ymdToUtcDate(ymd) {
+    if (ymd == null || ymd === '') return null;
+    if (ymd instanceof Date) return isNaN(ymd.getTime()) ? null : new Date(ymd.getTime());
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd));
+    if (m) return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
+    const d = new Date(ymd);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+// UTC 자정 Date → 'YYYY-MM-DD'
+function utcDateToYmd(d) {
+    if (!d || isNaN(d.getTime())) return null;
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+// 'YYYY-MM-DD' + n일 → 'YYYY-MM-DD' (admin-manage-modal.js의 _shiftYmd와 같은 UTC 산술)
+function ymdAddDays(ymd, n) {
+    const d = ymdToUtcDate(ymd);
+    if (!d) return null;
+    d.setUTCDate(d.getUTCDate() + n);
+    return utcDateToYmd(d);
+}
+
+// 내챌 과제 날짜 = 시작일 + (주차−1)×7 + 요일 번호(일=0…토=6). UTC 자정 Date, 시작일 없으면 null.
+function getChallengeTaskDate(app, week, dayIndex) {
+    const start = ymdToUtcDate(app && app.schedule_start);
+    if (!start) return null;
+    start.setUTCDate(start.getUTCDate() + (week - 1) * 7 + dayIndex);
+    return start;
+}
+
+function getChallengeTaskYmd(app, week, dayIndex) {
+    return utcDateToYmd(getChallengeTaskDate(app, week, dayIndex));
+}
+
+// 시작일부터 today(UTC 자정 Date)까지 경과 일수 = floor((today − 시작일)/1일). 시작일 없으면 null.
+function getChallengeDayDiff(app, today) {
+    const start = ymdToUtcDate(app && app.schedule_start);
+    if (!start || !today) return null;
+    return Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+// 주차(보정 없음) = floor(경과일/7) + 1. 하한·상한 보정은 호출처가 한다(화면마다 규칙이 달라서).
+function getChallengeWeekRaw(app, today) {
+    const diff = getChallengeDayDiff(app, today);
+    return diff == null ? null : Math.floor(diff / 7) + 1;
+}
+
+// 내챌 종료일. 화면마다 정의가 달라 모드로 구분한다(1단계는 기존 정의 그대로).
+//   'status'   = schedule_end (getAppLiveStatus의 종료 판정)
+//   'display'  = 자기주도면 self_paced_end_date, 아니면 schedule_end (학생 화면·신청서 상세 표시)
+//   'practice' = 둘 중 늦은 날 (연습코스 자동 오픈 크론 GREATEST와 동일)
+// 반환은 저장값 그대로('YYYY-MM-DD' 또는 빈값). Date가 필요하면 getChallengeEndDate.
+function getChallengeEndYmd(app, mode) {
+    if (!app) return null;
+    if (mode === 'practice') {
+        const cands = [app.schedule_end, app.self_paced_end_date].map(ymdToUtcDate).filter(Boolean);
+        if (cands.length === 0) return null;
+        return utcDateToYmd(new Date(Math.max(...cands.map(d => d.getTime()))));
+    }
+    if (mode === 'display') return app.self_paced ? app.self_paced_end_date : app.schedule_end;
+    return app.schedule_end;
+}
+
+function getChallengeEndDate(app, mode) {
+    return ymdToUtcDate(getChallengeEndYmd(app, mode));
+}
+
+// 첨삭 12회차 날짜('YYYY-MM-DD'): 첨삭 종료일(correction_end_date)이 있으면 그 날, 없으면 시작일+25일.
+// (학생 대시보드 연장 신청 마감 계산 출처. 정규는 getCorrSessionDate(12)=시작+25와 같다.)
+function getCorrSession12Ymd(app) {
+    if (!app) return null;
+    if (app.correction_end_date) return app.correction_end_date;
+    if (!app.correction_start_date) return null;
+    return ymdAddDays(app.correction_start_date, 25);
+}
+
 // ===== 공통 유틸: 계약 동의 이후 단계 판정 =====
 // 학생 '입금 완료' 버튼은 없어졌으므로(2026-08-23) 입금 단계는 관리자 입금 확인 하나로만 판정한다.
 // 관리자 목록·학생 대시보드·신청서 상세가 모두 이 판정을 쓴다. 계약 동의 전 단계는 각 화면이 따로 판정.
@@ -426,8 +514,8 @@ function getAppLiveStatus(app) {
     if (!app.deposit_confirmed_by_admin) return null; // 입금 미확인 → 기존 프로세스 상태 사용
 
     const today = getEffectiveToday();
-    const start = app.schedule_start ? new Date(app.schedule_start) : null;
-    const end = app.schedule_end ? new Date(app.schedule_end) : null;
+    const start = ymdToUtcDate(app.schedule_start);
+    const end = getChallengeEndDate(app, 'status');
 
     if (!start) return null;
 
@@ -480,11 +568,7 @@ function getCorrectionWindow(app, phase) {
     }
     const start = new Date(startYmd);
     const endMoment = _correctionEndKST(start);
-    const e2 = new Date(start);
-    e2.setDate(e2.getDate() + 27);
-    const endYmd = e2.getFullYear() + '-' +
-        String(e2.getMonth() + 1).padStart(2, '0') + '-' +
-        String(e2.getDate()).padStart(2, '0');
+    const endYmd = ymdAddDays(startYmd, 27);   // 시작일+27일 (일정 계산 단일 출처)
     return { endYmd, endMoment };
 }
 
@@ -637,9 +721,9 @@ function getDueTaskList(scheduleRaw, programType, startDate, effectiveToday, tot
         const dayIndex = DAY_ENG_TO_INDEX[s.day];
         if (dayIndex === undefined) continue;
 
-        // 해당 과제의 날짜 계산: start + (week-1)*7 + dayOffset
-        const taskDate = new Date(startDate);
-        taskDate.setUTCDate(taskDate.getUTCDate() + (s.week - 1) * 7 + dayIndex);
+        // 해당 과제의 날짜 계산: start + (week-1)*7 + dayOffset (일정 계산 단일 출처)
+        const taskDate = getChallengeTaskDate({ schedule_start: startDate }, s.week, dayIndex);
+        if (!taskDate) continue;
 
         // effectiveToday 이하만 (도래한 과제만)
         if (taskDate > effectiveToday) continue;

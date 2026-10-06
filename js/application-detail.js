@@ -13,7 +13,7 @@ function displayProgramName(app) {
 }
 // 자기주도 종료일은 전용 완료일(self_paced_end_date)에 저장되므로 그 값을 사용한다.
 function effectiveScheduleEnd(app) {
-    return app.self_paced ? app.self_paced_end_date : app.schedule_end;
+    return getChallengeEndYmd(app, 'display');   // 일정 계산 단일 출처(supabase-config.js)
 }
 // 첨삭 종류 라벨: 해당 학기의 종료일 컬럼이 있으면 '자기주도·N일'(N=시작·종료 양끝 포함 일수),
 // 없으면 '정규·4주'. 종료일 출처는 supabase-config.js의 getCorrectionWindow(app,phase) 하나로 통일.

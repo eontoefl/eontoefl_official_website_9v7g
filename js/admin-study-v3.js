@@ -130,9 +130,9 @@ async function loadStudyData() {
             const myRecords = allRecords.filter(r => r.user_id === userId);
             const myAuthRecords = allAuthRecords.filter(r => r.user_id === userId);
 
-            const startDate = new Date(app.schedule_start);
-            const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
-            const currentWeek = Math.max(1, Math.floor(diffDays / 7) + 1);
+            // 일정 계산 단일 출처(supabase-config.js). 주차 하한 1은 이 화면 규칙.
+            const startDate = ymdToUtcDate(app.schedule_start);
+            const currentWeek = Math.max(1, getChallengeWeekRaw(app, today));
 
             const programStr = app.assigned_program || app.preferred_program || '';
             const programType = programStr.includes('Fast') ? 'Fast' : 'Standard';
@@ -164,9 +164,8 @@ async function loadStudyData() {
                 if (s.week > totalWeeks) continue;
                 const dayIndex = dayEngNames.indexOf(s.day);
                 if (dayIndex < 0) continue;
-                const taskDate = new Date(startDate);
-                taskDate.setDate(taskDate.getDate() + (s.week - 1) * 7 + dayIndex);
-                if (taskDate > today) continue;
+                const taskDate = getChallengeTaskDate(app, s.week, dayIndex);
+                if (!taskDate || taskDate > today) continue;
                 for (const sec of [s.section1, s.section2, s.section3, s.section4]) {
                     const parsed = parseScheduleSection(sec);
                     if (parsed && parsed.taskType !== 'unknown') totalDeadlinedTasks++;
@@ -194,8 +193,7 @@ async function loadStudyData() {
             const gradeColor = (displayGrade !== '-') ? getGradeColor(displayGrade) : '#94a3b8';
 
             // ── 추세 (이번 주 vs 저번 주 — 여전히 auth_records 기반) ──
-            const thisWeekStart = new Date(startDate);
-            thisWeekStart.setDate(thisWeekStart.getDate() + (currentWeek - 1) * 7);
+            const thisWeekStart = getChallengeTaskDate(app, currentWeek, 0);   // 이번 주 일요일
             const lastWeekStart = new Date(thisWeekStart);
             lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 
@@ -275,9 +273,8 @@ async function loadStudyData() {
                 if (sched.week > totalWeeks) return;
                 const dayIndex = dayEngNames.indexOf(sched.day);
                 if (dayIndex < 0) return;
-                const taskDate = new Date(startDate);
-                taskDate.setDate(taskDate.getDate() + (sched.week - 1) * 7 + dayIndex);
-                if (taskDate >= today) return;
+                const taskDate = getChallengeTaskDate(app, sched.week, dayIndex);
+                if (!taskDate || taskDate >= today) return;
                 if (taskDate < startDate) return;
                 const dateStr = taskDate.toISOString().split('T')[0];
                 const dayKr = dayEngToKrLocal[sched.day];
@@ -418,8 +415,8 @@ function applyFilters() {
         // 종료된 학생 하단
         if (aEnded !== bEnded) return aEnded ? 1 : -1;
 
-        const aBeforeStart = new Date(a.scheduleStart) > new Date();
-        const bBeforeStart = new Date(b.scheduleStart) > new Date();
+        const aBeforeStart = ymdToUtcDate(a.scheduleStart) > new Date();
+        const bBeforeStart = ymdToUtcDate(b.scheduleStart) > new Date();
 
         // 미시작자 하단
         if (aBeforeStart !== bBeforeStart) return aBeforeStart ? 1 : -1;
@@ -466,7 +463,7 @@ function renderTable() {
 
         // 행 스타일
         let rowStyle = '';
-        const isBeforeStart = new Date(s.scheduleStart) > new Date();
+        const isBeforeStart = ymdToUtcDate(s.scheduleStart) > new Date();
         if (isBeforeStart) {
             rowStyle += 'background: #f8fafc; opacity: 0.7;';
         } else if (isEnded) {
@@ -604,7 +601,7 @@ function updateAlertBoard(students, v3Records, scheduleData) {
         const ls = getAppLiveStatus({ deposit_confirmed_by_admin: true, schedule_start: s.scheduleStart, schedule_end: s.scheduleEnd, app_status: s.appStatus });
         if (ls && (ls.key === 'completed' || ls.key === 'refunded' || ls.key === 'dropped')) return false;
         // 미시작 제외
-        const startDate = new Date(s.scheduleStart);
+        const startDate = ymdToUtcDate(s.scheduleStart);
         if (today < startDate) return false;
         return true;
     });
@@ -612,7 +609,8 @@ function updateAlertBoard(students, v3Records, scheduleData) {
     activeStudents.forEach(s => {
         if (TEST_ACCOUNTS.includes(s.name)) return;
 
-        const startDate = new Date(s.scheduleStart);
+        const startDate = ymdToUtcDate(s.scheduleStart);
+        const sApp = { schedule_start: s.scheduleStart };   // 일정 계산 단일 출처에 넘길 최소 신청서 정보
         const prog = s.programType.toLowerCase();
         const submitted = v3SubmittedMap[s.userId] || new Set();
 
@@ -627,9 +625,8 @@ function updateAlertBoard(students, v3Records, scheduleData) {
             if (sched.week > s.totalWeeks) return;
             const dayIndex = dayEngNames.indexOf(sched.day);
             if (dayIndex < 0) return;
-            const taskDate = new Date(startDate);
-            taskDate.setDate(taskDate.getDate() + (sched.week - 1) * 7 + dayIndex);
-            if (taskDate >= today) return;  // 오늘 이후는 제외
+            const taskDate = getChallengeTaskDate(sApp, sched.week, dayIndex);
+            if (!taskDate || taskDate >= today) return;  // 오늘 이후는 제외
             if (taskDate < startDate) return;
             const dateStr = taskDate.toISOString().split('T')[0];
             const dayKr = dayEngToKr[sched.day];
