@@ -414,7 +414,7 @@ function getThursdayCutoffMs(sundayYmd) {
 // 형식이 다른 문자열은 기존과 같이 new Date(문자열)로 해석한다(유효하지 않으면 null).
 function ymdToUtcDate(ymd) {
     if (ymd == null || ymd === '') return null;
-    if (ymd instanceof Date) return isNaN(ymd.getTime()) ? null : new Date(ymd.getTime());
+    if (typeof ymd === 'object' && typeof ymd.getTime === 'function') return isNaN(ymd.getTime()) ? null : new Date(ymd.getTime());   // Date(다른 realm 포함)
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd));
     if (m) return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)));
     const d = new Date(ymd);
