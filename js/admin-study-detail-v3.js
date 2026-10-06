@@ -433,6 +433,12 @@ function renderV3SummaryCards() {
     renderCardGrade(effectiveToday, programType, startDate, totalWeeks, depositAmount);
 }
 
+// 날짜 계산에 넘길 신청서 모양: 시작일(화면 규칙대로 고른 값) + 일시정지 이력(정지 기간을 빼고 세기 위해 — 2026-10-06)
+function _appForDates(startDate) {
+    const app = studentData && studentData.app;
+    return { schedule_start: startDate, challenge_pauses: (app && app.challenge_pauses) || [] };
+}
+
 // ===== 카드1: 오늘의 과제 =====
 function renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks) {
     const el = document.getElementById('cardTodayTasks');
@@ -448,8 +454,18 @@ function renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks
         return;
     }
 
+    // 일시정지 중 — 오늘 과제 없음(학생 마이페이지와 같은 규칙)
+    if (typeof isPausedNow === 'function' && isPausedNow(studentData.app, 'challenge')) {
+        el.innerHTML = `
+            <div class="card-prestart-msg">
+                <i class="fas fa-pause-circle" style="color:#ea580c;"></i><br>
+                <span style="font-size:14px; font-weight:700; color:#ea580c;">일시정지 중 — 재개 후 과제가 이어집니다</span>
+            </div>`;
+        return;
+    }
+
     // 주차/요일 계산 (주차는 보정 없음 — 이 카드 규칙. 요일은 달력 요일)
-    const weekNum = getChallengeWeekRaw({ schedule_start: startDate }, effectiveToday);
+    const weekNum = getChallengeWeekRaw(_appForDates(startDate), effectiveToday);
     const dayIndex = effectiveToday.getUTCDay(); // 0=일, 1=월...
 
     // 챌린지 종료 후
@@ -524,7 +540,7 @@ function renderCardChallenge(effectiveToday, startDate, totalDays) {
         return;
     }
 
-    const dplus = getChallengeDayDiff({ schedule_start: startDate }, effectiveToday) + 1;
+    const dplus = getChallengeDayDiff(_appForDates(startDate), effectiveToday) + 1;
     const elapsed = Math.min(dplus, totalDays);
     const remainingDays = Math.max(0, totalDays - elapsed);
     const elapsedPct = Math.min(100, Math.round((elapsed / totalDays) * 100));
@@ -672,7 +688,7 @@ function countDueTasks(effectiveToday, programType, startDate, totalWeeks) {
         if (dayIndex === undefined) continue;
 
         // 해당 과제의 날짜 계산 (일정 계산 단일 출처)
-        const taskDate = getChallengeTaskDate({ schedule_start: startDate }, s.week, dayIndex);
+        const taskDate = getChallengeTaskDate(_appForDates(startDate), s.week, dayIndex);
 
         // effectiveToday 이후면 아직 도래하지 않음
         if (!taskDate || taskDate > effectiveToday) continue;
@@ -734,7 +750,7 @@ const NO_ERROR_NOTE_TYPES = ['vocab', 'intro-book'];  // 오답노트 해당 없
 
 // 과제 날짜 계산: scheduleStart + (week-1)*7 + dayIndex (일정 계산 단일 출처에 위임)
 function getTaskDate(scheduleStart, week, dayEng) {
-    return getChallengeTaskDate({ schedule_start: scheduleStart }, week, DAY_ENG_TO_INDEX[dayEng] || 0);
+    return getChallengeTaskDate(_appForDates(scheduleStart), week, DAY_ENG_TO_INDEX[dayEng] || 0);
 }
 
 async function renderStudyRecordTable() {
