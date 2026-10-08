@@ -4511,14 +4511,14 @@ function _renderPauseBlock(app, kind, label) {
                 <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 (정지 시작일 ${_pauseKrDate(active.paused_from)}과 같은 요일)</label>
                 <input type="date" id="pauseResumeOn_${kind}" value="${_pauseNextSameWeekday(active.paused_from)}" min="${active.paused_from}" step="7" form="__pause_no_form" style="${inputStyle}">
                 <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-                    <button onclick="pauseResumeFromModal('${kind}')" style="padding:8px 20px; background:#7c3aed; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-play"></i> 재개</button>
+                    <button type="button" onclick="pauseResumeFromModal('${kind}')" style="padding:8px 20px; background:#7c3aed; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-play"></i> 재개</button>
                 </div>
             </div>`}`;
     } else if (scheduled) {
         body = `
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                 ${chip(`<i class="fas fa-clock"></i> 정지 예약 · ${_pauseKrDate(scheduled.paused_from)} ~ ${scheduled.resume_on ? _pauseKrDate(scheduled.resume_on) : '무기한'}`, '#b45309', '#fef3c7')}
-                ${_analysisEditing ? `<button onclick="pauseCancelFromModal('${kind}')" style="padding:6px 14px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:12px;">예약 취소</button>` : ''}
+                ${_analysisEditing ? `<button type="button" onclick="pauseCancelFromModal('${kind}')" style="padding:6px 14px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:12px;">예약 취소</button>` : ''}
             </div>`;
     } else if (!_analysisEditing) {
         body = `<div style="font-size:13px; color:#94a3b8; padding:4px 0;">정지 없음</div>`;
@@ -4539,7 +4539,7 @@ function _renderPauseBlock(app, kind, label) {
                     <input type="text" id="pauseNote_${kind}" placeholder="메모 (선택) — 예: 여행, 시험 연기" form="__pause_no_form" style="${inputStyle}">
                 </div>
                 <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-                    <button onclick="pauseSetFromModal('${kind}')" style="padding:8px 20px; background:#ea580c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-pause"></i> 정지</button>
+                    <button type="button" onclick="pauseSetFromModal('${kind}')" style="padding:8px 20px; background:#ea580c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-pause"></i> 정지</button>
                 </div>
             </div>`;
     }
