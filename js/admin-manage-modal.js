@@ -4572,7 +4572,7 @@ async function pauseSetFromModal(kind) {
         if (diff % 7 !== 0) { alert(`재개일은 정지 시작일과 같은 요일(7일 단위)이어야 합니다. 예: ${ymdAddDays(from, 7)}, ${ymdAddDays(from, 14)}`); return; }
     }
     const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
-    if (!confirm(`${label}을(를) ${_pauseKrDate(from)}부터 일시정지합니다.\n재개: ${resume ? _pauseKrDate(resume) : '무기한(나중에 재개 버튼으로)'}\n\n정지 안내 알림톡이 바로 발송됩니다(템플릿 등록 전이면 발송되지 않음). 진행할까요?`)) return;
+    if (!confirm(`${label}을(를) ${_pauseKrDate(from)}부터 일시정지합니다.\n재개: ${resume ? _pauseKrDate(resume) : '무기한(나중에 재개 버튼으로)'}\n\n정지 안내 알림톡이 학생에게 바로 발송됩니다. 진행할까요?`)) return;
     try {
         await supabaseAPI.rpc('schedule_pause_set', { p_app_id: app.id, p_kind: kind, p_paused_from: from, p_resume_on: resume, p_note: note || null, p_by: _pauseAdminName() });
         alert('✅ 일시정지가 등록되었습니다.');
