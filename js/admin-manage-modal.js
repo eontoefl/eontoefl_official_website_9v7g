@@ -4571,7 +4571,7 @@ function _renderPauseBlock(app, kind, label) {
             ${entries.slice(0, 5).map(e => {
                 const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
                 const resched = e.rescheduled_at ? ` · 재개일 변경(${e.prev_resume_on ? _pauseKrDate(e.prev_resume_on) : '무기한'} → ${e.resume_on ? _pauseKrDate(e.resume_on) : '무기한'})` : '';
-                return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${e.shift_days ? ` · ${e.shift_days}일 밀림` : ''}${resched}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
+                return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${(e.shift_days && e.status !== 'canceled') ? ` · ${e.shift_days}일 밀림` : ''}${resched}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
             }).join('')}
         </div>`;
 
