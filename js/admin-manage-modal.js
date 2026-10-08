@@ -892,9 +892,6 @@ function loadModalInfoTab(app) {
 
         <!-- 수강 상태 관리 (세팅 완료된 학생만 표시) -->
         ${renderAppStatusSection(app)}
-
-        <!-- 일시정지 (진행 중인 내챌·첨삭만 표시) -->
-        ${renderPauseSection(app)}
     `;
 }
 
@@ -1258,6 +1255,9 @@ function loadModalAnalysisTab(app) {
                 </div>
 
                 </div><!-- /흰 카드 -->
+
+                <!-- 내챌 일시정지 (진행 중·정지 중 학생만. 읽기 전용이면 상태·이력만, 수정 모드에서 버튼) — 2026-10-08 -->
+                <div id="pauseBlockWrap_challenge">${renderPauseBlockCard(app, 'challenge')}</div>
             </div>
 
             <!-- 3. 추가 옵션 (스라첨삭) -->
@@ -1310,6 +1310,9 @@ function loadModalAnalysisTab(app) {
                     </div>
                 </div>
             </div>
+
+            <!-- 첨삭 일시정지 (첨삭 진행 중·정지 중 학생만) — 2026-10-08 -->
+            <div id="pauseBlockWrap_correction">${renderPauseBlockCard(app, 'correction')}</div>
 
             <!-- 4. 가격 정보 -->
             <div class="form-group" id="formGroup-price">
@@ -1457,6 +1460,10 @@ function loadModalAnalysisTab(app) {
     toggleCorrectionStartDate();
     // 학습 방식(정규/자기주도)에 맞춰 프로그램 영역·종료일 슬롯·시작일 안내 초기 반영
     syncLearningModeUI();
+
+    // 개별분석 탭을 새로 그리면 수정 모드 해제(정지 블록은 읽기 전용으로). 무기한 정지 중이면 수동 날짜 칸에 안내 한 줄.
+    _analysisEditing = false;
+    _injectPauseNotes(app);
 
     // 추천 일정: 아직 일정을 한 번도 안 넣은 학생(최초 저장 전·예약 초안 없음)이면 빈칸에 미리 채움
     _schedSuggested.clear();
@@ -2029,9 +2036,9 @@ function calculateModalEndDate() {
     // 기간에 따라 주수 결정 (fast=4주 / standard=8주)
     const weeks = duration === 'fast' ? 4 : 8;
 
-    // 종료일 계산: 시작일 + weeks주 후 토요일
+    // 종료일 계산: 시작일 + weeks주 후 토요일 + 일시정지로 밀린 일수(정지 이력 없으면 0 — 2026-10-08)
     const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + (weeks * 7) - 1);
+    endDate.setDate(endDate.getDate() + (weeks * 7) - 1 + _pauseShiftDaysFrom(currentManageApp, 'challenge', startInput.value));
 
     // ISO 형식으로 변환
     const endDateString = endDate.toISOString().split('T')[0];
@@ -2129,6 +2136,14 @@ async function saveModalAnalysis(event) {
     // (거부=종료 / 조건부승인=아직 협의 전. 승인으로 전환 저장할 때 새로 채워짐)
     const blankProgramFields = formData.get('analysis_status') === '거부'
         || formData.get('analysis_status') === '조건부승인';
+
+    // 일시정지 이력이 있는 학생: 시작일은 정지 시작일보다 앞으로만(그 뒤는 "리셋" 몫) — 2026-10-08 규칙 1
+    if (!blankProgramFields) {
+        const guardMsg = _pauseStartGuardMsg(currentManageApp, 'challenge', formData.get('schedule_start'), '내벨업챌린지 시작일')
+            || (formData.get('correction_enabled') === 'true'
+                ? _pauseStartGuardMsg(currentManageApp, 'correction', formData.get('correction_start_date'), '첨삭 시작일') : null);
+        if (guardMsg) { alert(guardMsg); return; }
+    }
     const basePrice = 1000000;
     const examSupport = 210000;
     const additionalDiscount = parseInt(formData.get('additional_discount')) || 0;
@@ -2279,6 +2294,9 @@ async function saveModalAnalysis(event) {
         correction_end_date: (blankProgramFields || !correctionEnabled || !formData.get('correction_start_date')) ? null : (formData.get('correction_end_date') || null),
         // 첨삭을 끄면 연장(13~24세션)도 함께 해제 (고아 데이터 방지)
         ...((blankProgramFields || !correctionEnabled) ? { extension_enabled: false, extension_start_date: null, extension_end_date: null } : {}),
+        // 첨삭을 끄면 열려 있는 첨삭 정지(진행 중·예약)도 종료 — 다시 켤 때 옛 정지가 살아나 잠기는 것 방지 (2026-10-08 규칙 4)
+        ...(((blankProgramFields || !correctionEnabled) && currentManageApp.correction_enabled && _hasOpenPause(currentManageApp, 'correction'))
+            ? { correction_pauses: _closedPauseEntries(getPauseEntries(currentManageApp, 'correction'), '첨삭 해제로 종료') } : {}),
         correction_fee: blankProgramFields ? 0 : correctionFee,
         program_price: blankProgramFields ? null : basePrice,
         discount_amount: blankProgramFields ? null : examSupport,
@@ -2609,6 +2627,10 @@ function previewAnalysis(appId) {
 
 // 수정하기 함수 (폼을 수정 가능하게)
 function editAnalysis() {
+    // 정지·재개·취소 버튼은 수정 모드에서만(연장 적용과 같은 즉시 적용 액션). 블록만 다시 그린다.
+    _analysisEditing = true;
+    _rerenderPauseBlocks();
+
     // 모든 input, select, textarea를 활성화
     const form = document.getElementById('modalAnalysisForm');
     if (form) {
@@ -4356,26 +4378,116 @@ function _pauseAdminName() {
     try { const u = JSON.parse(localStorage.getItem('iontoefl_user') || 'null'); return (u && (u.name || u.email)) || 'admin'; } catch (e) { return 'admin'; }
 }
 
-function renderPauseSection(app) {
-    const live = getAppLiveStatus(app);
-    const corr = app.correction_enabled ? getCorrectionStatus(app) : null;
-    // D15·V3: 진행 중(또는 정지 중)인 것만. 종료일 없는 옛 자기주도는 미지원.
-    const chEligible = !!live && (live.key === 'active' || live.key === 'paused') && !(app.self_paced && !app.self_paced_end_date);
-    const coEligible = !!corr && (corr.key === 'active' || corr.key === 'ext_active' || corr.key === 'paused');
-    if (!chEligible && !coEligible) return '';
+// ===== 일시정지 — 개별분석 탭의 일정 옆 (2026-10-08, 3단계) =====
+// 읽기 전용이면 상태·이력만, "수정"을 누르면 정지·재개·취소 버튼(즉시 적용 — 연장 적용과 같은 방식). 누른 뒤엔 블록만 다시 그린다.
+var _analysisEditing = false;
 
-    const blocks = [];
-    if (chEligible) blocks.push(_renderPauseBlock(app, 'challenge', '내벨업챌린지'));
-    if (coEligible) blocks.push(_renderPauseBlock(app, 'correction', '스라첨삭'));
+// 진행 중(또는 정지 중)인 종류만 자격. 종료일 없는 옛 자기주도는 미지원(D15·V3).
+function _pauseKindEligible(app, kind) {
+    if (!app) return false;
+    if (kind === 'challenge') {
+        const live = getAppLiveStatus(app);
+        return !!live && (live.key === 'active' || live.key === 'paused') && !(app.self_paced && !app.self_paced_end_date);
+    }
+    const corr = app.correction_enabled ? getCorrectionStatus(app) : null;
+    return !!corr && (corr.key === 'active' || corr.key === 'ext_active' || corr.key === 'paused');
+}
+
+function renderPauseBlockCard(app, kind) {
+    if (!_pauseKindEligible(app, kind)) return '';
+    const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
     return `
-    <div class="info-card" style="margin-top: 24px;">
-        <h3 class="info-card-title"><i class="fas fa-pause-circle"></i> 일시정지</h3>
-        <div style="font-size:12px; color:#94a3b8; margin:-4px 0 12px; line-height:1.6;">
-            정지 중엔 그 학생에게 가는 알림톡·자동 처리가 멈추고, 테스트룸은 읽기 전용(다시풀기만)이 됩니다.<br>
-            재개하면 정지 기간만큼 정지 이후 일정이 뒤로 밀립니다. 재개일은 정지 시작일과 <b>같은 요일(7일 단위)</b>이고, 소급 정지는 <b>최근 일요일</b>까지 가능합니다.
+    <div style="background:#ffffff; border-radius:14px; padding:16px 22px; margin-top:12px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b;"><i class="fas fa-pause-circle" style="color:#ea580c;"></i> ${label} 일시정지</div>
+        <div style="font-size:12px; color:#94a3b8; margin:6px 0 4px; line-height:1.6;">
+            정지 중엔 알림톡·자동 처리가 멈추고 테스트룸은 읽기 전용(다시풀기만). 재개하면 정지 이후 일정이 정지 기간만큼 뒤로 밀립니다. 재개일은 정지 시작일과 <b>같은 요일</b>, 소급은 <b>최근 일요일</b>까지.
+            ${_analysisEditing ? '<b style="color:#ea580c;">정지·재개·취소는 누르는 즉시 적용됩니다(저장과 별개).</b>' : '<span style="color:#64748b;">정지·재개·취소는 <b>수정</b>을 누른 뒤 할 수 있습니다.</span>'}
         </div>
-        ${blocks.join('')}
+        ${_renderPauseBlock(app, kind, label)}
     </div>`;
+}
+
+// 블록 2개만 다시 그린다(폼의 다른 입력은 그대로).
+function _rerenderPauseBlocks() {
+    const app = currentManageApp; if (!app) return;
+    for (const kind of ['challenge', 'correction']) {
+        const wrap = document.getElementById('pauseBlockWrap_' + kind);
+        if (wrap) wrap.innerHTML = renderPauseBlockCard(app, kind);
+    }
+}
+
+// 정지·재개·취소 뒤: 신청서를 다시 읽고 블록만 갱신(개별분석 탭 유지, 수정 모드 유지).
+async function _refreshPauseBlocks(appId) {
+    const fresh = await supabaseAPI.getById('applications', appId);
+    if (fresh) currentManageApp = fresh;
+    _rerenderPauseBlocks();
+    _injectPauseNotes(currentManageApp);
+    _syncShiftedDateFields(currentManageApp);
+}
+
+// 정지 등록·재개로 서버가 밀어 둔 날짜(자기주도 종료일·첨삭 종료일·연장 시작/종료일)를 폼 칸에 되비추고,
+// 자동 계산 종료일은 밀린 일수를 넣어 다시 계산한다 — 수정 모드에서 저장할 때 옛 값으로 덮어쓰지 않도록.
+function _syncShiftedDateFields(app) {
+    if (!app) return;
+    const put = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    put('self_paced_end_date', app.self_paced_end_date);
+    put('correction_end_date', app.correction_end_date);
+    put('extension_start_date', app.extension_start_date);
+    put('extension_end_date', app.extension_end_date);
+    if (typeof calculateModalEndDate === 'function') calculateModalEndDate();
+}
+
+// 취소 아닌 정지 항목 중 정지 시작일이 fromYmd 이후인 것들의 밀린 일수 합(무기한은 0 — 재개 때 서버가 민다).
+//   종료일 자동 계산(calculateModalEndDate)이 "시작일 + 기간"에 더한다. 정지 이력 없으면 0.
+function _pauseShiftDaysFrom(app, kind, fromYmd) {
+    if (!app || !fromYmd) return 0;
+    return getPauseEntries(app, kind)
+        .filter(e => e.status !== 'canceled' && e.paused_from >= fromYmd && e.shift_days != null && e.shift_days !== '')
+        .reduce((s, e) => s + Number(e.shift_days), 0);
+}
+
+// 규칙 1: 정지 이력(취소 제외)이 있으면 새 시작일은 가장 이른 정지 시작일보다 앞이어야 한다. 아니면 거절 문구, 괜찮으면 null.
+function _pauseStartGuardMsg(app, kind, newStartYmd, label) {
+    if (!app || !newStartYmd) return null;
+    const froms = getPauseEntries(app, kind).filter(e => e.status !== 'canceled').map(e => e.paused_from).sort();
+    if (froms.length === 0) return null;
+    if (newStartYmd < froms[0]) return null;
+    return `⚠️ ${label}은 정지 시작일(${_pauseKrDate(froms[0])})보다 앞 날짜로만 바꿀 수 있습니다.\n처음부터 다시 시작하려면 리셋을 쓰세요.`;
+}
+
+// 열린 정지(진행 중·예약)가 있는가 — 종류별
+function _hasOpenPause(app, kind) {
+    return getPauseEntries(app, kind).some(e => e.status === 'open');
+}
+
+// 규칙 4: 열린 정지를 전부 종료 처리한 새 이력 배열(첨삭 해제 때). 서버 밀기 되돌림 없음(첨삭 날짜가 함께 지워지므로).
+function _closedPauseEntries(entries, note) {
+    const now = new Date().toISOString();
+    return (entries || []).map(e => e.status === 'open'
+        ? Object.assign({}, e, { status: 'canceled', canceled_at: now, canceled_by: _pauseAdminName(), note: ((e.note ? e.note + ' · ' : '') + note) })
+        : e);
+}
+
+// 무기한 정지가 진행 중인가(open, resume_on 없음, 오늘 ≥ 정지 시작일)
+function _hasIndefinitePause(app, kind) {
+    const a = getActivePause(app, kind);
+    return !!a && !a.resume_on;
+}
+
+// 규칙 3: 무기한 정지 중이면 손으로 넣는 날짜 칸 아래 안내 한 줄(재개일을 정하면 서버가 같이 민다).
+function _injectPauseNotes(app) {
+    const spec = [['self_paced_end_date', 'challenge'], ['correction_end_date', 'correction'], ['extension_end_date', 'correction']];
+    for (const [id, kind] of spec) {
+        const el = document.getElementById(id); if (!el) continue;
+        const noteId = 'pauseNote_' + id;
+        const old = document.getElementById(noteId); if (old) old.remove();
+        if (!_hasIndefinitePause(app, kind)) continue;
+        const note = document.createElement('div');
+        note.id = noteId;
+        note.style.cssText = 'font-size:12px; color:#ea580c; margin-top:6px;';
+        note.innerHTML = '<i class="fas fa-pause-circle"></i> 무기한 정지 중입니다. 재개일을 정하면 이 날짜도 같이 밀립니다(정지 전 기준으로 입력).';
+        el.insertAdjacentElement('afterend', note);
+    }
 }
 
 function _renderPauseBlock(app, kind, label) {
@@ -4394,10 +4506,10 @@ function _renderPauseBlock(app, kind, label) {
                 ${chip(`<i class="fas fa-pause-circle"></i> 정지 중 · ${_pauseKrDate(active.paused_from)}부터`, '#ea580c', '#ffedd5')}
                 <span style="font-size:13px; color:#475569;">${until}</span>
             </div>
-            ${active.resume_on ? '' : `
+            ${(active.resume_on || !_analysisEditing) ? '' : `
             <div style="padding:14px; background:#f8fafc; border-radius:10px;">
                 <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 (정지 시작일 ${_pauseKrDate(active.paused_from)}과 같은 요일)</label>
-                <input type="date" id="pauseResumeOn_${kind}" value="${_pauseNextSameWeekday(active.paused_from)}" min="${today}" step="7" style="${inputStyle}">
+                <input type="date" id="pauseResumeOn_${kind}" value="${_pauseNextSameWeekday(active.paused_from)}" min="${active.paused_from}" step="7" form="__pause_no_form" style="${inputStyle}">
                 <div style="display:flex; justify-content:flex-end; margin-top:10px;">
                     <button onclick="pauseResumeFromModal('${kind}')" style="padding:8px 20px; background:#7c3aed; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-play"></i> 재개</button>
                 </div>
@@ -4406,23 +4518,25 @@ function _renderPauseBlock(app, kind, label) {
         body = `
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                 ${chip(`<i class="fas fa-clock"></i> 정지 예약 · ${_pauseKrDate(scheduled.paused_from)} ~ ${scheduled.resume_on ? _pauseKrDate(scheduled.resume_on) : '무기한'}`, '#b45309', '#fef3c7')}
-                <button onclick="pauseCancelFromModal('${kind}')" style="padding:6px 14px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:12px;">예약 취소</button>
+                ${_analysisEditing ? `<button onclick="pauseCancelFromModal('${kind}')" style="padding:6px 14px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-size:12px;">예약 취소</button>` : ''}
             </div>`;
+    } else if (!_analysisEditing) {
+        body = `<div style="font-size:13px; color:#94a3b8; padding:4px 0;">정지 없음</div>`;
     } else {
         body = `
             <div style="padding:14px; background:#f8fafc; border-radius:10px;">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                     <div>
                         <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">정지 시작일</label>
-                        <input type="date" id="pauseFrom_${kind}" value="${today}" min="${_pauseLastSundayYmd()}" max="${ymdAddDays(today, 180)}" style="${inputStyle}">
+                        <input type="date" id="pauseFrom_${kind}" value="${today}" min="${_pauseLastSundayYmd()}" max="${ymdAddDays(today, 180)}" form="__pause_no_form" style="${inputStyle}">
                     </div>
                     <div>
                         <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 <span style="font-weight:400; color:#94a3b8;">(비우면 무기한)</span></label>
-                        <input type="date" id="pauseResumeOn_${kind}" value="" style="${inputStyle}">
+                        <input type="date" id="pauseResumeOn_${kind}" value="" form="__pause_no_form" style="${inputStyle}">
                     </div>
                 </div>
                 <div style="margin-top:10px;">
-                    <input type="text" id="pauseNote_${kind}" placeholder="메모 (선택) — 예: 여행, 시험 연기" style="${inputStyle}">
+                    <input type="text" id="pauseNote_${kind}" placeholder="메모 (선택) — 예: 여행, 시험 연기" form="__pause_no_form" style="${inputStyle}">
                 </div>
                 <div style="display:flex; justify-content:flex-end; margin-top:10px;">
                     <button onclick="pauseSetFromModal('${kind}')" style="padding:8px 20px; background:#ea580c; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-pause"></i> 정지</button>
@@ -4462,7 +4576,7 @@ async function pauseSetFromModal(kind) {
     try {
         await supabaseAPI.rpc('schedule_pause_set', { p_app_id: app.id, p_kind: kind, p_paused_from: from, p_resume_on: resume, p_note: note || null, p_by: _pauseAdminName() });
         alert('✅ 일시정지가 등록되었습니다.');
-        await openManageModal(app.id);
+        await _refreshPauseBlocks(app.id);
     } catch (e) {
         console.error('pause set error:', e);
         alert('❌ 정지 실패: ' + e.message);
@@ -4480,7 +4594,7 @@ async function pauseResumeFromModal(kind) {
     try {
         await supabaseAPI.rpc('schedule_pause_resume', { p_app_id: app.id, p_kind: kind, p_resume_on: resume, p_by: _pauseAdminName() });
         alert('✅ 재개일이 확정되었습니다.');
-        await openManageModal(app.id);
+        await _refreshPauseBlocks(app.id);
     } catch (e) {
         console.error('pause resume error:', e);
         alert('❌ 재개 실패: ' + e.message);
@@ -4493,7 +4607,7 @@ async function pauseCancelFromModal(kind) {
     try {
         await supabaseAPI.rpc('schedule_pause_cancel', { p_app_id: app.id, p_kind: kind, p_by: _pauseAdminName() });
         alert('✅ 정지 예약이 취소되었습니다.');
-        await openManageModal(app.id);
+        await _refreshPauseBlocks(app.id);
     } catch (e) {
         console.error('pause cancel error:', e);
         alert('❌ 취소 실패: ' + e.message);
