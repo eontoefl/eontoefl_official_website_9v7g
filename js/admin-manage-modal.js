@@ -4413,6 +4413,7 @@ function _rerenderPauseBlocks() {
     for (const kind of ['challenge', 'correction']) {
         const wrap = document.getElementById('pauseBlockWrap_' + kind);
         if (wrap) wrap.innerHTML = renderPauseBlockCard(app, kind);
+        if (_analysisEditing && document.getElementById('pauseUndoWrap_' + kind)) _loadPauseUndoCheck(kind);
     }
 }
 
@@ -4501,19 +4502,40 @@ function _renderPauseBlock(app, kind, label) {
 
     if (active) {
         const until = active.resume_on ? `재개 예정 ${_pauseKrDate(active.resume_on)}` : '무기한(재개일 미정)';
+        const btnStyle = (bg) => `padding:8px 20px; background:${bg}; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;`;
+        const ghostStyle = 'padding:8px 16px; border:1px solid #d1d5db; background:white; color:#475569; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;';
+        let editor = '';
+        if (_analysisEditing && !active.resume_on) {
+            // 무기한 → 재개일 지정
+            editor = `
+            <div style="padding:14px; background:#f8fafc; border-radius:10px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 (정지 시작일 ${_pauseKrDate(active.paused_from)}과 같은 요일)</label>
+                <input type="date" id="pauseResumeOn_${kind}" value="${_pauseNextSameWeekday(active.paused_from)}" min="${active.paused_from}" step="7" form="__pause_no_form" style="${inputStyle}">
+                <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+                    <button type="button" onclick="pauseResumeFromModal('${kind}')" style="${btnStyle('#7c3aed')}"><i class="fas fa-play"></i> 재개</button>
+                </div>
+            </div>`;
+        } else if (_analysisEditing) {
+            // 재개일 → 다른 재개일 / 무기한 (4단계)
+            editor = `
+            <div style="padding:14px; background:#f8fafc; border-radius:10px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 변경 (정지 시작일 ${_pauseKrDate(active.paused_from)}과 같은 요일, 오늘 이후)</label>
+                <input type="date" id="pauseResumeOn_${kind}" value="${active.resume_on}" min="${active.paused_from}" step="7" form="__pause_no_form" style="${inputStyle}">
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                    <button type="button" onclick="pauseIndefiniteFromModal('${kind}')" style="${ghostStyle}"><i class="fas fa-infinity"></i> 무기한으로 전환</button>
+                    <button type="button" onclick="pauseRescheduleFromModal('${kind}')" style="${btnStyle('#7c3aed')}"><i class="fas fa-calendar-alt"></i> 재개일 변경</button>
+                </div>
+            </div>`;
+        }
+        // 되돌리기(4단계): 서버 판정(schedule_pause_undo_check) 결과로 채움 — _loadPauseUndoCheck
+        const undoWrap = _analysisEditing ? `<div id="pauseUndoWrap_${kind}" style="margin-top:10px; font-size:12px; color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> 되돌리기 가능 여부 확인 중…</div>` : '';
         body = `
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
                 ${chip(`<i class="fas fa-pause-circle"></i> 정지 중 · ${_pauseKrDate(active.paused_from)}부터`, '#ea580c', '#ffedd5')}
                 <span style="font-size:13px; color:#475569;">${until}</span>
             </div>
-            ${(active.resume_on || !_analysisEditing) ? '' : `
-            <div style="padding:14px; background:#f8fafc; border-radius:10px;">
-                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">재개일 (정지 시작일 ${_pauseKrDate(active.paused_from)}과 같은 요일)</label>
-                <input type="date" id="pauseResumeOn_${kind}" value="${_pauseNextSameWeekday(active.paused_from)}" min="${active.paused_from}" step="7" form="__pause_no_form" style="${inputStyle}">
-                <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-                    <button type="button" onclick="pauseResumeFromModal('${kind}')" style="padding:8px 20px; background:#7c3aed; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-play"></i> 재개</button>
-                </div>
-            </div>`}`;
+            ${editor}
+            ${undoWrap}`;
     } else if (scheduled) {
         body = `
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -4547,8 +4569,9 @@ function _renderPauseBlock(app, kind, label) {
     const history = entries.length === 0 ? '' : `
         <div style="margin-top:10px; font-size:12px; color:#64748b;">
             ${entries.slice(0, 5).map(e => {
-                const st = e.status === 'canceled' ? '취소' : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
-                return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${e.shift_days ? ` · ${e.shift_days}일 밀림` : ''}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
+                const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
+                const resched = e.rescheduled_at ? ` · 재개일 변경(${e.prev_resume_on ? _pauseKrDate(e.prev_resume_on) : '무기한'} → ${e.resume_on ? _pauseKrDate(e.resume_on) : '무기한'})` : '';
+                return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${e.shift_days ? ` · ${e.shift_days}일 밀림` : ''}${resched}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
             }).join('')}
         </div>`;
 
@@ -4592,7 +4615,8 @@ async function pauseResumeFromModal(kind) {
     if (diff <= 0 || diff % 7 !== 0) { alert(`재개일은 정지 시작일(${_pauseKrDate(active.paused_from)})과 같은 요일(7일 단위)이어야 합니다.`); return; }
     if (!confirm(`${_pauseKrDate(resume)}부터 재개합니다. 정지 이후 일정이 ${diff}일 뒤로 밀립니다.\n재개 안내 알림톡은 재개 전날 10시(이미 지났으면 지금) 발송됩니다. 진행할까요?`)) return;
     try {
-        await supabaseAPI.rpc('schedule_pause_resume', { p_app_id: app.id, p_kind: kind, p_resume_on: resume, p_by: _pauseAdminName() });
+        // 서버는 schedule_pause_resume에 위임하고 되돌리기 기준(undo.after)도 같이 갱신한다(4단계).
+        await supabaseAPI.rpc('schedule_pause_reschedule', { p_app_id: app.id, p_kind: kind, p_resume_on: resume, p_by: _pauseAdminName() });
         alert('✅ 재개일이 확정되었습니다.');
         await _refreshPauseBlocks(app.id);
     } catch (e) {
@@ -4611,6 +4635,142 @@ async function pauseCancelFromModal(kind) {
     } catch (e) {
         console.error('pause cancel error:', e);
         alert('❌ 취소 실패: ' + e.message);
+    }
+}
+
+// ===== 일시정지 4단계: 기간 수정(재개일 변경·무기한 전환) + 되돌리기 (2026-10-08) =====
+// 서버: schedule_pause_reschedule(재개일|NULL) / schedule_pause_undo_check / schedule_pause_undo. 정지 시작일은 바꾸지 않는다.
+
+// 지금 밀려 있는 일수(밀기 적용된 것만) → 새 재개일로 바꾸면 '더' 밀리는 일수(음수면 앞당김)
+function _pauseRescheduleDelta(active, newResumeYmd) {
+    const diff = Math.round((ymdToUtcDate(newResumeYmd) - ymdToUtcDate(active.paused_from)) / 86400000);
+    const applied = active.shift_applied_at && active.shift_days != null ? Number(active.shift_days) : 0;
+    return { diff, delta: diff - applied, applied };
+}
+
+// 종류별 "지금 저장된 종료일"(없으면 null): 내챌=자기주도 종료일 또는 종료일, 첨삭=연장 종료일 또는 지정 종료일
+function _pauseKnownEndYmd(obj, kind) {
+    if (!obj) return null;
+    if (kind === 'challenge') return obj.self_paced_end_date || obj.schedule_end || null;
+    return obj.extension_end_date || obj.correction_end_date || null;
+}
+
+// 재개일 변경 확인창 문구
+function _pauseRescheduleConfirmMsg(app, kind, active, newResumeYmd) {
+    const { delta } = _pauseRescheduleDelta(active, newResumeYmd);
+    const lines = [`재개일 ${_pauseKrDate(active.resume_on)} → ${_pauseKrDate(newResumeYmd)}`];
+    if (delta > 0) lines.push(`정지 이후 일정이 ${delta}일 더 밀립니다.`);
+    else if (delta < 0) lines.push(`정지 이후 일정이 ${-delta}일 앞당겨집니다.`);
+    else lines.push('밀린 일수는 그대로입니다.');
+    const end = _pauseKnownEndYmd(app, kind);
+    if (end && delta !== 0 && end >= active.paused_from) lines.push(`종료일 ${_pauseKrDate(end)} → ${_pauseKrDate(ymdAddDays(end, delta))}`);
+    lines.push('', '재개 안내 알림톡은 새 재개일 전날 10시(이미 지났으면 지금) 발송됩니다. 진행할까요?');
+    return lines.join('\n');
+}
+
+// 무기한 전환 확인창 문구
+function _pauseIndefiniteConfirmMsg(app, kind, active) {
+    const applied = active.shift_applied_at && active.shift_days != null ? Number(active.shift_days) : 0;
+    const lines = [`재개일 ${_pauseKrDate(active.resume_on)}을(를) 지우고 무기한 정지로 바꿉니다.`];
+    if (applied) {
+        lines.push(`밀어 둔 ${applied}일을 되돌립니다(재개일을 다시 정하면 그때 밉니다).`);
+        const end = _pauseKnownEndYmd(app, kind);
+        if (end && end >= active.paused_from) lines.push(`종료일 ${_pauseKrDate(end)} → ${_pauseKrDate(ymdAddDays(end, -applied))}`);
+    }
+    lines.push('', '알림톡은 발송되지 않습니다. 진행할까요?');
+    return lines.join('\n');
+}
+
+// 되돌리기 확인창 문구(항목의 undo.before 스냅샷 기준)
+function _pauseUndoConfirmMsg(app, kind, entry) {
+    const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
+    const before = entry && entry.undo && entry.undo.before;
+    const lines = [`${label} 정지(${_pauseKrDate(entry.paused_from)}부터)를 없던 일로 되돌립니다.`];
+    const endNow = _pauseKnownEndYmd(app, kind), endBefore = _pauseKnownEndYmd(before, kind);
+    if (endBefore && endNow && endBefore !== endNow) lines.push(`종료일 ${_pauseKrDate(endNow)} → ${_pauseKrDate(endBefore)}`);
+    else lines.push('밀어 둔 날짜가 있으면 정지 전 값으로 되돌립니다.');
+    const n = Number(entry.reverted_rows || 0), m = Number(entry.deleted_reminders || 0);
+    if (n) lines.push(`미확정으로 돌렸던 과제 ${n}개를 원래대로 되돌립니다.`);
+    if (m) lines.push(`지웠던 회차 알림 기록 ${m}건을 복구합니다(중복 발송 방지).`);
+    lines.push('', '알림톡은 발송되지 않습니다 — 학생에게 직접 안내하세요. 진행할까요?');
+    return lines.join('\n');
+}
+
+// 되돌리기 불가 사유 표시 HTML
+function _pauseUndoBlockedHtml(reasons) {
+    const list = (reasons || []).map(r => `<div>· ${escapeHtml(String(r))}</div>`).join('');
+    return `<div style="font-size:12px; color:#94a3b8; line-height:1.6;"><i class="fas fa-undo"></i> 되돌리기 불가 — 변화가 있어 자동으로 되돌릴 수 없습니다. 필요하면 수동 처리를 요청하세요.${list}</div>`;
+}
+
+// 블록을 그린 뒤 서버에 되돌리기 가능 여부를 물어 버튼 또는 사유를 채운다.
+async function _loadPauseUndoCheck(kind) {
+    const app = currentManageApp; if (!app) return;
+    const wrap = document.getElementById('pauseUndoWrap_' + kind); if (!wrap) return;
+    try {
+        const res = await supabaseAPI.rpc('schedule_pause_undo_check', { p_app_id: app.id, p_kind: kind });
+        const stillThere = document.getElementById('pauseUndoWrap_' + kind);
+        if (!stillThere || !_analysisEditing) return;
+        if (res && res.ok) {
+            stillThere.innerHTML = `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                    <span style="font-size:12px; color:#64748b;">등록 뒤 제출·날짜 변화가 없어 <b>정지 전 상태로 정확히 되돌릴 수 있습니다</b>(알림톡 없음).</span>
+                    <button type="button" onclick="pauseUndoFromModal('${kind}')" style="padding:6px 14px; border:1px solid #fca5a5; background:#fff1f2; color:#b91c1c; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;"><i class="fas fa-undo"></i> 되돌리기</button>
+                </div>`;
+        } else {
+            stillThere.innerHTML = _pauseUndoBlockedHtml(res && res.reasons);
+        }
+    } catch (e) {
+        console.error('pause undo check error:', e);
+        const w = document.getElementById('pauseUndoWrap_' + kind);
+        if (w) w.innerHTML = `<div style="font-size:12px; color:#94a3b8;">되돌리기 가능 여부를 확인하지 못했습니다: ${escapeHtml(e.message || '')}</div>`;
+    }
+}
+
+async function pauseRescheduleFromModal(kind) {
+    const app = currentManageApp; if (!app) return;
+    const active = getActivePause(app, kind); if (!active || !active.resume_on) { alert('재개일이 있는 정지가 아닙니다.'); return; }
+    const resume = (document.getElementById(`pauseResumeOn_${kind}`) || {}).value;
+    if (!resume) { alert('새 재개일을 입력하세요.'); return; }
+    if (resume === active.resume_on) { alert('재개일이 지금과 같습니다.'); return; }
+    const { diff } = _pauseRescheduleDelta(active, resume);
+    if (diff <= 0 || diff % 7 !== 0) { alert(`재개일은 정지 시작일(${_pauseKrDate(active.paused_from)})과 같은 요일(7일 단위)이어야 합니다.`); return; }
+    if (resume < _pauseTodayYmd()) { alert('재개일은 오늘 이후여야 합니다.'); return; }
+    if (!confirm(_pauseRescheduleConfirmMsg(app, kind, active, resume))) return;
+    try {
+        await supabaseAPI.rpc('schedule_pause_reschedule', { p_app_id: app.id, p_kind: kind, p_resume_on: resume, p_by: _pauseAdminName() });
+        alert('✅ 재개일이 변경되었습니다.');
+        await _refreshPauseBlocks(app.id);
+    } catch (e) {
+        console.error('pause reschedule error:', e);
+        alert('❌ 재개일 변경 실패: ' + e.message);
+    }
+}
+
+async function pauseIndefiniteFromModal(kind) {
+    const app = currentManageApp; if (!app) return;
+    const active = getActivePause(app, kind); if (!active || !active.resume_on) { alert('재개일이 있는 정지가 아닙니다.'); return; }
+    if (!confirm(_pauseIndefiniteConfirmMsg(app, kind, active))) return;
+    try {
+        await supabaseAPI.rpc('schedule_pause_reschedule', { p_app_id: app.id, p_kind: kind, p_resume_on: null, p_by: _pauseAdminName() });
+        alert('✅ 무기한 정지로 바뀌었습니다.');
+        await _refreshPauseBlocks(app.id);
+    } catch (e) {
+        console.error('pause indefinite error:', e);
+        alert('❌ 무기한 전환 실패: ' + e.message);
+    }
+}
+
+async function pauseUndoFromModal(kind) {
+    const app = currentManageApp; if (!app) return;
+    const active = getActivePause(app, kind); if (!active) { alert('정지 중이 아닙니다.'); return; }
+    if (!confirm(_pauseUndoConfirmMsg(app, kind, active))) return;
+    try {
+        await supabaseAPI.rpc('schedule_pause_undo', { p_app_id: app.id, p_kind: kind, p_by: _pauseAdminName() });
+        alert('✅ 정지 전 상태로 되돌렸습니다. 학생에게 직접 안내해 주세요.');
+        await _refreshPauseBlocks(app.id);
+    } catch (e) {
+        console.error('pause undo error:', e);
+        alert('❌ 되돌리기 실패: ' + e.message);
     }
 }
 
