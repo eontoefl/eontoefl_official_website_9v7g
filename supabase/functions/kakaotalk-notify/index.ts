@@ -39,11 +39,20 @@ const TEMPLATE_IDS: Record<string, number> = {
   challenge_deadline_extended:  50247,  // 내벨업챌린지 마감 연장 안내 (버튼 없음)
   resume_approved:             50242,  // 진행 재개 승인 안내 (기한 리셋 완료)
   resume_held:                 50243,  // 진행 재개 보류 안내 (카톡 개별 안내 예정)
-  // 일시정지(2026-10-06): 템플릿 검수 전 — 번호 0이면 아래 "Unknown template type"으로 거절되어 발송되지 않는다.
-  // 검수 완료 후 번호를 넣고 본문을 승인 원문과 글자 단위로 맞출 것.
-  schedule_paused:             0,      // 일시정지 안내 (내챌/첨삭 공통, #{target})
-  schedule_resumed:            0,      // 재개 안내 (재개일·변경된 종료일·첨삭이면 다음 회차)
+  // 일시정지(2026-10-08 승인, 셋 다 버튼 없음). 서버(process_resume_notices)는 type 'schedule_resumed' + target으로 보내고,
+  // 여기서 target(내벨업챌린지/스라첨삭)에 따라 내챌용·첨삭용 템플릿으로 가른다(resolveType).
+  schedule_paused:               50248,  // 일시정지 안내 (내챌/첨삭 공통, #{target})
+  schedule_resumed_challenge:    50249,  // 내벨업챌린지 재개 안내 (재개일·변경된 종료일)
+  schedule_resumed_correction:   50250,  // 스라첨삭 재개 안내 (재개일·변경된 종료일·재개 후 첫 회차)
 };
+
+// 서버가 보내는 묶음 type을 실제 템플릿 type으로. 'schedule_resumed'는 target으로 내챌/첨삭을 가른다.
+function resolveType(type: string, data: Record<string, unknown>): string {
+  if (type === "schedule_resumed") {
+    return String(data?.target ?? "") === "스라첨삭" ? "schedule_resumed_correction" : "schedule_resumed_challenge";
+  }
+  return type;
+}
 
 // ===== 입금 계좌 정보 (전 학생 공통, 하드코딩) =====
 const DEPOSIT_BANK = "국민은행";
@@ -467,30 +476,51 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
 
     case "schedule_paused":
-      // [검수 전 임시 본문] 변수: #{name} / #{target} / #{paused_from} / #{resume_on}('추후 안내' 가능)
+      // 50248 승인 원문(2026-10-08). 변수: #{name} / #{target} / #{paused_from} / #{resume_on}(무기한이면 서버가 '추후 안내')
       return [
         "이온토플 - 일시정지 안내",
         "",
-        `${data.name}님, 안녕하세요 :)`,
+        `${data.name}님, 안녕하세요.`,
+        `${data.target} 일시정지가 등록되었습니다.`,
         "",
-        `신청하신 ${data.target}이(가) ${data.paused_from}부터 일시정지됩니다.`,
-        `재개 예정일: ${data.resume_on}`,
+        `- 정지 시작일: ${data.paused_from}`,
+        `- 재개 예정일: ${data.resume_on}`,
         "",
-        "정지 기간 동안에는 과제 마감과 알림이 멈추며, 재개하면 남은 일정이 정지 기간만큼 뒤로 밀려 그대로 이어집니다.",
+        "정지 기간에는 과제 마감과 알림이 중단됩니다.",
+        "재개하면 남은 일정은 정지 기간만큼 뒤로 조정되어 이어집니다.",
+        "",
+        "※ 일시정지는 원칙적으로 불가하며, 입원·수술 등 학습이 불가능한 건강상 사유에 한해 증빙(진단서 등) 확인 후 예외 적용됩니다.",
       ].join("\n");
 
-    case "schedule_resumed":
-      // [검수 전 임시 본문] 변수: #{name} / #{target} / #{resume_on} / #{end_date} / #{next_session}(첨삭만, 비면 빈 문자열)
+    case "schedule_resumed_challenge":
+      // 50249 승인 원문(2026-10-08). 변수: #{name} / #{resume_on} / #{end_date}
       return [
-        "이온토플 - 재개 안내",
+        "이온토플 - 내벨업챌린지 재개 안내",
         "",
-        `${data.name}님, 안녕하세요 :)`,
+        `${data.name}님, 안녕하세요.`,
+        "일시정지된 내벨업챌린지가 아래 일정으로 다시 시작됩니다.",
         "",
-        `일시정지했던 ${data.target}이(가) ${data.resume_on}부터 다시 시작됩니다.`,
-        `변경된 종료일: ${data.end_date}`,
-        ...(data.next_session ? [`다음 회차: ${data.next_session}`] : []),
+        `- 재개일: ${data.resume_on}`,
+        `- 변경된 종료일: ${data.end_date}`,
         "",
-        "테스트룸에서 이어서 진행해주세요 :)",
+        "남은 일정은 정지 기간만큼 뒤로 조정되었습니다.",
+        "재개일부터 테스트룸에서 남은 과제를 이어서 진행해주세요.",
+      ].join("\n");
+
+    case "schedule_resumed_correction":
+      // 50250 승인 원문(2026-10-08). 변수: #{name} / #{resume_on} / #{end_date} / #{next_session}
+      return [
+        "이온토플 - 스라첨삭 재개 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,
+        "일시정지된 스라첨삭이 아래 일정으로 다시 시작됩니다.",
+        "",
+        `- 재개일: ${data.resume_on}`,
+        `- 변경된 종료일: ${data.end_date}`,
+        `- 재개 후 첫 회차: ${data.next_session}`,
+        "",
+        "남은 일정은 정지 기간만큼 뒤로 조정되었습니다.",
+        "테스트룸에서 회차별 일정을 확인하고, 재개일부터 첨삭 과정을 이어서 진행해주세요.",
       ].join("\n");
 
     default:
@@ -557,10 +587,13 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 스라첨삭 마감이 연장되었습니다. 테스트룸에서 변경된 마감을 확인해주세요.";
     case "challenge_deadline_extended":
       return "[이온토플] 내벨업챌린지 과제 마감이 연장되었습니다. 테스트룸에서 변경된 마감을 확인해주세요.";
+    // 일시정지 3종: 파트너스 센터에 등록된 대체문자와 동일(2026-10-08)
     case "schedule_paused":
-      return `[이온토플] ${data.target} 일시정지 ${data.paused_from}부터. 재개 예정 ${data.resume_on}`;
-    case "schedule_resumed":
-      return `[이온토플] ${data.target} ${data.resume_on}부터 재개. 변경된 종료일 ${data.end_date}. https://testroom.eonfl.com`;
+      return "[이온토플] 일시정지가 등록되었습니다. 정지 중에는 과제 마감과 알림이 멈춥니다.";
+    case "schedule_resumed_challenge":
+      return "[이온토플] 내벨업챌린지가 내일 재개됩니다. 테스트룸에서 변경된 일정을 확인해주세요.";
+    case "schedule_resumed_correction":
+      return "[이온토플] 스라첨삭이 내일 재개됩니다. 테스트룸에서 첫 회차와 종료일을 확인해주세요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -575,8 +608,7 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
   if (type === "correction_start_reminder") {
     return `${SITE_URL}/my-dashboard.html`;
   }
-  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open"
-      || type === "schedule_resumed") {
+  if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open") {
     return TESTROOM_URL;
   }
   // 50244(세션 당일 안내) 버튼 "테스트룸 바로가기" — 템플릿에 등록된 링크가 http:// 이므로
@@ -604,7 +636,11 @@ function hasNoButton(templateId: number): boolean {
       || templateId === TEMPLATE_IDS.deposit_reminder
       // 50246/50247(마감 연장 안내): 승인 템플릿에 버튼 없음.
       || templateId === TEMPLATE_IDS.correction_deadline_extended
-      || templateId === TEMPLATE_IDS.challenge_deadline_extended;
+      || templateId === TEMPLATE_IDS.challenge_deadline_extended
+      // 50248/50249/50250(일시정지·재개 안내): 승인 템플릿에 버튼 없음(2026-10-08 파트너스 센터 확인).
+      || templateId === TEMPLATE_IDS.schedule_paused
+      || templateId === TEMPLATE_IDS.schedule_resumed_challenge
+      || templateId === TEMPLATE_IDS.schedule_resumed_correction;
 }
 
 // ===== 단건 메시지 객체 생성 =====
@@ -743,10 +779,11 @@ Deno.serve(async (req) => {
     }
 
     // ===== 단건 발송 모드 =====
-    const { type, data } = body as {
+    const { type: rawType, data } = body as {
       type: string;
       data: Record<string, unknown>;
     };
+    const type = resolveType(rawType, data);
 
     // 유효성 검사
     const templateId = TEMPLATE_IDS[type];
@@ -834,7 +871,8 @@ async function handleBulkSend(
   const grouped: Record<number, { messages: Record<string, unknown>[]; logEntries: Record<string, unknown>[] }> = {};
 
   for (let i = 0; i < items.length; i++) {
-    const { type, data } = items[i];
+    const { type: rawType, data } = items[i];
+    const type = resolveType(rawType, data);
     const templateId = TEMPLATE_IDS[type];
     if (!templateId || !data.phone) continue;
 

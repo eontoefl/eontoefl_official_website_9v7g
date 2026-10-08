@@ -142,9 +142,10 @@ for (const t of oldTypes) {
   check(`[회귀] ${t} 버튼URL`, now.getBtnUrl(t, { ...SAMPLE }), before.getBtnUrl(t, { ...SAMPLE }));
   check(`[회귀] ${t} 버튼유무`, now.hasNoButton(now.TEMPLATE_IDS[t]), before.hasNoButton(before.TEMPLATE_IDS[t]));
 }
-check('[회귀] main 에 없던 type 은 correction_session_reminder 하나뿐',
-  Object.keys(now.TEMPLATE_IDS).filter((t) => !oldTypes.includes(t)).join(','),
-  'correction_session_reminder');
+// 기준 main(로컬 ref)에 없던 type: 50244 반영 뒤로는 일시정지 3종(50248/50249/50250, 2026-10-08)만 추가됐다.
+check('[회귀] 기준 main 에 없던 type 은 일시정지 3종뿐',
+  Object.keys(now.TEMPLATE_IDS).filter((t) => !oldTypes.includes(t) && t !== 'correction_session_reminder').join(','),
+  'schedule_paused,schedule_resumed_challenge,schedule_resumed_correction');
 // 알 수 없는 type 은 여전히 빈 문자열 (기존 default 동작 보존)
 check('[회귀] 미등록 type 본문은 빈 문자열', now.buildMsgContent('no_such_type', {}), '');
 
