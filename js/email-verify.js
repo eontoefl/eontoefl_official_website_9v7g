@@ -14,13 +14,17 @@
 //   이메일 칸을 고치면 인증이 풀린다. 인증 성공은 sessionStorage에 10분 보관(새로고침·초안 복원 대응).
 //   인증 전에는 폼의 제출 버튼이 눌리지 않는다.
 //
-// 서버: Edge Function email-verify (supabase-config.js의 SUPABASE_URL / SUPABASE_ANON_KEY 사용)
+// 서버: Edge Function email-verify (supabase-config.js의 최상위 const SUPABASE_URL / SUPABASE_ANON_KEY 를 전역 식별자로 읽음)
 // 입력칸에는 name 을 두지 않는다 (챌린지 신청서의 초안 저장·입력 변경 검사에 섞이지 않게).
 
 (function (global) {
     'use strict';
 
-    const ENDPOINT = () => `${global.SUPABASE_URL}/functions/v1/email-verify`;
+    // supabase-config.js 는 SUPABASE_URL / SUPABASE_ANON_KEY 를 최상위 const 로 선언한다.
+    // const 는 window 속성이 되지 않으므로 전역 식별자를 직접 읽는다(없으면 window 속성으로 폴백).
+    function cfgUrl() { return typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : global.SUPABASE_URL; }
+    function cfgKey() { return typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : global.SUPABASE_ANON_KEY; }
+    const ENDPOINT = () => `${cfgUrl()}/functions/v1/email-verify`;
     const SESSION_KEY = 'iontoefl_email_verified';
     const VERIFIED_KEEP_MS = 10 * 60 * 1000;   // 인증 성공 기록 10분 보관
     const DEFAULT_TTL = 180;                    // 서버 응답이 없을 때의 기본값(3분)
@@ -79,7 +83,7 @@
     async function call(action, email, code) {
         const resp = await fetch(ENDPOINT(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${global.SUPABASE_ANON_KEY}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfgKey()}` },
             body: JSON.stringify({ action, email, code })
         });
         let body = null;

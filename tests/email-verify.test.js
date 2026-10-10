@@ -39,14 +39,14 @@ function loadComponent({ fetchImpl, session = {} }) {
         removeItem: (k) => { delete session[k]; },
     };
     const timers = [];
+    // 실제 공홈처럼 SUPABASE_URL/KEY 는 전역 식별자(최상위 const)로만 존재하고 window 속성이 아니다
     const window = {
-        SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: 'anon',
         document, sessionStorage, fetch: fetchImpl, console,
         setInterval: (fn, ms) => { timers.push(fn); return timers.length; },
         clearInterval: () => {},
     };
     window.window = window;
-    vm.runInNewContext(src, window);
+    vm.runInNewContext("const SUPABASE_URL = 'https://example.supabase.co'; const SUPABASE_ANON_KEY = 'anon';\n" + src, window);
     return { EmailVerify: window.EmailVerify, timers, byId, session };
 }
 
@@ -54,6 +54,8 @@ function fakeFetch(script) {
     // script: 배열 — 호출 순서대로 돌려줄 응답 객체
     const calls = [];
     const impl = async (url, init) => {
+        assert.equal(url, 'https://example.supabase.co/functions/v1/email-verify');   // 주소가 비면 공홈 404로 가던 실제 사고 재현 방지
+        assert.equal(init.headers.Authorization, 'Bearer anon');
         const body = JSON.parse(init.body);
         calls.push(body);
         const next = script.shift() || { ok: false, reason: 'server_error' };
