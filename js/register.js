@@ -63,11 +63,19 @@ nicknameInput.addEventListener('input', (e) => {
     checkNickname(e.target.value.trim());
 });
 
+// ==================== 이메일 인증 (가입 전 필수) ====================
+const emailVerify = EmailVerify.mount({
+    form: document.getElementById('registerForm'),
+    emailInput: document.getElementById('email'),
+    container: document.getElementById('emailVerifyBox')
+});
+
 // ==================== 회원가입 제출 ====================
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     if (!validateForm('registerForm')) return;
+    if (!emailVerify.requireVerified()) return;
 
     const nickname = document.getElementById('nickname').value.trim();
     if (nickname.length < 2) {

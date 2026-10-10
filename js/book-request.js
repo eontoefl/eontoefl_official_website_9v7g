@@ -57,6 +57,9 @@ let isComposing = false;
 let emailAvailable = false;
 let emailCheckTimer = null;
 
+// 이메일 인증 부품 (비로그인 신규 전용, initForm('anonymous')에서 붙임)
+let emailVerify = null;
+
 
 document.addEventListener('DOMContentLoaded', async function () {
     const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
@@ -151,6 +154,11 @@ function initForm(mode, userData) {
         setupEmailCheck();
         setupPhoneFormat();
         setupPasswordConfirmation();
+        emailVerify = EmailVerify.mount({
+            form: document.getElementById('bookRequestForm'),
+            emailInput: document.getElementById('email'),
+            container: document.getElementById('emailVerifyBox')
+        });
 
         const goLoginLink = document.getElementById('goLoginLink');
         if (goLoginLink) {
@@ -842,6 +850,7 @@ function validateBookForm() {
         if (!name) { showToast('이름을 입력해주세요.', 'error'); focusEl('name'); return false; }
         if (nickname.length < 2) { showToast('닉네임을 2자 이상 입력해주세요.', 'error'); focusEl('nickname'); return false; }
         if (!email || !validateEmail(email)) { showToast('올바른 이메일을 입력해주세요.', 'error'); focusEl('email'); return false; }
+        if (!emailVerify || !emailVerify.requireVerified()) { showToast('이메일 인증을 먼저 완료해주세요.', 'error'); return false; }
         if (!phone) { showToast('전화번호를 입력해주세요.', 'error'); focusEl('phone'); return false; }
         if (!password || password.length < 6) { showToast('비밀번호를 6자 이상 입력해주세요.', 'error'); focusEl('password'); return false; }
         if (!passwordConfirm) { showToast('비밀번호 확인을 입력해주세요.', 'error'); focusEl('passwordConfirm'); return false; }

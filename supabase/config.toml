@@ -417,3 +417,8 @@ entrypoint = "./functions/telegram-notify/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/telegram-notify/*.html" ]
+
+[functions.email-verify]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/email-verify/index.ts"

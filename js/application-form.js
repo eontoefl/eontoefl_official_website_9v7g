@@ -24,6 +24,7 @@ const applicationState = {
 };
 let nicknameCheckTimer = null;
 let emailCheckTimer = null;
+let emailVerify = null;   // 이메일 인증 부품 (비로그인 신규 전용, setupAccountFields에서 1회 붙임)
 let nicknameComposing = false;
 let applicationAutoSaveTimeout = null;
 let applicationCompleted = false;
@@ -418,12 +419,20 @@ function setupAccountFields(userData, editing) {
             input.disabled = true;
         }));
         clearAccountPasswordConfirmation();
+        if (emailVerify) emailVerify.release();   // 계정 생성 직후 로그인 전환: 제출 버튼 잠금 해제
     } else {
         signupOnly.forEach(el => { el.style.display = ''; });
         setupNicknameCheck();
         setupEmailCheck();
         setupPhoneFormat();
         setupAccountPasswordConfirmation();
+        if (!emailVerify) {
+            emailVerify = EmailVerify.mount({
+                form: document.getElementById('applicationForm'),
+                emailInput: emailInput,
+                container: document.getElementById('emailVerifyBox')
+            });
+        }
     }
 
     if (userData && !editing) {
@@ -1126,6 +1135,10 @@ function captureSignupSnapshot() {
 
 async function validateSignupAccount(formFingerprint) {
     if (!applicationState.isAnonymous || isEditMode) return true;
+    if (!emailVerify || !emailVerify.requireVerified()) {
+        alert('이메일 인증을 먼저 완료해 주세요.');
+        return false;
+    }
 
     const nicknameInput = document.getElementById('accountNickname');
     const emailInput = document.getElementById('applicantEmail');
