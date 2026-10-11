@@ -648,6 +648,11 @@ input[type="radio"] {
     gap: 0.85rem;
 }
 
+/* 가입 이메일 인증 줄([이메일 칸][인증번호 받기])이 붙은 칸은 두 칸 폭을 다 쓴다 — 반 칸에선 주소가 잘린다 */
+.two-column-grid > .form-group:has(.email-verify-row) {
+    grid-column: 1 / -1;
+}
+
 @media (max-width: 768px) {
     .two-column-grid {
         grid-template-columns: 1fr;

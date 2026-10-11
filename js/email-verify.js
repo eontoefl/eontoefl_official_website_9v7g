@@ -9,6 +9,10 @@
 //   });
 //   제출 직전:  if (!ev.requireVerified()) return;   // 인증 안 됐으면 문구 표시 + false
 //
+// 생김새: 이메일 칸 오른쪽에 [인증번호 받기] 버튼이 같은 높이로 붙는다(이메일 칸을 flex 줄로 감싼다).
+//   보내면 아래에 [인증번호 6자리 (칸 안에 남은 시간)][확인] 한 줄이 생기고, 안내 문구는 그 아래 한 줄에만 보인다.
+//   인증되면 둘째 줄은 사라지고 오른쪽 버튼이 초록 "인증 완료 ✓"로 남는다.
+//
 // 동작(회의 확정): "인증번호 받기" → 6자리 입력칸 + 3:00 카운트다운 → "확인" → 인증 완료 ✓.
 //   재발송은 30초 뒤부터(새 번호, 타이머 리셋). 틀리면 남은 횟수 표시(5회). 3분 지나면 재발송 안내.
 //   이메일 칸을 고치면 인증이 풀린다. 인증 성공은 sessionStorage에 10분 보관(새로고침·초안 복원 대응).
@@ -31,7 +35,6 @@
     const DEFAULT_RESEND = 30;
 
     const MSG = {
-        idle: '이메일을 입력한 뒤 인증번호를 받아주세요.',
         sending: '인증번호를 보내는 중...',
         sent: '인증번호를 보냈어요. 메일함(스팸함 포함)을 확인해 주세요.',
         checking: '확인 중...',
@@ -53,10 +56,7 @@
         changed: '이메일이 바뀌어 인증이 풀렸어요. 다시 받아주세요.'
     };
 
-    const COLOR = {
-        text: '#334155', muted: '#64748b', ok: '#15803d', err: '#dc2626',
-        btnBg: '#efeaf7', btnText: '#5b4a7d', border: '#d9d2e6'
-    };
+    const COLOR = { muted: '#64748b', ok: '#15803d', err: '#dc2626' };   // 버튼·칸 색은 위 스타일시트에
 
     // ---------- 작은 도우미 ----------
     function normalize(v) { return String(v || '').trim().toLowerCase(); }
@@ -115,23 +115,43 @@
         let timerId = null;
         let busy = false;
 
-        // 화면
+        // 화면 — 1줄: [이메일 칸][인증번호 받기] / 보낸 뒤 2줄: [인증번호 6자리 (칸 안에 남은 시간)][확인] / 아래 안내 한 줄
         container.innerHTML = '';
         container.classList.add('email-verify-box');
         if (!document.getElementById('emailVerifyStyle')) {
             const st = document.createElement('style');
             st.id = 'emailVerifyStyle';
-            st.textContent = '.email-verify-box button:disabled{opacity:.55;cursor:default}';
+            st.textContent =
+                '.email-verify-row{display:flex;align-items:stretch;gap:8px}' +
+                '.email-verify-row>.email-verify-field{flex:1 1 auto;min-width:0}' +
+                '.email-verify-row>.email-verify-field>input[type="email"]{padding-right:5.2rem}' +   /* 칸 안 오른쪽의 "사용 가능" 표시와 글자가 겹치지 않게 */
+                '.email-verify-row>button{flex:0 0 124px;width:124px;padding:0 8px;border:1px solid #d9d2e6;border-radius:10px;background:#efeaf7;color:#5b4a7d;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;line-height:1}' +
+                '.email-verify-row>button:hover:not(:disabled){background:#e7dce7}' +
+                '.email-verify-row>button:disabled{opacity:.55;cursor:default}' +
+                '.email-verify-row>button[data-verified="1"]:disabled{opacity:1;background:#f0fdf4;border-color:#bbf7d0;color:#15803d}' +
+                '.email-verify-code{position:relative;flex:1 1 auto;min-width:0}' +
+                '.email-verify-code input{padding-right:4.2rem!important;letter-spacing:3px;font-variant-numeric:tabular-nums}' +
+                '.email-verify-code input::placeholder{letter-spacing:0}' +
+                '.email-verify-timer{position:absolute;right:0.9rem;top:50%;transform:translateY(-50%);font-size:12px;color:#64748b;font-variant-numeric:tabular-nums;pointer-events:none}' +
+                '@media (max-width:480px){.email-verify-row>button{flex-basis:100px;width:100px;padding:0 4px}}';   /* 폰: 버튼을 줄여 칸을 넓힌다 */
             document.head.appendChild(st);
         }
-        container.style.cssText = 'margin-top:6px;';
 
-        const row1 = el('div', 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;');
+        // 1줄: 이메일 칸을 flex 줄로 감싸고 오른쪽에 버튼을 붙인다 (이메일 칸이 상태 표시용 wrapper 안에 있으면 wrapper째 옮김)
+        const wrap0 = emailInput.parentElement;
+        const field = (wrap0 && (wrap0.classList.contains('field-with-status') || wrap0.style.position === 'relative')) ? wrap0 : emailInput;
+        const row1 = el('div', '');
+        row1.className = 'email-verify-row';
         const sendBtn = button('인증번호 받기');
-        const timerEl = el('span', `font-size:13px; color:${COLOR.muted}; min-width:40px; display:none; font-variant-numeric:tabular-nums;`);
-        row1.appendChild(sendBtn); row1.appendChild(timerEl);
+        if (field.parentNode) field.parentNode.insertBefore(row1, field);
+        row1.appendChild(field); row1.appendChild(sendBtn);
+        field.classList.add('email-verify-field');
 
-        const row2 = el('div', 'display:none; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;');
+        // 2줄: 인증번호 칸(안에 남은 시간) + 확인 버튼
+        const row2 = el('div', 'display:none; margin-top:8px;');
+        row2.className = 'email-verify-row';
+        const codeWrap = el('div', '');
+        codeWrap.className = 'email-verify-code';
         const codeInput = document.createElement('input');
         codeInput.type = 'text';
         codeInput.inputMode = 'numeric';
@@ -139,22 +159,42 @@
         codeInput.maxLength = 6;
         codeInput.placeholder = '인증번호 6자리';
         codeInput.setAttribute('aria-label', '이메일 인증번호');
-        codeInput.style.cssText = `width:150px; padding:8px 10px; border:1px solid ${COLOR.border}; border-radius:8px; font-size:15px; letter-spacing:3px; font-variant-numeric:tabular-nums;`;
+        if (emailInput.className) codeInput.className = emailInput.className;   // 페이지의 입력칸 모양(.form-input 등)을 그대로 따른다
+        const timerEl = el('span', 'display:none;');
+        timerEl.className = 'email-verify-timer';
+        codeWrap.appendChild(codeInput); codeWrap.appendChild(timerEl);
         const confirmBtn = button('확인');
-        row2.appendChild(codeInput); row2.appendChild(confirmBtn);
+        row2.appendChild(codeWrap); row2.appendChild(confirmBtn);
 
-        const status = el('div', `font-size:12px; margin-top:6px; color:${COLOR.muted}; min-height:16px;`);
+        // 안내 한 줄 (비어 있으면 자리도 차지하지 않음)
+        const status = el('div', `display:none; font-size:12px; margin-top:6px; color:${COLOR.muted}; line-height:1.4;`);
         status.setAttribute('aria-live', 'polite');
-        status.textContent = MSG.idle;
 
-        container.appendChild(row1); container.appendChild(row2); container.appendChild(status);
+        container.style.cssText = '';
+        container.appendChild(row2); container.appendChild(status);
+
+        // 모서리·글자 크기는 이메일 칸의 실제 값에 맞춘다 (페이지마다 입력칸 모양이 달라서)
+        try {
+            if (typeof getComputedStyle === 'function') {
+                const cs = getComputedStyle(emailInput);
+                [sendBtn, confirmBtn].forEach(b => { b.style.borderRadius = cs.borderRadius; b.style.fontSize = cs.fontSize; });
+            }
+        } catch (e) { /* 무시 */ }
 
         const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
 
         // ---------- 상태 전이 ----------
         function setStatus(text, kind) {
-            status.textContent = text;
+            status.textContent = text || '';
+            status.style.display = text ? '' : 'none';
             status.style.color = kind === 'ok' ? COLOR.ok : kind === 'err' ? COLOR.err : COLOR.muted;
+        }
+        // 이메일 칸 안의 중복확인 표시("사용 가능")를 비운다 — 아래 거절 문구와 반대말처럼 보이지 않게
+        function clearDupBadge() {
+            try {
+                const badge = field !== emailInput && field.querySelector ? field.querySelector('#emailStatus, .field-status') : null;
+                if (badge) badge.textContent = '';
+            } catch (e) { /* 무시 */ }
         }
         function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
         function lockSubmit(locked) {
@@ -163,8 +203,8 @@
             else if (submitBtn.dataset.emailVerifyLocked === '1') { submitBtn.disabled = false; delete submitBtn.dataset.emailVerifyLocked; }
         }
         function renderSendBtn() {
-            if (verifiedEmail) { sendBtn.style.display = 'none'; return; }
-            sendBtn.style.display = '';
+            if (verifiedEmail) { sendBtn.textContent = MSG.verified; sendBtn.disabled = true; sendBtn.dataset.verified = '1'; return; }
+            delete sendBtn.dataset.verified;
             if (!codeSentFor) { sendBtn.textContent = '인증번호 받기'; sendBtn.disabled = busy; return; }
             if (resendLeft > 0) { sendBtn.textContent = `재발송 (${resendLeft}초)`; sendBtn.disabled = true; }
             else { sendBtn.textContent = '재발송'; sendBtn.disabled = busy; }
@@ -195,7 +235,8 @@
             timerEl.style.display = 'none';
             row2.style.display = 'none';
             renderSendBtn();
-            setStatus(MSG.verified, 'ok');
+            setStatus('');                 // 완료 표시는 오른쪽 버튼이 맡는다
+            clearDupBadge();               // "사용 가능" 표시는 더 필요 없다
             writeSession(email);
             lockSubmit(false);
         }
@@ -207,7 +248,7 @@
             codeInput.value = '';
             // 세션 기록은 지우지 않는다: 이메일을 고쳤다가 같은 값으로 돌아오면 10분 안에는 복원된다.
             renderSendBtn();
-            setStatus(reasonText || MSG.idle, reasonText ? 'err' : null);
+            setStatus(reasonText || '', reasonText ? 'err' : null);
             lockSubmit(true);
         }
 
@@ -228,7 +269,7 @@
                     return;
                 }
                 if (r.reason === 'already_registered') { setStatus(MSG.registered, 'err'); return; }
-                if (r.reason === 'domain_not_found') { setStatus(MSG.domainNotFound, 'err'); emailInput.focus(); return; }
+                if (r.reason === 'domain_not_found') { clearDupBadge(); setStatus(MSG.domainNotFound, 'err'); emailInput.focus(); return; }
                 if (r.reason === 'too_soon') { setStatus(MSG.tooSoon(r.retry_after || DEFAULT_RESEND), 'err'); return; }
                 if (r.reason === 'hourly_limit') { setStatus(MSG.hourly, 'err'); return; }
                 if (r.reason === 'daily_limit') { setStatus(MSG.daily, 'err'); return; }
@@ -302,7 +343,8 @@
             },
             // 로그인 전환 등으로 계정 칸이 사라질 때 잠금 해제
             release() { stopTimer(); lockSubmit(false); },
-            reset() { clearSession(); reset(null); }
+            reset() { clearSession(); reset(null); },
+            _els: { row1, row2, sendBtn, timerEl, codeInput, confirmBtn, status }   // 테스트용
         };
 
         function el(tag, css) { const d = document.createElement(tag); d.style.cssText = css; return d; }
@@ -310,9 +352,6 @@
             const b = document.createElement('button');
             b.type = 'button';
             b.textContent = label;
-            b.style.cssText = `padding:8px 14px; border:1px solid ${COLOR.border}; border-radius:8px; background:${COLOR.btnBg}; color:${COLOR.btnText}; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;`;
-            b.addEventListener('mouseenter', () => { if (!b.disabled) b.style.background = '#e7dce7'; });
-            b.addEventListener('mouseleave', () => { b.style.background = COLOR.btnBg; });
             return b;
         }
     }

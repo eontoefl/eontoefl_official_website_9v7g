@@ -10,16 +10,26 @@ const vm = require('node:vm');
 
 // ---------- 아주 작은 DOM 흉내 ----------
 function makeEl(tag) {
+    const classes = new Set();
     const el = {
         tagName: tag.toUpperCase(), children: [], style: {}, dataset: {}, attrs: {}, listeners: {},
-        disabled: false, value: '', textContent: '', innerHTML: '', id: '', type: '',
-        classList: { add() {}, remove() {}, contains() { return false; } },
-        appendChild(c) { this.children.push(c); c.parent = this; return c; },
+        disabled: false, value: '', textContent: '', innerHTML: '', id: '', type: '', parentNode: null,
+        get className() { return [...classes].join(' '); },
+        set className(v) { classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach(c => classes.add(c)); },
+        classList: { add(c) { classes.add(c); }, remove(c) { classes.delete(c); }, contains(c) { return classes.has(c); } },
+        get parentElement() { return this.parentNode; },
+        set parentElement(v) { this.parentNode = v; },
+        appendChild(c) { if (c.parentNode) c.parentNode.children = c.parentNode.children.filter(x => x !== c); this.children.push(c); c.parentNode = this; return c; },
+        insertBefore(c, ref) { const i = this.children.indexOf(ref); this.children.splice(i < 0 ? this.children.length : i, 0, c); c.parentNode = this; return c; },
         setAttribute(k, v) { this.attrs[k] = v; },
         addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); },
         dispatch(ev, arg) { (this.listeners[ev] || []).forEach(fn => fn(arg || { key: '' })); },
         focus() {}, select() {}, scrollIntoView() {},
-        querySelector(sel) { return sel.includes('submit') ? this.submitBtn || null : null; },
+        querySelector(sel) {
+            if (sel.includes('submit')) return this.submitBtn || null;
+            if (sel.includes('emailStatus')) return this.statusEl || null;
+            return null;
+        },
     };
     return el;
 }
@@ -69,13 +79,17 @@ function setup(script, opts = {}) {
     const fetchImpl = fakeFetch(script);
     const { EmailVerify, timers, session } = loadComponent({ fetchImpl, session: opts.session });
     const form = makeEl('form'); const submitBtn = makeEl('button'); form.submitBtn = submitBtn;
-    const emailInput = makeEl('input'); emailInput.value = opts.email || '';
+    // 실제 페이지처럼: form-group > (상태표시 wrapper > 이메일칸 + 배지) + 인증 div
+    const group = makeEl('div');
+    const wrap = makeEl('div'); wrap.style.position = 'relative';
+    const emailInput = makeEl('input'); emailInput.value = opts.email || ''; emailInput.className = opts.inputClass || '';
+    const badge = makeEl('span'); badge.textContent = opts.badge || ''; wrap.statusEl = badge;
+    wrap.appendChild(emailInput); wrap.appendChild(badge);
     const container = makeEl('div');
+    group.appendChild(wrap); group.appendChild(container);
     const ev = EmailVerify.mount({ form, emailInput, container });
-    const [row1, row2, status] = container.children;
-    const sendBtn = row1.children[0]; const timerEl = row1.children[1];
-    const codeInput = row2.children[0]; const confirmBtn = row2.children[1];
-    return { ev, fetchImpl, timers, session, submitBtn, emailInput, sendBtn, timerEl, codeInput, confirmBtn, status, row2 };
+    const { row1, row2, sendBtn, timerEl, codeInput, confirmBtn, status } = ev._els;
+    return { ev, fetchImpl, timers, session, submitBtn, emailInput, sendBtn, timerEl, codeInput, confirmBtn, status, row1, row2, group, wrap, badge, container };
 }
 
 const tick = () => new Promise(r => setImmediate(r));
@@ -102,6 +116,31 @@ test('인증 칸 div가 없는 옛 HTML이어도 멈추지 않고 이메일 칸 
     const ev = EmailVerify.mount({ form, emailInput, container: null });
     assert.ok(inserted && inserted.where === 'afterend');
     assert.equal(ev.isVerified(), false);
+    assert.deepEqual(ev._els.row1.children, [wrap, ev._els.sendBtn]);   // wrapper째 줄 안으로 옮기고 오른쪽에 버튼
+});
+
+// ---------- 배치 ----------
+test('배치: 이메일 칸 오른쪽에 버튼, 안내 줄은 처음엔 비어 있고 자리도 차지하지 않는다', () => {
+    const s = setup([], { inputClass: 'form-input' });
+    assert.deepEqual(s.group.children, [s.row1, s.container]);           // form-group > [줄1][인증 div]
+    assert.deepEqual(s.row1.children, [s.wrap, s.sendBtn]);              // 줄1 = [이메일 wrapper][인증번호 받기]
+    assert.ok(s.wrap.classList.contains('email-verify-field'));
+    assert.equal(s.sendBtn.textContent, '인증번호 받기');
+    assert.equal(s.row2.style.display, 'none');
+    assert.equal(s.status.style.display, 'none');
+    assert.equal(s.status.textContent, '');
+    assert.equal(s.codeInput.className, 'form-input');                    // 번호 칸은 페이지 입력칸 모양을 따른다
+    assert.equal(s.row2.children[0].children[0], s.codeInput);            // 줄2 = [번호칸+남은시간][확인]
+    assert.equal(s.row2.children[0].children[1], s.timerEl);
+    assert.equal(s.row2.children[1], s.confirmBtn);
+});
+
+test('없는 도메인 거절 시 이메일 칸 안의 "사용 가능" 표시를 비운다', async () => {
+    const s = setup([{ ok: false, reason: 'domain_not_found' }], { email: 'sadf@asdfg.asdgf', badge: '사용 가능' });
+    s.sendBtn.dispatch('click'); await tick();
+    assert.equal(s.badge.textContent, '');
+    assert.equal(s.status.textContent, '존재하지 않는 이메일 도메인이에요. 주소를 다시 확인해 주세요.');
+    assert.equal(s.status.style.display, '');
 });
 
 // ---------- 화면 흐름 ----------
@@ -126,7 +165,10 @@ test('받기 → 확인 성공 → 인증 완료 + 제출 버튼 풀림 + 세션
     assert.equal(s.fetchImpl.calls[1].code, '482913');
     assert.equal(s.ev.isVerified(), true);
     assert.equal(s.submitBtn.disabled, false);
-    assert.equal(s.status.textContent, '인증 완료 ✓');
+    assert.equal(s.sendBtn.textContent, '인증 완료 ✓');          // 완료 표시는 오른쪽 버튼이 맡는다
+    assert.equal(s.sendBtn.dataset.verified, '1');
+    assert.equal(s.row2.style.display, 'none');                   // 번호 줄은 사라짐
+    assert.equal(s.status.style.display, 'none');                 // 안내 줄은 비움
     const saved = JSON.parse(s.session.iontoefl_email_verified);
     assert.equal(saved.email, 'kim@gmail.com');
 });
