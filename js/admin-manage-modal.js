@@ -1117,6 +1117,10 @@ function loadModalAnalysisTab(app) {
             </div>
         </div>
 
+        <!-- 수강 관리(일시정지·환불·중도포기) — 탭 맨 위, 폼 밖(즉시 적용 동작). 2026-10-12 -->
+        <div id="pauseBlockWrap_challenge">${renderPauseBlockCard(app, 'challenge')}</div>
+        <div id="pauseBlockWrap_correction"></div>
+
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
             <!-- 0. 학생 유형(프로모션/일반) 스위치: 켜짐=프로모션. 보낸 분석은 수정 모드에서만, 동의·기한 지난 학생은 잠금 -->
             <div class="form-group" id="incentiveToggleBox" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); ${pointerEvents}">
@@ -1256,8 +1260,6 @@ function loadModalAnalysisTab(app) {
 
                 </div><!-- /흰 카드 -->
 
-                <!-- 수강 관리 카드(내챌·첨삭 한 줄씩: 상태·일시정지·환불). 읽기 전용이면 상태·이력만, 수정 모드에서 버튼 — 2026-10-08/10-12 -->
-                <div id="pauseBlockWrap_challenge">${renderPauseBlockCard(app, 'challenge')}</div>
             </div>
 
             <!-- 3. 추가 옵션 (스라첨삭) -->
@@ -1311,8 +1313,6 @@ function loadModalAnalysisTab(app) {
                 </div>
             </div>
 
-            <!-- (2026-10-12) 첨삭 정지·환불은 위 "수강 관리" 카드에서. 이 자리는 갱신 함수 호환용으로만 남김(항상 빈 값) -->
-            <div id="pauseBlockWrap_correction">${renderPauseBlockCard(app, 'correction')}</div>
 
             <!-- 4. 가격 정보 -->
             <div class="form-group" id="formGroup-price">
@@ -4302,176 +4302,288 @@ function _stopKindEligible(app, kind) {
     return true;
 }
 
-// ===== "수강 관리" 표 하나 (2026-10-12 3단계 재구성, 대표 지적: 정지·환불 블록이 네 덩어리로 흩어짐) =====
-//   표: 상품(내벨업챌린지·스라첨삭) 한 줄씩 = [상품 | 상태(칩 + 요약 한 줄) | 처리 버튼]. 버튼을 누르면 표 아래에 그 상품용 입력칸 하나만 열린다.
-//   이력(정지·환불 합쳐 시간순)은 맨 아래 접힘. 내챌 일정 아래 자리(pauseBlockWrap_challenge)에 한 번만 그리고 첨삭 자리는 비운다.
-//   버튼은 "수정"을 누른 뒤에만(대표 결정). 처리 자체는 서버 RPC로 즉시 적용(저장과 별개).
-var _manageForm = null;   // { kind: 'challenge'|'correction', action: 'pause'|'stop' } — 열려 있는 입력칸
+// ===== 수강 관리 (2026-10-12) — 표(상품 2줄) · 줄 끝 [관리 ▾] 메뉴 · 동작별 작은 창 · 토스트 =====
+//   관리 화면의 흔한 방식 그대로: 상태를 보고 → 메뉴에서 동작을 고르고 → 작은 창에서 필요한 칸만 채우고 확인. 설명문 없음, 수정 모드와 무관, 브라우저 팝업 없음.
+//   개별분석 탭 맨 위(pauseBlockWrap_challenge)에 한 번 그린다. 처리는 서버 RPC(정지: schedule_pause_*, 환불: service_stop_*)로 즉시 적용.
+var _manageForm = null;   // (옛 입력칸 상태 — 더 이상 쓰지 않음, 호환용)
 
 function renderPauseBlockCard(app, kind) {
     if (kind !== 'challenge') return '';
-    const rows = ['challenge', 'correction'].map(k => _renderManageTableRow(app, k)).filter(Boolean);
+    const rows = ['challenge', 'correction'].map(k => _mgRow(app, k)).filter(Boolean);
     if (rows.length === 0) return '';
-    const f = _manageForm;
-    const formOk = f && _analysisEditing && ((f.action === 'stop' && (_stopKindEligible(app, f.kind) || getActiveStop(app, f.kind))) || (f.action === 'pause' && _pauseKindEligible(app, f.kind)));
-    if (f && !formOk) _manageForm = null;
-    const form = (f && formOk) ? _renderManageForm(app, f.kind, f.action) : '';
-    const hint = _analysisEditing
-        ? '버튼을 누르면 아래에 입력칸이 열리고, 처리는 누르는 즉시 적용됩니다(아래 저장 버튼과 무관).'
-        : '정지·환불 처리는 <b>수정하기</b>를 누른 뒤 할 수 있습니다.';
     return `
-    <div style="background:#ffffff; border-radius:14px; padding:16px 22px; margin-top:12px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리</div>
-            <span style="font-size:12px; color:#94a3b8;">${hint}</span>
-        </div>
-        <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
-            <thead><tr style="color:#94a3b8; font-size:12px; text-align:left;">
-                <th style="padding:6px 8px; font-weight:600; width:120px;">상품</th>
-                <th style="padding:6px 8px; font-weight:600;">상태</th>
-                <th style="padding:6px 8px; font-weight:600; text-align:right; white-space:nowrap;">처리</th>
-            </tr></thead>
-            <tbody>${rows.join('')}</tbody>
-        </table>
-        ${form}
-        ${_renderManageHistory(app)}
+    <div style="background:#ffffff; border-radius:14px; padding:14px 22px 10px; margin-bottom:24px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b; margin-bottom:4px;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리</div>
+        ${rows.join('')}
+        ${_mgHistory(app)}
     </div>`;
 }
 
-// 상품 한 줄. 아무 상태도 없고(세팅 전) 처리할 것도 없으면 ''.
-function _renderManageTableRow(app, kind) {
+// 상품 한 줄: 상품명 · 상태 칩 · 요약 · [관리 ▾]
+function _mgRow(app, kind) {
     const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
     const stop = getActiveStop(app, kind);
-    const pauseOk = _pauseKindEligible(app, kind);
-    const stopOk = _stopKindEligible(app, kind);
     const st = kind === 'challenge' ? getAppLiveStatus(app) : ((app.correction_enabled || stop) ? getCorrectionStatus(app) : null);
-    if (!st && !pauseOk && !stopOk && !stop) return '';
-    const chip = st ? `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; background:${st.bg || (st.color + '1f')}; color:${st.color}; white-space:nowrap;"><i class="fas ${st.icon}"></i> ${st.adminLabel || st.label}</span>` : '<span style="font-size:12px; color:#94a3b8;">세팅 전</span>';
-    // 요약 한 줄
+    const actions = _mgActions(app, kind);
+    if (!st && actions.length === 0) return '';
+    const chip = st
+        ? `<span style="display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:12px; font-weight:600; background:${st.bg || (st.color + '1f')}; color:${st.color}; white-space:nowrap;"><i class="fas ${st.icon}"></i> ${st.adminLabel || st.label}</span>`
+        : '<span style="font-size:12px; color:#94a3b8;">세팅 전</span>';
     let summary = '';
     if (stop) {
-        summary = `${stop.requested_on ? _pauseKrDate(stop.requested_on) + ' 요청' : ''}${stop.kind === 'dropped' ? '' : ' · ' + Number(stop.amount || 0).toLocaleString() + '원'}${stop.legacy ? ' · 옛 기록' : (stop.paid_at ? ' · <b style="color:#15803d;">입금 완료</b>' : (stop.kind === 'dropped' ? '' : ' · <b style="color:#b45309;">미입금</b>'))}${stop.reason ? ' · ' + escapeHtml(stop.reason) : ''}`;
+        summary = [stop.requested_on ? _pauseKrDate(stop.requested_on) + ' 요청' : '', stop.kind === 'dropped' ? '' : Number(stop.amount || 0).toLocaleString() + '원',
+                   stop.legacy ? '옛 기록' : (stop.paid_at ? '<span style="color:#15803d;">입금 완료</span>' : (stop.kind === 'dropped' ? '' : '<span style="color:#b45309;">미입금</span>')),
+                   stop.reason ? escapeHtml(stop.reason) : ''].filter(Boolean).join(' · ');
     } else {
         const ap = getActivePause(app, kind), sp = getScheduledPause(app, kind);
-        if (ap) summary = `${_pauseKrDate(ap.paused_from)}부터 정지 · ${ap.resume_on ? _pauseKrDate(ap.resume_on) + ' 재개' : '재개일 미정'}`;
+        if (ap) summary = `${_pauseKrDate(ap.paused_from)}부터 · ${ap.resume_on ? _pauseKrDate(ap.resume_on) + ' 재개' : '재개일 미정'}`;
         else if (sp) summary = `${_pauseKrDate(sp.paused_from)} 정지 예약${sp.resume_on ? ' · ' + _pauseKrDate(sp.resume_on) + ' 재개' : ''}`;
     }
-    // 처리 버튼 (수정 모드에서만)
-    const btn = (txt, icon, onclick, color, active) => `<button type="button" onclick="${onclick}" style="padding:6px 12px; border:1px solid ${active ? color : '#d1d5db'}; background:${active ? color : 'white'}; color:${active ? 'white' : color}; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; margin-left:6px;"><i class="fas ${icon}"></i> ${txt}</button>`;
-    let actions = '';
-    if (_analysisEditing) {
-        const f = _manageForm || {};
-        if (stop) {
-            if (!stop.legacy) {
-                actions += btn(stop.paid_at ? '입금 해제' : '입금했어요', stop.paid_at ? 'fa-times' : 'fa-check', `stopPaidFromModal('${kind}', '${stop.id}', ${stop.paid_at ? 'false' : 'true'})`, '#15803d', false);
-                actions += btn(stop.kind === 'dropped' ? '중도포기 철회' : '환불 철회', 'fa-rotate-left', `stopWithdrawFromModal('${kind}', '${stop.id}')`, '#b91c1c', false);
-            } else {
-                actions += '<span style="font-size:12px; color:#94a3b8;">옛 방식 기록 — 철회·입금 체크 불가</span>';
-            }
-        } else {
-            const ap = getActivePause(app, kind), sp = getScheduledPause(app, kind);
-            if (pauseOk) actions += btn(ap ? '정지 관리' : (sp ? '예약 취소·관리' : '일시정지'), 'fa-pause', `manageOpenForm('${kind}', 'pause')`, '#ea580c', f.kind === kind && f.action === 'pause');
-            if (stopOk) actions += btn('환불·중도포기', 'fa-undo', `manageOpenForm('${kind}', 'stop')`, '#ef4444', f.kind === kind && f.action === 'stop');
-        }
-    } else {
-        actions = '<span style="font-size:12px; color:#cbd5e1;">—</span>';
+    const menuBtn = actions.length
+        ? `<button type="button" id="mgBtn_${kind}" onclick="mgToggleMenu('${kind}')" aria-haspopup="menu" aria-expanded="false" style="padding:7px 12px; border:none; border-radius:8px; background:#f3f4f5; color:#334155; cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap; transition:background .15s;" onmouseover="this.style.background='#e9ebee'" onmouseout="this.style.background='#f3f4f5'">관리 <i class="fas fa-chevron-down" style="font-size:11px; margin-left:4px; color:#64748b;"></i></button>
+           <div id="mgMenu_${kind}" role="menu" style="display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:200px; background:#fff; border-radius:12px; box-shadow:0 12px 32px rgba(25,28,29,0.14); padding:6px; z-index:50; opacity:0; transform:translateY(-4px); transition:opacity .15s, transform .15s;">
+               ${actions.map(a => `<button type="button" role="menuitem" onclick="mgAction('${kind}','${a.id}')" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:9px 12px; border:none; border-radius:8px; background:none; color:${a.danger ? '#a53b22' : '#1e293b'}; cursor:pointer; font-size:13px; font-weight:500;" onmouseover="this.style.background='#f3f4f5'" onmouseout="this.style.background='none'"><i class="fas ${a.icon}" style="width:14px; color:${a.danger ? '#a53b22' : '#64748b'};"></i>${a.label}</button>`).join('')}
+           </div>`
+        : (stop && stop.legacy ? '<span style="font-size:12px; color:#94a3b8;">옛 방식 기록</span>' : '');
+    return `
+        <div style="display:flex; align-items:center; gap:14px; padding:12px 0;">
+            <div style="width:110px; flex-shrink:0; font-size:14px; font-weight:700; color:#1e293b;">${label}</div>
+            <div style="flex:1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;">${chip}<span style="font-size:12.5px; color:#475569;">${summary}</span></div>
+            <div style="position:relative; flex-shrink:0;">${menuBtn}</div>
+        </div>`;
+}
+
+// 상태별로 가능한 동작만 (메뉴 항목)
+function _mgActions(app, kind) {
+    const out = [];
+    const stop = getActiveStop(app, kind);
+    if (stop) {
+        if (stop.legacy) return out;
+        if (stop.kind !== 'dropped') out.push(stop.paid_at ? { id: 'unpaid', label: '입금 완료 해제', icon: 'fa-times' } : { id: 'paid', label: '입금 완료로 표시', icon: 'fa-check' });
+        out.push({ id: 'withdraw', label: (stop.kind === 'dropped' ? '중도포기' : '환불') + ' 철회', icon: 'fa-rotate-left', danger: true });
+        return out;
     }
-    return `
-        <tr style="border-top:1px solid #f1f5f9;">
-            <td style="padding:10px 8px; font-weight:700; color:#1e293b; vertical-align:middle;">${label}</td>
-            <td style="padding:10px 8px; vertical-align:middle;"><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">${chip}<span style="font-size:12px; color:#475569;">${summary}</span></div></td>
-            <td style="padding:10px 8px; text-align:right; vertical-align:middle; white-space:nowrap;">${actions}</td>
-        </tr>`;
+    const ap = getActivePause(app, kind), sp = getScheduledPause(app, kind);
+    if (_pauseKindEligible(app, kind)) {
+        if (ap) {
+            if (ap.resume_on) { out.push({ id: 'reschedule', label: '재개일 변경', icon: 'fa-calendar-alt' }); out.push({ id: 'indefinite', label: '무기한 정지로 전환', icon: 'fa-infinity' }); }
+            else out.push({ id: 'resume', label: '재개일 정하기', icon: 'fa-play' });
+            if (ap.undo) out.push({ id: 'undo', label: '정지 되돌리기', icon: 'fa-undo' });
+        } else if (sp) {
+            out.push({ id: 'cancel', label: '정지 예약 취소', icon: 'fa-times' });
+        } else {
+            out.push({ id: 'pause', label: '일시정지', icon: 'fa-pause' });
+        }
+    }
+    if (_stopKindEligible(app, kind)) {
+        out.push({ id: 'refund', label: '환불', icon: 'fa-undo', danger: true });
+        out.push({ id: 'drop', label: '중도포기', icon: 'fa-user-slash', danger: true });
+    }
+    return out;
 }
 
-function manageOpenForm(kind, action) {
-    const f = _manageForm;
-    _manageForm = (f && f.kind === kind && f.action === action) ? null : { kind, action };   // 같은 버튼 다시 누르면 닫힘
-    _rerenderPauseBlocks();
+function mgToggleMenu(kind) {
+    // 메뉴는 body에 띄운다(모달 스크롤·겹침 영향 없음). 같은 버튼을 다시 누르면 닫힘.
+    const btn = document.getElementById('mgBtn_' + kind);
+    const src = document.getElementById('mgMenu_' + kind);
+    const wasOpen = !!document.getElementById('mgMenuPop') && document.getElementById('mgMenuPop').dataset.kind === kind;
+    mgCloseMenus();
+    if (wasOpen || !btn || !src) return;
+    const pop = document.createElement('div');
+    pop.id = 'mgMenuPop'; pop.dataset.kind = kind; pop.setAttribute('role', 'menu');
+    pop.innerHTML = src.innerHTML;
+    const r = btn.getBoundingClientRect();
+    pop.style.cssText = `position:fixed; top:${r.bottom + 6}px; right:${Math.max(8, window.innerWidth - r.right)}px; min-width:200px; background:#fff; border-radius:12px; box-shadow:0 12px 32px rgba(25,28,29,0.14); padding:6px; z-index:10040; opacity:0; transform:translateY(-4px); transition:opacity .15s, transform .15s;`;
+    document.body.appendChild(pop);
+    requestAnimationFrame(() => { pop.style.opacity = '1'; pop.style.transform = 'translateY(0)'; });
+    btn.setAttribute('aria-expanded', 'true');
+    setTimeout(() => { document.addEventListener('click', _mgOutside); document.addEventListener('keydown', _mgEsc); window.addEventListener('scroll', mgCloseMenus, true); }, 0);
 }
-function manageCloseForm() { _manageForm = null; _rerenderPauseBlocks(); }
+function mgCloseMenus() {
+    const pop = document.getElementById('mgMenuPop'); if (pop) pop.remove();
+    document.querySelectorAll('[id^="mgBtn_"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    document.removeEventListener('click', _mgOutside); document.removeEventListener('keydown', _mgEsc); window.removeEventListener('scroll', mgCloseMenus, true);
+}
+function _mgOutside(e) { if (!e.target.closest('#mgMenuPop, [id^="mgBtn_"]')) mgCloseMenus(); }
+function _mgEsc(e) { if (e.key === 'Escape') mgCloseMenus(); }
 
-// 표 아래 입력칸 하나: 정지는 기존 폼(_renderPauseBlock), 환불은 질문 형식 폼
-function _renderManageForm(app, kind, action) {
+// 메뉴 항목 → 작은 창
+function mgAction(kind, id) {
+    mgCloseMenus();
+    const app = currentManageApp; if (!app) return;
     const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
-    const title = action === 'pause' ? `${label} 일시정지` : `${label} 환불·중도포기`;
-    const icon = action === 'pause' ? 'fa-pause-circle' : 'fa-undo';
-    const color = action === 'pause' ? '#ea580c' : '#ef4444';
-    const body = action === 'pause' ? _renderPauseBlock(app, kind, label) : _renderStopForm(app, kind, label);
-    const help = action === 'pause'
-        ? '정지 중엔 알림톡·자동 처리가 멈추고 테스트룸은 다시풀기만 됩니다. 재개하면 정지 이후 일정이 정지 기간만큼 뒤로 밀립니다(재개일은 정지 시작일과 같은 요일, 소급은 최근 일요일까지).'
-        : '처리하는 순간 그 상품의 알림·자동 처리가 멈추고, 요청일 이후 제출하지 않은 첨삭 회차는 닫힙니다. 날짜는 밀지 않습니다. 잘못 눌렀으면 철회할 수 있습니다.';
-    return `
-        <div style="margin-top:12px; padding:14px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                <div style="font-size:13px; font-weight:700; color:#1e293b;"><i class="fas ${icon}" style="color:${color};"></i> ${title}</div>
-                <button type="button" onclick="manageCloseForm()" style="border:none; background:none; color:#94a3b8; cursor:pointer; font-size:12px;"><i class="fas fa-times"></i> 닫기</button>
-            </div>
-            <div style="font-size:12px; color:#94a3b8; margin:6px 0 10px; line-height:1.6;">${help}</div>
-            ${body}
-        </div>`;
+    const stop = getActiveStop(app, kind);
+    const ap = getActivePause(app, kind);
+    const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:none; border-radius:8px; background:#f3f4f5; font-family:\'Pretendard\'; font-size:14px; outline:none;';
+    const field = (lbl, html, hint) => `<div style="margin-bottom:12px;"><label style="display:block; font-size:12.5px; font-weight:600; color:#475569; margin-bottom:6px;">${lbl}${hint ? ` <span style="font-weight:400; color:#94a3b8;">${hint}</span>` : ''}</label>${html}</div>`;
+    const today = _pauseTodayYmd();
+    const rpc = (fn, args) => supabaseAPI.rpc(fn, Object.assign({ p_app_id: app.id }, args));
+    const by = _pauseAdminName();
+    const dateDiff = (a, b) => Math.round((ymdToUtcDate(b) - ymdToUtcDate(a)) / 86400000);
+
+    if (id === 'paid' || id === 'unpaid') {
+        _mgRun(() => rpc('service_stop_mark_paid', { p_entry_id: stop.id, p_paid: id === 'paid', p_by: by }), id === 'paid' ? `${label} 입금 완료로 표시했어요` : `${label} 입금 완료 표시를 해제했어요`);
+        return;
+    }
+    if (id === 'withdraw') {
+        const k = stop.kind === 'dropped' ? '중도포기' : '환불';
+        _mgDialog({ title: `${label} ${k} 철회`, danger: true, confirmLabel: '철회',
+            body: `<p style="margin:0 0 6px; font-size:14px; color:#1e293b;">${label}을(를) 다시 <b>진행중</b>으로 되돌립니다.</p><p style="margin:0; font-size:12.5px; color:#64748b;">기록은 남고, 날짜는 밀지 않습니다. 학생에게 알림은 가지 않습니다.</p>`,
+            onConfirm: () => rpc('service_stop_withdraw', { p_entry_id: stop.id, p_by: by }), toast: `${label} ${k}을(를) 철회했어요` });
+        return;
+    }
+    if (id === 'refund' || id === 'drop') {
+        const isDrop = id === 'drop';
+        const otherStopped = kind === 'challenge' ? !!getActiveStop(app, 'correction') : !!getActiveStop(app, 'challenge');
+        const targetSel = kind === 'correction' ? '' : (app.correction_enabled && !otherStopped
+            ? field('범위', `<select id="mg_target" style="${inputStyle}"><option value="both">내벨업챌린지 + 스라첨삭</option><option value="challenge">내벨업챌린지만 (첨삭은 계속)</option></select>`)
+            : '');
+        _mgDialog({ title: `${label} ${isDrop ? '중도포기' : '환불'}`, danger: true, confirmLabel: isDrop ? '중도포기 처리' : '환불 처리',
+            body: targetSel
+                + field('요청일', `<input type="date" id="mg_requested" value="${today}" max="${today}" style="${inputStyle}">`, '이날부터 중단')
+                + (isDrop ? '' : field('환불 금액(원)', `<input type="number" id="mg_amount" value="0" min="0" step="1000" style="${inputStyle}">`))
+                + field('메모', `<input type="text" id="mg_reason" placeholder="선택" style="${inputStyle}">`)
+                + `<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer;"><input type="checkbox" id="mg_notify" checked> 학생에게 안내 카톡 보내기</label>`,
+            validate: () => {
+                const r = document.getElementById('mg_requested').value; if (!r) return '요청일을 입력하세요.';
+                if (!isDrop && (parseInt(document.getElementById('mg_amount').value, 10) || 0) < 0) return '금액을 확인하세요.';
+                return null;
+            },
+            onConfirm: () => rpc('service_stop_set', {
+                p_kind: isDrop ? 'dropped' : 'refund',
+                p_target: kind === 'correction' ? 'correction' : ((document.getElementById('mg_target') || {}).value || 'challenge'),
+                p_amount: isDrop ? 0 : (parseInt(document.getElementById('mg_amount').value, 10) || 0),
+                p_reason: (document.getElementById('mg_reason').value || '').trim() || null,
+                p_requested_on: document.getElementById('mg_requested').value,
+                p_notify: !!document.getElementById('mg_notify').checked, p_by: by }),
+            toast: `${label} ${isDrop ? '중도포기' : '환불'} 처리했어요` });
+        return;
+    }
+    if (id === 'pause') {
+        _mgDialog({ title: `${label} 일시정지`, confirmLabel: '정지',
+            body: field('정지 시작일', `<input type="date" id="mg_from" value="${today}" min="${_pauseLastSundayYmd()}" max="${ymdAddDays(today, 180)}" style="${inputStyle}">`, '소급은 최근 일요일까지')
+                + field('재개일', `<input type="date" id="mg_resume" value="" style="${inputStyle}">`, '비우면 무기한 · 정지 시작일과 같은 요일')
+                + field('메모', `<input type="text" id="mg_note" placeholder="선택 — 예: 여행, 시험 연기" style="${inputStyle}">`),
+            validate: () => {
+                const from = document.getElementById('mg_from').value, resume = document.getElementById('mg_resume').value;
+                if (!from) return '정지 시작일을 입력하세요.';
+                if (resume) { const d = dateDiff(from, resume); if (d <= 0) return '재개일은 정지 시작일 뒤여야 합니다.'; if (d % 7 !== 0) return `재개일은 정지 시작일과 같은 요일이어야 합니다. 예: ${ymdAddDays(from, 7)}, ${ymdAddDays(from, 14)}`; }
+                return null;
+            },
+            onConfirm: () => rpc('schedule_pause_set', { p_kind: kind, p_paused_from: document.getElementById('mg_from').value, p_resume_on: document.getElementById('mg_resume').value || null, p_note: (document.getElementById('mg_note').value || '').trim() || null, p_by: by }),
+            toast: `${label} 일시정지를 등록했어요` });
+        return;
+    }
+    if (id === 'resume' || id === 'reschedule') {
+        const cur = ap.resume_on || _pauseNextSameWeekday(ap.paused_from);
+        _mgDialog({ title: id === 'resume' ? `${label} 재개일 정하기` : `${label} 재개일 변경`, confirmLabel: id === 'resume' ? '재개 확정' : '변경',
+            body: field('재개일', `<input type="date" id="mg_resume" value="${cur}" min="${ap.paused_from}" step="7" style="${inputStyle}">`, `정지 시작일 ${_pauseKrDate(ap.paused_from)}과 같은 요일`),
+            validate: () => { const r = document.getElementById('mg_resume').value; if (!r) return '재개일을 입력하세요.'; const d = dateDiff(ap.paused_from, r); if (d <= 0 || d % 7 !== 0) return '재개일은 정지 시작일과 같은 요일(7일 단위)이어야 합니다.'; if (r < today) return '재개일은 오늘 이후여야 합니다.'; if (id === 'reschedule' && r === ap.resume_on) return '재개일이 지금과 같습니다.'; return null; },
+            onConfirm: () => rpc('schedule_pause_reschedule', { p_kind: kind, p_resume_on: document.getElementById('mg_resume').value, p_by: by }),
+            toast: id === 'resume' ? `${label} 재개일을 확정했어요` : `${label} 재개일을 변경했어요` });
+        return;
+    }
+    if (id === 'indefinite') {
+        _mgDialog({ title: `${label} 무기한 정지로 전환`, confirmLabel: '전환',
+            body: `<p style="margin:0; font-size:14px; color:#1e293b;">재개일 ${_pauseKrDate(ap.resume_on)}을 지우고 무기한 정지로 바꿉니다.</p><p style="margin:6px 0 0; font-size:12.5px; color:#64748b;">밀어 둔 날짜는 되돌리고, 나중에 재개일을 다시 정하면 그때 밉니다.</p>`,
+            onConfirm: () => rpc('schedule_pause_reschedule', { p_kind: kind, p_resume_on: null, p_by: by }), toast: `${label} 무기한 정지로 바꿨어요` });
+        return;
+    }
+    if (id === 'undo') {
+        _mgDialog({ title: `${label} 정지 되돌리기`, danger: true, confirmLabel: '되돌리기',
+            body: `<p style="margin:0; font-size:14px; color:#1e293b;">정지를 등록하기 전 상태로 정확히 되돌립니다.</p><p style="margin:6px 0 0; font-size:12.5px; color:#64748b;">등록 뒤 제출이나 날짜 변화가 있었으면 서버가 거절합니다. 알림은 가지 않습니다.</p>`,
+            onConfirm: () => rpc('schedule_pause_undo', { p_kind: kind, p_by: by }), toast: `${label} 정지를 되돌렸어요` });
+        return;
+    }
+    if (id === 'cancel') {
+        _mgDialog({ title: `${label} 정지 예약 취소`, confirmLabel: '예약 취소',
+            body: `<p style="margin:0; font-size:14px; color:#1e293b;">예약된 정지를 취소합니다. 밀어 둔 날짜가 있으면 되돌립니다.</p>`,
+            onConfirm: () => rpc('schedule_pause_cancel', { p_kind: kind, p_by: by }), toast: `${label} 정지 예약을 취소했어요` });
+        return;
+    }
 }
 
-// 환불·중도포기 입력칸 — 질문 형식
-function _renderStopForm(app, kind, label) {
-    const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; font-family:\'Pretendard\'; font-size:14px;';
-    const otherStopped = kind === 'challenge' ? !!getActiveStop(app, 'correction') : !!getActiveStop(app, 'challenge');
-    const targetOptions = kind === 'correction'
-        ? `<option value="correction">스라첨삭만</option>`
-        : (app.correction_enabled && !otherStopped
-            ? `<option value="both">둘 다 (내벨업챌린지 + 스라첨삭)</option><option value="challenge">내벨업챌린지만 (첨삭은 계속)</option>`
-            : `<option value="challenge">내벨업챌린지${otherStopped ? ' (첨삭은 이미 처리됨)' : ''}</option>`);
-    return `
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-            <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">어떤 걸 처리하나요?</label>
-                <select id="stopTarget_${kind}" form="__pause_no_form" style="${inputStyle}">${targetOptions}</select>
+// 작은 창: 제목 · 본문(칸) · [취소] [확인]. 확인 → 스피너 → 성공: 닫고 토스트·표 갱신 / 실패: 창 안 빨간 한 줄
+function _mgDialog(o) {
+    _mgDialogClose();
+    const wrap = document.createElement('div');
+    wrap.id = 'mgDialog';
+    wrap.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; background:rgba(25,28,29,0.28); opacity:0; transition:opacity .16s;';
+    wrap.innerHTML = `
+        <div role="dialog" aria-modal="true" style="width:min(460px, calc(100vw - 32px)); background:#fff; border-radius:16px; padding:22px 24px 18px; box-shadow:0 24px 60px rgba(25,28,29,0.18); transform:translateY(8px) scale(.98); transition:transform .16s;">
+            <div style="font-size:16px; font-weight:700; color:#1e293b; margin-bottom:14px;">${o.title}</div>
+            <div>${o.body}</div>
+            <div id="mgDialogErr" style="display:none; margin-top:10px; font-size:12.5px; color:#ba1a1a;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button type="button" onclick="_mgDialogClose()" style="padding:10px 16px; border:none; border-radius:8px; background:#f3f4f5; color:#334155; cursor:pointer; font-size:14px; font-weight:600;">취소</button>
+                <button type="button" id="mgDialogOk" style="padding:10px 18px; border:none; border-radius:8px; background:${o.danger ? '#a53b22' : '#7c3aed'}; color:#fff; cursor:pointer; font-size:14px; font-weight:700; min-width:96px;">${o.confirmLabel || '확인'}</button>
             </div>
-            <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">환불인가요, 중도포기인가요?</label>
-                <select id="stopKind_${kind}" form="__pause_no_form" style="${inputStyle}" onchange="document.getElementById('stopAmountWrap_${kind}').style.visibility = this.value === 'dropped' ? 'hidden' : 'visible'"><option value="refund">환불 (돈을 돌려줌)</option><option value="dropped">중도포기 (돈 안 돌려줌)</option></select>
-            </div>
-            <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">학생이 요청한 날 <span style="font-weight:400; color:#94a3b8;">(이날부터 중단)</span></label>
-                <input type="date" id="stopRequestedOn_${kind}" value="${_pauseTodayYmd()}" max="${_pauseTodayYmd()}" form="__pause_no_form" style="${inputStyle}">
-            </div>
-            <div id="stopAmountWrap_${kind}">
-                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">돌려주는 금액(원)</label>
-                <input type="number" id="stopAmount_${kind}" value="0" min="0" step="1000" form="__pause_no_form" style="${inputStyle}">
-            </div>
-        </div>
-        <div style="margin-top:12px;">
-            <input type="text" id="stopReason_${kind}" placeholder="메모 (선택) — 예: 목표 점수 달성, 개인 사정" form="__pause_no_form" style="${inputStyle}">
-        </div>
-        <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#475569; cursor:pointer;">
-            <input type="checkbox" id="stopNotify_${kind}" checked form="__pause_no_form"> 학생에게 안내 카톡 보내기 <span style="color:#94a3b8;">(지난 건을 나중에 입력할 땐 끄기 · 템플릿 등록 전엔 발송되지 않음)</span>
-        </label>
-        <div style="display:flex; justify-content:flex-end; margin-top:12px;">
-            <button type="button" onclick="stopSetFromModal('${kind}')" style="padding:10px 22px; background:#ef4444; color:white; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:700;"><i class="fas fa-undo"></i> 처리하기</button>
         </div>`;
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => { wrap.style.opacity = '1'; const box = wrap.firstElementChild; box.style.transform = 'translateY(0) scale(1)'; });
+    const first = wrap.querySelector('input, select'); if (first) setTimeout(() => first.focus(), 60);
+    wrap.addEventListener('click', (e) => { if (e.target === wrap) _mgDialogClose(); });
+    wrap._esc = (e) => { if (e.key === 'Escape') _mgDialogClose(); if (e.key === 'Enter' && e.target && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); document.getElementById('mgDialogOk')?.click(); } };
+    document.addEventListener('keydown', wrap._esc);
+    document.getElementById('mgDialogOk').onclick = async () => {
+        const err = o.validate ? o.validate() : null;
+        const errEl = document.getElementById('mgDialogErr');
+        if (err) { errEl.textContent = err; errEl.style.display = 'block'; return; }
+        const ok = document.getElementById('mgDialogOk');
+        ok.disabled = true; ok.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            await o.onConfirm();
+            _mgDialogClose();
+            _mgToast(o.toast || '처리했어요');
+            if (currentManageApp) await _refreshPauseBlocks(currentManageApp.id);
+        } catch (e) {
+            console.error('수강 관리 처리 실패:', e);
+            errEl.textContent = e.message || '처리하지 못했어요.'; errEl.style.display = 'block';
+            ok.disabled = false; ok.textContent = o.confirmLabel || '확인';
+        }
+    };
+}
+function _mgDialogClose() {
+    const w = document.getElementById('mgDialog'); if (!w) return;
+    if (w._esc) document.removeEventListener('keydown', w._esc);
+    w.style.opacity = '0'; setTimeout(() => w.remove(), 160);
+}
+// 창 없이 바로 처리(입금 표시 토글)
+async function _mgRun(fn, toast) {
+    try { await fn(); _mgToast(toast); if (currentManageApp) await _refreshPauseBlocks(currentManageApp.id); }
+    catch (e) { console.error(e); _mgToast('처리하지 못했어요: ' + (e.message || ''), true); }
+}
+function _mgToast(msg, isErr) {
+    document.getElementById('mgToast')?.remove();
+    const t = document.createElement('div');
+    t.id = 'mgToast';
+    t.style.cssText = `position:fixed; left:50%; bottom:28px; transform:translate(-50%, 12px); z-index:10060; padding:11px 18px; border-radius:12px; background:${isErr ? '#a53b22' : '#191c1d'}; color:#fff; font-size:13.5px; font-weight:600; box-shadow:0 12px 32px rgba(25,28,29,0.2); opacity:0; transition:opacity .18s, transform .18s; max-width:calc(100vw - 32px);`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translate(-50%, 0)'; });
+    setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translate(-50%, 12px)'; setTimeout(() => t.remove(), 200); }, 3000);
 }
 
-// 이력: 정지·환불을 합쳐 시간순(최신 먼저), 접힘
-function _renderManageHistory(app) {
+// 이력(정지·환불 합쳐 최신순), 접힘
+function _mgHistory(app) {
     const items = [];
     for (const kind of ['challenge', 'correction']) {
         const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
         for (const e of getPauseEntries(app, kind)) {
-            const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
-            const resched = e.rescheduled_at ? ` · 재개일 변경(${e.prev_resume_on ? _pauseKrDate(e.prev_resume_on) : '무기한'} → ${e.resume_on ? _pauseKrDate(e.resume_on) : '무기한'})` : '';
-            items.push({ t: e.created_at || e.paused_from || '', html: `<i class="fas fa-pause-circle" style="color:#ea580c;"></i> ${label} · ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${(e.shift_days && e.status !== 'canceled') ? ` · ${e.shift_days}일 밀림` : ''}${resched}${e.note ? ` · ${escapeHtml(e.note)}` : ''}` });
+            const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지' : '정지(무기한)');
+            items.push({ t: e.created_at || e.paused_from || '', html: `<i class="fas fa-pause-circle" style="color:#ea580c; width:14px;"></i> ${label} · ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${(e.shift_days && e.status !== 'canceled') ? ` · ${e.shift_days}일 밀림` : ''}${e.note ? ` · ${escapeHtml(e.note)}` : ''}` });
         }
     }
-    const targetLabel = (t) => t === 'both' ? '둘 다' : t === 'correction' ? '스라첨삭' : '내벨업챌린지';
+    const tl = (t) => t === 'both' ? '둘 다' : t === 'correction' ? '스라첨삭' : '내벨업챌린지';
     for (const e of getStopEntries(app)) {
-        items.push({ t: e.created_at || '', html: `<i class="fas fa-undo" style="color:#ef4444;"></i> ${e.kind === 'dropped' ? '중도포기' : '환불'} · ${targetLabel(e.target)} · ${e.requested_on ? _pauseKrDate(e.requested_on) + ' 요청' : ''}${e.kind === 'dropped' ? '' : ' · ' + Number(e.amount || 0).toLocaleString() + '원'} — ${e.status === 'active' ? (e.paid_at ? '처리됨 · 입금 완료' : '처리됨') : '철회됨' + (e.withdrawn_at ? `(${_pauseKrDate(String(e.withdrawn_at).slice(0, 10))})` : '')}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''}` });
+        items.push({ t: e.created_at || '', html: `<i class="fas fa-undo" style="color:#a53b22; width:14px;"></i> ${e.kind === 'dropped' ? '중도포기' : '환불'} · ${tl(e.target)}${e.requested_on ? ' · ' + _pauseKrDate(e.requested_on) + ' 요청' : ''}${e.kind === 'dropped' ? '' : ' · ' + Number(e.amount || 0).toLocaleString() + '원'} — ${e.status === 'active' ? (e.paid_at ? '처리됨 · 입금 완료' : '처리됨') : '철회됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''}` });
     }
     if (items.length === 0) return '';
     items.sort((a, b) => (String(b.t) > String(a.t) ? 1 : -1));
     return `
-        <details style="margin-top:10px; font-size:12px; color:#64748b;">
-            <summary style="cursor:pointer; color:#94a3b8;">이력 ${items.length}건</summary>
-            ${items.slice(0, 10).map(i => `<div style="margin-top:4px;">${i.html}</div>`).join('')}
+        <details style="margin-top:2px; padding-top:8px; font-size:12px; color:#64748b;">
+            <summary style="cursor:pointer; color:#94a3b8; list-style:none;">이력 ${items.length}건 <i class="fas fa-chevron-down" style="font-size:10px;"></i></summary>
+            ${items.slice(0, 10).map(i => `<div style="margin-top:6px;">${i.html}</div>`).join('')}
         </details>`;
 }
 
@@ -4527,6 +4639,7 @@ async function stopPaidFromModal(kind, entryId, paid) {
 // 블록 2개만 다시 그린다(폼의 다른 입력은 그대로).
 function _rerenderPauseBlocks() {
     const app = currentManageApp; if (!app) return;
+    if (typeof mgCloseMenus === 'function') mgCloseMenus();
     for (const kind of ['challenge', 'correction']) {
         const wrap = document.getElementById('pauseBlockWrap_' + kind);
         if (wrap) wrap.innerHTML = renderPauseBlockCard(app, kind);
