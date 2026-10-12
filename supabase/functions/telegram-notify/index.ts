@@ -1209,6 +1209,15 @@ async function handleConfirmExtensionCallback(
       });
       return new Response("OK", { headers: corsHeaders });
     }
+    // [환불] 서버가 환불 처리 때 'canceled'로 바꾼 신청은 옛 메시지의 버튼으로도 확정할 수 없다(2026-10-12, 환불처리 2단계)
+    if (reqRow.status === "canceled") {
+      await sendTelegram("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "취소된 연장 신청입니다(환불·중도포기 등). 확정할 수 없습니다.",
+        show_alert: true,
+      });
+      return new Response("OK", { headers: corsHeaders });
+    }
 
     if (!reqRow.application_id) {
       await sendTelegram("answerCallbackQuery", {
@@ -1227,6 +1236,26 @@ async function handleConfirmExtensionCallback(
         show_alert: true,
       });
       return new Response("OK", { headers: corsHeaders });
+    }
+
+    // [환불] 첨삭이 환불·중도포기된 신청서면 거절 — 서버 판정 하나(service_stop_at)를 그대로 묻는다(2026-10-12)
+    try {
+      const stopResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/service_stop_at`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_SERVICE_ROLE_KEY, "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_app_id: reqRow.application_id, p_kind: "correction" }),
+      });
+      const stopAt = stopResp.ok ? await stopResp.json() : null;
+      if (stopAt) {
+        await sendTelegram("answerCallbackQuery", {
+          callback_query_id: callbackId,
+          text: "첨삭이 환불·중도포기 처리된 학생입니다. 연장을 적용할 수 없습니다. 필요하면 신청서 관리에서 환불을 철회하세요.",
+          show_alert: true,
+        });
+        return new Response("OK", { headers: corsHeaders });
+      }
+    } catch (e) {
+      console.warn("service_stop_at 조회 실패(진행):", e);
     }
 
     const extStart = await computeExtStartDate(reqRow.user_id, app.correction_start_date || null);

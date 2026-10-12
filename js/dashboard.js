@@ -232,11 +232,17 @@ async function renderCorrectionProgressSection(app) {
     const section = document.getElementById('correctionProgressSection');
     if (!section) return;
 
-    // 스라첨삭 미희망(미신청)이면 카드 자체를 숨긴다
-    if (!app.correction_enabled) { section.style.display = 'none'; return; }
+    // 스라첨삭 미희망(미신청)이면 카드 자체를 숨긴다. 첨삭 환불 기록이 있으면 스위치가 꺼져 있어도 보여준다(S7).
+    const corrStop = (typeof getActiveStop === 'function') ? getActiveStop(app, 'correction') : null;
+    if (!app.correction_enabled && !corrStop) { section.style.display = 'none'; return; }
     section.style.display = '';
 
-    const today = (typeof getEffectiveToday === 'function') ? getEffectiveToday() : new Date();
+    // 환불·중도포기(2026-10-12): 진행 표시는 요청일에서 멈춘다(min(오늘, 요청일)). 스피너 없음.
+    let today = (typeof getEffectiveToday === 'function') ? getEffectiveToday() : new Date();
+    if (corrStop) {
+        const reqD = (corrStop.requested_on && typeof ymdToUtcDate === 'function') ? ymdToUtcDate(corrStop.requested_on) : null;
+        if (reqD && reqD < today) today = reqD;
+    }
     const cStart = app.correction_start_date ? new Date(app.correction_start_date) : null;
     const cEnd = cStart ? getCorrectionWindow(app, 1).endMoment : null;
     const hasExt = !!(app.extension_enabled && app.extension_start_date);
@@ -262,8 +268,8 @@ async function renderCorrectionProgressSection(app) {
         : `${progress}%`;
     const progressLabel = allDone ? '첨삭 완료' : '현재 진행률';
 
-    // 현재 단계(잠금 아닌 첫 미완료)
-    let currentStepIndex = steps.findIndex(s => !s.completed && !s.locked);
+    // 현재 단계(잠금 아닌 첫 미완료). 환불이면 진행 중 표시 없음.
+    let currentStepIndex = corrStop ? -1 : steps.findIndex(s => !s.completed && !s.locked);
 
     // 상태 배지(getCorrectionStatus) + 연장 신청 대기 배지
     let statusBadge = '';
@@ -275,7 +281,7 @@ async function renderCorrectionProgressSection(app) {
     // 연장 신청 '입금 대기'(pending) 조회 → 상단 작은 배지 / 없으면 연장 버튼 노출 판정
     let pendingBanner = '';
     let showExtendBtn = false;
-    if (!hasExt && app.user_id) {
+    if (!hasExt && app.user_id && !corrStop) {   // 첨삭 환불이면 연장 버튼·입금 대기 안내 없음(2026-10-12)
         try {
             const r = await supabaseAPI.query('correction_extension_requests',
                 { 'user_id': `eq.${app.user_id}`, 'status': 'eq.pending', 'limit': '1' });
@@ -389,6 +395,12 @@ function _corrExtDeadline(app) {
 async function requestExtensionFromDashboard(btn) {
     const app = window._dashCorrectionApp;
     if (!app || !app.user_id) return;
+    // [환불] 첨삭 환불·중도포기면 신청 불가. 화면이 열려 있는 사이 환불됐을 수도 있으니 서버 판정으로 한 번 더(2026-10-12)
+    if (typeof getActiveStop === 'function' && getActiveStop(app, 'correction')) { alert('스라첨삭이 환불·중도포기 처리되어 연장을 신청할 수 없어요.'); return; }
+    try {
+        const cut = await supabaseAPI.rpc('service_stop_at', { p_app_id: app.id, p_kind: 'correction' });
+        if (cut) { alert('스라첨삭이 환불·중도포기 처리되어 연장을 신청할 수 없어요.'); return; }
+    } catch (e) { console.warn('환불 판정 조회 실패(진행):', e); }
     if (!confirm('기존 첨삭과 동일한 조건·규정으로 13~24세션 연장을 신청합니다.\n신청 후 안내되는 계좌로 입금하시면 확정됩니다.\n\n신청하시겠어요?')) return;
 
     btn.disabled = true;
@@ -453,7 +465,31 @@ function renderActionItems(app) {
     if (!actionItemsContent) return;
 
     const actionItems = [];
-    
+
+    // 환불·중도포기(2026-10-12, 환불처리 2단계): 어느 상품이든 환불 기록이 있으면 할 일 대신 안내 카드. 단계 판정·정지 카드보다 앞.
+    const stopCh = (typeof getActiveStop === 'function') ? getActiveStop(app, 'challenge') : null;
+    const stopCo = (typeof getActiveStop === 'function') ? getActiveStop(app, 'correction') : null;
+    if (stopCh || stopCo) {
+        const fmtS = (ymd) => {
+            const d = (ymd && typeof ymdToUtcDate === 'function') ? ymdToUtcDate(ymd) : null;
+            if (!d) return '';
+            return ` · 요청일 ${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${['일', '월', '화', '수', '목', '금', '토'][d.getUTCDay()]})`;
+        };
+        const kindOf = (st) => (st.kind === 'dropped' ? '중도포기' : '환불');
+        const lines = [];
+        if (stopCh) lines.push(`내벨업챌린지: ${kindOf(stopCh)} 처리${fmtS(stopCh.requested_on)}`);
+        if (stopCo) lines.push(`스라첨삭: ${kindOf(stopCo)} 처리${fmtS(stopCo.requested_on)}`);
+        const bothStopped = !!stopCh && (!!stopCo || !app.correction_enabled);
+        actionItemsContent.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+                <i class="fas fa-ban" style="font-size: 48px; margin-bottom: 16px; color: #ef4444;"></i>
+                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #1e293b;">${bothStopped ? '수강이 종료된 계정이에요' : '일부 프로그램이 종료됐어요'}</h3>
+                <p style="font-size: 14px; line-height: 1.7;">${lines.join('<br>')}<br>${stopCh ? '새 과제와 알림은 멈추고, 이미 완료한 과제는 테스트룸에서 다시풀기로 볼 수 있어요.' : '첨삭은 이미 제출한 회차까지만 진행되고, 내벨업챌린지는 그대로 이어집니다.'}<br>문의는 카카오톡 채널로 남겨주세요.</p>
+            </div>
+        `;
+        return;
+    }
+
     // 1️⃣ 신청서 제출 직후 ~ 분석 등록 직전
     if (app.submitted_date && !app.analysis_saved_at) {
         actionItemsContent.innerHTML = `
@@ -780,7 +816,7 @@ async function renderTimeline(app) {
                         events.push({
                             date: new Date(r.created_at), icon: 'fa-paper-plane', iconColor: '#7c3aed',
                             title: '첨삭 연장 신청',
-                            description: r.status === 'confirmed' ? '입금 확인 완료' : (r.status === 'expired' ? '기간 만료' : '입금 확인 대기 중')
+                            description: r.status === 'confirmed' ? '입금 확인 완료' : (r.status === 'expired' ? '기간 만료' : (r.status === 'canceled' ? '취소됨' : '입금 확인 대기 중'))
                         });
                     }
                 });
@@ -1311,7 +1347,7 @@ async function renderProgramInfo(app) {
 
     // 첨삭 상태 텍스트
     let correctionStatusHtml = '';
-    if (app.correction_enabled) {
+    if (app.correction_enabled || (typeof getActiveStop === 'function' && getActiveStop(app, 'correction'))) {
         const corrStatus = typeof getCorrectionStatus === 'function' ? getCorrectionStatus(app) : null;
         if (corrStatus) {
             const statusColors = {
@@ -1326,7 +1362,7 @@ async function renderProgramInfo(app) {
             };
             const style = statusColors[corrStatus.key] || { bg: '#f1f5f9', color: '#64748b' };
             // active/completed/refunded/paused는 고정 라벨, 그 외(연장 등)는 status.label 사용
-            const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? '환불' : corrStatus.key === 'paused' ? '일시정지' : corrStatus.label;
+            const label = corrStatus.key === 'active' ? '진행중' : corrStatus.key === 'completed' ? '종료' : corrStatus.key === 'refunded' ? (corrStatus.label || '환불') : corrStatus.key === 'paused' ? '일시정지' : corrStatus.label;
             correctionStatusHtml = `<span style="display:inline-block; white-space:nowrap; background:${style.bg}; color:${style.color}; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; margin-left:6px;">${label}</span>`;
         }
     }
