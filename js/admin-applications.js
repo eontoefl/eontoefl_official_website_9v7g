@@ -226,11 +226,11 @@ function getAdminActionMessage(app) {
         else if (liveStatus.key === 'active') result = { text: `${nLabel}진행중`, color: '#7c3aed', bgColor: '#ede9fe', icon: 'fa-running', isLive: true, glint: true };
         else if (liveStatus.key === 'completed') result = { text: `${nLabel}종료`, color: '#22c55e', bgColor: '#dcfce7', icon: 'fa-check-circle', isLive: true };
         else if (liveStatus.key === 'paused') result = { text: `${nLabel}정지중`, color: '#ea580c', bgColor: '#ffedd5', icon: 'fa-pause-circle', isLive: true };
-        else if (liveStatus.key === 'refunded') result = { text: '환불완료', color: '#a53b22', bgColor: '#f7e7e1', icon: 'fa-undo', isLive: true };
-        else if (liveStatus.key === 'dropped') result = { text: '중도포기', color: '#64748b', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
-        
-        // 첨삭 상태 뱃지 추가 (환불/중도포기가 아닌 경우)
-        if (result && hasCorrection && liveStatus.key !== 'refunded' && liveStatus.key !== 'dropped') {
+        else if (liveStatus.key === 'refunded') result = { text: `${nLabel}환불`, color: '#a53b22', bgColor: '#f7e7e1', icon: 'fa-undo', isLive: true };
+        else if (liveStatus.key === 'dropped') result = { text: `${nLabel}중도포기`, color: '#64748b', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true };
+
+        // 첨삭 상태 뱃지 추가 — 내챌이 환불·중도포기여도 첨삭이 살아 있을 수 있으므로(2026-10-12 세 조합 허용) 항상 붙인다
+        if (result && hasCorrection) {
             const corrStatus = getCorrectionStatus(app);
             if (corrStatus) {
                 const corrColorMap = {
@@ -681,7 +681,9 @@ function displayApplications() {
         const stall = getStallStatus(app);
         const isSelected = selectedIds.has(app.id);
         const liveStatus = getAppLiveStatus(app);
-        const isInactive = liveStatus && (liveStatus.key === 'refunded' || liveStatus.key === 'dropped');
+        // 줄 흐림은 내챌·첨삭이 둘 다 멈췄을 때만(내챌만 환불·첨삭 진행 중인 학생은 흐리지 않음, 2026-10-12)
+        const isInactive = liveStatus && (liveStatus.key === 'refunded' || liveStatus.key === 'dropped')
+            && (!app.correction_enabled || (typeof getActiveStop === 'function' && !!getActiveStop(app, 'correction')));
         
         return `
             <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted || isInactive ? 'opacity: 0.55;' : ''}">

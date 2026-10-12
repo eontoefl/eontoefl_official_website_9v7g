@@ -1256,7 +1256,7 @@ function loadModalAnalysisTab(app) {
 
                 </div><!-- /흰 카드 -->
 
-                <!-- 내챌 일시정지 (진행 중·정지 중 학생만. 읽기 전용이면 상태·이력만, 수정 모드에서 버튼) — 2026-10-08 -->
+                <!-- 수강 관리 카드(내챌·첨삭 한 줄씩: 상태·일시정지·환불). 읽기 전용이면 상태·이력만, 수정 모드에서 버튼 — 2026-10-08/10-12 -->
                 <div id="pauseBlockWrap_challenge">${renderPauseBlockCard(app, 'challenge')}</div>
             </div>
 
@@ -1311,7 +1311,7 @@ function loadModalAnalysisTab(app) {
                 </div>
             </div>
 
-            <!-- 첨삭 일시정지 (첨삭 진행 중·정지 중 학생만) — 2026-10-08 -->
+            <!-- (2026-10-12) 첨삭 정지·환불은 위 "수강 관리" 카드에서. 이 자리는 갱신 함수 호환용으로만 남김(항상 빈 값) -->
             <div id="pauseBlockWrap_correction">${renderPauseBlockCard(app, 'correction')}</div>
 
             <!-- 4. 가격 정보 -->
@@ -4301,25 +4301,44 @@ function _stopKindEligible(app, kind) {
     return true;
 }
 
-// 카드 = 일시정지(진행 중일 때만 버튼) + 환불·중도포기(입금 확인 뒤 언제나). 카드 이름·배치 정리는 대표 검수 때(계획서 1장).
+// "수강 관리" 카드 하나 = 상품(내벨업챌린지·스라첨삭)마다 한 줄: 상태 칩 + 일시정지 + 환불·중도포기 (2026-10-12 3단계, 대표 지적 — 카드 두 개로 흩어져 있던 것을 합침)
+//   내챌 일정 아래 자리(pauseBlockWrap_challenge)에 한 번만 그린다. 첨삭 쪽 자리(pauseBlockWrap_correction)는 비워 둔다(갱신 함수들이 두 id를 모두 쓰므로 유지).
+//   정지 버튼은 진행 중일 때만, 환불 버튼은 입금 확인 뒤 언제나. 둘 다 "수정"을 누른 뒤.
 function renderPauseBlockCard(app, kind) {
+    if (kind !== 'challenge') return '';
+    const rows = ['challenge', 'correction'].map(k => _renderManageRow(app, k)).filter(Boolean);
+    if (rows.length === 0) return '';
+    return `
+    <div style="background:#ffffff; border-radius:14px; padding:16px 22px; margin-top:12px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리 <span style="font-size:12px; font-weight:400; color:#94a3b8; margin-left:4px;">일시정지 · 환불 · 중도포기</span></div>
+        <div style="font-size:12px; color:#94a3b8; margin:6px 0 2px; line-height:1.6;">
+            ${_analysisEditing ? '<b style="color:#ea580c;">정지·재개·취소·환불·철회는 누르는 즉시 적용됩니다(저장과 별개).</b>' : '<span style="color:#64748b;">처리는 <b>수정</b>을 누른 뒤 할 수 있습니다.</span>'}
+            정지: 재개하면 정지 이후 일정이 정지 기간만큼 뒤로 밀림(재개일은 정지 시작일과 같은 요일, 소급은 최근 일요일까지). 환불·중도포기: 요청일부터 중단, 날짜는 밀지 않음.
+        </div>
+        ${rows.join('')}
+    </div>`;
+}
+
+// 상품 한 줄: 머리(상품명 + 상태 칩 + 요약) → 일시정지 블록 → 환불 블록. 보여줄 게 하나도 없으면 ''.
+function _renderManageRow(app, kind) {
+    const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
     const pauseOk = _pauseKindEligible(app, kind);
     const stopOk = _stopKindEligible(app, kind);
     const stop = getActiveStop(app, kind);
-    if (!pauseOk && !stopOk && !stop) return '';
-    const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
-    const pausePart = (pauseOk || getPauseEntries(app, kind).length > 0) ? `
-        <div style="font-size:12px; color:#94a3b8; margin:6px 0 4px; line-height:1.6;">
-            정지 중엔 알림톡·자동 처리가 멈추고 테스트룸은 읽기 전용(다시풀기만). 재개하면 정지 이후 일정이 정지 기간만큼 뒤로 밀립니다. 재개일은 정지 시작일과 <b>같은 요일</b>, 소급은 <b>최근 일요일</b>까지.
-            ${_analysisEditing ? '<b style="color:#ea580c;">정지·재개·취소는 누르는 즉시 적용됩니다(저장과 별개).</b>' : '<span style="color:#64748b;">정지·재개·취소는 <b>수정</b>을 누른 뒤 할 수 있습니다.</span>'}
-        </div>
-        ${pauseOk ? _renderPauseBlock(app, kind, label) : _renderPauseHistoryOnly(app, kind, label)}` : '';
+    const hasPauseHist = getPauseEntries(app, kind).length > 0;
+    if (!pauseOk && !stopOk && !stop && !hasPauseHist) return '';
+    const st = kind === 'challenge' ? getAppLiveStatus(app) : (app.correction_enabled || stop ? getCorrectionStatus(app) : null);
+    const chip = st ? `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; background:${st.bg || (st.color + '1f')}; color:${st.color};"><i class="fas ${st.icon}"></i> ${st.adminLabel || st.label}</span>` : '';
+    const pausePart = pauseOk ? _renderPauseBlock(app, kind, label) : _renderPauseHistoryOnly(app, kind, label);
     return `
-    <div style="background:#ffffff; border-radius:14px; padding:16px 22px; margin-top:12px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
-        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b;"><i class="fas fa-pause-circle" style="color:#ea580c;"></i> ${label} 일시정지 · 환불</div>
-        ${pausePart}
-        ${_renderStopBlock(app, kind, label)}
-    </div>`;
+        <div style="margin-top:12px; padding:12px 14px; background:#fafafa; border:1px solid #f1f5f9; border-radius:12px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span style="font-size:14px; font-weight:700; color:#1e293b;">${label}</span>
+                ${chip}
+            </div>
+            ${pausePart}
+            ${_renderStopBlock(app, kind, label)}
+        </div>`;
 }
 
 // 정지 자격이 없는(시작 전·종료·환불) 학생: 정지 이력만 보여준다
@@ -4327,15 +4346,13 @@ function _renderPauseHistoryOnly(app, kind, label) {
     const entries = getPauseEntries(app, kind).slice().reverse();
     if (entries.length === 0) return '';
     return `
-        <div style="padding:12px 0; border-top:1px solid #f1f5f9;">
-            <div style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:8px;">${label} 정지 이력</div>
-            <div style="font-size:12px; color:#64748b;">
+        <details style="margin-top:8px; font-size:12px; color:#64748b;">
+            <summary style="cursor:pointer; color:#94a3b8;">정지 이력 ${entries.length}건</summary>
             ${entries.slice(0, 5).map(e => {
                 const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
                 return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
             }).join('')}
-            </div>
-        </div>`;
+        </details>`;
 }
 
 // ===== 환불·중도포기 블록 (2026-10-12, 환불처리 1단계) =====
@@ -4407,13 +4424,14 @@ function _renderStopBlock(app, kind, label) {
             </div>`;
     }
     const hist = history.length === 0 ? '' : `
-        <div style="margin-top:10px; font-size:12px; color:#64748b;">
+        <details style="margin-top:8px; font-size:12px; color:#64748b;">
+            <summary style="cursor:pointer; color:#94a3b8;">환불 이력 ${history.length}건(철회됨)</summary>
             ${history.slice(0, 5).map(e => `<div>· ${e.kind === 'dropped' ? '중도포기' : '환불'} ${targetLabel(e.target)} · 요청일 ${e.requested_on ? _pauseKrDate(e.requested_on) : '-'} · ${Number(e.amount || 0).toLocaleString()}원 — 철회됨${e.withdrawn_at ? ` (${_pauseKrDate(String(e.withdrawn_at).slice(0, 10))})` : ''}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''}</div>`).join('')}
-        </div>`;
+        </details>`;
     if (!body && !hist) return '';
     return `
-        <div style="padding:12px 0; border-top:1px solid #f1f5f9;">
-            <div style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:8px;">${label} 환불·중도포기</div>
+        <div style="padding:10px 0 4px; margin-top:8px; border-top:1px dashed #e2e8f0;">
+            <div style="font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px;"><i class="fas fa-undo" style="color:#ef4444;"></i> 환불·중도포기</div>
             ${body}
             ${hist}
         </div>`;
@@ -4626,17 +4644,18 @@ function _renderPauseBlock(app, kind, label) {
     }
 
     const history = entries.length === 0 ? '' : `
-        <div style="margin-top:10px; font-size:12px; color:#64748b;">
+        <details style="margin-top:8px; font-size:12px; color:#64748b;">
+            <summary style="cursor:pointer; color:#94a3b8;">정지 이력 ${entries.length}건</summary>
             ${entries.slice(0, 5).map(e => {
                 const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
                 const resched = e.rescheduled_at ? ` · 재개일 변경(${e.prev_resume_on ? _pauseKrDate(e.prev_resume_on) : '무기한'} → ${e.resume_on ? _pauseKrDate(e.resume_on) : '무기한'})` : '';
                 return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${(e.shift_days && e.status !== 'canceled') ? ` · ${e.shift_days}일 밀림` : ''}${resched}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
             }).join('')}
-        </div>`;
+        </details>`;
 
     return `
-        <div style="padding:12px 0; border-top:1px solid #f1f5f9;">
-            <div style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:8px;">${label}</div>
+        <div style="padding:10px 0 4px; margin-top:8px; border-top:1px dashed #e2e8f0;">
+            <div style="font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px;"><i class="fas fa-pause-circle" style="color:#ea580c;"></i> 일시정지</div>
             ${body}
             ${history}
         </div>`;

@@ -312,7 +312,9 @@ function renderPracticeSection() {
         statusText = '비활성화 (수동 OFF · 자동 활성화 대상에서 제외됨)';
         statusIcon = 'fa-times-circle'; statusColor = '#ef4444';
     } else if (excluded) {
-        statusText = `자동 활성화 제외 (${app.app_status === 'refunded' ? '환불완료' : '중도포기'})`;
+        // 제외 사유: 환불·중도포기 기록 우선, 없으면(정지 중) '일시정지 중' — 2026-10-12
+        const _stopC = (typeof getActiveStop === 'function') ? getActiveStop(app, 'challenge') : null;
+        statusText = `자동 활성화 제외 (${_stopC ? (_stopC.kind === 'dropped' ? '중도포기' : '환불') : (app.app_status === 'refunded' ? '환불' : app.app_status === 'dropped' ? '중도포기' : '일시정지 중')})`;
         statusIcon = 'fa-ban'; statusColor = '#94a3b8';
     } else if (isEnded || finalTaskDate) {
         // 조건은 충족했는데 아직 꺼져 있음 → 다음 크론(매일 00:05)에서 켜짐

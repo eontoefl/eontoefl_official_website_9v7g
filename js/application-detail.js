@@ -327,6 +327,9 @@ function displayApplicationDetail(app) {
             statusHint = '계약서가 도착했어요. STEP 3에서 확인하고 동의해 주세요.';
         } else if (getPaymentStage(app) === 'deposit_waiting') {
             statusHint = '입금 후 카카오톡에 성함을 남겨 주세요.';
+        } else if (typeof getActiveStop === 'function' && getActiveStop(app, 'challenge')) {
+            // 환불·중도포기(2026-10-12): "모든 준비가 끝났어요" 대신 종료 안내
+            statusHint = (getActiveStop(app, 'challenge').kind === 'dropped' ? '중도포기' : '환불') + ' 처리되어 수강이 종료되었어요. 문의는 카카오톡 채널로 남겨 주세요.';
         } else {
             statusHint = '모든 준비가 끝났어요. STEP 5에서 이용 방법을 확인해 주세요.';
         }
