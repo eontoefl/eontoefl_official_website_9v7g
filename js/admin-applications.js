@@ -154,7 +154,21 @@ function getAdminActionMessage(app) {
     if (app.application_type === 'book_only') {
         return { text: '📖 입문서 신청', color: '#7c3aed', bgColor: '#ede9fe' };
     }
-    
+
+    // 내챌 환불·중도포기(2026-10-12): 단계 검사보다 앞 — 택배·이용방법 단계가 남아 있어도 "환불" 칩이 보여야 한다(환불은 입금 확인 뒤에만 가능)
+    const stopCh = (typeof getActiveStop === 'function') ? getActiveStop(app, 'challenge') : null;
+    if (stopCh) {
+        const nLabel0 = app.correction_enabled ? '내챌 ' : '';
+        const r0 = stopCh.kind === 'dropped'
+            ? { text: `${nLabel0}중도포기`, color: '#64748b', bgColor: '#f1f5f9', icon: 'fa-user-slash', isLive: true }
+            : { text: `${nLabel0}환불`, color: '#a53b22', bgColor: '#f7e7e1', icon: 'fa-undo', isLive: true };
+        if (app.correction_enabled) {
+            const cs = getCorrectionStatus(app);
+            if (cs) r0.correctionBadge = { text: cs.adminLabel || (cs.key === 'refunded' ? '첨삭 환불' : cs.key === 'active' ? '첨삭 진행중' : cs.key === 'completed' ? '첨삭 종료' : `첨삭 ${cs.label}`), color: cs.key === 'refunded' ? '#a53b22' : cs.key === 'paused' ? '#ea580c' : '#2563eb', icon: cs.icon || 'fa-pen-nib' };
+        }
+        return r0;
+    }
+
     // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기 → 🟠 검토 대기
     if (app.analysis_content && !app.analysis_status) {
         // 예약 발송 대기 중이면 → 🟢 발송 예약됨 (검토 완료 + 발송 시간 대기)
@@ -319,6 +333,9 @@ function getStallStatus(app) {
 function getAppStageFilter(app) {
     // 입문서 신청은 별도 카테고리
     if (app.application_type === 'book_only') return 'book_only';
+    // 내챌 환불·중도포기는 단계와 무관하게 그 분류로(칩과 같은 순서, 2026-10-12)
+    const stopCh0 = (typeof getActiveStop === 'function') ? getActiveStop(app, 'challenge') : null;
+    if (stopCh0) return stopCh0.kind === 'dropped' ? 'live_dropped' : 'live_refunded';
     // 예약 발송 대기 중이면 → 학생 액션 대기 (관리자 할 일 끝남)
     if (app.analysis_alimtalk_scheduled_at && app.analysis_status_pending && app.analysis_content_pending) return 'student_waiting';
     // 1-a. AI 분석 자동 생성 완료, 관리자 검토 대기
