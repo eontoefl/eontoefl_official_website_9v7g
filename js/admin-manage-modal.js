@@ -1461,6 +1461,7 @@ function loadModalAnalysisTab(app) {
     // 학습 방식(정규/자기주도)에 맞춰 프로그램 영역·종료일 슬롯·시작일 안내 초기 반영
     syncLearningModeUI();
 
+    _manageForm = null;   // 수강 관리 표의 열린 입력칸 닫기(2026-10-12)
     // 개별분석 탭을 새로 그리면 수정 모드 해제(정지 블록은 읽기 전용으로). 무기한 정지 중이면 수동 날짜 칸에 안내 한 줄.
     _analysisEditing = false;
     _injectPauseNotes(app);
@@ -4301,140 +4302,177 @@ function _stopKindEligible(app, kind) {
     return true;
 }
 
-// "수강 관리" 카드 하나 = 상품(내벨업챌린지·스라첨삭)마다 한 줄: 상태 칩 + 일시정지 + 환불·중도포기 (2026-10-12 3단계, 대표 지적 — 카드 두 개로 흩어져 있던 것을 합침)
-//   내챌 일정 아래 자리(pauseBlockWrap_challenge)에 한 번만 그린다. 첨삭 쪽 자리(pauseBlockWrap_correction)는 비워 둔다(갱신 함수들이 두 id를 모두 쓰므로 유지).
-//   정지 버튼은 진행 중일 때만, 환불 버튼은 입금 확인 뒤 언제나. 둘 다 "수정"을 누른 뒤.
+// ===== "수강 관리" 표 하나 (2026-10-12 3단계 재구성, 대표 지적: 정지·환불 블록이 네 덩어리로 흩어짐) =====
+//   표: 상품(내벨업챌린지·스라첨삭) 한 줄씩 = [상품 | 상태(칩 + 요약 한 줄) | 처리 버튼]. 버튼을 누르면 표 아래에 그 상품용 입력칸 하나만 열린다.
+//   이력(정지·환불 합쳐 시간순)은 맨 아래 접힘. 내챌 일정 아래 자리(pauseBlockWrap_challenge)에 한 번만 그리고 첨삭 자리는 비운다.
+//   버튼은 "수정"을 누른 뒤에만(대표 결정). 처리 자체는 서버 RPC로 즉시 적용(저장과 별개).
+var _manageForm = null;   // { kind: 'challenge'|'correction', action: 'pause'|'stop' } — 열려 있는 입력칸
+
 function renderPauseBlockCard(app, kind) {
     if (kind !== 'challenge') return '';
-    const rows = ['challenge', 'correction'].map(k => _renderManageRow(app, k)).filter(Boolean);
+    const rows = ['challenge', 'correction'].map(k => _renderManageTableRow(app, k)).filter(Boolean);
     if (rows.length === 0) return '';
+    const f = _manageForm;
+    const formOk = f && _analysisEditing && ((f.action === 'stop' && (_stopKindEligible(app, f.kind) || getActiveStop(app, f.kind))) || (f.action === 'pause' && _pauseKindEligible(app, f.kind)));
+    if (f && !formOk) _manageForm = null;
+    const form = (f && formOk) ? _renderManageForm(app, f.kind, f.action) : '';
+    const hint = _analysisEditing
+        ? '버튼을 누르면 아래에 입력칸이 열리고, 처리는 누르는 즉시 적용됩니다(아래 저장 버튼과 무관).'
+        : '정지·환불 처리는 <b>수정하기</b>를 누른 뒤 할 수 있습니다.';
     return `
     <div style="background:#ffffff; border-radius:14px; padding:16px 22px; margin-top:12px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
-        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리 <span style="font-size:12px; font-weight:400; color:#94a3b8; margin-left:4px;">일시정지 · 환불 · 중도포기</span></div>
-        <div style="font-size:12px; color:#94a3b8; margin:6px 0 2px; line-height:1.6;">
-            ${_analysisEditing ? '<b style="color:#ea580c;">정지·재개·취소·환불·철회는 누르는 즉시 적용됩니다(저장과 별개).</b>' : '<span style="color:#64748b;">처리는 <b>수정</b>을 누른 뒤 할 수 있습니다.</span>'}
-            정지: 재개하면 정지 이후 일정이 정지 기간만큼 뒤로 밀림(재개일은 정지 시작일과 같은 요일, 소급은 최근 일요일까지). 환불·중도포기: 요청일부터 중단, 날짜는 밀지 않음.
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리</div>
+            <span style="font-size:12px; color:#94a3b8;">${hint}</span>
         </div>
-        ${rows.join('')}
+        <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
+            <thead><tr style="color:#94a3b8; font-size:12px; text-align:left;">
+                <th style="padding:6px 8px; font-weight:600; width:120px;">상품</th>
+                <th style="padding:6px 8px; font-weight:600;">상태</th>
+                <th style="padding:6px 8px; font-weight:600; text-align:right; white-space:nowrap;">처리</th>
+            </tr></thead>
+            <tbody>${rows.join('')}</tbody>
+        </table>
+        ${form}
+        ${_renderManageHistory(app)}
     </div>`;
 }
 
-// 상품 한 줄: 머리(상품명 + 상태 칩 + 요약) → 일시정지 블록 → 환불 블록. 보여줄 게 하나도 없으면 ''.
-function _renderManageRow(app, kind) {
+// 상품 한 줄. 아무 상태도 없고(세팅 전) 처리할 것도 없으면 ''.
+function _renderManageTableRow(app, kind) {
     const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
+    const stop = getActiveStop(app, kind);
     const pauseOk = _pauseKindEligible(app, kind);
     const stopOk = _stopKindEligible(app, kind);
-    const stop = getActiveStop(app, kind);
-    const hasPauseHist = getPauseEntries(app, kind).length > 0;
-    if (!pauseOk && !stopOk && !stop && !hasPauseHist) return '';
-    const st = kind === 'challenge' ? getAppLiveStatus(app) : (app.correction_enabled || stop ? getCorrectionStatus(app) : null);
-    const chip = st ? `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; background:${st.bg || (st.color + '1f')}; color:${st.color};"><i class="fas ${st.icon}"></i> ${st.adminLabel || st.label}</span>` : '';
-    const pausePart = pauseOk ? _renderPauseBlock(app, kind, label) : _renderPauseHistoryOnly(app, kind, label);
-    return `
-        <div style="margin-top:12px; padding:12px 14px; background:#fafafa; border:1px solid #f1f5f9; border-radius:12px;">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <span style="font-size:14px; font-weight:700; color:#1e293b;">${label}</span>
-                ${chip}
-            </div>
-            ${pausePart}
-            ${_renderStopBlock(app, kind, label)}
-        </div>`;
-}
-
-// 정지 자격이 없는(시작 전·종료·환불) 학생: 정지 이력만 보여준다
-function _renderPauseHistoryOnly(app, kind, label) {
-    const entries = getPauseEntries(app, kind).slice().reverse();
-    if (entries.length === 0) return '';
-    return `
-        <details style="margin-top:8px; font-size:12px; color:#64748b;">
-            <summary style="cursor:pointer; color:#94a3b8;">정지 이력 ${entries.length}건</summary>
-            ${entries.slice(0, 5).map(e => {
-                const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
-                return `<div>· ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${e.note ? ` · ${escapeHtml(e.note)}` : ''}</div>`;
-            }).join('')}
-        </details>`;
-}
-
-// ===== 환불·중도포기 블록 (2026-10-12, 환불처리 1단계) =====
-// 한 번 누름 = 즉시 중단(알림·자동 처리·테스트룸 관문이 service_stops 를 본다). 서버 RPC service_stop_set / _withdraw / _mark_paid.
-function _renderStopBlock(app, kind, label) {
-    const stop = getActiveStop(app, kind);
-    const history = getStopEntries(app).filter(e => e.status !== 'active' && (e.target === 'both' || e.target === kind)).slice().reverse();
-    const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:none; border-radius:8px; background:#eef1f5; font-family:\'Pretendard\'; font-size:14px;';
-    const chip = (text, color, bg) => `<span style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:600; background:${bg}; color:${color};">${text}</span>`;
-    const targetLabel = (t) => t === 'both' ? '내벨업챌린지+스라첨삭' : t === 'correction' ? '스라첨삭' : '내벨업챌린지';
-    let body = '';
+    const st = kind === 'challenge' ? getAppLiveStatus(app) : ((app.correction_enabled || stop) ? getCorrectionStatus(app) : null);
+    if (!st && !pauseOk && !stopOk && !stop) return '';
+    const chip = st ? `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; background:${st.bg || (st.color + '1f')}; color:${st.color}; white-space:nowrap;"><i class="fas ${st.icon}"></i> ${st.adminLabel || st.label}</span>` : '<span style="font-size:12px; color:#94a3b8;">세팅 전</span>';
+    // 요약 한 줄
+    let summary = '';
     if (stop) {
-        const kindLabel = stop.kind === 'dropped' ? '중도포기' : '환불';
-        const paid = !!stop.paid_at;
-        body = `
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
-                ${chip(`<i class="fas ${stop.kind === 'dropped' ? 'fa-user-slash' : 'fa-undo'}"></i> ${kindLabel}됨 · ${targetLabel(stop.target)}`, stop.kind === 'dropped' ? '#475569' : '#ef4444', stop.kind === 'dropped' ? '#f1f5f9' : '#fef2f2')}
-                ${stop.legacy ? chip('옛 방식 기록 — 철회·입금 체크 불가', '#64748b', '#f1f5f9') : (paid ? chip('<i class="fas fa-check"></i> 입금 완료', '#15803d', '#dcfce7') : chip('<i class="fas fa-won-sign"></i> 환불 미입금', '#b45309', '#fef3c7'))}
-            </div>
-            <div style="font-size:13px; color:#475569; line-height:1.7;">
-                요청일 <b>${stop.requested_on ? _pauseKrDate(stop.requested_on) : '-'}</b> · 금액 <b>${Number(stop.amount || 0).toLocaleString()}원</b>${stop.reason ? ` · 사유: ${escapeHtml(stop.reason)}` : ''}
-                ${stop.notice_at ? '<br><span style="color:#94a3b8;">환불 안내 알림톡 요청함(템플릿 등록 전이면 발송되지 않음)</span>' : (stop.legacy ? '' : '<br><span style="color:#94a3b8;">알림톡 보내지 않음</span>')}
-            </div>
-            ${(_analysisEditing && !stop.legacy) ? `
-            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px; flex-wrap:wrap;">
-                <button type="button" onclick="stopPaidFromModal('${kind}', '${stop.id}', ${paid ? 'false' : 'true'})" style="padding:8px 16px; border:1px solid #d1d5db; background:white; color:#475569; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas ${paid ? 'fa-times' : 'fa-check'}"></i> ${paid ? '입금 완료 해제' : '입금 완료'}</button>
-                <button type="button" onclick="stopWithdrawFromModal('${kind}', '${stop.id}')" style="padding:8px 16px; border:1px solid #fca5a5; background:white; color:#b91c1c; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-rotate-left"></i> ${kindLabel} 철회</button>
-            </div>` : ''}`;
-    } else if (!_stopKindEligible(app, kind)) {
-        body = '';
-    } else if (!_analysisEditing) {
-        body = `<div style="font-size:13px; color:#94a3b8; padding:4px 0;">환불·중도포기 없음 <span style="color:#cbd5e1;">· 처리는 <b>수정</b>을 누른 뒤</span></div>`;
+        summary = `${stop.requested_on ? _pauseKrDate(stop.requested_on) + ' 요청' : ''}${stop.kind === 'dropped' ? '' : ' · ' + Number(stop.amount || 0).toLocaleString() + '원'}${stop.legacy ? ' · 옛 기록' : (stop.paid_at ? ' · <b style="color:#15803d;">입금 완료</b>' : (stop.kind === 'dropped' ? '' : ' · <b style="color:#b45309;">미입금</b>'))}${stop.reason ? ' · ' + escapeHtml(stop.reason) : ''}`;
     } else {
-        const otherStopped = kind === 'challenge' ? !!getActiveStop(app, 'correction') : !!getActiveStop(app, 'challenge');
-        const targetOptions = kind === 'correction'
-            ? `<option value="correction">스라첨삭만</option>`
-            : (app.correction_enabled && !otherStopped
-                ? `<option value="both">내벨업챌린지 + 스라첨삭 (둘 다)</option><option value="challenge">내벨업챌린지만 (첨삭은 계속)</option>`
-                : `<option value="challenge">내벨업챌린지${otherStopped ? ' (첨삭은 이미 처리됨)' : ''}</option>`);
-        body = `
-            <div style="padding:14px; background:#f8fafc; border-radius:10px;">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                    <div>
-                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">종류</label>
-                        <select id="stopKind_${kind}" form="__pause_no_form" style="${inputStyle}"><option value="refund">환불</option><option value="dropped">중도포기(환불 없음)</option></select>
-                    </div>
-                    <div>
-                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">대상</label>
-                        <select id="stopTarget_${kind}" form="__pause_no_form" style="${inputStyle}">${targetOptions}</select>
-                    </div>
-                    <div>
-                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">요청일 <span style="font-weight:400; color:#94a3b8;">(이날부터 환불 대상)</span></label>
-                        <input type="date" id="stopRequestedOn_${kind}" value="${_pauseTodayYmd()}" max="${_pauseTodayYmd()}" form="__pause_no_form" style="${inputStyle}">
-                    </div>
-                    <div>
-                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">환불 금액(원)</label>
-                        <input type="number" id="stopAmount_${kind}" value="0" min="0" step="1000" form="__pause_no_form" style="${inputStyle}">
-                    </div>
-                </div>
-                <div style="margin-top:10px;">
-                    <input type="text" id="stopReason_${kind}" placeholder="사유 (예: 목표 점수 달성, 개인 사정)" form="__pause_no_form" style="${inputStyle}">
-                </div>
-                <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#475569; cursor:pointer;">
-                    <input type="checkbox" id="stopNotify_${kind}" checked form="__pause_no_form"> 환불 안내 알림톡 보내기 <span style="color:#94a3b8;">(지난 건을 소급 입력할 땐 끄기 · 템플릿 등록 전엔 발송되지 않음)</span>
-                </label>
-                <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-                    <button type="button" onclick="stopSetFromModal('${kind}')" style="padding:8px 20px; background:#ef4444; color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;"><i class="fas fa-undo"></i> 환불·중도포기 처리</button>
-                </div>
-            </div>`;
+        const ap = getActivePause(app, kind), sp = getScheduledPause(app, kind);
+        if (ap) summary = `${_pauseKrDate(ap.paused_from)}부터 정지 · ${ap.resume_on ? _pauseKrDate(ap.resume_on) + ' 재개' : '재개일 미정'}`;
+        else if (sp) summary = `${_pauseKrDate(sp.paused_from)} 정지 예약${sp.resume_on ? ' · ' + _pauseKrDate(sp.resume_on) + ' 재개' : ''}`;
     }
-    const hist = history.length === 0 ? '' : `
-        <details style="margin-top:8px; font-size:12px; color:#64748b;">
-            <summary style="cursor:pointer; color:#94a3b8;">환불 이력 ${history.length}건(철회됨)</summary>
-            ${history.slice(0, 5).map(e => `<div>· ${e.kind === 'dropped' ? '중도포기' : '환불'} ${targetLabel(e.target)} · 요청일 ${e.requested_on ? _pauseKrDate(e.requested_on) : '-'} · ${Number(e.amount || 0).toLocaleString()}원 — 철회됨${e.withdrawn_at ? ` (${_pauseKrDate(String(e.withdrawn_at).slice(0, 10))})` : ''}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''}</div>`).join('')}
-        </details>`;
-    if (!body && !hist) return '';
+    // 처리 버튼 (수정 모드에서만)
+    const btn = (txt, icon, onclick, color, active) => `<button type="button" onclick="${onclick}" style="padding:6px 12px; border:1px solid ${active ? color : '#d1d5db'}; background:${active ? color : 'white'}; color:${active ? 'white' : color}; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; margin-left:6px;"><i class="fas ${icon}"></i> ${txt}</button>`;
+    let actions = '';
+    if (_analysisEditing) {
+        const f = _manageForm || {};
+        if (stop) {
+            if (!stop.legacy) {
+                actions += btn(stop.paid_at ? '입금 해제' : '입금했어요', stop.paid_at ? 'fa-times' : 'fa-check', `stopPaidFromModal('${kind}', '${stop.id}', ${stop.paid_at ? 'false' : 'true'})`, '#15803d', false);
+                actions += btn(stop.kind === 'dropped' ? '중도포기 철회' : '환불 철회', 'fa-rotate-left', `stopWithdrawFromModal('${kind}', '${stop.id}')`, '#b91c1c', false);
+            } else {
+                actions += '<span style="font-size:12px; color:#94a3b8;">옛 방식 기록 — 철회·입금 체크 불가</span>';
+            }
+        } else {
+            const ap = getActivePause(app, kind), sp = getScheduledPause(app, kind);
+            if (pauseOk) actions += btn(ap ? '정지 관리' : (sp ? '예약 취소·관리' : '일시정지'), 'fa-pause', `manageOpenForm('${kind}', 'pause')`, '#ea580c', f.kind === kind && f.action === 'pause');
+            if (stopOk) actions += btn('환불·중도포기', 'fa-undo', `manageOpenForm('${kind}', 'stop')`, '#ef4444', f.kind === kind && f.action === 'stop');
+        }
+    } else {
+        actions = '<span style="font-size:12px; color:#cbd5e1;">—</span>';
+    }
     return `
-        <div style="padding:10px 0 4px; margin-top:8px; border-top:1px dashed #e2e8f0;">
-            <div style="font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px;"><i class="fas fa-undo" style="color:#ef4444;"></i> 환불·중도포기</div>
+        <tr style="border-top:1px solid #f1f5f9;">
+            <td style="padding:10px 8px; font-weight:700; color:#1e293b; vertical-align:middle;">${label}</td>
+            <td style="padding:10px 8px; vertical-align:middle;"><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">${chip}<span style="font-size:12px; color:#475569;">${summary}</span></div></td>
+            <td style="padding:10px 8px; text-align:right; vertical-align:middle; white-space:nowrap;">${actions}</td>
+        </tr>`;
+}
+
+function manageOpenForm(kind, action) {
+    const f = _manageForm;
+    _manageForm = (f && f.kind === kind && f.action === action) ? null : { kind, action };   // 같은 버튼 다시 누르면 닫힘
+    _rerenderPauseBlocks();
+}
+function manageCloseForm() { _manageForm = null; _rerenderPauseBlocks(); }
+
+// 표 아래 입력칸 하나: 정지는 기존 폼(_renderPauseBlock), 환불은 질문 형식 폼
+function _renderManageForm(app, kind, action) {
+    const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
+    const title = action === 'pause' ? `${label} 일시정지` : `${label} 환불·중도포기`;
+    const icon = action === 'pause' ? 'fa-pause-circle' : 'fa-undo';
+    const color = action === 'pause' ? '#ea580c' : '#ef4444';
+    const body = action === 'pause' ? _renderPauseBlock(app, kind, label) : _renderStopForm(app, kind, label);
+    const help = action === 'pause'
+        ? '정지 중엔 알림톡·자동 처리가 멈추고 테스트룸은 다시풀기만 됩니다. 재개하면 정지 이후 일정이 정지 기간만큼 뒤로 밀립니다(재개일은 정지 시작일과 같은 요일, 소급은 최근 일요일까지).'
+        : '처리하는 순간 그 상품의 알림·자동 처리가 멈추고, 요청일 이후 제출하지 않은 첨삭 회차는 닫힙니다. 날짜는 밀지 않습니다. 잘못 눌렀으면 철회할 수 있습니다.';
+    return `
+        <div style="margin-top:12px; padding:14px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div style="font-size:13px; font-weight:700; color:#1e293b;"><i class="fas ${icon}" style="color:${color};"></i> ${title}</div>
+                <button type="button" onclick="manageCloseForm()" style="border:none; background:none; color:#94a3b8; cursor:pointer; font-size:12px;"><i class="fas fa-times"></i> 닫기</button>
+            </div>
+            <div style="font-size:12px; color:#94a3b8; margin:6px 0 10px; line-height:1.6;">${help}</div>
             ${body}
-            ${hist}
         </div>`;
+}
+
+// 환불·중도포기 입력칸 — 질문 형식
+function _renderStopForm(app, kind, label) {
+    const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; font-family:\'Pretendard\'; font-size:14px;';
+    const otherStopped = kind === 'challenge' ? !!getActiveStop(app, 'correction') : !!getActiveStop(app, 'challenge');
+    const targetOptions = kind === 'correction'
+        ? `<option value="correction">스라첨삭만</option>`
+        : (app.correction_enabled && !otherStopped
+            ? `<option value="both">둘 다 (내벨업챌린지 + 스라첨삭)</option><option value="challenge">내벨업챌린지만 (첨삭은 계속)</option>`
+            : `<option value="challenge">내벨업챌린지${otherStopped ? ' (첨삭은 이미 처리됨)' : ''}</option>`);
+    return `
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">어떤 걸 처리하나요?</label>
+                <select id="stopTarget_${kind}" form="__pause_no_form" style="${inputStyle}">${targetOptions}</select>
+            </div>
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">환불인가요, 중도포기인가요?</label>
+                <select id="stopKind_${kind}" form="__pause_no_form" style="${inputStyle}" onchange="document.getElementById('stopAmountWrap_${kind}').style.visibility = this.value === 'dropped' ? 'hidden' : 'visible'"><option value="refund">환불 (돈을 돌려줌)</option><option value="dropped">중도포기 (돈 안 돌려줌)</option></select>
+            </div>
+            <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">학생이 요청한 날 <span style="font-weight:400; color:#94a3b8;">(이날부터 중단)</span></label>
+                <input type="date" id="stopRequestedOn_${kind}" value="${_pauseTodayYmd()}" max="${_pauseTodayYmd()}" form="__pause_no_form" style="${inputStyle}">
+            </div>
+            <div id="stopAmountWrap_${kind}">
+                <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">돌려주는 금액(원)</label>
+                <input type="number" id="stopAmount_${kind}" value="0" min="0" step="1000" form="__pause_no_form" style="${inputStyle}">
+            </div>
+        </div>
+        <div style="margin-top:12px;">
+            <input type="text" id="stopReason_${kind}" placeholder="메모 (선택) — 예: 목표 점수 달성, 개인 사정" form="__pause_no_form" style="${inputStyle}">
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#475569; cursor:pointer;">
+            <input type="checkbox" id="stopNotify_${kind}" checked form="__pause_no_form"> 학생에게 안내 카톡 보내기 <span style="color:#94a3b8;">(지난 건을 나중에 입력할 땐 끄기 · 템플릿 등록 전엔 발송되지 않음)</span>
+        </label>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+            <button type="button" onclick="stopSetFromModal('${kind}')" style="padding:10px 22px; background:#ef4444; color:white; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:700;"><i class="fas fa-undo"></i> 처리하기</button>
+        </div>`;
+}
+
+// 이력: 정지·환불을 합쳐 시간순(최신 먼저), 접힘
+function _renderManageHistory(app) {
+    const items = [];
+    for (const kind of ['challenge', 'correction']) {
+        const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
+        for (const e of getPauseEntries(app, kind)) {
+            const st = e.status === 'canceled' ? (e.undone_at ? '되돌림' : '취소') : e.status === 'resumed' ? '재개됨' : (e.resume_on ? '정지(재개일 지정)' : '정지(무기한)');
+            const resched = e.rescheduled_at ? ` · 재개일 변경(${e.prev_resume_on ? _pauseKrDate(e.prev_resume_on) : '무기한'} → ${e.resume_on ? _pauseKrDate(e.resume_on) : '무기한'})` : '';
+            items.push({ t: e.created_at || e.paused_from || '', html: `<i class="fas fa-pause-circle" style="color:#ea580c;"></i> ${label} · ${_pauseKrDate(e.paused_from)} ~ ${e.resume_on ? _pauseKrDate(e.resume_on) : '미정'} — ${st}${(e.shift_days && e.status !== 'canceled') ? ` · ${e.shift_days}일 밀림` : ''}${resched}${e.note ? ` · ${escapeHtml(e.note)}` : ''}` });
+        }
+    }
+    const targetLabel = (t) => t === 'both' ? '둘 다' : t === 'correction' ? '스라첨삭' : '내벨업챌린지';
+    for (const e of getStopEntries(app)) {
+        items.push({ t: e.created_at || '', html: `<i class="fas fa-undo" style="color:#ef4444;"></i> ${e.kind === 'dropped' ? '중도포기' : '환불'} · ${targetLabel(e.target)} · ${e.requested_on ? _pauseKrDate(e.requested_on) + ' 요청' : ''}${e.kind === 'dropped' ? '' : ' · ' + Number(e.amount || 0).toLocaleString() + '원'} — ${e.status === 'active' ? (e.paid_at ? '처리됨 · 입금 완료' : '처리됨') : '철회됨' + (e.withdrawn_at ? `(${_pauseKrDate(String(e.withdrawn_at).slice(0, 10))})` : '')}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''}` });
+    }
+    if (items.length === 0) return '';
+    items.sort((a, b) => (String(b.t) > String(a.t) ? 1 : -1));
+    return `
+        <details style="margin-top:10px; font-size:12px; color:#64748b;">
+            <summary style="cursor:pointer; color:#94a3b8;">이력 ${items.length}건</summary>
+            ${items.slice(0, 10).map(i => `<div style="margin-top:4px;">${i.html}</div>`).join('')}
+        </details>`;
 }
 
 async function stopSetFromModal(kind) {
@@ -4443,7 +4481,7 @@ async function stopSetFromModal(kind) {
     const stopKind = (g('stopKind') || {}).value || 'refund';
     const target = (g('stopTarget') || {}).value || kind;
     const requestedOn = (g('stopRequestedOn') || {}).value || _pauseTodayYmd();
-    const amount = parseInt((g('stopAmount') || {}).value, 10) || 0;
+    const amount = stopKind === 'dropped' ? 0 : (parseInt((g('stopAmount') || {}).value, 10) || 0);
     const reason = ((g('stopReason') || {}).value || '').trim();
     const notify = !!((g('stopNotify') || {}).checked);
     const targetLabel = target === 'both' ? '내벨업챌린지 + 스라첨삭' : target === 'correction' ? '스라첨삭' : '내벨업챌린지';
@@ -4453,6 +4491,7 @@ async function stopSetFromModal(kind) {
     try {
         await supabaseAPI.rpc('service_stop_set', { p_app_id: app.id, p_kind: stopKind, p_target: target, p_amount: amount, p_reason: reason || null, p_requested_on: requestedOn, p_notify: notify, p_by: _pauseAdminName() });
         alert(`✅ ${kindLabel} 처리되었습니다. (개별분석 내용을 고치지 않았다면 아래 저장 버튼은 누르지 않아도 됩니다)`);
+        _manageForm = null;
         await _refreshPauseBlocks(app.id);
     } catch (e) {
         console.error('service_stop_set error:', e);
@@ -4466,6 +4505,7 @@ async function stopWithdrawFromModal(kind, entryId) {
     try {
         await supabaseAPI.rpc('service_stop_withdraw', { p_app_id: app.id, p_entry_id: entryId, p_by: _pauseAdminName() });
         alert('✅ 철회되었습니다. 진행중으로 돌아갔습니다.');
+        _manageForm = null;
         await _refreshPauseBlocks(app.id);
     } catch (e) {
         console.error('service_stop_withdraw error:', e);
@@ -4653,12 +4693,7 @@ function _renderPauseBlock(app, kind, label) {
             }).join('')}
         </details>`;
 
-    return `
-        <div style="padding:10px 0 4px; margin-top:8px; border-top:1px dashed #e2e8f0;">
-            <div style="font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px;"><i class="fas fa-pause-circle" style="color:#ea580c;"></i> 일시정지</div>
-            ${body}
-            ${history}
-        </div>`;
+    return body;   // 소제목·이력은 수강 관리 표(패널 제목·통합 이력)가 맡는다(2026-10-12)
 }
 
 async function pauseSetFromModal(kind) {
