@@ -2720,9 +2720,22 @@ async function tempSaveCorrection() {
 
 // ===== 3-7. Approve (Release) =====
 
+// [환불·정지] 서버 판정 하나(correction_release_blocked)로 "기준 이후 제출 건" 여부를 묻는다 — 자동 공개와 같은 규칙(계획서 S9).
+//   환불·정지 전에 1차를 낸 회차는 끝까지 정상(false). 판정 조회가 실패하면 막지 않는다(승인은 관리자 의도).
+async function _isReleaseBlockedByServer(item) {
+    try {
+        const r = await supabaseAPI.rpc('correction_release_blocked', { p_user_id: item.user_id, p_draft1_at: item.draft_1_submitted_at || null });
+        return r === true;
+    } catch (e) { console.warn('release_blocked 조회 실패(막지 않음):', e); return false; }
+}
+
 async function approveCorrection() {
     if (!currentModalItem) return;
 
+    if (await _isReleaseBlockedByServer(currentModalItem)) {
+        alert('이 제출은 환불·중도포기(또는 일시정지) 기준 이후에 제출된 건이라 공개할 수 없습니다.\n필요하면 신청서 관리에서 환불을 철회한 뒤 승인하세요.');
+        return;
+    }
     if (!confirm('이 피드백을 학생에게 공개합니다. 계속하시겠습니까?')) return;
 
     const btn = document.getElementById('btnApprove');
@@ -3130,16 +3143,22 @@ async function bulkApprove() {
     if (selectedIds.size === 0) return;
 
     // Filter: only pending items that are NOT already scheduled
-    const pendingItems = allCorrections.filter(item =>
+    const pendingAll = allCorrections.filter(item =>
         selectedIds.has(item.id) && getCorrectionStatus(item).isPending && !item.scheduled_release_at
     );
+    // [환불·정지] 기준 이후 제출 건은 빼고 진행(자동 공개와 같은 서버 판정)
+    const blockedFlags = await Promise.all(pendingAll.map(_isReleaseBlockedByServer));
+    const pendingItems = pendingAll.filter((_, i) => !blockedFlags[i]);
+    const blockedCount = pendingAll.length - pendingItems.length;
 
     if (pendingItems.length === 0) {
-        alert('선택된 건 중 승인 대기 상태인 건이 없습니다.');
+        alert(blockedCount > 0
+            ? `선택된 ${blockedCount}건은 환불·중도포기(또는 일시정지) 기준 이후 제출 건이라 공개할 수 없습니다.`
+            : '선택된 건 중 승인 대기 상태인 건이 없습니다.');
         return;
     }
 
-    if (!confirm(`${pendingItems.length}건을 승인하시겠습니까?\n\n⚠️ AI 피드백 원본 그대로 학생에게 공개됩니다.`)) return;
+    if (!confirm(`${pendingItems.length}건을 승인하시겠습니까?${blockedCount > 0 ? `\n(환불·정지 기준 이후 제출 ${blockedCount}건은 제외됨)` : ''}\n\n⚠️ AI 피드백 원본 그대로 학생에게 공개됩니다.`)) return;
 
     let successCount = 0;
     let failCount = 0;

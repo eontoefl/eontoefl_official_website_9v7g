@@ -44,6 +44,10 @@ const TEMPLATE_IDS: Record<string, number> = {
   schedule_paused:               50248,  // 일시정지 안내 (내챌/첨삭 공통, #{target})
   schedule_resumed_challenge:    50249,  // 내벨업챌린지 재개 안내 (재개일·변경된 종료일)
   schedule_resumed_correction:   50250,  // 스라첨삭 재개 안내 (재개일·변경된 종료일·재개 후 첫 회차)
+  // 환불처리(2026-10-12). 템플릿 검수 전 → 0. 0이면 아래 입구 검사(!templateId)에서 400으로 거절되어 발송·로그 없음.
+  //   서버(service_stop_set)가 보낸다. 변수: name / product(내벨업챌린지|스라첨삭|내벨업챌린지+스라첨삭) / kind(환불|중도포기) / amount(쉼표) / requested_on(M월 D일(요일))
+  //   검수 통과 후: 번호 넣고 아래 본문·대체문자를 승인 원문과 글자 단위로 맞출 것.
+  refund_notice:                 0,
 };
 
 // 서버가 보내는 묶음 type을 실제 템플릿 type으로. 'schedule_resumed'는 target으로 내챌/첨삭을 가른다.
@@ -507,6 +511,24 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "재개일부터 테스트룸에서 남은 과제를 이어서 진행해주세요.",
       ].join("\n");
 
+    case "refund_notice":
+      // ⚠️ 초안(템플릿 미등록, 번호 0). 승인되면 원문으로 교체. 변수: #{name} / #{product} / #{kind} / #{amount} / #{requested_on}
+      return [
+        "이온토플 - 환불 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,
+        `요청하신 ${data.product} ${data.kind}이 처리되었습니다.`,
+        "",
+        `- 대상: ${data.product}`,
+        `- 환불 금액: ${data.amount}원`,
+        `- 요청일: ${data.requested_on}`,
+        "",
+        `오늘부터 ${data.product} 이용이 종료됩니다. 이미 제출한 첨삭 회차는 그대로 진행됩니다.`,
+        "환불금은 신청서에 적어주신 계좌로 3영업일 이내 입금됩니다.",
+        "문의는 카카오톡 채널로 남겨주세요.",
+      ].join("
+");
+
     case "schedule_resumed_correction":
       // 50250 승인 원문(2026-10-08). 변수: #{name} / #{resume_on} / #{end_date} / #{next_session}
       return [
@@ -594,6 +616,8 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 내벨업챌린지가 내일 재개됩니다. 테스트룸에서 변경된 일정을 확인해주세요.";
     case "schedule_resumed_correction":
       return "[이온토플] 스라첨삭이 내일 재개됩니다. 테스트룸에서 첫 회차와 종료일을 확인해주세요.";
+    case "refund_notice":
+      return "[이온토플] 요청하신 환불이 처리되었습니다. 환불금은 신청서의 계좌로 3영업일 이내 입금됩니다.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -640,7 +664,9 @@ function hasNoButton(templateId: number): boolean {
       // 50248/50249/50250(일시정지·재개 안내): 승인 템플릿에 버튼 없음(2026-10-08 파트너스 센터 확인).
       || templateId === TEMPLATE_IDS.schedule_paused
       || templateId === TEMPLATE_IDS.schedule_resumed_challenge
-      || templateId === TEMPLATE_IDS.schedule_resumed_correction;
+      || templateId === TEMPLATE_IDS.schedule_resumed_correction
+      // 환불 안내(2026-10-12): 버튼 없음으로 가정(검수 결과에 따라 조정)
+      || templateId === TEMPLATE_IDS.refund_notice;
 }
 
 // ===== 단건 메시지 객체 생성 =====

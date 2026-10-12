@@ -371,6 +371,11 @@ async function togglePracticeMode(enable) {
 
     // 이미 같은 상태면 무시
     if (enable === currentState) return;
+    // [환불] 내챌이 환불·중도포기된 학생은 수동으로도 열지 않는다(자동 오픈 제외와 같은 규칙, 계획서 S9). 끄는 건 허용.
+    if (enable && typeof getActiveStop === 'function' && getActiveStop(app, 'challenge')) {
+        alert('내벨업챌린지가 환불·중도포기 처리된 학생입니다. 연습코스를 열 수 없습니다. 필요하면 신청서 관리에서 환불을 철회하세요.');
+        return;
+    }
 
     const actionText = enable ? '활성화' : '비활성화';
     const studentName = studentData.user.name || '학생';

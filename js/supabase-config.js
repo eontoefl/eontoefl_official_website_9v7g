@@ -507,6 +507,39 @@ function getPausedDaysUntil(app, kind, todayYmd) {
     return days;
 }
 
+// ===== 환불·중도포기 (2026-10-12, 환불처리 1단계) =====
+// 신청서의 환불 기록(service_stops, 배열)을 읽는다. 서버 service_stop_at / is_service_stopped 와 같은 규칙.
+//   항목 = { id, kind 'refund'|'dropped', target 'challenge'|'correction'|'both', amount, reason, requested_on,
+//            status 'active'|'withdrawn', created_at, paid_at, notice_at, ... }
+//   기록이 비어 있고 옛 칸 app_status 가 refunded|dropped 이면(이 기능 전 기록, 상품 구분 없음) 둘 다 중단으로 본다.
+// ⚠️ 이 함수들은 안에서 getCorrectionStatus 를 부르지 않는다(admin-correction.js 에 같은 이름의 다른 함수가 있어 덮어씀).
+function getStopEntries(app) {
+    if (!app) return [];
+    let raw = app.service_stops;
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
+    return Array.isArray(raw) ? raw.filter(e => e && e.target) : [];
+}
+// 그 상품(challenge|correction)을 덮는 active 환불 항목. 없으면 null. 옛 방식 표시는 legacy:true 로 합성.
+function getActiveStop(app, kind) {
+    if (!app) return null;
+    const entries = getStopEntries(app);
+    const hit = entries.find(e => e.status === 'active' && (e.target === 'both' || e.target === kind));
+    if (hit) return hit;
+    if (entries.length === 0 && (app.app_status === 'refunded' || app.app_status === 'dropped')) {
+        // 옛 기록: 첨삭이 있던 학생만 첨삭도 중단으로 본다
+        if (kind === 'correction' && !(app.correction_enabled || app.correction_start_date)) return null;
+        return { legacy: true, kind: app.app_status, target: 'both', amount: app.refund_amount, reason: app.refund_reason,
+                 requested_on: app.refund_at ? utcDateToYmd(new Date(Number(app.refund_at))) : null, status: 'active', created_at: app.refund_at || null };
+    }
+    return null;
+}
+// "이 학생의 내챌/첨삭이 멈춰 있나" = 환불·중도포기 OR 일시정지 (서버 is_service_stopped 와 같은 뜻)
+function isStoppedNow(app, kind) { return !!getActiveStop(app, kind) || isPausedNow(app, kind); }
+function _stopStatusObj(stop) {
+    if (stop.kind === 'dropped') return { key: 'dropped', label: '중도포기', color: '#94a3b8', bg: '#f1f5f9', icon: 'fa-user-slash', stop };
+    return { key: 'refunded', label: '환불완료', color: '#ef4444', bg: '#fef2f2', icon: 'fa-undo', stop };
+}
+
 // 내챌 과제 날짜 = 시작일 + (주차−1)×7 + 요일 번호(일=0…토=6) + 정지 기간. UTC 자정 Date.
 // 시작일 없으면 null, 무기한 정지 구간에 걸린 과제도 null(미정).
 function getChallengeTaskDate(app, week, dayIndex) {
@@ -579,9 +612,9 @@ function getPaymentStage(app) {
 // app_status가 DB에 저장되어 있으면 그 값을 우선 사용하고,
 // 없으면 schedule_start / schedule_end 기준으로 자동 판정한다.
 function getAppLiveStatus(app) {
-    // 수동 설정값 우선 (환불완료, 중도포기)
-    if (app.app_status === 'refunded') return { key: 'refunded', label: '환불완료', color: '#ef4444', bg: '#fef2f2', icon: 'fa-undo' };
-    if (app.app_status === 'dropped') return { key: 'dropped', label: '중도포기', color: '#94a3b8', bg: '#f1f5f9', icon: 'fa-user-slash' };
+    // 환불·중도포기 최우선 (service_stops 의 내챌 항목. 기록이 없으면 옛 칸 app_status 로 — 학습관리 v3 는 작은 객체로 판정하므로 fallback 필수)
+    const stopC = getActiveStop(app, 'challenge');
+    if (stopC) return _stopStatusObj(stopC);
 
     // 세팅 완료 여부 확인 (입금 확인까지 됐는지)
     if (!app.deposit_confirmed_by_admin) return null; // 입금 미확인 → 기존 프로세스 상태 사용
@@ -648,10 +681,14 @@ function getCorrectionWindow(app, phase) {
 //   연장(extension_enabled + extension_start_date)이 켜진 학생은 13~24세션 학기 기준으로 전환.
 //   학생 라벨: "13~24세션 진행 중/시작 예정", 관리자 라벨(adminLabel): "첨삭 연장중/연장예정"
 function getCorrectionStatus(app) {
+    // 첨삭 환불·중도포기 최우선 — 스위치(correction_enabled) 검사보다 앞(환불 뒤 스위치를 꺼도 "첨삭 환불"이 남도록, S7)
+    const stopK = getActiveStop(app, 'correction');
+    if (stopK) return { key: 'refunded', label: stopK.kind === 'dropped' ? '중도포기' : '환불', adminLabel: stopK.kind === 'dropped' ? '첨삭 중도포기' : '첨삭 환불', color: '#ef4444', icon: 'fa-undo', stop: stopK };
+
     if (!app.correction_enabled) return null;
 
-    // 수동 설정값 우선 (환불)
-    if (app.correction_status === 'refunded') return { key: 'refunded', label: '환불', color: '#ef4444', icon: 'fa-undo' };
+    // 옛 칸(correction_status) — 이 기능 전엔 쓰는 코드가 없었고, 지금은 서버가 service_stops 와 함께 갱신한다(호환)
+    if (app.correction_status === 'refunded' || app.correction_status === 'dropped') return { key: 'refunded', label: app.correction_status === 'dropped' ? '중도포기' : '환불', color: '#ef4444', icon: 'fa-undo' };
 
     if (!app.correction_start_date) return { key: 'pending', label: '시작일 미설정', color: '#94a3b8', icon: 'fa-clock' };
 
