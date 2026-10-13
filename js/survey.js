@@ -44,7 +44,7 @@ function showDuplicate(giftySent) {
             '<p>이 시험에 대한 리포트는 이미 잘 받았습니다.<br>한 시험당 한 번만 제출할 수 있어요.</p>' +
             (giftySent
                 ? '<div class="sv-done-gift">☕ 기프티콘도 이미 발송되었습니다.</div>'
-                : '<div class="sv-done-gift">☕ 기프티콘은 3영업일 내에 도착합니다.</div>');
+                : '<div class="sv-done-gift">☕ 커피 쿠폰은 카카오톡 ‘이온’ 채널로 보내드려요. 잠시만 기다려주세요!</div>');
     }
     showState('svDone');
 }
