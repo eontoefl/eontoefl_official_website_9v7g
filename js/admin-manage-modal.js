@@ -4443,7 +4443,8 @@ function mgAction(kind, id) {
                 + field('요청일', `<input type="date" id="mg_requested" value="${today}" max="${today}" style="${inputStyle}">`, '이날부터 중단')
                 + (isDrop ? '' : field('환불 금액(원)', `<input type="number" id="mg_amount" value="0" min="0" step="1000" style="${inputStyle}">`))
                 + field('메모', `<input type="text" id="mg_reason" placeholder="선택" style="${inputStyle}">`)
-                + `<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer;"><input type="checkbox" id="mg_notify" checked> 학생에게 안내 카톡 보내기</label>`,
+                // 안내 카톡은 환불만(50252~50254). 중도포기 안내 템플릿은 없어서 체크 자체를 안 보인다(2026-10-13)
+                + (isDrop ? '' : `<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer;"><input type="checkbox" id="mg_notify" checked> 학생에게 안내 카톡 보내기</label>`),
             validate: () => {
                 const r = document.getElementById('mg_requested').value; if (!r) return '요청일을 입력하세요.';
                 if (!isDrop && (parseInt(document.getElementById('mg_amount').value, 10) || 0) < 0) return '금액을 확인하세요.';
@@ -4455,7 +4456,7 @@ function mgAction(kind, id) {
                 p_amount: isDrop ? 0 : (parseInt(document.getElementById('mg_amount').value, 10) || 0),
                 p_reason: (document.getElementById('mg_reason').value || '').trim() || null,
                 p_requested_on: document.getElementById('mg_requested').value,
-                p_notify: !!document.getElementById('mg_notify').checked, p_by: by }),
+                p_notify: !isDrop && !!(document.getElementById('mg_notify') || {}).checked, p_by: by }),
             toast: `${label} ${isDrop ? '중도포기' : '환불'} 처리했어요` });
         return;
     }
