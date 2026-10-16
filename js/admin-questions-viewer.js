@@ -132,7 +132,10 @@ const QV_CONFIGS = {
             { key: 'answer', label: '정답', extract: (s, rows) => waFormatGrouped(rows, 'correct_answer') },
             { key: 'answer_trans', label: '정답 (번역)', extract: (s, rows) => waFormatGrouped(rows, 'correct_translation') },
             { key: 'options', label: '제시 단어', extract: (s, rows) => waFormatGrouped(rows, 'option_words') },
-            { key: 'explanation', label: '해설', extract: (s, rows) => waFormatGrouped(rows, 'explanation') }
+            { key: 'explanation', label: '해설', extract: (s, rows) => waFormatGrouped(rows, 'explanation') },
+            { key: 'answer2', label: '정답2', extract: (s, rows) => waFormatGrouped(rows, 'correct_answer_2') },
+            { key: 'answer2_trans', label: '정답2 (번역)', extract: (s, rows) => waFormatGrouped(rows, 'correct_translation_2') },
+            { key: 'explanation2', label: '해설2', extract: (s, rows) => waFormatGrouped(rows, 'explanation_2') }
         ]
     },
     'writing-email': {
