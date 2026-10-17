@@ -4627,7 +4627,7 @@ function _mgHistory(app) {
         const prev = e.prev || {};
         const corr = e.corr_action === 'restart' ? '첨삭 처음부터' : e.corr_action === 'keep' ? '첨삭 그대로' : '';
         const modeLabel = e.mode === 'selfpaced' ? '자기주도' : e.mode === 'standard' ? 'Standard' : e.mode === 'fast' ? 'Fast' : e.mode === 'australia' ? '호주' : '';
-        items.push({ t: e.at || '', html: `<i class="fas fa-history" style="color:#b45309; width:14px;"></i> 리셋 · ${_pauseKrDate(String(e.at || '').slice(0, 10))} · 새 시작일 ${e.new_start ? _pauseKrDate(String(e.new_start).slice(0, 10)) : '-'}${modeLabel ? ' · ' + modeLabel : ''}${corr ? ' · ' + corr : ''} — ${e.undone_at ? '되돌림' : '처리됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''} <span style="color:#94a3b8;">(리셋 전: ${escapeHtml(prev.schedule_start || '-')} · ${escapeHtml(String(prev.assigned_program || '-').replace('내벨업챌린지 - ', ''))})</span>` });
+        items.push({ t: e.at || '', html: `<i class="fas fa-history" style="color:#b45309; width:14px;"></i> 리셋 · ${_pauseKrDate(String(e.at || '').slice(0, 10))} · 새 시작일 ${e.new_start ? _pauseKrDate(String(e.new_start).slice(0, 10)) : '-'}${modeLabel ? ' · ' + modeLabel : ''}${corr ? ' · ' + corr : ''} — ${e.undone_at ? '되돌림' : '처리됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''} <span style="color:#94a3b8;">(리셋 전: ${escapeHtml(prev.schedule_start || '-')} · ${prev.self_paced === true ? '자기주도' : escapeHtml(String(prev.assigned_program || '-').replace('내벨업챌린지 Australia - ', '호주 ').replace('내벨업챌린지 - ', ''))})</span>` });
     }
     if (items.length === 0) return '';
     items.sort((a, b) => (String(b.t) > String(a.t) ? 1 : -1));
@@ -5262,7 +5262,7 @@ async function _mgResetAction(id) {
     const liveCount = _resetLiveEntries(app).length;
     const tomorrow = ymdAddDays(today, 1);
     const defStart = curMode === 'selfpaced' ? tomorrow : _ymdNextSunday(tomorrow);
-    const weeksOf = (m) => m === 'standard' ? 8 : 4;
+    const weeksOf = (m) => m === 'standard' ? 8 : (m === 'australia' ? (String(app.assigned_program || '').includes('Standard') ? 8 : 4) : 4);
     // 현재 선택 과정(호주는 고정). validate/onConfirm 시점에 읽는다.
     const modeNow = () => isAus ? 'australia' : ((document.querySelector('input[name="rs_mode"]:checked') || {}).value || curMode);
     const segBtn = (val, label) => `<label style="flex:1;"><input type="radio" name="rs_mode" value="${val}" ${val === curMode ? 'checked' : ''} style="display:none;"><span class="rs-seg" data-val="${val}" style="display:block; text-align:center; padding:9px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; color:#64748b;">${label}</span></label>`;
@@ -5272,7 +5272,7 @@ async function _mgResetAction(id) {
     const practiceLine = isAus ? ''
         : (app.practice_enabled === true
             ? '<div style="font-size:13px; color:#475569; margin-bottom:12px;"><i class="fas fa-check" style="color:#15803d;"></i> 연습코스 켜져 있음 — 그대로 둡니다(시작 전 자유 연습 가능)</div>'
-            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 리셋 연습코스 안내 알림톡이 따로 나가요)</span></label>');
+            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 기존 연습코스 오픈 알림톡은 안 나가요)</span></label>');
     const corrLine = !app.correction_enabled ? ''
         : (corrAction === 'restart'
             ? '<div style="font-size:13px; color:#1e293b; margin-bottom:8px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>처음부터</b>(제출·피드백은 보관함으로, 12회 새로)</div>'
@@ -5283,7 +5283,7 @@ async function _mgResetAction(id) {
         body: '<p style="margin:0 0 10px; font-size:14px; color:#1e293b;">학습 기록이 학생 화면에서 사라지고 인증률이 0에서 다시 시작돼요. 기록은 보관되고 되돌릴 수 있어요. 열린 일시정지는 취소돼요.</p>'
             + (liveCount > 0 ? '<div style="background:#fef3c7; color:#92400e; border-radius:8px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;">⚠️ 이 학생은 이미 리셋 ' + liveCount + '번(1인 1회 방침). 사유를 확인하고 진행하세요.</div>' : '')
             + modeSeg
-            + field('새 시작일', `<input type="date" id="rs_start" value="${defStart}" min="${tomorrow}" style="${inputStyle}">`, '', 'rs_start_wrap')
+            + field('새 시작일', `<input type="date" id="rs_start" value="${defStart}" min="${tomorrow}" style="${inputStyle}">`, curMode === 'selfpaced' ? '내일 이후 · 요일 자유' : '일요일만 · 내일 이후', 'rs_start_wrap')
             + field('종료일', `<input type="date" id="rs_sp_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 1)}" style="${inputStyle}">`, '자기주도 종료일 · 직접 입력', 'rs_sp_end_wrap')
             + '<div id="rs_end_preview" style="font-size:12.5px; color:#475569; margin:-4px 0 12px;"></div>'
             + corrLine
@@ -5345,7 +5345,8 @@ async function _mgResetAction(id) {
         }));
         if (s) s.addEventListener('change', follow);
         paint();
-    }, 0);
+        if (s) { try { s.focus(); } catch (e) { /* 무시 */ } }
+    }, 60);
 }
 
 // 개별분석 폼: 첨삭 '새로/다시' 세그먼트

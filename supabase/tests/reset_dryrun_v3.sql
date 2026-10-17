@@ -56,7 +56,7 @@ BEGIN
     BEGIN PERFORM public.enrollment_reset_undo(a.id, '테스트'); RAISE EXCEPTION 'A2-2 실패: 첨삭 off 변경인데 통과';
     EXCEPTION WHEN OTHERS THEN IF SQLERRM LIKE 'A2-2%' THEN RAISE; END IF; RAISE NOTICE 'A2-2 OK: %', SQLERRM; END;
     UPDATE public.applications SET correction_enabled = true WHERE id = a.id;
-    INSERT INTO public.tr_weekly_check_drafts (user_id, student_name, week, title, message, status, created_at) VALUES (a.user_id::uuid, '리셋테스트A', 1, '[v3] 리셋 뒤 초안', 'x', 'skipped', now() + interval '2 seconds');
+    INSERT INTO public.tr_weekly_check_drafts (user_id, student_name, week, title, message, auth_rate, status, program_type, created_at) VALUES (a.user_id::uuid, '리셋테스트A', 1, '[v3] 리셋 뒤 초안', 'x', 0, 'skipped', 'fast', now() + interval '2 seconds');
     u := public.enrollment_reset_undo(a.id, '테스트');
     ASSERT (u->'restored'->>'late_drafts_dismissed')::int = 1, 'A2 리셋 뒤 초안 숨김';
     SELECT count(*) INTO cnt FROM public.tr_weekly_check_drafts WHERE user_id = a.user_id::uuid AND status = 'pending'; ASSERT cnt = 1, 'A2 옛 초안 복원';

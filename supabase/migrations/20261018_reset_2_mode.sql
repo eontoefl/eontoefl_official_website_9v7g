@@ -299,12 +299,25 @@ BEGIN
          + (SELECT count(*) FROM public.tr_deadline_extensions WHERE user_id = a.user_id AND enrollment_id = a.id)
       INTO v_new_rows;
     IF v_new_rows > 0 THEN RAISE EXCEPTION '리셋 뒤 새 학습 기록이 %건 있어 되돌릴 수 없습니다.', v_new_rows; END IF;
-    -- 거부 2: 리셋 뒤 새로 등록한 정지(밀린 날짜·지운 알림은 스냅샷으로 안 돌아옴)
+    -- 거부 2: 리셋 뒤 정지 이력이 달라짐(새 정지가 살아 있거나, 리셋 전 정지를 리셋 뒤 바꿈). 밀린 날짜·지운 알림은 스냅샷으로 안 돌아오므로 거부.
+    --   비교 규칙: 리셋이 붙인 취소 표시(canceled_* / canceled_by_reset=batch)는 지우고 status를 prev 것으로 되돌린 뒤 prev 항목과 같아야 함.
+    --   prev에 없는 항목(리셋 뒤 등록)은 status='canceled'(취소·되돌림으로 밀기가 복구된 것)만 허용.
     SELECT count(*) INTO v_late_pauses
-      FROM (SELECT e FROM jsonb_array_elements(COALESCE(a.challenge_pauses, '[]'::jsonb)) e
-            UNION ALL SELECT e FROM jsonb_array_elements(COALESCE(a.correction_pauses, '[]'::jsonb)) e) x
-     WHERE (x.e->>'created_at') IS NOT NULL AND (x.e->>'created_at')::timestamptz > v_at;
-    IF v_late_pauses > 0 THEN RAISE EXCEPTION '리셋 뒤 등록한 일시정지가 %건 있어 되돌릴 수 없습니다. 정지를 먼저 되돌리거나 취소하세요.', v_late_pauses; END IF;
+      FROM (
+        SELECT x.kind, x.e,
+               (SELECT p FROM jsonb_array_elements(COALESCE(v_prev->x.kind, '[]'::jsonb)) p WHERE p->>'id' = x.e->>'id' LIMIT 1) AS pe
+          FROM (SELECT 'challenge_pauses' AS kind, e FROM jsonb_array_elements(COALESCE(a.challenge_pauses, '[]'::jsonb)) e
+                UNION ALL SELECT 'correction_pauses', e FROM jsonb_array_elements(COALESCE(a.correction_pauses, '[]'::jsonb)) e) x
+      ) y
+     WHERE (y.pe IS NULL AND y.e->>'status' <> 'canceled')
+        -- 리셋이 아닌 손으로 취소한 경우(밀기 복구됨)는 허용하지 않음: 날짜·알림 상태가 스냅샷과 어긋날 수 있음
+        OR (y.pe IS NOT NULL AND y.e->>'status' = 'canceled' AND y.pe->>'status' <> 'canceled' AND COALESCE(y.e->>'canceled_by_reset', '') <> v_batch::text)
+        -- 재개 처리(status resumed·resumed_at·알림 표시)는 크론이 자연히 바꾸는 값이라 비교에서 제외. 재개일·밀린 일수·정지 시작일이 다르면 거부.
+        OR (y.pe IS NOT NULL AND
+            (y.e - 'canceled_at' - 'canceled_by' - 'canceled_by_reset' - 'status' - 'resumed_at' - 'resumed_by' - 'resume_notice_sent_for' - 'pause_notice_at')
+            IS DISTINCT FROM
+            (y.pe - 'canceled_at' - 'canceled_by' - 'canceled_by_reset' - 'status' - 'resumed_at' - 'resumed_by' - 'resume_notice_sent_for' - 'pause_notice_at'));
+    IF v_late_pauses > 0 THEN RAISE EXCEPTION '리셋 뒤 일시정지가 바뀐 항목이 %건 있어 되돌릴 수 없습니다. 리셋 뒤 건 정지는 "정지 되돌리기"로 먼저 되돌리세요.', v_late_pauses; END IF;
     -- 거부 3: 리셋 뒤 첨삭 켜짐/꺼짐이 바뀜
     IF (v_prev ? 'correction_enabled') AND COALESCE((v_prev->>'correction_enabled')::boolean, false) IS DISTINCT FROM COALESCE(a.correction_enabled, false) THEN
         RAISE EXCEPTION '리셋 뒤 첨삭 설정이 바뀌어 되돌릴 수 없습니다. 첨삭 설정을 리셋 당시(%)로 먼저 맞추세요.', CASE WHEN (v_prev->>'correction_enabled')::boolean THEN '켜짐' ELSE '꺼짐' END;
@@ -318,19 +331,7 @@ BEGIN
     UPDATE public.tr_deadline_extensions SET enrollment_id = a.id WHERE user_id = a.user_id AND enrollment_id = v_batch;
     GET DIAGNOSTICS n_ext = ROW_COUNT;
 
-    -- ② 첨삭 보관분 복원(처음부터였을 때). 보관 0줄이면 리셋이 새로 만든 일정표 줄을 지운다.
-    IF v_entry->>'corr_batch' IS NOT NULL THEN
-        v_corr_batch := (v_entry->>'corr_batch')::uuid;
-        v_archived := COALESCE((v_entry->'corr_archived'->>'submissions')::int, 0) + COALESCE((v_entry->'corr_archived'->>'schedules')::int, 0);
-        IF v_archived > 0 THEN
-            v_corr_restored := public.restart_correction_restore(v_corr_batch);   -- 새 제출이 생겼으면 여기서 거부
-        ELSE
-            DELETE FROM public.correction_schedules WHERE user_id = v_uid;
-            GET DIAGNOSTICS v_sched_deleted = ROW_COUNT;
-        END IF;
-    END IF;
-
-    -- ③ 신청서 칸 복원 — prev에 있는 키만(v2 이력 호환). 정지 이력과 일정을 한 UPDATE로.
+    -- ② 신청서 칸 복원 — prev에 있는 키만(v2 이력 호환). 정지 이력과 일정을 한 UPDATE로. (첨삭 복원보다 먼저: 복원된 정지가 시작 안내 트리거 판정에 반영되게)
     UPDATE public.applications SET
         schedule_start           = CASE WHEN v_prev ? 'schedule_start'           THEN v_prev->>'schedule_start'                        ELSE schedule_start END,
         schedule_end             = CASE WHEN v_prev ? 'schedule_end'             THEN v_prev->>'schedule_end'                          ELSE schedule_end END,
@@ -351,6 +352,18 @@ BEGIN
         practice_alimtalk_sent_at = CASE WHEN v_prev ? 'practice_alimtalk_sent_at' THEN (v_prev->>'practice_alimtalk_sent_at')::timestamptz ELSE practice_alimtalk_sent_at END,
         practice_enabled_at      = CASE WHEN v_prev ? 'practice_enabled_at'      THEN (v_prev->>'practice_enabled_at')::timestamptz     ELSE practice_enabled_at END
     WHERE id = a.id;
+
+    -- ③ 첨삭 보관분 복원(처음부터였을 때). 보관 0줄이면 리셋이 새로 만든 일정표 줄을 지운다.
+    IF v_entry->>'corr_batch' IS NOT NULL THEN
+        v_corr_batch := (v_entry->>'corr_batch')::uuid;
+        v_archived := COALESCE((v_entry->'corr_archived'->>'submissions')::int, 0) + COALESCE((v_entry->'corr_archived'->>'schedules')::int, 0);
+        IF v_archived > 0 THEN
+            v_corr_restored := public.restart_correction_restore(v_corr_batch);   -- 새 제출이 생겼으면 여기서 거부
+        ELSE
+            DELETE FROM public.correction_schedules WHERE user_id = v_uid;
+            GET DIAGNOSTICS v_sched_deleted = ROW_COUNT;
+        END IF;
+    END IF;
 
     -- ④ 첨삭 일정표 날짜를 신청서(prev)와 맞춤 — 복원 함수가 되살린 옛 줄과 같아야 하며, 동기화 트리거는 값이 같으면 건너뜀
     IF v_corr_batch IS NOT NULL AND v_archived > 0 AND (v_prev->>'correction_start_date') ~ '^\d{4}-\d{2}-\d{2}$' THEN
