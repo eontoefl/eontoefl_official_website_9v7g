@@ -5159,7 +5159,7 @@ async function _loadRestartCorrSummary() {
     const el = document.getElementById('restartCorrSummary'); if (!el || !currentManageApp) return;
     if (el.dataset.loaded === '1') return;
     try {
-        const s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: currentManageApp.user_id });
+        const s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: currentManageApp.user_id, p_app_id: currentManageApp.id });   // p_app_id = 수강 2 신청서: 그 제출 시각보다 먼저 생긴 기록만 수강 1 기록으로(수강 2 자신의 일정표·제출물 제외, 2026-10-17)
         el.dataset.loaded = '1';
         if (!s || !s.has_rows) {
             el.innerHTML = '수강 1 첨삭 기록 없음 → <b>새로</b>(+200,000원)만 의미 있어요.';
@@ -5178,13 +5178,13 @@ async function _loadRestartCorrSummary() {
 async function _restartArchiveIfNeeded(app, correctionMode) {
     if (!app || !app.user_id) return true;
     let s = null;
-    try { s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: app.user_id }); } catch (e) { alert('수강 1 첨삭 현황을 확인하지 못해 저장을 멈춥니다.\n\n' + (e.message || '')); return false; }
+    try { s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: app.user_id, p_app_id: app.id }); } catch (e) { alert('수강 1 첨삭 현황을 확인하지 못해 저장을 멈춥니다.\n\n' + (e.message || '')); return false; }
     if (!s || !s.has_rows) return true;
     if (s.busy) { alert('수강 1 첨삭 피드백이 처리 중인 제출이 ' + s.busy + '건 있어요. 끝난 뒤 다시 저장하세요.'); return false; }
     const ok = confirm('수강 1 첨삭 기록(12세션 중 ' + (s.sessions_1_12 || 0) + '개 제출)을 보관함으로 옮기고 첨삭을 처음부터 다시 시작합니다.\n\n학생 테스트룸에서는 지난 첨삭 기록이 보이지 않게 돼요(보관함에 남고 SQL로 되돌릴 수 있음).\n\n' + (correctionMode === 'again' ? '[다시] 0원' : '[새로] +200,000원') + ' 으로 진행할까요?');
     if (!ok) return false;
     try {
-        const r = await supabaseAPI.rpc('restart_correction_archive', { p_user_id: app.user_id, p_from_app: app.restart_of || null, p_by: _pauseAdminName() });
+        const r = await supabaseAPI.rpc('restart_correction_archive', { p_user_id: app.user_id, p_from_app: app.restart_of || null, p_by: _pauseAdminName(), p_app_id: app.id });
         console.log('[restart] 첨삭 기록 보관 이동:', r);
         return true;
     } catch (e) {
