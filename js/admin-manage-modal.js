@@ -3200,6 +3200,7 @@ async function previewSentContract(appId) {
         contract_date: new Date().toLocaleDateString('ko-KR')
     };
     
+    if (typeof attachPrevContract === 'function') await attachPrevContract(app.contract_snapshot, app, studentData);   // 재시작: 수강1 계약서 상자
     const parsedHTML = parseContractTemplate(app.contract_snapshot, studentData);
     
     // 모달 표시

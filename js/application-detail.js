@@ -2584,6 +2584,7 @@ async function getContractDisplay(app) {
             };
             
             // 스냅샷 파싱
+            if (typeof attachPrevContract === 'function') await attachPrevContract(app.contract_snapshot, app, studentData);   // 재시작: 수강1 계약서 상자
             const parsedHTML = parseContractTemplate(app.contract_snapshot, studentData);
             
             // 계약서 HTML 반환
@@ -2644,6 +2645,7 @@ async function getContractDisplay(app) {
             }
             
             // 계약서 템플릿 파싱
+            if (typeof attachPrevContract === 'function') await attachPrevContract(contract.content, app, studentData);   // 재시작: 수강1 계약서 상자
             const parsedHTML = parseContractTemplate(contract.content, studentData);
             console.log('Contract template parsed successfully');
             
