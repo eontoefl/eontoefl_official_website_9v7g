@@ -4349,6 +4349,8 @@ function renderPauseBlockCard(app, kind) {
     const rows = ['challenge', 'correction'].map(k => _mgRow(app, k)).filter(Boolean);
     const restartRow = _mgRestartRow(app);   // 재시작(수강 2) — 끝난 수강 1 신청서에만 보임
     if (restartRow) rows.push(restartRow);
+    const resetRow = _mgResetRow(app);       // 리셋 — 입금 확인된 챌린지 신청서(진행 중·종료 모두), 2026-10-18
+    if (resetRow) rows.push(resetRow);
     if (rows.length === 0) return '';
     return `
     <div style="background:#ffffff; border-radius:14px; padding:14px 22px 10px; margin-bottom:24px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
@@ -4451,6 +4453,7 @@ function mgAction(kind, id) {
     mgCloseMenus();
     const app = currentManageApp; if (!app) return;
     if (kind === 'restart') { _mgRestartAction(id); return; }   // 재시작(수강 2) 허용·취소
+    if (kind === 'reset') { _mgResetAction(id); return; }       // 리셋·되돌리기 (2026-10-18)
     const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
     const stop = getActiveStop(app, kind);
     const ap = getActivePause(app, kind);
@@ -4618,6 +4621,12 @@ function _mgHistory(app) {
     const tl = (t) => t === 'both' ? '둘 다' : t === 'correction' ? '스라첨삭' : '내벨업챌린지';
     for (const e of getStopEntries(app)) {
         items.push({ t: e.created_at || '', html: `<i class="fas fa-undo" style="color:#a53b22; width:14px;"></i> ${e.kind === 'dropped' ? '중도포기' : '환불'} · ${tl(e.target)}${e.requested_on ? ' · ' + _pauseKrDate(e.requested_on) + ' 요청' : ''}${e.kind === 'dropped' ? '' : ' · ' + Number(e.amount || 0).toLocaleString() + '원'} — ${e.status === 'active' ? (e.paid_at ? '처리됨 · 입금 완료' : '처리됨') : '철회됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''}` });
+    }
+    // 리셋 이력 (2026-10-18)
+    for (const e of (typeof _resetEntries === 'function' ? _resetEntries(app) : [])) {
+        const prev = e.prev || {};
+        const corr = e.corr_action === 'restart' ? '첨삭 처음부터' : e.corr_action === 'keep' ? '첨삭 그대로' : '';
+        items.push({ t: e.at || '', html: `<i class="fas fa-history" style="color:#b45309; width:14px;"></i> 리셋 · ${_pauseKrDate(String(e.at || '').slice(0, 10))} · 새 시작일 ${e.new_start ? _pauseKrDate(String(e.new_start).slice(0, 10)) : '-'}${corr ? ' · ' + corr : ''} — ${e.undone_at ? '되돌림' : '처리됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''} <span style="color:#94a3b8;">(리셋 전: ${escapeHtml(prev.schedule_start || '-')} · ${escapeHtml(String(prev.assigned_program || '-').replace('내벨업챌린지 - ', ''))})</span>` });
     }
     if (items.length === 0) return '';
     items.sort((a, b) => (String(b.t) > String(a.t) ? 1 : -1));
@@ -5139,6 +5148,169 @@ async function _mgRestartAction(id) {
             await supabaseAPI.patch('applications', app.id, { restart_allowed_at: new Date().toISOString(), restart_allowed_by: by });
         },
         toast: '수강 2를 허용했어요 — 학생 대시보드에 "신청서 작성하기"가 열려요' });
+}
+
+// ================================================
+// 리셋 — 같은 신청서 안에서 학습 기록을 숨기고(꼬리표 교체) 새 시작일로 되감기 (2026-10-18)
+//   · 수강 관리 표 "리셋" 줄: 입금 확인된 챌린지 신청서면 진행 중·종료 모두. [리셋] / [되돌리기](가장 최근 1건)
+//   · 첨삭은 창이 판단: 1차 제출 회차 0~5회 → 처음부터(보관 이동 + 새 첨삭 시작일 칸), 6회 이상 → 그대로
+//   · 서버 함수 enrollment_reset / enrollment_reset_undo 가 한 트랜잭션으로 처리. 성공 뒤 개별분석 탭 전체를 다시 그린다(옛 폼 값 저장 방지).
+//   · 리셋 알림톡은 템플릿 승인 번호가 들어온 뒤 연결(그 전엔 호출 안 함).
+// ================================================
+function _resetEntries(app) {
+    let raw = app && app.reset_history;
+    if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
+    return Array.isArray(raw) ? raw : [];
+}
+function _resetLiveEntries(app) { return _resetEntries(app).filter(e => e && !e.undone_at); }
+function _resetLastEntry(app) { const es = _resetEntries(app); return es.length ? es[es.length - 1] : null; }
+function _isAustraliaApp(app) { return !!app && (app.course_track === 'australia' || String(app.assigned_program || '').includes('Australia')); }
+function _ymdIsSunday(ymd) { const d = ymdToUtcDate(ymd); return !!d && d.getUTCDay() === 0; }
+function _ymdNextSunday(fromYmd) { let d = fromYmd; for (let i = 0; i < 7; i++) { if (_ymdIsSunday(d)) return d; d = ymdAddDays(d, 1); } return d; }
+
+// 리셋 자격: 챌린지 · 입금 확인 · 삭제 아님 · 수강 2로 넘어가지 않음 · 내챌/첨삭 환불 없음 · 예약 발송 없음 · 연장 진행/대기 아님
+function _resetBlockReason(app) {
+    if (!app) return '신청서 없음';
+    if (app.application_type && app.application_type !== 'challenge') return '챌린지 신청서만';
+    if (app.deposit_confirmed_by_admin !== true) return '입금 확인 전';
+    if (app.deleted === true) return '삭제된 신청서';
+    if (app.superseded_by) return '수강 2로 넘어간 신청서';
+    if (getActiveStop(app, 'challenge')) return '내챌 환불·중도포기 상태(먼저 철회)';
+    if (app.correction_enabled && getActiveStop(app, 'correction')) return '첨삭 환불 상태(먼저 철회)';
+    if (app.analysis_alimtalk_scheduled_at) return '개별분석 예약 발송 대기(먼저 취소)';
+    const corr = app.correction_enabled ? getCorrectionStatus(app) : null;
+    if (corr && (corr.key === 'ext_active' || corr.key === 'ext_waiting')) return '첨삭 연장(13~24회차) 진행 중';
+    return null;
+}
+
+function _mgResetRow(app) {
+    if (!app || (app.application_type && app.application_type !== 'challenge') || app.deposit_confirmed_by_admin !== true || app.deleted === true) return '';
+    const live = _resetLiveEntries(app), last = _resetLastEntry(app);
+    const block = _resetBlockReason(app);
+    const actions = [];
+    if (!block) actions.push({ id: 'reset', label: '리셋', icon: 'fa-history', danger: true });
+    if (last && !last.undone_at) actions.push({ id: 'reset_undo', label: '리셋 되돌리기', icon: 'fa-undo' });
+    if (actions.length === 0 && live.length === 0) return '';
+    const chipHtml = live.length
+        ? '<span style="display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:12px; font-weight:600; background:#fef3c7; color:#b45309; white-space:nowrap;"><i class="fas fa-history"></i> 리셋 ' + live.length + '회</span>'
+        : '<span style="font-size:12px; color:#94a3b8;">이력 없음</span>';
+    let summary = '';
+    if (last) {
+        summary = _pauseKrDate(String(last.at || '').slice(0, 10)) + ' 리셋' + (last.undone_at ? ' → 되돌림' : '') + (last.reason ? ' · ' + escapeHtml(last.reason) : '');
+    }
+    if (block) summary += (summary ? ' · ' : '') + '<span style="color:#94a3b8;">리셋 불가: ' + escapeHtml(block) + '</span>';
+    const menuBtn = actions.length
+        ? '<button type="button" id="mgBtn_reset" onclick="mgToggleMenu(\'reset\')" aria-haspopup="menu" aria-expanded="false" style="padding:7px 12px; border:none; border-radius:8px; background:#f3f4f5; color:#334155; cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap; transition:background .15s;" onmouseover="this.style.background=\'#e9ebee\'" onmouseout="this.style.background=\'#f3f4f5\'">관리 <i class="fas fa-chevron-down" style="font-size:11px; margin-left:4px; color:#64748b;"></i></button>'
+          + '<div id="mgMenu_reset" role="menu" style="display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:200px; background:#fff; border-radius:12px; box-shadow:0 12px 32px rgba(25,28,29,0.14); padding:6px; z-index:50;">'
+          + actions.map(a => '<button type="button" role="menuitem" onclick="mgAction(\'reset\',\'' + a.id + '\')" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:9px 12px; border:none; border-radius:8px; background:transparent; cursor:pointer; font-size:13.5px; color:' + (a.danger ? '#a53b22' : '#1e293b') + ';"><i class="fas ' + a.icon + '" style="width:14px; color:' + (a.danger ? '#a53b22' : '#7c3aed') + ';"></i>' + a.label + '</button>').join('')
+          + '</div>'
+        : '';
+    return '<div style="display:flex; align-items:center; gap:14px; padding:12px 0; border-top:1px dashed #eef1f5;">'
+        + '<div style="width:110px; flex-shrink:0; font-size:14px; font-weight:700; color:#1e293b;">리셋</div>'
+        + '<div style="flex:1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;">' + chipHtml + '<span style="font-size:12.5px; color:#475569;">' + summary + '</span></div>'
+        + '<div style="position:relative; flex-shrink:0;">' + menuBtn + '</div>'
+        + '</div>';
+}
+
+// 리셋·되돌리기 성공 뒤: 신청서를 다시 읽고 개별분석 탭 전체를 다시 그린다(옛 시작일이 폼에 남아 저장되는 사고 방지)
+async function _resetReloadTab(appId) {
+    const fresh = await supabaseAPI.getById('applications', appId);
+    if (fresh) currentManageApp = fresh;
+    _analysisEditing = false;
+    if (typeof mgCloseMenus === 'function') mgCloseMenus();
+    loadModalTab('analysis');
+}
+
+async function _mgResetAction(id) {
+    const app = currentManageApp; if (!app) return;
+    const by = _pauseAdminName();
+    const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:none; border-radius:8px; background:#f3f4f5; font-family:\'Pretendard\'; font-size:14px; outline:none;';
+    const field = (lbl, html, hint) => `<div style="margin-bottom:12px;"><label style="display:block; font-size:12.5px; font-weight:600; color:#475569; margin-bottom:6px;">${lbl}${hint ? ` <span style="font-weight:400; color:#94a3b8;">${hint}</span>` : ''}</label>${html}</div>`;
+
+    if (id === 'reset_undo') {
+        const last = _resetLastEntry(app); if (!last || last.undone_at) return;
+        const prev = last.prev || {};
+        _mgDialog({ title: '리셋 되돌리기', danger: true, confirmLabel: '되돌리기',
+            body: '<p style="margin:0 0 8px; font-size:14px; color:#1e293b;">숨긴 학습 기록' + (last.corr_batch ? '과 첨삭 보관분' : '') + '을 제자리로 되돌립니다.</p>'
+                + '<p style="margin:0 0 8px; font-size:12.5px; color:#64748b;">리셋 뒤 새 기록이 생겼으면 서버가 거절합니다. 정지 이력·챌린지 시작일·연습코스는 되돌리지 않아요. 리셋 전 값: 시작일 ' + escapeHtml(prev.schedule_start || '-') + ' · ' + escapeHtml(prev.assigned_program || '-') + (prev.correction_start_date ? ' · 첨삭 ' + escapeHtml(prev.correction_start_date) : '') + '</p>',
+            onConfirm: async () => {
+                await supabaseAPI.rpc('enrollment_reset_undo', { p_app_id: app.id, p_by: by });
+                await _resetReloadTab(app.id);
+            },
+            toast: '리셋을 되돌렸어요' });
+        return;
+    }
+    if (id !== 'reset') return;
+    const block = _resetBlockReason(app);
+    if (block) { _mgToast('리셋 불가: ' + block, true); return; }
+
+    // 첨삭 이용 회차 수(1차 제출한 회차, 1~12) → 0~5 처음부터 / 6 이상 그대로. 서버 함수가 같은 기준으로 다시 판정한다.
+    let used = null, corrAction = null;
+    if (app.correction_enabled) {
+        try { const s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: app.user_id }); used = Number(s && s.sessions_1_12) || 0; }
+        catch (e) { _mgToast('첨삭 현황을 불러오지 못했어요: ' + (e.message || ''), true); return; }
+        corrAction = used <= 5 ? 'restart' : 'keep';
+    }
+    const today = _pauseTodayYmd();
+    const isSp = app.self_paced === true, isAus = _isAustraliaApp(app);
+    const corrSp = !!app.correction_end_date;   // 첨삭 자기주도(종료일 지정)
+    const liveCount = _resetLiveEntries(app).length;
+    const defStart = isSp ? ymdAddDays(today, 1) : _ymdNextSunday(ymdAddDays(today, 1));
+    const practiceLine = isAus ? ''
+        : (app.practice_enabled === true
+            ? '<div style="font-size:13px; color:#475569; margin-bottom:12px;"><i class="fas fa-check" style="color:#15803d;"></i> 연습코스 켜져 있음 — 그대로 둡니다(시작 전 자유 연습 가능)</div>'
+            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 오픈 알림톡은 안 보냄)</span></label>');
+    const corrLine = !app.correction_enabled ? ''
+        : (corrAction === 'restart'
+            ? '<div style="font-size:13px; color:#1e293b; margin-bottom:8px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>처음부터</b>(제출·피드백은 보관함으로, 12회 새로)</div>'
+              + field('첨삭 시작일', `<input type="date" id="rs_corr_start" value="${defStart}" min="${ymdAddDays(today, 1)}" style="${inputStyle}">`, '보통 새 시작일과 같게')
+              + (corrSp ? field('첨삭 종료일', `<input type="date" id="rs_corr_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 12)}" style="${inputStyle}">`, '첨삭 자기주도 · 시작일 12일 뒤 이후') : '')
+            : '<div style="font-size:13px; color:#1e293b; margin-bottom:12px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>그대로</b>(6회 이상은 새로 드리지 않아요. 남은 회차를 미루려면 첨삭 [일시정지])</div>');
+    _mgDialog({ title: '리셋 — 처음부터 다시', danger: true, confirmLabel: '리셋',
+        body: '<p style="margin:0 0 10px; font-size:14px; color:#1e293b;">학습 기록이 학생 화면에서 사라지고 인증률이 0에서 다시 시작돼요. 기록은 보관되고 되돌릴 수 있어요. 열린 일시정지는 취소돼요.</p>'
+            + (liveCount > 0 ? '<div style="background:#fef3c7; color:#92400e; border-radius:8px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;">⚠️ 이 학생은 이미 리셋 ' + liveCount + '번(1인 1회 방침). 사유를 확인하고 진행하세요.</div>' : '')
+            + field('새 시작일', `<input type="date" id="rs_start" value="${defStart}" min="${ymdAddDays(today, 1)}" ${isSp ? '' : 'step="7"'} style="${inputStyle}">`, isSp ? '내일 이후' : '일요일만 · 내일 이후')
+            + (isSp ? field('종료일', `<input type="date" id="rs_sp_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 1)}" style="${inputStyle}">`, '자기주도 종료일') : '')
+            + corrLine
+            + field('사유', `<input type="text" id="rs_reason" placeholder="예: 유학 연기로 1월 재시작 약속" style="${inputStyle}">`, '필수 · 이력에 남음')
+            + practiceLine
+            + '<p style="margin:0; font-size:12px; color:#94a3b8;">리셋 뒤 개별분석 탭에서 과정 유형(Fast/Standard)을 바꾸고 분석을 다시 만드세요. 시작 안내 알림톡은 새 날짜 전날 10시에 자동으로 나가요.</p>',
+        validate: () => {
+            const s = (document.getElementById('rs_start') || {}).value;
+            if (!s) return '새 시작일을 입력하세요.';
+            if (s < ymdAddDays(today, 1)) return '새 시작일은 내일 이후여야 합니다.';
+            if (!isSp && !_ymdIsSunday(s)) return '정규·호주 과정 시작일은 일요일이어야 합니다. 예: ' + _ymdNextSunday(s);
+            if (isSp) { const e = (document.getElementById('rs_sp_end') || {}).value; if (!e) return '종료일을 입력하세요.'; if (e <= s) return '종료일은 시작일 뒤여야 합니다.'; }
+            if (corrAction === 'restart') {
+                const cs = (document.getElementById('rs_corr_start') || {}).value;
+                if (!cs) return '첨삭 시작일을 입력하세요.';
+                if (cs < ymdAddDays(today, 1)) return '첨삭 시작일은 내일 이후여야 합니다.';
+                if (corrSp) { const ce = (document.getElementById('rs_corr_end') || {}).value; if (!ce) return '첨삭 종료일을 입력하세요.'; if (ce < ymdAddDays(cs, 12)) return '첨삭 종료일은 시작일 12일 뒤 이후여야 합니다.'; }
+            }
+            if (!((document.getElementById('rs_reason') || {}).value || '').trim()) return '사유를 입력하세요.';
+            return null;
+        },
+        onConfirm: async () => {
+            const g = (i) => (document.getElementById(i) || {}).value || null;
+            await supabaseAPI.rpc('enrollment_reset', {
+                p_app_id: app.id,
+                p_new_start: g('rs_start'),
+                p_reason: (g('rs_reason') || '').trim(),
+                p_corr_start: corrAction === 'restart' ? g('rs_corr_start') : null,
+                p_corr_end: (corrAction === 'restart' && corrSp) ? g('rs_corr_end') : null,
+                p_sp_end: isSp ? g('rs_sp_end') : null,
+                p_open_practice: !!((document.getElementById('rs_practice') || {}).checked),
+                p_by: by });
+            await _resetReloadTab(app.id);
+        },
+        toast: '리셋했어요 — 개별분석 탭에서 유형·분석을 다시 잡아주세요' });
+    // 새 시작일을 바꾸면 첨삭 시작일 기본값도 따라가게(아직 손대지 않았을 때만)
+    setTimeout(() => {
+        const s = document.getElementById('rs_start'), c = document.getElementById('rs_corr_start');
+        if (!s || !c) return;
+        let touched = false; c.addEventListener('input', () => { touched = true; });
+        s.addEventListener('change', () => { if (!touched) c.value = s.value; });
+    }, 0);
 }
 
 // 개별분석 폼: 첨삭 '새로/다시' 세그먼트

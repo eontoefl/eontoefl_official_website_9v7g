@@ -49,6 +49,10 @@ const TEMPLATE_IDS: Record<string, number> = {
   refund_notice_correction:      50252,  // 스라첨삭 환불 안내
   refund_notice_challenge:       50253,  // 내벨업챌린지 환불 안내
   refund_notice_both:            50254,  // 내벨업챌린지·스라첨삭 환불 안내
+  // 리셋 안내(2026-10-17): 템플릿 검수 전 — 번호 0이면 아래 "Unknown template type"으로 거절되어 발송되지 않는다.
+  // 검수 완료 후 번호를 넣고 본문·대체문자를 승인 원문과 글자 단위로 맞출 것.
+  // 입력 data: name / phone / app_id / new_start('YYYY-MM-DD') / program(과정 유형) / practice_open(boolean)
+  schedule_reset:                0,      // 리셋 안내 (#{이름} / #{시작일} / #{과정} / #{연습코스안내})
 };
 
 // 서버가 보내는 묶음 type을 실제 템플릿 type으로. 'schedule_resumed'는 target으로 내챌/첨삭을 가른다.
@@ -604,6 +608,22 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "환불 받으실 계좌 정보가 맞는지 확인해 주세요!",
       ].join("\n");
 
+    case "schedule_reset": {
+      // [검수 전 자리만 — 본문은 대표 검수 문구로 교체] 변수: #{이름} / #{시작일} / #{과정} / #{연습코스안내}
+      // #{시작일}: new_start('YYYY-MM-DD') → 'M월 D일'. #{연습코스안내}: practice_open이 true면 한 줄, 아니면 빈 문자열.
+      const [, sm, sd] = String(data.new_start ?? "").split("-");
+      const startDate = sm && sd ? `${Number(sm)}월 ${Number(sd)}일` : String(data.new_start ?? "");
+      const practiceLine = data.practice_open === true ? "시작 전까지 연습코스에서 자유롭게 연습하실 수 있어요" : "";
+      return [
+        "이온토플 - 리셋 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,              // #{이름}
+        `- 과정: ${data.program}`,                  // #{과정}
+        `- 새 시작일: ${startDate}`,                // #{시작일}
+        practiceLine,                               // #{연습코스안내}
+      ].join("\n");
+    }
+
     case "schedule_resumed_correction":
       // 50250 승인 원문(2026-10-08). 변수: #{name} / #{resume_on} / #{end_date} / #{next_session}
       return [
@@ -698,6 +718,9 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 내벨업챌린지 환불이 접수되었어요. 신청서의 계좌로 5영업일 이내 입금될 예정입니다.";
     case "refund_notice_both":
       return "[이온토플] 내벨업챌린지·스라첨삭 환불이 접수되었어요. 신청서의 계좌로 5영업일 이내 입금될 예정입니다.";
+    // 리셋 안내: [검수 전 임시 대체문자] 파트너스 센터 등록 대체문자가 정해지면 글자 단위로 맞출 것
+    case "schedule_reset":
+      return "[이온토플] 일정이 새로 잡혔습니다. 테스트룸에서 새 시작일을 확인해주세요.";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }

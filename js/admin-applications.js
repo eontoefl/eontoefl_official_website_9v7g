@@ -761,6 +761,7 @@ function displayApplications() {
                     ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;">첨삭</span>' : ''}
                     ${Number(app.enrollment_no) >= 2 ? '<span style="display:inline-block; background:#e7dce7; color:#5b4a7d; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;" title="재시작 신청서(수강 2)">수강 2</span>' : ''}
                     ${app.superseded_by ? '<span style="display:inline-block; background:#f1f5f9; color:#64748b; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;" title="이 수강을 이어받은 수강 2 신청서가 있음">수강 1·종료</span>' : ''}
+                    ${(() => { const n = (Array.isArray(app.reset_history) ? app.reset_history : []).filter(e => e && !e.undone_at).length; return n ? '<span style="display:inline-block; background:#fef3c7; color:#b45309; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;" title="학습 기록을 0으로 되감은 횟수">리셋 ' + n + '회</span>' : ''; })()}
                 </td>
                 <td style="font-size: 12px; color: #64748b; line-height: 1.5;">
                     ${app.schedule_start 
