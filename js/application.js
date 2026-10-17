@@ -129,7 +129,11 @@ async function confirmDelete() {
     btn.disabled = true;
     
     try {
+        // 재시작(수강 2) 신청서면 삭제 뒤 수강 1의 "수강 2로 이어졌다" 표시를 지워야 하므로 먼저 읽어 둔다
+        let deletedApp = null;
+        try { deletedApp = await supabaseAPI.getById('applications', deleteTargetId); } catch (e) { deletedApp = null; }
         await supabaseAPI.delete('applications', deleteTargetId);
+        if (typeof releaseRestartLink === 'function') await releaseRestartLink(deletedApp);
         closeDeleteModal();
         
         // 삭제 완료 알림

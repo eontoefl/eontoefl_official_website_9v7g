@@ -20,7 +20,8 @@ const applicationState = {
     checkedNickname: '',
     nicknameAvailable: false,
     checkedEmail: '',
-    emailAvailable: false
+    emailAvailable: false,
+    restartForm: false   // 재시작(수강 2) 신청서 화면: 숨김·필수 완화가 적용된 상태
 };
 let nicknameCheckTimer = null;
 let emailCheckTimer = null;
@@ -885,6 +886,9 @@ async function initEditMode(appId) {
         // 폼에 데이터 채우기
         populateFormData(app);
 
+        // 재시작(수강 2) 신청서를 고칠 때도 같은 숨김·필수 완화(안 하면 빈 필수 칸 때문에 저장이 막힘)
+        if (typeof isRestartApp === 'function' && isRestartApp(app)) applyRestartFormLayout();
+
     } catch (error) {
         console.error('Failed to load application for editing:', error);
         alert('신청서 데이터를 불러오는 데 실패했습니다.');
@@ -1666,7 +1670,8 @@ function validateForm() {
         return false;
     }
 
-    // 이온토플을 알게 된 경로: 최소 하나는 입력해야 함
+    // 이온토플을 알게 된 경로: 최소 하나는 입력해야 함 (재시작 신청서는 이 섹션을 숨기므로 검사하지 않음)
+    if (applicationState.restartForm) return true;
     const referralSearchKeyword = (document.querySelector('input[name="referral_search_keyword"]')?.value || '').trim();
     const referralSocialMedia = (document.querySelector('select[name="referral_social_media"]')?.value || '').trim();
     const referralFromFriend = document.querySelector('input[name="referral_from_friend"]:checked')?.value;
@@ -2193,6 +2198,7 @@ async function sendTelegramNotification(formData) {
 // ================================================
 function applyRestartMode(prevApp) {
     try {
+        applyRestartFormLayout();
         const header = document.querySelector('.form-header');
         if (header && !document.getElementById('restartFormBanner')) {
             const copy = (typeof RESTART_COPY !== 'undefined' && RESTART_COPY.formBanner)
@@ -2216,7 +2222,148 @@ function applyRestartMode(prevApp) {
         // 희망 프로그램·첨삭 희망은 지난 값으로 미리 골라 두되, 바꿀 수 있다
         set('select[name="preferred_program"]', prevApp.preferred_program);
         set('select[name="preferred_correction"]', prevApp.preferred_correction);
+        // 제목은 목록 표시에 쓰이니 비우지 않고 기본값(고칠 수 있음)
+        set('input[name="application_title"]', (typeof RESTART_COPY !== 'undefined' && RESTART_COPY.formTitleDefault) || '재시작 신청서 (수강 2)');
+        // 점수 이력: [지난 기록 불러오기] 버튼 + 최근 실제 성적으로 점수 칸 미리 채움
+        setupRestartHistory(prevApp);
     } catch (e) {
         console.warn('[restart] 재시작 모드 적용 실패(무시):', e);
     }
+}
+
+/**
+ * 재시작 신청서 화면 정리(대표 확정 2026-10-17). 새로 쓸 때와 수강 2 신청서를 고칠 때 둘 다 쓴다.
+ *   - 숨김(빈칸으로 저장, 필수 해제): 머리 안내문 · 직업 · 블로그 글 · 알게 된 경로 · 노트북 준비
+ *   - 보이는 섹션 번호 다시 매김
+ *   - 설명 한 줄: 점수 설명 · 공부 방법 · 영어 실력 평가 · 첨삭 · 다짐 머리말
+ *   저장되는 칸(DB 열)은 하나도 바뀌지 않는다. 일반 신청서는 이 함수를 타지 않는다.
+ */
+function applyRestartFormLayout() {
+    if (applicationState.restartForm) return;
+    applicationState.restartForm = true;
+    const C = (typeof RESTART_COPY !== 'undefined') ? RESTART_COPY : {};
+    const esc = (typeof restartEsc === 'function') ? restartEsc : (s => String(s == null ? '' : s));
+    const hideWrap = (sel, wrapSel) => {
+        const el = document.querySelector(sel);
+        const wrap = el && el.closest(wrapSel);
+        if (!wrap) return;
+        wrap.style.display = 'none';
+        wrap.classList.add('restart-hidden');
+        wrap.querySelectorAll('[required]').forEach(i => { i.required = false; });
+    };
+    // 1) 머리 안내문("승인률…")은 띠가 대신한다
+    const desc = document.querySelector('.form-header .form-description');
+    if (desc) desc.style.display = 'none';
+    // 2) 숨김
+    hideWrap('input[name="occupation"]', '.form-section');
+    hideWrap('textarea[name="memorable_blog_content"]', '.form-section');
+    hideWrap('input[name="referral_search_keyword"]', '.form-section');
+    hideWrap('textarea[name="program_note"]', '.form-group');
+    // 3) 섹션 번호 다시 매김
+    let n = 0;
+    document.querySelectorAll('.form-section').forEach(sec => {
+        const num = sec.querySelector('.section-number');
+        if (num && !sec.classList.contains('restart-hidden')) num.textContent = String(++n);
+    });
+    // 4) 설명 한 줄
+    const note = (text) => `<small class="restart-note" style="display:block; margin-top:8px; color:#5b4a7d; background:#efeaf7; border-radius:8px; padding:8px 11px; line-height:1.6; font-size:12.5px;"><i class="fas fa-redo" style="margin-right:6px; font-size:11px;"></i>${esc(text)}</small>`;
+    const after = (sel, text) => {
+        const el = document.querySelector(sel);
+        if (!el || !text) return;
+        const g = el.closest('.form-group') || el.parentElement;
+        g.insertAdjacentHTML('beforeend', note(text));
+    };
+    after('textarea[name="score_history"]', C.formNoteScoreHistory);
+    after('textarea[name="current_study_method"]', C.formNoteStudyMethod);
+    const wdesc = document.querySelector('#writingSection .section-description');
+    if (wdesc && C.formNoteWriting) wdesc.insertAdjacentHTML('afterend', note(C.formNoteWriting));
+    after('select[name="preferred_correction"]', C.formNoteCorrection);
+    const pledge = document.querySelector('textarea[name="give_up_plan"]');
+    const pledgeGroup = pledge && pledge.closest('.form-group');
+    if (pledgeGroup && C.formNotePledge) pledgeGroup.insertAdjacentHTML('beforebegin', note(C.formNotePledge));
+}
+
+/**
+ * 점수 이력(대표 확정 2026-10-17):
+ *   - "점수 관련 상세 설명" 위에 [지난 기록 불러오기] 버튼. 누르면 지난 신청서 점수 + 테스트룸 실제 성적(날짜·점수만, 메모 제외)을 칸에 넣는다.
+ *   - 테스트룸에 등록한 가장 최근 실제 성적이 있으면 점수 칸(개정 1~6)을 미리 채운다(비어 있을 때만, 고칠 수 있음).
+ */
+async function setupRestartHistory(prevApp) {
+    const C = (typeof RESTART_COPY !== 'undefined') ? RESTART_COPY : {};
+    const hist = document.querySelector('textarea[name="score_history"]');
+    if (!hist) return;
+    const uid = applicationState.user && (applicationState.user.id || applicationState.user.user_id);
+    let actual = [];
+    try {
+        if (uid) {
+            actual = await supabaseAPI.query('toefl_actual_scores', {
+                'user_id': `eq.${uid}`,
+                'select': 'test_date,reading,listening,speaking,writing,overall,legacy_total',
+                'order': 'test_date.asc',
+                'limit': '50'
+            }) || [];
+        }
+    } catch (e) { console.warn('[restart] 실제 성적 조회 실패(무시):', e); actual = []; }
+
+    // 버튼 + 한 줄 안내
+    if (!document.getElementById('restartLoadHistoryBtn')) {
+        const wrap = document.createElement('div');
+        wrap.id = 'restartLoadHistoryWrap';
+        wrap.style.cssText = 'display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 8px;';
+        wrap.innerHTML = `<button type="button" id="restartLoadHistoryBtn" style="display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; border:1px solid #d9cde6; background:#efeaf7; color:#5b4a7d; font-weight:700; font-size:13px; cursor:pointer;"><i class="fas fa-history"></i>${restartEsc(C.formHistoryButton || '지난 기록 불러오기')}</button><span style="font-size:12px; color:#64748b; line-height:1.5;">${restartEsc(C.formHistoryHint || '')}</span>`;
+        hist.parentElement.insertBefore(wrap, hist);
+        wrap.querySelector('#restartLoadHistoryBtn').addEventListener('click', () => {
+            const text = buildRestartHistoryText(prevApp, actual);
+            const cur = hist.value.trim();
+            hist.value = cur ? cur + '\n\n' + text : text;
+            hist.dispatchEvent(new Event('input', { bubbles: true }));
+            hist.focus();
+        });
+    }
+
+    // 점수 칸 미리 채움: 가장 최근 실제 성적(개정 1~6)
+    const latest = actual.length ? actual[actual.length - 1] : null;
+    const yes = document.querySelector('input[name="has_toefl_score"][value="yes"]');
+    const anyChecked = document.querySelector('input[name="has_toefl_score"]:checked');
+    const totalNew = document.querySelector('input[name="score_total_new"]');
+    if (latest && latest.overall != null && yes && !anyChecked && totalNew && !totalNew.value) {
+        yes.checked = true;
+        yes.dispatchEvent(new Event('change', { bubbles: true }));
+        const tab = document.querySelector('[data-tab="new-score"]');
+        if (tab) tab.click();
+        const put = (name, v) => { const el = document.querySelector(`input[name="${name}"]`); if (el && v != null && !el.value) el.value = v; };
+        put('score_reading_new', latest.reading);
+        put('score_listening_new', latest.listening);
+        put('score_speaking_new', latest.speaking);
+        put('score_writing_new', latest.writing);
+        put('score_total_new', latest.overall);
+    }
+}
+
+function buildRestartHistoryText(prevApp, actual) {
+    const C = (typeof RESTART_COPY !== 'undefined') ? RESTART_COPY : {};
+    const v = (x) => (x == null || x === '') ? '-' : String(x);
+    const v1 = (x) => (x == null || x === '' || isNaN(Number(x))) ? v(x) : Number(x).toFixed(1);   // 개정 점수(1~6)는 4.0처럼 한 자리
+    const whenOf = (app) => {
+        const iso = app.submitted_date ? String(app.submitted_date) : (app.created_at ? new Date(Number(app.created_at) || app.created_at).toISOString() : '');
+        const m = iso.match(/^(\d{4})-(\d{2})/);
+        return m ? `${m[1]}년 ${Number(m[2])}월` : '지난 수강';
+    };
+    const lines = [];
+    const p = prevApp || {};
+    const hasNew = p.score_total_new != null && p.score_total_new !== '';
+    const hasOld = p.score_total_old != null && p.score_total_old !== '';
+    if (p.has_toefl_score === 'no' || (!hasNew && !hasOld)) {
+        lines.push(`${C.formHistoryPrev || '[지난 수강 신청 때 점수]'} ${whenOf(p)} · 점수 없이 신청(영어 글쓰기로 평가)`);
+    } else if (hasNew && (p.score_version === 'new' || !hasOld)) {
+        lines.push(`${C.formHistoryPrev || '[지난 수강 신청 때 점수]'} ${whenOf(p)} · 총점 ${v1(p.score_total_new)} (R ${v1(p.score_reading_new)} / L ${v1(p.score_listening_new)} / S ${v1(p.score_speaking_new)} / W ${v1(p.score_writing_new)})`);
+    } else {
+        lines.push(`${C.formHistoryPrev || '[지난 수강 신청 때 점수]'} ${whenOf(p)} · 총점 ${v(p.score_total_old)}점(개정 전 0~120 체계; R ${v(p.score_reading_old)} / L ${v(p.score_listening_old)} / S ${v(p.score_speaking_old)} / W ${v(p.score_writing_old)})`);
+    }
+    (actual || []).forEach(a => {
+        const legacy = a.legacy_total ? ` (개정 전 환산 ${a.legacy_total}점)` : '';
+        lines.push(`${C.formHistoryActual || '[테스트룸에 등록한 실제 시험]'} ${v(a.test_date)} · 총점 ${v1(a.overall)}${legacy} (R ${v1(a.reading)} / L ${v1(a.listening)} / S ${v1(a.speaking)} / W ${v1(a.writing)})`);
+    });
+    lines.push(C.formHistoryNow || '[그 뒤 본 시험이나 지금 상황] ← 여기에 적어 주세요');
+    return lines.join('\n');
 }

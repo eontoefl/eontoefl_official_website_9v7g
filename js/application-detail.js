@@ -50,6 +50,8 @@ async function confirmDetailDelete() {
     
     try {
         await supabaseAPI.delete('applications', currentApplication.id);
+        // 재시작(수강 2) 신청서였다면 수강 1의 "수강 2로 이어졌다" 표시를 지운다(안 지우면 다시 못 씀)
+        if (typeof releaseRestartLink === 'function') await releaseRestartLink(currentApplication);
         alert('신청서가 삭제되었습니다.');
         window.location.href = 'application.html';
     } catch (error) {

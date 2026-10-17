@@ -27,7 +27,19 @@ const RESTART_COPY = {
     priceDepositNote: '지난 보증금은 환급 조건에 못 미쳐 소멸됐어요. 이번 보증금은 과제 인증률대로 다시 돌려드려요: 95% 이상 전액, 70~94% 부분 환급, 70% 미만 0원.',
     priceCorrectionNew: '지난번에 첨삭 없이 하셨다면, 이번엔 라이팅·스피킹을 같이 잡는 걸 권해요.',
     priceCorrectionAgain: '지난 수강의 첨삭은 처음부터 다시 받아요(추가 비용 없음).',
-    priceFinalNote: '추가 금액은 없고, 위 금액만 입금하시면 돼요.'
+    priceFinalNote: '추가 금액은 없고, 위 금액만 입금하시면 돼요.',
+    // 재시작 신청서 화면(대표 확정 2026-10-17): 숨김·설명·불러오기
+    formTitleDefault: '재시작 신청서 (수강 2)',
+    formNoteScoreHistory: '지난 수강이 끝난 뒤에 본 시험이 있으면 그 시험 기준으로 적어 주세요. 없으면 가장 최근 시험이에요.',
+    formNoteStudyMethod: '지난 수강이 끝난 뒤부터 지금까지 어떻게 공부했는지(안 했으면 \'쉬었음\'도 괜찮아요) 적어 주세요.',
+    formNoteWriting: '지난번에 쓰셨더라도 지금 실력을 다시 보려는 거예요. 검색이나 수정 없이, 지금 바로 떠오르는 대로 써 주세요.',
+    formNoteCorrection: '지난 수강에 첨삭이 없었다면 새로 신청(+200,000원), 있었다면 처음부터 다시 받는 데 추가 비용이 없어요. 최종 안내는 개별분석에서 드려요.',
+    formNotePledge: '지난번에 끝까지 가지 못한 이유를 떠올려 보고 적어 주세요. 이번 계획을 짤 때 그대로 반영돼요.',
+    formHistoryButton: '지난 기록 불러오기',
+    formHistoryHint: '지난 신청서의 점수와 테스트룸에 등록한 실제 시험 성적을 아래 칸에 넣어 드려요. 그 뒤 상황만 덧붙여 주세요.',
+    formHistoryPrev: '[지난 수강 신청 때 점수]',
+    formHistoryActual: '[테스트룸에 등록한 실제 시험]',
+    formHistoryNow: '[그 뒤 본 시험이나 지금 상황] ← 여기에 적어 주세요: 언제, 얼마나 준비해서, 어디가 어려웠는지'
 };
 
 // 대표 확정(2026-10-16): 다시 요청할 수 있는 실물 교재 2개
@@ -40,6 +52,23 @@ function restartEsc(s) {
 
 function isRestartApp(app) {
     return !!app && Number(app.enrollment_no) >= 2;
+}
+
+/**
+ * 수강 2 신청서가 삭제될 때(학생 상세·학생 목록·관리자 일괄 삭제) 수강 1에 붙은 "수강 2로 이어졌다" 표시를 지운다.
+ * 안 지우면 카드도 안 뜨고 신청서도 못 써서 학생이 갇힌다(2026-10-17 대표 범위 추가).
+ * 삭제가 성공한 뒤에 부른다. 실패해도 삭제 흐름은 막지 않는다.
+ */
+async function releaseRestartLink(deletedApp) {
+    try {
+        if (!deletedApp || !deletedApp.restart_of || typeof supabaseAPI === 'undefined') return false;
+        await supabaseAPI.patch('applications', deletedApp.restart_of, { superseded_by: null });
+        console.log('[restart] 수강 1 superseded_by 해제:', deletedApp.restart_of);
+        return true;
+    } catch (e) {
+        console.warn('[restart] 수강 1 superseded_by 해제 실패(무시):', e);
+        return false;
+    }
 }
 
 /** 신청서 → 자동 발송·추천할 계약서 종류 */

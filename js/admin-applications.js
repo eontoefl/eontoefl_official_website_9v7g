@@ -1360,6 +1360,8 @@ async function bulkSoftDelete() {
             supabaseAPI.delete('applications', a.id)
         );
         await Promise.all(promises);
+        // 재시작(수강 2) 신청서가 섞여 있으면 수강 1의 "수강 2로 이어졌다" 표시를 지운다
+        if (typeof releaseRestartLink === 'function') await Promise.all(targetApps.filter(a => a.restart_of).map(a => releaseRestartLink(a)));
 
         alert(`✅ ${targetApps.length}건 삭제 처리 완료`);
         clearSelection();
@@ -1400,6 +1402,7 @@ async function bulkHardDelete() {
             supabaseAPI.hardDelete('applications', a.id)
         );
         await Promise.all(promises);
+        if (typeof releaseRestartLink === 'function') await Promise.all(selectedApps.filter(a => a.restart_of).map(a => releaseRestartLink(a)));
 
         alert(`✅ ${selectedApps.length}건 완전 삭제 완료\n\nDB에서 영구적으로 제거되었습니다.`);
         clearSelection();
