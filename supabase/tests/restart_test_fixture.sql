@@ -60,7 +60,8 @@ COMMIT;
 -- BEGIN;
 -- DELETE FROM public.study_results_v3 WHERE user_id IN (SELECT id::text FROM public.users WHERE email = 'restart.test@eontoefl.local');
 -- DELETE FROM public.tr_deadline_extensions WHERE user_id IN (SELECT id::text FROM public.users WHERE email = 'restart.test@eontoefl.local');
--- DELETE FROM public.tr_weekly_check_drafts WHERE user_id IN (SELECT id::text FROM public.users WHERE email = 'restart.test@eontoefl.local');
+-- DELETE FROM public.tr_weekly_check_drafts WHERE user_id::text IN (SELECT id::text FROM public.users WHERE email = 'restart.test@eontoefl.local');   -- user_id가 uuid라 ::text 비교
+-- DELETE FROM public.kakaotalk_logs WHERE application_id IN (SELECT id FROM public.applications WHERE email = 'restart.test@eontoefl.local');   -- 알림톡 로그(2026-10-17 정리 때 1줄 있었음)
 -- DELETE FROM public.correction_submissions_archive WHERE user_id IN (SELECT id FROM public.users WHERE email = 'restart.test@eontoefl.local');
 -- DELETE FROM public.correction_schedules_archive WHERE user_id IN (SELECT id FROM public.users WHERE email = 'restart.test@eontoefl.local');
 -- DELETE FROM public.correction_schedules WHERE user_id IN (SELECT id FROM public.users WHERE email = 'restart.test@eontoefl.local');
