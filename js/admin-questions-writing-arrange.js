@@ -82,6 +82,22 @@ function initWaQuestions() {
                     <textarea id="waExplain${i}" rows="2" placeholder="문법 해설 등"></textarea>
                 </div>
 
+                <!-- 정답2 (선택): 정답2 문장 + 번역2 + 해설2 한 벌 -->
+                <div id="waAltArea${i}" style="display:none;">
+                    <div class="wa-field">
+                        <label>정답2 문장 <span class="wa-hint">(선택) 비우면 단일정답 · 정답1과 같은 방식(붙일 단어는 밑줄) · 주어진 단어 자리는 정답1과 같아야 함</span></label>
+                        <input type="text" id="waSentence2_${i}" placeholder="정답1과 다른 순서로 맞는 문장" oninput="onWaAltInput(${i})">
+                    </div>
+                    <div class="wa-field">
+                        <label>정답2 번역 (한글) <span class="wa-hint">(정답2가 있으면 필수)</span></label>
+                        <input type="text" id="waAnswerTrans2_${i}" oninput="onWaAltInput(${i})">
+                    </div>
+                    <div class="wa-field">
+                        <label>해설2 <span class="wa-hint">(정답2가 있으면 필수)</span></label>
+                        <textarea id="waExplain2_${i}" rows="2" oninput="onWaAltInput(${i})"></textarea>
+                    </div>
+                </div>
+
                 <!-- 자동 생성 결과 + 미리보기 -->
                 <div class="wa-preview-box" id="waPreview${i}">
                     <div class="wa-pv-label">📋 미리보기</div>
@@ -156,6 +172,7 @@ function showWaSubAreas(num) {
     document.getElementById(`waDummyArea${num}`).style.display = '';
     document.getElementById(`waTransArea${num}`).style.display = '';
     document.getElementById(`waExplainArea${num}`).style.display = '';
+    document.getElementById(`waAltArea${num}`).style.display = '';
 }
 
 // ===== Step 2: 단어 클릭 토글 =====
@@ -246,6 +263,89 @@ function getWaGenerated(num) {
     return { presented, correctAnswer, optionWords, punct, fullSentence, correctParts };
 }
 
+// ===== 정답2 (선택) =====
+// 입력란과 정답1 상태(waQData)에서 매번 새로 계산한다. 정답2·번역2·해설2가 모두 비면 null(단일정답).
+function getWaAlt(num) {
+    const raw = document.getElementById(`waSentence2_${num}`)?.value.trim() || '';
+    const trans2 = document.getElementById(`waAnswerTrans2_${num}`)?.value.trim() || '';
+    const expl2 = document.getElementById(`waExplain2_${num}`)?.value.trim() || '';
+    if (!raw && !trans2 && !expl2) return null;
+
+    const result = { blanks: [], correctAnswer2: '', fullSentence2: '', errors: [] };
+    if (!raw) {
+        result.errors.push('정답2 문장이 없는데 정답2 번역/해설2가 입력되어 있습니다');
+        return result;
+    }
+    if (!trans2) result.errors.push('정답2 번역을 입력해주세요');
+    if (!expl2) result.errors.push('해설2를 입력해주세요');
+
+    // 끝 부호: 정답1(parseWaSentence)과 같은 규칙
+    let punct = '.';
+    let sentence = raw;
+    if (sentence.endsWith('?')) { punct = '?'; sentence = sentence.slice(0, -1).trim(); }
+    else if (sentence.endsWith('.')) { sentence = sentence.slice(0, -1).trim(); }
+    const tokens = sentence.split(/\s+/).filter(w => w).map(w => w.replace(/_/g, ' '));
+    result.fullSentence2 = tokens.join(' ') + punct;
+
+    const data = waQData[num];
+    const words = data ? data.words : [];
+    if (words.length === 0) {
+        result.errors.push('정답1 문장을 먼저 입력하고 [분석]을 눌러주세요');
+        return result;
+    }
+    if (punct !== data.punct) {
+        result.errors.push(`정답2 끝부호(${punct})가 정답1(${data.punct})과 다릅니다`);
+    }
+    if (tokens.length !== words.length) {
+        result.errors.push(`정답2 단어 수(${tokens.length})가 정답1(${words.length})과 다릅니다`);
+        return result;
+    }
+
+    // 보기 단어(정답1 빈칸 단어 + 오답 단어), 대소문자 무시·개수 포함
+    const pool = [...words.filter(w => !w.isGiven).map(w => w.text), ...data.dummies].map(w => w.toLowerCase());
+    const blanks = [];
+    words.forEach((w, k) => {
+        const t = tokens[k];
+        if (w.isGiven) {
+            if (t.toLowerCase() !== w.text.toLowerCase()) {
+                result.errors.push(`정답2 ${k + 1}번째 자리는 주어진 단어 "${w.text}"여야 합니다 (입력: "${t}")`);
+            }
+        } else {
+            blanks.push(t);
+            const p = pool.indexOf(t.toLowerCase());
+            if (p === -1) result.errors.push(`정답2의 "${t}"는 보기 단어에 없습니다 (또는 개수 초과)`);
+            else pool.splice(p, 1);
+        }
+    });
+    const blanks1 = words.filter(w => !w.isGiven).map(w => w.text.toLowerCase()).join('|');
+    if (blanks.length > 0 && blanks.map(b => b.toLowerCase()).join('|') === blanks1) {
+        result.errors.push('정답2가 정답1과 같습니다');
+    }
+    result.blanks = blanks;
+    result.correctAnswer2 = blanks.join('|');
+    return result;
+}
+
+// DB의 correct_answer_2를 presented_words의 빈칸(_) 자리에 채워 정답2 문장으로 복원
+function restoreWaAltSentence(presentedParts, correctAnswer2, punct) {
+    if (!(correctAnswer2 || '').trim()) return '';
+    const parts2 = correctAnswer2.split('|');
+    let ci = 0;
+    const tokens = presentedParts.map(p => {
+        const t = p.trim();
+        const w = (t === '_') ? (parts2[ci++] || '') : t;
+        return w.replace(/ /g, '_');
+    });
+    // 빈칸 수보다 정답2 단어가 많으면 뒤에 붙여 단어 수 검증에 걸리게 한다
+    while (ci < parts2.length) tokens.push(parts2[ci++].replace(/ /g, '_'));
+    return tokens.join(' ') + punct;
+}
+
+function onWaAltInput(num) {
+    updateWaPreview(num);
+    updateWaRegisterBtn();
+}
+
 function shuffleArray(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -310,6 +410,10 @@ function updateWaPreview(num) {
     if (optionsHtml) html += `<div style="font-size:11px; color:#64748b; margin-top:4px;">보기:</div><div class="wa-pv-options">${optionsHtml}</div>`;
     html += `<div class="wa-pv-answer">✅ 정답: ${escapeHtml(gen.fullSentence)}</div>`;
     if (answerTrans) html += `<div class="wa-pv-answer-trans">📝 ${escapeHtml(answerTrans)}</div>`;
+    const alt = getWaAlt(num);
+    const answerTrans2 = document.getElementById(`waAnswerTrans2_${num}`)?.value.trim() || '';
+    if (alt && alt.fullSentence2) html += `<div class="wa-pv-answer">✅ 정답2: ${escapeHtml(alt.fullSentence2)}</div>`;
+    if (alt && answerTrans2) html += `<div class="wa-pv-answer-trans">📝 ${escapeHtml(answerTrans2)}</div>`;
 
     // 자동 생성 필드 표시 (디버그용, 접기)
     html += `<details style="margin-top:8px; font-size:11px; color:#94a3b8;">
@@ -319,6 +423,7 @@ function updateWaPreview(num) {
             <div><strong>correct_answer:</strong> ${escapeHtml(gen.correctAnswer)}</div>
             <div><strong>option_words:</strong> ${escapeHtml(gen.optionWords)}</div>
             <div><strong>end_punctuation:</strong> ${escapeHtml(gen.punct)}</div>
+            <div><strong>correct_answer_2:</strong> ${escapeHtml(alt && alt.blanks.length ? alt.correctAnswer2 : 'null')}</div>
         </div>
     </details>`;
 
@@ -326,6 +431,11 @@ function updateWaPreview(num) {
         const isInfo = w.startsWith('💡');
         html += `<div class="wa-pv-warn" style="${isInfo ? 'color:#f59e0b;' : ''}"><i class="fas fa-${isInfo ? 'info-circle' : 'exclamation-triangle'}"></i> ${w}</div>`;
     });
+    if (alt) {
+        alt.errors.forEach(e => {
+            html += `<div class="wa-pv-warn"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(e)}</div>`;
+        });
+    }
 
     box.innerHTML = html;
 }
@@ -416,6 +526,8 @@ function validateWaForm() {
         if (!gen) errors.push(`Q${i}: 정답 문장을 입력하고 [분석]을 눌러주세요`);
         else if (gen.correctParts.length === 0) errors.push(`Q${i}: 빈칸이 없습니다 — 주어진 단어만 있으면 안 됩니다`);
         if (!answerTrans) errors.push(`Q${i}: 정답 번역을 입력해주세요`);
+        const alt = getWaAlt(i);
+        if (alt) alt.errors.forEach(e => errors.push(`Q${i}: ${e}`));
     }
     return errors;
 }
@@ -433,6 +545,7 @@ function buildWaPayload() {
     for (let i = 1; i <= WA_Q_COUNT; i++) {
         const qi = String(i).padStart(2, '0');
         const gen = getWaGenerated(i);
+        const alt = getWaAlt(i);
         rows.push({
             id: `${setId}_q${qi}`,
             set_id: setId,
@@ -445,6 +558,9 @@ function buildWaPayload() {
             option_words: gen ? gen.optionWords : '',
             end_punctuation: gen ? gen.punct : '.',
             explanation: document.getElementById(`waExplain${i}`)?.value.trim() || '',
+            correct_answer_2: (alt && alt.blanks.length) ? alt.correctAnswer2 : null,
+            correct_translation_2: document.getElementById(`waAnswerTrans2_${i}`)?.value.trim() || null,
+            explanation_2: document.getElementById(`waExplain2_${i}`)?.value.trim() || null,
             week: '',
             day: ''
         });
@@ -573,6 +689,11 @@ async function editWaSet(setId) {
             const fullSentence = words.map(w => w.raw).join(' ') + punct;
             setVal(`waSentence${i}`, fullSentence);
 
+            // 정답2 복원 (없으면 비움)
+            setVal(`waSentence2_${i}`, restoreWaAltSentence(presentedParts, row.correct_answer_2, punct));
+            setVal(`waAnswerTrans2_${i}`, row.correct_translation_2 || '');
+            setVal(`waExplain2_${i}`, row.explanation_2 || '');
+
             showWaSubAreas(i);
             renderWaWordChips(i);
             renderWaDummyChips(i);
@@ -627,6 +748,9 @@ function resetWaForm() {
         setVal(`waSentence${i}`, '');
         setVal(`waAnswerTrans${i}`, '');
         setVal(`waExplain${i}`, '');
+        setVal(`waSentence2_${i}`, '');
+        setVal(`waAnswerTrans2_${i}`, '');
+        setVal(`waExplain2_${i}`, '');
 
         waQData[i] = { words: [], dummies: [], punct: '.' };
 
@@ -634,6 +758,7 @@ function resetWaForm() {
         document.getElementById(`waDummyArea${i}`).style.display = 'none';
         document.getElementById(`waTransArea${i}`).style.display = 'none';
         document.getElementById(`waExplainArea${i}`).style.display = 'none';
+        document.getElementById(`waAltArea${i}`).style.display = 'none';
 
         updateWaPreview(i);
         updateWaQHeader(i);
@@ -764,6 +889,11 @@ function applyWaJson() {
         // 정답 문장 복원 (입력 필드에)
         const fullSentence = words.map(w => w.raw).join(' ') + punct;
         setVal(`waSentence${i}`, fullSentence);
+
+        // 정답2 (없으면 비움)
+        setVal(`waSentence2_${i}`, restoreWaAltSentence(presentedParts, item.correct_answer_2, punct));
+        setVal(`waAnswerTrans2_${i}`, item.correct_translation_2 || '');
+        setVal(`waExplain2_${i}`, item.explanation_2 || '');
 
         // UI 업데이트
         showWaSubAreas(i);
