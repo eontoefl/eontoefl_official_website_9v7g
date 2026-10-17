@@ -363,6 +363,7 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
         `📱 전화: ${data.phone || "-"}\n` +
         `🎯 목표: ${data.target_score || "-"}점\n` +
         `📚 희망 프로그램: ${data.preferred_program || "-"}\n` +
+        (Number(data.enrollment_no) >= 2 ? `🔁 재시작(수강 2) 신청서 — 가격 10만원(첨삭 선택 시 +20만)\n` : "") +
         `🕐 접수 시간: ${now}`;
       break;
     }
@@ -485,6 +486,32 @@ async function handleNotification(body: Record<string, unknown>, corsHeaders: Re
           { text: "✅ 재개 승인", callback_data: `resume_approve:${appId}` },
           { text: "⏸ 보류·카톡 안내", callback_data: `resume_hold:${appId}` },
         ],
+        [
+          { text: "📄 신청서 보기", url: `${SITE_URL}/application-detail.html?id=${appId}` },
+        ],
+      ];
+      break;
+    }
+
+    // ----- 재시작(수강 2) 요청 (2026-10-16): 끝난 수강의 학생이 대시보드 카드에서 요청. 허용은 관리창에서. -----
+    case "restart_requested": {
+      const appId = String(data.app_id || "");
+      const app = await getApplication(appId);
+      if (!app) {
+        return new Response(
+          JSON.stringify({ error: "Application not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const mats = Array.isArray(data.materials) && data.materials.length ? data.materials.join(", ") : "없음";
+      text =
+        `🔁 재시작(수강 2) 요청 — ${app.name || "-"}\n\n` +
+        `지난 수강: ${app.assigned_program || app.preferred_program || "-"}\n` +
+        `시작일: ${app.schedule_start || "-"} / 종료일: ${app.self_paced_end_date || app.schedule_end || "-"}\n` +
+        `첨삭: ${app.correction_enabled ? "있음" : "없음"}\n` +
+        `실물 교재 요청: ${mats}\n\n` +
+        `허용은 관리창 → 수강 관리 → [수강 2 허용]`;
+      buttons = [
         [
           { text: "📄 신청서 보기", url: `${SITE_URL}/application-detail.html?id=${appId}` },
         ],

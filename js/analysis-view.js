@@ -107,7 +107,7 @@ function displayAnalysis(app) {
             ` : ''}
             <div class="info-row">
                 <div class="info-label">이용가</div>
-                <div class="info-value">${formatPrice((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0))}</div>
+                <div class="info-value">${formatPrice(Number(app.enrollment_no) >= 2 ? (app.correction_fee || 0) : ((app.program_price || 1000000) - (app.discount_amount || 210000) + (app.correction_fee || 0)))}</div>
             </div>
             ${app.additional_discount ? `
                 <div class="info-row">
@@ -121,6 +121,11 @@ function displayAnalysis(app) {
                     <div class="info-value" style="font-size: 13px;">${escapeHtml(app.discount_reason)}</div>
                 </div>
             ` : ''}
+            ${Number(app.enrollment_no) >= 2 ? `
+            <div class="info-row">
+                <div class="info-label">재시작(수강 2)</div>
+                <div class="info-value" style="font-size: 13px; color: #5b4a7d;">수강료 0원 · 지난 보증금 소멸 · 시험 2회+후기 조건 다시 시작</div>
+            </div>` : ''}
             <div class="info-row">
                 <div class="info-label">보증금</div>
                 <div class="info-value" style="color: #3b82f6;">+${formatPrice(100000)}</div>

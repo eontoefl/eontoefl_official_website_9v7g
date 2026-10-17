@@ -352,6 +352,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 환불 계좌 — 은행 선택 드롭다운 + 계좌번호 하이픈 처리
     setupBankSelector();
 
+    // 재시작(수강 2) 모드: 안내 띠 + 수강 1에서 주소·계좌 미리 채움
+    if (applicationState.restartOf) applyRestartMode(applicationState.restartOf);
+
     // 초기 상태: 비활성 탭의 required 해제
     cleanupInactiveTabRequired();
 
@@ -391,12 +394,28 @@ async function guardFormAccess(userData) {
         // 편집 모드는 본인 챌린지 신청서 수정 → 통과
         if (editId) return true;
 
-        // 이미 챌린지 신청서를 제출한 경우 → 본인 신청 현황으로
+        // 재시작(수강 2, 2026-10-16): 대표가 허용한 수강 1 신청서가 있고 아직 수강 2가 없으면 새 신청서 작성 통과.
+        //   브라우저에 남은 옛 임시저장(수강 1 번호를 들고 있음)은 반드시 비우고 새 번호로 시작한다.
+        const challengeApps = apps.filter(a => a.application_type !== 'book_only')
+            .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+        const hasEnrollment2 = challengeApps.some(a => Number(a.enrollment_no) >= 2);
+        const restartSource = !hasEnrollment2 ? challengeApps.find(a => a.restart_allowed_at && !a.superseded_by) : null;
+        if (challengeApp && restartSource) {
+            applicationState.draftKey = getUserDraftKey(userData);
+            clearApplicationDraft();
+            try { localStorage.removeItem(`iontoefl_form_draft_${userData.email}`); } catch (e) { /* 무시 */ }
+            applicationState.restartOf = restartSource;
+            console.log('[restart] 수강 2 작성 모드 — 수강 1:', restartSource.id);
+            return true;
+        }
+
+        // 이미 챌린지 신청서를 제출한 경우 → 본인 신청 현황으로(가장 최근 것)
         if (challengeApp) {
+            const latest = challengeApps[0] || challengeApp;
             applicationState.draftKey = getUserDraftKey(userData);
             clearApplicationDraft();
             alert('이미 내벨업챌린지 신청서를 제출하셨습니다.\n내 신청 현황으로 이동합니다.');
-            window.location.href = `application-detail.html?id=${challengeApp.id}`;
+            window.location.href = `application-detail.html?id=${latest.id}`;
             return false;
         }
         // 그 외 로그인 회원 → 통과 (입문서 미수령자 포함, URL 직접 진입 허용)
@@ -1425,17 +1444,33 @@ function setupFormSubmission() {
                 formData.email = sessionUser.email;
                 formData.application_type = 'challenge';
                 formData.book_access_enabled = true;
+                if (applicationState.restartOf) {
+                    // 재시작(수강 2): 수강 번호·원 신청서·교재 체크를 함께 저장. n8n 웹훅은 formData를 통째로 보내므로 enrollment_no가 같이 간다(→ 일반 판정·재시작 문단).
+                    formData.enrollment_no = 2;
+                    formData.restart_of = applicationState.restartOf.id;
+                    formData.restart_materials = Array.isArray(applicationState.restartOf.restart_materials) ? applicationState.restartOf.restart_materials : [];
+                    formData.is_incentive_applicant = false;
+                }
 
                 let existingDifferentApplication = null;
                 await withApplicationSubmissionLock(`user-${sessionUser.id}`, async () => {
                     const existingChallenge = await findExistingChallengeApplication(sessionUser);
-                    if (existingChallenge && existingChallenge.id !== formData.id) {
+                    // 재시작: 가장 최근 챌린지 신청서가 바로 그 수강 1이면 통과. (다른 탭에서 이미 수강 2가 생겼으면 그게 최근이라 막힌다)
+                    const restartOk = !!(applicationState.restartOf && existingChallenge && existingChallenge.id === applicationState.restartOf.id);
+                    if (existingChallenge && existingChallenge.id !== formData.id && !restartOk) {
                         existingDifferentApplication = existingChallenge;
                         return;
                     }
 
                     const saved = await saveApplicationIdempotently(formData, sessionUser);
                     result = saved.application;
+
+                    // 재시작: 수강 1 신청서에 "수강 2 번호"를 적어 카드·허용을 끝낸다(1회 한정)
+                    if (result && applicationState.restartOf && saved.shouldSendSideEffects) {
+                        try {
+                            await supabaseAPI.patch('applications', applicationState.restartOf.id, { superseded_by: result.id });
+                        } catch (e) { console.warn('[restart] 수강 1 superseded_by 기록 실패:', e); }
+                    }
 
                     if (!result) {
                         throw new Error('신청서 제출에 실패했습니다.');
@@ -2143,9 +2178,45 @@ async function sendTelegramNotification(formData) {
                 email: formData.email,
                 phone: formData.phone,
                 target_score: formData.target_score,
-                preferred_program: formData.preferred_program
+                preferred_program: formData.preferred_program,
+                enrollment_no: formData.enrollment_no || 1
             }
         })
     });
 }
 
+// ================================================
+// 재시작(수강 2) 작성 모드 — 2026-10-16
+//   guardFormAccess()가 "허용된 수강 1"을 찾으면 applicationState.restartOf에 넣는다.
+//   여기서는 안내 띠를 보여주고 주소·환불 계좌를 수강 1에서 미리 채운다(이름·연락처·이메일은 로그인 정보로 이미 잠겨 있음).
+//   점수·목표·시험일·공부 시간·다짐은 학생이 새로 쓴다.
+// ================================================
+function applyRestartMode(prevApp) {
+    try {
+        const header = document.querySelector('.form-header');
+        if (header && !document.getElementById('restartFormBanner')) {
+            const copy = (typeof RESTART_COPY !== 'undefined' && RESTART_COPY.formBanner)
+                ? RESTART_COPY.formBanner
+                : '기존 수강생 재시작 신청서예요. 점수·목표·시험 일정은 지금 기준으로 새로 적어 주세요.';
+            header.insertAdjacentHTML('beforeend', `
+                <div id="restartFormBanner" style="margin-top:14px; background:#efeaf7; color:#5b4a7d; border-radius:12px; padding:12px 16px; font-size:13.5px; line-height:1.7; text-align:left;">
+                    <strong style="display:block; margin-bottom:2px;"><i class="fas fa-redo" style="margin-right:6px;"></i>다시 시작 신청서 (수강 2)</strong>${copy}
+                </div>`);
+        }
+        const set = (sel, val) => { const el = document.querySelector(sel); if (el && val && !el.value) el.value = val; };
+        set('input[name="address"]', prevApp.address);
+        set('#accountNumberInput', prevApp.account_number);
+        set('#accountHolderInput', prevApp.account_holder);
+        if (prevApp.bank_name) {
+            const hidden = document.getElementById('bankNameInput');
+            const content = document.getElementById('bankTriggerContent');
+            if (hidden && !hidden.value) hidden.value = prevApp.bank_name;
+            if (content) content.innerHTML = `<span class="bank-trigger-name">${restartEsc(prevApp.bank_name)}</span>`;
+        }
+        // 희망 프로그램·첨삭 희망은 지난 값으로 미리 골라 두되, 바꿀 수 있다
+        set('select[name="preferred_program"]', prevApp.preferred_program);
+        set('select[name="preferred_correction"]', prevApp.preferred_correction);
+    } catch (e) {
+        console.warn('[restart] 재시작 모드 적용 실패(무시):', e);
+    }
+}

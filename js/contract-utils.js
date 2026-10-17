@@ -208,7 +208,8 @@ function fixContractInputOverflow() {
  * 계약서 미리보기용 샘플 데이터
  */
 function getContractSampleData(contractType) {
-    const isCorrection = contractType === 'correction';
+    const isCorrection = contractType === 'correction' || contractType === 'restart_correction';
+    const isRestart = contractType === 'restart' || contractType === 'restart_correction';
     return {
         name: '홍길동',
         email: 'hong@example.com',
@@ -216,7 +217,7 @@ function getContractSampleData(contractType) {
         assigned_program: isCorrection ? '내벨업챌린지 - Fast + 스라첨삭' : '내벨업챌린지 - Fast',
         schedule_start: '2026-02-16',
         schedule_end: '2026-03-15',
-        final_price: isCorrection ? '1,090,000' : '890,000',
+        final_price: isRestart ? (isCorrection ? '300,000' : '100,000') : (isCorrection ? '1,090,000' : '890,000'),
         contract_date: '2026-02-13'
     };
 }

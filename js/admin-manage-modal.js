@@ -1278,6 +1278,16 @@ function loadModalAnalysisTab(app) {
                             <span id="correction_enabled_knob" style="position: absolute; top: 3px; left: ${fillCorrectionEnabled ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
                         </label>
                     </div>
+                    <!-- 재시작(수강 2) 첨삭 선택: 새로(+20만) / 다시(0원, 수강 1 첨삭 기록 보관 이동). 첨삭 스위치가 켜질 때만 보임 -->
+                    ${(typeof isRestartApp === 'function' && isRestartApp(app)) ? `
+                    <div id="correctionModeWrap" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
+                        <input type="hidden" name="correction_mode" id="correction_mode" value="${app.correction_mode === 'again' ? 'again' : 'new'}">
+                        <div style="display:flex; gap:4px; background:#eef1f5; border-radius:10px; padding:4px; max-width:420px; ${pointerEvents}">
+                            <button type="button" id="seg_corrmode_new" onclick="setCorrectionMode('new')" style="flex:1; padding:9px 12px; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; background:${app.correction_mode === 'again' ? 'transparent' : '#fff'}; color:${app.correction_mode === 'again' ? '#64748b' : '#1e293b'}; box-shadow:${app.correction_mode === 'again' ? 'none' : '0 1px 3px rgba(0,0,0,0.08)'};">새로 <span style="font-size:11px; color:#3b82f6;">+200,000원</span></button>
+                            <button type="button" id="seg_corrmode_again" onclick="setCorrectionMode('again')" style="flex:1; padding:9px 12px; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; background:${app.correction_mode === 'again' ? '#fff' : 'transparent'}; color:${app.correction_mode === 'again' ? '#1e293b' : '#64748b'}; box-shadow:${app.correction_mode === 'again' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'};">다시 <span style="font-size:11px; color:#15803d;">0원</span></button>
+                        </div>
+                        <div id="restartCorrSummary" style="font-size:12px; color:#64748b; margin-top:8px; line-height:1.6;">수강 1 첨삭 현황 불러오는 중…</div>
+                    </div>` : ''}
                     <!-- 첨삭 시작일 (아코디언) -->
                     <div id="correctionStartDateWrapper" style="padding: 0 0 12px; ${fillCorrectionEnabled ? '' : 'display: none;'}">
                         <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">첨삭 시작일 (일요일 권장) <span style="color:#3b82f6; font-size:11px;">(D-1부터 자동 활성화)</span></label>
@@ -1320,11 +1330,11 @@ function loadModalAnalysisTab(app) {
                 <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
                         <tbody>
-                        <tr>
+                        <tr id="priceRowBase" style="${(typeof isRestartApp === 'function' && isRestartApp(app)) ? 'display: none;' : ''}">
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">정가</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600;">1,000,000원</td>
                         </tr>
-                        <tr>
+                        <tr id="priceRowExam" style="${(typeof isRestartApp === 'function' && isRestartApp(app)) ? 'display: none;' : ''}">
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">시험료 지원</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #22c55e;">-210,000원</td>
                         </tr>
@@ -1332,7 +1342,7 @@ function loadModalAnalysisTab(app) {
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">스라첨삭</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #3b82f6;">+200,000원</td>
                         </tr>
-                        <tr>
+                        <tr id="priceRowDiscount" style="${(typeof isRestartApp === 'function' && isRestartApp(app)) ? 'display: none;' : ''}">
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">
                                 추가 할인 
                                 <input type="number" name="additional_discount" id="additional_discount" 
@@ -1343,6 +1353,11 @@ function loadModalAnalysisTab(app) {
                             </td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #ef4444;" id="displayAdditionalDiscount">-0원</td>
                         </tr>
+                        ${(typeof isRestartApp === 'function' && isRestartApp(app)) ? `
+                        <tr>
+                            <td style="padding: 8px 0; color: #64748b; text-align: left;">재시작(수강 2) 수강료</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #15803d;">0원 <span style="font-size:11px; color:#94a3b8; font-weight:500;">(지난 수강 인정 · 시험료 지원 유지 · 옛 보증금 소멸)</span></td>
+                        </tr>` : ''}
                         <tr>
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">보증금 (환불)</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: 600;">+100,000원</td>
@@ -1652,7 +1667,7 @@ function toggleOptionSwitch(name) {
     const knob = document.getElementById(name + '_knob');
     if (track) track.style.background = on ? '#3b82f6' : '#cbd5e1';
     if (knob) knob.style.left = on ? '25px' : '3px';
-    if (name === 'correction_enabled') { toggleCorrectionStartDate(); calculateModalPrice(); }
+    if (name === 'correction_enabled') { toggleCorrectionStartDate(); _syncCorrectionModeWrap(); calculateModalPrice(); }
 }
 
 // KST 기준 '다가오는 첫 일요일'(오늘이 일요일이면 오늘) → 'YYYY-MM-DD'.
@@ -1907,12 +1922,17 @@ async function maybeSendExtensionAlimTalk(userId, extStart) {
 
 // 모달 내 가격 계산
 function calculateModalPrice() {
-    const additionalDiscount = parseInt(document.getElementById('additional_discount').value) || 0;
+    const restart = typeof isRestartApp === 'function' && isRestartApp(currentManageApp);
+    const additionalDiscount = restart ? 0 : (parseInt(document.getElementById('additional_discount').value) || 0);
     const correctionEnabled = document.getElementById('correction_enabled')?.value === 'true';
-    const correctionFee = correctionEnabled ? 200000 : 0;
-    const basePrice = 790000;
+    // 재시작(수강 2): 첨삭 '새로'만 +20만, '다시'는 0원. 수강료·추가할인 없음 → 10만 또는 30만
+    const correctionMode = document.getElementById('correction_mode')?.value || 'new';
+    const correctionFee = correctionEnabled ? ((restart && correctionMode === 'again') ? 0 : 200000) : 0;
+    const basePrice = restart ? 0 : 790000;
     const deposit = 100000;
     const finalPrice = basePrice + correctionFee - additionalDiscount + deposit;
+    const corrPriceCell = document.querySelector('#correctionPriceRow td:last-child');
+    if (corrPriceCell) corrPriceCell.textContent = correctionFee > 0 ? '+200,000원' : '0원 (다시)';
     
     document.getElementById('displayAdditionalDiscount').textContent = '-' + additionalDiscount.toLocaleString() + '원';
     document.getElementById('displayFinalPrice').textContent = finalPrice.toLocaleString() + '원';
@@ -2147,11 +2167,15 @@ async function saveModalAnalysis(event) {
                 ? _pauseStartGuardMsg(currentManageApp, 'correction', formData.get('correction_start_date'), '첨삭 시작일') : null);
         if (guardMsg) { alert(guardMsg); return; }
     }
-    const basePrice = 1000000;
-    const examSupport = 210000;
-    const additionalDiscount = parseInt(formData.get('additional_discount')) || 0;
+    // 재시작(수강 2, 2026-10-16): 수강료 0 · 시험료 지원 0(유지라서 다시 안 뺌) · 추가할인 0 · 첨삭(새로 20만/다시 0) · 보증금 10만 → 10만 또는 30만
+    const isRestartSave = typeof isRestartApp === 'function' && isRestartApp(currentManageApp);
     const correctionEnabled = formData.get('correction_enabled') === 'true';
-    const correctionFee = correctionEnabled ? 200000 : 0;
+    const correctionModeRaw = formData.get('correction_mode') || 'new';
+    const correctionMode = !correctionEnabled ? 'none' : (correctionModeRaw === 'again' ? 'again' : 'new');
+    const basePrice = isRestartSave ? 0 : 1000000;
+    const examSupport = isRestartSave ? 0 : 210000;
+    const additionalDiscount = isRestartSave ? 0 : (parseInt(formData.get('additional_discount')) || 0);
+    const correctionFee = correctionEnabled ? ((isRestartSave && correctionMode === 'again') ? 0 : 200000) : 0;
     const deposit = 100000;
     const finalPrice = basePrice - examSupport + correctionFee - additionalDiscount + deposit;
 
@@ -2228,7 +2252,7 @@ async function saveModalAnalysis(event) {
         }
     }
 
-    const isIncentive = document.getElementById('incentiveToggle')?.checked || false;
+    const isIncentive = isRestartSave ? false : (document.getElementById('incentiveToggle')?.checked || false);   // 수강 2는 항상 일반
     const nowMs = Date.now();
 
     // === 분기: 예약 발송 ===
@@ -2259,8 +2283,14 @@ async function saveModalAnalysis(event) {
         const updateData = {
             analysis_status_pending: formData.get('analysis_status'),
             analysis_content_pending: formData.get('analysis_content'),
-            analysis_pending_payload: pendingPayload
+            analysis_pending_payload: pendingPayload,
+            ...(isRestartSave ? { correction_mode: blankProgramFields ? null : correctionMode } : {})
         };
+        // 재시작 첨삭 '다시'·'새로'(수강 1 첨삭 기록이 있을 때): 보관 이동은 학생 공개 전이라도 지금 한다(처리 중 피드백이 있으면 서버가 거부)
+        if (isRestartSave && !blankProgramFields && correctionEnabled) {
+            const moved = await _restartArchiveIfNeeded(currentManageApp, correctionMode);
+            if (moved === false) return;
+        }
         // 'scheduled' 모드일 때만 예약 시각 새로 세팅. 'update-scheduled'는 시각 유지.
         if (mode === 'scheduled') {
             updateData.analysis_alimtalk_scheduled_at = scheduledAtIso;
@@ -2315,6 +2345,7 @@ async function saveModalAnalysis(event) {
         current_step: 2,
         status: '개별분석완료',
         is_incentive_applicant: isIncentive,
+        ...(isRestartSave ? { correction_mode: blankProgramFields ? null : correctionMode } : {}),
         // 즉시 저장 시 예약 데이터가 남아있으면 정리 (이론상 이 분기는 isScheduled=false 상태에서만 도달하지만 안전장치)
         analysis_alimtalk_scheduled_at: null,
         analysis_status_pending: null,
@@ -2337,6 +2368,12 @@ async function saveModalAnalysis(event) {
         updateData.analysis_deadline_override = null;
         updateData.analysis_agree_reminder_sent_at = null;
         updateData.incentive_warning_sent_at = null;
+    }
+
+    // 재시작 첨삭 '다시'·'새로'(수강 1 첨삭 기록이 있을 때): 일정표를 새로 쓰기 전에 옛 기록을 보관함으로. 거부되면 저장 중단.
+    if (isRestartSave && !blankProgramFields && correctionEnabled) {
+        const moved = await _restartArchiveIfNeeded(currentManageApp, correctionMode);
+        if (moved === false) return;
     }
 
     try {
@@ -2796,8 +2833,8 @@ async function loadModalContractTab(app) {
                     <select id="contractSelectDropdown" style="width: 100%; box-sizing: border-box; padding: 11px 13px; border: none; border-radius: 8px; background: #eef1f5; outline: none; font-size: 14px; font-family: inherit; margin-bottom: 14px;">
                         <option value="">계약서를 선택하세요...</option>
                         ${contracts.map(c => {
-                            const typeLabel = c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지';
-                            const recommendType = app.correction_enabled ? 'correction' : 'nevelup';
+                            const typeLabel = (typeof contractTypeLabel === 'function') ? contractTypeLabel(c.contract_type) : (c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지');
+                            const recommendType = (typeof contractTypeForApp === 'function') ? contractTypeForApp(app) : (app.correction_enabled ? 'correction' : 'nevelup');   // 재시작은 restart / restart_correction
                             const isRecommend = (c.contract_type || 'nevelup') === recommendType;
                             return `<option value="${c.id}" ${isRecommend ? 'selected' : ''}>${c.version} [${typeLabel}] - ${escapeHtml(c.title)}${isRecommend ? ' ✓ 추천' : ''}</option>`;
                         }).join('')}
@@ -4310,10 +4347,12 @@ var _manageForm = null;   // (옛 입력칸 상태 — 더 이상 쓰지 않음,
 function renderPauseBlockCard(app, kind) {
     if (kind !== 'challenge') return '';
     const rows = ['challenge', 'correction'].map(k => _mgRow(app, k)).filter(Boolean);
+    const restartRow = _mgRestartRow(app);   // 재시작(수강 2) — 끝난 수강 1 신청서에만 보임
+    if (restartRow) rows.push(restartRow);
     if (rows.length === 0) return '';
     return `
     <div style="background:#ffffff; border-radius:14px; padding:14px 22px 10px; margin-bottom:24px; box-shadow:0 2px 20px rgba(25,28,29,0.05);">
-        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b; margin-bottom:4px;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#1e293b; margin-bottom:4px;"><i class="fas fa-sliders-h" style="color:#7c3aed;"></i> 수강 관리${(typeof isRestartApp === 'function' && isRestartApp(app)) ? ' <span style="display:inline-block; background:#e7dce7; color:#5b4a7d; font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px; margin-left:6px;">수강 2 · 재시작</span>' : ''}</div>
         ${rows.join('')}
         ${_mgHistory(app)}
     </div>`;
@@ -4411,6 +4450,7 @@ function _mgEsc(e) { if (e.key === 'Escape') mgCloseMenus(); }
 function mgAction(kind, id) {
     mgCloseMenus();
     const app = currentManageApp; if (!app) return;
+    if (kind === 'restart') { _mgRestartAction(id); return; }   // 재시작(수강 2) 허용·취소
     const label = kind === 'challenge' ? '내벨업챌린지' : '스라첨삭';
     const stop = getActiveStop(app, kind);
     const ap = getActivePause(app, kind);
@@ -5001,3 +5041,154 @@ async function pauseUndoFromModal(kind) {
     }
 }
 
+// ================================================
+// 재시작(수강 2) — 관리창 (2026-10-16)
+//   · 수강 관리 표에 "재시작" 줄: 끝난(또는 중도포기) 수강 1 신청서에만. [수강 2 허용] / [허용 취소]
+//   · 개별분석 폼: 수강 2면 첨삭 '새로/다시' 선택 + 수강 1 첨삭 현황(12세션 중 N개) + 가격 10만/30만
+//   · 첨삭 '다시'(또는 수강 1 첨삭 기록이 있는데 '새로'): restart_correction_archive RPC로 옛 기록 보관 이동
+// ================================================
+function _restartEligibleRow(app) {
+    if (!app || (typeof isRestartApp === 'function' && isRestartApp(app))) return false;
+    if (app.application_type && app.application_type !== 'challenge') return false;
+    if (app.deposit_confirmed_by_admin !== true || app.deleted === true || !app.schedule_start) return false;
+    if (app.course_track === 'australia' || String(app.assigned_program || '').includes('Australia')) return false;
+    const stop = getActiveStop(app, 'challenge');
+    if (stop && stop.kind !== 'dropped') return false;
+    if (app.superseded_by) return true;   // 이미 수강 2가 생김 → 상태만 표시
+    const live = getAppLiveStatus(app);
+    return !!(stop && stop.kind === 'dropped') || !!(live && (live.key === 'ended' || live.key === 'completed' || live.key === 'finished'));
+}
+
+function _mgRestartRow(app) {
+    if (!_restartEligibleRow(app)) return '';
+    let chip, summary = '', actions = [];
+    if (app.superseded_by) {
+        chip = { bg: '#e7dce7', color: '#5b4a7d', label: '수강 2 진행' };
+        summary = '이 수강을 이어받은 수강 2 신청서가 있어요 · <a href="application-detail.html?id=' + app.superseded_by + '" target="_blank" style="color:#7c3aed;">수강 2 신청서 보기</a>';
+    } else if (app.restart_allowed_at) {
+        chip = { bg: '#dcfce7', color: '#15803d', label: '허용됨' };
+        summary = _pauseKrDate(String(app.restart_allowed_at).slice(0, 10)) + ' 허용 · 학생이 신청서를 쓰면 수강 2가 생겨요';
+        actions.push({ id: 'restart_revoke', label: '허용 취소', icon: 'fa-times', danger: true });
+    } else if (app.restart_requested_at) {
+        chip = { bg: '#fef3c7', color: '#b45309', label: '요청 접수' };
+        const mats = Array.isArray(app.restart_materials) && app.restart_materials.length ? ' · 교재: ' + app.restart_materials.map(escapeHtml).join(', ') : '';
+        summary = _pauseKrDate(String(app.restart_requested_at).slice(0, 10)) + ' 요청' + mats;
+        actions.push({ id: 'restart_allow', label: '수강 2 허용', icon: 'fa-redo' });
+    } else {
+        chip = { bg: '#f1f5f9', color: '#64748b', label: '대상' };
+        summary = '학생 요청은 없음 · 카톡으로 요청받았으면 바로 허용할 수 있어요';
+        actions.push({ id: 'restart_allow', label: '수강 2 허용', icon: 'fa-redo' });
+    }
+    const chipHtml = '<span style="display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:12px; font-weight:600; background:' + chip.bg + '; color:' + chip.color + '; white-space:nowrap;">' + chip.label + '</span>';
+    const menuBtn = actions.length
+        ? '<button type="button" id="mgBtn_restart" onclick="mgToggleMenu(\'restart\')" aria-haspopup="menu" aria-expanded="false" style="padding:7px 12px; border:none; border-radius:8px; background:#f3f4f5; color:#334155; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;">관리 <i class="fas fa-chevron-down" style="font-size:10px; margin-left:4px;"></i></button>'
+          + '<div id="mgMenu_restart" role="menu" style="display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:200px; background:#fff; border-radius:12px; box-shadow:0 12px 32px rgba(25,28,29,0.14); padding:6px; z-index:50;">'
+          + actions.map(a => '<button type="button" role="menuitem" onclick="mgAction(\'restart\',\'' + a.id + '\')" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:9px 12px; border:none; border-radius:8px; background:transparent; cursor:pointer; font-size:13.5px; color:' + (a.danger ? '#a53b22' : '#1e293b') + ';"><i class="fas ' + a.icon + '" style="width:14px; color:' + (a.danger ? '#a53b22' : '#7c3aed') + ';"></i>' + a.label + '</button>').join('')
+          + '</div>'
+        : '';
+    return '<div style="display:flex; align-items:center; gap:14px; padding:12px 0; border-top:1px dashed #eef1f5;">'
+        + '<div style="width:110px; flex-shrink:0; font-size:14px; font-weight:700; color:#1e293b;">재시작</div>'
+        + '<div style="flex:1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;">' + chipHtml + '<span style="font-size:12.5px; color:#475569;">' + summary + '</span></div>'
+        + '<div style="position:relative; flex-shrink:0;">' + menuBtn + '</div>'
+        + '</div>';
+}
+
+async function _mgRestartAction(id) {
+    const app = currentManageApp; if (!app) return;
+    const by = _pauseAdminName();
+    if (id === 'restart_revoke') {
+        _mgDialog({ title: '수강 2 허용 취소', danger: true, confirmLabel: '허용 취소',
+            body: '<p style="margin:0; font-size:14px; color:#1e293b;">학생의 신청서 작성 문을 다시 닫습니다.</p><p style="margin:6px 0 0; font-size:12.5px; color:#64748b;">이미 수강 2 신청서를 제출했으면 취소되지 않아요.</p>',
+            onConfirm: async () => {
+                const fresh = await supabaseAPI.getById('applications', app.id);
+                if (fresh && fresh.superseded_by) throw new Error('이미 수강 2 신청서가 제출돼 취소할 수 없어요.');
+                await supabaseAPI.patch('applications', app.id, { restart_allowed_at: null, restart_allowed_by: null });
+            },
+            toast: '수강 2 허용을 취소했어요' });
+        return;
+    }
+    if (id !== 'restart_allow') return;
+
+    // 경고 재료: 종료 후 2년 · 수강 1 첨삭 진행 중 · 첨삭 제출 현황
+    const todayYmd = _pauseTodayYmd();
+    const endYmd = [app.schedule_end, app.self_paced_end_date].filter(v => typeof v === 'string' && v.length >= 10).map(v => v.slice(0, 10)).sort().slice(-1)[0] || null;
+    let over2y = false;
+    if (endYmd) { const d = new Date(endYmd + 'T00:00:00Z'); d.setUTCFullYear(d.getUTCFullYear() + 2); over2y = todayYmd > d.toISOString().slice(0, 10); }
+    const corr = app.correction_enabled ? getCorrectionStatus(app) : null;
+    const corrRunning = !!(corr && (corr.key === 'active' || corr.key === 'ext_active' || corr.key === 'paused'));
+    let summary = null;
+    try { if (app.user_id) summary = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: app.user_id }); } catch (e) { console.warn('첨삭 현황 조회 실패(무시):', e); }
+    const s = summary || {};
+    const warn = [];
+    if (over2y) warn.push('지난 수강 종료가 2년을 넘었어요(방침: 2년 이내). 그래도 허용할지 확인하세요.');
+    if (corrRunning) warn.push('수강 1 첨삭이 아직 진행 중이에요' + (corr && corr.label ? ' (' + corr.label + ')' : '') + '. 반 이하 했으면 수강 2에서 "다시", 반 이상이면 첨삭 끝난 뒤 시작일을 잡아요.');
+    if (!app.restart_requested_at) warn.push('학생의 카드 요청 기록이 없어요. 카톡으로 받은 요청이면 그대로 진행하세요.');
+    const corrLine = app.correction_enabled || s.has_rows
+        ? '<div style="font-size:13px; color:#1e293b; margin-bottom:6px;">수강 1 첨삭: <b>12세션 중 ' + (s.sessions_1_12 != null ? s.sessions_1_12 : '?') + '개</b> 제출' + (s.sessions_13_24 ? ' · 연장 ' + s.sessions_13_24 + '개' : '') + (s.archived_batches ? ' · 보관 이력 ' + s.archived_batches + '건' : '') + '</div>'
+        : '<div style="font-size:13px; color:#1e293b; margin-bottom:6px;">수강 1 첨삭: 없음 → 수강 2에서 "새로"(+20만) 가능</div>';
+    const mats = Array.isArray(app.restart_materials) && app.restart_materials.length ? app.restart_materials.map(escapeHtml).join(', ') : '없음';
+    _mgDialog({ title: '수강 2(재시작) 허용', confirmLabel: '허용',
+        body: '<p style="margin:0 0 10px; font-size:14px; color:#1e293b;">학생이 <b>새 신청서</b>를 쓸 수 있게 문을 엽니다. 수강 1 기록은 그대로 남고, 수강 2는 1주차부터 새 판이에요.</p>'
+            + corrLine
+            + '<div style="font-size:13px; color:#1e293b; margin-bottom:6px;">실물 교재 요청: ' + mats + '</div>'
+            + '<div style="font-size:12.5px; color:#64748b; margin-bottom:6px;">가격은 개별분석 저장 때 자동으로 보증금 10만원(첨삭 새로 +20만). 계약서는 재시작용이 기본 추천.</div>'
+            + (warn.length ? '<div style="background:#fef3c7; color:#92400e; border-radius:8px; padding:10px 12px; font-size:12.5px; line-height:1.6;">' + warn.map(w => '⚠️ ' + escapeHtml(w)).join('<br>') + '</div>' : ''),
+        onConfirm: async () => {
+            const fresh = await supabaseAPI.getById('applications', app.id);
+            if (fresh && fresh.superseded_by) throw new Error('이미 수강 2 신청서가 있어요.');
+            await supabaseAPI.patch('applications', app.id, { restart_allowed_at: new Date().toISOString(), restart_allowed_by: by });
+        },
+        toast: '수강 2를 허용했어요 — 학생 대시보드에 "신청서 작성하기"가 열려요' });
+}
+
+// 개별분석 폼: 첨삭 '새로/다시' 세그먼트
+function setCorrectionMode(mode) {
+    const input = document.getElementById('correction_mode'); if (!input) return;
+    input.value = mode === 'again' ? 'again' : 'new';
+    const on = (id, yes) => { const b = document.getElementById(id); if (!b) return; b.style.background = yes ? '#fff' : 'transparent'; b.style.color = yes ? '#1e293b' : '#64748b'; b.style.boxShadow = yes ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'; };
+    on('seg_corrmode_new', input.value === 'new'); on('seg_corrmode_again', input.value === 'again');
+    calculateModalPrice();
+}
+function _syncCorrectionModeWrap() {
+    const wrap = document.getElementById('correctionModeWrap'); if (!wrap) return;
+    const on = document.getElementById('correction_enabled')?.value === 'true';
+    wrap.style.display = on ? '' : 'none';
+    if (on) _loadRestartCorrSummary();
+}
+async function _loadRestartCorrSummary() {
+    const el = document.getElementById('restartCorrSummary'); if (!el || !currentManageApp) return;
+    if (el.dataset.loaded === '1') return;
+    try {
+        const s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: currentManageApp.user_id });
+        el.dataset.loaded = '1';
+        if (!s || !s.has_rows) {
+            el.innerHTML = '수강 1 첨삭 기록 없음 → <b>새로</b>(+200,000원)만 의미 있어요.';
+            if (!currentManageApp.correction_mode) setCorrectionMode('new');
+            return;
+        }
+        el.innerHTML = '수강 1 첨삭: <b>12세션 중 ' + (s.sessions_1_12 || 0) + '개 제출</b>' + (s.sessions_13_24 ? ' · 연장 ' + s.sessions_13_24 + '개' : '')
+            + (s.busy ? ' · <span style="color:#b45309;">피드백 처리 중 ' + s.busy + '건(끝나야 보관 이동 가능)</span>' : '')
+            + '<br>반 이하면 <b>다시</b>(0원), 반 이상이면 첨삭 없음 권장. 어느 쪽이든 저장할 때 수강 1 첨삭 기록은 보관함으로 옮겨져 테스트룸에서 사라져요(SQL로 되돌릴 수 있음).';
+        if (!currentManageApp.correction_mode && (s.sessions_1_12 || 0) <= 6) setCorrectionMode('again');
+    } catch (e) {
+        el.textContent = '수강 1 첨삭 현황을 불러오지 못했어요: ' + (e.message || '');
+    }
+}
+// 저장 직전: 수강 1 첨삭 기록이 있으면 보관함으로 옮긴다(다시·새로 공통). 확인 창 → RPC. 거부(처리 중)면 false.
+async function _restartArchiveIfNeeded(app, correctionMode) {
+    if (!app || !app.user_id) return true;
+    let s = null;
+    try { s = await supabaseAPI.rpc('restart_correction_summary', { p_user_id: app.user_id }); } catch (e) { alert('수강 1 첨삭 현황을 확인하지 못해 저장을 멈춥니다.\n\n' + (e.message || '')); return false; }
+    if (!s || !s.has_rows) return true;
+    if (s.busy) { alert('수강 1 첨삭 피드백이 처리 중인 제출이 ' + s.busy + '건 있어요. 끝난 뒤 다시 저장하세요.'); return false; }
+    const ok = confirm('수강 1 첨삭 기록(12세션 중 ' + (s.sessions_1_12 || 0) + '개 제출)을 보관함으로 옮기고 첨삭을 처음부터 다시 시작합니다.\n\n학생 테스트룸에서는 지난 첨삭 기록이 보이지 않게 돼요(보관함에 남고 SQL로 되돌릴 수 있음).\n\n' + (correctionMode === 'again' ? '[다시] 0원' : '[새로] +200,000원') + ' 으로 진행할까요?');
+    if (!ok) return false;
+    try {
+        const r = await supabaseAPI.rpc('restart_correction_archive', { p_user_id: app.user_id, p_from_app: app.restart_of || null, p_by: _pauseAdminName() });
+        console.log('[restart] 첨삭 기록 보관 이동:', r);
+        return true;
+    } catch (e) {
+        alert('첨삭 기록 보관 이동에 실패했습니다. 저장을 멈춥니다.\n\n' + (e.message || ''));
+        return false;
+    }
+}

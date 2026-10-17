@@ -108,7 +108,7 @@ function displayActiveContracts() {
                             ${escapeHtml(contract.version || 'v1')}
                         </span>
                         <span style="background: ${contract.contract_type === 'correction' ? '#dbeafe' : '#f0fdf4'}; color: ${contract.contract_type === 'correction' ? '#2563eb' : '#166534'}; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
-                            ${contract.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지'}
+                            ${contractTypeLabel(contract.contract_type)}
                         </span>
                         <h3 style="font-size: 18px; font-weight: 600; margin: 0; color: #1e293b;">
                             ${escapeHtml(contract.title)}
@@ -171,7 +171,7 @@ function displayInactiveContracts() {
                             ${escapeHtml(contract.version || 'v1')}
                         </span>
                         <span style="background: ${contract.contract_type === 'correction' ? '#dbeafe' : '#f0fdf4'}; color: ${contract.contract_type === 'correction' ? '#2563eb' : '#166534'}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-                            ${contract.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지'}
+                            ${contractTypeLabel(contract.contract_type)}
                         </span>
                         <h4 style="font-size: 16px; font-weight: 600; margin: 0; color: #64748b;">
                             ${escapeHtml(contract.title)}
@@ -211,7 +211,7 @@ function updateLoadContractSelect() {
     
     select.innerHTML = '<option value="">기존 계약서 선택...</option>' + 
         contracts.map(c => `
-            <option value="${c.id}">${c.version} [${c.contract_type === 'correction' ? '첨삭포함' : '내벨업챌린지'}] - ${escapeHtml(c.title)}</option>
+            <option value="${c.id}">${c.version} [${contractTypeLabel(c.contract_type)}] - ${escapeHtml(c.title)}</option>
         `).join('');
 }
 

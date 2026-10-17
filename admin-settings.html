@@ -197,6 +197,8 @@
                                 <select id="newContractType" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;">
                                     <option value="nevelup">내벨업챌린지 (기본)</option>
                                     <option value="correction">첨삭포함</option>
+                                    <option value="restart">재시작 (수강 2)</option>
+                                    <option value="restart_correction">재시작 + 첨삭 (수강 2)</option>
                                 </select>
                                 <small style="color: #64748b;">학생의 첨삭 포함 여부에 따라 자동으로 해당 타입의 계약서가 발송됩니다.</small>
                             </div>
@@ -498,10 +500,11 @@
 
     <!-- Scripts -->
     <script src="js/supabase-config.js?v=20261012"></script>
+    <script src="js/restart-shared.js?v=20261016_restart"></script>
     <script src="js/admin-utils.js"></script>
-    <script src="js/contract-utils.js"></script>
+    <script src="js/contract-utils.js?v=20261016_restart"></script>
     <script src="js/admin-settings-tabs.js"></script>
-    <script src="js/admin-contracts.js"></script>
+    <script src="js/admin-contracts.js?v=20261016_restart"></script>
     <script src="js/admin-notices.js"></script>
 </body>
 </html>

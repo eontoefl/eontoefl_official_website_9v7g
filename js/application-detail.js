@@ -1649,7 +1649,7 @@ async function submitStudentAgreement() {
 
         // 2. 활성 계약서 자동 조회 → 자동 발송 (첨삭 포함 여부에 따라 타입 구분)
         try {
-            const contractType = currentApplication.correction_enabled ? 'correction' : 'nevelup';
+            const contractType = (typeof contractTypeForApp === 'function') ? contractTypeForApp(currentApplication) : (currentApplication.correction_enabled ? 'correction' : 'nevelup');   // 재시작은 restart / restart_correction
             const contracts = await supabaseAPI.query('contracts', { 'is_active': 'eq.true', 'contract_type': `eq.${contractType}`, 'limit': '1' });
             if (contracts && contracts.length > 0) {
                 const contract = contracts[0];
@@ -2931,6 +2931,8 @@ async function submitContractAgreement() {
  * @param {boolean} showPaymentNotice - 결제 안내 문구 표시 여부 (기본값: true, Step 4에서는 false)
  */
 function getPricingBox(app, showPaymentNotice = true) {
+    // 재시작(수강 2): 전용 가격 박스(restart-shared.js). 수강료 0 · 첨삭(새로 20만/다시 0) · 보증금 10만
+    if (typeof isRestartApp === 'function' && isRestartApp(app) && typeof getRestartPricingBox === 'function') return getRestartPricingBox(app, (typeof showPaymentNotice === 'undefined') ? true : showPaymentNotice);
     if (!app.assigned_program) return '';
 
     // 한 줄 항목: 라벨 좌 / 값 우. 선 없이 여백으로만 나눈다.

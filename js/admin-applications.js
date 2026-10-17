@@ -668,6 +668,9 @@ function applyFilters() {
         });
     }
     
+    // 재시작(수강 2): 같은 학생의 수강 1·수강 2 줄을 붙여서(수강 2 위, 수강 1 아래) 보여준다
+    filteredApplications = groupRestartRows(filteredApplications);
+
     // 페이지 초기화
     currentPage = 1;
     
@@ -676,6 +679,25 @@ function applyFilters() {
     } else {
         displayApplications();
     }
+}
+
+// 재시작(수강 2, 2026-10-16): 같은 학생의 수강 1·수강 2 신청서를 한 묶음으로.
+//   정렬 결과를 따라가되, 수강 2 줄 바로 아래에 그 수강 1 줄을 붙인다(수강 1이 먼저 나오면 수강 2를 끌어올린다).
+//   표시용 꼬리표: _groupTop(묶음 첫 줄) / _groupChild(아래 줄 — 이름·이메일 생략). 수강 1만 있는 학생은 그대로.
+function groupRestartRows(list) {
+    const byId = {};
+    list.forEach(a => { byId[a.id] = a; delete a._groupTop; delete a._groupChild; });
+    const placed = new Set();
+    const out = [];
+    list.forEach(a => {
+        if (placed.has(a.id)) return;
+        let top = a, child = null;
+        if (a.restart_of && byId[a.restart_of] && !placed.has(a.restart_of)) { child = byId[a.restart_of]; }
+        else if (a.superseded_by && byId[a.superseded_by] && !placed.has(a.superseded_by)) { top = byId[a.superseded_by]; child = a; }
+        out.push(top); placed.add(top.id);
+        if (child) { top._groupTop = true; child._groupChild = true; out.push(child); placed.add(child.id); }
+    });
+    return out;
 }
 
 // 신청서 표시
@@ -703,7 +725,7 @@ function displayApplications() {
             && (!app.correction_enabled || (typeof getActiveStop === 'function' && !!getActiveStop(app, 'correction')));
         
         return `
-            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted || isInactive ? 'opacity: 0.55;' : ''}">
+            <tr style="${isSelected ? 'background: #f0f9ff;' : ''}${app.deleted || isInactive ? 'opacity: 0.55;' : ''}${app._groupTop ? 'border-left: 4px solid #c9b8d9; border-bottom: none;' : ''}${app._groupChild ? 'border-left: 4px solid #c9b8d9; background: #faf7fa;' : ''}">
                 <td>
                     <input type="checkbox" 
                            class="app-checkbox" 
@@ -719,8 +741,10 @@ function displayApplications() {
                     </div>
                 </td>
                 <td>
-                    <div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}${app.withdrawn_at ? ' <span style="background:#f1f5f9; color:#94a3b8; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; vertical-align:middle;">탈퇴</span>' : ''}</div>
-                    <div style="font-size:11px; color:#94a3b8; line-height:1.3; margin-top:1px;">${escapeHtml(app.email)}</div>
+                    ${app._groupChild
+                        ? '<div style="font-size:11px; color:#94a3b8; line-height:1.3; white-space:nowrap;"><i class="fas fa-level-up-alt" style="transform:rotate(90deg); margin-right:4px;"></i>같은 학생 · 지난 수강</div>'
+                        : `<div style="font-weight:600; line-height:1.3;">${escapeHtml(app.name)}${app.withdrawn_at ? ' <span style="background:#f1f5f9; color:#94a3b8; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; vertical-align:middle;">탈퇴</span>' : ''}</div>
+                    <div style="font-size:11px; color:#94a3b8; line-height:1.3; margin-top:1px;">${escapeHtml(app.email)}</div>`}
                 </td>
                 <td style="font-size: 13px; white-space:nowrap;">
                     ${getScoreDisplay(app)}
@@ -735,6 +759,8 @@ function displayApplications() {
                             : (app.assigned_program || app.preferred_program || '-'))}
                     </span>
                     ${app.correction_enabled ? '<span style="display:inline-block; background:#dbeafe; color:#2563eb; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;">첨삭</span>' : ''}
+                    ${Number(app.enrollment_no) >= 2 ? '<span style="display:inline-block; background:#e7dce7; color:#5b4a7d; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;" title="재시작 신청서(수강 2)">수강 2</span>' : ''}
+                    ${app.superseded_by ? '<span style="display:inline-block; background:#f1f5f9; color:#64748b; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-left:4px;" title="이 수강을 이어받은 수강 2 신청서가 있음">수강 1·종료</span>' : ''}
                 </td>
                 <td style="font-size: 12px; color: #64748b; line-height: 1.5;">
                     ${app.schedule_start 

@@ -98,13 +98,21 @@ async function loadStudyData() {
 
         // 6. study_results_v3 (V3 인증률 계산용 + 알림판 연속미제출 판정용)
         const v3Records = await supabaseAPI.query('study_results_v3', {
-            'select': 'user_id,locked_auth_rate,initial_record,error_note_submitted,section_type,week,day,completed_at',
+            'select': 'user_id,enrollment_id,locked_auth_rate,initial_record,error_note_submitted,section_type,week,day,completed_at',
             'limit': '10000'
         });
-        const v3Map = {};
+        // 재시작(2026-10-16): 기록은 수강(신청서) 꼬리표로 묶는다. 꼬리표가 없는 옛 줄(0000…)은 사람 기준으로만 남겨 둔다.
+        const LEGACY_ENROLL = '00000000-0000-0000-0000-000000000000';
+        const v3Map = {};         // enrollment_id → rows
+        const v3LegacyMap = {};   // user_id → 꼬리표 없는 rows
         (v3Records || []).forEach(r => {
-            if (!v3Map[r.user_id]) v3Map[r.user_id] = [];
-            v3Map[r.user_id].push(r);
+            if (r.enrollment_id && r.enrollment_id !== LEGACY_ENROLL) {
+                if (!v3Map[r.enrollment_id]) v3Map[r.enrollment_id] = [];
+                v3Map[r.enrollment_id].push(r);
+            } else {
+                if (!v3LegacyMap[r.user_id]) v3LegacyMap[r.user_id] = [];
+                v3LegacyMap[r.user_id].push(r);
+            }
         });
 
         // 7. 토플 실제 성적 로드
@@ -145,7 +153,7 @@ async function loadStudyData() {
             const isBeforeStart = today < startDate;
 
             // ── study_results_v3 기반 인증률 계산 ──
-            const myV3 = v3Map[userId] || [];
+            const myV3 = (v3Map[app.id] || []).concat(v3LegacyMap[userId] || []);   // 그 수강의 기록 + 꼬리표 없는 옛 기록
             let authRateSum = 0;
             for (const r of myV3) {
                 if (r.locked_auth_rate != null) {
@@ -305,6 +313,9 @@ async function loadStudyData() {
             return {
                 userId,
                 appId: app.id,
+                enrollmentNo: Number(app.enrollment_no) || 1,   // 재시작(수강 2) 묶음 표시용
+                restartOf: app.restart_of || null,
+                supersededBy: app.superseded_by || null,
                 name: user.name || app.name || '-',
                 email: user.email,
                 programType,
@@ -439,7 +450,27 @@ function applyFilters() {
         }
     });
 
+    // 재시작(수강 2): 같은 학생의 수강 1·수강 2 줄을 붙여서(수강 2 위, 수강 1 아래) 보여준다
+    filteredStudentData = groupRestartStudents(filteredStudentData);
+
     renderTable();
+}
+
+// 재시작(수강 2, 2026-10-16): 같은 학생의 두 수강을 한 묶음으로. 정렬 결과를 따라가되 수강 2 줄 아래에 수강 1 줄을 붙인다.
+function groupRestartStudents(list) {
+    const byApp = {};
+    list.forEach(s => { byApp[s.appId] = s; delete s._groupTop; delete s._groupChild; });
+    const placed = new Set();
+    const out = [];
+    list.forEach(s => {
+        if (placed.has(s.appId)) return;
+        let top = s, child = null;
+        if (s.restartOf && byApp[s.restartOf] && !placed.has(s.restartOf)) child = byApp[s.restartOf];
+        else if (s.supersededBy && byApp[s.supersededBy] && !placed.has(s.supersededBy)) { top = byApp[s.supersededBy]; child = s; }
+        out.push(top); placed.add(top.appId);
+        if (child) { top._groupTop = true; child._groupChild = true; out.push(child); placed.add(child.appId); }
+    });
+    return out;
 }
 
 // ===== 테이블 렌더링 =====
@@ -474,6 +505,8 @@ function renderTable() {
             rowStyle += 'background: #fef2f2;';
         }
         if (!isEnded && !isPaused && s.grade !== '-' && s.consecutiveMissing >= 2) rowStyle += 'border-left: 4px solid #f59e0b;';
+        if (s._groupTop) rowStyle += 'border-left: 4px solid #c9b8d9; border-bottom: none;';
+        if (s._groupChild) rowStyle += 'border-left: 4px solid #c9b8d9; background: #faf7fa;';
 
         const nameWarning = (!isEnded && !isPaused && s.grade !== '-' && s.daysSinceActivity >= 3) ? ' ⚠️' : '';
 
@@ -505,10 +538,12 @@ function renderTable() {
         return `
             <tr style="${rowStyle}">
                 <td>
-                    <strong>${escapeHtml(s.name)}</strong>${statusBadge}${nameWarning}
+                    ${s._groupChild
+                        ? '<span style="font-size:11px; color:#94a3b8; white-space:nowrap;"><i class="fas fa-level-up-alt" style="transform:rotate(90deg); margin-right:4px;"></i>같은 학생 · 지난 수강</span>'
+                        : `<strong>${escapeHtml(s.name)}</strong>`}${s._groupTop ? ' <span style="display:inline-block; background:#e7dce7; color:#5b4a7d; font-size:9px; font-weight:700; padding:2px 7px; border-radius:4px; margin-left:4px;">수강 ' + s.enrollmentNo + '</span>' : ''}${s._groupChild ? ' <span style="display:inline-block; background:#f1f5f9; color:#64748b; font-size:9px; font-weight:600; padding:2px 7px; border-radius:4px; margin-left:4px;">수강 ' + s.enrollmentNo + '</span>' : ''}${statusBadge}${nameWarning}
                     ${s.hasFraud ? '<span style="display:inline-block; background:#ef4444; color:white; font-size:9px; padding:1px 5px; border-radius:3px; margin-left:4px;">FRAUD</span>' : ''}
                 </td>
-                <td style="font-size:12px; color:#64748b; white-space:nowrap;">${escapeHtml(s.email || '')}</td>
+                <td style="font-size:12px; color:#64748b; white-space:nowrap;">${s._groupChild ? '' : escapeHtml(s.email || '')}</td>
                 <td>
                     <span style="display:inline-block; background:${s.selfPaced ? '#fef3c7' : s.programType === 'Fast' ? '#ede9fe' : '#e0f2fe'}; color:${s.selfPaced ? '#b45309' : s.programType === 'Fast' ? '#7c3aed' : '#0284c7'}; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600;">
                         ${s.isAustralia ? 'AU ' : ''}${s.selfPaced ? 'SELF' : s.programType}
@@ -532,7 +567,7 @@ function renderTable() {
                 <td>${lastActivityText}</td>
                 <td style="text-align: center;">${getToeflBadge(s.toeflCount)}</td>
                 <td>
-                    <button onclick="window.location.href='admin-study-detail-v3.html?id=${s.userId}'" 
+                    <button onclick="window.location.href='admin-study-detail-v3.html?id=${s.userId}${s.appId ? '&app=' + s.appId : ''}'" 
                             style="background:#7c3aed; color:white; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">
                         <i class="fas fa-eye"></i> 상세
                     </button>
@@ -674,7 +709,7 @@ function updateAlertBoard(students, v3Records, scheduleData) {
                 icon: '⚠️',
                 title: `${s.name} - ${missedDays.length}일 연속 미제출 (${missedDays.reverse().join(', ')})`,
                 subtitle: `${s.isAustralia ? 'AU ' : ''}${s.selfPaced ? '자기주도' : `${s.programType} ${s.totalWeeks}주`} | ${s.currentWeek}주차 | 인증률 ${s.avgAuthRate}%`,
-                userId: s.userId
+                userId: s.userId, appId: s.appId
             });
         }
     });
@@ -741,7 +776,7 @@ function updateAlertBoard(students, v3Records, scheduleData) {
                         ${escapeHtml(a.subtitle)}
                     </div>
                 </div>
-                <button onclick="window.location.href='admin-study-detail-v3.html?id=${a.userId}'" 
+                <button onclick="window.location.href='admin-study-detail-v3.html?id=${a.userId}${a.appId ? '&app=' + a.appId : ''}'" 
                         style="background:white; border:1px solid #e2e8f0; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; color:#475569; font-weight:500; white-space:nowrap; margin-left:12px;">
                     학생 보기 <i class="fas fa-chevron-right" style="font-size:10px;"></i>
                 </button>

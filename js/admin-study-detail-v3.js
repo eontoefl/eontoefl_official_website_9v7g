@@ -53,6 +53,7 @@ async function loadStudentDetail() {
         // URL에서 user_id 추출
         const params = new URLSearchParams(window.location.search);
         const userId = params.get('id');
+        const appParam = params.get('app');   // 재시작: 특정 수강(신청서)을 지정해 볼 때
         if (!userId) throw new Error('학생 ID가 지정되지 않았습니다.');
 
         // 1. users 테이블에서 학생 조회
@@ -67,7 +68,7 @@ async function loadStudentDetail() {
             'limit': '10',
             'order': 'created_at.desc'
         });
-        const app = apps && apps.length > 0 ? apps[0] : null;
+        const app = apps && apps.length > 0 ? ((appParam && apps.find(a => String(a.id) === appParam)) || apps[0]) : null;
         if (!app) {
             // 입금 미확인이라도 시도
             const apps2 = await supabaseAPI.query('applications', {
@@ -89,11 +90,13 @@ async function loadStudentDetail() {
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
+                'enrollment_id': `eq.${studentData.app.id}`,   // 재시작: 그 수강의 기록만
                 'select': 'id,user_id,section_type,module_number,week,day,initial_record,initial_level,locked_auth_rate,error_note_submitted,error_note_text,completed_at,speaking_file_1,writing_email_text,writing_discussion_text,rewrite_record',
                 'limit': '1000'
             }),
             supabaseAPI.query('tr_deadline_extensions', {
                 'user_id': `eq.${studentUserId}`,
+                'enrollment_id': `eq.${studentData.app.id}`,
                 'order': 'original_date.desc',
                 'limit': '200'
             }),
@@ -205,6 +208,7 @@ function renderProfileHeader() {
         ? `${formatKSTDate(app.schedule_start)} ~ ${formatKSTDate(end)}`
         : '-';
     document.getElementById('studentEmail').textContent = user.email || '-';
+    renderEnrollmentSwitch().catch(e => console.warn('수강 선택 표시 실패(무시):', e));   // 재시작: 수강 1·2 전환
 
     // 수강 상태 뱃지
     const liveStatus = getAppLiveStatus(app);
@@ -1722,6 +1726,7 @@ async function loadDeadlineExtensions() {
     try {
         const result = await supabaseAPI.query('tr_deadline_extensions', {
             'user_id': `eq.${userId}`,
+            'enrollment_id': `eq.${studentData.app.id}`,
             'order': 'original_date.desc',
             'limit': '200'
         });
@@ -1818,6 +1823,7 @@ async function addDeadlineExtension() {
     try {
         const existing = await supabaseAPI.query('tr_deadline_extensions', {
             'user_id': `eq.${userId}`,
+            'enrollment_id': `eq.${studentData.app.id}`,
             'original_date': `eq.${originalDate}`,
             'limit': '1'
         });
@@ -1838,6 +1844,7 @@ async function addDeadlineExtension() {
             await supabaseAPI.post('tr_deadline_extensions', {
                 id: rowId,
                 user_id: userId,
+                enrollment_id: studentData.app.id,   // 재시작: 어느 수강의 연장인지
                 original_date: originalDate,
                 extra_days: extraDays,
                 reason: reason || null
@@ -2271,8 +2278,10 @@ async function deleteNotification(id) {
  */
 async function loadWeeklyCheckDrafts(userId) {
     try {
+        const sinceStart = (studentData && studentData.app && typeof studentData.app.schedule_start === 'string' && studentData.app.schedule_start.length >= 10) ? studentData.app.schedule_start.slice(0, 10) : null;
         const result = await supabaseAPI.query('tr_weekly_check_drafts', {
             'user_id': `eq.${userId}`,
+            ...(sinceStart ? { 'created_at': `gte.${sinceStart}` } : {}),   // 재시작: 이 수강 시작 뒤 초안만
             'status': 'in.(pending,skipped)',
             'order': 'created_at.desc',
             'limit': '10'
@@ -3498,4 +3507,28 @@ async function reloadToeflAdminData() {
     toeflScoresAdmin = results[0] || [];
     toeflExamsAdmin = results[1] || [];
     renderToeflAdminSection();
+}
+
+// ================================================
+// 재시작(수강 2) — 학습상세에서 수강 1·2 전환 (2026-10-16)
+//   같은 학생의 입금 확인된 신청서가 2장이면 머리에 "수강 N" 뱃지와 다른 수강으로 가는 링크를 보여준다.
+// ================================================
+async function renderEnrollmentSwitch() {
+    const { user, app } = studentData;
+    const programEl = document.getElementById('studentProgram');
+    if (!programEl || !user || !app) return;
+    document.getElementById('enrollmentSwitch')?.remove();
+    const apps = await supabaseAPI.query('applications', {
+        'email': `eq.${user.email}`,
+        'deposit_confirmed_by_admin': 'eq.true',
+        'deleted': 'not.is.true',
+        'select': 'id,enrollment_no,schedule_start,created_at',
+        'order': 'created_at.desc',
+        'limit': '10'
+    });
+    if (!apps || apps.length < 2) return;
+    const no = Number(app.enrollment_no) >= 2 ? app.enrollment_no : 1;
+    const others = apps.filter(a => String(a.id) !== String(app.id));
+    const links = others.map(a => `<a href="admin-study-detail-v3.html?id=${encodeURIComponent(user.id)}&app=${encodeURIComponent(a.id)}" style="color:#7c3aed; font-weight:600; text-decoration:none;">수강 ${Number(a.enrollment_no) >= 2 ? a.enrollment_no : 1} 보기${a.schedule_start ? ' (' + String(a.schedule_start).slice(0, 10) + ' 시작)' : ''}</a>`).join(' · ');
+    programEl.insertAdjacentHTML('afterend', `<span id="enrollmentSwitch" style="margin-left:8px; font-size:12px;"><span style="display:inline-block; background:#e7dce7; color:#5b4a7d; font-weight:700; padding:1px 8px; border-radius:999px;">수강 ${no}</span> <span style="color:#94a3b8;">· 다른 수강: ${links}</span></span>`);
 }

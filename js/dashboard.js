@@ -70,6 +70,7 @@ async function loadDashboard() {
             renderProgressSection(challengeApp);
             await renderCorrectionProgressSection(challengeApp);
             renderActionItems(challengeApp);
+            await renderRestartCard(challengeApp);   // 재시작(수강 2) 카드 — 조건 맞는 종료 학생만 보임
             await renderTimeline(challengeApp);
             await renderQuickMenuGrid(challengeApp);
             renderShipping(challengeApp);
@@ -99,6 +100,7 @@ async function loadDashboard() {
         renderProgressSection(application);
         await renderCorrectionProgressSection(application);
         renderActionItems(application);
+        await renderRestartCard(application);   // 재시작(수강 2) 카드 — 조건 맞는 종료 학생만 보임
         await renderTimeline(application);
         await renderQuickMenuGrid(application);
         renderShipping(application);
@@ -2319,5 +2321,145 @@ async function loadSurveyTeaser() {
         if (teaser) teaser.style.display = '';
     } catch (e) {
         // 테이블 미생성 등 — 배너는 그냥 안 보이면 됨
+    }
+}
+
+// ================================================
+// 재시작(수강 2) 카드 — 2026-10-16
+//   끝난 수강(수강 1)의 신청서를 보고, 조건 9개가 맞을 때만 "지금 해야 할 일" 아래에 카드를 하나 그린다.
+//   조건: 챌린지 신청서 · 입금 확인 · 시작일 있음 · 종료일 지남(중도포기 포함) · 정지 중 아님 · 내챌 환불 없음
+//         · 환급 0원 등급 · 호주 아님 · 재시작 이력 없음(허용 안 됨·수강 2 없음) + 종료 후 2년 이내
+//   학생 쪽 동작은 "요청"만. 허용은 대표가 관리창에서 누른다.
+// ================================================
+async function restartCardEligibility(app) {
+    if (!app || app.application_type === 'book_only') return { ok: false };
+    if (typeof isRestartApp === 'function' && isRestartApp(app)) return { ok: false };     // 이미 수강 2
+    if (app.superseded_by) return { ok: false };                                            // 이미 수강 2가 만들어짐
+    if (!app.deposit_confirmed_by_admin || !app.schedule_start) return { ok: false };
+    if (app.course_track === 'australia' || String(app.assigned_program || '').includes('Australia')) return { ok: false };
+    const stopCh = (typeof getActiveStop === 'function') ? getActiveStop(app, 'challenge') : null;
+    if (stopCh && stopCh.kind !== 'dropped') return { ok: false };                          // 환불(옛 방식 포함)은 제외, 중도포기는 통과
+    if (typeof getActivePause === 'function' && getActivePause(app, 'challenge')) return { ok: false };
+
+    // 종료 판정: 일반·자기주도 종료일 중 늦은 날(자기주도는 시작+4주도 지나야). 중도포기는 종료로 본다.
+    const todayYmd = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const ends = [app.schedule_end, app.self_paced_end_date].filter(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)).map(v => v.slice(0, 10));
+    let endYmd = ends.length ? ends.sort().slice(-1)[0] : null;
+    if (app.self_paced && app.schedule_start) {
+        const d = new Date(String(app.schedule_start).slice(0, 10) + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 28);
+        const plus4w = d.toISOString().slice(0, 10);
+        if (!endYmd || plus4w > endYmd) endYmd = plus4w;
+    }
+    const dropped = !!(stopCh && stopCh.kind === 'dropped');
+    if (!dropped) {
+        if (!endYmd || todayYmd < endYmd) return { ok: false };
+    }
+    // 2년 이내
+    const baseYmd = endYmd || todayYmd;
+    const twoYears = new Date(baseYmd + 'T00:00:00Z'); twoYears.setUTCFullYear(twoYears.getUTCFullYear() + 2);
+    if (todayYmd > twoYears.toISOString().slice(0, 10)) return { ok: false, reason: 'expired' };
+
+    // 환급 0원 등급: 관리자 목록과 같은 식(그 수강의 기록만 · 분모는 과제표 전체 — 끝난 수강이므로)
+    try {
+        const [rows, sched, rules] = await Promise.all([
+            supabaseAPI.query('study_results_v3', { 'enrollment_id': `eq.${app.id}`, 'select': 'locked_auth_rate,initial_record,error_note_submitted,week', 'limit': '1000' }),
+            supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' }),
+            supabaseAPI.query('tr_grade_rules', { 'order': 'min_rate.desc' })
+        ]);
+        const programStr = app.assigned_program || app.preferred_program || '';
+        const isFast = programStr.includes('Fast') || !!app.self_paced;
+        const prog = isFast ? 'fast' : 'standard';
+        const totalWeeks = isFast ? 4 : 8;
+        let total = 0;
+        (sched || []).forEach(s => {
+            if ((s.program || '').toLowerCase() !== prog || Number(s.week) > totalWeeks) return;
+            [s.section1, s.section2, s.section3, s.section4].forEach(sec => {
+                const p = (typeof parseScheduleSection === 'function') ? parseScheduleSection(sec) : null;
+                if (p && p.taskType !== 'unknown') total++;
+            });
+        });
+        let sum = 0;
+        (rows || []).forEach(r => {
+            if (Number(r.week) > totalWeeks) return;
+            if (r.locked_auth_rate != null) sum += Number(r.locked_auth_rate);
+            else if (r.initial_record) sum += r.error_note_submitted ? 100 : 50;
+        });
+        const rate = total > 0 ? Math.round(sum / total) : 0;
+        const g = (typeof getGradeFromRules === 'function') ? getGradeFromRules(rate, rules || [], 100000) : null;
+        const refundRate = g ? Number(g.refund_rate != null ? g.refund_rate : g.refundRate) : 0;
+        if (refundRate > 0) return { ok: false, reason: 'refund' };
+        return { ok: true, rate: rate, endYmd: endYmd };
+    } catch (e) {
+        console.warn('[restart] 인증률 계산 실패 — 카드 숨김:', e);
+        return { ok: false };
+    }
+}
+
+async function renderRestartCard(app) {
+    try {
+        const host = document.getElementById('actionItemsContent');
+        const card = host ? host.closest('.dashboard-card') : null;
+        if (!card || typeof RESTART_COPY === 'undefined') return;
+        document.getElementById('restartCard')?.remove();
+        const elig = await restartCardEligibility(app);
+        if (!elig.ok) return;
+
+        const materials = (typeof RESTART_MATERIALS !== 'undefined') ? RESTART_MATERIALS : [];
+        const chosen = Array.isArray(app.restart_materials) ? app.restart_materials : [];
+        let body;
+        if (app.restart_allowed_at) {
+            body = `
+                <p style="font-size:14px; color:#475569; line-height:1.7; margin:0 0 14px;">${restartEsc(RESTART_COPY.cardAllowed)}</p>
+                <a href="application-form.html?restart=1" style="display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border-radius:10px; background:#efeaf7; color:#5b4a7d; font-weight:700; font-size:14px; text-decoration:none;">${restartEsc(RESTART_COPY.cardAllowedButton)} <i class="fas fa-chevron-right" style="font-size:12px;"></i></a>`;
+        } else if (app.restart_requested_at) {
+            body = `<p style="font-size:14px; color:#475569; line-height:1.7; margin:0;"><i class="fas fa-check" style="color:#5b4a7d; margin-right:6px;"></i>${restartEsc(RESTART_COPY.cardRequested)}</p>`;
+        } else {
+            body = `
+                <p style="font-size:14px; color:#475569; line-height:1.7; margin:0 0 14px;">${restartEsc(RESTART_COPY.cardBody)}</p>
+                <div style="background:#faf7fa; border-radius:12px; padding:12px 14px; margin-bottom:14px;">
+                    <div style="font-size:12.5px; color:#64748b; margin-bottom:8px;">${restartEsc(RESTART_COPY.cardMaterialsLabel)}</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px 16px;">
+                        ${materials.map((m, i) => `<label style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#1e293b; cursor:pointer;"><input type="checkbox" class="restart-material" value="${restartEsc(m)}" ${chosen.includes(m) ? 'checked' : ''}> ${restartEsc(m)}</label>`).join('')}
+                    </div>
+                </div>
+                <button type="button" id="restartRequestBtn" onclick="requestRestartFromDashboard(this)" style="display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border:none; border-radius:10px; background:#efeaf7; color:#5b4a7d; font-weight:700; font-size:14px; cursor:pointer;">${restartEsc(RESTART_COPY.cardButton)} <i class="fas fa-chevron-right" style="font-size:12px;"></i></button>
+                <div id="restartRequestErr" style="display:none; margin-top:8px; font-size:12.5px; color:#ba1a1a;"></div>`;
+        }
+        card.insertAdjacentHTML('afterend', `
+            <div class="dashboard-card" id="restartCard" data-app-id="${app.id}">
+                <div class="card-header">
+                    <span class="card-icon" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; background:#e7dce7; border-radius:6px; color:#5b4a7d; font-size:13px; font-weight:700;"><i class="fas fa-redo"></i></span>
+                    <h2>${restartEsc(RESTART_COPY.cardTitle)}</h2>
+                </div>
+                <div style="padding: 4px 2px 2px;">${body}</div>
+            </div>`);
+    } catch (e) {
+        console.warn('[restart] 카드 렌더 실패(무시):', e);
+    }
+}
+
+async function requestRestartFromDashboard(btn) {
+    const card = document.getElementById('restartCard');
+    const appId = card ? card.dataset.appId : null;
+    const errEl = document.getElementById('restartRequestErr');
+    if (!appId) return;
+    const materials = Array.from(document.querySelectorAll('.restart-material:checked')).map(el => el.value);
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 요청 중...';
+    try {
+        const now = new Date().toISOString();
+        const updated = await supabaseAPI.patch('applications', appId, { restart_requested_at: now, restart_materials: materials });
+        if (!updated) throw new Error('저장되지 않았어요. 잠시 후 다시 시도해 주세요.');
+        // 대표 텔레그램 — 실패해도 요청 자체는 저장됨
+        try {
+            await fetch(`${SUPABASE_URL}/functions/v1/telegram-notify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+                body: JSON.stringify({ type: 'restart_requested', data: { app_id: appId, materials: materials } })
+            });
+        } catch (e) { console.warn('[restart] 텔레그램 발송 실패(무시):', e); }
+        await renderRestartCard(updated);
+    } catch (e) {
+        btn.disabled = false; btn.innerHTML = restartEsc(RESTART_COPY.cardButton) + ' <i class="fas fa-chevron-right" style="font-size:12px;"></i>';
+        if (errEl) { errEl.textContent = e.message || '요청에 실패했어요.'; errEl.style.display = 'block'; }
     }
 }
