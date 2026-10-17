@@ -4626,7 +4626,8 @@ function _mgHistory(app) {
     for (const e of (typeof _resetEntries === 'function' ? _resetEntries(app) : [])) {
         const prev = e.prev || {};
         const corr = e.corr_action === 'restart' ? '첨삭 처음부터' : e.corr_action === 'keep' ? '첨삭 그대로' : '';
-        items.push({ t: e.at || '', html: `<i class="fas fa-history" style="color:#b45309; width:14px;"></i> 리셋 · ${_pauseKrDate(String(e.at || '').slice(0, 10))} · 새 시작일 ${e.new_start ? _pauseKrDate(String(e.new_start).slice(0, 10)) : '-'}${corr ? ' · ' + corr : ''} — ${e.undone_at ? '되돌림' : '처리됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''} <span style="color:#94a3b8;">(리셋 전: ${escapeHtml(prev.schedule_start || '-')} · ${escapeHtml(String(prev.assigned_program || '-').replace('내벨업챌린지 - ', ''))})</span>` });
+        const modeLabel = e.mode === 'selfpaced' ? '자기주도' : e.mode === 'standard' ? 'Standard' : e.mode === 'fast' ? 'Fast' : e.mode === 'australia' ? '호주' : '';
+        items.push({ t: e.at || '', html: `<i class="fas fa-history" style="color:#b45309; width:14px;"></i> 리셋 · ${_pauseKrDate(String(e.at || '').slice(0, 10))} · 새 시작일 ${e.new_start ? _pauseKrDate(String(e.new_start).slice(0, 10)) : '-'}${modeLabel ? ' · ' + modeLabel : ''}${corr ? ' · ' + corr : ''} — ${e.undone_at ? '되돌림' : '처리됨'}${e.reason ? ` · ${escapeHtml(e.reason)}` : ''} <span style="color:#94a3b8;">(리셋 전: ${escapeHtml(prev.schedule_start || '-')} · ${escapeHtml(String(prev.assigned_program || '-').replace('내벨업챌린지 - ', ''))})</span>` });
     }
     if (items.length === 0) return '';
     items.sort((a, b) => (String(b.t) > String(a.t) ? 1 : -1));
@@ -5225,19 +5226,22 @@ async function _mgResetAction(id) {
     const app = currentManageApp; if (!app) return;
     const by = _pauseAdminName();
     const inputStyle = 'width:100%; box-sizing:border-box; padding:10px 12px; border:none; border-radius:8px; background:#f3f4f5; font-family:\'Pretendard\'; font-size:14px; outline:none;';
-    const field = (lbl, html, hint) => `<div style="margin-bottom:12px;"><label style="display:block; font-size:12.5px; font-weight:600; color:#475569; margin-bottom:6px;">${lbl}${hint ? ` <span style="font-weight:400; color:#94a3b8;">${hint}</span>` : ''}</label>${html}</div>`;
+    const field = (lbl, html, hint, wrapId) => `<div${wrapId ? ` id="${wrapId}"` : ''} style="margin-bottom:12px;"><label style="display:block; font-size:12.5px; font-weight:600; color:#475569; margin-bottom:6px;">${lbl}${hint ? ` <span style="font-weight:400; color:#94a3b8;">${hint}</span>` : ''}</label>${html}</div>`;
 
     if (id === 'reset_undo') {
         const last = _resetLastEntry(app); if (!last || last.undone_at) return;
         const prev = last.prev || {};
+        const prevMode = prev.self_paced === true ? '자기주도' : (String(prev.assigned_program || '').replace('내벨업챌린지 Australia - ', '호주 ').replace('내벨업챌린지 - ', '') || '-');
+        const prevEnd = prev.self_paced === true ? (prev.self_paced_end_date ? String(prev.self_paced_end_date).slice(0, 10) : '') : (prev.schedule_end || '');
         _mgDialog({ title: '리셋 되돌리기', danger: true, confirmLabel: '되돌리기',
-            body: '<p style="margin:0 0 8px; font-size:14px; color:#1e293b;">숨긴 학습 기록' + (last.corr_batch ? '과 첨삭 보관분' : '') + '을 제자리로 되돌립니다.</p>'
-                + '<p style="margin:0 0 8px; font-size:12.5px; color:#64748b;">리셋 뒤 새 기록이 생겼으면 서버가 거절합니다. 정지 이력·챌린지 시작일·연습코스는 되돌리지 않아요. 리셋 전 값: 시작일 ' + escapeHtml(prev.schedule_start || '-') + ' · ' + escapeHtml(prev.assigned_program || '-') + (prev.correction_start_date ? ' · 첨삭 ' + escapeHtml(prev.correction_start_date) : '') + '</p>',
+            body: '<p style="margin:0 0 8px; font-size:14px; color:#1e293b;"><b>리셋 전 상태로 전부</b> 되돌립니다 — 학습 기록·일정·과정·첨삭 날짜' + (last.corr_batch ? '·첨삭 보관분' : '') + '·정지 이력·연습코스·주간체크 초안.</p>'
+                + '<p style="margin:0 0 8px; font-size:12.5px; color:#64748b;">리셋 전 값: 시작일 ' + escapeHtml(prev.schedule_start || '-') + ' · ' + escapeHtml(prevMode) + (prevEnd ? ' (종료 ' + escapeHtml(prevEnd) + ')' : '') + (prev.correction_start_date ? ' · 첨삭 ' + escapeHtml(prev.correction_start_date) : '') + '</p>'
+                + '<p style="margin:0; font-size:12.5px; color:#64748b;">리셋 뒤 새 기록이 생겼거나, 리셋 뒤 일시정지를 새로 걸었거나, 첨삭 켜짐/꺼짐을 바꿨으면 서버가 거절해요. 리셋 뒤 고친 개별분석 글·가격은 그대로예요.</p>',
             onConfirm: async () => {
                 await supabaseAPI.rpc('enrollment_reset_undo', { p_app_id: app.id, p_by: by });
                 await _resetReloadTab(app.id);
             },
-            toast: '리셋을 되돌렸어요' });
+            toast: '리셋을 되돌렸어요 — 리셋 전 상태로 복원' });
         return;
     }
     if (id !== 'reset') return;
@@ -5252,45 +5256,58 @@ async function _mgResetAction(id) {
         corrAction = used <= 5 ? 'restart' : 'keep';
     }
     const today = _pauseTodayYmd();
-    const isSp = app.self_paced === true, isAus = _isAustraliaApp(app);
+    const isAus = _isAustraliaApp(app);
+    const curMode = app.self_paced === true ? 'selfpaced' : (String(app.assigned_program || '').includes('Standard') ? 'standard' : 'fast');
     const corrSp = !!app.correction_end_date;   // 첨삭 자기주도(종료일 지정)
     const liveCount = _resetLiveEntries(app).length;
-    const defStart = isSp ? ymdAddDays(today, 1) : _ymdNextSunday(ymdAddDays(today, 1));
+    const tomorrow = ymdAddDays(today, 1);
+    const defStart = curMode === 'selfpaced' ? tomorrow : _ymdNextSunday(tomorrow);
+    const weeksOf = (m) => m === 'standard' ? 8 : 4;
+    // 현재 선택 과정(호주는 고정). validate/onConfirm 시점에 읽는다.
+    const modeNow = () => isAus ? 'australia' : ((document.querySelector('input[name="rs_mode"]:checked') || {}).value || curMode);
+    const segBtn = (val, label) => `<label style="flex:1;"><input type="radio" name="rs_mode" value="${val}" ${val === curMode ? 'checked' : ''} style="display:none;"><span class="rs-seg" data-val="${val}" style="display:block; text-align:center; padding:9px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; color:#64748b;">${label}</span></label>`;
+    const modeSeg = isAus
+        ? `<div style="font-size:13px; color:#475569; margin-bottom:12px;">과정: <b>${escapeHtml(app.assigned_program || '호주')}</b> (호주 과정은 리셋 창에서 바꾸지 않아요)</div>`
+        : field('과정', `<div id="rs_mode_seg" style="display:flex; gap:4px; background:#eef1f5; border-radius:10px; padding:4px;">${segBtn('fast', 'Fast (4주)')}${segBtn('standard', 'Standard (8주)')}${segBtn('selfpaced', '자기주도')}</div>`, '새 판의 과정');
     const practiceLine = isAus ? ''
         : (app.practice_enabled === true
             ? '<div style="font-size:13px; color:#475569; margin-bottom:12px;"><i class="fas fa-check" style="color:#15803d;"></i> 연습코스 켜져 있음 — 그대로 둡니다(시작 전 자유 연습 가능)</div>'
-            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 오픈 알림톡은 안 보냄)</span></label>');
+            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 리셋 연습코스 안내 알림톡이 따로 나가요)</span></label>');
     const corrLine = !app.correction_enabled ? ''
         : (corrAction === 'restart'
             ? '<div style="font-size:13px; color:#1e293b; margin-bottom:8px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>처음부터</b>(제출·피드백은 보관함으로, 12회 새로)</div>'
-              + field('첨삭 시작일', `<input type="date" id="rs_corr_start" value="${defStart}" min="${ymdAddDays(today, 1)}" style="${inputStyle}">`, '보통 새 시작일과 같게')
+              + field('첨삭 시작일', `<input type="date" id="rs_corr_start" value="${defStart}" min="${tomorrow}" style="${inputStyle}">`, '보통 새 시작일과 같게')
               + (corrSp ? field('첨삭 종료일', `<input type="date" id="rs_corr_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 12)}" style="${inputStyle}">`, '첨삭 자기주도 · 시작일 12일 뒤 이후') : '')
             : '<div style="font-size:13px; color:#1e293b; margin-bottom:12px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>그대로</b>(6회 이상은 새로 드리지 않아요. 남은 회차를 미루려면 첨삭 [일시정지])</div>');
     _mgDialog({ title: '리셋 — 처음부터 다시', danger: true, confirmLabel: '리셋',
         body: '<p style="margin:0 0 10px; font-size:14px; color:#1e293b;">학습 기록이 학생 화면에서 사라지고 인증률이 0에서 다시 시작돼요. 기록은 보관되고 되돌릴 수 있어요. 열린 일시정지는 취소돼요.</p>'
             + (liveCount > 0 ? '<div style="background:#fef3c7; color:#92400e; border-radius:8px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;">⚠️ 이 학생은 이미 리셋 ' + liveCount + '번(1인 1회 방침). 사유를 확인하고 진행하세요.</div>' : '')
-            + field('새 시작일', `<input type="date" id="rs_start" value="${defStart}" min="${ymdAddDays(today, 1)}" ${isSp ? '' : 'step="7"'} style="${inputStyle}">`, isSp ? '내일 이후' : '일요일만 · 내일 이후')
-            + (isSp ? field('종료일', `<input type="date" id="rs_sp_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 1)}" style="${inputStyle}">`, '자기주도 종료일') : '')
+            + modeSeg
+            + field('새 시작일', `<input type="date" id="rs_start" value="${defStart}" min="${tomorrow}" style="${inputStyle}">`, '', 'rs_start_wrap')
+            + field('종료일', `<input type="date" id="rs_sp_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 1)}" style="${inputStyle}">`, '자기주도 종료일 · 직접 입력', 'rs_sp_end_wrap')
+            + '<div id="rs_end_preview" style="font-size:12.5px; color:#475569; margin:-4px 0 12px;"></div>'
             + corrLine
             + field('사유', `<input type="text" id="rs_reason" placeholder="예: 유학 연기로 1월 재시작 약속" style="${inputStyle}">`, '필수 · 이력에 남음')
             + practiceLine
-            + '<p style="margin:0; font-size:12px; color:#94a3b8;">리셋 뒤 개별분석 탭에서 과정 유형(Fast/Standard)을 바꾸고 분석을 다시 만드세요. 시작 안내 알림톡은 새 날짜 전날 10시에 자동으로 나가요.</p>',
+            + '<p style="margin:0; font-size:12px; color:#94a3b8;">리셋 뒤 분석 글은 개별분석 탭 [AI 피드백 재생성]으로 새 과정에 맞춰 다시 만들 수 있어요(선택). 시작 안내 알림톡은 새 날짜 전날 10시에 자동으로 나가요.</p>',
         validate: () => {
+            const m = modeNow();
             const s = (document.getElementById('rs_start') || {}).value;
             if (!s) return '새 시작일을 입력하세요.';
-            if (s < ymdAddDays(today, 1)) return '새 시작일은 내일 이후여야 합니다.';
-            if (!isSp && !_ymdIsSunday(s)) return '정규·호주 과정 시작일은 일요일이어야 합니다. 예: ' + _ymdNextSunday(s);
-            if (isSp) { const e = (document.getElementById('rs_sp_end') || {}).value; if (!e) return '종료일을 입력하세요.'; if (e <= s) return '종료일은 시작일 뒤여야 합니다.'; }
+            if (s < tomorrow) return '새 시작일은 내일 이후여야 합니다.';
+            if (m !== 'selfpaced' && !_ymdIsSunday(s)) return '정규·호주 과정 시작일은 일요일이어야 합니다. 예: ' + _ymdNextSunday(s);
+            if (m === 'selfpaced') { const e = (document.getElementById('rs_sp_end') || {}).value; if (!e) return '자기주도 종료일을 입력하세요.'; if (e <= s) return '종료일은 시작일 뒤여야 합니다.'; }
             if (corrAction === 'restart') {
                 const cs = (document.getElementById('rs_corr_start') || {}).value;
                 if (!cs) return '첨삭 시작일을 입력하세요.';
-                if (cs < ymdAddDays(today, 1)) return '첨삭 시작일은 내일 이후여야 합니다.';
+                if (cs < tomorrow) return '첨삭 시작일은 내일 이후여야 합니다.';
                 if (corrSp) { const ce = (document.getElementById('rs_corr_end') || {}).value; if (!ce) return '첨삭 종료일을 입력하세요.'; if (ce < ymdAddDays(cs, 12)) return '첨삭 종료일은 시작일 12일 뒤 이후여야 합니다.'; }
             }
             if (!((document.getElementById('rs_reason') || {}).value || '').trim()) return '사유를 입력하세요.';
             return null;
         },
         onConfirm: async () => {
+            const m = modeNow();
             const g = (i) => (document.getElementById(i) || {}).value || null;
             await supabaseAPI.rpc('enrollment_reset', {
                 p_app_id: app.id,
@@ -5298,18 +5315,36 @@ async function _mgResetAction(id) {
                 p_reason: (g('rs_reason') || '').trim(),
                 p_corr_start: corrAction === 'restart' ? g('rs_corr_start') : null,
                 p_corr_end: (corrAction === 'restart' && corrSp) ? g('rs_corr_end') : null,
-                p_sp_end: isSp ? g('rs_sp_end') : null,
+                p_sp_end: m === 'selfpaced' ? g('rs_sp_end') : null,
                 p_open_practice: !!((document.getElementById('rs_practice') || {}).checked),
-                p_by: by });
+                p_by: by,
+                p_mode: isAus ? null : m });
             await _resetReloadTab(app.id);
         },
-        toast: '리셋했어요 — 개별분석 탭에서 유형·분석을 다시 잡아주세요' });
-    // 새 시작일을 바꾸면 첨삭 시작일 기본값도 따라가게(아직 손대지 않았을 때만)
+        toast: '리셋했어요 — 새 시작일부터 새 판' });
+    // 과정 세그먼트·날짜 연동: 선택에 따라 요일 안내·종료일 칸·미리보기. 새 시작일을 바꾸면 첨삭·종료일 기본값이 따라감(손대기 전까지).
     setTimeout(() => {
-        const s = document.getElementById('rs_start'), c = document.getElementById('rs_corr_start');
-        if (!s || !c) return;
-        let touched = false; c.addEventListener('input', () => { touched = true; });
-        s.addEventListener('change', () => { if (!touched) c.value = s.value; });
+        const s = document.getElementById('rs_start'), c = document.getElementById('rs_corr_start'), ce = document.getElementById('rs_corr_end'), se = document.getElementById('rs_sp_end');
+        const hint = document.querySelector('#rs_start_wrap label span'), spWrap = document.getElementById('rs_sp_end_wrap'), prev = document.getElementById('rs_end_preview');
+        let cTouched = false, ceTouched = false, seTouched = false;
+        if (c) c.addEventListener('input', () => { cTouched = true; });
+        if (ce) ce.addEventListener('input', () => { ceTouched = true; });
+        if (se) se.addEventListener('input', () => { seTouched = true; });
+        const paint = () => {
+            const m = modeNow();
+            document.querySelectorAll('#rs_mode_seg .rs-seg').forEach(el => { const on = el.dataset.val === m; el.style.background = on ? '#fff' : 'transparent'; el.style.color = on ? '#1e293b' : '#64748b'; el.style.boxShadow = on ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'; });
+            if (hint) hint.textContent = m === 'selfpaced' ? '내일 이후 · 요일 자유' : '일요일만 · 내일 이후';
+            if (spWrap) spWrap.style.display = m === 'selfpaced' ? '' : 'none';
+            if (prev && s) prev.textContent = (m === 'selfpaced' || !s.value) ? '' : ('종료일(자동): ' + ymdAddDays(s.value, weeksOf(m) * 7 - 1) + ' · ' + weeksOf(m) + '주');
+        };
+        const follow = () => { if (!s || !s.value) return; if (c && !cTouched) c.value = s.value; if (ce && !ceTouched) ce.value = ymdAddDays(s.value, 27); if (se && !seTouched) se.value = ymdAddDays(s.value, 27); paint(); };
+        document.querySelectorAll('input[name="rs_mode"]').forEach(r => r.addEventListener('change', () => {
+            const m = modeNow();
+            if (s && m !== 'selfpaced' && s.value && !_ymdIsSunday(s.value)) s.value = _ymdNextSunday(s.value);   // 정규로 바꾸면 다음 일요일로
+            follow();
+        }));
+        if (s) s.addEventListener('change', follow);
+        paint();
     }, 0);
 }
 
