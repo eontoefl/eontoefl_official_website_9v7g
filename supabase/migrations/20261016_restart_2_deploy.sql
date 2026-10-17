@@ -35,11 +35,11 @@ BEGIN
     RAISE EXCEPTION 'ABORT 이미 적용된 파일(study_results_v3_enrollment_uniq 있음)';
   END IF;
   SELECT md5(p.prosrc) INTO v FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='schedule_pause_set';
-  IF v IS DISTINCT FROM '__MD5_SCHEDULE_PAUSE_SET__' THEN RAISE EXCEPTION 'ABORT schedule_pause_set 라이브 본문이 확인본과 다름: %', v; END IF;
+  IF v IS DISTINCT FROM '7c1bea7f058c75065b9f5d9f5cbeb592' THEN RAISE EXCEPTION 'ABORT schedule_pause_set 라이브 본문이 확인본과 다름: %', v; END IF;
   SELECT md5(p.prosrc) INTO v FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='schedule_pause_undo_check';
-  IF v IS DISTINCT FROM '__MD5_SCHEDULE_PAUSE_UNDO_CHECK__' THEN RAISE EXCEPTION 'ABORT schedule_pause_undo_check 라이브 본문이 확인본과 다름: %', v; END IF;
+  IF v IS DISTINCT FROM '6efc0f46f82f2ed0c04473b0bd3ea5db' THEN RAISE EXCEPTION 'ABORT schedule_pause_undo_check 라이브 본문이 확인본과 다름: %', v; END IF;
   SELECT md5(p.prosrc) INTO v FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='auto_enable_practice_mode';
-  IF v IS DISTINCT FROM '__MD5_AUTO_ENABLE_PRACTICE_MODE__' THEN RAISE EXCEPTION 'ABORT auto_enable_practice_mode 라이브 본문이 확인본과 다름: %', v; END IF;
+  IF v IS DISTINCT FROM '9ddfa6b0d8607ca4faa76fa39ca3bb5a' THEN RAISE EXCEPTION 'ABORT auto_enable_practice_mode 라이브 본문이 확인본과 다름: %', v; END IF;
 END $chk$;
 -- ※ 위 __MD5_*__ 세 값은 배포일 직전에 아래 한 줄로 받아서 채운다(대표가 SQL 편집기에서 실행 → 결과를 Claude에게):
 --    SELECT proname, md5(prosrc) FROM pg_proc WHERE proname IN ('schedule_pause_set','schedule_pause_undo_check','auto_enable_practice_mode');
