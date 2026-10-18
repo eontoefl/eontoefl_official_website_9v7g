@@ -2359,34 +2359,14 @@ async function restartCardEligibility(app) {
     const twoYears = new Date(baseYmd + 'T00:00:00Z'); twoYears.setUTCFullYear(twoYears.getUTCFullYear() + 2);
     if (todayYmd > twoYears.toISOString().slice(0, 10)) return { ok: false, reason: 'expired' };
 
-    // 환급 0원 등급: 관리자 목록과 같은 식(그 수강의 기록만 · 분모는 과제표 전체 — 끝난 수강이므로)
+    // 환급 0원 등급: 디비 enrollment_auth의 "최종" 인증률(그 수강의 기록 ÷ 과정 전체 과제 — 끝난 수강·중도포기 기준).
+    //   계산은 학습관리 목록·관리자 상세·학생 마이페이지와 같은 한 곳(_auth_core, 2026-10-18 인증률통일).
     try {
-        const [rows, sched, rules] = await Promise.all([
-            supabaseAPI.query('study_results_v3', { 'enrollment_id': `eq.${app.id}`, 'select': 'locked_auth_rate,initial_record,error_note_submitted,week', 'limit': '1000' }),
-            supabaseAPI.query('tr_schedule_assignment', { 'limit': '500' }),
-            supabaseAPI.query('tr_grade_rules', { 'order': 'min_rate.desc' })
-        ]);
-        const programStr = app.assigned_program || app.preferred_program || '';
-        const isFast = programStr.includes('Fast') || !!app.self_paced;
-        const prog = isFast ? 'fast' : 'standard';
-        const totalWeeks = isFast ? 4 : 8;
-        let total = 0;
-        (sched || []).forEach(s => {
-            if ((s.program || '').toLowerCase() !== prog || Number(s.week) > totalWeeks) return;
-            [s.section1, s.section2, s.section3, s.section4].forEach(sec => {
-                const p = (typeof parseScheduleSection === 'function') ? parseScheduleSection(sec) : null;
-                if (p && p.taskType !== 'unknown') total++;
-            });
-        });
-        let sum = 0;
-        (rows || []).forEach(r => {
-            if (Number(r.week) > totalWeeks) return;
-            if (r.locked_auth_rate != null) sum += Number(r.locked_auth_rate);
-            else if (r.initial_record) sum += r.error_note_submitted ? 100 : 50;
-        });
-        const rate = total > 0 ? Math.round(sum / total) : 0;
-        const g = (typeof getGradeFromRules === 'function') ? getGradeFromRules(rate, rules || [], 100000) : null;
-        const refundRate = g ? Number(g.refund_rate != null ? g.refund_rate : g.refundRate) : 0;
+        const rows = await supabaseAPI.rpc('enrollment_auth', { p_app_ids: [app.id] });
+        const a = Array.isArray(rows) ? rows[0] : null;
+        if (!a) return { ok: false };
+        const rate = a.rateFinal != null ? a.rateFinal : 0;
+        const refundRate = Number(a.refundRateFinal) || 0;
         if (refundRate > 0) return { ok: false, reason: 'refund' };
         return { ok: true, rate: rate, endYmd: endYmd };
     } catch (e) {

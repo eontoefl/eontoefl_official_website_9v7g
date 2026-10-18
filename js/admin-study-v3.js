@@ -79,13 +79,12 @@ async function loadWeeklyCheckDrafts() {
 }
 
 // 디비 결과 한 줄 → 목록 한 줄. 표시용 글자·색만 여기서 만든다(예전 규칙 그대로).
+// 인증률은 디비 _auth_core가 센 값(authRate). 아직 셀 과제가 없으면(시작 전) null → "-" — 관리자 상세·학생 마이페이지와 같은 규칙(2026-10-18 인증률통일).
 function toStudentRow(r) {
-    const isBeforeStart = ymdToUtcDate(r.today) < ymdToUtcDate(r.scheduleStart);
-    const hasTasksOrRecords = r.totalDeadlinedTasks > 0 || r.recordCount > 0;
     return {
         ...r,
         lastActivity: r.lastActivity ? new Date(r.lastActivity).getTime() : null,
-        authDisplay: (!isBeforeStart && hasTasksOrRecords) ? `${r.avgAuthRate}%` : '-',
+        authDisplay: (r.authRate != null) ? `${r.authRate}%` : '-',
         gradeColor: (r.grade !== '-') ? getGradeColor(r.grade) : '#94a3b8',
         challengePauses: r.challengePauses || [],
         missedDays: r.missedDays || []

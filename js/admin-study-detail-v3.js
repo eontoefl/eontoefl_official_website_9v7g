@@ -10,6 +10,7 @@ let weeklyCheckDrafts = [];  // tr_weekly_check_drafts 해당 학생 (승인대�
 let toeflScoresAdmin = [];   // toefl_actual_scores 해당 학생
 let toeflExamsAdmin = [];    // toefl_exam_schedules 해당 학생 (학생이 마이페이지에 등록한 시험 일정)
 let toeflAdminChartInstance = null;
+let enrollmentAuth = null;  // 디비 enrollment_auth 결과(이 수강의 인증률·등급 — 모든 화면 공통 계산, 2026-10-18 인증률통일). 실패 시 null
 let toeflEditingScoreId = null;   // 수정 중인 성적 id (null이면 신규)
 let toeflFormImageDataUri = null; // 새로 첨부한 성적표 (base64)
 
@@ -86,7 +87,7 @@ async function loadStudentDetail() {
         const studentUserId = studentData.user.id;
 
         // 병렬로 필요한 데이터 모두 로드
-        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult, toeflResult, examResult] = await Promise.all([
+        const [scheduleResult, studyV3Result, deadlineResult, gradeRules, draftsResult, toeflResult, examResult, authResult] = await Promise.all([
             supabaseAPI.query('tr_schedule_assignment', { 'order': 'id.asc', 'limit': '500' }),
             supabaseAPI.query('study_results_v3', {
                 'user_id': `eq.${studentUserId}`,
@@ -112,7 +113,11 @@ async function loadStudentDetail() {
                 'user_id': `eq.${studentUserId}`,
                 'order': 'exam_datetime.asc',
                 'limit': '100'
-            })
+            }),
+            // 인증률·등급: 디비 한 곳에서 계산(학습관리 목록·학생 마이페이지와 같은 숫자). 실패해도 상세는 뜬다.
+            supabaseAPI.rpc('enrollment_auth', { p_app_ids: [studentData.app.id] })
+                .then(rows => (Array.isArray(rows) && rows[0]) || null)
+                .catch(e => { console.warn('인증률 계산 조회 실패:', e); return null; })
         ]);
 
         scheduleData = scheduleResult || [];
@@ -121,6 +126,7 @@ async function loadStudentDetail() {
         weeklyCheckDrafts = draftsResult || [];
         toeflScoresAdmin = toeflResult || [];
         toeflExamsAdmin = examResult || [];
+        enrollmentAuth = authResult;
 
         // 렌더링
         loading.style.display = 'none';
@@ -440,8 +446,8 @@ function renderV3SummaryCards() {
 
     renderCardTodayTasks(effectiveToday, programType, startDate, totalWeeks);
     renderCardChallenge(effectiveToday, startDate, totalDays);
-    renderCardAuthRate(effectiveToday, programType, startDate, totalWeeks);
-    renderCardGrade(effectiveToday, programType, startDate, totalWeeks, depositAmount);
+    renderCardAuthRate();
+    renderCardGrade(depositAmount);
 }
 
 // 날짜 계산에 넘길 신청서 모양: 시작일(화면 규칙대로 고른 값) + 일시정지 이력(정지 기간을 빼고 세기 위해 — 2026-10-06)
@@ -577,96 +583,53 @@ function renderCardChallenge(effectiveToday, startDate, totalDays) {
 }
 
 // ===== 카드3: 인증률 =====
-function renderCardAuthRate(effectiveToday, programType, startDate, totalWeeks) {
+// 숫자는 디비 enrollment_auth(_auth_core)가 계산한다 — 학습관리 목록·학생 마이페이지와 같은 규칙(2026-10-18 인증률통일).
+//   예전에는 여기서 Fast 달력으로 따로 셌다(자기주도 일정표·연장·학생 시간대가 반영되지 않았음).
+function renderCardAuthRate() {
     const el = document.getElementById('cardAuthRate');
+    const a = enrollmentAuth;
 
-    // 시작 전
-    if (!startDate || effectiveToday < startDate) {
+    // 계산 실패 / 시작 전(아직 셀 과제 없음)
+    if (!a || a.rate == null) {
         el.innerHTML = `
             <div style="text-align:center;">
                 <div class="auth-rate-value" style="color:#94a3b8;">-<span>%</span></div>
                 <div class="auth-bar-wrap"><div class="auth-bar" style="width:0%; background:#e2e8f0;"></div></div>
-                <div class="auth-sub">시작 전</div>
+                <div class="auth-sub">${a ? '시작 전' : '인증률을 불러오지 못했습니다'}</div>
             </div>`;
         return;
     }
 
-    // study_results_v3에서 인증률 분자 계산
-    // locked_auth_rate가 있으면 사용, 없으면 initial_record 존재시 50 (error_note_submitted이면 100), 아니면 0
-    let authRateSum = 0;
-    for (const r of studyResultsV3) {
-        if (r.locked_auth_rate != null) {
-            authRateSum += r.locked_auth_rate;
-        } else if (r.initial_record) {
-            // 초기 기록이 있으면 50, 오답노트 제출했으면 100
-            authRateSum += r.error_note_submitted ? 100 : 50;
-        }
-        // initial_record 없으면 0 (미제출)
-    }
-
-    // 인증률 분모 계산: 도래한 과제 수 (tr_deadline_extensions 적용)
-    const tasksDueToday = countDueTasks(effectiveToday, programType, startDate, totalWeeks);
-
-    const authRate = tasksDueToday > 0 ? Math.round(authRateSum / tasksDueToday) : 0;
+    const authRate = a.rate;
     const barColor = authRate >= 90 ? '#10b981' : authRate >= 70 ? '#f59e0b' : '#ef4444';
 
     el.innerHTML = `
         <div style="text-align:center;">
             <div class="auth-rate-value" style="color:${barColor};">${authRate}<span>%</span></div>
             <div class="auth-bar-wrap"><div class="auth-bar" style="width:${Math.min(100, authRate)}%; background:${barColor};"></div></div>
-            <div class="auth-sub" style="color:#94a3b8; font-size:12px; margin-top:6px;">오늘까지 할당된 과제 ${tasksDueToday}건 기준</div>
+            <div class="auth-sub" style="color:#94a3b8; font-size:12px; margin-top:6px;">오늘까지 할당된 과제 ${a.dueCount}건 기준</div>
         </div>`;
 }
 
 // ===== 카드4: 등급 & 환급 =====
-function renderCardGrade(effectiveToday, programType, startDate, totalWeeks, depositAmount) {
+// 등급·환급률도 디비 결과(같은 등급표 tr_grade_rules). 환급률은 비율(1.0 = 100%).
+function renderCardGrade(depositAmount) {
     const el = document.getElementById('cardGrade');
+    const a = enrollmentAuth;
 
-    // 시작 전
-    if (!startDate || effectiveToday < startDate) {
+    if (!a || a.rate == null) {
         el.innerHTML = `
             <div style="text-align:center;">
                 <div class="grade-badge-lg" style="background:#cbd5e1;">-</div>
-                <div class="grade-sub">시작 후 산정</div>
+                <div class="grade-sub">${a ? '시작 후 산정' : '등급을 불러오지 못했습니다'}</div>
             </div>`;
         return;
     }
 
-    // 인증률 재계산 (카드3과 동일 로직)
-    let authRateSum = 0;
-    for (const r of studyResultsV3) {
-        if (r.locked_auth_rate != null) {
-            authRateSum += r.locked_auth_rate;
-        } else if (r.initial_record) {
-            authRateSum += r.error_note_submitted ? 100 : 50;
-        }
-    }
-    const tasksDueToday = countDueTasks(effectiveToday, programType, startDate, totalWeeks);
-    const authRate = tasksDueToday > 0 ? Math.round(authRateSum / tasksDueToday) : 0;
-
-    // 등급 판정
-    const rules = gradeRulesCache || [];
-    let grade = '-', refundRate = 0, refundAmount = 0;
-
-    if (rules.length > 0) {
-        for (const rule of rules) {
-            if (authRate >= rule.min_rate) {
-                grade = rule.grade;
-                refundRate = rule.refund_rate || 0;
-                // refund_rate가 1 이하면 비율(0.9 = 90%), 100 초과면 퍼센트로 처리
-                if (refundRate > 1) {
-                    refundAmount = Math.round(depositAmount * refundRate / 100);
-                } else {
-                    refundAmount = Math.round(depositAmount * refundRate);
-                }
-                break;
-            }
-        }
-        if (grade === '-') {
-            grade = 'F'; refundRate = 0; refundAmount = 0;
-        }
-    }
-
+    const grade = a.grade || 'F';
+    const refundRate = Number(a.refundRate) || 0;
+    // 예전 표시 규칙 유지: 1 초과면 퍼센트 값, 1 이하면 비율
+    const refundAmount = refundRate > 1 ? Math.round(depositAmount * refundRate / 100) : Math.round(depositAmount * refundRate);
     const gradeColor = getGradeColor(grade);
 
     el.innerHTML = `
@@ -677,47 +640,6 @@ function renderCardGrade(effectiveToday, programType, startDate, totalWeeks, dep
             </div>
             <div class="grade-sub">보증금 ${depositAmount.toLocaleString()}원 / ${Math.round((refundRate > 1 ? refundRate : refundRate * 100))}% 환급</div>
         </div>`;
-}
-
-// ===== 도래 과제 수 계산 (tr_deadline_extensions 적용) =====
-function countDueTasks(effectiveToday, programType, startDate, totalWeeks) {
-    const prog = programType.toLowerCase();
-    const progSchedule = (scheduleData || []).filter(s => (s.program || '').toLowerCase() === prog);
-
-    // deadline extensions를 날짜 키로 매핑
-    const extMap = {};
-    (deadlineExtensionsData || []).forEach(ext => {
-        if (ext.original_date) extMap[ext.original_date] = ext.extra_days || 0;
-    });
-
-    let count = 0;
-    const dayEngNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-
-    for (const s of progSchedule) {
-        if (s.week > totalWeeks) continue;
-        const dayIndex = DAY_ENG_TO_INDEX[s.day];
-        if (dayIndex === undefined) continue;
-
-        // 해당 과제의 날짜 계산 (일정 계산 단일 출처)
-        const taskDate = getChallengeTaskDate(_appForDates(startDate), s.week, dayIndex);
-
-        // effectiveToday 이후면 아직 도래하지 않음
-        if (!taskDate || taskDate > effectiveToday) continue;
-
-        // deadline extension 체크: 연장된 날짜의 과제는 분모에서 제외하지 않음
-        // (인증률 분모는 모든 도래 과제를 포함, 연장은 마감만 늦춤)
-        const dateStr = toDateStr(taskDate);
-
-        // section1~4 중 유효한 과제 수 세기
-        for (const sec of [s.section1, s.section2, s.section3, s.section4]) {
-            const parsed = parseScheduleSection(sec);
-            if (parsed && parsed.taskType !== 'unknown') {
-                count++;
-            }
-        }
-    }
-
-    return count;
 }
 
 // ===== 카드용 날짜 포맷 =====
