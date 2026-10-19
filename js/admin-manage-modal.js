@@ -5273,14 +5273,14 @@ async function _mgResetAction(id) {
     const practiceLine = isAus ? ''
         : (app.practice_enabled === true
             ? '<div style="font-size:13px; color:#475569; margin-bottom:12px;"><i class="fas fa-check" style="color:#15803d;"></i> 연습코스 켜져 있음 — 그대로 둡니다(시작 전 자유 연습 가능)</div>'
-            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 기존 연습코스 오픈 알림톡은 안 나가요)</span></label>');
+            : '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; cursor:pointer; margin-bottom:12px;"><input type="checkbox" id="rs_practice" checked> 연습코스 열어두기 <span style="color:#94a3b8;">(시작 전 자유 연습 · 리셋 연습코스 안내 알림톡이 따로 나가요)</span></label>');
     const corrLine = !app.correction_enabled ? ''
         : (corrAction === 'restart'
             ? '<div style="font-size:13px; color:#1e293b; margin-bottom:8px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>처음부터</b>(제출·피드백은 보관함으로, 12회 새로)</div>'
               + field('첨삭 시작일', `<input type="date" id="rs_corr_start" value="${defStart}" min="${tomorrow}" style="${inputStyle}">`, '보통 새 시작일과 같게')
               + (corrSp ? field('첨삭 종료일', `<input type="date" id="rs_corr_end" value="${ymdAddDays(defStart, 27)}" min="${ymdAddDays(defStart, 12)}" style="${inputStyle}">`, '첨삭 자기주도 · 시작일 12일 뒤 이후') : '')
             : '<div style="font-size:13px; color:#1e293b; margin-bottom:12px;">스라첨삭: <b>12회 중 ' + used + '회 이용</b> → <b>그대로</b>(6회 이상은 새로 드리지 않아요. 남은 회차를 미루려면 첨삭 [일시정지])</div>');
-    _mgDialog({ title: '리셋 — 처음부터 다시', danger: true, confirmLabel: '리셋',
+    const dlg = { title: '리셋 — 처음부터 다시', danger: true, confirmLabel: '리셋',
         body: '<p style="margin:0 0 10px; font-size:14px; color:#1e293b;">학습 기록이 학생 화면에서 사라지고 인증률이 0에서 다시 시작돼요. 기록은 보관되고 되돌릴 수 있어요. 열린 일시정지는 취소돼요.</p>'
             + (liveCount > 0 ? '<div style="background:#fef3c7; color:#92400e; border-radius:8px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;">⚠️ 이 학생은 이미 리셋 ' + liveCount + '번(1인 1회 방침). 사유를 확인하고 진행하세요.</div>' : '')
             + modeSeg
@@ -5290,7 +5290,7 @@ async function _mgResetAction(id) {
             + corrLine
             + field('사유', `<input type="text" id="rs_reason" placeholder="예: 유학 연기로 1월 재시작 약속" style="${inputStyle}">`, '필수 · 이력에 남음')
             + practiceLine
-            + '<p style="margin:0; font-size:12px; color:#94a3b8;">리셋 뒤 분석 글은 개별분석 탭 [AI 피드백 재생성]으로 새 과정에 맞춰 다시 만들 수 있어요(선택). 시작 안내 알림톡은 새 날짜 전날 10시에 자동으로 나가요.</p>',
+            + '<p style="margin:0; font-size:12px; color:#94a3b8;">리셋 뒤 분석 글은 개별분석 탭 [AI 피드백 재생성]으로 새 과정에 맞춰 다시 만들 수 있어요(선택). 리셋 안내 알림톡이 바로 나가고, 시작 안내 알림톡은 새 날짜 전날 10시에 자동으로 나가요.</p>',
         validate: () => {
             const m = modeNow();
             const s = (document.getElementById('rs_start') || {}).value;
@@ -5310,7 +5310,7 @@ async function _mgResetAction(id) {
         onConfirm: async () => {
             const m = modeNow();
             const g = (i) => (document.getElementById(i) || {}).value || null;
-            await supabaseAPI.rpc('enrollment_reset', {
+            const r = await supabaseAPI.rpc('enrollment_reset', {
                 p_app_id: app.id,
                 p_new_start: g('rs_start'),
                 p_reason: (g('rs_reason') || '').trim(),
@@ -5320,9 +5320,14 @@ async function _mgResetAction(id) {
                 p_open_practice: !!((document.getElementById('rs_practice') || {}).checked),
                 p_by: by,
                 p_mode: isAus ? null : m });
+            // 리셋은 끝났다 — 여기서부터 실패해도 창을 다시 열지 않는다(두 번 누르면 두 번 리셋). 알림톡 결과는 토스트 문구로.
+            const noti = await _resetNotify(app, r);
+            dlg.toast = noti.ok ? '리셋했어요 — 새 시작일부터 새 판 · 리셋 안내 알림톡 발송' + (noti.practice ? ' (+연습코스 안내)' : '')
+                : ('리셋은 됐지만 알림톡이 안 나갔어요(' + noti.err + ') — 카톡으로 직접 안내하세요');
             await _resetReloadTab(app.id);
         },
-        toast: '리셋했어요 — 새 시작일부터 새 판' });
+        toast: '리셋했어요 — 새 시작일부터 새 판' };
+    _mgDialog(dlg);
     // 과정 세그먼트·날짜 연동: 선택에 따라 요일 안내·종료일 칸·미리보기. 새 시작일을 바꾸면 첨삭·종료일 기본값이 따라감(손대기 전까지).
     setTimeout(() => {
         const s = document.getElementById('rs_start'), c = document.getElementById('rs_corr_start'), ce = document.getElementById('rs_corr_end'), se = document.getElementById('rs_sp_end');
@@ -5348,6 +5353,26 @@ async function _mgResetAction(id) {
         paint();
         if (s) { try { s.focus(); } catch (e) { /* 무시 */ } }
     }, 60);
+}
+
+// 리셋 알림톡: ① 수강 리셋 안내(50256)는 리셋 성공 직후 전원, ② 리셋 연습코스 안내(50257)는 이 리셋에서 연습코스를 켠 학생(함수 반환 practice_opened)에게만.
+// 되돌리기 때는 보내지 않는다. 실패해도 리셋은 유지되고 토스트로만 알린다. 반환 { ok, practice, err }.
+async function _resetNotify(app, r) {
+    const res = r || {};
+    if (!app.phone) return { ok: false, practice: false, err: '전화번호 없음' };
+    const mode = res.mode;
+    const program = mode === 'standard' ? '내벨업챌린지 - Standard'
+        : mode === 'fast' ? '내벨업챌린지 - Fast'
+        : mode === 'selfpaced' ? '내벨업챌린지 - 자기주도'
+        : (app.assigned_program || '내벨업챌린지');   // 호주: 과정 이름 그대로
+    const base = { name: app.name, phone: app.phone, app_id: app.id, new_start: res.new_start };
+    const a = await sendKakaoAlimTalk('schedule_reset', Object.assign({ program }, base));
+    const wantPractice = res.practice_opened === true;
+    const b = wantPractice ? await sendKakaoAlimTalk('schedule_reset_practice', base) : { success: true };
+    const errs = [];
+    if (!a || !a.success) errs.push('리셋 안내: ' + ((a && a.error) || '실패'));
+    if (!b || !b.success) errs.push('연습코스 안내: ' + ((b && b.error) || '실패'));
+    return { ok: errs.length === 0, practice: wantPractice && !!(b && b.success), err: errs.join(' / ') };
 }
 
 // 개별분석 폼: 첨삭 '새로/다시' 세그먼트

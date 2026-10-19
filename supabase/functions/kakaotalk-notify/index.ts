@@ -9,6 +9,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE_URL = "https://eonfl.com";
 const TESTROOM_URL = "https://testroom.eonfl.com";
 
+// 'YYYY-MM-DD' → 'M월 D일' (리셋 안내 #{시작일}). 형식이 아니면 받은 값 그대로.
+function toKoreanMonthDay(ymd: unknown): string {
+  const [, m, d] = String(ymd ?? "").split("-");
+  return m && d ? `${Number(m)}월 ${Number(d)}일` : String(ymd ?? "");
+}
+
 // ===== 템플릿 ID 매핑 =====
 const TEMPLATE_IDS: Record<string, number> = {
   analysis_complete:  50236,  // 개별분석 완료 안내 (일반 학생)
@@ -49,10 +55,11 @@ const TEMPLATE_IDS: Record<string, number> = {
   refund_notice_correction:      50252,  // 스라첨삭 환불 안내
   refund_notice_challenge:       50253,  // 내벨업챌린지 환불 안내
   refund_notice_both:            50254,  // 내벨업챌린지·스라첨삭 환불 안내
-  // 리셋 안내(2026-10-17): 템플릿 검수 전 — 번호 0이면 아래 "Unknown template type"으로 거절되어 발송되지 않는다.
-  // 검수 완료 후 번호를 넣고 본문·대체문자를 승인 원문과 글자 단위로 맞출 것.
-  // 입력 data: name / phone / app_id / new_start('YYYY-MM-DD') / program(과정 유형) / practice_open(boolean)
-  schedule_reset:                0,      // 리셋 안내 (#{이름} / #{시작일} / #{과정} / #{연습코스안내})
+  // 리셋 안내(둘 다 버튼 없음). 관리창 [리셋] 성공 직후 화면(admin-manage-modal.js _resetNotify)이 보낸다. 되돌리기 때는 안 나감.
+  // 입력 data: name / phone / app_id / new_start('YYYY-MM-DD') / program(과정 유형 — #{과정})
+  schedule_reset:                50256,  // 수강 리셋 안내 (#{이름} / #{과정} / #{시작일}) — 2026-10-19 승인
+  // 리셋 창에서 연습코스를 "이번에" 켠 학생에게만(함수 반환 practice_opened=true) ①에 이어 한 번. 입력 data: name / phone / app_id / new_start
+  schedule_reset_practice:       50257,  // 리셋 연습코스 안내 (#{이름} / #{시작일}) — 2026-10-19 검수 요청 중(승인 전엔 루나소프트가 거절)
 };
 
 // 서버가 보내는 묶음 type을 실제 템플릿 type으로. 'schedule_resumed'는 target으로 내챌/첨삭을 가른다.
@@ -609,18 +616,42 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
       ].join("\n");
 
     case "schedule_reset": {
-      // [검수 전 자리만 — 본문은 대표 검수 문구로 교체] 변수: #{이름} / #{시작일} / #{과정} / #{연습코스안내}
-      // #{시작일}: new_start('YYYY-MM-DD') → 'M월 D일'. #{연습코스안내}: practice_open이 true면 한 줄, 아니면 빈 문자열.
-      const [, sm, sd] = String(data.new_start ?? "").split("-");
-      const startDate = sm && sd ? `${Number(sm)}월 ${Number(sd)}일` : String(data.new_start ?? "");
-      const practiceLine = data.practice_open === true ? "시작 전까지 연습코스에서 자유롭게 연습하실 수 있어요" : "";
+      // 50256 승인 원문(2026-10-19)과 글자 단위 일치 — 수정 시 카카오 재검수 필요. 변수: #{이름} / #{과정} / #{시작일}
+      // #{시작일}: new_start('YYYY-MM-DD') → 'M월 D일'
+      const startDate = toKoreanMonthDay(data.new_start);
       return [
-        "이온토플 - 리셋 안내",
+        "이온토플 - 수강 리셋 안내",
         "",
-        `${data.name}님, 안녕하세요.`,              // #{이름}
-        `- 과정: ${data.program}`,                  // #{과정}
-        `- 새 시작일: ${startDate}`,                // #{시작일}
-        practiceLine,                               // #{연습코스안내}
+        `${data.name}님, 안녕하세요.`,
+        "요청하신 대로 수강을 처음부터 다시 세팅했어요.",
+        "학습 기록과 인증률은 0에서 새로 시작해요.",
+        "",
+        `- 과정: ${data.program}`,
+        `- 새 시작일: ${startDate}`,
+        "",
+        "보증금과 수강료는 그대로이고, 추가 결제는 없어요.",
+        "리셋 전에 보신 시험도 시험 2회 조건에 그대로 인정돼요.",
+        "",
+        "시작 전날 진행 안내를 한 번 더 보내드릴게요.",
+        "",
+        "궁금한 점은 이 채팅방에 남겨주세요.",
+      ].join("\n");
+    }
+
+    case "schedule_reset_practice": {
+      // 50257 등록 원문(2026-10-19 검수 요청)과 글자 단위 일치 — 승인 뒤 원문이 바뀌면 여기도 맞출 것. 변수: #{이름} / #{시작일}
+      const startDate = toKoreanMonthDay(data.new_start);
+      return [
+        "이온토플 - 연습코스 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,
+        `요청하신 수강 리셋에 맞춰 새 시작일(${startDate}) 전까지 연습코스를 열어두었어요.`,
+        "",
+        "연습코스는 내벨업챌린지와 같은 구조의 새 문항 60세트예요.",
+        "별도 인증 절차 없이 자유롭게 이용하실 수 있고,",
+        "연습 기록은 인증률에 들어가지 않아요.",
+        "",
+        "테스트룸 PRACTICE 탭에서 확인해주세요.",
       ].join("\n");
     }
 
@@ -718,9 +749,11 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return "[이온토플] 내벨업챌린지 환불이 접수되었어요. 신청서의 계좌로 5영업일 이내 입금될 예정입니다.";
     case "refund_notice_both":
       return "[이온토플] 내벨업챌린지·스라첨삭 환불이 접수되었어요. 신청서의 계좌로 5영업일 이내 입금될 예정입니다.";
-    // 리셋 안내: [검수 전 임시 대체문자] 파트너스 센터 등록 대체문자가 정해지면 글자 단위로 맞출 것
+    // 리셋 안내: 파트너스 센터 등록 대체문자와 글자 단위 일치(2026-10-19)
     case "schedule_reset":
-      return "[이온토플] 일정이 새로 잡혔습니다. 테스트룸에서 새 시작일을 확인해주세요.";
+      return `[이온토플] 수강이 리셋됐어요. 새 시작일은 ${toKoreanMonthDay(data.new_start)}이에요. 추가 결제는 없어요.`;
+    case "schedule_reset_practice":
+      return `[이온토플] ${toKoreanMonthDay(data.new_start)} 전까지 연습코스를 열어두었어요. PRACTICE 탭에서 확인해주세요.`;
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -771,7 +804,10 @@ function hasNoButton(templateId: number): boolean {
       // 50252/50253/50254(환불 안내): 승인 템플릿에 버튼 없음(2026-10-13 파트너스 센터 확인).
       || templateId === TEMPLATE_IDS.refund_notice_correction
       || templateId === TEMPLATE_IDS.refund_notice_challenge
-      || templateId === TEMPLATE_IDS.refund_notice_both;
+      || templateId === TEMPLATE_IDS.refund_notice_both
+      // 50256/50257(리셋 안내·리셋 연습코스 안내): 버튼 없음(2026-10-19 파트너스 센터 미리보기 확인).
+      || templateId === TEMPLATE_IDS.schedule_reset
+      || templateId === TEMPLATE_IDS.schedule_reset_practice;
 }
 
 // ===== 단건 메시지 객체 생성 =====
