@@ -60,6 +60,9 @@ const TEMPLATE_IDS: Record<string, number> = {
   schedule_reset:                50256,  // 수강 리셋 안내 (#{이름} / #{과정} / #{시작일}) — 2026-10-19 승인
   // 리셋 창에서 연습코스를 "이번에" 켠 학생에게만(함수 반환 practice_opened=true) ①에 이어 한 번. 입력 data: name / phone / app_id / new_start
   schedule_reset_practice:       50257,  // 리셋 연습코스 안내 (#{이름} / #{시작일}) — 2026-10-19 검수 요청 중(승인 전엔 루나소프트가 거절)
+  // 재시작(수강 2) 허용 안내. 관리창 [수강 2 허용] 저장 직후 화면(admin-manage-modal.js _mgRestartAction)이 보낸다. 허용 취소 때는 안 나감.
+  // 같은 신청서(app_id)로 이미 'sent' 기록이 있으면 다시 보내지 않는다(취소 뒤 재허용). 입력 data: name / phone / app_id
+  restart_allowed:               50255,  // 재수강 안내 (#{name}) — 2026-10-16 등록·승인, 버튼 "신청서 작성하기" → 대시보드
 };
 
 // 서버가 보내는 묶음 type을 실제 템플릿 type으로. 'schedule_resumed'는 target으로 내챌/첨삭을 가른다.
@@ -615,6 +618,18 @@ function buildMsgContent(type: string, data: Record<string, unknown>): string {
         "환불 받으실 계좌 정보가 맞는지 확인해 주세요!",
       ].join("\n");
 
+    case "restart_allowed":
+      // 50255 승인 원문(2026-10-16 등록·승인)과 글자 단위 일치 — 수정 시 카카오 재검수 필요. 변수: #{name}
+      return [
+        "이온토플 - 재수강 안내",
+        "",
+        `${data.name}님, 안녕하세요.`,
+        "요청하신 재시작이 수락됐어요.",
+        "",
+        "공홈 대시보드에서 신청서를 새로 작성해주시면",
+        "개별분석부터 처음처럼 다시 진행해드릴게요.",
+      ].join("\n");
+
     case "schedule_reset": {
       // 50256 승인 원문(2026-10-19)과 글자 단위 일치 — 수정 시 카카오 재검수 필요. 변수: #{이름} / #{과정} / #{시작일}
       // #{시작일}: new_start('YYYY-MM-DD') → 'M월 D일'
@@ -754,6 +769,9 @@ function buildSmsContent(type: string, data: Record<string, unknown> = {}): stri
       return `[이온토플] 수강이 리셋됐어요. 새 시작일은 ${toKoreanMonthDay(data.new_start)}이에요. 추가 결제는 없어요.`;
     case "schedule_reset_practice":
       return `[이온토플] ${toKoreanMonthDay(data.new_start)} 전까지 연습코스를 열어두었어요. PRACTICE 탭에서 확인해주세요.`;
+    // 재수강 안내: 파트너스 센터 등록 대체문자와 글자 단위 일치(2026-10-21 확인)
+    case "restart_allowed":
+      return "[이온토플] 요청하신 재시작이 수락됐어요. https://eonfl.com/my-dashboard.html";
     default:
       return "[이온토플] 알림이 도착했습니다.";
   }
@@ -765,7 +783,7 @@ function getBtnUrl(type: string, data: Record<string, unknown>): string {
     const trackingNoDigits = String(data.tracking_number ?? "").replace(/[^0-9]/g, "");
     return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${trackingNoDigits}`;
   }
-  if (type === "correction_start_reminder") {
+  if (type === "correction_start_reminder" || type === "restart_allowed") {
     return `${SITE_URL}/my-dashboard.html`;
   }
   if (type === "correction_feedback_1" || type === "correction_feedback_2" || type === "weekly_check_registered" || type === "practice_open") {
@@ -924,6 +942,22 @@ async function logToDatabase(logData: Record<string, unknown>) {
   }
 }
 
+// ===== 이미 보낸 기록 확인 (재수강 안내 중복 방지) =====
+// 조회가 실패하면 false(보낸 적 없음)로 보고 발송한다 — 안내가 안 가는 쪽보다 한 번 더 가는 쪽이 낫다.
+async function hasSentLog(appId: string, templateType: string): Promise<boolean> {
+  try {
+    const q = `application_id=eq.${encodeURIComponent(appId)}&template_type=eq.${encodeURIComponent(templateType)}&status=eq.sent&select=application_id&limit=1`;
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/kakaotalk_logs?${q}`, {
+      headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
+    });
+    if (!resp.ok) return false;
+    const rows = await resp.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (_e) {
+    return false;
+  }
+}
+
 // ===== 메인 핸들러 =====
 Deno.serve(async (req) => {
   const corsHeaders = {
@@ -965,6 +999,14 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ success: false, error: "Phone number is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // 재수강 안내는 신청서당 한 번: 허용 취소 뒤 다시 허용해도 이미 보낸 기록이 있으면 보내지 않는다.
+    if (type === "restart_allowed" && data.app_id && await hasSentLog(String(data.app_id), type)) {
+      return new Response(
+        JSON.stringify({ success: true, skipped: "already_sent" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 

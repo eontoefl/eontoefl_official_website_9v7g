@@ -5138,7 +5138,7 @@ async function _mgRestartAction(id) {
         ? '<div style="font-size:13px; color:#1e293b; margin-bottom:6px;">수강 1 첨삭: <b>12세션 중 ' + (s.sessions_1_12 != null ? s.sessions_1_12 : '?') + '개</b> 제출' + (s.sessions_13_24 ? ' · 연장 ' + s.sessions_13_24 + '개' : '') + (s.archived_batches ? ' · 보관 이력 ' + s.archived_batches + '건' : '') + '</div>'
         : '<div style="font-size:13px; color:#1e293b; margin-bottom:6px;">수강 1 첨삭: 없음 → 수강 2에서 "새로"(+20만) 가능</div>';
     const mats = Array.isArray(app.restart_materials) && app.restart_materials.length ? app.restart_materials.map(escapeHtml).join(', ') : '없음';
-    _mgDialog({ title: '수강 2(재시작) 허용', confirmLabel: '허용',
+    const dlg = { title: '수강 2(재시작) 허용', confirmLabel: '허용',
         body: '<p style="margin:0 0 10px; font-size:14px; color:#1e293b;">학생이 <b>새 신청서</b>를 쓸 수 있게 문을 엽니다. 수강 1 기록은 그대로 남고, 수강 2는 1주차부터 새 판이에요.</p>'
             + corrLine
             + '<div style="font-size:13px; color:#1e293b; margin-bottom:6px;">실물 교재 요청: ' + mats + '</div>'
@@ -5148,8 +5148,19 @@ async function _mgRestartAction(id) {
             const fresh = await supabaseAPI.getById('applications', app.id);
             if (fresh && fresh.superseded_by) throw new Error('이미 수강 2 신청서가 있어요.');
             await supabaseAPI.patch('applications', app.id, { restart_allowed_at: new Date().toISOString(), restart_allowed_by: by });
+            // 허용은 끝났다 — 여기서부터 실패해도 창을 다시 열지 않는다. 재수강 안내 알림톡(50255) 결과는 토스트 문구로.
+            // 같은 신청서로 이미 보낸 적이 있으면(취소 뒤 재허용) 알림톡 함수가 건너뛴다(skipped).
+            const noti = app.phone
+                ? await sendKakaoAlimTalk('restart_allowed', { name: app.name, phone: app.phone, app_id: app.id })
+                : { success: false, error: '전화번호 없음' };
+            dlg.toast = !noti || !noti.success
+                ? '수강 2는 허용됐지만 알림톡이 안 나갔어요(' + ((noti && noti.error) || '실패') + ') — 카톡으로 직접 안내하세요'
+                : noti.skipped
+                    ? '수강 2를 허용했어요 — 재수강 안내는 전에 이미 보내서 다시 보내지 않았어요'
+                    : '수강 2를 허용했어요 — 재수강 안내 알림톡 발송';
         },
-        toast: '수강 2를 허용했어요 — 학생 대시보드에 "신청서 작성하기"가 열려요' });
+        toast: '수강 2를 허용했어요 — 학생 대시보드에 "신청서 작성하기"가 열려요' };
+    _mgDialog(dlg);
 }
 
 // ================================================
