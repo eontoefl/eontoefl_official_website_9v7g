@@ -72,7 +72,9 @@
   }
   function inert(html) { const t = document.createElement('template'); t.innerHTML = html || ''; return t.content; }
   function headingsIn(root) {
-    return [...root.querySelectorAll('h1,h2,h3,[data-book-kind="heading"]')].filter(h => !h.parentElement?.closest('h1,h2,h3,[data-book-kind="heading"]'));
+    // Table-of-contents entries are headings made entirely of links; they are not outline items.
+    const tocEntry = h => { const all = h.textContent.replace(/\s/g, ''); const linked = [...h.querySelectorAll('a')].map(a => a.textContent).join('').replace(/\s/g, ''); return !!all && all === linked; };
+    return [...root.querySelectorAll('h1,h2,h3,[data-book-kind="heading"]')].filter(h => !h.parentElement?.closest('h1,h2,h3,[data-book-kind="heading"]') && !tocEntry(h));
   }
   function buildTOC() {
     const list = $('toc'); list.replaceChildren();

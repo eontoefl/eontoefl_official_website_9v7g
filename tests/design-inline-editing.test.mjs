@@ -34,12 +34,12 @@ function block(type, patch = {}) {
 }
 function html(type, value) { return renderToStaticMarkup(blocks.designBlockSpecs[type].implementation.toExternalHTML({ block: value })); }
 
-test('eight schema types, no inline controls or details', () => {
-  assert.deepEqual(Object.keys(blocks.designBlockSpecs), ['bookHeading', 'bookCallout', 'bookCompare', 'bookAnnotated', 'bookQuestion', 'bookFlow', 'bookMedia', 'bookCover']);
+test('nine schema types, no inline controls or details', () => {
+  assert.deepEqual(Object.keys(blocks.designBlockSpecs), ['bookHeading', 'bookCallout', 'bookCompare', 'bookAnnotated', 'bookQuestion', 'bookFlow', 'bookMedia', 'bookCover', 'bookFinePrint']);
   assert.doesNotMatch(source, /<details|<summary|디자인 편집/);
   assert.equal((source.match(/<EditorControls block=\{block\} editor=\{editor\}>/g) || []).length, 8);
 });
-test('all eight external exports contain no editing UI/attributes', () => {
+test('all nine external exports contain no editing UI/attributes', () => {
   for (const type of Object.keys(blocks.designBlockSpecs)) {
     assert.doesNotMatch(html(type, block(type)), /contenteditable|data-design-inline|role="textbox"|디자인 설정|<dialog|<details|aria-invalid/i);
   }

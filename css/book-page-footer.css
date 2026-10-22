@@ -49,3 +49,26 @@
   .bookv2-paper { --book-footer-offset:28px; }
 }
 /* END BATCH FOOTER SPACING */
+
+/* Cover page: the cover fills the whole page (no paper padding, no page number). */
+.bookedit-paper:has(.book-cover) { padding: 0 !important; min-height: 0 !important; overflow: hidden; }
+.bookedit-mount .bn-editor:has(.book-cover) { padding: 0 !important; }
+.bookedit-paper .bn-editor > .bn-block-group:has(.book-cover) { max-width: none !important; min-height: 0 !important; }
+.bookedit-paper .bn-editor > .bn-block-group:has(.book-cover) .bn-block-outer { margin: 0 !important; }
+.bookedit-paper .bn-editor > .bn-block-group:has(.book-cover) .bn-block-content:has(> .book-cover) { padding: 0 !important; }
+.bookedit-paper .bn-editor:has(.book-cover) .bn-trailing-block { display: none; }
+.bookedit-preview:has(.book-cover) { padding: 0 !important; min-height: 0 !important; }
+.bookv2-paper:has(.book-cover) { padding: 0 !important; min-height: 0 !important; }
+.book-content.book-numbered-page:has(.book-cover) { min-height: 0 !important; }
+.preview-page body:has(.book-cover) { padding: 0 !important; }
+.preview-page .book-content:has(.book-cover) { max-width: none !important; }
+
+/* Fine print sits at the very bottom, directly above the page number. */
+.book-content.book-numbered-page > .book-fineprint,
+.bookedit-mount .bn-editor > .bn-block-group.book-numbered-page > .bn-block-outer:has(.book-fineprint) {
+  order: 1; margin-top: auto !important; transform: translateY(var(--book-footer-offset, 0px));
+}
+.book-content.book-numbered-page:has(> .book-fineprint) > .book-page-number,
+.bookedit-mount .bn-editor > .bn-block-group.book-numbered-page:has(> .bn-block-outer .book-fineprint) > .book-page-number {
+  margin-top: 6px !important; padding-top: 0 !important;
+}

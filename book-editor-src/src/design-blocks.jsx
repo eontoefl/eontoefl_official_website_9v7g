@@ -817,6 +817,28 @@ const bookCoverSpec = createReactBlockSpec(
   },
 )();
 
+// Small legal/notice text (copyright, trademark). Sits at the bottom of the page,
+// just above the printed page number. Text is ordinary inline content.
+function BookFinePrint({ block, contentRef }) {
+  return (
+    <div {...bookRootProps("fineprint", "neutral")}>
+      <p className="book-fineprint-text" ref={contentRef} />
+    </div>
+  );
+}
+
+const bookFinePrintSpec = createReactBlockSpec(
+  {
+    type: "bookFinePrint",
+    propSchema: {},
+    content: "inline",
+  },
+  {
+    render: (props) => <BookFinePrint {...props} />,
+    toExternalHTML: (props) => <BookFinePrint {...props} />,
+  },
+)();
+
 const bookHeadingSpec = createReactBlockSpec(
   {
     type: "bookHeading",
@@ -956,6 +978,7 @@ export const designBlockSpecs = Object.freeze({
   bookFlow: bookFlowSpec,
   bookMedia: bookMediaSpec,
   bookCover: bookCoverSpec,
+  bookFinePrint: bookFinePrintSpec,
 });
 
 export const designPresets = Object.freeze([
@@ -998,6 +1021,11 @@ export const designPresets = Object.freeze([
     type: "bookCover",
     label: "표지",
     description: "로고, 제목, 카피가 들어간 전자책 표지",
+  },
+  {
+    type: "bookFinePrint",
+    label: "작은 안내 문구",
+    description: "저작권·상표 고지처럼 쪽 맨 아래에 들어가는 작은 글씨",
   },
 ]);
 
@@ -1074,6 +1102,10 @@ const BLOCK_DEFAULT_FACTORIES = Object.freeze({
       hook: "남들이 문제부터 풀 때,",
       hookStrong: "합격자들은 시험부터 읽었습니다",
     },
+  }),
+  bookFinePrint: () => ({
+    type: "bookFinePrint",
+    content: "© 2026 EONTOEFL. All rights reserved.",
   }),
 });
 

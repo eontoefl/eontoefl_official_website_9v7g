@@ -405,10 +405,17 @@ function inlineText(content) {
 }
 
 // 한 페이지의 blocks에서 제목1·2를 순서대로 추출(중첩도 훑음)
+function isTocEntryBlock(b) {
+  const items = Array.isArray(b.content) ? b.content : [];
+  const visible = items.filter((x) => x && (x.type === "link" || String(x.text || "").trim()));
+  return visible.length > 0 && visible.every((x) => x.type === "link");
+}
+
 function collectHeadingsFromBlocks(blocks, pageId, out) {
   if (!Array.isArray(blocks)) return;
   blocks.forEach((b) => {
-    if (b && (b.type === "heading" || b.type === "bookHeading")) {
+    // 차례(목차 쪽)의 항목은 전체가 다른 쪽으로 가는 링크인 제목이다. 왼쪽 목차에서는 뺀다.
+    if (b && (b.type === "heading" || b.type === "bookHeading") && !isTocEntryBlock(b)) {
       const lvl = Number((b.props && b.props.level) || 1);
       if (lvl === 1 || lvl === 2) {
         out.push({ pageId: pageId, blockId: b.id, level: lvl, text: inlineText(b.content).trim() });

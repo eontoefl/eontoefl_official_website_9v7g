@@ -845,7 +845,7 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
   background: #F4F0FA;
   color: #4E3D73;
@@ -895,3 +895,19 @@
 .book-content .book-cover .book-cover-hook strong { font-weight: 600; color: #4E3D73; }
 /* A cover page shows no printed page number. */
 .book-numbered-page:has(.book-cover) > .book-page-number { display: none !important; }
+
+/* ---------------------------------------------------------------------
+   Fine print (bookFinePrint) — copyright / trademark notice, small text.
+   Page placement (bottom, above the page number) lives in book-page-footer.css.
+   --------------------------------------------------------------------- */
+.book-content .book-design.book-fineprint,
+.book-content [data-book-kind="fineprint"] {
+  margin: 0; padding: 24px 0 0; border: 0; border-radius: 0; background: none;
+  color: #9b97a8; font-family: "Pretendard", "Malgun Gothic", sans-serif;
+  font-weight: 400; font-size: 11px; line-height: 1.6; text-align: center; word-break: keep-all;
+}
+.book-content .book-fineprint .book-fineprint-text,
+.book-content .book-fineprint .bn-inline-content {
+  margin: 0 !important; color: inherit; font-family: inherit;
+  font-size: 11px !important; line-height: 1.6 !important; text-align: center !important;
+}
