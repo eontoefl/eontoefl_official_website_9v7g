@@ -10,3 +10,6 @@
   - 공식 사용 조건: https://www.heungkuklife.co.kr/jsps/front/company/ci/digit-hand-font-info.jsp
   - 웹/앱 및 폰트 파일 임베딩 허용. 유료 판매, 임의 수정·개작 재배포 금지. TTF를 변환하지 않았다.
   - 확인한 고지는 `leeseoyun/LICENSE-ko.txt`에 보관했다.
+- Outfit (Variable, 100-900): https://github.com/google/fonts/raw/refs/heads/main/ofl/outfit/Outfit%5Bwght%5D.ttf
+  - 라이선스 원문: https://github.com/google/fonts/raw/refs/heads/main/ofl/outfit/OFL.txt
+  - `outfit/OFL.txt`를 함께 배포한다. 표지(bookCover)의 영문 라벨과 R/L/W/S 블록에 쓴다. 확인일 2026-10-23.

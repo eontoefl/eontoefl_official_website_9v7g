@@ -34,12 +34,12 @@ function block(type, patch = {}) {
 }
 function html(type, value) { return renderToStaticMarkup(blocks.designBlockSpecs[type].implementation.toExternalHTML({ block: value })); }
 
-test('seven schema types, no inline controls or details', () => {
-  assert.deepEqual(Object.keys(blocks.designBlockSpecs), ['bookHeading', 'bookCallout', 'bookCompare', 'bookAnnotated', 'bookQuestion', 'bookFlow', 'bookMedia']);
+test('eight schema types, no inline controls or details', () => {
+  assert.deepEqual(Object.keys(blocks.designBlockSpecs), ['bookHeading', 'bookCallout', 'bookCompare', 'bookAnnotated', 'bookQuestion', 'bookFlow', 'bookMedia', 'bookCover']);
   assert.doesNotMatch(source, /<details|<summary|디자인 편집/);
-  assert.equal((source.match(/<EditorControls block=\{block\} editor=\{editor\}>/g) || []).length, 7);
+  assert.equal((source.match(/<EditorControls block=\{block\} editor=\{editor\}>/g) || []).length, 8);
 });
-test('all seven external exports contain no editing UI/attributes', () => {
+test('all eight external exports contain no editing UI/attributes', () => {
   for (const type of Object.keys(blocks.designBlockSpecs)) {
     assert.doesNotMatch(html(type, block(type)), /contenteditable|data-design-inline|role="textbox"|디자인 설정|<dialog|<details|aria-invalid/i);
   }
@@ -84,3 +84,13 @@ if (process.env.DESIGN_BLOCKS_BASELINE) {
     }
   });
 }
+
+test('cover exports its text and never renders an unsafe logo address', () => {
+  const ok = html('bookCover', block('bookCover'));
+  assert.match(ok, /data-book-kind="cover"/);
+  assert.match(ok, /<h1 class="book-cover-title">입문서<\/h1>/);
+  assert.match(ok, /<img class="book-cover-logo" src="https:\/\/[^"]+" alt="이온토플"/);
+  const bad = html('bookCover', block('bookCover', { logoUrl: 'javascript:alert(1)' }));
+  assert.doesNotMatch(bad, /<img|javascript:/);
+  assert.match(bad, /book-cover-logo-text/);
+});

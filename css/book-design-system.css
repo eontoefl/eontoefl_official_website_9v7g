@@ -819,3 +819,68 @@
 @font-face { font-family: "LeeSeoyun"; src: url("../assets/fonts/leeseoyun/LeeSeoyun.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
 .book-content [data-book-font="nanumGothic"] { font-family: "NanumGothic", sans-serif; font-weight: 400; }
 .book-content [data-book-font="leeSeoyun"] { font-family: "LeeSeoyun", sans-serif; font-weight: 400; font-size: 1.08em; }
+
+/* ---------------------------------------------------------------------
+   Cover (bookCover) — e-book cover, scales with its own width.
+   All sizes use container units so PC and mobile keep the same layout.
+   --------------------------------------------------------------------- */
+@font-face { font-family: "Outfit"; src: url("../assets/fonts/outfit/Outfit-Variable.ttf") format("truetype"); font-weight: 100 900; font-style: normal; font-display: swap; }
+.book-content .book-design.book-cover,
+.book-content [data-book-kind="cover"] {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #F4F0FA;
+  color: #4E3D73;
+}
+.book-content .book-cover-top {
+  position: absolute; left: 8cqw; right: 8cqw; top: 7cqw;
+  display: flex; align-items: center; justify-content: space-between; gap: 4cqw;
+}
+.book-content .book-cover .book-cover-logo { display: block; height: max(14px, 3.4cqw); width: auto; max-width: 40cqw; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; }
+.book-content .book-cover-logo-text { font: 700 max(13px, 3cqw)/1 "Paperlogy", sans-serif; color: #4E3D73; }
+.book-content .book-cover-tag {
+  font: 500 max(9px, 1.8cqw)/1 "Outfit", sans-serif; letter-spacing: .42em; color: #9D93B8;
+}
+.book-content .book-cover-tiles {
+  position: absolute; right: -3cqw; top: 17cqw;
+  display: grid; grid-template-columns: repeat(2, 22cqw); gap: 2.2cqw;
+  transform: rotate(-8deg); pointer-events: none; user-select: none;
+}
+.book-content .book-cover-tiles > span {
+  display: grid; place-items: center; height: 22cqw; border-radius: 5cqw;
+  font: 800 13cqw/1 "Outfit", sans-serif; color: #4E3D73;
+}
+.book-content .book-cover-tiles [data-tile="r"] { background: #D3E5F4; }
+.book-content .book-cover-tiles [data-tile="l"] { background: #F5D7E4; }
+.book-content .book-cover-tiles [data-tile="w"] { background: #A994DA; color: #fff; }
+.book-content .book-cover-tiles [data-tile="s"] { background: #DED2F2; }
+.book-content .book-cover-tiles [data-tile="next"] {
+  border: .5cqw dashed #E58FAE; color: #E58FAE; font-size: 8cqw; box-sizing: border-box;
+}
+.book-content .book-cover-text { position: absolute; left: 8cqw; right: 8cqw; bottom: 12cqw; }
+.book-content .book-cover .book-cover-label {
+  margin: 0 0 2.6cqw; padding: 0; border: 0;
+  font: 600 max(9px, 2cqw)/1.2 "Outfit", sans-serif; letter-spacing: .38em; color: #E58FAE;
+}
+.book-content .book-cover .book-cover-title {
+  margin: 0; padding: 0; border: 0;
+  font: 700 15cqw/1 "Paperlogy", "Pretendard", sans-serif; letter-spacing: -.04em; color: #4E3D73;
+}
+.book-content .book-cover .book-cover-title::after,
+.book-content .book-cover .book-cover-title::before { content: none; display: none; }
+.book-content .book-cover .book-cover-hook {
+  margin: 6.5cqw 0 0; padding: 0;
+  font: 400 max(12px, 3.2cqw)/1.7 "Pretendard", "Noto Sans KR", -apple-system, sans-serif;
+  letter-spacing: -.01em; color: #6E6489;
+}
+.book-content .book-cover .book-cover-hook > * { display: block; }
+.book-content .book-cover .book-cover-hook strong { font-weight: 600; color: #4E3D73; }
+/* A cover page shows no printed page number. */
+.book-numbered-page:has(.book-cover) > .book-page-number { display: none !important; }

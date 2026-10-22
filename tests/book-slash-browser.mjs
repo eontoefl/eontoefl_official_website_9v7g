@@ -12,7 +12,7 @@ const server=http.createServer(async(req,res)=>{try{const p=new URL(req.url,'htt
 const browser=await chromium.launch({channel:'chrome',headless:true});const report={checks:[],errors:[]};
 try{const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
  await page.goto(origin+'/__harness');await page.waitForFunction(()=>window.h?.getEditor());await page.evaluate(()=>h.ready);
- for(const [type,label] of [['bookHeading','교재 제목'],['bookCallout','강조 상자'],['bookCompare','비교'],['bookAnnotated','지문 해설'],['bookQuestion','확인 문제'],['bookFlow','판단 흐름'],['bookMedia','학습 자료']]){
+ for(const [type,label] of [['bookHeading','교재 제목'],['bookCallout','강조 상자'],['bookCompare','비교'],['bookAnnotated','지문 해설'],['bookQuestion','확인 문제'],['bookFlow','판단 흐름'],['bookMedia','학습 자료'],['bookCover','표지']]){
   await page.evaluate(()=>{h.setBlocks([{type:'paragraph'}]);h.getEditor().setTextCursorPosition(h.getEditor().document[0]);h.getEditor().focus();});
   await page.keyboard.type('/');await page.getByRole('option').filter({hasText:label}).first().waitFor();
   await page.getByRole('option').filter({hasText:label}).first().click();

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { parseAnnotatedNotes, parseQuestionOptions } from "./design-data.js";
 import "./design-editing.css";
 
-const types = new Set(["bookHeading", "bookCallout", "bookCompare", "bookAnnotated", "bookQuestion", "bookFlow", "bookMedia"]);
+const types = new Set(["bookHeading", "bookCallout", "bookCompare", "bookAnnotated", "bookQuestion", "bookFlow", "bookMedia", "bookCover"]);
 const states = new WeakMap();
 const dialogListeners = new Set();
 let opened = null;

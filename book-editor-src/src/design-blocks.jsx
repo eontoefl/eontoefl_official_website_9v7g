@@ -747,6 +747,76 @@ function BookMedia({ block, editor, editable }) {
   );
 }
 
+export const COVER_LOGO_URL = "https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1792681413418_pzrawx.png";
+
+// Full-width e-book cover. Text is edited in place; the R/L/W/S tiles are
+// fixed series artwork and scale with the cover width (container units).
+function BookCover({ block, editor, editable }) {
+  const logo = safeHttpUrl(block.props.logoUrl);
+  return (
+    <section
+      {...designRootEvents(editor, block, editable)}
+      {...bookRootProps("cover", "neutral")}
+    >
+      <div className="book-cover-top">
+        {logo ? (
+          <img className="book-cover-logo" src={logo} alt="이온토플" />
+        ) : (
+          <span className="book-cover-logo-text">이온토플</span>
+        )}
+        <DesignText as="span" className="book-cover-tag" block={block} editor={editor} editable={editable} field="tag" />
+      </div>
+      <div className="book-cover-tiles" aria-hidden="true">
+        <span data-tile="r">R</span>
+        <span data-tile="l">L</span>
+        <span data-tile="w">W</span>
+        <span data-tile="s">S</span>
+        <span data-tile="next">+</span>
+      </div>
+      <div className="book-cover-text">
+        <DesignText as="p" className="book-cover-label" block={block} editor={editor} editable={editable} field="label" />
+        <DesignText as="h1" className="book-cover-title" block={block} editor={editor} editable={editable} field="title" />
+        <p className="book-cover-hook">
+          <DesignText as="span" block={block} editor={editor} editable={editable} field="hook" />
+          <DesignText as="strong" block={block} editor={editor} editable={editable} field="hookStrong" />
+        </p>
+      </div>
+      {editable ? (
+        <EditorControls block={block} editor={editor}>
+          <TextControl
+            label="로고 이미지 URL"
+            value={block.props.logoUrl}
+            inputMode="url"
+            spellCheck={false}
+            help="http:// 또는 https:// 주소만 허용됩니다. 비우면 '이온토플' 글자로 표시됩니다."
+            onChange={(logoUrl) => updateBlockProps(editor, block, { logoUrl })}
+          />
+        </EditorControls>
+      ) : null}
+    </section>
+  );
+}
+
+const bookCoverSpec = createReactBlockSpec(
+  {
+    type: "bookCover",
+    propSchema: {
+      logoUrl: { default: COVER_LOGO_URL },
+      tag: { default: "E-BOOK" },
+      label: { default: "TOEFL iBT®" },
+      title: { default: "입문서" },
+      hook: { default: "남들이 문제부터 풀 때," },
+      hookStrong: { default: "합격자들은 시험부터 읽었습니다" },
+    },
+    content: "none",
+  },
+  {
+    meta: { selectable: false },
+    render: (props) => <BookCover {...props} editable />,
+    toExternalHTML: (props) => <BookCover {...props} editable={false} />,
+  },
+)();
+
 const bookHeadingSpec = createReactBlockSpec(
   {
     type: "bookHeading",
@@ -885,6 +955,7 @@ export const designBlockSpecs = Object.freeze({
   bookQuestion: bookQuestionSpec,
   bookFlow: bookFlowSpec,
   bookMedia: bookMediaSpec,
+  bookCover: bookCoverSpec,
 });
 
 export const designPresets = Object.freeze([
@@ -922,6 +993,11 @@ export const designPresets = Object.freeze([
     type: "bookMedia",
     label: "학습 자료",
     description: "안전한 외부 링크, 오디오, 비디오 자료",
+  },
+  {
+    type: "bookCover",
+    label: "표지",
+    description: "로고, 제목, 카피가 들어간 전자책 표지",
   },
 ]);
 
@@ -986,6 +1062,17 @@ const BLOCK_DEFAULT_FACTORIES = Object.freeze({
       url: "",
       description: "자료의 내용과 활용 방법을 입력하세요.",
       mediaType: "link",
+    },
+  }),
+  bookCover: () => ({
+    type: "bookCover",
+    props: {
+      logoUrl: COVER_LOGO_URL,
+      tag: "E-BOOK",
+      label: "TOEFL iBT®",
+      title: "입문서",
+      hook: "남들이 문제부터 풀 때,",
+      hookStrong: "합격자들은 시험부터 읽었습니다",
     },
   }),
 });
