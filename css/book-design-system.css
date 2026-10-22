@@ -799,12 +799,23 @@
 @font-face { font-family: "Paperlogy"; src: url("../assets/fonts/paperlogy/Paperlogy-4Regular.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
 @font-face { font-family: "Paperlogy"; src: url("../assets/fonts/paperlogy/Paperlogy-5Medium.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
 @font-face { font-family: "Paperlogy"; src: url("../assets/fonts/paperlogy/Paperlogy-7Bold.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: swap; }
+/* Book typography: headings SUIT (sans), body MaruBuri (serif). Both SIL OFL 1.1,
+   self-hosted; see assets/fonts/BOOK_FONT_SOURCES.md. Paperlogy stays for the cover. */
+@font-face { font-family: "MaruBuri"; src: url("../assets/fonts/maruburi/MaruBuri-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "MaruBuri"; src: url("../assets/fonts/maruburi/MaruBuri-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "SUIT"; src: url("../assets/fonts/suit/SUIT-Medium.woff2") format("woff2"); font-weight: 400 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "SUIT"; src: url("../assets/fonts/suit/SUIT-Bold.woff2") format("woff2"); font-weight: 600 900; font-style: normal; font-display: swap; }
+/* SUIT draws the arrow block like a ">" bracket; arrows in headings use MaruBuri. */
+@font-face { font-family: "BookArrows"; src: url("../assets/fonts/maruburi/MaruBuri-Regular.woff2") format("woff2"); unicode-range: U+2190-21FF; font-display: swap; }
 .book-content,
 .book-content .bn-container,
 .book-content .bn-editor {
-  --bn-font-family: "Paperlogy", "Malgun Gothic", sans-serif;
-  font-family: "Paperlogy", "Malgun Gothic", sans-serif;
+  --bn-font-family: "MaruBuri", "Malgun Gothic", serif;
+  font-family: "MaruBuri", "Malgun Gothic", serif;
   font-weight: 400;
+}
+.book-content :is(h1, h2, h3, h4, .book-design-title, .book-design-label) {
+  font-family: "BookArrows", "SUIT", "Pretendard", "Malgun Gothic", sans-serif;
 }
 .book-content .book-design-title,
 .book-content .book-design.book-heading .book-design-title,

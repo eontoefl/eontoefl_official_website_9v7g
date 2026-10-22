@@ -13,3 +13,7 @@
 - Outfit (Variable, 100-900): https://github.com/google/fonts/raw/refs/heads/main/ofl/outfit/Outfit%5Bwght%5D.ttf
   - 라이선스 원문: https://github.com/google/fonts/raw/refs/heads/main/ofl/outfit/OFL.txt
   - `outfit/OFL.txt`를 함께 배포한다. 표지(bookCover)의 영문 라벨과 R/L/W/S 블록에 쓴다. 확인일 2026-10-23.
+- SUIT Medium/Bold (static woff2): https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/static/woff2/
+  - 라이선스 원문: https://github.com/sun-typeface/SUIT/blob/main/LICENSE (SIL OFL 1.1), `suit/OFL.txt`. 교재 제목에 쓴다. 확인일 2026-10-23.
+- MaruBuri Regular/Bold (woff2): https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/
+  - 라이선스: 네이버 나눔글꼴 라이선스 안내 https://help.naver.com/service/30016/contents/18088 (마루 부리 포함, SIL OFL 1.1). 안내문의 저작권 문구와 OFL 원문을 `maruburi/OFL.txt`에 보관. 교재 본문에 쓴다. 확인일 2026-10-23.
