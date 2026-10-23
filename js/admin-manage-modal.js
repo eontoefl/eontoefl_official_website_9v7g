@@ -1346,7 +1346,7 @@ function loadModalAnalysisTab(app) {
                             <td style="padding: 8px 0; color: #64748b; text-align: left;">
                                 추가 할인 
                                 <input type="number" name="additional_discount" id="additional_discount" 
-                                       value="${fillAdditionalDiscount}" min="0" max="790000"
+                                       value="${fillAdditionalDiscount}" min="0" max="${790000 + (fillCorrectionEnabled ? 200000 : 0) + 100000}"
                                        ${readOnly}
                                        onchange="calculateModalPrice()"
                                        style="width: 120px; padding: 6px 10px; border: none; border-radius: 6px; background: #eef1f5; outline: none; font-family: inherit; margin-left: 8px;">원
@@ -1936,6 +1936,22 @@ function calculateModalPrice() {
     
     document.getElementById('displayAdditionalDiscount').textContent = '-' + additionalDiscount.toLocaleString() + '원';
     document.getElementById('displayFinalPrice').textContent = finalPrice.toLocaleString() + '원';
+
+    // 추가 할인 상한(2026-10-23): 고정 79만 대신 "최종 금액이 0원이 되는 지점"(수강료+첨삭+보증금).
+    // 첨삭 켜고 끌 때마다 같이 바뀜. 저장은 form.reportValidity()를 거치므로 넘으면 저장이 막힌다.
+    const discountEl = document.getElementById('additional_discount');
+    if (discountEl) {
+        if (restart) {
+            discountEl.removeAttribute('max');
+            discountEl.setCustomValidity('');
+        } else {
+            const maxDiscount = basePrice + correctionFee + deposit;
+            discountEl.max = maxDiscount;
+            discountEl.setCustomValidity(additionalDiscount > maxDiscount
+                ? `최종 금액이 마이너스가 됩니다. 추가 할인은 최대 ${maxDiscount.toLocaleString()}원까지 입력할 수 있어요.`
+                : '');
+        }
+    }
     
     // 추가 할인 금액에 따라 할인 사유란 표시/숨김
     const reasonWrapper = document.getElementById('discountReasonWrapper');
