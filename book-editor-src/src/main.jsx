@@ -35,6 +35,8 @@ const themes = bookThemes;
 function Editor({ editorRef, initialBlocks, uploadFile, onChange, onReady, designTools }) {
   const [theme, setTheme] = useState("neutral");
   const editor = useCreateBlockNote({ schema, dictionary: ko, extensions:[PageFooterExtension],
+    // Browser spellcheck marks almost every Korean word with an English dictionary.
+    domAttributes: { editor: { spellcheck: "false" } },
     initialContent: initialBlocks?.length ? initialBlocks : undefined, uploadFile });
   useEffect(() => {
     editorRef.current = editor;

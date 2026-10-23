@@ -195,9 +195,9 @@ function EditableText({ Tag, block, editor, field, index, itemKey, value, label,
   useLayoutEffect(() => {
     if (!session.current?.dirty && document.activeElement !== node.current) setText(value);
   }, [value]);
-  if (nativeInput) return <Tag {...attributes} contentEditable={false}><textarea ref={node} rows={1}
+  if (nativeInput) return <Tag {...attributes} contentEditable={false}><textarea ref={node} rows={1} spellCheck={false}
     data-design-inline="true" aria-label={label} aria-multiline="true" aria-invalid={error || undefined} /></Tag>;
-  return <Tag {...attributes} ref={node} contentEditable="plaintext-only" suppressContentEditableWarning
+  return <Tag {...attributes} ref={node} contentEditable="plaintext-only" spellCheck={false} suppressContentEditableWarning
     data-design-inline="true" tabIndex={0} role="textbox" aria-label={label} aria-multiline="true"
     aria-invalid={error || undefined} title={error ? "다른 변경과 충돌했습니다. 내용을 복사한 뒤 Esc로 최신 값을 다시 불러오세요." : undefined} />;
 }
