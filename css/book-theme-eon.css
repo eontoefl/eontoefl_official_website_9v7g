@@ -235,3 +235,6 @@
 .bookedit-paper.bt-eon .bn-editor table{display:block!important;overflow-x:auto}
 .bt-eon th p{margin:0!important}
 @media (max-width:680px){.bookedit-paper.bt-eon .bn-editor > .bn-block-group{max-width:calc(100vw - 52px)!important;margin-left:auto!important;margin-right:auto!important}}
+/* 일반 해상도 화면에서 본문 명조 획이 거칠게 보이는 것 보강. 글자 폭은 그대로라 줄바꿈 불변 */
+.bt-eon p,.bt-eon li,.bt-eon .book-design-body{-webkit-text-stroke:0.25px currentColor}
+.bt-eon .book-cover p,.bt-eon .book-cover .book-design-body,.bt-eon .book-fine-print p{-webkit-text-stroke:0}
