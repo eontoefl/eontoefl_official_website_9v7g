@@ -75,8 +75,10 @@
 .bt-eon figcaption,.bt-eon .bn-file-caption,.bt-eon .bt-cap{font:500 12px/1.5 SUIT,sans-serif!important;color:var(--bt-mute)!important;margin-top:6px;text-align:left}
 
 /* 링크 버튼 (결정9) */
-.bt-eon a[href^="http"]{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--bt-k);border-radius:20px;padding:3px 14px;font:700 13.5px/1.6 SUIT,sans-serif!important;color:var(--bt-k)!important;text-decoration:none!important;background:#fff}
-.bt-eon a[href^="http"]::before{content:"▶";font-size:9px}
+.bt-eon a[href^="http"]{display:inline-block;border:1.5px solid var(--bt-k);border-radius:20px;padding:3px 14px;font:700 13.5px/1.6 SUIT,sans-serif!important;color:var(--bt-k)!important;text-decoration:none!important;background:#fff}
+.bt-eon a[href^="http"]::before{content:"▶";font-size:9px;margin-right:6px;vertical-align:1px}
+.bt-eon a[href^="http"] *{color:inherit!important}
+.bt-eon .book-design-label{text-transform:none!important;letter-spacing:0!important}
 
 /* 일반 표 (결정11) */
 .bt-eon table{border-collapse:collapse}
@@ -153,3 +155,4 @@
 @media (max-width:680px){.book-scorecard .book-score-row{flex-direction:column}.book-scorecard .book-score-overall{flex:none}.book-scorecard .book-score-tiles{grid-template-columns:repeat(2,1fr)}}
 
 .bt-eon .book-compare > .book-design-title:empty{display:none!important}
+
