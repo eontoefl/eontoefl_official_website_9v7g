@@ -179,3 +179,58 @@
 .bt-eon .bt-memo-memo .bt-arw-lead{font-size:0!important;letter-spacing:0}
 /* 지문, 스크립트, 모범답안: 회색 카드만, "영어 예시" 이름표 없음 */
 .bt-eon p.bt-eng-plain::before,.bt-eon .bt-eng-plain>p::before{content:none!important;display:none!important}
+
+/* ===== 편집기 = 학생 화면 (줄바꿈, 간격까지 같게). 편집 도구는 그대로 두고 블록 포장만 투명하게 ===== */
+.bookedit-paper.bt-eon .bn-editor .bn-inline-content{line-height:1.8}
+.bookedit-paper.bt-eon .bn-editor > .bn-block-group > .bn-block-outer + .bn-block-outer{margin-top:0}
+.bookedit-paper.bt-eon .bn-editor .bn-block-content{padding-top:0!important;padding-bottom:0!important}
+.bookedit-paper.bt-eon .bn-editor .bn-block-content:not([data-content-type="checkListItem"]):not([data-content-type="bulletListItem"]):not([data-content-type="numberedListItem"]){display:block}
+.bookedit-paper.bt-eon .bn-editor .bn-block-content[data-content-type="paragraph"] > p{margin:0 0 15px}
+.bookedit-paper.bt-eon .bn-editor .bn-block-content[data-url*="/reference-"]{display:none!important}
+.bookedit-paper.bt-eon .bn-editor > .bn-block-group{display:flex;flex-direction:column}
+.bookedit-paper.bt-eon .bn-block-content > aside,.bookedit-paper.bt-eon .bn-block-content > .book-design{display:flow-root}
+.bookedit-paper.bt-eon .bn-visual-media-wrapper{margin:16px 0}
+.bookedit-paper.bt-eon .bn-editor .tableWrapper,.bookedit-paper.bt-eon .bn-editor .tableWrapper-inner{width:100%;padding:0!important;margin:0!important}
+.bookedit-paper.bt-eon .bn-editor table{width:100%!important;margin:16px 0}
+.bookedit-paper.bt-eon .bn-editor table td,.bookedit-paper.bt-eon .bn-editor table th{padding:9px 12px}
+.bookedit-paper.bt-eon .bn-editor .bt-eng > p.bn-inline-content{line-height:1.75}
+.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="compare"],.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="flow"],.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="annotated"],.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="question"],.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="media"]{margin:18px 0!important}
+.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="scorecard"]{margin:14px 0!important}
+.bookedit-paper.bt-eon .bn-block-content > .book-design[data-book-kind="pairs"]{margin:12px 0 16px!important}
+.bookedit-paper.bt-eon .bn-block-content[data-content-type="image"]{margin:16px 0}
+.bookedit-paper.bt-eon .bn-visual-media-wrapper{margin:16px 0 16px}
+.bookedit-paper.bt-eon .bn-file-caption{margin:0!important;padding:0!important}
+.bookedit-paper.bt-eon .bn-editor table .bn-inline-content,.bookedit-paper.bt-eon .bn-editor table p{line-height:1.6!important}
+.bookedit-paper.bt-eon .bn-block-content[data-content-type="checkListItem"]{margin-bottom:8px}
+.bookedit-paper.bt-eon .bn-block-content[data-content-type="checkListItem"] .bn-inline-content{line-height:1.7}
+.bookedit-paper.bt-eon .bn-editor table{table-layout:auto!important}
+
+.bookedit-paper.bt-eon .bn-editor table td,.bookedit-paper.bt-eon .bn-editor table th{min-width:88px!important}
+.bookedit-paper.bt-eon .bn-editor table p{min-height:0!important}
+.bookedit-paper.bt-eon .bn-file-block-content-wrapper{align-items:flex-start}
+.bookedit-paper.bt-eon .bn-file-caption{max-width:none!important}
+.bookedit-paper.bt-eon .book-heading[data-book-level="3"] .book-design-title{line-height:1.5!important}
+/* 그림은 저장된 폭 그대로, 설명은 학생 화면처럼 본문 폭으로 */
+.bookedit-paper.bt-eon .bn-editor > .bn-block-group{container-type:inline-size}
+.bookedit-paper.bt-eon .bn-file-caption{width:100cqw!important;max-width:none!important;text-align:left}
+.bookedit-paper.bt-eon .bn-editor,.bookedit-paper.bt-eon .bn-editor .bn-block-outer,.bookedit-paper.bt-eon .bn-editor .bn-block,.bookedit-paper.bt-eon .bn-editor .bn-block-content{line-height:1.8}
+.bookedit-paper.bt-eon .bt-memo-q .book-design-body > div{display:inline}
+.bookedit-paper.bt-eon .bn-visual-media{box-sizing:border-box}
+.bookedit-paper.bt-eon .book-design ol,.bookedit-paper.bt-eon .book-design ul{padding-left:24px;margin:0 0 16px}
+.bookedit-paper.bt-eon .book-design li{margin-bottom:8px}
+.bookedit-paper.bt-eon.bt-kind-toc [data-bt-ch] .book-design-title{padding-bottom:4px!important}
+.bookedit-paper.bt-eon .book-annotated .book-design-body > p{margin:0 0 15px}
+/* 편집기가 켜지기 전 잠깐 보이는 미리보기도 학생 화면과 같은 간격 */
+.bookedit-paper.bt-eon .bookedit-preview{line-height:1.8;display:flex;flex-direction:column}
+.bookedit-paper.bt-eon .bookedit-preview p{margin:0 0 15px}
+.bookedit-paper.bt-eon .bookedit-preview img{margin:16px 0}
+.bookedit-paper.bt-eon .bookedit-preview figure{margin:16px 0}
+.bookedit-paper.bt-eon .bookedit-preview figure img{margin:16px 0 16px}
+.bookedit-paper.bt-eon .bookedit-preview figcaption{margin-top:6px}
+.bookedit-paper.bt-eon .bookedit-preview tr:first-child td{font-weight:700}
+.bookedit-paper.bt-eon .bn-block-content[data-content-type="image"]:not(:has(.bn-file-caption)){margin:0}
+.book-scorecard .book-score-sub{min-height:20px}
+.bt-eon.book-content img:not([width="24"]):not(.bt-icon){border:1px solid var(--bt-line);box-sizing:border-box}
+.bookedit-paper.bt-eon .bn-editor table{display:block!important;overflow-x:auto}
+.bt-eon th p{margin:0!important}
+@media (max-width:680px){.bookedit-paper.bt-eon .bn-editor > .bn-block-group{max-width:calc(100vw - 52px)!important;margin-left:auto!important;margin-right:auto!important}}

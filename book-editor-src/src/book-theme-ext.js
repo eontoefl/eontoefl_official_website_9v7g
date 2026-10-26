@@ -76,7 +76,9 @@ function build(doc) {
       return false;
     }
     if (name === 'paragraph') {
-      const text = node.textContent; const cls = [];
+      // Same text the reader sees: inline marks like ✓/X count as characters.
+      let text = ''; node.forEach(ch => { if (ch.isText) text += ch.text; else if (ch.type.name === 'hardBreak') text += ''; else if (ch.attrs && ch.attrs.glyph) text += ch.attrs.glyph; });
+      const cls = [];
       if (/^\s*-\s*\d{1,4}\s*-\s*$/.test(text)) return false;
       const eng = rules.isEnglish(text);
       if (inlineLead(decos, node, pos, rules.step, 'bt-num', c => ({ 'data-n': String(rules.circledNumber(c)) }))) { if (!eng) cls.push('bt-step'); }
