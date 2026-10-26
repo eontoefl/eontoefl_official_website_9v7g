@@ -134,3 +134,22 @@
 
 .bt-eon .bt-src [data-content-type="bookCallout"]{justify-content:flex-end}
 
+
+/* 점수 성적 카드 (4-7, 7가). Generic block style, only used in this book. */
+.book-design.book-scorecard{border:1.5px solid #A9ADF2;border-radius:14px;padding:14px 18px 16px;margin:14px 0;background:#fff;font-family:Outfit,SUIT,sans-serif;color:#2E2A3A}
+.book-scorecard .book-score-label{margin:0 0 10px!important;font:700 12px SUIT,sans-serif!important;color:#6E6489}
+.book-scorecard .book-score-row{display:flex;gap:16px;align-items:stretch}
+.book-scorecard .book-score-overall{flex:0 0 170px;text-align:center}
+.book-scorecard .book-score-name{margin:0!important;font:600 12px Outfit,sans-serif!important;color:#4E3D73}
+.book-scorecard .book-score-gauge{--score:0;position:relative;width:150px;height:78px;margin:8px auto 4px;overflow:hidden}
+.book-scorecard .book-score-gauge::before{content:"";position:absolute;left:0;top:0;width:150px;height:150px;border-radius:50%;box-sizing:border-box;
+  background:conic-gradient(from -90deg,#9CA0F4 calc(var(--score) * 1.8deg),#ECEDFB 0 180deg,transparent 0);-webkit-mask:radial-gradient(circle,transparent 52px,#000 53px);mask:radial-gradient(circle,transparent 52px,#000 53px)}
+.book-scorecard .book-score-value{position:absolute;left:0;right:0;bottom:2px;font:800 20px Outfit,sans-serif;color:#2E2A3A}
+.book-scorecard .book-score-value small,.book-scorecard .book-score-tilev small{font-weight:500;font-size:11px;color:#6E6489}
+.book-scorecard .book-score-sub{margin:2px 0 0!important;font:600 12.5px Outfit,SUIT,sans-serif!important;color:#4E3D73;white-space:pre-line}
+.book-scorecard .book-score-tiles{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.book-scorecard .book-score-tile{background:#E8E9FC;border-radius:10px;padding:10px 8px;text-align:center;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.book-scorecard .book-score-tilev{margin:0!important;font:800 18px Outfit,sans-serif!important;color:#2E2A3A}
+@media (max-width:680px){.book-scorecard .book-score-row{flex-direction:column}.book-scorecard .book-score-overall{flex:none}.book-scorecard .book-score-tiles{grid-template-columns:repeat(2,1fr)}}
+
+.bt-eon .book-compare > .book-design-title:empty{display:none!important}

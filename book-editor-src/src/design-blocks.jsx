@@ -817,6 +817,72 @@ const bookCoverSpec = createReactBlockSpec(
   },
 )();
 
+// Score report card ("My Scores" look, no ETS marks). Numbers are the book's own examples.
+const SCORE_SECTIONS = [["r", "Reading"], ["l", "Listening"], ["w", "Writing"], ["s", "Speaking"]];
+function scorePercent(value, max) {
+  const v = parseFloat(String(value).replace(/[^0-9.]/g, "")); const m = parseFloat(max);
+  if (!isFinite(v) || !isFinite(m) || m <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((v / m) * 100)));
+}
+function BookScoreCard({ block, editor, editable }) {
+  const p = block.props;
+  return (
+    <section
+      {...designRootEvents(editor, block, editable)}
+      {...bookRootProps("scorecard", "neutral")}
+      contentEditable={editable ? false : undefined}
+    >
+      <DesignText as="p" className="book-score-label" block={block} editor={editor} editable={editable} field="label" />
+      <div className="book-score-row">
+        <div className="book-score-overall">
+          <p className="book-score-name">Overall Score</p>
+          <div className="book-score-gauge" style={{ "--score": scorePercent(p.overall, p.overallMax) }}>
+            <span className="book-score-value"><DesignText as="b" block={block} editor={editor} editable={editable} field="overall" /> <small>of {p.overallMax}</small></span>
+          </div>
+          <DesignText as="p" className="book-score-sub" block={block} editor={editor} editable={editable} field="sub" />
+        </div>
+        <div className="book-score-tiles">
+          {SCORE_SECTIONS.map(([key, name]) => (
+            <div className="book-score-tile" key={key}>
+              <p className="book-score-name">{name}</p>
+              <p className="book-score-tilev"><DesignText as="b" block={block} editor={editor} editable={editable} field={key} /> <small>of {p.max}</small></p>
+            </div>
+          ))}
+        </div>
+      </div>
+      {editable ? (
+        <EditorControls block={block} editor={editor}>
+          <TextControl label="영역 만점 (6 또는 30)" value={p.max} onChange={(max) => updateBlockProps(editor, block, { max })} />
+          <TextControl label="전체 만점 (6 또는 120)" value={p.overallMax} onChange={(overallMax) => updateBlockProps(editor, block, { overallMax })} />
+        </EditorControls>
+      ) : null}
+    </section>
+  );
+}
+
+const bookScoreCardSpec = createReactBlockSpec(
+  {
+    type: "bookScoreCard",
+    propSchema: {
+      label: { default: "이렇게 나와요 (예시)" },
+      overall: { default: "5.0" },
+      overallMax: { default: "6" },
+      sub: { default: "" },
+      max: { default: "6" },
+      r: { default: "5.0" },
+      l: { default: "5.0" },
+      w: { default: "5.0" },
+      s: { default: "5.0" },
+    },
+    content: "none",
+  },
+  {
+    meta: { selectable: false },
+    render: (props) => <BookScoreCard {...props} editable />,
+    toExternalHTML: (props) => <BookScoreCard {...props} editable={false} />,
+  },
+)();
+
 // Small legal/notice text (copyright, trademark). Sits at the bottom of the page,
 // just above the printed page number. Text is ordinary inline content.
 function BookFinePrint({ block, contentRef }) {
@@ -979,6 +1045,7 @@ export const designBlockSpecs = Object.freeze({
   bookMedia: bookMediaSpec,
   bookCover: bookCoverSpec,
   bookFinePrint: bookFinePrintSpec,
+  bookScoreCard: bookScoreCardSpec,
 });
 
 export const designPresets = Object.freeze([
@@ -1026,6 +1093,11 @@ export const designPresets = Object.freeze([
     type: "bookFinePrint",
     label: "작은 안내 문구",
     description: "저작권·상표 고지처럼 쪽 맨 아래에 들어가는 작은 글씨",
+  },
+  {
+    type: "bookScoreCard",
+    label: "점수 성적 카드",
+    description: "실제 성적 화면처럼 전체 점수와 영역 점수를 보여주는 예시 카드",
   },
 ]);
 
@@ -1102,6 +1174,10 @@ const BLOCK_DEFAULT_FACTORIES = Object.freeze({
       hook: "남들이 문제부터 풀 때,",
       hookStrong: "합격자들은 시험부터 읽었습니다",
     },
+  }),
+  bookScoreCard: () => ({
+    type: "bookScoreCard",
+    props: { label: "이렇게 나와요 (예시)", overall: "5.0", overallMax: "6", sub: "", max: "6", r: "5.0", l: "5.0", w: "5.0", s: "5.0" },
   }),
   bookFinePrint: () => ({
     type: "bookFinePrint",
