@@ -3256,7 +3256,7 @@ async function getPaymentInfo(app) {
             </div>
             <p class="s4-note" style="margin:12px 0 0 0; text-align:center;">
                 보증금 100,000원 포함 · 과제 인증률에 따라 최대 100,000원 환급<br>
-                <span style="font-size:11px;">(70% 미만 0원 / 70~94% 부분 환급 / 95% 이상 전액 환급)</span>
+                <span style="font-size:11px;">(95% 이상 10만원 / 90% 이상 9만원 / 80% 이상 8만원 / 70% 이상 7만원 / 70% 미만 0원)</span>
             </p>
         </div>
 
