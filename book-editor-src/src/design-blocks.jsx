@@ -817,6 +817,67 @@ const bookCoverSpec = createReactBlockSpec(
   },
 )();
 
+// Chunked English passage paired with its Korean reading (DESIGN 4-6).
+// Props are plain lines: en/ko chunks (one per line), links "word|question" (one per line, between chunks).
+const PAIR_COLORS = 3;
+function splitLines(v) { return String(v || "").split("\n").map((s) => s.trim()).filter(Boolean); }
+function PairRow({ chunks, links, lang, label }) {
+  const out = [];
+  if (label) out.push(<span className="book-pairs-label" key="label">{label}</span>);
+  chunks.forEach((text, i) => {
+    out.push(
+      <span className="book-pairs-chunk" data-pair={(i % PAIR_COLORS) + 1} key={"c" + i}>
+        <b className="book-pairs-no">{i + 1}</b>{text}
+      </span>,
+    );
+    if (i < chunks.length - 1 && links[i]) {
+      const [word, question] = links[i].split("|");
+      out.push(<span className="book-pairs-link" key={"l" + i}>{lang === "ko" ? (question || word) : word}</span>);
+    }
+  });
+  return <p className={"book-pairs-" + lang}>{out}</p>;
+}
+function BookPairs({ block, editor, editable }) {
+  const p = block.props;
+  const en = splitLines(p.en), ko = splitLines(p.ko), links = splitLines(p.links);
+  return (
+    <section
+      {...designRootEvents(editor, block, editable)}
+      {...bookRootProps("pairs", "neutral")}
+      contentEditable={editable ? false : undefined}
+    >
+      <PairRow chunks={en} links={links} lang="en" />
+      <PairRow chunks={ko} links={links} lang="ko" label={p.label} />
+      {editable ? (
+        <EditorControls block={block} editor={editor}>
+          <TextControl label="영어 덩어리 (한 줄에 하나)" value={p.en} multiline rows={5} onChange={(v) => updateBlockProps(editor, block, { en: v })} />
+          <TextControl label="해석 덩어리 (한 줄에 하나, 영어와 같은 순서)" value={p.ko} multiline rows={5} onChange={(v) => updateBlockProps(editor, block, { ko: v })} />
+          <TextControl label="덩어리 사이 연결어 (한 줄에 하나, 영어|질문)" value={p.links} multiline rows={3} onChange={(v) => updateBlockProps(editor, block, { links: v })} />
+          <TextControl label="해석 앞 표시" value={p.label} onChange={(v) => updateBlockProps(editor, block, { label: v })} />
+        </EditorControls>
+      ) : null}
+    </section>
+  );
+}
+
+const bookPairsSpec = createReactBlockSpec(
+  {
+    type: "bookPairs",
+    propSchema: {
+      en: { default: "First chunk\nSecond chunk" },
+      ko: { default: "첫 번째 덩어리\n두 번째 덩어리" },
+      links: { default: "that|that 무엇을?" },
+      label: { default: "해석" },
+    },
+    content: "none",
+  },
+  {
+    meta: { selectable: false },
+    render: (props) => <BookPairs {...props} editable />,
+    toExternalHTML: (props) => <BookPairs {...props} editable={false} />,
+  },
+)();
+
 // Score report card ("My Scores" look, no ETS marks). Numbers are the book's own examples.
 const SCORE_SECTIONS = [["r", "Reading"], ["l", "Listening"], ["w", "Writing"], ["s", "Speaking"]];
 function scorePercent(value, max) {
@@ -1046,6 +1107,7 @@ export const designBlockSpecs = Object.freeze({
   bookCover: bookCoverSpec,
   bookFinePrint: bookFinePrintSpec,
   bookScoreCard: bookScoreCardSpec,
+  bookPairs: bookPairsSpec,
 });
 
 export const designPresets = Object.freeze([
@@ -1098,6 +1160,11 @@ export const designPresets = Object.freeze([
     type: "bookScoreCard",
     label: "점수 성적 카드",
     description: "실제 성적 화면처럼 전체 점수와 영역 점수를 보여주는 예시 카드",
+  },
+  {
+    type: "bookPairs",
+    label: "끊어 읽기 짝 맞추기",
+    description: "끊어 읽은 영어 덩어리와 해석을 같은 색과 번호로 짝지은 지문",
   },
 ]);
 
@@ -1174,6 +1241,10 @@ const BLOCK_DEFAULT_FACTORIES = Object.freeze({
       hook: "남들이 문제부터 풀 때,",
       hookStrong: "합격자들은 시험부터 읽었습니다",
     },
+  }),
+  bookPairs: () => ({
+    type: "bookPairs",
+    props: { en: "First chunk\nSecond chunk", ko: "첫 번째 덩어리\n두 번째 덩어리", links: "that|that 무엇을?", label: "해석" },
   }),
   bookScoreCard: () => ({
     type: "bookScoreCard",

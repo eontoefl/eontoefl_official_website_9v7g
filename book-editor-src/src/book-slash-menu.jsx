@@ -4,7 +4,7 @@ import { createDesignBlock, designPresets } from './design-blocks.jsx';
 
 export const bookThemes = [['neutral','기본 안내'],['reading','리딩'],['listening','리스닝'],['writing','라이팅'],['speaking','스피킹']];
 // Blocks that have an on-demand settings dialog (fine print is plain inline text).
-const customTypes = new Set(designPresets.map(p => p.type).filter(t => t !== 'bookFinePrint' && t !== 'bookScoreCard'));
+const customTypes = new Set(designPresets.map(p => p.type).filter(t => t !== 'bookFinePrint' && t !== 'bookScoreCard' && t !== 'bookPairs'));
 export function currentDesignBlock(editor) {
   let cursor;
   try { cursor = editor.getTextCursorPosition(); } catch (_) {}

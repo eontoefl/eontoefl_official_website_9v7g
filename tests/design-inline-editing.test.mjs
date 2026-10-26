@@ -34,10 +34,10 @@ function block(type, patch = {}) {
 }
 function html(type, value) { return renderToStaticMarkup(blocks.designBlockSpecs[type].implementation.toExternalHTML({ block: value })); }
 
-test('ten schema types, no inline controls or details', () => {
-  assert.deepEqual(Object.keys(blocks.designBlockSpecs), ['bookHeading', 'bookCallout', 'bookCompare', 'bookAnnotated', 'bookQuestion', 'bookFlow', 'bookMedia', 'bookCover', 'bookFinePrint', 'bookScoreCard']);
+test('eleven schema types, no inline controls or details', () => {
+  assert.deepEqual(Object.keys(blocks.designBlockSpecs), ['bookHeading', 'bookCallout', 'bookCompare', 'bookAnnotated', 'bookQuestion', 'bookFlow', 'bookMedia', 'bookCover', 'bookFinePrint', 'bookScoreCard', 'bookPairs']);
   assert.doesNotMatch(source, /<details|<summary|디자인 편집/);
-  assert.equal((source.match(/<EditorControls block=\{block\} editor=\{editor\}>/g) || []).length, 9);
+  assert.equal((source.match(/<EditorControls block=\{block\} editor=\{editor\}>/g) || []).length, 10);
 });
 test('all nine external exports contain no editing UI/attributes', () => {
   for (const type of Object.keys(blocks.designBlockSpecs)) {

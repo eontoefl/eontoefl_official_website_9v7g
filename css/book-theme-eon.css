@@ -156,3 +156,16 @@
 
 .bt-eon .book-compare > .book-design-title:empty{display:none!important}
 
+
+/* 끊어 읽기 짝 맞추기 (4-6, 6가) */
+.book-design.book-pairs{margin:12px 0 16px;padding:14px 16px;border:1px solid #E4DEF0;border-radius:12px;background:#fff}
+.book-pairs p{margin:0!important}
+.book-pairs .book-pairs-en{font:500 15.5px/2.15 Outfit,sans-serif!important;color:#2E2A3A;padding-bottom:10px;border-bottom:1.5px dotted #CFC8E0;margin-bottom:10px!important}
+.book-pairs .book-pairs-ko{font:400 15.5px/2.15 MaruBuri,serif!important;color:#2E2A3A}
+.book-pairs .book-pairs-chunk{padding:3px 6px;border-radius:6px;-webkit-box-decoration-break:clone;box-decoration-break:clone;margin-right:4px}
+.book-pairs .book-pairs-chunk[data-pair="1"]{background:#DDEBF7;--pn:#3F6E99}
+.book-pairs .book-pairs-chunk[data-pair="2"]{background:#FBE3EC;--pn:#B5517A}
+.book-pairs .book-pairs-chunk[data-pair="3"]{background:#E7E0F6;--pn:#6A52AE}
+.book-pairs .book-pairs-no{display:inline-block;width:17px;height:17px;border-radius:50%;background:var(--pn);color:#fff;font:700 10.5px/17px Outfit,sans-serif;text-align:center;margin-right:5px;vertical-align:2px}
+.book-pairs .book-pairs-link{font:700 12.5px SUIT,sans-serif;color:#C9658B;margin:0 6px 0 2px}
+.book-pairs .book-pairs-label{font:700 12px SUIT,sans-serif;color:#9D93B8;margin-right:8px}
