@@ -41,7 +41,7 @@
     return [...frag.children].filter(e => !(e.tagName === 'P' && (FOOTER.test(e.textContent) || !e.textContent.trim()) && !e.querySelector('img')));
   }
   function headingTexts(frag) {
-    return [...frag.querySelectorAll('[data-book-kind="heading"], h1, h2, h3')].filter(h => !h.parentElement?.closest('[data-book-kind="heading"]')).map(h => h.textContent.trim());
+    return [...frag.querySelectorAll('[data-book-kind="heading"], h1, h2, h3')].filter(h => !h.parentElement?.closest('[data-book-kind="heading"]')).map(h => { const x = h.cloneNode(true); x.querySelectorAll('br').forEach(b => b.replaceWith(' ')); return x.textContent.replace(/\s+/g, ' ').trim(); });
   }
   function isTocEntry(el) {
     const all = el.textContent.replace(/\s/g, ''); const linked = [...el.querySelectorAll('a')].map(a => a.textContent).join('').replace(/\s/g, '');

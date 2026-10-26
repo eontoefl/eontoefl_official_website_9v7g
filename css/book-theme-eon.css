@@ -17,7 +17,8 @@
 .bt-eon [data-style-type="textColor"]{color:inherit!important}
 .bt-eon [data-style-type="backgroundColor"]{background:none!important}
 .bt-eon [data-style-type="textColor"][data-value="#b23a3a"],.bt-eon [data-style-type="textColor"][data-value="#ef4d4d"],
-.bt-eon [data-style-type="textColor"][data-value="#de716c"],.bt-eon [data-style-type="textColor"][data-value="#c0392b"]{color:var(--bt-pinkink)!important}
+.bt-eon [data-style-type="textColor"][data-value="#de716c"],.bt-eon [data-style-type="textColor"][data-value="#c0392b"],.bt-eon [data-style-type="textColor"][data-value="#bf4141"],.bt-eon [data-style-type="textColor"][data-value="#BF4141"],.bt-eon [data-style-type="textColor"][data-value="#fd648d"]{color:var(--bt-pinkink)!important}
+.bt-eon [data-style-type="textColor"][data-value="#6cb77e"],.bt-eon [data-style-type="textColor"][data-value="#58d58d"]{color:var(--bt-k)!important}
 .bt-eon strong,.bt-eon b:not(.bt-deco){color:var(--bt-ink)}
 .bt-eon u{text-decoration-color:var(--bt-pink);text-decoration-thickness:2px;text-underline-offset:3px}
 .bt-eon [data-book-source-marker="X"]{color:var(--bt-pinkink)!important}
@@ -132,3 +133,4 @@
 
 
 .bt-eon .bt-src [data-content-type="bookCallout"]{justify-content:flex-end}
+
