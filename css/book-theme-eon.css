@@ -169,3 +169,8 @@
 .book-pairs .book-pairs-no{display:inline-block;width:17px;height:17px;border-radius:50%;background:var(--pn);color:#fff;font:700 10.5px/17px Outfit,sans-serif;text-align:center;margin-right:5px;vertical-align:2px}
 .book-pairs .book-pairs-link{font:700 12.5px SUIT,sans-serif;color:#C9658B;margin:0 6px 0 2px}
 .book-pairs .book-pairs-label{font:700 12px SUIT,sans-serif;color:#9D93B8;margin-right:8px}
+
+/* 메모 안 표시색 유지 (X는 진한 핑크, ✓○●는 장 색, 빨간 강조는 핑크) */
+.bt-eon .book-callout .book-design-body [data-book-source-marker="X"]{color:var(--bt-pinkink)!important}
+.bt-eon .book-callout .book-design-body [data-book-source-marker="✓"],.bt-eon .book-callout .book-design-body [data-book-source-marker="○"],.bt-eon .book-callout .book-design-body [data-book-source-marker="●"]{color:var(--bt-k)!important}
+.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#b23a3a"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#ef4d4d"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#de716c"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#bf4141"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#BF4141"]{color:var(--bt-pinkink)!important}

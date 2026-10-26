@@ -55,12 +55,14 @@ function trailingPage(decos, node, pos) {
 function build(doc) {
   const decos = [];
   const rules = R(); let last = '';
+  let run = [];
+  const flush = () => { const kinds = rules.unifyRun(run.map(r => r.kind)); run.forEach((r, i) => decos.push(Decoration.node(r.pos - 1, r.pos - 1 + r.parent.nodeSize, { class: kinds[i] === 'src' ? 'bt-src' : 'bt-memo-' + kinds[i] }))); run = []; };
   // React node views ignore decoration attrs, so mark the surrounding blockContainer instead.
   const outer = (pos, parent, attrs) => { if (parent && parent.type.name === 'blockContainer') decos.push(Decoration.node(pos - 1, pos - 1 + parent.nodeSize, attrs)); };
   doc.descendants((node, pos, parent) => {
     const name = node.type.name;
     let prevBlock = '';
-    if (node.isBlock && name !== 'blockContainer' && name !== 'blockGroup' && name !== 'doc') { prevBlock = last; last = name; }
+    if (node.isBlock && name !== 'blockContainer' && name !== 'blockGroup' && name !== 'doc') { prevBlock = last; last = name; if (name !== 'bookCallout' && run.length) flush(); }
     if (name === 'table') return false;
     if (name === 'bookHeading') {
       const level = String(node.attrs.level || '2');
@@ -76,23 +78,25 @@ function build(doc) {
     if (name === 'paragraph') {
       const text = node.textContent; const cls = [];
       if (/^\s*-\s*\d{1,4}\s*-\s*$/.test(text)) return false;
-      if (inlineLead(decos, node, pos, rules.step, 'bt-num', c => ({ 'data-n': String(rules.circledNumber(c)) }))) cls.push('bt-step');
+      const eng = rules.isEnglish(text);
+      if (inlineLead(decos, node, pos, rules.step, 'bt-num', c => ({ 'data-n': String(rules.circledNumber(c)) }))) { if (!eng) cls.push('bt-step'); }
       else if (inlineLead(decos, node, pos, rules.parenStep, 'bt-pnum')) cls.push('bt-pstep');
       else if (inlineLead(decos, node, pos, rules.leadNum, 'bt-lnum')) cls.push('bt-li');
       if (arrows(decos, node, pos) && rules.arrow.test(text.trimStart())) cls.push('bt-arrp');
-      if (rules.isEnglish(text)) cls.push('bt-eng');
+      if (eng) cls.push('bt-eng');
       if (allLinked(node)) { cls.push('bt-tocitem'); trailingPage(decos, node, pos); }
       if (cls.length) decos.push(Decoration.node(pos, pos + node.nodeSize, { class: cls.join(' ') }));
       return false;
     }
     if (name === 'bookCallout') {
       const media = ['image', 'table', 'bookMedia', 'video'].includes(prevBlock);
-      outer(pos, parent, { class: media && rules.source.test(node.textContent) ? 'bt-src' : 'bt-memo-' + rules.memoKind(node.textContent) });
+      if (parent && parent.type.name === 'blockContainer') run.push({ pos, parent, kind: media && rules.source.test(node.textContent) ? 'src' : rules.memoKind(node.textContent) });
       arrows(decos, node, pos);
       return false;
     }
     return true;
   });
+  flush();
   return DecorationSet.create(doc, decos);
 }
 

@@ -22,12 +22,17 @@
       const t = String(text || '').trim();
       if (!t) return 'memo';
       if (/^\([\s\S]*\)$/.test(t)) return 'aside';
-      if (/\?(\s|$)/.test(t.replace(/\([^)]*\)/g, ''))) return 'q';
+      // An arrow-led line is the author's explanation, even if it contains a question.
+      if (!/^(→|->|=>)/.test(t) && /\?(\s|$)/.test(t.replace(/\([^)]*\)/g, ''))) return 'q';
       if (t.length <= 22 && !t.includes('\n')) return 'short';
       return 'memo';
     },
+    // Consecutive memos read as one note: short ones follow the explanation style.
+    unifyRun(kinds) {
+      return kinds.includes('memo') ? kinds.map(k => (k === 'short' ? 'memo' : k)) : kinds;
+    },
     isEnglish(text) {
-      const t = String(text || '').trim();
+      const t = String(text || '').trim().replace(/^[①-⑳]\s*/, '');
       return t.length > 50 && /^[A-Za-z"“(]/.test(t) && /^[A-Za-z0-9\s,.'"“”’‘…;:!?()\-\/_%&$]+$/.test(t);
     },
   };
@@ -132,21 +137,29 @@
       if (p.closest('table, .book-design:not(.book-callout), li') || !fresh(p)) return;
       const text = p.textContent;
       if (FOOTER.test(text)) return;
-      if (rules.step.test(text) && wrapLeading(p, rules.step, c => span('bt-num', c, { 'data-n': String(rules.circledNumber(c)) }))) p.classList.add('bt-step');
+      const eng = rules.isEnglish(text);
+      if (rules.step.test(text) && wrapLeading(p, rules.step, c => span('bt-num', c, { 'data-n': String(rules.circledNumber(c)) })) && !eng) p.classList.add('bt-step');
       else if (rules.parenStep.test(text) && wrapLeading(p, rules.parenStep, n => span('bt-pnum', '(' + n + ')'))) p.classList.add('bt-pstep');
       if (decorateArrows(p) && rules.arrow.test(text.trimStart())) p.classList.add('bt-arrp');
       if (meta?.kind === 'opener-title' && wrapLeading(p, rules.leadNum, n => span('bt-lnum', n))) p.classList.add('bt-li');
       if (meta?.kind === 'toc') { const w = D.createTreeWalker(p, 4); let last = null, n; while ((n = w.nextNode())) if (n.data.trim()) last = n; const m = last?.data.match(rules.tocPage); if (m && isTocEntry(p)) { last.data = last.data.slice(0, m.index); last.after(span('bt-tpage', m[1])); } }
-      if (rules.isEnglish(text)) p.classList.add('bt-eng');
+      if (eng) p.classList.add('bt-eng');
     });
-    root.querySelectorAll('aside.book-callout').forEach(a => {
-      if (!fresh(a)) return;
+    const asides = [...root.querySelectorAll('aside.book-callout')].filter(fresh);
+    const kindOf = a => {
       const body = a.querySelector('.book-design-body') || a;
       const prev = a.previousElementSibling;
       const afterMedia = prev && (prev.matches('img, figure, table, .tableWrapper, [data-book-kind="media"]') || prev.querySelector?.(':scope > img'));
-      a.classList.add(afterMedia && rules.source.test(body.textContent) ? 'bt-src' : 'bt-memo-' + rules.memoKind(body.textContent));
-      decorateArrows(body);
+      return afterMedia && rules.source.test(body.textContent) ? 'src' : rules.memoKind(body.textContent);
+    };
+    let run = [];
+    const flush = () => { const kinds = rules.unifyRun(run.map(kindOf)); run.forEach((a, i) => a.classList.add(kinds[i] === 'src' ? 'bt-src' : 'bt-memo-' + kinds[i])); run = []; };
+    asides.forEach(a => {
+      if (run.length && run[run.length - 1].nextElementSibling !== a) flush();
+      run.push(a);
+      decorateArrows(a.querySelector('.book-design-body') || a);
     });
+    flush();
   }
 
   global.BookTheme = Object.freeze({ isThemed, classify, pageClasses, applyPage, decorateReader, rules, LABEL, CH_BY_NUM });
