@@ -48,6 +48,12 @@
     return !!all && all === linked;
   }
 
+  // A table-of-contents page: most blocks are entries whose whole text is a link.
+  function isTocPage(frag, blocks) {
+    const entries = [...frag.querySelectorAll('[data-book-kind="heading"], p')].filter(e => !e.closest('[data-book-kind="heading"] p') && isTocEntry(e));
+    return entries.length >= 5 && entries.length >= blocks.length * 0.6;
+  }
+
   /* pages: [{sort_order, html}] in reading order. Returns array of meta. */
   function classify(pages) {
     const metas = []; let ch = 'n'; let firstOpener = -1; let pendingTitle = null;
@@ -64,7 +70,7 @@
         pendingTitle.title = (heads[0] || '').replace(/\.\s*$/, '');
         meta.title = pendingTitle.title;
       } else if (!blocks.length) { meta.kind = 'empty'; meta.band = false; }
-      else if ([...frag.querySelectorAll('[data-book-kind="heading"]')].filter(isTocEntry).length >= 3) { meta.kind = 'toc'; meta.band = false; }
+      else if (isTocPage(frag, blocks)) { meta.kind = 'toc'; meta.band = false; }
       metas.push(meta);
     });
     metas.forEach(m => { if (firstOpener >= 0 && m.index < firstOpener && m.kind === 'body') { m.kind = 'front'; m.band = false; } });
