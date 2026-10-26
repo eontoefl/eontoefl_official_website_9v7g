@@ -14,7 +14,7 @@
     tocPage: /\s(\d{1,3})\s*$/,                                  // "토플 이해하기  28"
     step: /^(\s*)([①-⑳])(\s*)/,
     parenStep: /^(\s*)\((\d{1,2})\)(\s+)(?=\S)/,
-    arrow: /^(\s*)(→|->)/,
+    arrow: /^(\s*)(→|->)(\s*)/,
     leadNum: /^(\s*)(\d{1,2})(\s+)(?=\S)/,
     circledNumber(ch) { return CIRCLED.indexOf(ch) + 1; },
     source: /(출처|공식\s*(발표|홈페이지|자료))/,
@@ -31,9 +31,14 @@
     unifyRun(kinds) {
       return kinds.includes('memo') ? kinds.map(k => (k === 'short' ? 'memo' : k)) : kinds;
     },
+    // Passages, scripts and sample answers are English by nature: card without the "영어 예시" label.
+    engPlain(text) {
+      const t = String(text || '').trim().replace(/^[①-⑳]\s*/, '');
+      return t.length > 300 || /^(Woman|Man|Interviewer|Professor|Student)\s*:/i.test(t) || /Sample Answer/i.test(t);
+    },
     isEnglish(text) {
       const t = String(text || '').trim().replace(/^[①-⑳]\s*/, '');
-      return t.length > 50 && /^[A-Za-z"“(]/.test(t) && /^[A-Za-z0-9\s,.'"“”’‘…;:!?()\-\/_%&$]+$/.test(t);
+      return t.length > 50 && /^[A-Za-z"“(]/.test(t) && /^[A-Za-z0-9\s,.'"“”’‘…;:!?()\-\/_%&$①-⑳]+$/.test(t);
     },
   };
 
@@ -112,14 +117,14 @@
   function decorateArrows(el) {
     // "→" at the start of the element or right after a <br>.
     const walker = D.createTreeWalker(el, 5); const hits = [];
-    let node, lineStart = true;
+    let node, lineStart = true, seen = false;
     while ((node = walker.nextNode())) {
       if (node.nodeType === 1) { if (node.tagName === 'BR') lineStart = true; continue; }
-      if (node.parentElement?.closest('.bt-deco')) { lineStart = false; continue; }
-      if (lineStart && rules.arrow.test(node.data)) hits.push(node);
-      if (node.data.trim()) lineStart = false;
+      if (node.parentElement?.closest('.bt-deco')) { lineStart = false; seen = true; continue; }
+      if (lineStart && rules.arrow.test(node.data)) hits.push({ n: node, lead: !seen });
+      if (node.data.trim()) { lineStart = false; seen = true; }
     }
-    hits.forEach(n => { const m = n.data.match(rules.arrow); const f = D.createDocumentFragment(); if (m[1]) f.append(m[1]); f.append(span('bt-arw', m[2])); f.append(n.data.slice(m[0].length)); n.replaceWith(f); });
+    hits.forEach(({ n, lead }) => { const m = n.data.match(rules.arrow); const f = D.createDocumentFragment(); if (m[1]) f.append(m[1]); f.append(span(lead ? 'bt-arw bt-arw-lead' : 'bt-arw', lead ? m[2] + m[3] : m[2])); f.append((lead ? '' : m[3]) + n.data.slice(m[0].length)); n.replaceWith(f); });
     return hits.length;
   }
   function decorateReader(root, meta) {
@@ -143,7 +148,7 @@
       if (decorateArrows(p) && rules.arrow.test(text.trimStart())) p.classList.add('bt-arrp');
       if (meta?.kind === 'opener-title' && wrapLeading(p, rules.leadNum, n => span('bt-lnum', n))) p.classList.add('bt-li');
       if (meta?.kind === 'toc') { const w = D.createTreeWalker(p, 4); let last = null, n; while ((n = w.nextNode())) if (n.data.trim()) last = n; const m = last?.data.match(rules.tocPage); if (m && isTocEntry(p)) { last.data = last.data.slice(0, m.index); last.after(span('bt-tpage', m[1])); } }
-      if (eng) p.classList.add('bt-eng');
+      if (eng) { p.classList.add('bt-eng'); if (rules.engPlain(text)) p.classList.add('bt-eng-plain'); }
     });
     const asides = [...root.querySelectorAll('aside.book-callout')].filter(fresh);
     const kindOf = a => {

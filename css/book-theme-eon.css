@@ -174,3 +174,8 @@
 .bt-eon .book-callout .book-design-body [data-book-source-marker="X"]{color:var(--bt-pinkink)!important}
 .bt-eon .book-callout .book-design-body [data-book-source-marker="✓"],.bt-eon .book-callout .book-design-body [data-book-source-marker="○"],.bt-eon .book-callout .book-design-body [data-book-source-marker="●"]{color:var(--bt-k)!important}
 .bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#b23a3a"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#ef4d4d"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#de716c"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#bf4141"],.bt-eon .book-callout .book-design-body [data-style-type="textColor"][data-value="#BF4141"]{color:var(--bt-pinkink)!important}
+
+/* 설명 메모: 손그림 화살표가 있으니 맨 앞 글자 화살표는 숨김 (데이터는 그대로) */
+.bt-eon .bt-memo-memo .bt-arw-lead{font-size:0!important;letter-spacing:0}
+/* 지문, 스크립트, 모범답안: 회색 카드만, "영어 예시" 이름표 없음 */
+.bt-eon p.bt-eng-plain::before,.bt-eon .bt-eng-plain>p::before{content:none!important;display:none!important}

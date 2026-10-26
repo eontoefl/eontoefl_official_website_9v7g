@@ -26,14 +26,14 @@ function inlineLead(decos, node, pos, re, cls, attrsFor, gap) {
   return true;
 }
 function arrows(decos, node, pos) {
-  let off = 0, lineStart = true, count = 0;
+  let off = 0, lineStart = true, count = 0, seen = false;
   for (let i = 0; i < node.childCount; i++) {
     const c = node.child(i);
     if (c.type.name === 'hardBreak') lineStart = true;
     else if (c.isText) {
-      if (lineStart) { const m = c.text.match(R().arrow); if (m) { const from = pos + 1 + off + m[1].length; decos.push(Decoration.inline(from, from + m[2].length, { class: 'bt-deco bt-arw' })); count++; } }
-      if (c.text.trim()) lineStart = false;
-    } else lineStart = false;
+      if (lineStart) { const m = c.text.match(R().arrow); if (m) { const from = pos + 1 + off + m[1].length; const lead = !seen; decos.push(Decoration.inline(from, from + m[2].length + (lead ? m[3].length : 0), { class: lead ? 'bt-deco bt-arw bt-arw-lead' : 'bt-deco bt-arw' })); count++; } }
+      if (c.text.trim()) { lineStart = false; seen = true; }
+    } else { lineStart = false; seen = true; }
     off += c.nodeSize;
   }
   return count;
@@ -83,7 +83,7 @@ function build(doc) {
       else if (inlineLead(decos, node, pos, rules.parenStep, 'bt-pnum')) cls.push('bt-pstep');
       else if (inlineLead(decos, node, pos, rules.leadNum, 'bt-lnum')) cls.push('bt-li');
       if (arrows(decos, node, pos) && rules.arrow.test(text.trimStart())) cls.push('bt-arrp');
-      if (eng) cls.push('bt-eng');
+      if (eng) { cls.push('bt-eng'); if (rules.engPlain(text)) cls.push('bt-eng-plain'); }
       if (allLinked(node)) { cls.push('bt-tocitem'); trailingPage(decos, node, pos); }
       if (cls.length) decos.push(Decoration.node(pos, pos + node.nodeSize, { class: cls.join(' ') }));
       return false;
