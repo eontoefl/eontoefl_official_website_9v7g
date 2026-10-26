@@ -137,11 +137,17 @@
     return fragment;
   }
   function frameShell() {
-    const styles = ['css/book-design-system.css','css/book-design-viewer.css','css/private-book-preview.css','css/book-page-footer.css'].map(p => new URL(p,base).href);
+    const styles = ['css/book-design-system.css','css/book-design-viewer.css','css/private-book-preview.css','css/book-page-footer.css','css/book-theme-eon.css'].map(p => new URL(p,base).href);
     const assetPrefix = assetPrefixes(book).join(' ');
     const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src ${assetPrefix}; style-src 'unsafe-inline' ${styles.join(' ')}; font-src 'self';`;
     const escape = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
     return '<!doctype html><html lang="ko" class="preview-page"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + escape(policy) + '"><meta name="viewport" content="width=device-width, initial-scale=1">' + styles.map(u => '<link rel="stylesheet" href="'+escape(u)+'">').join('') + '</head><body><article class="book-content bookv2-content" id="admin-page-content"></article></body></html>';
+  }
+  let themeMetas = null;
+  function applyTheme(el, idx) {
+    const T = global.BookTheme; if (!T || !T.isThemed(book)) return;
+    themeMetas = themeMetas || T.classify(rows);
+    T.applyPage(el, themeMetas[idx]); T.decorateReader(el, themeMetas[idx]);
   }
   async function show(number, headingIndex) {
     if (stopped || !rows.length) return;
@@ -159,7 +165,7 @@
         try { verify(); } catch (_) { return; }
         const doc = nextFrame.contentDocument; content = doc?.getElementById('admin-page-content');
         if (!content) { clearPreview('미리보기 보안 프레임을 열 수 없습니다'); return; }
-        content.replaceChildren(prepareContent(row.html)); global.BookPageFooter?.decorateReader(content); applyZoom();
+        content.replaceChildren(prepareContent(row.html)); global.BookPageFooter?.decorateReader(content); applyTheme(content, current - 1); applyZoom();
         if (headingIndex !== undefined) headingsIn(content)[headingIndex]?.scrollIntoView();
         $('status').textContent = '기존 관리자 역할 확인 · 읽기 전용 · 학습 기록은 저장하지 않습니다';
       }, {once:true});

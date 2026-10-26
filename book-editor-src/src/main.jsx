@@ -1,6 +1,7 @@
 // Common design editor. Real book data stays in the existing page controller.
 import { useEffect, useState } from "react";
 import { PageFooterExtension } from "./page-footer.js";
+import { BookThemeExtension } from "./book-theme-ext.js";
 import "../../js/book-page-footer.js";
 import "../../css/book-page-footer.css";
 import { createRoot } from "react-dom/client";
@@ -34,7 +35,7 @@ const schema = BlockNoteSchema.create({
 const themes = bookThemes;
 function Editor({ editorRef, initialBlocks, uploadFile, onChange, onReady, designTools }) {
   const [theme, setTheme] = useState("neutral");
-  const editor = useCreateBlockNote({ schema, dictionary: ko, extensions:[PageFooterExtension],
+  const editor = useCreateBlockNote({ schema, dictionary: ko, extensions:[PageFooterExtension, BookThemeExtension],
     // Browser spellcheck marks almost every Korean word with an English dictionary.
     domAttributes: { editor: { spellcheck: "false" } },
     initialContent: initialBlocks?.length ? initialBlocks : undefined, uploadFile });

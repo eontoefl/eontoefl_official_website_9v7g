@@ -165,6 +165,22 @@ function renderStack() {
 
   updateSlideBar();
   buildOutline(); // 페이지 추가/삭제/순서변경도 목차에 반영
+  applyBookTheme();
+}
+
+// 이온토플 입문서 테마: 쪽 종류(장 시작/차례/본문)와 장 색을 종이에 표시한다(내용은 바꾸지 않음).
+function applyBookTheme() {
+  const T = window.BookTheme;
+  if (!T || !State.book) return;
+  const on = T.isThemed(State.book.id);
+  const metas = on ? T.classify(State.pages) : [];
+  State.pages.forEach((p, i) => {
+    const paper = State.nodes.get(p.id)?.querySelector(".bookedit-paper");
+    if (!paper) return;
+    T.applyPage(paper, on ? metas[i] : null);
+    const prev = paper.querySelector(".bookedit-preview");
+    if (on && prev) T.decorateReader(prev, metas[i]);
+  });
 }
 
 function createPageSection(p) {

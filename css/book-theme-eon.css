@@ -1,0 +1,134 @@
+/* 이온토플 입문서 테마 (C:\기능구현\입문서_수정\DESIGN.md).
+   Only inside .bt-eon (set by BookTheme.applyPage for this book's pages).
+   Works on both the editor (BlockNote DOM) and exported reader HTML. */
+.bt-eon{--bt-ink:#4E3D73;--bt-ink2:#6E6489;--bt-mute:#9D93B8;--bt-line:#E4DEF0;--bt-lav:#F4F0FA;--bt-pink:#E58FAE;--bt-pinkink:#C9658B;
+  --bt-p:#E6E0F2;--bt-pl:#F4F0FA;--bt-k:#6E5A9E;--bt-on:#8C7BB8;--bt-fg:78,61,115;--bt-bg:244,240,250}
+.bt-eon.bt-ch-r{--bt-p:#D3E5F4;--bt-pl:#EDF5FB;--bt-k:#3F6E99;--bt-on:#fff;--bt-fg:63,110,153;--bt-bg:237,245,251}
+.bt-eon.bt-ch-l{--bt-p:#F5D7E4;--bt-pl:#FCEFF4;--bt-k:#B5517A;--bt-on:#fff;--bt-fg:181,81,122;--bt-bg:252,239,244}
+.bt-eon.bt-ch-w{--bt-p:#CBBDEA;--bt-pl:#EFEAF9;--bt-k:#6A52AE;--bt-on:#fff;--bt-fg:106,82,174;--bt-bg:239,234,249}
+.bt-eon.bt-ch-s{--bt-p:#DED2F2;--bt-pl:#F3EEFB;--bt-k:#7E66B8;--bt-on:#fff;--bt-fg:126,102,184;--bt-bg:243,238,251}
+.bt-eon [data-bt-ch="r"]{--bt-tab:#D3E5F4}.bt-eon [data-bt-ch="l"]{--bt-tab:#F5D7E4}.bt-eon [data-bt-ch="w"]{--bt-tab:#CBBDEA}.bt-eon [data-bt-ch="s"]{--bt-tab:#DED2F2}.bt-eon [data-bt-ch="n"]{--bt-tab:#E6E0F2}
+
+/* page top band (9다) */
+.bt-eon.bt-band{border-top:6px solid var(--bt-p)!important}
+
+/* 글자 꾸밈 (결정3, 7, 8) */
+.bt-eon .book-content{color:#2E2A3A}
+.bt-eon [data-style-type="textColor"]{color:inherit!important}
+.bt-eon [data-style-type="backgroundColor"]{background:none!important}
+.bt-eon [data-style-type="textColor"][data-value="#b23a3a"],.bt-eon [data-style-type="textColor"][data-value="#ef4d4d"],
+.bt-eon [data-style-type="textColor"][data-value="#de716c"],.bt-eon [data-style-type="textColor"][data-value="#c0392b"]{color:var(--bt-pinkink)!important}
+.bt-eon strong,.bt-eon b:not(.bt-deco){color:var(--bt-ink)}
+.bt-eon u{text-decoration-color:var(--bt-pink);text-decoration-thickness:2px;text-underline-offset:3px}
+.bt-eon [data-book-source-marker="X"]{color:var(--bt-pinkink)!important}
+.bt-eon [data-book-source-marker="✓"],.bt-eon [data-book-source-marker="○"],.bt-eon [data-book-source-marker="●"]{color:var(--bt-k)!important}
+
+/* 섹션 제목과 소제목 (2나, 결정13) */
+.bt-eon .book-heading{margin:0!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important}
+.bt-eon .book-heading .book-design-title{font-family:BookArrows,SUIT,Pretendard,sans-serif!important;color:var(--bt-ink)!important;background:none!important;border:0!important;box-shadow:none!important}
+.bt-eon .book-heading .book-design-title::before,.bt-eon .book-heading .book-design-title::after{display:none!important;content:none!important}
+.bt-eon .book-heading[data-book-level="1"]{margin:8px 0 14px!important}
+.bt-eon .book-heading[data-book-level="1"] .book-design-title{font-size:23px!important;font-weight:800!important;line-height:1.3!important;padding:0 0 10px!important;border-bottom:2px solid var(--bt-p)!important}
+.bt-eon .bt-kick{display:block;font:700 11px/1.6 Outfit,sans-serif;letter-spacing:.28em;color:var(--bt-k)}
+.bt-eon .book-heading[data-book-level="2"]{margin:22px 0 8px!important}
+.bt-eon .book-heading[data-book-level="2"] .book-design-title{display:block!important;font-size:16.5px!important;font-weight:700!important;line-height:1.6!important;padding:0!important}
+.bt-eon .book-heading[data-book-level="2"] .book-design-title>*{display:inline;padding:0 2px;background:linear-gradient(transparent 58%,var(--bt-p) 58%);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.bt-eon.bt-kind-toc .book-heading[data-book-level="2"] .book-design-title>*{background:none}
+.bt-eon .book-heading[data-book-level="3"] .book-design-title{font-size:15.5px!important;font-weight:700!important;padding:0!important}
+
+/* 단계 번호 (3가, 결정21) */
+.bt-eon .bt-num{font-size:0!important;display:inline-block;vertical-align:2px;margin-right:8px}
+.bt-eon .bt-num::before{content:attr(data-n);display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--bt-k);color:#fff;font:700 12px/22px Outfit,sans-serif;text-align:center;text-indent:0}
+.bt-eon .book-heading .bt-num::before{width:20px;height:20px;font-size:11px;line-height:20px}
+.bt-eon .bt-step,.bt-eon .bt-step>p{font-family:SUIT,sans-serif!important;font-weight:700;color:var(--bt-ink);margin-top:16px}
+.bt-eon .bt-pnum{font:800 15px Outfit,sans-serif;color:var(--bt-k);margin-right:4px}
+.bt-eon .bt-pstep,.bt-eon .bt-pstep>p{font-family:SUIT,sans-serif!important;font-weight:700;color:var(--bt-ink);margin-top:14px}
+
+/* 화살표 (4가) */
+.bt-eon .bt-arw{color:var(--bt-k)}
+.bt-eon p.bt-arrp,.bt-eon .bt-arrp>p{padding-left:1.2em;text-indent:-1.2em}
+
+/* 손글씨 메모 (4-5 가: 펜으로 쓴 메모) */
+.bt-eon .book-callout{border:0!important;background:none!important;box-shadow:none!important;border-radius:0!important;padding:0 0 0 26px!important;margin:10px 0 14px!important;position:relative}
+.bt-eon .book-callout::before{display:none!important}
+.bt-eon .book-callout::after{content:"";position:absolute;left:0;top:5px;width:20px;height:18px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='18' viewBox='0 0 20 18'><path d='M3 2 C3 9 6 12 15 12' fill='none' stroke='%23E58FAE' stroke-width='1.8' stroke-linecap='round'/><path d='M11 8 L15.5 12 L11 15.5' fill='none' stroke='%23E58FAE' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat}
+.bt-eon .book-callout>.book-design-title{display:none!important}
+.bt-eon .book-callout .book-design-body,.bt-eon .book-callout .book-design-body *{font-family:LeeSeoyun,serif!important;font-weight:400!important;color:var(--bt-k)!important;background:none!important}
+.bt-eon .book-callout .book-design-body{font-size:19px!important;line-height:1.55!important}
+.bt-eon .bt-memo-q.book-callout,.bt-eon .bt-memo-q .book-callout,.bt-eon .bt-memo-short.book-callout,.bt-eon .bt-memo-short .book-callout,.bt-eon .bt-memo-aside.book-callout,.bt-eon .bt-memo-aside .book-callout{padding-left:0!important}
+.bt-eon .bt-memo-q.book-callout::after,.bt-eon .bt-memo-q .book-callout::after,.bt-eon .bt-memo-short.book-callout::after,.bt-eon .bt-memo-short .book-callout::after,.bt-eon .bt-memo-aside.book-callout::after,.bt-eon .bt-memo-aside .book-callout::after{display:none}
+.bt-eon .bt-memo-q .book-design-body,.bt-eon .bt-memo-q.book-callout .book-design-body{display:inline!important;padding-bottom:5px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='6' viewBox='0 0 24 6'><path d='M0 3 Q3 0 6 3 T12 3 T18 3 T24 3' fill='none' stroke='%23E58FAE' stroke-width='1.4'/></svg>") repeat-x left bottom!important}
+.bt-eon .bt-memo-short .book-design-body,.bt-eon .bt-memo-short.book-callout .book-design-body{font-size:17px!important}
+.bt-eon .bt-memo-aside .book-design-body,.bt-eon .bt-memo-aside.book-callout .book-design-body,.bt-eon .bt-memo-aside .book-design-body *,.bt-eon .bt-memo-aside.book-callout .book-design-body *{font-size:16px!important;color:#9A92B2!important}
+.bt-eon .bt-src.book-callout,.bt-eon .bt-src .book-callout{text-align:right;padding-left:0!important;margin-top:-4px!important}
+.bt-eon .bt-src .book-design-body,.bt-eon .bt-src.book-callout .book-design-body{font-size:15px!important;color:#9A92B2!important}
+.bt-eon .bt-src.book-callout::after,.bt-eon .bt-src .book-callout::after{display:none}
+
+/* 끊어 읽기 없는 영어 (결정10) */
+.bt-eon p.bt-eng,.bt-eon .bt-eng>p{background:#F7F6FA;border-radius:8px;padding:10px 14px!important;font-family:Outfit,sans-serif!important;font-size:15px;line-height:1.75}
+.bt-eon p.bt-eng::before,.bt-eon .bt-eng>p::before{content:"영어 예시";display:block;font:700 10.5px SUIT,sans-serif;color:var(--bt-mute);margin-bottom:2px}
+
+/* 이미지 (8가, 결정4) */
+.bt-eon img{box-shadow:none!important;border-radius:6px!important}
+.bt-eon .book-content img:not([width="24"]):not(.bt-icon),.bt-eon .bn-visual-media{border:1px solid var(--bt-line)}
+.bt-eon figcaption,.bt-eon .bn-file-caption,.bt-eon .bt-cap{font:500 12px/1.5 SUIT,sans-serif!important;color:var(--bt-mute)!important;margin-top:6px;text-align:left}
+
+/* 링크 버튼 (결정9) */
+.bt-eon a[href^="http"]{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--bt-k);border-radius:20px;padding:3px 14px;font:700 13.5px/1.6 SUIT,sans-serif!important;color:var(--bt-k)!important;text-decoration:none!important;background:#fff}
+.bt-eon a[href^="http"]::before{content:"▶";font-size:9px}
+
+/* 일반 표 (결정11) */
+.bt-eon table{border-collapse:collapse}
+.bt-eon table td,.bt-eon table th{border:0!important;border-bottom:1px solid var(--bt-line)!important;font-family:SUIT,sans-serif!important;font-size:13.5px;background:none!important;box-shadow:none!important}
+.bt-eon table tr:first-child td,.bt-eon table tr:first-child th{background:var(--bt-p)!important;color:var(--bt-ink);font-weight:700}
+
+/* 체크리스트 (결정14) */
+.bt-eon input[type="checkbox"]{appearance:none;-webkit-appearance:none;width:18px;height:18px;border:2px solid var(--bt-k);border-radius:5px;background:#fff;vertical-align:-3px}
+.bt-eon input[type="checkbox"]:checked{background:var(--bt-k)}
+
+/* 특수 블록 색 (결정12) */
+.bt-eon .book-design[data-book-theme]:not(.book-callout):not(.book-heading){--book-fg-rgb:var(--bt-fg);--book-bg-rgb:var(--bt-bg)}
+
+/* 원문 배치 참고: 학생·미리보기에서는 숨김, 편집기에서는 작게 (결정5) */
+.bt-eon:not(.bookedit-paper) [data-name^="원문 배치 참고"],.bt-eon #content [data-name^="원문 배치 참고"]{display:none!important}
+.bookedit-paper.bt-eon .bn-block-content[data-content-type="file"]{opacity:.55}
+
+/* 장 시작 번호 쪽 (1나, 결정16) */
+.bt-eon.bt-kind-opener{background:var(--bt-p)!important;min-height:520px}
+.bt-eon.bt-kind-opener.book-content{padding:8px 48px 24px!important;border-radius:4px}
+.bt-eon.bt-kind-opener .bookedit-preview,.bt-eon.bt-kind-opener .bn-editor,.bt-eon.bt-kind-opener .book-content{background:transparent!important}
+.bt-eon.bt-kind-opener .book-heading .book-design-title{font:800 110px/1 Outfit,sans-serif!important;color:var(--bt-on)!important;border:0!important;padding:70px 0 0!important}
+.bt-eon.bt-kind-opener .book-heading .book-design-title::after{display:block!important;content:var(--bt-label)!important;font:700 12px/1 Outfit,sans-serif!important;letter-spacing:.3em;color:var(--bt-k);margin-top:28px}
+.bt-eon.bt-kind-opener .book-heading::after{display:block;content:var(--bt-title);font:800 24px/1.4 SUIT,sans-serif;color:var(--bt-ink);margin-top:10px}
+.bt-eon.bt-ch-w.bt-kind-opener .book-heading .book-design-title::after{color:#fff}
+@media (max-width:680px){.bt-eon.bt-kind-opener{min-height:420px}.bt-eon.bt-kind-opener .book-heading .book-design-title{font-size:80px!important;padding-top:40px!important}.bt-eon.bt-kind-opener .book-heading::after{font-size:20px}}
+
+/* 장 시작 제목 쪽 */
+.bt-eon.bt-kind-opener-title .book-heading[data-book-level="1"] .book-design-title{font-size:26px!important;border-bottom:0!important;padding-bottom:0!important}
+.bt-eon.bt-kind-opener-title .book-heading[data-book-level="1"]::after{content:"";display:block;width:36px;height:5px;border-radius:3px;background:var(--bt-p);margin:12px 0 10px}
+.bt-eon.bt-kind-opener-title p.bt-li,.bt-eon.bt-kind-opener-title .bt-li>p{font:500 15px/2.4 SUIT,sans-serif!important;color:var(--bt-ink2);border-bottom:1px solid var(--bt-line);margin:0!important}
+.bt-eon.bt-kind-opener-title .bt-lnum{display:inline-block;min-width:26px;font:700 14px Outfit,sans-serif;color:var(--bt-k)}
+
+/* 차례 (10다) */
+.bt-eon.bt-kind-toc .book-heading[data-book-level="1"] .book-design-title{border-bottom:0!important;padding-bottom:0!important}
+.bt-eon.bt-kind-toc [data-bt-ch] .book-design-title,.bt-eon.bt-kind-toc .book-heading[data-bt-ch] .book-design-title{position:relative;padding:10px 0 4px 18px!important;font-size:16px!important;border-top:1px solid var(--bt-line)!important}
+.bt-eon.bt-kind-toc [data-bt-ch] .book-design-title::before,.bt-eon.bt-kind-toc .book-heading[data-bt-ch] .book-design-title::before{display:block!important;content:""!important;position:absolute;left:0;top:10px;bottom:4px;width:7px;border-radius:4px;background:var(--bt-tab)}
+.bt-eon.bt-kind-toc .bt-kick{display:inline-block;font:300 24px/1 Outfit,sans-serif;letter-spacing:0;color:var(--bt-ink);margin-right:10px;vertical-align:-2px}
+.bt-eon.bt-kind-toc .book-design-title,.bt-eon.bt-kind-toc p.bt-tocitem,.bt-eon.bt-kind-toc .bt-tocitem>p,.bt-eon.bt-kind-toc p:has(a){position:relative;padding-right:40px!important;display:block!important;box-sizing:border-box}
+.bt-eon.bt-kind-toc .bn-block-content>p{flex:1 1 auto}
+.bt-eon.bt-kind-toc .bt-tpage{position:absolute;right:0;bottom:inherit;font:700 12.5px Outfit,sans-serif;color:var(--bt-pinkink)}
+.bt-eon.bt-kind-toc .book-heading[data-book-level="2"]{margin:6px 0 0 18px!important}
+.bt-eon.bt-kind-toc .book-heading[data-book-level="2"] .book-design-title{display:block!important;font-size:13.5px!important;font-weight:700!important;background:none!important;color:var(--bt-ink2)!important}
+.bt-eon.bt-kind-toc p.bt-tocitem,.bt-eon.bt-kind-toc .bt-tocitem>p,.bt-eon.bt-kind-toc p:has(a){font:500 12.5px/1.7 SUIT,sans-serif!important;margin:0 0 0 18px!important;color:var(--bt-mute)}
+.bt-eon.bt-kind-toc p a,.bt-eon.bt-kind-toc .book-design-title a{color:inherit!important;text-decoration:none!important;border:0!important;padding:0!important;background:none!important;display:inline!important;font:inherit!important}
+.bt-eon.bt-kind-toc p a::before,.bt-eon.bt-kind-toc .book-design-title a::before{content:none!important}
+.bt-eon.bt-kind-toc p .bt-tpage,.bt-eon.bt-kind-toc .book-heading[data-book-level="2"] .bt-tpage{font-weight:500;color:var(--bt-mute)}
+
+
+
+/* editor: heading blocks span the full line like the reader */
+.bt-eon .bn-block-content[data-content-type="bookHeading"],.bt-eon .bn-block-content[data-content-type="bookHeading"]>.book-heading{width:100%;flex:1 1 auto}
+.bt-eon .book-heading[data-book-level="1"] .book-design-title{display:block!important}
+
+
+.bt-eon .bt-src [data-content-type="bookCallout"]{justify-content:flex-end}
