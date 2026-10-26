@@ -221,7 +221,8 @@
 .bookedit-paper.bt-eon.bt-kind-toc [data-bt-ch] .book-design-title{padding-bottom:4px!important}
 .bookedit-paper.bt-eon .book-annotated .book-design-body > p{margin:0 0 15px}
 /* 편집기가 켜지기 전 잠깐 보이는 미리보기도 학생 화면과 같은 간격 */
-.bookedit-paper.bt-eon .bookedit-preview{line-height:1.8;display:flex;flex-direction:column}
+.bookedit-page:not(.is-mounted) .bookedit-paper.bt-eon .bookedit-preview{line-height:1.8;display:flex;flex-direction:column}
+.bookedit-page.is-mounted .bookedit-paper .bookedit-preview{display:none!important}
 .bookedit-paper.bt-eon .bookedit-preview p{margin:0 0 15px}
 .bookedit-paper.bt-eon .bookedit-preview img{margin:16px 0}
 .bookedit-paper.bt-eon .bookedit-preview figure{margin:16px 0}
