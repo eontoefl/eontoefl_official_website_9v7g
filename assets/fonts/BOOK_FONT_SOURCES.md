@@ -17,3 +17,6 @@
   - 라이선스 원문: https://github.com/sun-typeface/SUIT/blob/main/LICENSE (SIL OFL 1.1), `suit/OFL.txt`. 교재 제목에 쓴다. 확인일 2026-10-23.
 - MaruBuri Regular/Bold (woff2): https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/
   - 라이선스: 네이버 나눔글꼴 라이선스 안내 https://help.naver.com/service/30016/contents/18088 (마루 부리 포함, SIL OFL 1.1). 안내문의 저작권 문구와 OFL 원문을 `maruburi/OFL.txt`에 보관. 교재 본문에 쓴다. 확인일 2026-10-23.
+
+- Noto Sans KR (Variable, 124개 유니코드 조각 woff2): Google Fonts CSS2 API `https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800` 가 내려주는 fonts.gstatic.com v40 파일을 그대로 받았다.
+  - 라이선스 원문: https://github.com/google/fonts/blob/main/ofl/notosanskr/OFL.txt (SIL OFL 1.1), `notosanskr/OFL.txt`. 글꼴 이름은 `NotoSansKRBook`(css/book-font-notosanskr.css). 단어장 표지(bookCover, 단어장 디자인)에 쓴다. 확인일 2026-10-28.

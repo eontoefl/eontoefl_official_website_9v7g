@@ -896,6 +896,60 @@
 /* A cover page shows no printed page number. */
 .book-numbered-page:has(.book-cover) > .book-page-number { display: none !important; }
 
+/* 단어장 cover (bookCover, variant "voca"). Same full-page frame as the 입문서
+   cover; layout copied from the print cover (210×280mm, 1mm = .476cqw).
+   Font: NotoSansKRBook (css/book-font-notosanskr.css). */
+.book-content .book-cover[data-cover-variant="voca"] {
+  background: #FCFAF6; color: #5B4A7D;
+  font-family: "NotoSansKRBook", "SUIT", sans-serif;
+}
+.book-content .book-cover[data-cover-variant="voca"] * { font-family: inherit; -webkit-text-stroke: 0; }
+.book-content .book-cover[data-cover-variant="voca"] .book-cover-top { left: 12.45cqw; right: 7.26cqw; top: 8.3cqw; }
+.book-content .book-cover[data-cover-variant="voca"] .book-cover-logo { height: max(12px, 3.11cqw); }
+.book-content .book-cover[data-cover-variant="voca"] .book-cover-tag {
+  font-weight: 500; font-size: max(7px, 1.21cqw); line-height: 1; letter-spacing: .34em; color: #A69DBE;
+}
+.book-content .book-cover-rule {
+  position: absolute; left: 12.45cqw; right: 7.26cqw; top: 16.08cqw;
+  border-top: max(1px, .143cqw) solid #ECE6F2;
+}
+.book-content .book-cover .book-cover-wordmark {
+  position: absolute; left: 11.1cqw; top: 23.87cqw; margin: 0; padding: 0; border: 0;
+  font-weight: 800; font-size: 21.6cqw; line-height: .88; letter-spacing: -.05em; color: #5B4A7D; white-space: nowrap;
+}
+.book-content .book-cover .book-cover-wordmark::first-letter { color: #E9A0B8; }
+.book-content .book-cover-entry { position: absolute; left: 12.45cqw; top: 49.81cqw; width: 67.44cqw; }
+.book-content .book-cover .book-cover-entry p { margin: 0; padding: 0; border: 0; text-indent: 0; }
+.book-content .book-cover .book-cover-headline { display: flex; align-items: baseline; gap: 1.56cqw; flex-wrap: wrap; line-height: 1.45; }
+.book-content .book-cover .book-cover-headword { font-weight: 800; font-size: max(13px, 2.75cqw); line-height: inherit; letter-spacing: -.02em; color: #5B4A7D; }
+.book-content .book-cover .book-cover-pron { font-weight: 400; font-size: max(8px, 1.65cqw); color: #A69DBE; }
+.book-content .book-cover .book-cover-sense,
+.book-content .book-cover .book-cover-syn { font-weight: 400; font-size: max(9px, 1.57cqw); line-height: 1.75; color: #6F6690; }
+.book-content .book-cover .book-cover-entry .book-cover-sense { margin-top: 1.35cqw; }
+.book-content .book-cover .book-cover-pos { font-style: italic; font-weight: 700; color: #E9A0B8; margin-right: .76cqw; }
+.book-content .book-cover .book-cover-syn-label { color: #A69DBE; }
+.book-content .book-cover[data-cover-variant="voca"] .book-cover-title {
+  margin: 6.23cqw 0 0; padding: 0; border: 0;
+  font-weight: 800; font-size: max(15px, 3.11cqw); line-height: 1.45; letter-spacing: -.03em; color: #5B4A7D;
+}
+.book-content .book-cover-tabs {
+  position: absolute; right: 0; top: 49.81cqw;
+  display: flex; flex-direction: column; gap: .72cqw; pointer-events: none; user-select: none;
+}
+/* Each tab is turned 180° so its label reads bottom-to-top; the round
+   corners are set on the right so they end up on the left after turning. */
+.book-content .book-cover-tabs > span {
+  display: flex; align-items: center; justify-content: center;
+  width: 7.78cqw; height: 9.08cqw; border-radius: 0 1.25cqw 1.25cqw 0;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-weight: 800; font-size: max(7px, 1.39cqw); line-height: 1; color: #5B4A7D;
+}
+.book-content .book-cover-tabs > [data-tab="1"], .book-content .book-cover-tabs > [data-tab="5"] { background: #DDF0E8; }
+.book-content .book-cover-tabs > [data-tab="2"], .book-content .book-cover-tabs > [data-tab="6"] { background: #DCEBF6; }
+.book-content .book-cover-tabs > [data-tab="3"], .book-content .book-cover-tabs > [data-tab="7"] { background: #E4DBF5; }
+.book-content .book-cover-tabs > [data-tab="4"] { background: #F8E1EB; }
+.book-content .book-cover-tabs > [data-tab="8"] { background: #B7A6E0; color: #fff; }
+
 /* ---------------------------------------------------------------------
    Fine print (bookFinePrint) — copyright / trademark notice, small text.
    Page placement (bottom, above the page number) lives in book-page-footer.css.

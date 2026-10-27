@@ -137,7 +137,7 @@
     return fragment;
   }
   function frameShell() {
-    const styles = ['css/book-design-system.css','css/book-design-viewer.css','css/private-book-preview.css','css/book-page-footer.css','css/book-theme-eon.css'].map(p => new URL(p,base).href);
+    const styles = ['css/book-font-notosanskr.css','css/book-design-system.css','css/book-design-viewer.css','css/private-book-preview.css','css/book-page-footer.css','css/book-theme-eon.css'].map(p => new URL(p,base).href);
     const assetPrefix = assetPrefixes(book).join(' ');
     const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src ${assetPrefix}; style-src 'unsafe-inline' ${styles.join(' ')}; font-src 'self';`;
     const escape = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');

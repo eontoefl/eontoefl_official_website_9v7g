@@ -94,3 +94,19 @@ test('cover exports its text and never renders an unsafe logo address', () => {
   assert.doesNotMatch(bad, /<img|javascript:/);
   assert.match(bad, /book-cover-logo-text/);
 });
+
+test('단어장 cover design exports its own text and tabs; 입문서 design is unchanged', () => {
+  const voca = html('bookCover', block('bookCover', { variant: 'voca', tag: 'VOCABULARY', title: '단어장' }));
+  assert.match(voca, /data-cover-variant="voca"/);
+  assert.match(voca, /<p class="book-cover-wordmark">VOCA<\/p>/);
+  assert.match(voca, /<h1 class="book-cover-title">단어장<\/h1>/);
+  assert.match(voca, /vo·cab·u·lar·y/);
+  assert.equal((voca.match(/data-tab="/g) || []).length, 8);
+  assert.doesNotMatch(voca, /book-cover-tiles|book-cover-hook/);
+  const intro = html('bookCover', block('bookCover'));
+  assert.match(intro, /data-cover-variant="intro"/);
+  assert.match(intro, /book-cover-tiles/);
+  assert.doesNotMatch(intro, /book-cover-wordmark|book-cover-tabs/);
+  // An unknown design name falls back to the 입문서 design.
+  assert.match(html('bookCover', block('bookCover', { variant: 'zzz' })), /data-cover-variant="intro"/);
+});

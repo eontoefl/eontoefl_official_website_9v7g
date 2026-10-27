@@ -749,23 +749,107 @@ function BookMedia({ block, editor, editable }) {
 
 export const COVER_LOGO_URL = "https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1792681413418_pzrawx.png";
 
+// Cover designs share one block. Each design is a fixed series layout; only
+// the text fields are edited in place. Switching the design swaps the
+// design-specific texts (tag, title) to that design's defaults.
+export const COVER_VARIANTS = Object.freeze({
+  intro: { label: "입문서", tag: "E-BOOK", title: "입문서" },
+  voca: { label: "단어장", tag: "VOCABULARY", title: "단어장" },
+});
+const COVER_VARIANT_OPTIONS = Object.entries(COVER_VARIANTS).map(([value, v]) => ({ value, label: v.label }));
+function coverVariant(props) {
+  return Object.hasOwn(COVER_VARIANTS, props.variant) ? props.variant : "intro";
+}
+// 단어장 cover: right-edge A–Z thumb tabs (fixed artwork, like the R/L/W/S tiles).
+const VOCA_TABS = ["A–C", "D–F", "G–I", "J–L", "M–O", "P–R", "S–U", "V–Z"];
+
+function CoverTop({ block, editor, editable, logo }) {
+  return (
+    <div className="book-cover-top">
+      {logo ? (
+        <img className="book-cover-logo" src={logo} alt="이온토플" />
+      ) : (
+        <span className="book-cover-logo-text">이온토플</span>
+      )}
+      <DesignText as="span" className="book-cover-tag" block={block} editor={editor} editable={editable} field="tag" />
+    </div>
+  );
+}
+
+function VocaCoverBody({ block, editor, editable }) {
+  const text = (field, as, className) => (
+    <DesignText as={as} className={className} block={block} editor={editor} editable={editable} field={field} />
+  );
+  return (
+    <>
+      <div className="book-cover-rule" aria-hidden="true" />
+      {text("wordmark", "p", "book-cover-wordmark")}
+      <div className="book-cover-entry">
+        <p className="book-cover-headline">
+          {text("headword", "span", "book-cover-headword")}
+          {text("pron", "span", "book-cover-pron")}
+        </p>
+        <p className="book-cover-sense">
+          {text("pos", "i", "book-cover-pos")}
+          {text("meaning", "span", "book-cover-meaning")}
+        </p>
+        <p className="book-cover-syn">
+          <span className="book-cover-syn-label">syn.</span>{" "}
+          {text("syn", "span", "book-cover-syn-text")}
+        </p>
+        {text("title", "h1", "book-cover-title")}
+      </div>
+      <div className="book-cover-tabs" aria-hidden="true">
+        {VOCA_TABS.map((t, i) => <span key={t} data-tab={i + 1}>{t}</span>)}
+      </div>
+    </>
+  );
+}
+
 // Full-width e-book cover. Text is edited in place; the R/L/W/S tiles are
 // fixed series artwork and scale with the cover width (container units).
 function BookCover({ block, editor, editable }) {
   const logo = safeHttpUrl(block.props.logoUrl);
+  const variant = coverVariant(block.props);
   return (
     <section
       {...designRootEvents(editor, block, editable)}
-      {...bookRootProps("cover", "neutral")}
+      {...bookRootProps("cover", "neutral", { "data-cover-variant": variant })}
     >
-      <div className="book-cover-top">
-        {logo ? (
-          <img className="book-cover-logo" src={logo} alt="이온토플" />
-        ) : (
-          <span className="book-cover-logo-text">이온토플</span>
-        )}
-        <DesignText as="span" className="book-cover-tag" block={block} editor={editor} editable={editable} field="tag" />
-      </div>
+      <CoverTop block={block} editor={editor} editable={editable} logo={logo} />
+      {variant === "voca" ? (
+        <VocaCoverBody block={block} editor={editor} editable={editable} />
+      ) : (
+        <IntroCoverBody block={block} editor={editor} editable={editable} />
+      )}
+      {editable ? (
+        <EditorControls block={block} editor={editor}>
+          <SelectControl
+            label="표지 디자인"
+            value={variant}
+            options={COVER_VARIANT_OPTIONS}
+            onChange={(next) => {
+              const v = COVER_VARIANTS[next];
+              if (v) updateBlockProps(editor, block, { variant: next, tag: v.tag, title: v.title });
+            }}
+          />
+          <TextControl
+            label="로고 이미지 URL"
+            value={block.props.logoUrl}
+            inputMode="url"
+            spellCheck={false}
+            help="http:// 또는 https:// 주소만 허용됩니다. 비우면 '이온토플' 글자로 표시됩니다."
+            onChange={(logoUrl) => updateBlockProps(editor, block, { logoUrl })}
+          />
+        </EditorControls>
+      ) : null}
+    </section>
+  );
+}
+
+function IntroCoverBody({ block, editor, editable }) {
+  return (
+    <>
       <div className="book-cover-tiles" aria-hidden="true">
         <span data-tile="r">R</span>
         <span data-tile="l">L</span>
@@ -781,19 +865,7 @@ function BookCover({ block, editor, editable }) {
           <DesignText as="strong" block={block} editor={editor} editable={editable} field="hookStrong" />
         </p>
       </div>
-      {editable ? (
-        <EditorControls block={block} editor={editor}>
-          <TextControl
-            label="로고 이미지 URL"
-            value={block.props.logoUrl}
-            inputMode="url"
-            spellCheck={false}
-            help="http:// 또는 https:// 주소만 허용됩니다. 비우면 '이온토플' 글자로 표시됩니다."
-            onChange={(logoUrl) => updateBlockProps(editor, block, { logoUrl })}
-          />
-        </EditorControls>
-      ) : null}
-    </section>
+    </>
   );
 }
 
@@ -807,6 +879,14 @@ const bookCoverSpec = createReactBlockSpec(
       title: { default: "입문서" },
       hook: { default: "남들이 문제부터 풀 때," },
       hookStrong: { default: "합격자들은 시험부터 읽었습니다" },
+      // 단어장 design (variant "voca"). Ignored by the 입문서 design.
+      variant: { default: "intro" },
+      wordmark: { default: "VOCA" },
+      headword: { default: "vo·cab·u·lar·y" },
+      pron: { default: "/vəˈkæbjəleri/" },
+      pos: { default: "n." },
+      meaning: { default: "어휘, 단어 목록" },
+      syn: { default: "lexicon, word list" },
     },
     content: "none",
   },
