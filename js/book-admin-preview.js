@@ -146,7 +146,7 @@
   let themeMetas = null;
   function applyTheme(el, idx) {
     const T = global.BookTheme; if (!T || !T.isThemed(book)) return;
-    themeMetas = themeMetas || T.classify(rows);
+    themeMetas = themeMetas || T.classify(rows, book);
     T.applyPage(el, themeMetas[idx]); T.decorateReader(el, themeMetas[idx]);
   }
   async function show(number, headingIndex) {

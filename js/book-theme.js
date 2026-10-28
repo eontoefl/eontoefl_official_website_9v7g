@@ -3,7 +3,12 @@
    (rules), the admin preview and the student viewer (decorateReader). */
 (function (global) {
   'use strict';
-  const THEMED = new Set(['e660266e-1b01-4d11-9254-81ea7e613344']);
+  // Books that use this theme. book: extra page class (bt-book-<book>).
+  // front: leading pages without the top band (used when a book has no chapter openers).
+  const THEMED = new Map([
+    ['e660266e-1b01-4d11-9254-81ea7e613344', { book: 'intro' }],          // 입문서
+    ['07f6cd4e-c737-40a1-b537-6e07af3d1aa5', { book: 'voca', front: 4 }], // 단어장: 1쪽 표지, 2~4쪽 경고문·안내
+  ]);
   const CH_BY_NUM = { '06': 'r', '07': 'l', '08': 'w', '09': 's' };
   const LABEL = { n: 'TOEFL', r: 'READING', l: 'LISTENING', w: 'WRITING', s: 'SPEAKING' };
   const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
@@ -65,11 +70,12 @@
   }
 
   /* pages: [{sort_order, html}] in reading order. Returns array of meta. */
-  function classify(pages) {
+  function classify(pages, bookId) {
+    const cfg = THEMED.get(String(bookId || '')) || {};
     const metas = []; let ch = 'n'; let firstOpener = -1; let pendingTitle = null;
     pages.forEach((p, i) => {
       const frag = parse(p.html); const blocks = blocksOf(frag); const heads = headingTexts(frag);
-      const meta = { index: i, ch, kind: 'body', band: true, num: '', label: '', title: '' };
+      const meta = { index: i, ch, kind: 'body', band: true, num: '', label: '', title: '', book: cfg.book || '' };
       if (frag.querySelector('[data-book-kind="cover"]')) { meta.kind = 'cover'; meta.band = false; }
       else if (blocks.length === 1 && heads.length === 1 && /^\d{2}$/.test(heads[0])) {
         const num = heads[0]; ch = CH_BY_NUM[num] || 'n'; if (firstOpener < 0) firstOpener = i;
@@ -83,17 +89,18 @@
       else if (isTocPage(frag, blocks)) { meta.kind = 'toc'; meta.band = false; }
       metas.push(meta);
     });
-    metas.forEach(m => { if (firstOpener >= 0 && m.index < firstOpener && m.kind === 'body') { m.kind = 'front'; m.band = false; } });
+    const frontEnd = firstOpener >= 0 ? firstOpener : (cfg.front || 0);
+    metas.forEach(m => { if (m.index < frontEnd && m.kind === 'body') { m.kind = 'front'; m.band = false; } });
     if (metas.length && metas[metas.length - 1].kind === 'body') { const last = metas[metas.length - 1]; last.kind = 'last'; last.band = false; }
     return metas;
   }
 
   function pageClasses(meta) {
-    return ['bt-eon', 'bt-ch-' + meta.ch, 'bt-kind-' + meta.kind].concat(meta.band ? ['bt-band'] : []);
+    return ['bt-eon', 'bt-ch-' + meta.ch, 'bt-kind-' + meta.kind].concat(meta.band ? ['bt-band'] : [], meta.book ? ['bt-book-' + meta.book] : []);
   }
   function applyPage(el, meta) {
     if (!el) return;
-    [...el.classList].filter(c => c === 'bt-eon' || c === 'bt-band' || c.startsWith('bt-ch-') || c.startsWith('bt-kind-')).forEach(c => el.classList.remove(c));
+    [...el.classList].filter(c => c === 'bt-eon' || c === 'bt-band' || c.startsWith('bt-ch-') || c.startsWith('bt-kind-') || c.startsWith('bt-book-')).forEach(c => el.classList.remove(c));
     if (!meta) { el.style.removeProperty('--bt-label'); el.style.removeProperty('--bt-title'); return; }
     el.classList.add(...pageClasses(meta));
     if (meta.kind === 'opener') { el.style.setProperty('--bt-label', JSON.stringify(meta.label)); el.style.setProperty('--bt-title', JSON.stringify(meta.title || '')); }

@@ -173,7 +173,7 @@ function applyBookTheme() {
   const T = window.BookTheme;
   if (!T || !State.book) return;
   const on = T.isThemed(State.book.id);
-  const metas = on ? T.classify(State.pages) : [];
+  const metas = on ? T.classify(State.pages, State.book.id) : [];
   State.pages.forEach((p, i) => {
     const paper = State.nodes.get(p.id)?.querySelector(".bookedit-paper");
     if (!paper) return;
