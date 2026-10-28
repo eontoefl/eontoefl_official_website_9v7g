@@ -153,7 +153,7 @@ function renderProgressSection(app) {
         { id: 6, name: '계약\n동의', icon: 'fa-signature', completed: !!app.contract_agreed_at },
         { id: 7, name: '입금\n확인', icon: 'fa-check-double', completed: !!app.deposit_confirmed_by_admin_at },
         { id: 8, name: '이용방법\n전달', icon: 'fa-book-open', completed: !!app.guide_sent },
-        { id: 9, name: app.shipping_waived ? '교재\n전달' : '택배\n발송', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
+        { id: 9, name: app.shipping_waived ? '교재\n전달' : '교재\n발송', icon: 'fa-shipping-fast', completed: !!app.shipping_completed || !!app.shipping_waived }
     ];
 
     // 현재 단계 찾기
@@ -1149,7 +1149,7 @@ function renderShipping(app) {
     if (app.shipping_completed) {
         statusClass = 'delivered';
         statusIcon = 'fa-check-circle';
-        statusText = '출고 완료';
+        statusText = '교재 발송 완료';
         trackingNumber = app.shipping_tracking_number || '-';
         
         // 출고 완료 칸 = 실제 출고일, 도착 예정 칸 = 출고 다음날 (2026-10-28: 예전엔 출고 칸에 출고+2일이 찍혔음)
@@ -1174,7 +1174,7 @@ function renderShipping(app) {
         if (app.schedule_start) {
             const startDate = new Date(app.schedule_start);
             const shipDate = new Date(startDate);
-            shipDate.setDate(shipDate.getDate() - 2); // 시작 2일 전(금) 출고 — 입금 단계 안내 "늦어도 금요일 출고"와 맞춤 (2026-10-29)
+            shipDate.setDate(shipDate.getDate() - 2); // 시작 2일 전(금) 발송 — 입금 단계 안내 "늦어도 금요일 발송"과 맞춤 (2026-10-29)
             expectedDate = shipDate.toLocaleDateString('ko-KR');
         }
     }
@@ -1189,7 +1189,7 @@ function renderShipping(app) {
         
         <div class="shipping-info">
             <div class="shipping-info-row">
-                <span class="shipping-info-label">출고 ${app.shipping_completed ? '완료' : '예정'}</span>
+                <span class="shipping-info-label">발송 ${app.shipping_completed ? '완료' : '예정'}</span>
                 <span class="shipping-info-value">${expectedDate}</span>
             </div>
             ${arrivalDate ? `

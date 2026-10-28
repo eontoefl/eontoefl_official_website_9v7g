@@ -3144,7 +3144,7 @@ async function loadPaymentTab(app) {
                     <div class="s4-card-title"><i class="fas fa-truck-fast"></i> 이번 주 시작 안내</div>
                     <p style="font-size:14px; color:#5b4a7d; margin:0; line-height:1.85;">
                         이번 일요일(<strong>${sundayLabel}</strong>)에 시작하려면 <strong>${thursdayLabel} 밤 11:59</strong>까지 입금이 확인되어야 해요.<br>
-                        늦어도 금요일에 교재를 출고해야 토요일에 도착하거든요.<br>
+                        늦어도 금요일에 교재를 발송해야 토요일에 도착하거든요.<br>
                         이후에 입금되면 다음 일요일 시작으로 안내드려요.
                     </p>
                 </div>
@@ -3161,7 +3161,7 @@ async function loadPaymentTab(app) {
     const noShipRestart = Number(app.enrollment_no) === 2 && !(Array.isArray(app.restart_materials) && app.restart_materials.length);
     const timelineSteps = noShipRestart
         ? ['입금 확인 (당일)', '이용 방법 안내', startLabel]
-        : ['입금 확인 (당일)', '이용 방법 안내', '교재 출고', '익일 도착', startLabel];
+        : ['입금 확인 (당일)', '이용 방법 안내', '교재 발송', '익일 도착', startLabel];
     const vocaNoteHtml = noShipRestart ? '' : `
             <div style="display:flex; gap:9px; align-items:flex-start; margin-top:14px; background:#f7f5fd; border-radius:10px; padding:11px 14px; font-size:13px; line-height:1.65; color:#4b3f6b;">
                 <i class="fas fa-book-open" style="color:#7a68aa; margin-top:3px; font-size:12px;"></i>
