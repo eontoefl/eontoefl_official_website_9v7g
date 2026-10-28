@@ -628,7 +628,7 @@ function renderActionItems(app) {
     if (actionItems.length === 0 && (app.shipping_completed || app.shipping_waived)) {
         const shippingNote = app.shipping_waived
             ? `교재 전달 정보는 아래 '배송 정보'에서 확인하실 수 있어요.`
-            : `택배 발송 정보는 아래 '배송 정보'에서 확인하실 수 있어요.`;
+            : `교재 발송 정보는 아래 '배송 정보'에서 확인하실 수 있어요.`;
         actionItemsContent.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #64748b;">
                 <i class="fas fa-check-circle" style="font-size: 48px; margin-bottom: 16px; color: #77bf7e;"></i>
