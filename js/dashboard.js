@@ -1174,7 +1174,7 @@ function renderShipping(app) {
         if (app.schedule_start) {
             const startDate = new Date(app.schedule_start);
             const shipDate = new Date(startDate);
-            shipDate.setDate(shipDate.getDate() - 3); // 시작 3일 전 발송
+            shipDate.setDate(shipDate.getDate() - 2); // 시작 2일 전(금) 출고 — 입금 단계 안내 "늦어도 금요일 출고"와 맞춤 (2026-10-29)
             expectedDate = shipDate.toLocaleDateString('ko-KR');
         }
     }
@@ -1225,7 +1225,7 @@ function renderShipping(app) {
         
         <div style="display:flex; gap:9px; align-items:flex-start; background:#f7f5fd; border-radius:10px; padding:11px 14px; margin: 16px 0; font-size:13px; line-height:1.65; color:#4b3f6b;">
             <i class="fas fa-book-open" style="color:#7a68aa; margin-top:3px; font-size:12px;"></i>
-            <span style="word-break:keep-all;">교재 도착 전에도 <strong style="color:#5b4a7d;">테스트룸 &gt; 마이페이지 &gt; 내 서재</strong>에서 볼 수 있어요. PDF로 받아 인쇄해도 돼요.</span>
+            <span style="word-break:keep-all;">교재 도착 전에도 <strong style="color:#5b4a7d;">테스트룸 &gt; 마이페이지 &gt; 내 서재</strong>에서 볼 수 있어요. PC에서는 PDF로 받아 인쇄해도 돼요.</span>
         </div>
 
         <button class="tracking-button" ${!trackingUrl ? 'disabled' : ''} onclick="window.open('${trackingUrl}', '_blank')">

@@ -3165,7 +3165,7 @@ async function loadPaymentTab(app) {
     const vocaNoteHtml = noShipRestart ? '' : `
             <div style="display:flex; gap:9px; align-items:flex-start; margin-top:14px; background:#f7f5fd; border-radius:10px; padding:11px 14px; font-size:13px; line-height:1.65; color:#4b3f6b;">
                 <i class="fas fa-book-open" style="color:#7a68aa; margin-top:3px; font-size:12px;"></i>
-                <span style="word-break:keep-all;">교재 도착 전에도 <strong style="color:#5b4a7d;">테스트룸 &gt; 마이페이지 &gt; 내 서재</strong>에서 볼 수 있어요. PDF로 받아 인쇄해도 돼요.</span>
+                <span style="word-break:keep-all;">교재 도착 전에도 <strong style="color:#5b4a7d;">테스트룸 &gt; 마이페이지 &gt; 내 서재</strong>에서 볼 수 있어요. PC에서는 PDF로 받아 인쇄해도 돼요.</span>
             </div>`;
     const timelineHtml = `
         <div class="s4-card">
