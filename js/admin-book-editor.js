@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (loading) loading.style.display = "none";
   document.getElementById("slideBar").hidden = false;
   setCurrent(State.pages.length ? State.pages[0].id : null);
-  setStatus("saved", "준비됨");
+  setStatus("saved", State.staleDrafts ? "서버 내용이 더 새로운 쪽은 서버 내용을 보여줘요 (예전 임시본 " + State.staleDrafts + "개는 따로 보관)" : "준비됨");
 });
 
 function checkAuth() {
@@ -788,10 +788,11 @@ async function savePage() {
       if (!blocks) continue;
       const html = await conv.htmlOf(blocks);
 
+      const savedAt = new Date().toISOString();
       await supabaseAPI.patch("tr_book_pages", pageId, {
         blocks: blocks,
         html: html,
-        updated_at: new Date().toISOString(),
+        updated_at: savedAt,
       });
       await supabaseAPI.post("tr_book_page_versions", {
         page_id: pageId,
@@ -802,7 +803,7 @@ async function savePage() {
       });
 
       const p = State.pages.find((x) => x.id === pageId);
-      if (p) { p.blocks = blocks; p.html = html; }
+      if (p) { p.blocks = blocks; p.html = html; p.updated_at = savedAt; }
       clearDraft(pageId);
       markPageDirty(pageId, false);
     }
@@ -1009,17 +1010,48 @@ async function uploadFile(file) {
 // ---------------------------------------------------------------------
 // 임시저장(localStorage) — 페이지별
 // ---------------------------------------------------------------------
+// 임시저장본은 어느 서버본(updated_at)을 고치던 중이었는지(base)를 함께 기록한다.
+// 서버본이 그보다 새로워졌으면(다른 창·다른 사람·작업이 저장) 임시저장본은 보여주지 않고
+// 지우지도 않는다. 보관 키(bookedit_draftbak_)로 옮겨 두고 서버본을 보여준다.
+// base가 없는 예전 형식(배열만 저장)은 언제 것인지 알 수 없어 같은 방식으로 보관만 한다.
 function draftKey(pageId) {
   return "bookedit_draft_" + (State.book ? State.book.id : "x") + "_" + pageId;
 }
+function draftBackupKey(pageId) {
+  return "bookedit_draftbak_" + (State.book ? State.book.id : "x") + "_" + pageId;
+}
+function serverUpdatedAt(pageId) {
+  const p = State.pages.find((x) => x.id === pageId);
+  return p && p.updated_at ? Date.parse(p.updated_at) : NaN;
+}
 function saveDraft(pageId, blocks) {
-  try { localStorage.setItem(draftKey(pageId), JSON.stringify(blocks || [])); } catch (_) {}
+  const p = State.pages.find((x) => x.id === pageId);
+  const draft = { v: 2, base: (p && p.updated_at) || null, at: new Date().toISOString(), blocks: blocks || [] };
+  try { localStorage.setItem(draftKey(pageId), JSON.stringify(draft)); } catch (_) {}
+}
+function setDraftAside(pageId, raw, reason) {
+  try {
+    localStorage.setItem(draftBackupKey(pageId), JSON.stringify({ reason: reason, movedAt: new Date().toISOString(), draft: raw }));
+    localStorage.removeItem(draftKey(pageId));
+  } catch (_) {}
+  State.staleDrafts = (State.staleDrafts || 0) + 1;
+  setStatus("saved", "서버 내용이 더 새로운 쪽은 서버 내용을 보여줘요 (예전 임시본 " + State.staleDrafts + "개는 따로 보관)");
 }
 function loadDraft(pageId) {
   try {
     const raw = localStorage.getItem(draftKey(pageId));
-    const arr = raw ? JSON.parse(raw) : null;
-    return Array.isArray(arr) && arr.length ? arr : null;
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (Array.isArray(d)) { // 예전 형식: 언제 기준인지 모름
+      if (d.length) setDraftAside(pageId, d, "legacy");
+      else localStorage.removeItem(draftKey(pageId));
+      return null;
+    }
+    if (!d || !Array.isArray(d.blocks) || !d.blocks.length) return null;
+    const server = serverUpdatedAt(pageId);
+    const base = d.base ? Date.parse(d.base) : NaN;
+    if (!isNaN(server) && (isNaN(base) || server > base)) { setDraftAside(pageId, d, "server-newer"); return null; }
+    return d.blocks;
   } catch (_) { return null; }
 }
 function clearDraft(pageId) {
