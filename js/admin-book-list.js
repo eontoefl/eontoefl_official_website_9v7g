@@ -89,6 +89,11 @@ function renderActive(books) {
           audBadge +
         "</div>" +
         '<div class="book-card-meta">' + (b.total_pages || 0) + "페이지 · 수정 " + fmtDate(b.updated_at) + "</div>" +
+        // 책마다 켜고 끄는 학생 화면 설정 (2026-10-28 단어장 디지털 전달)
+        '<div class="book-card-opts">' +
+          optChip("view_confirm", "처음 열 때 확인", "fa-lock", !!b.view_confirm, "켜면 학생이 처음 열 때 확인 창을 띄우고, 처음 연 시각을 기록해요") +
+          optChip("allow_print", "PDF 저장·인쇄", "fa-print", !!b.allow_print, "켜면 책 화면에 PDF 저장·인쇄 버튼이 생겨요 (쪽마다 학생 이름·이메일 표시)") +
+        "</div>" +
       "</div>" +
       '<div class="book-card-actions">' +
         '<label class="toggle" title="공개/숨김"><input type="checkbox" data-act="pub"' + (pub ? " checked" : "") + "><span class=\"toggle-track\"></span><span class=\"toggle-thumb\"></span></label>" +
@@ -109,6 +114,7 @@ function renderActive(books) {
       else if (act === "pub") togglePublish(b, t.checked);
       else if (act === "role") openRoleMenu(b, t);
       else if (act === "audience") openAudience(b);
+      else if (act === "opt") toggleOpt(b, t.dataset.key);
     });
     list.appendChild(card);
   });
@@ -176,6 +182,22 @@ async function renameBook(b) {
   await supabaseAPI.patch("tr_book_documents", b.id, { title: name.trim() });
   b.title = name.trim();
   render();
+}
+
+// 책 설정 스위치 (처음 열 때 확인 / PDF 저장·인쇄)
+function optChip(key, label, icon, on, title) {
+  return '<button type="button" class="book-opt' + (on ? " on" : "") + '" data-act="opt" data-key="' + key + '" title="' + esc(title) + '">' +
+    '<i class="fas ' + icon + '"></i> ' + esc(label) + ' <span class="book-opt-state">' + (on ? "켜짐" : "꺼짐") + "</span></button>";
+}
+
+async function toggleOpt(b, key) {
+  if (key !== "view_confirm" && key !== "allow_print") return;
+  const val = !b[key];
+  try {
+    await supabaseAPI.patch("tr_book_documents", b.id, { [key]: val });
+    b[key] = val;
+    render();
+  } catch (e) { alert("변경 실패: " + e.message); render(); }
 }
 
 async function togglePublish(b, val) {

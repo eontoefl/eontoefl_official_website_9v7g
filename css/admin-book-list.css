@@ -138,3 +138,12 @@
   .booklist-topbar { height: auto; min-height: 66px; flex-wrap: wrap; gap: 8px; padding: 12px; }
   .booklist-topbar-right { flex-wrap: wrap; }
 }
+
+/* 책 설정 스위치: 처음 열 때 확인 / PDF 저장·인쇄 (2026-10-28) */
+.book-card-opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.book-opt { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: none; border-radius: 999px; background: var(--surface-low); color: var(--on-surface-variant); font: 500 12px "Inter", sans-serif; cursor: pointer; transition: background .15s, color .15s; }
+.book-opt i { font-size: 11px; }
+.book-opt:hover { background: var(--surface-high); }
+.book-opt .book-opt-state { font-weight: 700; color: #94a3b8; }
+.book-opt.on { background: rgba(80,201,255,0.16); color: var(--primary); }
+.book-opt.on .book-opt-state { color: var(--primary); }

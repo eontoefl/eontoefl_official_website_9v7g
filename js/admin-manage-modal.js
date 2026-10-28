@@ -3065,12 +3065,6 @@ async function loadModalContractTab(app) {
 
                     <!-- 입금 확인 처리 -->
                     <div style="background: #ffffff; padding: 20px 22px; border-radius: 14px;">
-                        ${app.late_start_choice ? `
-                        <div style="background: #faf7fa; border: 1px solid #ece4f2; border-radius: 10px; padding: 11px 13px; margin-bottom: 16px; font-size: 13px; color: #5b4a7d; line-height: 1.5;">
-                            <i class="fas fa-user-clock" style="font-size: 11px; margin-right: 6px;"></i>
-                            학생 시작 선택: <strong>${app.late_start_choice === '다음주' ? '다음주' : '이번주(교재 PDF 선발송)'}</strong>
-                        </div>
-                        ` : ''}
                         <div style="margin-bottom: 16px;">
                             <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">입금자명</label>
                             <input type="text" id="modalDepositorName" value="${app.depositor_name || app.name}"

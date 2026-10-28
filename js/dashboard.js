@@ -767,7 +767,7 @@ async function renderTimeline(app) {
             icon: 'fa-box-open',
             iconColor: '#77bf7e',
             title: '교재 전달 완료',
-            description: '수강생 요청에 따른 실물 택배 미발송 (교재 PDF 전달 완료)'
+            description: '택배 없이 진행해요. 단어장은 테스트룸 > 마이페이지 > 내 서재에서 볼 수 있어요.'
         });
     } else if (app.shipping_completed) {
         events.push({
@@ -1132,7 +1132,7 @@ function renderShipping(app) {
 
             <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.6; color: #0c4a6e;">
                 <i class="fas fa-info-circle" style="color: #0284c7; margin-right: 6px;"></i>
-                수강생 요청에 따른 실물 택배 미발송 (교재 PDF 전달 완료)
+                택배 없이 진행해요. 단어장은 테스트룸 &gt; 마이페이지 &gt; 내 서재에서 볼 수 있어요.
             </div>
         `;
         return;
@@ -1143,6 +1143,7 @@ function renderShipping(app) {
     let statusText = '준비 중';
     let trackingNumber = '-';
     let expectedDate = '-';
+    let arrivalDate = '';
     let trackingUrl = '';
 
     if (app.shipping_completed) {
@@ -1151,12 +1152,13 @@ function renderShipping(app) {
         statusText = '출고 완료';
         trackingNumber = app.shipping_tracking_number || '-';
         
-        // 발송 완료 시간으로부터 예상 도착일 계산 (2-3일 후)
+        // 출고 완료 칸 = 실제 출고일, 도착 예정 칸 = 출고 다음날 (2026-10-28: 예전엔 출고 칸에 출고+2일이 찍혔음)
         if (app.shipping_completed_at) {
             const shippingDate = new Date(app.shipping_completed_at);
-            const expectedArrival = new Date(shippingDate);
-            expectedArrival.setDate(expectedArrival.getDate() + 2);
-            expectedDate = expectedArrival.toLocaleDateString('ko-KR');
+            expectedDate = shippingDate.toLocaleDateString('ko-KR');
+            const arrival = new Date(shippingDate);
+            arrival.setDate(arrival.getDate() + 1);
+            arrivalDate = arrival.toLocaleDateString('ko-KR');
         }
 
         // 택배사 조회 URL (CJ대한통운)
@@ -1190,6 +1192,12 @@ function renderShipping(app) {
                 <span class="shipping-info-label">출고 ${app.shipping_completed ? '완료' : '예정'}</span>
                 <span class="shipping-info-value">${expectedDate}</span>
             </div>
+            ${arrivalDate ? `
+            <div class="shipping-info-row">
+                <span class="shipping-info-label">도착 예정</span>
+                <span class="shipping-info-value">${arrivalDate}</span>
+            </div>
+            ` : ''}
             ${app.shipping_completed ? `
             <div class="shipping-info-row">
                 <span class="shipping-info-label">택배사</span>
@@ -1215,6 +1223,11 @@ function renderShipping(app) {
         </div>
         ` : ''}
         
+        <div style="display:flex; gap:9px; align-items:flex-start; background:#f7f5fd; border-radius:10px; padding:11px 14px; margin: 16px 0; font-size:13px; line-height:1.65; color:#4b3f6b;">
+            <i class="fas fa-book-open" style="color:#7a68aa; margin-top:3px; font-size:12px;"></i>
+            <span style="word-break:keep-all;">교재 도착 전에도 <strong style="color:#5b4a7d;">테스트룸 &gt; 마이페이지 &gt; 내 서재</strong>에서 볼 수 있어요. PDF로 받아 인쇄해도 돼요.</span>
+        </div>
+
         <button class="tracking-button" ${!trackingUrl ? 'disabled' : ''} onclick="window.open('${trackingUrl}', '_blank')">
             <i class="fas fa-search"></i> 택배 배송 조회하기
         </button>

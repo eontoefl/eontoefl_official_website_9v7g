@@ -3125,11 +3125,11 @@ async function loadPaymentTab(app) {
         }
     }
 
-    // ── Step 4b: 이번 주(다가오는 일요일) 시작 학생용 안내 / 늦은 시작 선택 ──
+    // ── Step 4b: 이번 주(다가오는 일요일) 시작 학생용 안내 ──
     // 1층 등록확정기한 배너 바로 아래에 붙는다. 시작일이 다가오는 일요일이 아니거나,
     // 자기주도(self_paced)이거나, 시작일이 없으면 아무것도 렌더하지 않는다.
     //   · 목요일 컷오프 전  → 안내 문구(2층)
-    //   · 목요일 컷오프 후  → 이번주/다음주 시작 선택 카드
+    //   · 목요일 컷오프 후  → 없음 (이번주/다음주 선택 카드는 2026-10-28 삭제)
     let lateStartHTML = '';
     const isThisWeekStart = (app.self_paced !== true) && app.schedule_start
         && (app.schedule_start === getUpcomingSundayStr());
@@ -3149,34 +3149,24 @@ async function loadPaymentTab(app) {
                     </p>
                 </div>
             `;
-        } else {
-            // 선택카드: 목요일 컷오프 후 — 이번주/다음주 시작 선택
-            const nextSundayLabel = formatKstDateKo(new Date(app.schedule_start).getTime() + 7 * 24 * 60 * 60 * 1000);
-            const pickNext = app.late_start_choice === '다음주'; // 그 외('이번주'/NULL)는 카드1(이번주) 기본 강조
-            const cardBase = 'border-radius:12px; padding:18px 20px; cursor:pointer; transition:0.15s;';
-            const onStyle = 'background:#efeaf7; box-shadow:0 0 0 2px #9480c5 inset;';
-            const offStyle = 'background:#f6f4fb; box-shadow:none;';
-            lateStartHTML = `
-                <div class="s4-card">
-                    <div class="s4-card-title"><i class="fas fa-calendar-check"></i> 이번 주 시작, 아직 늦지 않았어요. 언제 시작할까요?</div>
-                    <div id="lateStartCard-thisweek" onclick="selectLateStart('이번주')" style="${cardBase} margin-bottom:10px; ${pickNext ? offStyle : onStyle}">
-                        <div style="font-size:15px; font-weight:700; color:#5b4a7d; letter-spacing:-0.01em;">이번 일요일(${sundayLabel}) 바로 시작</div>
-                        <div style="font-size:13px; color:#64748b; margin-top:5px; line-height:1.6;">교재는 PDF로 먼저 받고 출발 · 종이책은 이어서 배송</div>
-                    </div>
-                    <div id="lateStartCard-nextweek" onclick="selectLateStart('다음주')" style="${cardBase} ${pickNext ? onStyle : offStyle}">
-                        <div style="font-size:15px; font-weight:700; color:#5b4a7d; letter-spacing:-0.01em;">다음 일요일(${nextSundayLabel})부터 시작</div>
-                        <div style="font-size:13px; color:#64748b; margin-top:5px; line-height:1.6;">종이 교재 받고 여유 있게</div>
-                    </div>
-                </div>
-            `;
         }
+        // 목요일 컷오프 후의 이번주/다음주 선택 카드는 2026-10-28 삭제 (학생에게 선택지를 주지 않음. 교재 도착 전에는 테스트룸 내 서재의 단어장으로)
     }
 
     // 입금 후 진행 순서(타임라인). 마지막 줄 시작일은 자기주도(self_paced)이거나 시작일이 없으면 "시작일에 시작"으로 대체.
     const startLabel = (app.self_paced === true || !app.schedule_start)
         ? '시작일에 시작'
         : `${formatKstDateKo(app.schedule_start)} 시작`;
-    const timelineSteps = ['입금 확인 (당일)', '이용 방법 안내', '교재 출고 (늦어도 금요일)', '토요일까지 도착', startLabel];
+    // 재시작(수강 2)인데 교재를 다시 요청하지 않은 학생은 택배가 없으므로 교재 칸과 안내를 뺀다 (2026-10-28)
+    const noShipRestart = Number(app.enrollment_no) === 2 && !(Array.isArray(app.restart_materials) && app.restart_materials.length);
+    const timelineSteps = noShipRestart
+        ? ['입금 확인 (당일)', '이용 방법 안내', startLabel]
+        : ['입금 확인 (당일)', '이용 방법 안내', '교재 출고', '익일 도착', startLabel];
+    const vocaNoteHtml = noShipRestart ? '' : `
+            <div style="display:flex; gap:9px; align-items:flex-start; margin-top:14px; background:#f7f5fd; border-radius:10px; padding:11px 14px; font-size:13px; line-height:1.65; color:#4b3f6b;">
+                <i class="fas fa-book-open" style="color:#7a68aa; margin-top:3px; font-size:12px;"></i>
+                <span style="word-break:keep-all;">교재 도착 전에도 <strong style="color:#5b4a7d;">테스트룸 &gt; 마이페이지 &gt; 내 서재</strong>에서 볼 수 있어요. PDF로 받아 인쇄해도 돼요.</span>
+            </div>`;
     const timelineHtml = `
         <div class="s4-card">
             <div class="s4-card-title"><i class="fas fa-route"></i> 입금 후 진행 순서</div>
@@ -3186,6 +3176,7 @@ async function loadPaymentTab(app) {
                     <span style="display:inline-flex; align-items:center; padding:7px 13px; border-radius:999px; font-size:13px; font-weight:${i === timelineSteps.length - 1 ? '700' : '500'}; background:${i === timelineSteps.length - 1 ? '#efeaf7' : '#f6f4fb'}; color:${i === timelineSteps.length - 1 ? '#5b4a7d' : '#64748b'};">${s}</span>
                 `).join('')}
             </div>
+            ${vocaNoteHtml}
         </div>
     `;
 
@@ -3209,7 +3200,7 @@ async function loadPaymentTab(app) {
         </div>
     `;
 
-    // 배치: 등록확정기한 배너 → (이번주 시작 안내/선택) → 계좌 정보 → 타임라인 → 카톡 성함 카드
+    // 배치: 등록확정기한 배너 → (이번주 시작 안내) → 계좌 정보 → 타임라인(+단어장 안내) → 카톡 성함 카드
     paymentContent.innerHTML = s4style + deadlineHTML + lateStartHTML + paymentInfoHtml + timelineHtml + kakaoCardHtml;
     // 등록 확정 기한은 배너에 절대 일시로 고정 표기(초시계 없음).
 }
@@ -3306,41 +3297,6 @@ function fallbackCopy(text, done) {
     ta.select();
     try { document.execCommand('copy'); done && done(); } catch (e) { /* ignore */ }
     document.body.removeChild(ta);
-}
-
-// Step 4b: 이번 주 시작 선택 저장('이번주'|'다음주')
-//   1) 클릭한 카드로 강조 즉시 전환, 2) currentApplication 로컬 갱신,
-//   3) applications.late_start_choice 저장(방어적: 컬럼 없거나 실패해도 화면 안 깨짐 → 콘솔 경고만).
-async function selectLateStart(choice) {
-    const app = currentApplication;
-    if (!app) return;
-
-    // 1) 화면 강조 전환
-    const pickNext = choice === '다음주';
-    const onStyle = { bg: '#efeaf7', shadow: '0 0 0 2px #9480c5 inset' };
-    const offStyle = { bg: '#f6f4fb', shadow: 'none' };
-    const thisCard = document.getElementById('lateStartCard-thisweek');
-    const nextCard = document.getElementById('lateStartCard-nextweek');
-    if (thisCard) {
-        const s = pickNext ? offStyle : onStyle;
-        thisCard.style.background = s.bg;
-        thisCard.style.boxShadow = s.shadow;
-    }
-    if (nextCard) {
-        const s = pickNext ? onStyle : offStyle;
-        nextCard.style.background = s.bg;
-        nextCard.style.boxShadow = s.shadow;
-    }
-
-    // 2) 로컬 갱신
-    app.late_start_choice = choice;
-
-    // 3) 저장(방어적)
-    try {
-        await supabaseAPI.patch('applications', app.id, { late_start_choice: choice });
-    } catch (e) {
-        console.warn('[late_start_choice] 저장 실패(마이그레이션 전이면 정상):', e);
-    }
 }
 
 // 클립보드에 복사
