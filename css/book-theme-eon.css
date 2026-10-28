@@ -249,12 +249,14 @@
 .bt-eon.bt-book-voca.book-content table col:nth-child(2),.bt-eon.bt-book-voca .book-content table col:nth-child(2){width:24%!important}
 .bt-eon.bt-book-voca.book-content table col:nth-child(3),.bt-eon.bt-book-voca .book-content table col:nth-child(3){width:auto!important}
 .bt-eon.bt-book-voca.book-content table td,.bt-eon.bt-book-voca .book-content table td{min-width:0!important}
-.bt-eon.bt-book-voca td[data-text-alignment="center"],.bt-eon.bt-book-voca td[data-text-alignment="center"] p{text-align:center!important}
+.bt-eon.bt-book-voca td[data-text-alignment="center"],.bt-eon.bt-book-voca td[data-text-alignment="center"] p,.bt-eon.bt-book-voca th[data-text-alignment="center"],.bt-eon.bt-book-voca th[data-text-alignment="center"] p{text-align:center!important}
+/* 단어장은 표 첫 줄을 머리줄로 칠하지 않는다. 머리줄은 5쪽처럼 th(머리줄 표시)로 저장된 줄만. */
+.bt-eon.bt-book-voca table tr:first-child td,.bt-eon.bt-book-voca table tr:first-child td *{background:none!important;font-weight:400!important;color:inherit!important}
 /* 폰(680px 이하, 편집기 제외): 한 줄에 제시어(굵게)와 동의어, 아래 줄에 풀이. 머리줄은 숨김. */
 @media (max-width:680px){
 .bt-eon.bt-book-voca{--bt-voca-fs:14px}
 .bt-eon.bt-book-voca:not(.bookedit-paper) table,.bt-eon.bt-book-voca:not(.bookedit-paper) tbody{display:block!important;width:100%!important}
-.bt-eon.bt-book-voca:not(.bookedit-paper) colgroup,.bt-eon.bt-book-voca:not(.bookedit-paper) tr:first-child{display:none!important}
+.bt-eon.bt-book-voca:not(.bookedit-paper) colgroup,.bt-eon.bt-book-voca:not(.bookedit-paper) tr:has(th){display:none!important}
 .bt-eon.bt-book-voca:not(.bookedit-paper) tr{display:grid!important;grid-template-columns:1fr 1fr;column-gap:8px;border-bottom:1px solid var(--bt-line)}
 .bt-eon.bt-book-voca:not(.bookedit-paper) table td{display:block!important;border:0!important;padding:10px 2px 2px!important;text-align:left!important}
 .bt-eon.bt-book-voca:not(.bookedit-paper) td[data-text-alignment="center"],.bt-eon.bt-book-voca:not(.bookedit-paper) td[data-text-alignment="center"] p{text-align:left!important}
