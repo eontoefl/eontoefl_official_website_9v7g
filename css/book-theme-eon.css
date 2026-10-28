@@ -265,3 +265,5 @@
 .bt-eon.bt-book-voca:not(.bookedit-paper) table td:nth-child(3){grid-column:1/-1;padding:2px 2px 10px!important}
 .bt-eon.bt-book-voca:not(.bookedit-paper) table td[colspan="3"]{grid-column:1/-1;padding:10px 2px!important}
 }
+/* 표지 로고(이온토플)에는 그림 테두리를 두지 않는다 (입문서·단어장 앞뒤 표지 모두). */
+.bt-eon .book-cover img.book-cover-logo,.bt-eon.book-content .book-cover img.book-cover-logo{border:0!important;box-shadow:none!important;border-radius:0!important;outline:0!important}

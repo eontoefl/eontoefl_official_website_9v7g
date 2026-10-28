@@ -451,7 +451,10 @@ function buildOutline() {
   if (!listEl) return;
 
   outlineItems = [];
-  State.pages.forEach((p) => {
+  const jumps = (window.BookTheme && window.BookTheme.jumpPages) ? window.BookTheme.jumpPages(State.book && State.book.id, State.pages.length) : [];
+  State.pages.forEach((p, i) => {
+    // 쪽 바로가기(예: 단어장 10쪽)는 그 쪽 제목들보다 먼저
+    if (jumps.includes(i + 1)) outlineItems.push({ pageId: p.id, blockId: null, level: 1, text: (i + 1) + "쪽", page: true });
     collectHeadingsFromBlocks(currentBlocksFor(p.id, false) || [], p.id, outlineItems);
   });
 
@@ -463,11 +466,11 @@ function buildOutline() {
   listEl.innerHTML = "";
   outlineItems.forEach((it) => {
     const btn = document.createElement("button");
-    btn.className = "bookedit-outline-item lv" + it.level + (it.text ? "" : " is-empty");
-    btn.dataset.blockId = it.blockId;
+    btn.className = "bookedit-outline-item lv" + it.level + (it.text ? "" : " is-empty") + (it.page ? " is-page" : "");
+    if (it.blockId) btn.dataset.blockId = it.blockId;
     btn.textContent = it.text || "(제목 없음)";
     btn.title = it.text || "(제목 없음)";
-    btn.addEventListener("click", () => jumpToHeading(it.pageId, it.blockId));
+    btn.addEventListener("click", () => (it.page ? jumpToPage(it.pageId) : jumpToHeading(it.pageId, it.blockId)));
     listEl.appendChild(btn);
   });
 
@@ -481,6 +484,23 @@ function scheduleOutline() {
 }
 
 // 목차 항목 클릭 → 해당 제목으로 이동(안 켜진 페이지면 켜고 나서 이동)
+// 목차의 쪽 바로가기: 먼 거리는 부드럽게 스크롤하면 가는 동안 쪽이 켜지며 높이가 바뀌어
+// 다른 쪽에 멈춘다. 바로 이동한 뒤 자리가 잡힐 때까지 몇 번 다시 맞춘다.
+function jumpToPage(pageId) {
+  if (!pageId) return;
+  const currentHandle = State.editors.get(State.currentId);
+  if (currentHandle?.flush && !currentHandle.flush()) { setStatus('error', '입력을 마치거나 충돌 표시를 확인해주세요.'); return; }
+  const el = State.nodes.get(pageId);
+  if (!el) return;
+  setCurrent(pageId);
+  ensureMounted(pageId);
+  State.scrollLock = true;
+  const align = () => el.scrollIntoView({ block: "start", behavior: "auto" });
+  align();
+  [150, 400, 800, 1300].forEach((ms) => setTimeout(align, ms));
+  setTimeout(() => { State.scrollLock = false; setCurrent(pageId); }, 1400);
+}
+
 function jumpToHeading(pageId, blockId) {
   setCurrent(pageId);
   ensureMounted(pageId);
@@ -511,11 +531,12 @@ function updateActiveHeading() {
 
   let current = null;
   outlineItems.forEach((it) => {
+    if (!it.blockId) return; // 쪽 바로가기는 현재 위치 표시 대상 아님
     const el = document.querySelector('.bookedit-mount [data-id="' + it.blockId + '"]');
     if (!el) return;
     if (el.getBoundingClientRect().top <= threshold) current = it.blockId;
   });
-  if (current === null && outlineItems.length) current = outlineItems[0].blockId;
+  if (current === null && outlineItems.length) current = (outlineItems.find((it) => it.blockId) || {}).blockId || null;
   if (current === activeBlockId) return;
 
   activeBlockId = current;

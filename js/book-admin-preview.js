@@ -78,7 +78,13 @@
   }
   function buildTOC() {
     const list = $('toc'); list.replaceChildren();
+    const T = global.BookTheme; const jumps = T && T.jumpPages ? T.jumpPages(book, rows.length) : [];
     rows.forEach((row, index) => {
+      if (jumps.includes(index + 1)) { // 쪽 바로가기 (예: 단어장 10쪽)
+        const jb = document.createElement('button'); jb.type = 'button'; jb.dataset.page = String(index + 1);
+        jb.textContent = `${index + 1}쪽`; jb.className = 'page-jump';
+        jb.addEventListener('click', () => show(index + 1)); list.append(jb);
+      }
       for (const [headingIndex, h] of headingsIn(inert(row.html)).entries()) {
         const text = h.textContent.trim(); if (!text) continue;
         const button = document.createElement('button'); button.type = 'button'; button.dataset.page = String(index + 1);

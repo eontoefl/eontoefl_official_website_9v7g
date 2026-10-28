@@ -7,7 +7,8 @@
   // front: leading pages without the top band (used when a book has no chapter openers).
   const THEMED = new Map([
     ['e660266e-1b01-4d11-9254-81ea7e613344', { book: 'intro' }],          // 입문서
-    ['07f6cd4e-c737-40a1-b537-6e07af3d1aa5', { book: 'voca', front: 4 }], // 단어장: 1쪽 표지, 2~4쪽 경고문·안내
+    // 단어장: 1쪽 표지, 2~4쪽 경고문·안내. jump: 왼쪽 목차에 넣는 쪽 바로가기.
+    ['07f6cd4e-c737-40a1-b537-6e07af3d1aa5', { book: 'voca', front: 4, jump: [1, 10, 20, 30, 40, 50, 60] }],
   ]);
   const CH_BY_NUM = { '06': 'r', '07': 'l', '08': 'w', '09': 's' };
   const LABEL = { n: 'TOEFL', r: 'READING', l: 'LISTENING', w: 'WRITING', s: 'SPEAKING' };
@@ -48,6 +49,11 @@
   };
 
   function isThemed(bookId) { return THEMED.has(String(bookId || '')); }
+  // 왼쪽 목차에 넣을 쪽 바로가기 번호 (1부터 세는 쪽 번호). 없으면 빈 배열.
+  function jumpPages(bookId, total) {
+    const cfg = THEMED.get(String(bookId || '')) || {};
+    return (cfg.jump || []).filter(n => !total || n <= total);
+  }
 
   function parse(html) {
     const t = document.createElement('template'); t.innerHTML = html || ''; return t.content;
@@ -174,5 +180,5 @@
     flush();
   }
 
-  global.BookTheme = Object.freeze({ isThemed, classify, pageClasses, applyPage, decorateReader, rules, LABEL, CH_BY_NUM });
+  global.BookTheme = Object.freeze({ isThemed, jumpPages, classify, pageClasses, applyPage, decorateReader, rules, LABEL, CH_BY_NUM });
 })(typeof window !== 'undefined' ? window : globalThis);
