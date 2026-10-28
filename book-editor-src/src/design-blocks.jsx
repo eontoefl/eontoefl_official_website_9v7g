@@ -755,6 +755,7 @@ export const COVER_LOGO_URL = "https://qpqjevecjejvbeuogtbx.supabase.co/storage/
 export const COVER_VARIANTS = Object.freeze({
   intro: { label: "입문서", tag: "E-BOOK", title: "입문서" },
   voca: { label: "단어장", tag: "VOCABULARY", title: "단어장" },
+  "voca-back": { label: "단어장 뒷표지", tag: "VOCABULARY", title: "이온토플 단어장" },
 });
 const COVER_VARIANT_OPTIONS = Object.entries(COVER_VARIANTS).map(([value, v]) => ({ value, label: v.label }));
 function coverVariant(props) {
@@ -806,6 +807,31 @@ function VocaCoverBody({ block, editor, editable }) {
   );
 }
 
+// 단어장 back cover: small VOCABULARY, small VOCA, footer with logo, book name and
+// copyright. The book name is a paragraph (not a heading) so it stays out of the outline.
+function VocaBackBody({ block, editor, editable, logo }) {
+  const text = (field, as, className) => (
+    <DesignText as={as} className={className} block={block} editor={editor} editable={editable} field={field} />
+  );
+  return (
+    <>
+      {text("tag", "span", "book-cover-tag book-cover-back-tag")}
+      {text("wordmark", "p", "book-cover-wordmark book-cover-back-mark")}
+      <div className="book-cover-back-foot">
+        <div className="book-cover-back-brand">
+          {logo ? (
+            <img className="book-cover-logo" src={logo} alt="이온토플" />
+          ) : (
+            <span className="book-cover-logo-text">이온토플</span>
+          )}
+          {text("title", "p", "book-cover-back-name")}
+        </div>
+        {text("copyright", "p", "book-cover-back-copy")}
+      </div>
+    </>
+  );
+}
+
 // Full-width e-book cover. Text is edited in place; the R/L/W/S tiles are
 // fixed series artwork and scale with the cover width (container units).
 function BookCover({ block, editor, editable }) {
@@ -816,11 +842,17 @@ function BookCover({ block, editor, editable }) {
       {...designRootEvents(editor, block, editable)}
       {...bookRootProps("cover", "neutral", { "data-cover-variant": variant })}
     >
-      <CoverTop block={block} editor={editor} editable={editable} logo={logo} />
-      {variant === "voca" ? (
-        <VocaCoverBody block={block} editor={editor} editable={editable} />
+      {variant === "voca-back" ? (
+        <VocaBackBody block={block} editor={editor} editable={editable} logo={logo} />
       ) : (
-        <IntroCoverBody block={block} editor={editor} editable={editable} />
+        <>
+          <CoverTop block={block} editor={editor} editable={editable} logo={logo} />
+          {variant === "voca" ? (
+            <VocaCoverBody block={block} editor={editor} editable={editable} />
+          ) : (
+            <IntroCoverBody block={block} editor={editor} editable={editable} />
+          )}
+        </>
       )}
       {editable ? (
         <EditorControls block={block} editor={editor}>
@@ -887,6 +919,8 @@ const bookCoverSpec = createReactBlockSpec(
       pos: { default: "n." },
       meaning: { default: "어휘, 단어 목록" },
       syn: { default: "lexicon, word list" },
+      // 단어장 back cover (variant "voca-back").
+      copyright: { default: "© 2027 이온. ALL RIGHTS RESERVED." },
     },
     content: "none",
   },

@@ -107,6 +107,11 @@ test('단어장 cover design exports its own text and tabs; 입문서 design is 
   assert.match(intro, /data-cover-variant="intro"/);
   assert.match(intro, /book-cover-tiles/);
   assert.doesNotMatch(intro, /book-cover-wordmark|book-cover-tabs/);
+  const back = html('bookCover', block('bookCover', { variant: 'voca-back', tag: 'VOCABULARY', title: '이온토플 단어장' }));
+  assert.match(back, /data-cover-variant="voca-back"/);
+  assert.match(back, /<p class="book-cover-back-name">이온토플 단어장<\/p>/);
+  assert.match(back, /© 2027 이온\. ALL RIGHTS RESERVED\./);
+  assert.doesNotMatch(back, /<h1|book-cover-tabs|book-cover-entry/);
   // An unknown design name falls back to the 입문서 design.
   assert.match(html('bookCover', block('bookCover', { variant: 'zzz' })), /data-cover-variant="intro"/);
 });

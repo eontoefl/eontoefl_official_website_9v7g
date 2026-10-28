@@ -899,11 +899,11 @@
 /* 단어장 cover (bookCover, variant "voca"). Same full-page frame as the 입문서
    cover; layout copied from the print cover (210×280mm, 1mm = .476cqw).
    Font: NotoSansKRBook (css/book-font-notosanskr.css). */
-.book-content .book-cover[data-cover-variant="voca"] {
+.book-content .book-cover[data-cover-variant^="voca"] {
   background: #FCFAF6; color: #5B4A7D;
   font-family: "NotoSansKRBook", "SUIT", sans-serif;
 }
-.book-content .book-cover[data-cover-variant="voca"] * { font-family: inherit; -webkit-text-stroke: 0; }
+.book-content .book-cover[data-cover-variant^="voca"] * { font-family: inherit; -webkit-text-stroke: 0; }
 .book-content .book-cover[data-cover-variant="voca"] .book-cover-top { left: 12.45cqw; right: 7.26cqw; top: 8.3cqw; }
 .book-content .book-cover[data-cover-variant="voca"] .book-cover-logo { height: max(12px, 3.11cqw); }
 .book-content .book-cover[data-cover-variant="voca"] .book-cover-tag {
@@ -949,6 +949,22 @@
 .book-content .book-cover-tabs > [data-tab="3"], .book-content .book-cover-tabs > [data-tab="7"] { background: #E4DBF5; }
 .book-content .book-cover-tabs > [data-tab="4"] { background: #F8E1EB; }
 .book-content .book-cover-tabs > [data-tab="8"] { background: #B7A6E0; color: #fff; }
+/* 단어장 뒷표지 (variant "voca-back"). 원본 뒷면 210×280mm 배치 그대로. */
+.book-content .book-cover .book-cover-back-tag {
+  position: absolute; left: 7.26cqw; top: 8.3cqw;
+  font-weight: 500; font-size: max(7px, 1.21cqw); line-height: 1; letter-spacing: .34em; color: #A69DBE;
+}
+.book-content .book-cover .book-cover-wordmark.book-cover-back-mark {
+  left: 7.26cqw; top: 61.22cqw; font-size: 5.49cqw; line-height: 1; letter-spacing: -.04em;
+}
+.book-content .book-cover-back-foot {
+  position: absolute; left: 7.26cqw; right: 12.45cqw; top: 115.18cqw;
+  border-top: max(1px, .143cqw) solid #ECE6F2; padding-top: 2.08cqw;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 4cqw;
+}
+.book-content .book-cover[data-cover-variant="voca-back"] .book-cover-logo { height: max(10px, 2.8cqw); }
+.book-content .book-cover .book-cover-back-name { margin: 1.25cqw 0 0; padding: 0; border: 0; font-weight: 400; font-size: max(8px, 1.35cqw); line-height: 1.4; color: #A69DBE; }
+.book-content .book-cover .book-cover-back-copy { margin: 0; padding: 0; border: 0; font-weight: 400; font-size: max(6px, 1.04cqw); line-height: 1.4; letter-spacing: .14em; color: #B3AAC9; text-align: right; }
 
 /* ---------------------------------------------------------------------
    Fine print (bookFinePrint) — copyright / trademark notice, small text.

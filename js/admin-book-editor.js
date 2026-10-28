@@ -437,7 +437,7 @@ function collectHeadingsFromBlocks(blocks, pageId, out) {
         out.push({ pageId: pageId, blockId: b.id, level: lvl, text: inlineText(b.content).trim() });
       }
     }
-    if (b && b.type === "bookCover") {
+    if (b && b.type === "bookCover" && !(b.props && b.props.variant === "voca-back")) { // 뒷표지는 목차에 넣지 않는다
       out.push({ pageId: pageId, blockId: b.id, level: 1, text: String((b.props && b.props.title) || "").trim() });
     }
     if (b && Array.isArray(b.children) && b.children.length) {
