@@ -51,7 +51,10 @@ begin
   end if;
   return v;
 end $$;
+-- 소유자 변경에는 새 소유자의 스키마 CREATE 권한이 필요하다. 지정 직후 회수한다.
+grant create on schema book_collab_private to book_collab_writer;
 alter function book_collab_private.site_actor() owner to book_collab_writer;
+revoke create on schema book_collab_private from book_collab_writer;
 revoke all on function book_collab_private.site_actor() from public;
 do $$
 begin
