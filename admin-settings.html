@@ -442,9 +442,15 @@
                             <div class="form-group" style="flex: 1;">
                                 <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">게시</label>
                                 <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; cursor: pointer;">
-                                    <input type="checkbox" id="noticeIsActive" checked style="width: 18px; height: 18px; cursor: pointer;">
-                                    <span style="font-size: 14px; color: #475569;">테스트룸에 표시 (켜면 7일 뒤 자동 종료)</span>
+                                    <input type="checkbox" id="noticeIsActive" checked onchange="onNoticeActiveChange()" style="width: 18px; height: 18px; cursor: pointer;">
+                                    <span style="font-size: 14px; color: #475569;">테스트룸에 표시</span>
                                 </label>
+                                <!-- 종료 일시: 게시를 켰을 때만 표시. 처음엔 7일 뒤가 채워지고, 더 짧게·길게 바꿀 수 있음 -->
+                                <div id="noticeUntilWrap" style="margin-top: 10px;">
+                                    <label for="noticeActiveUntil" style="font-size: 13px; color: #475569; margin-bottom: 4px; display: block;">종료 일시</label>
+                                    <input type="datetime-local" id="noticeActiveUntil" style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; box-sizing: border-box;">
+                                    <small style="color: #64748b;">이 시각이 지나면 테스트룸에서 자동으로 내려가요</small>
+                                </div>
                             </div>
                         </div>
 

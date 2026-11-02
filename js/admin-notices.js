@@ -97,7 +97,7 @@ async function loadNotices() {
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 88px;">대상</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600;">제목</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 96px;">등록일시</th>
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 124px;">게시</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 72px;">게시</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 104px;">액션</th>
             </tr>
         </thead><tbody>`;
@@ -130,11 +130,7 @@ async function loadNotices() {
                     <div style="color: #94a3b8; font-size: 12px; margin-top: 2px;">${(NB.formatDate(n.created_at).split(' ')[1]) || ''}</div>
                 </td>
                 <td style="padding: 12px 8px; text-align: center;">
-                    <label style="cursor: pointer; display: inline-flex; align-items: center;">
-                        <input type="checkbox" ${live ? 'checked' : ''} onchange="toggleNoticeActive('${n.id}', this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
-                        <span style="margin-left: 4px; font-size: 12px; color: ${live ? '#22c55e' : '#94a3b8'};">${live ? '게시 중' : '꺼짐'}</span>
-                    </label>
-                    ${live ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 2px; white-space: nowrap;">${NB.formatDate(n.active_until).slice(5)}까지</div>` : ''}
+                    <span style="font-size: 12px; font-weight: 600; white-space: nowrap; color: ${live ? '#22c55e' : '#94a3b8'};">${live ? '게시 중' : '꺼짐'}</span>
                 </td>
                 <td style="padding: 12px 8px; text-align: center;">
                     <button onclick="editNotice('${n.id}')" style="padding: 5px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #475569; font-size: 12px; cursor: pointer; margin-right: 4px;" title="수정">
@@ -204,6 +200,8 @@ async function showNoticeForm(editData) {
         let live = false;
         try { live = (await noticeBoardReady).isLive(editData); } catch (e) { /* 파일 로드 실패 시 꺼짐으로 표시 */ }
         document.getElementById('noticeIsActive').checked = live;
+        // 게시 중이면 지금 종료 일시를 채움 (꺼져 있으면 비워두고, 켜는 순간 기본값을 채움)
+        _setNoticeUntilInput(live ? _toLocalInputValue(editData.active_until) : '');
     } else {
         titleEl.innerHTML = '<i class="fas fa-plus-circle" style="color: #3b82f6;"></i> 공지 등록';
         document.getElementById('noticeEditId').value = '';
@@ -213,6 +211,9 @@ async function showNoticeForm(editData) {
         document.getElementById('noticeContent').value = '';
         document.getElementById('noticeSortOrder').value = allNotices.length;
         document.getElementById('noticeIsActive').checked = true;
+        let defaultUntil = '';
+        try { defaultUntil = _toLocalInputValue((await noticeBoardReady).newActiveUntil()); } catch (e) { /* 파일 로드 실패 시 빈칸 */ }
+        _setNoticeUntilInput(defaultUntil);
     }
 
     formEl.style.display = 'block';
@@ -224,14 +225,40 @@ function cancelNoticeForm() {
     document.getElementById('noticeFormContainer').style.display = 'none';
 }
 
-// ===== 저장 =====
-// 게시 켜기/끄기 → 게시 종료 시각 (저장·목록 토글 공통)
-//   켜면 지금부터 NoticeBoard.ACTIVE_DAYS일, 끄면 지금 종료. 상태가 그대로면 undefined(기간 유지)
-function _activeUntilFor(NB, notice, wantLive, now) {
-    const wasLive = notice ? NB.isLive(notice, now) : false;
-    if (wantLive === wasLive) return undefined;
-    return wantLive ? NB.newActiveUntil(now) : now.toISOString();
+// ===== 게시 종료 일시 입력칸 =====
+// datetime-local 값(관리자 컴퓨터 시계 기준 'YYYY-MM-DDTHH:mm') ↔ ISO 시각
+function _toLocalInputValue(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+// 폼을 열 때 채운 값을 함께 기억 — 저장 시 사용자가 바꾼 경우에만 종료 시각을 새로 기록(초 단위 보존)
+function _setNoticeUntilInput(value) {
+    const input = document.getElementById('noticeActiveUntil');
+    input.value = value;
+    input.dataset.initial = value;
+    _syncNoticeUntilVisibility();
+}
+
+function _syncNoticeUntilVisibility() {
+    const on = document.getElementById('noticeIsActive').checked;
+    document.getElementById('noticeUntilWrap').style.display = on ? '' : 'none';
+}
+
+// 게시 체크를 켜면 종료 일시가 비었거나 지난 값일 때 기본값(지금부터 7일)을 채움
+async function onNoticeActiveChange() {
+    const on = document.getElementById('noticeIsActive').checked;
+    const input = document.getElementById('noticeActiveUntil');
+    if (on && (!input.value || !(new Date(input.value) > new Date()))) {
+        try { input.value = _toLocalInputValue((await noticeBoardReady).newActiveUntil()); } catch (e) { /* 파일 로드 실패 시 직접 입력 */ }
+    }
+    _syncNoticeUntilVisibility();
+}
+
+// ===== 저장 =====
 
 async function saveNotice() {
     const editId = document.getElementById('noticeEditId').value;
@@ -266,8 +293,26 @@ async function saveNotice() {
         sort_order: sortOrder,
         updated_at: now.toISOString()
     };
-    const activeUntil = _activeUntilFor(NB, editing, isActive, now);
-    if (activeUntil !== undefined) data.active_until = activeUntil;
+    // 게시 종료 시각
+    //   켬: 입력칸 시각 (단, 게시 중이던 공지에서 값을 안 바꿈으면 원래 값 유지)
+    //   끔: 게시 중이던 공지만 지금으로 종료, 꺼져 있던 공지는 그대로
+    const wasLive = editing ? NB.isLive(editing, now) : false;
+    if (isActive) {
+        const untilInput = document.getElementById('noticeActiveUntil');
+        const untilValue = untilInput.value;
+        const unchanged = wasLive && untilValue === untilInput.dataset.initial;
+        if (!unchanged) {
+            const until = untilValue ? new Date(untilValue) : null;
+            if (!until || isNaN(until) || !(until > now)) {
+                alert('종료 일시는 지금 이후로 정해 주세요.');
+                untilInput.focus();
+                return;
+            }
+            data.active_until = until.toISOString();
+        }
+    } else if (wasLive) {
+        data.active_until = now.toISOString();
+    }
 
     try {
         if (editId) {
@@ -310,26 +355,6 @@ async function deleteNotice(id) {
         console.error('공지 삭제 실패:', error);
         alert('삭제에 실패했습니다: ' + error.message);
     }
-}
-
-// ===== 게시 켜기/끄기 (목록 체크박스) =====
-async function toggleNoticeActive(id, wantLive) {
-    try {
-        const NB = await noticeBoardReady;
-        const now = new Date();
-        const notice = allNotices.find(n => n.id === id);
-        const activeUntil = _activeUntilFor(NB, notice, wantLive, now);
-        if (activeUntil !== undefined) {
-            await supabaseAPI.patch('tr_notices', id, {
-                active_until: activeUntil,
-                updated_at: now.toISOString()
-            });
-        }
-    } catch (error) {
-        console.error('상태 변경 실패:', error);
-        alert('상태 변경에 실패했습니다.');
-    }
-    await loadNotices(); // 게시 종료 시각 표시까지 다시 그림
 }
 
 // ===== HTML 이스케이프 =====
