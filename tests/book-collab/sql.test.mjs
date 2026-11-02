@@ -69,7 +69,7 @@ await test('M0', '마이그레이션 직후: 어떤 책도 바뀌지 않고 기�
 });
 
 await test('M1', '미활성 책 쓰기 RPC는 행을 만들지 않고 거부(NOT_ENABLED/권한 없음)', async () => {
-  await rejects(commit(null, { pages: [] }), /BOOK_COLLAB_FORBIDDEN/, '권한 없는 책');
+  await rejects(commit(null, { pages: [] }), /BOOK_COLLAB_NOT_ENABLED/, '켜지지 않은 책');
   ok((await q(`select count(*)::int n from public.tr_book_revision_heads`))[0].n === 0, 'head 자동 생성 없음');
   ok((await q(`select count(*)::int n from public.tr_book_revisions`))[0].n === 0, '이력 생성 없음');
 });
@@ -91,7 +91,7 @@ await test('A0', '권한 구성: 브라우저 역할의 직접 접근 차단, �
       has_table_privilege('anon', 'public.tr_book_pages', 'update') a13,
       has_schema_privilege('book_collab_writer', 'public', 'create') a14`);
   const r = rows[0];
-  ok(r.a1 === false, 'anon commit 실행 불가');
+  ok(r.a1 === true, 'site 방식: 기존 관리자 화면(공용 키)에서 commit 호출 가능 (책별 jwt 방식이면 함수 안에서 거부)');
   ok(r.a2 === true, 'authenticated commit 실행 가능');
   ok(r.a3 === true, 'anon status 가능');
   ok(r.a4 === false && r.a5 === false, '활성화 함수는 브라우저·서비스 역할 실행 불가');
@@ -151,8 +151,8 @@ await test('T33', '활성화 후 옛 REST 직접쓰기·삭제·이동·비우�
 });
 
 await test('T18', '인증·권한: 익명/비관리자/위조 요청 거부', async () => {
-  await rejects(rpc(db, 'anon', ADMIN, 'book_collab_commit', { p_book: B, p_expected_head: V1, p_request_id: uid(), p_changes: { pages: [] },
-    p_title: '', p_summary: '', p_source_links: [] }), /permission denied/, 'anon 역할은 claims를 넣어도 실행 불가');
+  await rejects(rpc(db, 'anon', { role: 'anon' }, 'book_collab_commit', { p_book: B, p_expected_head: V1, p_request_id: uid(), p_changes: { pages: [] },
+    p_title: '', p_summary: '', p_source_links: [] }), /AUTH_REQUIRED/, 'jwt 방식 책은 공용 키 호출 거부');
   await rejects(call('book_collab_get_state', { p_book: B, p_include_pages: false }, null), /AUTH_REQUIRED/, 'JWT 없는 authenticated 거부');
   await rejects(call('book_collab_get_state', { p_book: B, p_include_pages: false }, { sub: ADMIN_ID, role: 'anon' }), /AUTH_REQUIRED/, 'claims role 불일치 거부');
   await rejects(call('book_collab_get_state', { p_book: B, p_include_pages: false }, HELPER), /FORBIDDEN/, '목록에 없는 계정 거부');
@@ -503,6 +503,38 @@ await test('ACT', '공개 중·학생 기록 있는 책은 초기 활성화 거�
   await rejects(q(`select public.book_collab_activate($1, $2)`, [OTHER_BOOK, [ADMIN_ID]]), /학생 기록/, '다른 책(공개·메모) 거부');
   await rejects(q(`select public.book_collab_activate($1, $2)`, [PDF_BOOK, [ADMIN_ID]]), /페이지형/, 'PDF 거부');
   ok((await q(`select count(*)::int n from public.tr_book_revision_heads where book_id = any($1)`, [[OTHER_BOOK, PDF_BOOK]]))[0].n === 0, 'head 미생성');
+});
+
+await test('SITE', "'site' 방식(기존 관리자 로그인 수준): 서버 로그인 없이 저장·수정안, 옛 직접쓰기는 계속 차단", async () => {
+  const SB = 'e0e0e0e0-0000-4000-8000-000000000001';
+  const ids = ['e0e0e0e0-0000-4000-8000-0000000000a1', 'e0e0e0e0-0000-4000-8000-0000000000a2', 'e0e0e0e0-0000-4000-8000-0000000000a3'];
+  await q("insert into public.tr_book_documents (id, title, kind, is_active, total_pages) values ($1, 'site 시험 책', 'pages', false, 3)", [SB]);
+  for (let i = 0; i < 3; i++) await q('insert into public.tr_book_pages (id, book_id, sort_order, html) values ($1, $2, $3, $4)', [ids[i], SB, i + 1, '<p>s' + i + '</p>']);
+  await rejects(asRole(db, 'anon', null, (tx) => tx.query('select public.book_collab_activate($1, $2)', [SB, []])), /permission denied/, '공용 키로 활성화 불가');
+  const act = (await q('select public.book_collab_activate($1, $2) r', [SB, []]))[0].r;
+  ok(act.ok && act.auth_mode === 'site', 'site 방식으로 켜짐');
+  const anon = (fn, args) => rpc(db, 'anon', { role: 'anon' }, fn, args);
+  const st = await anon('book_collab_get_state', { p_book: SB, p_include_pages: true });
+  ok(st.enabled && st.pages.length === 3 && st.head_seq === 1, '공용 키로 상태 조회');
+  const c = await anon('book_collab_commit', { p_book: SB, p_expected_head: st.head_revision_id, p_request_id: uid(),
+    p_changes: { pages: [page(ids[1], 'site 저장')] }, p_title: '', p_summary: '', p_source_links: [] });
+  ok(c.ok && c.seq === 2, '공용 키로 저장 V2');
+  const stale = await anon('book_collab_commit', { p_book: SB, p_expected_head: st.head_revision_id, p_request_id: uid(),
+    p_changes: { pages: [page(ids[0], '오래된 기준')] }, p_title: '', p_summary: '', p_source_links: [] });
+  ok(stale.ok === false && stale.code === 'CONFLICT', '충돌 차단은 그대로');
+  const pr = await anon('book_collab_submit_proposal', { p_book: SB, p_base_revision: c.revision_id, p_request_id: uid(), p_title: 'Aside', p_summary: '',
+    p_changes: { pages: [page(ids[2], 'Aside 제안')] }, p_author_source: 'aside', p_meta: null });
+  ok(pr.ok, '수정안');
+  const rev = (await q('select submitted_by, submitted_label, author_source from public.tr_book_revisions where id = $1', [pr.revision_id]))[0];
+  ok(rev.submitted_label === '관리자' && rev.author_source === 'aside', '작성 표시');
+  await rejects(asRole(db, 'anon', null, (tx) => tx.query("update public.tr_book_pages set html = '<p>x</p>' where id = $1", [ids[0]])), /BOOK_COLLAB_PROTECTED/, '옛 직접 수정 차단');
+  await rejects(asRole(db, 'anon', null, (tx) => tx.query('delete from public.tr_book_documents where id = $1', [SB])), /BOOK_COLLAB_PROTECTED/, '책 삭제 차단');
+  await rejects(anon('book_collab_commit', { p_book: SB, p_expected_head: c.revision_id, p_request_id: uid(),
+    p_changes: { pages: [{ page_uid: ids[0], blocks: [], html: '<script>x</script>' }] }, p_title: '', p_summary: '', p_source_links: [] }), /UNSAFE_HTML/, 'HTML 검사 그대로');
+  const viaJwt = await call('book_collab_get_state', { p_book: SB, p_include_pages: false }, HELPER);
+  ok(viaJwt.enabled, '로그인 세션이 있어도 site 방식은 동작');
+  // jwt 방식 책(대상 책)은 공용 키 거부 유지
+  await rejects(anon('book_collab_get_state', { p_book: B, p_include_pages: false }), /AUTH_REQUIRED/, 'jwt 방식 책은 그대로 보호');
 });
 
 const failed = results.filter((r) => !r.pass);

@@ -308,12 +308,9 @@
   // admin-book-editor.js의 loadPages 대신 호출. 반환 false면 편집기를 띄우지 않는다.
   async function loadPages(bookId) {
     BC.book = bookId;
+    // 기존 관리자 로그인 그대로 사용. 서버 로그인 세션이 있으면 그 계정으로 작업본을 나눈다.
     const session = await C.validSession();
-    if (!session) {
-      showGate(["이 책은 버전 협업이 켜져 있어 관리자 확인이 필요해요.", "기존 관리자 로그인 화면에서 한 번 다시 로그인하면 돌아와요."], true);
-      return false;
-    }
-    BC.user = session.user;
+    BC.user = session ? session.user : { id: "site-admin", email: "" };
     try { await W.open(); } catch (e) { BC.idbOk = false; }
     if (BC.idbOk) { try { await W.claimTab(); } catch (_) { BC.idbOk = false; } }
     if (!W.getTabId()) BC.fallbackTab = C.uuid();

@@ -32,7 +32,9 @@ await db.exec(`
     ('${OTHER_ADMIN_EMAIL}', 'site-pass', '다른 관리자(시험)', 'admin'),
     ('student@example.test', 'site-pass', '학생(시험)', 'user');
 `);
-const act = (await db.query(`select public.book_collab_activate($1, $2) r`, [TARGET_BOOK, [ADMIN_ID]])).rows[0].r;
+const SITE_MODE = args.includes('--site');
+const act = (await db.query(`select public.book_collab_activate($1, $2) r`, [TARGET_BOOK, SITE_MODE ? [] : [ADMIN_ID]])).rows[0].r;
+console.log('협업 방식:', act.auth_mode);
 console.log('시험 DB 준비:', fixture.source, '쪽', act.pages_live, '기준본 V' + act.seq);
 
 const tokens = new Map(); // access_token -> { sub, email, exp }

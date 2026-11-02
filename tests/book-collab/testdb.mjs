@@ -7,6 +7,7 @@ import url from 'node:url';
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 export const REPO = path.resolve(here, '..', '..');
 export const MIGRATION = path.join(REPO, 'supabase', 'migrations', '20261102120000_book_collab_versions.sql');
+export const MIGRATIONS = fs.readdirSync(path.join(REPO, 'supabase', 'migrations')).filter((f) => /^\d+_book_collab_.*\.sql$/.test(f)).sort().map((f) => path.join(REPO, 'supabase', 'migrations', f));
 export const TARGET_BOOK = 'e660266e-1b01-4d11-9254-81ea7e613344';
 export const OTHER_BOOK = '0b0b0b0b-0000-4000-8000-000000000001';
 export const PDF_BOOK = '0b0b0b0b-0000-4000-8000-000000000002';
@@ -74,7 +75,7 @@ export async function createTestDb({ fixture = loadFixture(), migrate = true } =
   await db.query(`insert into public.tr_book_memos (user_id, book_id, page_uid, content) values ('student-1', $1, $2, '다른 책 메모')`,
     [OTHER_BOOK, 'd0d0d0d0-0000-4000-8000-000000000001']);
   await db.query(`insert into public.tr_book_progress (user_id, book_id, last_page) values ('student-1', $1, 2)`, [PDF_BOOK]);
-  if (migrate) await db.exec(fs.readFileSync(MIGRATION, 'utf8'));
+  if (migrate) for (const m of MIGRATIONS) await db.exec(fs.readFileSync(m, 'utf8'));
   return db;
 }
 

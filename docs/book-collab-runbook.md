@@ -53,3 +53,9 @@ BOOK_COLLAB_FIXTURE=<읽기 사본> node dev-server.mjs --testroom <테스트룸
 - 운영 Auth 계정 로그인, 운영 권한(기본 권한·역할 소속)이 시험 DB 흉내와 같은지.
 - 로컬 검수 서버에서 이미지 업로드 후 저장 (로컬 주소라 서버 이미지 검사에 걸림 — 운영 주소에서는 통과 대상).
 - 닫힌 다른 작업창의 작업본을 백업해 불러오는 화면 흐름 (코드는 있으나 브라우저 검수 미실행).
+
+## 2026-11-02 변경: 기존 관리자 로그인 수준('site')으로 사용
+- 대표 결정: 사이트 보안 작업을 따로 하므로 지금은 서버 로그인을 요구하지 않는다. 로그인 커밋(a1b3d91)은 배포하지 않고 보관.
+- 마이그레이션 20261102130000_book_collab_site_auth.sql: 책별 auth_mode('site'|'jwt'). 활성화 때 관리자 목록을 비우면 'site'.
+- 활성화: select public.book_collab_activate('<책 UUID>', '{}'::uuid[]);
+- 보안 작업 뒤: 관리자 Auth 계정을 tr_book_revision_admins에 넣고 auth_mode를 'jwt'로 바꾼다(편집기는 서버 로그인 세션을 그대로 사용).

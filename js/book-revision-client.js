@@ -115,10 +115,11 @@
     return new CollabError(code, text, { status });
   }
 
+  // 서버 로그인 세션이 있으면 그것으로, 없으면 기존 관리자 화면과 같은 공용 키로 부른다.
+  // (책이 'jwt' 방식이면 서버가 AUTH_REQUIRED로 거부한다 — 사이트 보안 작업 뒤 사용)
   async function rpc(name, args, opts) {
     const o = opts || {};
     let s = await validSession();
-    if (!s) throw new CollabError("AUTH_REQUIRED", "관리자 확인이 필요해요");
     for (let attempt = 0; attempt < 2; attempt++) {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), o.timeout || TIMEOUT_MS);
@@ -128,7 +129,7 @@
           method: "POST",
           headers: {
             apikey: anonKey(),
-            Authorization: "Bearer " + s.access_token,
+            Authorization: "Bearer " + (s ? s.access_token : anonKey()),
             "Content-Type": "application/json",
           },
           body: JSON.stringify(args || {}),
@@ -145,7 +146,7 @@
       try { body = text ? JSON.parse(text) : null; } catch (_) {}
       if (resp.ok) return body;
       const err = parseRpcError(resp.status, body);
-      if (err.code === "AUTH_REQUIRED" && attempt === 0) {
+      if (err.code === "AUTH_REQUIRED" && attempt === 0 && s) {
         s = await refreshSession();
         if (s) continue;
       }
