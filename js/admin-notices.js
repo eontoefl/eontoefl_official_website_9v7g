@@ -1,16 +1,50 @@
 // ===== 공지사항 관리 (admin-notices.js) =====
+//
+// 공지 카드의 모양·동작·게시 기간 규칙은 테스트룸의 js/notice-board.js 하나를 같이 쓴다 (window.NoticeBoard).
+// 미리보기가 학생 화면과 항상 같게 보이도록 이 파일에는 사본을 두지 않는다.
 
-// 공지 타입 스타일 맵 (테스트룸과 동일)
-const NOTICE_STYLES = {
-    urgent:   { emoji: '🚨', label: '긴급 공지',   bg: '#fef2f2', titleColor: '#dc2626', textColor: '#991b1b' },
-    notice:   { emoji: '📢', label: '일반 공지',   bg: '#eff6ff', titleColor: '#1d4ed8', textColor: '#1e3a5f' },
-    deadline: { emoji: '⏰', label: '마감 안내',   bg: '#fff7ed', titleColor: '#c2410c', textColor: '#9a3412' },
-    tip:      { emoji: '💡', label: '팁 / 도움말', bg: '#f0fdf4', titleColor: '#16a34a', textColor: '#14532d' },
-    update:   { emoji: '🔄', label: '업데이트',    bg: '#fefce8', titleColor: '#a16207', textColor: '#78350f' },
-    event:    { emoji: '🎉', label: '이벤트',      bg: '#faf5ff', titleColor: '#7c3aed', textColor: '#5b21b6' },
-    warning:  { emoji: '⚠️', label: '주의사항',    bg: '#fff7ed', titleColor: '#ea580c', textColor: '#9a3412' },
-    check:    { emoji: '✅', label: '완료 / 확인', bg: '#f0fdf4', titleColor: '#16a34a', textColor: '#166534' }
-};
+const NOTICE_BOARD_VERSION = '001';                   // 테스트룸 js/notice-board.js 버전
+const NOTICE_PANEL_CSS_VERSION = '004_notice_board';  // 테스트룸 css/notice-panel.css 버전
+
+// 테스트룸 주소 — 로컬 개발(localhost)에서만 ?testroom=http://localhost:포트 로 바꿔 시험할 수 있음
+function _noticeBoardOrigin() {
+    const local = ['localhost', '127.0.0.1', '[::1]'];
+    const param = new URLSearchParams(location.search).get('testroom');
+    if (param && local.includes(location.hostname)) {
+        try {
+            const u = new URL(param);
+            if (local.includes(u.hostname)) return u.origin;
+        } catch (e) { /* 잘못된 값은 무시 */ }
+    }
+    return 'https://testroom.eonfl.com';
+}
+
+// 테스트룸 공지 카드 파일(css + js)을 한 번만 불러옴
+const noticeBoardReady = new Promise((resolve, reject) => {
+    const origin = _noticeBoardOrigin();
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `${origin}/css/notice-panel.css?v=${NOTICE_PANEL_CSS_VERSION}`;
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = `${origin}/js/notice-board.js?v=${NOTICE_BOARD_VERSION}`;
+    script.onload = () => window.NoticeBoard ? resolve(window.NoticeBoard) : reject(new Error('NoticeBoard 없음'));
+    script.onerror = () => reject(new Error('테스트룸 공지 파일을 불러오지 못했습니다'));
+    document.head.appendChild(script);
+});
+noticeBoardReady.then(_fillNoticeTypeOptions).catch(e => console.error('공지 카드 파일 로드 실패:', e));
+
+// 타입 선택 목록 — NoticeBoard.STYLES에서 생성
+function _fillNoticeTypeOptions(NB) {
+    const sel = document.getElementById('noticeType');
+    if (!sel) return;
+    const current = sel.value || 'notice';
+    sel.innerHTML = Object.keys(NB.STYLES)
+        .map(k => `<option value="${k}">${NB.STYLES[k].emoji} ${NB.STYLES[k].label}</option>`)
+        .join('');
+    sel.value = NB.STYLES[current] ? current : 'notice';
+}
 
 let allNotices = [];
 
@@ -21,27 +55,20 @@ const AUDIENCE_STYLES = {
     australia: { label: '호주내챌', icon: '🇦🇺', color: '#c2410c', bg: '#fff7ed' }
 };
 
-// ===== 등록 시각 → KST "2026.07.06 16:27" 포맷 =====
-function formatNoticeDate(iso) {
-    if (!iso) return '';
-    try {
-        const d = new Date(iso);
-        if (isNaN(d)) return '';
-        const p = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', hour12: false
-        }).formatToParts(d);
-        const g = t => (p.find(x => x.type === t) || {}).value || '';
-        return `${g('year')}.${g('month')}.${g('day')} ${g('hour')}:${g('minute')}`;
-    } catch (e) { return ''; }
-}
-
 // ===== 공지 목록 로드 =====
 async function loadNotices() {
     const listEl = document.getElementById('noticeList');
     const countEl = document.getElementById('noticeCount');
     
     listEl.innerHTML = '<div style="text-align: center; padding: 40px 0; color: #94a3b8;">로딩 중...</div>';
+
+    let NB;
+    try {
+        NB = await noticeBoardReady;
+    } catch (e) {
+        listEl.innerHTML = '<div style="text-align: center; padding: 40px 0; color: #ef4444;">테스트룸 공지 파일을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>';
+        return;
+    }
 
     try {
         const res = await supabaseAPI.query('tr_notices', {
@@ -70,13 +97,15 @@ async function loadNotices() {
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 88px;">대상</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600;">제목</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 96px;">등록일시</th>
-                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 72px;">상태</th>
+                <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 124px;">게시</th>
                 <th style="padding: 10px 8px; color: #64748b; font-weight: 600; width: 104px;">액션</th>
             </tr>
         </thead><tbody>`;
 
+        const now = new Date();
         allNotices.forEach(n => {
-            const style = NOTICE_STYLES[n.type] || NOTICE_STYLES.notice;
+            const style = NB.styleOf(n.type);
+            const live = NB.isLive(n, now);
             const aud = AUDIENCE_STYLES[n.audience] || AUDIENCE_STYLES.all;
             const contentPreview = (n.content || '').replace(/<[^>]*>/g, '').substring(0, 30) + ((n.content || '').length > 30 ? '...' : '');
 
@@ -97,14 +126,15 @@ async function loadNotices() {
                     <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">${escapeHtml(contentPreview)}</div>
                 </td>
                 <td style="padding: 12px 8px; white-space: nowrap;">
-                    <div style="color: #64748b; font-size: 12px;">${(formatNoticeDate(n.created_at).split(' ')[0]) || ''}</div>
-                    <div style="color: #94a3b8; font-size: 12px; margin-top: 2px;">${(formatNoticeDate(n.created_at).split(' ')[1]) || ''}</div>
+                    <div style="color: #64748b; font-size: 12px;">${(NB.formatDate(n.created_at).split(' ')[0]) || ''}</div>
+                    <div style="color: #94a3b8; font-size: 12px; margin-top: 2px;">${(NB.formatDate(n.created_at).split(' ')[1]) || ''}</div>
                 </td>
                 <td style="padding: 12px 8px; text-align: center;">
                     <label style="cursor: pointer; display: inline-flex; align-items: center;">
-                        <input type="checkbox" ${n.is_active ? 'checked' : ''} onchange="toggleNoticeActive('${n.id}', this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
-                        <span style="margin-left: 4px; font-size: 12px; color: ${n.is_active ? '#22c55e' : '#94a3b8'};">${n.is_active ? '활성' : '비활성'}</span>
+                        <input type="checkbox" ${live ? 'checked' : ''} onchange="toggleNoticeActive('${n.id}', this.checked)" style="width: 16px; height: 16px; cursor: pointer;">
+                        <span style="margin-left: 4px; font-size: 12px; color: ${live ? '#22c55e' : '#94a3b8'};">${live ? '게시 중' : '꺼짐'}</span>
                     </label>
+                    ${live ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 2px; white-space: nowrap;">${NB.formatDate(n.active_until).slice(5)}까지</div>` : ''}
                 </td>
                 <td style="padding: 12px 8px; text-align: center;">
                     <button onclick="editNotice('${n.id}')" style="padding: 5px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #475569; font-size: 12px; cursor: pointer; margin-right: 4px;" title="수정">
@@ -126,8 +156,8 @@ async function loadNotices() {
     }
 }
 
-// ===== 미리보기 업데이트 =====
-function updateNoticePreview() {
+// ===== 미리보기 업데이트 — 테스트룸과 같은 카드(NoticeBoard.renderItem)를 펼친 상태로 그림 =====
+async function updateNoticePreview() {
     const type = document.getElementById('noticeType').value;
     const title = document.getElementById('noticeTitle').value;
     const content = document.getElementById('noticeContent').value;
@@ -138,25 +168,28 @@ function updateNoticePreview() {
         return;
     }
 
-    const style = NOTICE_STYLES[type] || NOTICE_STYLES.notice;
-    
-    // 긴급 공지 깜빡임 효과
-    const pulseStyle = type === 'urgent' ? 'animation: noticePulse 2s ease-in-out infinite;' : '';
-    
-    previewEl.innerHTML = `
-        <div style="background: ${style.bg}; border-radius: 12px; padding: 16px 20px; ${pulseStyle}">
-            <div style="font-weight: 700; color: ${style.titleColor}; font-size: 15px; margin-bottom: 6px;">
-                ${style.emoji} ${escapeHtml(title || '제목을 입력하세요')}
-            </div>
-            <div style="color: ${style.textColor}; font-size: 14px; line-height: 1.5;">
-                ${content || '<span style="color: #94a3b8;">내용을 입력하세요</span>'}
-            </div>
-        </div>
-    `;
+    let NB;
+    try {
+        NB = await noticeBoardReady;
+    } catch (e) {
+        previewEl.innerHTML = '<p style="color: #ef4444; text-align: center; margin: 0;">테스트룸 공지 파일을 불러오지 못해 미리보기를 표시할 수 없습니다.</p>';
+        return;
+    }
+
+    const editId = document.getElementById('noticeEditId').value;
+    const editing = editId ? allNotices.find(n => n.id === editId) : null;
+
+    previewEl.innerHTML = NB.renderItem({
+        id: 'preview',
+        type,
+        title: title || '제목을 입력하세요',
+        content: content || '내용을 입력하세요',
+        created_at: editing ? editing.created_at : new Date().toISOString()
+    }, { isNew: true, collapsed: false });
 }
 
 // ===== 폼 표시/숨기기 =====
-function showNoticeForm(editData) {
+async function showNoticeForm(editData) {
     const formEl = document.getElementById('noticeFormContainer');
     const titleEl = document.getElementById('noticeFormTitle');
     
@@ -168,7 +201,9 @@ function showNoticeForm(editData) {
         document.getElementById('noticeTitle').value = editData.title || '';
         document.getElementById('noticeContent').value = editData.content || '';
         document.getElementById('noticeSortOrder').value = editData.sort_order || 0;
-        document.getElementById('noticeIsActive').checked = editData.is_active !== false;
+        let live = false;
+        try { live = (await noticeBoardReady).isLive(editData); } catch (e) { /* 파일 로드 실패 시 꺼짐으로 표시 */ }
+        document.getElementById('noticeIsActive').checked = live;
     } else {
         titleEl.innerHTML = '<i class="fas fa-plus-circle" style="color: #3b82f6;"></i> 공지 등록';
         document.getElementById('noticeEditId').value = '';
@@ -190,6 +225,14 @@ function cancelNoticeForm() {
 }
 
 // ===== 저장 =====
+// 게시 켜기/끄기 → 게시 종료 시각 (저장·목록 토글 공통)
+//   켜면 지금부터 NoticeBoard.ACTIVE_DAYS일, 끄면 지금 종료. 상태가 그대로면 undefined(기간 유지)
+function _activeUntilFor(NB, notice, wantLive, now) {
+    const wasLive = notice ? NB.isLive(notice, now) : false;
+    if (wantLive === wasLive) return undefined;
+    return wantLive ? NB.newActiveUntil(now) : now.toISOString();
+}
+
 async function saveNotice() {
     const editId = document.getElementById('noticeEditId').value;
     const type = document.getElementById('noticeType').value;
@@ -205,15 +248,26 @@ async function saveNotice() {
         return;
     }
 
+    let NB;
+    try {
+        NB = await noticeBoardReady;
+    } catch (e) {
+        alert('테스트룸 공지 파일을 불러오지 못해 게시 기간을 정할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+    }
+
+    const now = new Date();
+    const editing = editId ? allNotices.find(n => n.id === editId) : null;
     const data = {
         type,
         audience,
         title,
         content,
         sort_order: sortOrder,
-        is_active: isActive,
-        updated_at: new Date().toISOString()
+        updated_at: now.toISOString()
     };
+    const activeUntil = _activeUntilFor(NB, editing, isActive, now);
+    if (activeUntil !== undefined) data.active_until = activeUntil;
 
     try {
         if (editId) {
@@ -221,7 +275,7 @@ async function saveNotice() {
             await supabaseAPI.patch('tr_notices', editId, data);
         } else {
             // 등록
-            data.created_at = new Date().toISOString();
+            data.created_at = now.toISOString();
             await supabaseAPI.post('tr_notices', data);
         }
 
@@ -247,7 +301,6 @@ async function deleteNotice(id) {
     const notice = allNotices.find(n => n.id === id);
     if (!notice) return;
 
-    const style = NOTICE_STYLES[notice.type] || NOTICE_STYLES.notice;
     if (!confirm(`"${notice.title}" 공지를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
 
     try {
@@ -259,21 +312,24 @@ async function deleteNotice(id) {
     }
 }
 
-// ===== 활성/비활성 토글 =====
-async function toggleNoticeActive(id, isActive) {
+// ===== 게시 켜기/끄기 (목록 체크박스) =====
+async function toggleNoticeActive(id, wantLive) {
     try {
-        await supabaseAPI.patch('tr_notices', id, {
-            is_active: isActive,
-            updated_at: new Date().toISOString()
-        });
-        // 목록 다시 로드하지 않고 로컬만 업데이트
+        const NB = await noticeBoardReady;
+        const now = new Date();
         const notice = allNotices.find(n => n.id === id);
-        if (notice) notice.is_active = isActive;
+        const activeUntil = _activeUntilFor(NB, notice, wantLive, now);
+        if (activeUntil !== undefined) {
+            await supabaseAPI.patch('tr_notices', id, {
+                active_until: activeUntil,
+                updated_at: now.toISOString()
+            });
+        }
     } catch (error) {
         console.error('상태 변경 실패:', error);
         alert('상태 변경에 실패했습니다.');
-        await loadNotices(); // 실패 시 다시 로드
     }
+    await loadNotices(); // 게시 종료 시각 표시까지 다시 그림
 }
 
 // ===== HTML 이스케이프 =====

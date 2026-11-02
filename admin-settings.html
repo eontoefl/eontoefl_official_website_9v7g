@@ -10,6 +10,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
+    <!-- Pretendard Font (공지 미리보기 — 테스트룸 공지 카드와 같은 글꼴) -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+    
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     
@@ -406,14 +409,7 @@
                         <div class="form-group" style="margin-bottom: 16px;">
                             <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">타입</label>
                             <select id="noticeType" onchange="updateNoticePreview()" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif;">
-                                <option value="urgent">🚨 긴급 공지</option>
-                                <option value="notice" selected>📢 일반 공지</option>
-                                <option value="deadline">⏰ 마감 안내</option>
-                                <option value="tip">💡 팁 / 도움말</option>
-                                <option value="update">🔄 업데이트</option>
-                                <option value="event">🎉 이벤트</option>
-                                <option value="warning">⚠️ 주의사항</option>
-                                <option value="check">✅ 완료 / 확인</option>
+                                <!-- 선택지는 js/admin-notices.js가 NoticeBoard.STYLES로 채움 -->
                             </select>
                         </div>
 
@@ -434,7 +430,7 @@
 
                         <div class="form-group" style="margin-bottom: 16px;">
                             <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">내용</label>
-                            <textarea id="noticeContent" oninput="updateNoticePreview()" rows="4" placeholder="공지 내용을 입력하세요. HTML &lt;b&gt;태그 사용 가능" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
+                            <textarea id="noticeContent" oninput="updateNoticePreview()" rows="4" placeholder="공지 내용을 입력하세요. 엔터로 줄을 바꾸면 테스트룸에도 그대로 보여요. (HTML &lt;b&gt; 태그 사용 가능)" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif; resize: vertical; box-sizing: border-box;"></textarea>
                         </div>
 
                         <div style="display: flex; gap: 16px; margin-bottom: 16px;">
@@ -444,10 +440,10 @@
                                 <small style="color: #64748b;">숫자가 작을수록 위에 표시</small>
                             </div>
                             <div class="form-group" style="flex: 1;">
-                                <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">활성 상태</label>
+                                <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 6px; display: block;">게시</label>
                                 <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; cursor: pointer;">
                                     <input type="checkbox" id="noticeIsActive" checked style="width: 18px; height: 18px; cursor: pointer;">
-                                    <span style="font-size: 14px; color: #475569;">테스트룸에 표시</span>
+                                    <span style="font-size: 14px; color: #475569;">테스트룸에 표시 (켜면 7일 뒤 자동 종료)</span>
                                 </label>
                             </div>
                         </div>
@@ -455,7 +451,7 @@
                         <!-- 미리보기 -->
                         <div style="margin-bottom: 16px;">
                             <label style="font-weight: 600; font-size: 14px; color: #334155; margin-bottom: 8px; display: block;">📱 테스트룸 미리보기</label>
-                            <div id="noticePreview" style="border: 1px dashed #d1d5db; border-radius: 12px; padding: 16px; min-height: 60px;">
+                            <div id="noticePreview" style="border: 1px dashed #d1d5db; border-radius: 12px; padding: 16px; min-height: 60px; pointer-events: none;">
                                 <p style="color: #94a3b8; text-align: center; margin: 0;">위에 내용을 입력하면 미리보기가 표시됩니다</p>
                             </div>
                         </div>
