@@ -194,7 +194,11 @@
       if (stopped) return;
       verify();
       if (documents.length !== 1 || documents[0].id?.toLowerCase() !== book) throw new Error('교재를 찾을 수 없습니다');
-      const pages = await api.query('tr_book_pages', {book_id:'eq.' + book, order:'sort_order.asc'});
+      // 버전 협업 책의 삭제 쪽(deleted_at)은 빼고 본다. 그 열이 없는 DB에서는 예전 조회.
+      let pages;
+      try { pages = await api.query('tr_book_pages', {book_id:'eq.' + book, deleted_at:'is.null', order:'sort_order.asc'}); }
+      catch (_) { pages = null; }
+      if (!pages || !pages.length) pages = await api.query('tr_book_pages', {book_id:'eq.' + book, order:'sort_order.asc'});
       if (stopped) return;
       verify();
       if (!pages.length) throw new Error('저장된 페이지가 없습니다');

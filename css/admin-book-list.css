@@ -45,6 +45,7 @@
 /* 배지 */
 .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
 .badge-public { background: #dcfce7; color: #15803d; }
+.badge-collab { background: rgba(0, 102, 136, .1); color: #006688; }
 .badge-hidden { background: var(--surface-high); color: var(--on-surface-variant); }
 .badge-role { background: rgba(80,201,255,0.16); color: var(--primary); cursor: pointer; }
 .badge-role:hover { background: rgba(80,201,255,0.28); }

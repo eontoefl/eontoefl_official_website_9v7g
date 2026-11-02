@@ -1,0 +1,98 @@
+/* 입문서 버전 협업 — 편집기 패널·확인창 (admin-book-editor.css 변수 사용) */
+
+.bc-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
+  border-radius: 9px; background: var(--tertiary); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1;
+}
+.bc-badge[hidden] { display: none; }
+
+/* 저장·불러오기 중 편집 잠시 막기 */
+body.bc-busy .bookedit-canvas,
+body.bc-busy .bookedit-slidebar { pointer-events: none; opacity: .72; transition: opacity .15s; }
+
+/* 패널 */
+.bookedit-modal.bc-panel { max-width: 720px; width: 94%; max-height: 86vh; }
+.bc-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 10px; }
+.bc-tab {
+  border: 0; background: var(--surface-low); color: var(--on-surface-variant);
+  padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.bc-tab.on { background: rgba(80, 201, 255, .18); color: var(--primary); font-weight: 600; }
+.bc-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.bc-head-info { font-size: 12px; color: var(--on-surface-variant); }
+.bc-list { display: flex; flex-direction: column; gap: 2px; }
+
+.bc-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  border: 0; background: transparent; font: inherit; cursor: pointer;
+  padding: 11px 12px; border-radius: 10px; color: inherit;
+}
+.bc-item:hover { background: var(--surface-low); }
+.bc-item.is-new { background: rgba(165, 59, 34, .05); }
+.bc-item-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.bc-item-title { font-size: 14px; font-weight: 600; color: var(--on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-item-meta { font-size: 12px; color: var(--on-surface-variant); margin-top: 2px; overflow-wrap: anywhere; }
+
+.bc-kind {
+  flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+  background: var(--surface-container); color: var(--on-surface-variant); white-space: nowrap;
+}
+.bc-kind-save, .bc-kind-baseline { background: rgba(0, 102, 136, .1); color: var(--primary); }
+.bc-kind-proposal { background: rgba(165, 59, 34, .1); color: var(--tertiary); }
+
+.bc-chip { flex: none; font-size: 11px; padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--surface-low); }
+.bc-chip-new { background: var(--tertiary); color: #fff; font-weight: 700; }
+.bc-chip-loaded { background: rgba(80, 201, 255, .2); color: var(--on-primary-container); }
+.bc-chip-used { background: rgba(0, 102, 136, .1); color: var(--primary); }
+.bc-chip-head { background: var(--primary); color: #fff; }
+
+.bc-back { margin-bottom: 6px; }
+.bc-detail { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.bc-detail-title { font-size: 16px; font-weight: 700; color: var(--on-surface); }
+.bc-detail-summary { font-size: 14px; white-space: pre-wrap; }
+.bc-detail-meta { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.bc-detail-pages { width: 100%; max-height: 220px; overflow-y: auto; background: var(--surface-low); border-radius: 10px; padding: 6px 10px; }
+.bc-page-row { font-size: 12.5px; padding: 3px 0; overflow-wrap: anywhere; }
+.bc-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.bc-hint { font-size: 12px; color: var(--on-surface-variant); margin: 4px 0; line-height: 1.6; }
+.bc-warn { color: var(--tertiary); font-size: 13px; line-height: 1.6; margin: 2px 0; }
+
+/* 확인창 */
+.bc-dialog { z-index: 3000; }
+.bc-dialog-box { max-width: 520px; }
+.bc-dialog-body p { font-size: 14px; line-height: 1.7; margin: 0 0 8px; }
+.bc-dialog-body p:empty { display: none; }
+.bc-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 4px 20px 18px; }
+.bc-field { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 13px; }
+.bc-field input, .bc-field textarea, .bc-field select {
+  font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid rgba(62, 72, 79, .18); background: var(--surface-lowest); color: var(--on-surface);
+}
+
+/* 진입 안내 (관리자 확인 필요 등) */
+.bc-gate { max-width: 420px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 20px; }
+.bc-gate i { font-size: 28px; color: var(--primary); margin-bottom: 6px; }
+.bc-gate p { margin: 0; font-size: 14px; line-height: 1.7; }
+.bc-gate .btn-grad { margin-top: 12px; }
+
+/* 복구 안내 */
+.bc-recovery {
+  position: fixed; right: 16px; bottom: 16px; z-index: 1500; width: min(440px, calc(100vw - 32px));
+  background: var(--surface-lowest); border-radius: 14px; box-shadow: 0 16px 44px rgba(25, 28, 29, .16); padding: 12px 14px;
+}
+.bc-recovery[hidden] { display: none; }
+.bc-recovery-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--on-surface); }
+.bc-recovery-item { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; font-size: 13px; }
+.bc-recovery-item .btn-secondary { align-self: flex-start; }
+
+@media (max-width: 640px) {
+  .bookedit-modal.bc-panel { width: 100%; max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; align-self: flex-end; }
+  .bc-item { flex-wrap: wrap; }
+  .bc-item-main { flex-basis: calc(100% - 80px); }
+  .bc-item-title { white-space: normal; }
+  .bc-actions .btn-secondary { width: 100%; }
+  .bc-dialog-actions { justify-content: stretch; }
+  .bc-dialog-actions button { flex: 1 1 auto; }
+}

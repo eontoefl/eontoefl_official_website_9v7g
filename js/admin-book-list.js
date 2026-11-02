@@ -5,7 +5,7 @@
 // =====================================================================
 const ROLE_LABEL = { regular: "일반", australia: "호주", etc: "기타" };
 const TRASH_DAYS = 30;
-const BL = { books: [] };
+const BL = { books: [], collab: null }; // collab: { bookId: true } / null = 확인 실패(자동정리 안 함)
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!checkAuth()) return;
@@ -31,6 +31,7 @@ async function load() {
     // select=* 로 받아 컬럼 없어도 안전. deleted_at 분리는 JS에서.
     const books = await supabaseAPI.query("tr_book_documents", { kind: "eq.pages", order: "sort_order.asc", select: "*" });
     BL.books = books || [];
+    BL.collab = await loadCollabStatus(BL.books);
     await purgeExpired();
     render();
   } catch (e) {
@@ -41,14 +42,50 @@ async function load() {
   document.getElementById("loading").style.display = "none";
 }
 
+// 버전 협업 여부 (협업 책은 자동 영구삭제·직접 수정 대상이 아님)
+async function loadCollabStatus(books) {
+  if (!window.BookRevisionClient || !books.length) return {};
+  try { return await window.BookRevisionClient.status(books.map((b) => b.id)); }
+  catch (e) { console.warn("협업 상태 확인 실패 — 이번 방문엔 휴지통 자동정리를 하지 않아요", e); return null; }
+}
+function isCollabBook(b) { return !!(BL.collab && BL.collab[b.id]); }
+
 // 휴지통 30일 경과분 영구삭제 (방문 시 정리)
+//  - 버전 협업 책은 제외(이력 보관). 협업 상태를 확인하지 못한 방문엔 아무것도 지우지 않는다.
+//  - 서버에서 실제로 지워진 책만 목록에서 뺀다.
 async function purgeExpired() {
+  if (BL.collab === null) return;
   const cutoff = Date.now() - TRASH_DAYS * 24 * 60 * 60 * 1000;
-  const expired = BL.books.filter((b) => b.deleted_at && new Date(b.deleted_at).getTime() < cutoff);
+  const expired = BL.books.filter((b) => b.deleted_at && new Date(b.deleted_at).getTime() < cutoff && !isCollabBook(b));
+  const removed = [];
   for (const b of expired) {
-    try { await supabaseAPI.hardDelete("tr_book_documents", b.id); } catch (_) {}
+    try { await supabaseAPI.hardDelete("tr_book_documents", b.id); removed.push(b); }
+    catch (e) { console.warn("휴지통 정리 실패(목록에 남김)", b.id, e); }
   }
-  if (expired.length) BL.books = BL.books.filter((b) => !expired.includes(b));
+  if (removed.length) BL.books = BL.books.filter((b) => !removed.includes(b));
+}
+
+// 책 정보 변경: 협업 책은 서버 전용 함수(관리자 확인 필요), 일반 책은 기존 방식
+async function updateBook(b, patch, collabPatch) {
+  if (isCollabBook(b)) {
+    const C = window.BookRevisionClient;
+    const requestId = C.uuid();
+    let res;
+    try { res = await C.updateMetadata(b.id, requestId, collabPatch || patch); }
+    catch (e) {
+      if (e.code === "UNKNOWN_RESULT") res = await C.updateMetadata(b.id, requestId, collabPatch || patch);
+      else if (e.code === "AUTH_REQUIRED" || e.code === "FORBIDDEN") {
+        if (confirm("버전 협업 책은 관리자 확인이 필요해요.\n기존 관리자 로그인으로 다시 로그인할까요?")) {
+          location.href = "login.html?reauth=1&redirect=" + encodeURIComponent("admin-book-list.html");
+        }
+        throw new Error("관리자 확인 필요");
+      } else throw e;
+    }
+    Object.assign(b, res.book);
+    return;
+  }
+  await supabaseAPI.patch("tr_book_documents", b.id, patch);
+  Object.assign(b, patch);
 }
 
 function render() {
@@ -87,6 +124,7 @@ function renderActive(books) {
           '<span class="badge badge-role" data-act="role">' + (ROLE_LABEL[role] || "기타") + "</span>" +
           '<span class="badge ' + (pub ? "badge-public" : "badge-hidden") + '">' + (pub ? "공개" : "숨김") + "</span>" +
           audBadge +
+          (isCollabBook(b) ? '<span class="badge badge-collab" title="저장할 때마다 버전이 남고, 쪽 내용은 편집기 저장으로만 바뀌어요">버전 협업</span>' : "") +
         "</div>" +
         '<div class="book-card-meta">' + (b.total_pages || 0) + "페이지 · 수정 " + fmtDate(b.updated_at) + "</div>" +
         // 책마다 켜고 끄는 학생 화면 설정 (2026-10-28 단어장 디지털 전달)
@@ -131,7 +169,8 @@ function renderTrash(books) {
     card.innerHTML =
       '<div class="book-card-main">' +
         '<div class="book-card-titlerow"><span class="book-card-title">' + esc(b.title || "(제목 없음)") + "</span></div>" +
-        '<div class="book-card-meta trash-days">' + (b.total_pages || 0) + "페이지 · " + Math.max(0, left) + "일 후 영구삭제</div>" +
+        '<div class="book-card-meta trash-days">' + (b.total_pages || 0) + "페이지 · " +
+          (isCollabBook(b) ? "협업 이력 보관 중 · 자동 영구삭제 안 함" : Math.max(0, left) + "일 후 영구삭제") + "</div>" +
       "</div>" +
       '<div class="book-card-actions">' +
         '<button class="book-card-edit" data-act="restore"><i class="fas fa-rotate-left"></i> 되살리기</button>' +
@@ -160,11 +199,10 @@ async function downloadBook(b, btn) {
   const prev = btn ? btn.innerHTML : "";
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
   try {
-    const pages = await supabaseAPI.query("tr_book_pages", {
-      book_id: "eq." + b.id,
-      order: "sort_order.asc",
-      select: "sort_order,blocks",
-    });
+    const q = { book_id: "eq." + b.id, order: "sort_order.asc", select: "sort_order,blocks" };
+    let pages = null;
+    try { pages = await supabaseAPI.query("tr_book_pages", { ...q, deleted_at: "is.null" }); } catch (_) { pages = null; }
+    if (!pages || !pages.length) pages = await supabaseAPI.query("tr_book_pages", q);
     if (!pages || !pages.length) { alert("이 책엔 아직 페이지가 없어요."); return; }
     const md = window.BookMarkdown.buildBookMarkdown(b.title, pages);
     window.BookMarkdown.downloadMarkdown(window.BookMarkdown.filenameFor(b.title), md);
@@ -179,8 +217,8 @@ async function downloadBook(b, btn) {
 async function renameBook(b) {
   const name = prompt("책 이름 변경:", b.title);
   if (!name || !name.trim() || name.trim() === b.title) return;
-  await supabaseAPI.patch("tr_book_documents", b.id, { title: name.trim() });
-  b.title = name.trim();
+  try { await updateBook(b, { title: name.trim() }); }
+  catch (e) { alert("이름 변경 실패: " + e.message); }
   render();
 }
 
@@ -194,26 +232,25 @@ async function toggleOpt(b, key) {
   if (key !== "view_confirm" && key !== "allow_print") return;
   const val = !b[key];
   try {
-    await supabaseAPI.patch("tr_book_documents", b.id, { [key]: val });
-    b[key] = val;
+    await updateBook(b, { [key]: val });
     render();
   } catch (e) { alert("변경 실패: " + e.message); render(); }
 }
 
 async function togglePublish(b, val) {
   try {
-    await supabaseAPI.patch("tr_book_documents", b.id, { is_active: val });
-    b.is_active = val;
+    await updateBook(b, { is_active: val });
     render();
   } catch (e) { alert("변경 실패: " + e.message); render(); }
 }
 
 async function softDelete(b) {
-  if (!confirm('"' + b.title + '" 책을 휴지통으로 보낼까요?\n30일간 보관 후 자동 영구삭제돼요. (그 전엔 되살릴 수 있어요)')) return;
+  const msg = isCollabBook(b)
+    ? '"' + b.title + '" 책을 휴지통으로 보낼까요?\n버전 협업 책이라 자동 영구삭제되지 않고 이력이 보관돼요. 언제든 되살릴 수 있어요.'
+    : '"' + b.title + '" 책을 휴지통으로 보낼까요?\n30일간 보관 후 자동 영구삭제돼요. (그 전엔 되살릴 수 있어요)';
+  if (!confirm(msg)) return;
   try {
-    await supabaseAPI.patch("tr_book_documents", b.id, { deleted_at: new Date().toISOString(), is_active: false });
-    b.deleted_at = new Date().toISOString();
-    b.is_active = false;
+    await updateBook(b, { deleted_at: new Date().toISOString(), is_active: false }, { trash: true });
     render();
   } catch (e) {
     alert("휴지통 기능은 DB SQL(role/deleted_at 컬럼) 적용 후 동작해요.\n\n" + e.message);
@@ -221,8 +258,8 @@ async function softDelete(b) {
 }
 
 async function restoreBook(b) {
-  await supabaseAPI.patch("tr_book_documents", b.id, { deleted_at: null });
-  b.deleted_at = null;
+  try { await updateBook(b, { deleted_at: null }, { trash: false }); }
+  catch (e) { alert("되살리기 실패: " + e.message); }
   render();
 }
 
@@ -249,8 +286,7 @@ function openRoleMenu(b, anchor) {
 function closeRoleMenu() { if (roleMenuEl) { roleMenuEl.remove(); roleMenuEl = null; } }
 async function setRole(b, r) {
   try {
-    await supabaseAPI.patch("tr_book_documents", b.id, { role: r });
-    b.role = r;
+    await updateBook(b, { role: r });
     render();
   } catch (e) {
     alert("역할 기능은 DB SQL(role 컬럼) 적용 후 동작해요.\n\n" + e.message);
@@ -306,8 +342,7 @@ async function onAudModeChange(mode) {
   if (!AUD.book) return;
   applyAudModeUI(mode);
   try {
-    await supabaseAPI.patch("tr_book_documents", AUD.book.id, { audience_mode: mode });
-    AUD.book.audience_mode = mode;
+    await updateBook(AUD.book, { audience_mode: mode });
     render(); // 카드 배지 갱신
     if (mode === "selected") await loadAddedStudents();
   } catch (e) {

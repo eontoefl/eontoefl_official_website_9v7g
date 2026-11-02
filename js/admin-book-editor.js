@@ -43,7 +43,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   try {
     await loadBooks();
-    await loadPages();
+    // 버전 협업이 켜진 책은 서버 기준본(head)과 이 기기의 작업본으로 연다. 꺼진 책은 기존 방식 그대로.
+    let collab = false;
+    if (window.BookCollab) {
+      try { collab = await window.BookCollab.detect(State.book.id); }
+      catch (err) {
+        console.error(err);
+        setStatus("error", "협업 상태 확인 실패 — 새로고침 해주세요");
+        alert("이 책의 버전 협업 상태를 확인하지 못했어요. 네트워크를 확인한 뒤 새로고침해주세요.\n\n" + err.message);
+        return;
+      }
+    }
+    if (collab) {
+      const ready = await window.BookCollab.loadPages(State.book.id);
+      if (!ready) return;
+    } else {
+      await loadPages();
+    }
   } catch (e) {
     console.error(e);
     setStatus("error", "DB 연결 실패 — SQL 적용됐는지 확인");
@@ -66,8 +82,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (loading) loading.style.display = "none";
   document.getElementById("slideBar").hidden = false;
   setCurrent(State.pages.length ? State.pages[0].id : null);
+  if (isCollab()) { window.BookCollab.afterRender(); return; }
   setStatus("saved", State.staleDrafts ? "서버 내용이 더 새로운 쪽은 서버 내용을 보여줘요 (예전 임시본 " + State.staleDrafts + "개는 따로 보관)" : "준비됨");
 });
+
+function isCollab() {
+  return !!(window.BookCollab && window.BookCollab.enabled);
+}
 
 function checkAuth() {
   const params = new URLSearchParams(location.search);
@@ -255,6 +276,7 @@ function anyHandle() {
 
 // 페이지에 보여줄 blocks (임시저장본 우선, 없으면 서버본)
 function blocksForPage(pageId) {
+  if (isCollab()) return window.BookCollab.blocksForPage(pageId);
   const draft = loadDraft(pageId);
   if (draft) return draft;
   const p = State.pages.find((x) => x.id === pageId);
@@ -286,6 +308,7 @@ function onEditorChange(pageId) {
   setStatus("editing", "편집 중…");
   markPageDirty(pageId, true);
   scheduleOutline(); // 제목 편집이 목차에 반영되도록
+  if (isCollab()) { window.BookCollab.onChange(pageId); return; }
 
   clearTimeout(State.timers.get(pageId));
   State.timers.set(pageId, setTimeout(() => {
@@ -640,6 +663,7 @@ async function movePage(dir) {
   const idx = State.pages.findIndex((p) => p.id === State.currentId);
   const to = idx + dir;
   if (idx < 0 || to < 0 || to >= State.pages.length) return;
+  if (isCollab() && !window.BookCollab.canChangeStructure()) return;
 
   const [moved] = State.pages.splice(idx, 1);
   State.pages.splice(to, 0, moved);
@@ -766,6 +790,7 @@ async function onDropReorder(fromId, toId, before) {
   clearDropMarkers();
   DnD.fromId = null;
   if (!fromId || fromId === toId) return;
+  if (isCollab() && !window.BookCollab.canChangeStructure()) return;
 
   const from = State.pages.findIndex((p) => p.id === fromId);
   if (from < 0) return;
@@ -783,6 +808,7 @@ async function onDropReorder(fromId, toId, before) {
 // 저장(발행) — 서버 tr_book_pages 에 반영 + 버전 백업
 // ---------------------------------------------------------------------
 async function savePage() {
+  if (isCollab()) return window.BookCollab.save();
   const btn = document.getElementById("btnSave");
   btn.disabled = true;
   setStatus("editing", "저장 중…");
@@ -857,6 +883,18 @@ async function addPage() {
 }
 
 async function insertPageAt(index, seed) {
+  if (isCollab()) {
+    // 협업 책: 저장 버튼 전에는 서버에 쓰지 않는다
+    if (!window.BookCollab.canChangeStructure()) return;
+    const np = { id: window.BookRevisionClient.uuid(), sort_order: 0, blocks: (seed && seed.blocks) || [], html: (seed && seed.html) || "" };
+    const at = Math.max(0, Math.min(index, State.pages.length));
+    State.pages.splice(at, 0, np);
+    renderStack();
+    window.BookCollab.structureChanged({ added: np });
+    ensureMounted(np.id);
+    goToPage(np.id);
+    return;
+  }
   try {
     const np = await supabaseAPI.post("tr_book_pages", {
       book_id: State.book.id,
@@ -882,6 +920,7 @@ async function duplicatePage() {
   const id = State.currentId;
   const idx = State.pages.findIndex((p) => p.id === id);
   if (idx < 0) return;
+  if (isCollab() && !window.BookCollab.canChangeStructure()) return;
   try {
     const blocks = currentBlocksFor(id);
     const h = anyHandle();
@@ -898,6 +937,18 @@ async function deletePage(pageId) {
   if (!pageId) return;
   if (State.pages.length <= 1) {
     alert("최소 1페이지는 있어야 해요.");
+    return;
+  }
+  if (isCollab()) {
+    if (!window.BookCollab.canChangeStructure()) return;
+    if (!confirm("이 페이지를 삭제할까요?\n저장을 눌러야 서버에 반영돼요. 버전 → '삭제된 쪽'에서 되살릴 수 있어요.")) return;
+    const idx = State.pages.findIndex((p) => p.id === pageId);
+    State.dirty.delete(pageId);
+    State.pages = State.pages.filter((p) => p.id !== pageId);
+    renderStack();
+    const next = State.pages[Math.min(idx, State.pages.length - 1)];
+    if (next) setCurrent(next.id);
+    window.BookCollab.structureChanged();
     return;
   }
   if (!confirm("이 페이지를 삭제할까요? (되돌릴 수 없어요)")) return;
@@ -924,6 +975,7 @@ async function deletePage(pageId) {
 
 // 현재 배열 순서대로 sort_order 를 1..N 로 다시 매기고, 바뀐 것만 저장
 async function persistOrder() {
+  if (isCollab()) { window.BookCollab.structureChanged(); return; }
   const changed = [];
   State.pages.forEach((p, i) => {
     const so = i + 1;
@@ -941,6 +993,7 @@ async function persistOrder() {
 }
 
 async function syncTotalPages() {
+  if (isCollab()) return; // 협업 책은 저장(commit)이 쪽 수를 함께 바꾼다
   try {
     await supabaseAPI.patch("tr_book_documents", State.book.id, { total_pages: State.pages.length });
     State.book.total_pages = State.pages.length;
@@ -951,6 +1004,7 @@ async function syncTotalPages() {
 // 버전 되돌리기
 // ---------------------------------------------------------------------
 async function showVersions() {
+  if (isCollab()) return window.BookCollab.openPanel();
   const modal = document.getElementById("versionModal");
   const listEl = document.getElementById("versionList");
   modal.classList.add("open");
