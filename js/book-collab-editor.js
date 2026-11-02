@@ -44,9 +44,15 @@
   // 작은 도우미
   // ------------------------------------------------------------------
   const clone = (x) => (typeof structuredClone === "function" ? structuredClone(x) : JSON.parse(JSON.stringify(x)));
-  const same = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+  // 서버(jsonb)는 객체 키 순서를 바꿔 돌려주므로, 키를 정렬해 비교한다.
+  function canon(v) {
+    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+    if (v && typeof v === "object") return "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  const same = (a, b) => canon(a || []) === canon(b || []);
   function fingerprint(blocks) {
-    const s = JSON.stringify(blocks || []);
+    const s = canon(blocks || []);
     let h = 0x811c9dc5;
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
     return (h >>> 0).toString(16) + ":" + s.length;
@@ -361,7 +367,7 @@
       if (mine.base_revision_id === BC.head.id) {
         BC.wc = mine;
         applyWorkingToState(mine);
-        if (!BC.lastNotice) BC.lastNotice = "이 작업창의 미저장 작업을 복구했어요.";
+        if (!BC.lastNotice && workingHasChanges(mine)) BC.lastNotice = "이 작업창의 미저장 작업을 복구했어요.";
       } else {
         BC.recoveries.push({ rec: mine, reason: "이전 기준(V" + mine.base_seq + ")의 미저장 작업" });
         await W.deleteWorking(user, BC.book, tab).catch(() => {});
@@ -387,6 +393,12 @@
   }
 
   function applyWorkingToState(rec) {
+    // 서버 기준과 같아진 쪽은 미저장으로 세지 않는다 (예: 응답을 못 받았던 저장이 반영돼 있었을 때)
+    Object.keys(rec.content || {}).forEach((u) => {
+      const b = rec.added[u] ? null : BC.base.content.get(u);
+      if (b && same(b.blocks, rec.content[u].blocks)) delete rec.content[u];
+    });
+    if (rec.order && same(rec.order, BC.base.order)) rec.order = null;
     const order = rec.order || BC.base.order;
     const pages = [];
     order.forEach((uid) => {
@@ -955,7 +967,9 @@
         // 순서까지 맞추기: 남은 차이는 move로
         const moves = diffStructure(finalOrder, new Set(), target, new Set()).filter((o) => o.op === "move");
         ops = ops.concat(moves);
-        targetPages = target.filter((u) => content.has(u) && !same(blocksForPage(u), content.get(u).blocks));
+        const currentBlocks = (u) => (BC.wc.content[u] ? BC.wc.content[u].blocks
+          : ((BC.base.content.get(u) || BC.base.deleted.get(u) || {}).blocks));
+        targetPages = target.filter((u) => content.has(u) && !same(currentBlocks(u), content.get(u).blocks));
         notes.push("책 전체를 V" + rev.seq + " 상태로 바꿔요: 내용 다른 쪽 " + targetPages.length + "개, 쪽 구조 동작 " + ops.length + "개.");
       } else {
         if (rev.manifest_complete) {
@@ -978,16 +992,22 @@
         return;
       }
       const overlap = targetPages.filter((u) => BC.wc.content[u]);
-      const lines = ["현재 수정한 내용은 자동 백업됩니다. 선택한 수정안의 대상 범위로 바꿀까요? 저장을 누르기 전에는 서버 본문이 바뀌지 않습니다."];
-      lines.push("대상: " + pageLabelRange(targetPages) + (ops.length ? " · 쪽 구조 동작 " + ops.length + "개" : ""));
+      const what = rev.kind === "proposal" ? "수정안" : rev.kind === "backup" ? "백업" : "버전";
+      const lines = [(hasChanges() ? "현재 수정한 내용은 자동 백업됩니다. " : "지금 저장 안 한 수정은 없어요. ") +
+        (full ? "책 전체를 V" + rev.seq + " 상태로 바꿀까요?" : "선택한 " + what + "의 대상 범위로 바꿀까요?") +
+        " 저장을 누르기 전에는 서버 본문이 바뀌지 않습니다."];
+      if (!full) lines.push("대상: " + pageLabelRange(targetPages) + (ops.length ? " · 쪽 구조 동작 " + ops.length + "개" : ""));
       if (rev.base_seq && rev.base_seq !== BC.head.seq && !full) {
         const changed = rev.changed_since_base || [];
-        lines.push({ warn: true, text: "이 수정안은 V" + rev.base_seq + " 기준입니다. 이후 저장한 V" + BC.head.seq + "에서 대상 " + changed.length +
-          "쪽이 변경됐습니다. 불러오면 해당 쪽은 수정안 내용으로 교체됩니다." });
+        lines.push(changed.length
+          ? { warn: true, text: "이 " + what + "은 V" + rev.base_seq + " 기준입니다. 이후 저장한 V" + BC.head.seq + "에서 대상 " + changed.length +
+              "쪽이 변경됐습니다. 불러오면 해당 쪽은 " + what + " 내용으로 교체됩니다." }
+          : "이 " + what + "은 V" + rev.base_seq + " 기준이에요. 그 뒤 V" + BC.head.seq + "까지 대상 쪽은 바뀌지 않았어요.");
       }
       if (overlap.length) lines.push({ warn: true, text: "저장 안 한 수정이 있는 " + overlap.length + "쪽이 교체돼요(교체 전 서버 백업)." });
       notes.forEach((n) => lines.push(n));
-      lines.push("대상 밖의 쪽과 저장 안 한 수정은 그대로 둬요. 같은 쪽 안의 문장을 합치지는 않아요.");
+      lines.push(full ? "이 버전에 없는 쪽은 삭제(되살리기 가능)되고, 쪽 순서도 이 버전대로 바뀌어요. 책 이름·공개 여부·학생 기록은 그대로예요."
+        : "대상 밖의 쪽과 저장 안 한 수정은 그대로 둬요. 같은 쪽 안의 문장을 합치지는 않아요.");
       const d = await dialog({ title: (full ? "책 전체 바꾸기 · " : "불러오기 · ") + (rev.title || kindLabel(rev)), lines,
         buttons: [{ label: "불러오기", value: "ok", primary: true }] });
       if (!d) { refreshStatus("불러오기 취소 · 바뀐 것 없음"); return; }

@@ -66,7 +66,7 @@ test('no database/storage writes or progress/private adapters', () => {
   assert.doesNotMatch(source,/\.(?:post|patch|insert|update|delete|hardDelete|upsert|uploadFile|setItem|removeItem)\s*\(/);
   assert.doesNotMatch(source,/tr_book_progress|tr_book_memos|book-private|object\/sign/);
   assert.match(source,/api\.query\('tr_book_documents', \{id:'eq\.' \+ book\}\)/);
-  assert.match(source,/api\.query\('tr_book_pages', \{book_id:'eq\.' \+ book, order:'sort_order\.asc'\}\)/);
+  assert.match(source,/api\.query\('tr_book_pages', \{book_id:'eq\.' \+ book, deleted_at:'is\.null', order:'sort_order\.asc'\}\)/); // 버전 협업: 논리삭제 쪽 제외 (2026-11-02)
 });
 test('script-disabled sandbox, restrictive CSP and resource sanitation retained', () => {
   assert.match(source,/setAttribute\('sandbox','allow-same-origin'\)/);
@@ -114,7 +114,7 @@ test('runtime: invalid UUID and absent/student/malformed role never read tables'
 });
 test('runtime: admin reads hidden document and 292 ordered ordinary pages', async () => {
   const h=await harness({search:'?book='+book+'&p=292'});h.load();
-  assert.deepEqual(h.calls.filter(c=>c[0]==='query').map(c=>[c[1],JSON.parse(JSON.stringify(c[2]))]),[['tr_book_documents',{id:'eq.'+book}],['tr_book_pages',{book_id:'eq.'+book,order:'sort_order.asc'}]]);
+  assert.deepEqual(h.calls.filter(c=>c[0]==='query').map(c=>[c[1],JSON.parse(JSON.stringify(c[2]))]),[['tr_book_documents',{id:'eq.'+book}],['tr_book_pages',{book_id:'eq.'+book,deleted_at:'is.null',order:'sort_order.asc'}]]);
   assert.equal(h.elements.get('reader').hidden,false);
   assert.equal(h.elements.get('pageNumber').value,'292');
   assert.equal(h.elements.get('next').disabled,true);
