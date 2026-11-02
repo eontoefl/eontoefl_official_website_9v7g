@@ -374,6 +374,10 @@ function setCurrent(pageId) {
 
 function goToPage(pageId) {
   if (!pageId) return;
+  // 먼 쪽(3쪽 넘게)은 부드럽게 미끄러지면 지나가는 쪽 높이가 바뀌어 다른 쪽에 멈춘다 → 바로 이동 후 다시 맞추기
+  const from = State.pages.findIndex((p) => p.id === State.currentId);
+  const to = State.pages.findIndex((p) => p.id === pageId);
+  if (from >= 0 && to >= 0 && Math.abs(to - from) > 3) { jumpToPage(pageId); return; }
   const currentHandle = State.editors.get(State.currentId);
   if (currentHandle?.flush && !currentHandle.flush()) { setStatus('error', '입력을 마치거나 충돌 표시를 확인해주세요.'); return; }
   setCurrent(pageId);
@@ -518,31 +522,59 @@ function jumpToPage(pageId) {
   setCurrent(pageId);
   ensureMounted(pageId);
   State.scrollLock = true;
+  // CSS의 부드러운 스크롤 때문에 먼 거리 이동이 느리게 미끄러지지 않도록, 맞추는 동안만 즉시 이동
+  const canvas = document.getElementById("canvas");
+  const prevBehavior = canvas.style.scrollBehavior;
+  canvas.style.scrollBehavior = "auto";
   const align = () => el.scrollIntoView({ block: "start", behavior: "auto" });
   align();
   [150, 400, 800, 1300].forEach((ms) => setTimeout(align, ms));
-  setTimeout(() => { State.scrollLock = false; setCurrent(pageId); }, 1400);
+  setTimeout(() => { canvas.style.scrollBehavior = prevBehavior; State.scrollLock = false; setCurrent(pageId); }, 1400);
 }
 
+// 목차의 제목 이동: 먼 거리를 부드럽게 스크롤하면 지나가는 쪽들의 편집기가 켜지며 높이가 바뀌어
+// 목표보다 앞에서 멈춘다(2026-11-03 대표 확인: 196쪽 제목을 눌렀는데 194쪽에 멈춤).
+// 쪽 바로가기처럼 바로 이동한 뒤, 제목 위치가 더 이상 움직이지 않을 때까지 다시 맞춘다.
+// 그 사이 사용자가 직접 스크롤하면 맞추기를 멈춘다.
+let headingJumpToken = 0;
 function jumpToHeading(pageId, blockId) {
+  if (!pageId) return;
+  const currentHandle = State.editors.get(State.currentId);
+  if (currentHandle?.flush && !currentHandle.flush()) { setStatus('error', '입력을 마치거나 충돌 표시를 확인해주세요.'); return; }
   setCurrent(pageId);
   ensureMounted(pageId);
   State.scrollLock = true;
-
-  const tryScroll = (tries) => {
-    const el = document.querySelector('.bookedit-mount [data-id="' + blockId + '"]');
-    if (el) {
-      el.scrollIntoView({ block: "start", behavior: "smooth" });
-      setTimeout(() => { State.scrollLock = false; updateActiveHeading(); }, 600);
-      return;
-    }
-    if (tries > 0) { setTimeout(() => tryScroll(tries - 1), 80); return; }
-    // 못 찾으면 페이지 맨 위로라도
-    const pel = State.nodes.get(pageId);
-    if (pel) pel.scrollIntoView({ block: "start", behavior: "smooth" });
-    setTimeout(() => { State.scrollLock = false; }, 600);
+  const canvas = document.getElementById("canvas");
+  const token = ++headingJumpToken;
+  let last = null, stable = 0, tries = 0;
+  const stop = () => { if (token === headingJumpToken) headingJumpToken++; };
+  const userScroll = () => stop();
+  canvas.addEventListener("wheel", userScroll, { passive: true, once: true });
+  canvas.addEventListener("touchmove", userScroll, { passive: true, once: true });
+  // 편집 화면 CSS가 scroll-behavior: smooth라서 그대로 두면 "바로 이동"도 수 초에 걸쳐 내려가며
+  // 지나가는 쪽 편집기를 수십 개 켠다(덜덜거림의 원인). 맞추는 동안만 즉시 이동으로 바꾼다.
+  const prevBehavior = canvas.style.scrollBehavior;
+  canvas.style.scrollBehavior = "auto";
+  const finish = () => {
+    canvas.style.scrollBehavior = prevBehavior;
+    canvas.removeEventListener("wheel", userScroll);
+    canvas.removeEventListener("touchmove", userScroll);
+    State.scrollLock = false;
+    updateActiveHeading();
   };
-  tryScroll(12);
+  const align = () => {
+    if (token !== headingJumpToken) { finish(); return; }
+    const heading = document.querySelector('.bookedit-mount [data-id="' + blockId + '"]');
+    const el = heading || State.nodes.get(pageId);
+    if (!el) { finish(); return; }
+    el.scrollIntoView({ block: "start", behavior: "auto" });
+    const top = Math.round(el.getBoundingClientRect().top - canvas.getBoundingClientRect().top);
+    if (heading && last !== null && Math.abs(top - last) <= 2) stable++; else stable = 0;
+    last = top;
+    if (stable >= 3 || ++tries > 30) { finish(); return; }
+    setTimeout(align, 120);
+  };
+  align();
 }
 
 // 지금 보고 있는 위치의 제목을 목차에서 강조(스크롤 따라)
