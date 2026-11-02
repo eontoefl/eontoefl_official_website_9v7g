@@ -511,32 +511,81 @@ function scheduleOutline() {
 }
 
 // 목차 항목 클릭 → 해당 제목으로 이동(안 켜진 페이지면 켜고 나서 이동)
-// 목차의 쪽 바로가기: 먼 거리는 부드럽게 스크롤하면 가는 동안 쪽이 켜지며 높이가 바뀌어
-// 다른 쪽에 멈춘다. 바로 이동한 뒤 자리가 잡힐 때까지 몇 번 다시 맞춘다.
+// 먼 거리 이동 (목차 제목·쪽 바로가기·먼 쪽 번호)
+// 편집 화면 CSS가 scroll-behavior: smooth라서 처음부터 끝까지 미끄러지면 지나가는 쪽 편집기가 수십 개 켜지며
+// 덜덜거리고, 쪽 높이가 바뀌어 목표보다 앞에 멈춘다(2026-11-03 대표 확인: 196쪽 제목 → 194쪽).
+// 그래서: 목표 한 화면 앞까지 즉시 이동해 자리를 잡고 → 마지막 한 화면만 부드럽게 → 어긋났으면 살짝 바로잡는다.
+// 그 사이 사용자가 직접 스크롤하면 바로 멈춘다.
+let glideToken = 0;
+function glideTo(getTarget, done) {
+  const canvas = document.getElementById("canvas");
+  const token = ++glideToken;
+  const prevBehavior = canvas.style.scrollBehavior;
+  const cancelled = () => token !== glideToken;
+  const onUser = () => { if (token === glideToken) glideToken++; };
+  canvas.addEventListener("wheel", onUser, { passive: true });
+  canvas.addEventListener("touchmove", onUser, { passive: true });
+  const offsetOf = (node) => node.getBoundingClientRect().top - canvas.getBoundingClientRect().top;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    canvas.style.scrollBehavior = prevBehavior;
+    canvas.removeEventListener("wheel", onUser);
+    canvas.removeEventListener("touchmove", onUser);
+    if (done) done();
+  };
+  let el = getTarget();
+  if (!el) { finish(); return; }
+  const lead = Math.round(canvas.clientHeight * 0.85);
+  const down = offsetOf(el) > 0;
+  canvas.style.scrollBehavior = "auto";
+
+  let fixes = 0;
+  const fix = () => {
+    if (cancelled()) { finish(); return; }
+    canvas.style.scrollBehavior = "auto";
+    el = getTarget() || el;
+    const off = offsetOf(el);
+    if (Math.abs(off) > 2 && fixes++ < 8) { canvas.scrollTop += off; setTimeout(fix, 120); return; }
+    finish();
+  };
+  const glide = () => {
+    if (cancelled()) { finish(); return; }
+    el = getTarget() || el;
+    canvas.style.scrollBehavior = "smooth";
+    canvas.scrollTo({ top: canvas.scrollTop + offsetOf(el), behavior: "smooth" });
+    setTimeout(fix, 700);
+  };
+  if (Math.abs(offsetOf(el)) <= lead) { glide(); return; } // 가까우면 그냥 부드럽게
+
+  let last = null, stable = 0, tries = 0;
+  const pre = () => {
+    if (cancelled()) { finish(); return; }
+    el = getTarget() || el;
+    canvas.scrollTop += offsetOf(el) - (down ? lead : -lead);
+    const off = Math.round(offsetOf(el));
+    if (last !== null && Math.abs(off - last) <= 2) stable++; else stable = 0;
+    last = off;
+    if (stable >= 2 || ++tries > 20) { glide(); return; }
+    setTimeout(pre, 100);
+  };
+  pre();
+}
+
+// 목차의 쪽 바로가기 / 먼 쪽 번호
 function jumpToPage(pageId) {
   if (!pageId) return;
   const currentHandle = State.editors.get(State.currentId);
   if (currentHandle?.flush && !currentHandle.flush()) { setStatus('error', '입력을 마치거나 충돌 표시를 확인해주세요.'); return; }
-  const el = State.nodes.get(pageId);
-  if (!el) return;
+  if (!State.nodes.get(pageId)) return;
   setCurrent(pageId);
   ensureMounted(pageId);
   State.scrollLock = true;
-  // CSS의 부드러운 스크롤 때문에 먼 거리 이동이 느리게 미끄러지지 않도록, 맞추는 동안만 즉시 이동
-  const canvas = document.getElementById("canvas");
-  const prevBehavior = canvas.style.scrollBehavior;
-  canvas.style.scrollBehavior = "auto";
-  const align = () => el.scrollIntoView({ block: "start", behavior: "auto" });
-  align();
-  [150, 400, 800, 1300].forEach((ms) => setTimeout(align, ms));
-  setTimeout(() => { canvas.style.scrollBehavior = prevBehavior; State.scrollLock = false; setCurrent(pageId); }, 1400);
+  glideTo(() => State.nodes.get(pageId), () => { State.scrollLock = false; setCurrent(pageId); });
 }
 
-// 목차의 제목 이동: 먼 거리를 부드럽게 스크롤하면 지나가는 쪽들의 편집기가 켜지며 높이가 바뀌어
-// 목표보다 앞에서 멈춘다(2026-11-03 대표 확인: 196쪽 제목을 눌렀는데 194쪽에 멈춤).
-// 쪽 바로가기처럼 바로 이동한 뒤, 제목 위치가 더 이상 움직이지 않을 때까지 다시 맞춘다.
-// 그 사이 사용자가 직접 스크롤하면 맞추기를 멈춘다.
-let headingJumpToken = 0;
+// 목차의 제목 (편집기가 아직 안 켜졌으면 쪽 위치로 가다가 켜지면 제목으로 맞춘다)
 function jumpToHeading(pageId, blockId) {
   if (!pageId) return;
   const currentHandle = State.editors.get(State.currentId);
@@ -544,37 +593,10 @@ function jumpToHeading(pageId, blockId) {
   setCurrent(pageId);
   ensureMounted(pageId);
   State.scrollLock = true;
-  const canvas = document.getElementById("canvas");
-  const token = ++headingJumpToken;
-  let last = null, stable = 0, tries = 0;
-  const stop = () => { if (token === headingJumpToken) headingJumpToken++; };
-  const userScroll = () => stop();
-  canvas.addEventListener("wheel", userScroll, { passive: true, once: true });
-  canvas.addEventListener("touchmove", userScroll, { passive: true, once: true });
-  // 편집 화면 CSS가 scroll-behavior: smooth라서 그대로 두면 "바로 이동"도 수 초에 걸쳐 내려가며
-  // 지나가는 쪽 편집기를 수십 개 켠다(덜덜거림의 원인). 맞추는 동안만 즉시 이동으로 바꾼다.
-  const prevBehavior = canvas.style.scrollBehavior;
-  canvas.style.scrollBehavior = "auto";
-  const finish = () => {
-    canvas.style.scrollBehavior = prevBehavior;
-    canvas.removeEventListener("wheel", userScroll);
-    canvas.removeEventListener("touchmove", userScroll);
-    State.scrollLock = false;
-    updateActiveHeading();
-  };
-  const align = () => {
-    if (token !== headingJumpToken) { finish(); return; }
-    const heading = document.querySelector('.bookedit-mount [data-id="' + blockId + '"]');
-    const el = heading || State.nodes.get(pageId);
-    if (!el) { finish(); return; }
-    el.scrollIntoView({ block: "start", behavior: "auto" });
-    const top = Math.round(el.getBoundingClientRect().top - canvas.getBoundingClientRect().top);
-    if (heading && last !== null && Math.abs(top - last) <= 2) stable++; else stable = 0;
-    last = top;
-    if (stable >= 3 || ++tries > 30) { finish(); return; }
-    setTimeout(align, 120);
-  };
-  align();
+  glideTo(
+    () => document.querySelector('.bookedit-mount [data-id="' + blockId + '"]') || State.nodes.get(pageId),
+    () => { State.scrollLock = false; updateActiveHeading(); },
+  );
 }
 
 // 지금 보고 있는 위치의 제목을 목차에서 강조(스크롤 따라)
