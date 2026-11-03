@@ -95,7 +95,8 @@
 .bt-eon.bt-ch-w .book-compare>.book-design-title:not(:empty)::before{content:"먼저 나온 말";position:absolute;top:9px;left:16px;font:700 11.5px/1.4 SUIT,sans-serif;color:#9A8FBF;letter-spacing:.02em}
 
 /* W1 본문 강조 (2026-11-03 대표 결정): 굵게 = (가) 알아둘 것, 형광펜 / 굵게+밑줄 = (나) 직접 할 것·조심할 것, 손으로 그은 핑크 밑줄 */
-.bt-eon.bt-ch-w :is(p,li) strong span[data-style-type="textColor"][data-value="#4E3D73"]{background:linear-gradient(transparent 60%,#E7E0F6 60%,#E7E0F6 92%,transparent 92%);padding:0 1px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.bt-eon.bt-ch-w :is(p,li) strong span[data-style-type="textColor"][data-value="#4E3D73"]{background:#E4DAF8!important;border-radius:4px;padding:1px 4px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.bt-eon.bt-ch-w :is(p,li) u span[data-style-type="textColor"][data-value="#4E3D73"]{border-radius:0;padding:0 0 3px!important}
 .bt-eon.bt-ch-w :is(p,li) u:has(span[data-style-type="textColor"][data-value="#4E3D73"]),.bt-eon.bt-ch-w :is(p,li) u span[data-style-type="textColor"][data-value="#4E3D73"]{text-decoration:none!important}
 .bt-eon.bt-ch-w :is(p,li) u span[data-style-type="textColor"][data-value="#4E3D73"]{background:url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20120%2012%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M2%208c20-5%2050-6%2080-4%2012%201%2024%202%2036%200%22%20fill%3D%22none%22%20stroke%3D%22%23E58FAE%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E") 0 100%/100% 7px no-repeat!important;padding:0 0 3px!important;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 
