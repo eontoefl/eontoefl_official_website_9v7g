@@ -66,20 +66,33 @@
 .bt-eon .bt-src.book-callout::after,.bt-eon .bt-src .book-callout::after{display:none}
 /* 온글잎 의연체 메모 (W1부터, bodyFont=ongleip). 위의 LeeSeoyun 고정 규칙보다 구체적으로 덮는다 */
 .bt-eon .book-callout .book-design-body[data-book-font="ongleip"],.bt-eon .book-callout .book-design-body[data-book-font="ongleip"] *{font-family:"OngleipEoyeonce",LeeSeoyun,serif!important}
-/* 꿀팁 상자: 꿀팁 종류 + 의연체 메모일 때만 연한 상자와 제목 표시 (기존 이서윤체 꿀팁 메모는 그대로) */
-.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"]){background:var(--bt-pl)!important;border-radius:14px!important;padding:14px 18px 14px!important;margin:16px 0 18px!important}
-.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])::after{display:none}
-.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])>.book-design-title{display:inline-block!important;margin:0 0 6px!important;padding:2px 10px!important;border-radius:999px;background:var(--bt-k)!important;color:#fff!important;font:700 12.5px/1.6 SUIT,sans-serif!important;letter-spacing:.02em}
-.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])>.book-design-title::before{content:"꿀팁 · "}
-.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])>.book-design-title:empty::before{content:"꿀팁"}
-/* 핵심 상자: 주의 종류(이 책에서 W1부터 사용). 제목 띠 + 또렷한 본문 */
-.bt-eon .book-callout[data-book-tone="warning"]{border:1.5px solid var(--bt-p)!important;background:#fff!important;border-radius:14px!important;padding:14px 18px!important;margin:16px 0 18px!important}
-.bt-eon .book-callout[data-book-tone="warning"]::after{display:none}
-.bt-eon .book-callout[data-book-tone="warning"]>.book-design-title{display:block!important;margin:0 0 8px!important;padding:0!important;color:var(--bt-k)!important;font:800 13.5px/1.5 SUIT,sans-serif!important;letter-spacing:.02em}
-.bt-eon .book-callout[data-book-tone="warning"]>.book-design-title::before{content:"✔ ";color:var(--bt-pink)}
-.bt-eon .book-callout[data-book-tone="warning"] .book-design-body,.bt-eon .book-callout[data-book-tone="warning"] .book-design-body *{font-family:Paperlogy,SUIT,sans-serif!important;color:#2E2A3A!important}
-.bt-eon .book-callout[data-book-tone="warning"] .book-design-body{font-size:16.5px!important;line-height:1.75!important}
-.bt-eon .book-callout[data-book-tone="warning"] .book-design-body strong,.bt-eon .book-callout[data-book-tone="warning"] .book-design-body b{color:var(--bt-ink)!important;font-weight:700!important}
+/* W1 디자인 (2026-11-03 대표 선택). 라이팅 장(bt-ch-w)에만 적용 */
+/* 손글씨 메모 (나) 빨간펜 첨삭: 핑크 손글씨 + 위 문장을 가리키는 손그림 화살표, 밑줄은 손으로 그은 선 */
+.bt-eon.bt-ch-w .book-callout[data-book-tone="info"]:has(.book-design-body[data-book-font="ongleip"]){padding:0 0 0 60px!important;margin:4px 0 16px!important;transform:rotate(-1.2deg);transform-origin:0 50%}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="info"]:has(.book-design-body[data-book-font="ongleip"])::after{display:block!important;content:""!important;left:4px!important;top:-14px!important;width:48px!important;height:40px!important;background:url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2060%2050%22%3E%3Cpath%20d%3D%22M50%2044C30%2044%2012%2034%209%209%22%20fill%3D%22none%22%20stroke%3D%22%23D2577F%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M3%2015l6-9%207%208%22%20fill%3D%22none%22%20stroke%3D%22%23D2577F%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") center/contain no-repeat!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="info"]:has(.book-design-body[data-book-font="ongleip"]) .book-design-body,.bt-eon.bt-ch-w .book-callout[data-book-tone="info"]:has(.book-design-body[data-book-font="ongleip"]) .book-design-body *{font-family:"OngleipEoyeonce",LeeSeoyun,serif!important;color:#C2416E!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="info"]:has(.book-design-body[data-book-font="ongleip"]) .book-design-body{font-size:19px!important;line-height:1.5!important;display:block!important;padding-bottom:0!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="info"]:has(.book-design-body[data-book-font="ongleip"]) .book-design-body u{text-decoration:none!important;background:url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20120%2012%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M2%208c20-5%2050-6%2080-4%2012%201%2024%202%2036%200%22%20fill%3D%22none%22%20stroke%3D%22%23E58FAE%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E") 0 100%/100% 9px no-repeat!important;padding-bottom:4px}
+/* 핵심 (가) 형광펜 문장: 상자·테두리 없음, 위에 POINT, 굵은 부분에 연보라 형광펜 */
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"]{border:0!important;background:none!important;padding:0!important;margin:22px 0 20px!important;border-radius:0!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"]>.book-design-title{display:none!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"]::after{display:none!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"]::before{display:block!important;content:"POINT"!important;position:static!important;font:700 11px/1.2 Outfit,sans-serif!important;letter-spacing:.32em;color:#C9658B;margin:0 0 6px;width:auto;height:auto;background:none!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"] .book-design-body,.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"] .book-design-body *{font-family:SUIT,Paperlogy,sans-serif!important;color:#2E2A3A!important;font-weight:700!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"] .book-design-body{font-size:18.5px!important;line-height:1.75!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"] .book-design-body strong,.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"] .book-design-body b,.bt-eon.bt-ch-w .book-callout[data-book-tone="warning"] .book-design-body strong *{color:#4E3D73!important;font-weight:800!important;background:linear-gradient(transparent 58%,#DCD2F2 58%,#DCD2F2 92%,transparent 92%)!important}
+/* 꿀팁 (A) ★ 스티커 + TIP: 상자 없음, 굵은 부분에 핑크 형광펜 */
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"]{border:0!important;background:none!important;padding:36px 0 0 0!important;margin:22px 0 20px!important;border-radius:0!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"]>.book-design-title{display:none!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"]::before{display:flex!important;align-items:center;justify-content:center;content:"★"!important;position:absolute!important;left:0;top:0;width:26px;height:26px;border-radius:50%;background:#E89AB4!important;color:#fff;font:700 14px/1 SUIT,sans-serif}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"]::after{display:block!important;content:"TIP"!important;position:absolute!important;left:34px!important;top:7px!important;width:auto!important;height:auto!important;background:none!important;font:700 11px/1.2 Outfit,sans-serif;letter-spacing:.32em;color:#C9658B}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"] .book-design-body,.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"] .book-design-body *{font-family:SUIT,Paperlogy,sans-serif!important;color:#2E2A3A!important;font-weight:700!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"] .book-design-body{font-size:18.5px!important;line-height:1.75!important}
+.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"] .book-design-body strong,.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"] .book-design-body b,.bt-eon.bt-ch-w .book-callout[data-book-tone="tip"] .book-design-body strong *{color:#4E3D73!important;font-weight:800!important;background:linear-gradient(transparent 58%,#F8DCE7 58%,#F8DCE7 92%,transparent 92%)!important}
+
+/* 라이팅 장 비교 카드: 전체 제목 칸을 '먼저 나온 말'로 표시 (영어 줄 + 우리말 줄). 다른 장 비교 카드 제목은 그대로 */
+.bt-eon.bt-ch-w .book-compare>.book-design-title:not(:empty){display:block!important;position:relative;white-space:pre-line;background:#fff;border:1px solid var(--bt-line);border-radius:12px;padding:30px 16px 11px!important;margin:0 0 12px!important;font:500 15.5px/1.65 Outfit,Paperlogy,SUIT,sans-serif!important;color:#1F2A44!important;text-align:left}
+.bt-eon.bt-ch-w .book-compare>.book-design-title:not(:empty)::before{content:"먼저 나온 말";position:absolute;top:9px;left:16px;font:700 11.5px/1.4 SUIT,sans-serif;color:#9A8FBF;letter-spacing:.02em}
 
 /* 끊어 읽기 없는 영어 (결정10) */
 .bt-eon p.bt-eng,.bt-eon .bt-eng>p{background:#F7F6FA;border-radius:8px;padding:10px 14px!important;font-family:Outfit,sans-serif!important;font-size:15px;line-height:1.75}
