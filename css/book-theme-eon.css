@@ -64,6 +64,22 @@
 .bt-eon .bt-src.book-callout,.bt-eon .bt-src .book-callout{text-align:right;padding-left:0!important;margin-top:-4px!important}
 .bt-eon .bt-src .book-design-body,.bt-eon .bt-src.book-callout .book-design-body{font-size:15px!important;color:#9A92B2!important}
 .bt-eon .bt-src.book-callout::after,.bt-eon .bt-src .book-callout::after{display:none}
+/* 온글잎 의연체 메모 (W1부터, bodyFont=ongleip). 위의 LeeSeoyun 고정 규칙보다 구체적으로 덮는다 */
+.bt-eon .book-callout .book-design-body[data-book-font="ongleip"],.bt-eon .book-callout .book-design-body[data-book-font="ongleip"] *{font-family:"OngleipEoyeonce",LeeSeoyun,serif!important}
+/* 꿀팁 상자: 꿀팁 종류 + 의연체 메모일 때만 연한 상자와 제목 표시 (기존 이서윤체 꿀팁 메모는 그대로) */
+.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"]){background:var(--bt-pl)!important;border-radius:14px!important;padding:14px 18px 14px!important;margin:16px 0 18px!important}
+.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])::after{display:none}
+.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])>.book-design-title{display:inline-block!important;margin:0 0 6px!important;padding:2px 10px!important;border-radius:999px;background:var(--bt-k)!important;color:#fff!important;font:700 12.5px/1.6 SUIT,sans-serif!important;letter-spacing:.02em}
+.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])>.book-design-title::before{content:"꿀팁 · "}
+.bt-eon .book-callout[data-book-tone="tip"]:has(.book-design-body[data-book-font="ongleip"])>.book-design-title:empty::before{content:"꿀팁"}
+/* 핵심 상자: 주의 종류(이 책에서 W1부터 사용). 제목 띠 + 또렷한 본문 */
+.bt-eon .book-callout[data-book-tone="warning"]{border:1.5px solid var(--bt-p)!important;background:#fff!important;border-radius:14px!important;padding:14px 18px!important;margin:16px 0 18px!important}
+.bt-eon .book-callout[data-book-tone="warning"]::after{display:none}
+.bt-eon .book-callout[data-book-tone="warning"]>.book-design-title{display:block!important;margin:0 0 8px!important;padding:0!important;color:var(--bt-k)!important;font:800 13.5px/1.5 SUIT,sans-serif!important;letter-spacing:.02em}
+.bt-eon .book-callout[data-book-tone="warning"]>.book-design-title::before{content:"✔ ";color:var(--bt-pink)}
+.bt-eon .book-callout[data-book-tone="warning"] .book-design-body,.bt-eon .book-callout[data-book-tone="warning"] .book-design-body *{font-family:Paperlogy,SUIT,sans-serif!important;color:#2E2A3A!important}
+.bt-eon .book-callout[data-book-tone="warning"] .book-design-body{font-size:16.5px!important;line-height:1.75!important}
+.bt-eon .book-callout[data-book-tone="warning"] .book-design-body strong,.bt-eon .book-callout[data-book-tone="warning"] .book-design-body b{color:var(--bt-ink)!important;font-weight:700!important}
 
 /* 끊어 읽기 없는 영어 (결정10) */
 .bt-eon p.bt-eng,.bt-eon .bt-eng>p{background:#F7F6FA;border-radius:8px;padding:10px 14px!important;font-family:Outfit,sans-serif!important;font-size:15px;line-height:1.75}

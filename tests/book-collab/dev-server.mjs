@@ -230,7 +230,8 @@ function serveStatic(res, root, rel) {
   if (ext === '.js' && /supabase-(config|client)\.js$/.test(file)) {
     let s = data.toString('utf8');
     s = s.replace(/https:\/\/qpqjevecjejvbeuogtbx\.supabase\.co(?!\/storage\/v1\/object\/public)/g, SB)
-         .replace(/(SUPABASE_ANON_KEY\s*=\s*)(['"])[^'"]+\2/, `$1'${ANON}'`);
+         .replace(/(SUPABASE_ANON_KEY\s*=\s*)(['"])[^'"]+\2/, `$1'${ANON}'`)
+         .replace(/(anonKey\s*:\s*)(['"])[^'"]+\2/, `$1'${ANON}'`);
     data = Buffer.from(s);
   }
   res.writeHead(200, { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' });

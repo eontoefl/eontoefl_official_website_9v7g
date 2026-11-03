@@ -301,7 +301,7 @@ function BookCallout({ block, editor, contentRef, editable }) {
             options={TONE_OPTIONS}
             onChange={(tone) => updateBlockProps(editor, block, { tone })}
           />
-          <SelectControl label="본문 글꼴" value={block.props.bodyFont} options={[{value:"paperlogy",label:"페이퍼로지"},{value:"leeSeoyun",label:"이서윤체"},{value:"nanumGothic",label:"나눔고딕"}]} onChange={(bodyFont)=>updateBlockProps(editor,block,{bodyFont})} />
+          <SelectControl label="본문 글꼴" value={block.props.bodyFont} options={[{value:"paperlogy",label:"페이퍼로지"},{value:"leeSeoyun",label:"이서윤체"},{value:"ongleip",label:"온글잎 의연체"},{value:"nanumGothic",label:"나눔고딕"}]} onChange={(bodyFont)=>updateBlockProps(editor,block,{bodyFont})} />
           <TextControl
             label="제목"
             value={block.props.title}
@@ -1102,7 +1102,7 @@ const bookCalloutSpec = createReactBlockSpec(
       theme: { default: "neutral", values: DESIGN_THEMES },
       tone: { default: "info", values: DESIGN_TONES },
       title: { default: "학습 포인트" },
-      bodyFont: { default: "paperlogy", values: ["paperlogy", "leeSeoyun", "nanumGothic"] },
+      bodyFont: { default: "paperlogy", values: ["paperlogy", "leeSeoyun", "ongleip", "nanumGothic"] },
     },
     content: "inline",
   },

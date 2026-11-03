@@ -830,6 +830,9 @@
 @font-face { font-family: "LeeSeoyun"; src: url("../assets/fonts/leeseoyun/LeeSeoyun.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
 .book-content [data-book-font="nanumGothic"] { font-family: "NanumGothic", sans-serif; font-weight: 400; }
 .book-content [data-book-font="leeSeoyun"] { font-family: "LeeSeoyun", sans-serif; font-weight: 400; font-size: 1.08em; }
+/* 온글잎 의연체 (보이저엑스. 웹 탑재 허용, 파일 수정·재배포 금지라 받은 파일 그대로 탑재. 글자가 작게 그려지는 글꼴이라 size-adjust로 다른 메모와 크기를 맞춤) */
+@font-face { font-family: "OngleipEoyeonce"; src: url("../assets/fonts/ongleip/OngleipEoyeonce.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; size-adjust: 140%; }
+.book-content [data-book-font="ongleip"] { font-family: "OngleipEoyeonce", "LeeSeoyun", sans-serif; font-weight: 400; font-size: 1.08em; }
 
 /* ---------------------------------------------------------------------
    Cover (bookCover) — e-book cover, scales with its own width.
