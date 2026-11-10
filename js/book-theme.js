@@ -9,6 +9,8 @@
     ['e660266e-1b01-4d11-9254-81ea7e613344', { book: 'intro' }],          // 입문서
     // 단어장: 1쪽 표지, 2~4쪽 경고문·안내. jump: 왼쪽 목차에 넣는 쪽 바로가기.
     ['07f6cd4e-c737-40a1-b537-6e07af3d1aa5', { book: 'voca', front: 4, jump: [10, 20, 30, 40, 50, 60] }],
+    // 단어장 v2 (인쇄 v2와 같은 내용·모양). ed: 쪽에 bt-ed-<ed> 클래스와 v2 읽기 꾸밈(decorateVocaV2).
+    ['47282479-f8f6-4062-aa33-6c027d488d1a', { book: 'voca', ed: 'v2', front: 4, closing: 3, jump: [10, 20, 30, 40, 50, 60] }],
   ]);
   const CH_BY_NUM = { '06': 'r', '07': 'l', '08': 'w', '09': 's' };
   const LABEL = { n: 'TOEFL', r: 'READING', l: 'LISTENING', w: 'WRITING', s: 'SPEAKING' };
@@ -81,7 +83,7 @@
     const metas = []; let ch = 'n'; let firstOpener = -1; let pendingTitle = null;
     pages.forEach((p, i) => {
       const frag = parse(p.html); const blocks = blocksOf(frag); const heads = headingTexts(frag);
-      const meta = { index: i, ch, kind: 'body', band: true, num: '', label: '', title: '', book: cfg.book || '' };
+      const meta = { index: i, ch, kind: 'body', band: true, num: '', label: '', title: '', book: cfg.book || '', ed: cfg.ed || '' };
       if (frag.querySelector('[data-book-kind="cover"]')) { meta.kind = 'cover'; meta.band = false; }
       else if (blocks.length === 1 && heads.length === 1 && /^\d{2}$/.test(heads[0])) {
         const num = heads[0]; ch = CH_BY_NUM[num] || 'n'; if (firstOpener < 0) firstOpener = i;
@@ -98,15 +100,17 @@
     const frontEnd = firstOpener >= 0 ? firstOpener : (cfg.front || 0);
     metas.forEach(m => { if (m.index < frontEnd && m.kind === 'body') { m.kind = 'front'; m.band = false; } });
     if (metas.length && metas[metas.length - 1].kind === 'body') { const last = metas[metas.length - 1]; last.kind = 'last'; last.band = false; }
+    // closing: 뒤표지 바로 앞 N쪽(편지·기록·메모)은 띠 없이 맺음 쪽으로
+    if (cfg.closing) { let i = metas.length - 1; while (i >= 0 && metas[i].kind === 'cover') i--; for (let k = 0; k < cfg.closing && i >= 0; k++, i--) if (metas[i].kind === 'body' || metas[i].kind === 'last') { metas[i].kind = 'closing'; metas[i].band = false; } }
     return metas;
   }
 
   function pageClasses(meta) {
-    return ['bt-eon', 'bt-ch-' + meta.ch, 'bt-kind-' + meta.kind].concat(meta.band ? ['bt-band'] : [], meta.book ? ['bt-book-' + meta.book] : []);
+    return ['bt-eon', 'bt-ch-' + meta.ch, 'bt-kind-' + meta.kind].concat(meta.band ? ['bt-band'] : [], meta.book ? ['bt-book-' + meta.book] : [], meta.ed ? ['bt-ed-' + meta.ed] : []);
   }
   function applyPage(el, meta) {
     if (!el) return;
-    [...el.classList].filter(c => c === 'bt-eon' || c === 'bt-band' || c.startsWith('bt-ch-') || c.startsWith('bt-kind-') || c.startsWith('bt-book-')).forEach(c => el.classList.remove(c));
+    [...el.classList].filter(c => c === 'bt-eon' || c === 'bt-band' || c.startsWith('bt-ch-') || c.startsWith('bt-kind-') || c.startsWith('bt-book-') || c.startsWith('bt-ed-')).forEach(c => el.classList.remove(c));
     if (!meta) { el.style.removeProperty('--bt-label'); el.style.removeProperty('--bt-title'); return; }
     el.classList.add(...pageClasses(meta));
     if (meta.kind === 'opener') { el.style.setProperty('--bt-label', JSON.stringify(meta.label)); el.style.setProperty('--bt-title', JSON.stringify(meta.title || '')); }
@@ -140,9 +144,91 @@
     hits.forEach(({ n, lead }) => { const m = n.data.match(rules.arrow); const f = D.createDocumentFragment(); if (m[1]) f.append(m[1]); f.append(span(lead ? 'bt-arw bt-arw-lead' : 'bt-arw', lead ? m[2] + m[3] : m[2])); f.append((lead ? '' : m[3]) + n.data.slice(m[0].length)); n.replaceWith(f); });
     return hits.length;
   }
+  /* ---- 단어장 v2 읽기 꾸밈 (인쇄 v2 만들기 스크립트와 같은 규칙). 글자는 바꾸지 않고 감싸기만 한다. ---- */
+  const V2_POS = /\((adv|adj|v|n|conj|prep|phrase|phrasal verb|v\/adj|n\/v)\)\s*/g;
+  const V2_POS_SPECIAL = [['(v: 동사구)', ['phrase', 'etc', '']], ['(v: 과거/과거분사)', ['v', 'v', 'p.p.']], ['(v:현재분사/동명사)', ['v', 'v', '-ing']]];
+  const posCls = p => ({ n: 'n', v: 'v', adj: 'adj', adv: 'adv' })[p] || 'etc';
+  function chip(label, cls, extra) { const f = D.createDocumentFragment(); f.append(span('bt-pos ' + cls, label)); if (extra) f.append(span('bt-posx', extra)); f.append(' '); return f; }
+  function textNodes(el) { const w = D.createTreeWalker(el, 4); const out = []; let n; while ((n = w.nextNode())) out.push(n); return out; }
+  function decorateVocaV2(root) {
+    if (root.hasAttribute('data-bt-v2')) return; root.setAttribute('data-bt-v2', '1');
+    const rows = [...root.querySelectorAll('table tr')].filter(tr => tr.children.length === 3 && tr.children[0].tagName === 'TD');
+    rows.forEach(tr => {
+      tr.children[0].classList.add('bt-hw');
+      // 동의어: 한 줄에 하나씩, ①② 묶음은 번호를 첫 줄에
+      const td = tr.children[1]; td.classList.add('bt-syn');
+      const c = td.cloneNode(true); c.querySelectorAll('br').forEach(b => b.replaceWith(',')); c.querySelectorAll('p').forEach((pp, i) => { if (i > 0) pp.prepend(','); });
+      const raw = c.textContent.replace(/\s+/g, ' ').trim();
+      if (raw) {
+        const groups = raw.split(/(?=[\u2460-\u2469])/).map(s => s.trim()).filter(Boolean).map(g => { const m = g.match(/^([\u2460-\u2469])\s*(.*)$/); return { num: m ? m[1] : '', items: (m ? m[2] : g).split(/\s*,\s*/).map(s => s.trim()).filter(Boolean) }; });
+        const p = td.querySelector('p') || td; td.querySelectorAll('p').forEach((pp, i) => { if (i > 0) pp.remove(); });
+        p.replaceChildren(...groups.flatMap(g => g.items.map((it, k) => { const s = span('bt-sa', ''); if (k === 0 && g.num) s.append(span('bt-sgn', g.num)); s.append(it); return s; })));
+      }
+      // 품사 칩, EX 표시
+      const def = tr.children[2]; def.classList.add('bt-def');
+      textNodes(def).forEach(t => {
+        for (const [a, [label, cls, extra]] of V2_POS_SPECIAL) { const i = t.data.indexOf(a); if (i < 0) continue; const f = D.createDocumentFragment(); f.append(t.data.slice(0, i), chip(label, cls, extra), t.data.slice(i + a.length).replace(/^\s+/, '')); t.replaceWith(f); return; }
+        if (!V2_POS.test(t.data)) return; V2_POS.lastIndex = 0;
+        const f = D.createDocumentFragment(); let last = 0; let m;
+        while ((m = V2_POS.exec(t.data))) { f.append(t.data.slice(last, m.index), chip(m[1], posCls(m[1]))); last = m.index + m[0].length; }
+        f.append(t.data.slice(last)); t.replaceWith(f);
+      });
+      def.querySelectorAll('p').forEach(p => {
+        p.innerHTML = p.innerHTML.replace(/ex\)\s*((?:(?!<br).)*?(?:<br>\s*\d+\.(?:(?!<br).)*)*)(?=<br|$)/g, (m, body) => '<span class="bt-deco bt-exs"><span class="bt-exl">EX</span>' + body + '</span>');
+      });
+    });
+    // 한글 설명(* 줄, 한 칸짜리 설명 줄, 표 밖 메모)은 손글씨
+    const table = root.querySelector('table');
+    if (table) textNodes(root).forEach(n => {
+      const t = n.data.trim(); if (!/[가-힣]/.test(t) || n.parentElement.closest('th, .bt-deco')) return;
+      const tr = n.parentElement.closest('tr');
+      if (t.startsWith('*') || (tr && tr.children.length === 1) || !n.parentElement.closest('table')) { const s = span('bt-kn', n.data); n.replaceWith(s); }
+    });
+    // 쪽 위 단어 범위 (첫 단어 ~ 마지막 단어)
+    if (rows.length && !root.querySelector(':scope > .bt-range')) {
+      const f = rows[0].children[0].textContent.trim(), l = rows[rows.length - 1].children[0].textContent.trim();
+      const r = D.createElement('div'); r.className = 'bt-range'; const b1 = D.createElement('b'); b1.textContent = f; const b2 = D.createElement('b'); b2.textContent = l; r.append(b1, ' ~ ', b2); root.prepend(r);
+    }
+  }
+
+  // v2 앞·맺음 쪽: 인쇄 v2처럼 큰 번호 제목, 분홍 번호, 공부방법 점 줄, 경고문·편지 가운데 배치. 쪽 번호는 '내벨업보카 | 03'.
+  function decorateVocaV2Page(root, meta) {
+    if (root.hasAttribute('data-bt-v2p')) return; root.setAttribute('data-bt-v2p', '1');
+    root.querySelectorAll('p.book-page-number').forEach(p => {
+      const m = p.textContent.match(/\d+/); if (!m) return;
+      p.classList.add('bt-v2ft'); p.replaceChildren(span('bt-ftt', '내벨업보카'), span('bt-ftbar', ''), span('bt-ftn', m[0].padStart(2, '0')));
+    });
+    if (meta.kind !== 'front' && meta.kind !== 'closing') return;
+    const kids = [...root.children];
+    const h1 = kids.find(k => k.matches('[data-book-kind="heading"]'));
+    const title = h1 ? h1.textContent.replace(/\s+/g, ' ').trim() : '';
+    if (title === '경고문') root.classList.add('bt-v2-warn');
+    else if (meta.kind === 'closing' && kids.some(k => k.matches('p:not(.book-page-number)') && k.style.textAlign === 'center') && !root.querySelector('img')) root.classList.add('bt-v2-letter');
+    else if (meta.kind === 'front') root.classList.add('bt-v2-guide');
+    let sec = '';
+    kids.forEach(k => {
+      if (k.matches('[data-book-kind="heading"]')) { sec = ((k.textContent.trim().match(/^(\d{2})\s/) || [])[1] || ''); k.classList.add('bt-v2h'); return; }
+      k.setAttribute('data-bt-sec', sec);
+      if (!k.matches('p') || k.classList.contains('book-page-number')) return;
+      const w = D.createTreeWalker(k, 4); const first = w.nextNode(); const m = first && first.data.match(/^\s*(\d+)\.\s+/);
+      if (!m) return;
+      first.data = first.data.slice(m[0].length);
+      k.prepend(span(sec === '03' ? 'bt-v2dot' : 'bt-v2n', m[1]));
+      k.classList.add(sec === '03' ? 'bt-v2ts' : 'bt-v2li');
+    });
+    if (root.classList.contains('bt-v2-letter')) {
+      const ps = kids.filter(k => k.matches('p:not(.book-page-number)'));
+      if (ps[0]) { ps[0].classList.add('bt-v2-sub'); const bar = D.createElement('div'); bar.className = 'bt-deco bt-v2-bar'; ps[0].after(bar); }
+      if (ps.length > 1) ps[ps.length - 1].classList.add('bt-v2-sign');
+    }
+    if (root.classList.contains('bt-v2-warn') && h1) { const ic = span('bt-v2-ic', '!'); h1.before(ic); const bar = D.createElement('div'); bar.className = 'bt-deco bt-v2-bar'; h1.after(bar); }
+  }
+
   function decorateReader(root, meta) {
     if (!root) return;
     D = root.ownerDocument || document;
+    if (meta && meta.ed === 'v2' && meta.kind === 'body') decorateVocaV2(root);
+    if (meta && meta.ed === 'v2' && meta.kind !== 'cover') decorateVocaV2Page(root, meta);
     const fresh = el => { if (el.hasAttribute('data-bt')) return false; el.setAttribute('data-bt', '1'); return true; };
     root.querySelectorAll('[data-book-kind="heading"]').forEach(h => {
       const t = h.querySelector('.book-design-title'); if (!t || !fresh(h)) return;

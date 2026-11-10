@@ -756,7 +756,12 @@ export const COVER_VARIANTS = Object.freeze({
   intro: { label: "입문서", tag: "E-BOOK", title: "입문서" },
   voca: { label: "단어장", tag: "VOCABULARY", title: "단어장" },
   "voca-back": { label: "단어장 뒷표지", tag: "VOCABULARY", title: "이온토플 단어장" },
+  // 단어장 v2 (인쇄 v2 표지와 같은 배치): VO/CA 두 줄, 가로선, 두 칸 풀이, 오른쪽 점 색인.
+  voca2: { label: "단어장 v2", tag: "VOCABULARY", title: "내벨업보카", wordmark: "VO\nCA" },
+  "voca2-back": { label: "단어장 v2 뒷표지", tag: "VOCABULARY", title: "내벨업보카", wordmark: "VO\nCA" },
 });
+// 뒷표지 디자인은 왼쪽 목차에 넣지 않는다.
+export function isBackCoverVariant(variant) { return /-back$/.test(String(variant || "")); }
 const COVER_VARIANT_OPTIONS = Object.entries(COVER_VARIANTS).map(([value, v]) => ({ value, label: v.label }));
 function coverVariant(props) {
   return Object.hasOwn(COVER_VARIANTS, props.variant) ? props.variant : "intro";
@@ -832,6 +837,44 @@ function VocaBackBody({ block, editor, editable, logo }) {
   );
 }
 
+// 단어장 v2 front: VO/CA on two lines, a rule, the dictionary entry on the left and the
+// book name with its one-line definition on the right, and a dotted A–Z index on the right edge.
+function Voca2CoverBody({ block, editor, editable }) {
+  const text = (field, as, className) => (
+    <DesignText as={as} className={className} block={block} editor={editor} editable={editable} field={field} />
+  );
+  return (
+    <>
+      {text("wordmark", "p", "book-cover-wordmark")}
+      <div className="book-cover-rule" aria-hidden="true" />
+      <div className="book-cover-entry">
+        <p className="book-cover-headline">
+          {text("headword", "span", "book-cover-headword")}
+          {text("pron", "span", "book-cover-pron")}
+        </p>
+        <p className="book-cover-sense">
+          {text("pos", "i", "book-cover-pos")}
+          {text("meaning", "span", "book-cover-meaning")}
+        </p>
+        <p className="book-cover-syn">
+          <span className="book-cover-syn-label">syn.</span>{" "}
+          {text("syn", "span", "book-cover-syn-text")}
+        </p>
+      </div>
+      <div className="book-cover-name">
+        {text("title", "h1", "book-cover-title")}
+        <p className="book-cover-sense book-cover-tagline">
+          <i className="book-cover-pos">n.</i>
+          {text("tagline", "span", "book-cover-meaning")}
+        </p>
+      </div>
+      <div className="book-cover-index" aria-hidden="true">
+        {VOCA_TABS.map((t, i) => <span key={t} data-tab={i + 1}>{t}</span>)}
+      </div>
+    </>
+  );
+}
+
 // Full-width e-book cover. Text is edited in place; the R/L/W/S tiles are
 // fixed series artwork and scale with the cover width (container units).
 function BookCover({ block, editor, editable }) {
@@ -842,12 +885,14 @@ function BookCover({ block, editor, editable }) {
       {...designRootEvents(editor, block, editable)}
       {...bookRootProps("cover", "neutral", { "data-cover-variant": variant })}
     >
-      {variant === "voca-back" ? (
+      {isBackCoverVariant(variant) ? (
         <VocaBackBody block={block} editor={editor} editable={editable} logo={logo} />
       ) : (
         <>
           <CoverTop block={block} editor={editor} editable={editable} logo={logo} />
-          {variant === "voca" ? (
+          {variant === "voca2" ? (
+            <Voca2CoverBody block={block} editor={editor} editable={editable} />
+          ) : variant === "voca" ? (
             <VocaCoverBody block={block} editor={editor} editable={editable} />
           ) : (
             <IntroCoverBody block={block} editor={editor} editable={editable} />
@@ -862,7 +907,7 @@ function BookCover({ block, editor, editable }) {
             options={COVER_VARIANT_OPTIONS}
             onChange={(next) => {
               const v = COVER_VARIANTS[next];
-              if (v) updateBlockProps(editor, block, { variant: next, tag: v.tag, title: v.title });
+              if (v) updateBlockProps(editor, block, { variant: next, tag: v.tag, title: v.title, wordmark: v.wordmark || "VOCA" });
             }}
           />
           <TextControl
@@ -921,6 +966,8 @@ const bookCoverSpec = createReactBlockSpec(
       syn: { default: "lexicon, word list" },
       // 단어장 back cover (variant "voca-back").
       copyright: { default: "© 2027 이온. ALL RIGHTS RESERVED." },
+      // 단어장 v2 front: one-line definition of the book name.
+      tagline: { default: "더 많이 외우게 하는 책이 아니라, 시험에 안 나온 단어를 외우지 않게 하는 책." },
     },
     content: "none",
   },

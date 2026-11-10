@@ -302,3 +302,88 @@
 }
 /* 표지 로고(이온토플)에는 그림 테두리를 두지 않는다 (입문서·단어장 앞뒤 표지 모두). */
 .bt-eon .book-cover img.book-cover-logo,.bt-eon.book-content .book-cover img.book-cover-logo{border:0!important;box-shadow:none!important;border-radius:0!important;outline:0!important}
+
+/* ---- 단어장 v2 (bt-ed-v2): 인쇄 v2와 같은 표 모양. 꾸밈 요소는 book-theme.js decorateVocaV2가 감싼다.
+   글자는 원고 그대로, 모양만. v1(bt-book-voca만 있는 책)에는 영향 없음. ---- */
+.bt-eon.bt-ed-v2 .bt-range{margin:0 0 8px;text-align:right;font:400 11px/1.4 Outfit,sans-serif;color:#9A90B4;letter-spacing:.02em}
+.bt-eon.bt-ed-v2 .bt-range b{font-weight:600;color:#5B4A7D}
+.bt-eon.bt-ed-v2 table th,.bt-eon.bt-ed-v2 table th *{font-family:Outfit,sans-serif!important;font-weight:600!important;letter-spacing:.14em!important;text-transform:uppercase!important}
+.bt-eon.bt-ed-v2 table th p{font-size:.82em!important}
+.bt-eon.bt-ed-v2.book-content table col:nth-child(1),.bt-eon.bt-ed-v2 .book-content table col:nth-child(1){width:16%!important}
+.bt-eon.bt-ed-v2.book-content table col:nth-child(2),.bt-eon.bt-ed-v2 .book-content table col:nth-child(2){width:22%!important}
+.bt-eon.bt-ed-v2 table td{font-weight:350!important}
+.bt-eon.bt-ed-v2 table td.bt-hw,.bt-eon.bt-ed-v2 table td.bt-hw *{font-weight:500!important;color:#2E2A3A}
+.bt-eon.bt-ed-v2 table td.bt-syn,.bt-eon.bt-ed-v2 table td.bt-syn p{text-align:left!important}
+.bt-eon.bt-ed-v2 .bt-sa{display:block;border-left:2px solid #D9CFEA;padding:0 0 0 6px;margin:4px 0;line-height:1.3;text-align:left}
+.bt-eon.bt-ed-v2 .bt-sa:first-child{margin-top:0}
+.bt-eon.bt-ed-v2 .bt-sgn{font-family:Outfit,sans-serif;font-weight:700!important;color:#8F84AE!important;margin-right:.3em}
+.bt-eon.bt-ed-v2 table td .bt-pos{display:inline-block;font-family:Outfit,sans-serif;font-size:.78em;line-height:1;vertical-align:.08em;margin-right:.45em;letter-spacing:.01em;white-space:nowrap;padding:.22em .55em .24em;border-radius:99px;font-weight:600!important;color:#4E3D73!important}
+.bt-eon.bt-ed-v2 table tr td .bt-pos.n{background:#DDF0E8!important}
+.bt-eon.bt-ed-v2 table tr td .bt-pos.v{background:#DCEBF6!important}
+.bt-eon.bt-ed-v2 table tr td .bt-pos.adj{background:#E4DBF5!important}
+.bt-eon.bt-ed-v2 table tr td .bt-pos.adv{background:#F8E1EB!important}
+.bt-eon.bt-ed-v2 table tr td .bt-pos.etc{background:#F3EEE4!important}
+.bt-eon.bt-ed-v2 table td .bt-posx{font-family:Outfit,sans-serif;font-size:.78em;font-weight:500!important;color:#8F84AE!important;margin:0 .5em 0 -.15em;vertical-align:.08em}
+.bt-eon.bt-ed-v2 table td .bt-exs{display:block;position:relative;padding-left:1.75em;color:#4F4766!important}
+.bt-eon.bt-ed-v2 table td .bt-exl{position:absolute;left:0;top:.35em;font-family:Outfit,sans-serif!important;font-weight:600!important;font-size:.7em!important;letter-spacing:.1em;color:#9A90B4!important}
+.bt-eon.bt-ed-v2 .bt-kn,.bt-eon.bt-ed-v2 table td .bt-kn{font-family:GaeguBook,cursive!important;font-size:1.12em;letter-spacing:-.03em;word-spacing:-.2em;color:#5D5675!important;font-weight:400!important}
+@media (max-width:680px){.bt-eon.bt-ed-v2:not(.bookedit-paper) td.bt-syn{grid-column:auto}.bt-eon.bt-ed-v2 .bt-range{font-size:10px}}
+
+/* ---- 단어장 v2 앞·맺음 쪽 (book-theme.js decorateVocaV2Page). 인쇄 v2 3~4쪽·경고문·편지 모양 ---- */
+.bt-eon.bt-ed-v2 .bt-v2ft{display:flex!important;justify-content:flex-end;align-items:center;gap:8px;margin:30px 0 0!important;padding-top:8px!important;border-top:1px solid #ECE6F2;text-align:right!important}
+.bt-eon.bt-ed-v2 .bt-v2ft .bt-ftt{font:400 11px/1 SUIT,sans-serif;color:#B3AAC9;letter-spacing:.04em}
+.bt-eon.bt-ed-v2 .bt-v2ft .bt-ftbar{width:1px;height:12px;background:#D9CFEA}
+.bt-eon.bt-ed-v2 .bt-v2ft .bt-ftn{font:600 12px/1 Outfit,sans-serif;color:#5B4A7D}
+.bt-eon.bt-ed-v2 .bt-range{text-align:left;font-size:12px;font-weight:600}
+.bt-eon.bt-ed-v2 .bt-range b{font-weight:700}
+.bt-eon.bt-ed-v2.bt-kind-front,.bt-eon.bt-ed-v2.bt-kind-closing{color:#3E3655}
+.bt-eon.bt-ed-v2.bt-kind-front p,.bt-eon.bt-ed-v2.bt-kind-closing p{word-break:keep-all}
+/* 공부 안내(3~4쪽) */
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2h{margin:6px 0 12px!important}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2h~.bt-v2h{margin-top:34px!important}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2h .book-design-title{font:800 17px/1.45 SUIT,sans-serif!important;color:#5B4A7D!important;border:0!important;padding:0!important;letter-spacing:-.02em}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2h .bt-kick{display:block;font:700 34px/1 Outfit,sans-serif;letter-spacing:0;color:#D9CFEA;margin-bottom:6px}
+.bt-eon.bt-ed-v2.bt-v2-guide strong{font-weight:700!important;color:#2B2A33!important;background:linear-gradient(transparent 56%,#FFF6CC 56%,#FFF6CC 94%,transparent 94%);padding:0 .08em}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2li{position:relative;padding-left:1.35em!important}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2n{position:absolute;left:0;top:0;font-family:Outfit,sans-serif;font-weight:700;color:#E58FAE}
+.bt-eon.bt-ed-v2.bt-v2-guide [data-bt-sec="03"]:not(.bt-v2ft){margin-top:0!important;margin-bottom:0!important;padding:0 0 14px 36px!important;background:linear-gradient(#E4DBF5,#E4DBF5) 10px 0/1.5px 100% no-repeat}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2ts{position:relative}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-v2dot{position:absolute;left:0;top:.18em;width:22px;height:22px;border-radius:50%;background:#B7A6E0;color:#fff;font:700 12px/22px Outfit,sans-serif;text-align:center}
+.bt-eon.bt-ed-v2.bt-v2-guide .bt-memo-aside,.bt-eon.bt-ed-v2.bt-v2-guide aside.book-callout{margin-top:-4px!important;padding-top:0!important;padding-bottom:6px!important;background:none!important;border:0!important;box-shadow:none!important}
+.bt-eon.bt-ed-v2.bt-v2-guide aside.book-callout .book-design-body,.bt-eon.bt-ed-v2.bt-v2-guide aside.book-callout .book-design-body *{font-size:16px!important;line-height:1.55!important;color:#7A6FA0!important}
+.bt-eon.bt-ed-v2.bt-v2-guide aside.book-callout:not([data-bt-sec="03"]){padding-left:1.35em!important}
+.bt-eon.bt-ed-v2.bt-v2-guide figure figcaption,.bt-eon.bt-ed-v2.bt-v2-guide .bn-file-caption,.bt-eon.bt-ed-v2.bt-v2-guide figure p{font:400 12px/1.5 SUIT,sans-serif!important;color:#8F86AE!important;text-align:left!important}
+@media (min-width:681px){
+ .bt-eon.bt-ed-v2.bt-v2-guide>.bt-v2h{float:left;clear:both;width:23%;margin-top:4px!important}
+ .bt-eon.bt-ed-v2.bt-v2-guide>.bt-v2h~.bt-v2h{margin-top:4px!important}
+ .bt-eon.bt-ed-v2.bt-v2-guide>:not(.bt-v2h):not(.bt-v2ft){margin-left:28%!important}
+ .bt-eon.bt-ed-v2.bt-v2-guide>.bt-v2h+*{padding-top:4px}
+ .bt-eon.bt-ed-v2.bt-v2-guide>[data-bt-sec]:has(+.bt-v2h){margin-bottom:34px!important}
+ .bt-eon.bt-ed-v2.bt-v2-guide>.bt-v2ft{clear:both}
+ .bt-eon.bt-ed-v2.bt-v2-guide>img,.bt-eon.bt-ed-v2.bt-v2-guide>figure{max-width:72%!important;box-sizing:border-box}
+ .bt-eon.bt-ed-v2.bt-v2-guide>figure img{max-width:100%!important;height:auto!important}
+}
+/* 경고문(2쪽) */
+.bt-eon.bt-ed-v2.bt-v2-warn{text-align:center}
+.bt-eon.bt-ed-v2.bt-v2-warn .bt-v2-ic{display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin:90px auto 0;border:2px solid #E58FAE;border-radius:50%;font:700 24px/1 Outfit,sans-serif;color:#E58FAE}
+.bt-eon.bt-ed-v2.bt-v2-warn .bt-v2h{margin:18px 0 0!important}
+.bt-eon.bt-ed-v2.bt-v2-warn .bt-v2h .book-design-title{font:800 30px/1.3 SUIT,sans-serif!important;color:#5B4A7D!important;border:0!important;padding:0!important;text-align:center!important;letter-spacing:-.02em}
+.bt-eon.bt-ed-v2 .bt-v2-bar{width:36px;height:2px;border-radius:1px;background:#E58FAE;margin:18px auto 26px}
+.bt-eon.bt-ed-v2.bt-v2-warn p:not(.bt-v2ft){text-align:center!important;line-height:2!important;font-size:16px!important;margin:0 0 16px!important}
+.bt-eon.bt-ed-v2.bt-v2-warn strong{color:#E58FAE!important;font-weight:700!important;background:none!important}
+.bt-eon.bt-ed-v2.bt-v2-warn .bt-v2ft{margin-top:120px!important}
+/* 편지(62쪽) */
+.bt-eon.bt-ed-v2.bt-v2-letter{text-align:center}
+.bt-eon.bt-ed-v2.bt-v2-letter .bt-v2h{margin:60px 0 10px!important}
+.bt-eon.bt-ed-v2.bt-v2-letter .bt-v2h .book-design-title{font:800 28px/1.35 SUIT,sans-serif!important;color:#5B4A7D!important;border:0!important;padding:0!important;text-align:center!important}
+.bt-eon.bt-ed-v2.bt-v2-letter p:not(.bt-v2ft){line-height:2!important;font-size:17px!important;margin:0 0 26px!important;color:#5B4A7D}
+.bt-eon.bt-ed-v2.bt-v2-letter p.bt-v2-sub{margin:0!important;color:#6F6590!important}
+.bt-eon.bt-ed-v2.bt-v2-letter strong{font-weight:700!important;color:#2B2A33!important;background:linear-gradient(transparent 56%,#FFF6CC 56%,#FFF6CC 94%,transparent 94%)}
+.bt-eon.bt-ed-v2.bt-v2-letter p.bt-v2-sign,.bt-eon.bt-ed-v2.bt-v2-letter p.bt-v2-sign *{margin-top:34px!important;font:700 15px/1.6 SUIT,sans-serif!important;color:#E58FAE!important;background:none!important}
+.bt-eon.bt-ed-v2.bt-v2-letter .bt-v2ft{margin-top:70px!important}
+/* 회독 기록·메모(63~64쪽) */
+.bt-eon.bt-ed-v2.bt-kind-closing:not(.bt-v2-letter) .bt-v2h .book-design-title{font:800 22px/1.35 SUIT,sans-serif!important;color:#5B4A7D!important;border:0!important;padding:0!important}
+.bt-eon.bt-ed-v2.bt-kind-closing:not(.bt-v2-letter) img{border:0!important;box-shadow:none!important;border-radius:0!important}
+.bt-eon.bt-ed-v2.bt-kind-closing:not(.bt-v2-letter) p:not(.bt-v2ft){font-size:14px!important;color:#5B4A7D}
+.bt-eon.bt-ed-v2.bt-kind-closing:not(.bt-v2-letter) p[style*="center"]:not(.bt-v2ft){font-size:13px!important;color:#A79FC2!important}
+@media (max-width:680px){.bt-eon.bt-ed-v2.bt-v2-warn .bt-v2-ic{margin-top:40px}.bt-eon.bt-ed-v2.bt-v2-warn p:not(.bt-v2ft),.bt-eon.bt-ed-v2.bt-v2-letter p:not(.bt-v2ft){font-size:15px!important}.bt-eon.bt-ed-v2.bt-v2-letter .bt-v2h{margin-top:30px!important}}
