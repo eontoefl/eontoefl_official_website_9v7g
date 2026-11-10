@@ -387,3 +387,54 @@
 .bt-eon.bt-ed-v2.bt-kind-closing:not(.bt-v2-letter) p:not(.bt-v2ft){font-size:14px!important;color:#5B4A7D}
 .bt-eon.bt-ed-v2.bt-kind-closing:not(.bt-v2-letter) p[style*="center"]:not(.bt-v2ft){font-size:13px!important;color:#A79FC2!important}
 @media (max-width:680px){.bt-eon.bt-ed-v2.bt-v2-warn .bt-v2-ic{margin-top:40px}.bt-eon.bt-ed-v2.bt-v2-warn p:not(.bt-v2ft),.bt-eon.bt-ed-v2.bt-v2-letter p:not(.bt-v2ft){font-size:15px!important}.bt-eon.bt-ed-v2.bt-v2-letter .bt-v2h{margin-top:30px!important}}
+
+
+/* ===== 문장 배열 표현장 (W1 암기자료, 책 f2800a43) 2026-11-10 — 인쇄 표현장과 같은 단어장 보라 테마 ===== */
+.bt-book-trainw1{--tw-pu:#5B4A7D;--tw-pu2:#E6E0F2;--tw-pk:#E58FAE;--tw-memo:#C9658B;--tw-ink:#1F2A44;--tw-gr:#8a86a0;--tw-line:#E4DEF0;--tw-hl:#FFEE9F}
+.bt-book-trainw1 .book-design-title,.bt-book-trainw1 h1{font-family:SUIT,Pretendard,sans-serif!important;font-weight:800!important;color:var(--tw-pu)!important}
+.bt-book-trainw1 .book-heading[data-book-level="1"] .book-design-title{font-size:1.55em!important;letter-spacing:-.01em;border:0!important}
+.bt-book-trainw1 .bt-kick{color:#D9CFEA!important;font-family:SUIT,sans-serif!important;font-weight:800!important}
+.bt-book-trainw1 p,.bt-book-trainw1 td,.bt-book-trainw1 .book-design-body{font-family:SUIT,Pretendard,sans-serif!important;color:var(--tw-ink)}
+/* 색 표시 → 역할 */
+.bt-book-trainw1 span[data-style-type="textColor"][data-value="#5B4A7D"]{color:var(--tw-pu)!important}
+.bt-book-trainw1 span[data-style-type="textColor"][data-value="#E58FAE"]{color:var(--tw-pk)!important;font-weight:800}
+.bt-book-trainw1 span[data-style-type="textColor"][data-value="#8a86a0"]{color:var(--tw-gr)!important;font-weight:500}
+.bt-book-trainw1 span[data-style-type="textColor"][data-value="#4a5068"]{color:#4a5068!important;font-family:SUIT,sans-serif!important;font-size:.92em;font-weight:500}
+.bt-book-trainw1 span[data-style-type="textColor"][data-value="#C9658B"],.bt-book-trainw1 span[data-style-type="textColor"][data-value="#C9658B"] *{color:var(--tw-memo)!important;font-family:GaeguBook,cursive!important;font-size:1.08em;font-weight:400!important}
+.bt-book-trainw1 span[data-style-type="textColor"][data-value="#B7A6E0"],.bt-book-trainw1 span[data-style-type="textColor"][data-value="#b7a6e0"]{color:#b7a6e0!important}
+.bt-book-trainw1 span[data-style-type="backgroundColor"][data-value="yellow"]{background:linear-gradient(transparent 55%,var(--tw-hl) 55%,var(--tw-hl) 95%,transparent 95%)!important;padding:0 .15em}
+/* 배울 것, 헷갈리는 짝 꼬리표 */
+.bt-book-trainw1 p > strong:first-child > span[data-style-type="textColor"][data-value="#5B4A7D"]{display:inline-block;background:var(--tw-pu2);border-radius:4px;padding:.05em .55em;font-size:.82em;font-weight:800;margin-right:.3em}
+.bt-book-trainw1 table + p,.bt-book-trainw1 .bn-block-outer:has(table) + .bn-block-outer p{background:#F4F0FA;border-radius:6px;padding:.55em .8em!important;margin-top:.6em!important}
+/* UNIT 표 (3칸) */
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))){width:100%!important;border-collapse:collapse!important;table-layout:fixed!important}
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) col:nth-child(1){width:6%!important}
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) col:nth-child(2){width:50%!important}
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) col:nth-child(3){width:44%!important}
+.bt-book-trainw1 table td,.bt-book-trainw1 table th{border:0!important;border-bottom:1px solid var(--tw-line)!important;background:none!important;vertical-align:top!important;padding:.75em .55em!important}
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) td:nth-child(2){border-right:1px dashed #d9cfea!important}
+.bt-book-trainw1 table:has(col:nth-child(3)) tr:first-child td{background:var(--tw-pu2)!important;padding:.4em .55em!important;font-size:.78em!important;border-bottom:0!important}
+.bt-book-trainw1 table td p{line-height:1.75!important;margin:0!important}
+.bt-book-trainw1 table td:nth-child(2) p > strong:first-child{font-size:1.08em;font-weight:700}
+.bt-book-trainw1 table td:nth-child(2) p > strong:first-child span{font-size:.86em}
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) td:nth-child(3) p{font-family:MaruBuri,serif!important}
+.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) td:nth-child(3) span[data-value="#8a86a0"]{font-family:SUIT,sans-serif!important;font-size:.78em}
+/* 섞인 조각 */
+.bt-book-trainw1 table code{font:500 .82em/1.3 SUIT,sans-serif!important;color:#4E3D73!important;background:#F1EEF7!important;border:0!important;border-radius:99px!important;padding:.25em .75em!important;margin:.15em .1em!important;display:inline-block}
+/* 안내 쪽: 단계 번호 */
+.bt-book-trainw1 p > strong:first-child > span[data-value="#B7A6E0"]{display:inline-block;width:1.5em;height:1.5em;line-height:1.5em;border-radius:50%;background:#B7A6E0;color:#fff!important;text-align:center;font-size:.8em;font-weight:800;margin-right:.5em;letter-spacing:0;white-space:nowrap;overflow:hidden}
+.bt-book-trainw1 .book-callout{background:#F4F0FA!important;border:0!important;border-radius:8px!important}
+.bt-book-trainw1 img{max-width:100%!important;height:auto}
+
+.bt-book-trainw1 table p > strong:first-child > span[data-style-type="textColor"][data-value="#5B4A7D"]{display:inline;background:none;padding:0;border-radius:0;font-size:inherit;margin:0;font-weight:700}
+
+.bt-book-trainw1 .book-heading .bt-kick{display:block!important;font-size:1.45em!important;line-height:1!important;margin:0 0 .15em!important;color:#D9CFEA!important;letter-spacing:0!important}
+.bt-book-trainw1 table:not(:has(col:nth-child(3))) tr:first-child td{background:none!important;padding:.75em .55em!important;font-size:inherit!important;border-bottom:1px solid var(--tw-line)!important}
+@media (max-width:640px){
+  .bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) colgroup{display:none}
+  .bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) tr{display:grid!important;grid-template-columns:1.8em 1fr;border-bottom:1px solid var(--tw-line)}
+  .bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) td{border:0!important;width:auto!important}
+  .bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) td:nth-child(3){grid-column:2;padding-top:0!important}
+  .bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) tr:first-child{display:none!important}
+}
+@media (max-width:640px){.bt-book-trainw1 table:has(col:nth-child(3)):not(:has(col:nth-child(4))) td:nth-child(2){border-right:0!important}}
