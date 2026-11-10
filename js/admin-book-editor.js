@@ -67,6 +67,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  // HTML 책(모든 쪽이 <div class="twp"> 로 시작): 보이는 그대로 글자만 고치는 모드 (admin-book-html-mode.js)
+  if (!isCollab() && window.BookHtmlMode && window.BookHtmlMode.detect(State.pages)) {
+    renderBookUI();
+    window.BookHtmlMode.start();
+    return;
+  }
+
   renderBookUI();
   setupLazyMount();
   renderStack();
@@ -249,7 +256,7 @@ function setupLazyMount() {
 }
 
 function ensureMounted(pageId) {
-  if (!pageId) return null;
+  if (!pageId || (window.BookHtmlMode && window.BookHtmlMode.active)) return null;
   if (State.editors.has(pageId)) return State.editors.get(pageId);
 
   const sec = State.nodes.get(pageId);
@@ -474,6 +481,7 @@ function collectHeadingsFromBlocks(blocks, pageId, out) {
 }
 
 function buildOutline() {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return window.BookHtmlMode.buildOutline();
   const listEl = document.getElementById("outlineList");
   if (!listEl) return;
 
@@ -714,6 +722,7 @@ function bindSlideBar() {
 
 // 현재 페이지를 앞/뒤로 한 칸 옮기기 (순서 변경)
 async function movePage(dir) {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return;
   const idx = State.pages.findIndex((p) => p.id === State.currentId);
   const to = idx + dir;
   if (idx < 0 || to < 0 || to >= State.pages.length) return;
@@ -862,6 +871,7 @@ async function onDropReorder(fromId, toId, before) {
 // 저장(발행) — 서버 tr_book_pages 에 반영 + 버전 백업
 // ---------------------------------------------------------------------
 async function savePage() {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return window.BookHtmlMode.save();
   if (isCollab()) return window.BookCollab.save();
   const btn = document.getElementById("btnSave");
   btn.disabled = true;
@@ -937,6 +947,7 @@ async function addPage() {
 }
 
 async function insertPageAt(index, seed) {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return; // HTML 책은 쪽 구성 변경 없음
   if (isCollab()) {
     // 협업 책: 저장 버튼 전에는 서버에 쓰지 않는다
     if (!window.BookCollab.canChangeStructure()) return;
@@ -971,6 +982,7 @@ async function insertPageAt(index, seed) {
 
 // 현재 페이지 복제 → 바로 아래에
 async function duplicatePage() {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return;
   const id = State.currentId;
   const idx = State.pages.findIndex((p) => p.id === id);
   if (idx < 0) return;
@@ -988,6 +1000,7 @@ async function duplicatePage() {
 }
 
 async function deletePage(pageId) {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return;
   if (!pageId) return;
   if (State.pages.length <= 1) {
     alert("최소 1페이지는 있어야 해요.");
@@ -1058,6 +1071,7 @@ async function syncTotalPages() {
 // 버전 되돌리기
 // ---------------------------------------------------------------------
 async function showVersions() {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return;
   if (isCollab()) return window.BookCollab.openPanel();
   const modal = document.getElementById("versionModal");
   const listEl = document.getElementById("versionList");
@@ -1154,6 +1168,7 @@ function serverUpdatedAt(pageId) {
   return p && p.updated_at ? Date.parse(p.updated_at) : NaN;
 }
 function saveDraft(pageId, blocks) {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return; // HTML 책은 임시저장 없음
   const p = State.pages.find((x) => x.id === pageId);
   const draft = { v: 2, base: (p && p.updated_at) || null, at: new Date().toISOString(), blocks: blocks || [] };
   try { localStorage.setItem(draftKey(pageId), JSON.stringify(draft)); } catch (_) {}
@@ -1207,6 +1222,7 @@ function setStatus(type, text) {
 // 텍스트(.md) 다운로드 — 지금 편집 중인 내용(저장 안 한 것까지) 반영
 // ---------------------------------------------------------------------
 async function downloadBook() {
+  if (window.BookHtmlMode && window.BookHtmlMode.active) return;
   try {
     if (!window.BookMarkdown) throw new Error("변환기 로드 실패 — 새로고침 해주세요");
     const title = State.book && State.book.title ? State.book.title : "입문서";

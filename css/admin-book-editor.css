@@ -622,3 +622,12 @@ body.bookedit-body {
   .bookedit-canvas { padding: 20px 14px 80px; }
   .bookedit-paper { min-height: 60vh; }
 }
+
+/* ===== HTML 책 모드 (admin-book-html-mode.js) 2026-11-10 — 학생 화면과 같은 모양, 글자만 고침 ===== */
+.bookedit-htmlmode .bookedit-stack { max-width: 830px; }
+.bookedit-htmlmode .bookedit-page { margin-bottom: 22px; }
+.bookedit-htmlmode .bookedit-paper { min-height: 0; padding: 12px 0; background: #fff; }
+.bookedit-htmlmode .bookedit-html { max-width: 794px; margin: 0 auto; }
+.bookedit-htmlmode .bookedit-html .twp > .page { outline: none; cursor: text; white-space: normal !important; } /* plaintext-only 가 쪽 html 의 줄바꿈을 빈 줄로 보이게 하는 것 막기 */
+.bookedit-htmlmode .bookedit-html .twp > .page:focus-within { box-shadow: 0 0 0 2px rgba(80, 201, 255, 0.35) !important; }
+.bookedit-htmlmode .bookedit-page.is-dirty .bookedit-paper { box-shadow: 0 0 0 2px rgba(229, 143, 174, 0.75), var(--amb); }
