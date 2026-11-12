@@ -9,8 +9,6 @@
     ['e660266e-1b01-4d11-9254-81ea7e613344', { book: 'intro' }],          // 입문서
     // 단어장: 1쪽 표지, 2~4쪽 경고문·안내. jump: 왼쪽 목차에 넣는 쪽 바로가기.
     ['07f6cd4e-c737-40a1-b537-6e07af3d1aa5', { book: 'voca', front: 4, jump: [10, 20, 30, 40, 50, 60] }],
-    // 단어장 v2 (인쇄 v2와 같은 내용·모양). ed: 쪽에 bt-ed-<ed> 클래스와 v2 읽기 꾸밈(decorateVocaV2).
-    ['47282479-f8f6-4062-aa33-6c027d488d1a', { book: 'voca', ed: 'v2', front: 4, closing: 3, jump: [10, 20, 30, 40, 50, 60] }],
   ]);
   const CH_BY_NUM = { '06': 'r', '07': 'l', '08': 'w', '09': 's' };
   const LABEL = { n: 'TOEFL', r: 'READING', l: 'LISTENING', w: 'WRITING', s: 'SPEAKING' };
