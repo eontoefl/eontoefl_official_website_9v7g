@@ -16,6 +16,7 @@
   'use strict';
 
   const PREFIX = '<div class="twp">';
+  const RANGE_TITLE = /^(\d{2,3})\s+(.+?)\s+~\s+(.+)$/;
   const M = { active: false, dirty: new Set(), loadedAt: new Map() };
 
   function isHtmlPage(p) { return !!p && typeof p.html === 'string' && p.html.trim().startsWith(PREFIX); }
@@ -101,7 +102,17 @@
         if (!text) return;
         const btn = document.createElement('button');
         btn.className = 'bookedit-outline-item lv' + (h.tagName === 'H1' ? 1 : 2);
-        btn.textContent = text; btn.title = text;
+        btn.title = text; btn.dataset.pageId = p.id;
+        // "07 첫 단어 ~ 끝 단어" 꼴 제목(단어장 v2 단어 쪽): 번호 칩 + 첫 단어 윗줄, 끝 단어 아랫줄
+        const rg = text.match(RANGE_TITLE);
+        if (rg) {
+          btn.classList.add('bo-range');
+          const chip = document.createElement('span'); chip.className = 'bo-chip'; chip.textContent = rg[1];
+          const tx = document.createElement('span'); tx.className = 'bo-tx';
+          const b = document.createElement('b'); b.textContent = rg[2];
+          const s = document.createElement('span'); s.textContent = '~ ' + rg[3];
+          tx.append(b, s); btn.append(chip, tx);
+        } else btn.textContent = text;
         btn.addEventListener('click', () => {
           State.scrollLock = true;
           setCurrent(p.id);
@@ -132,6 +143,12 @@
 
     setupOutline();      // 접기·너비 조절 (목차 내용은 아래 buildOutline 이 채운다)
     bindScrollTracking();
+    // 목차에서 지금 보는 쪽 표시(제목이 있는 쪽)
+    const canvas = document.getElementById('canvas');
+    let raf = false;
+    const mark = () => { raf = false; const list = document.getElementById('outlineList'); if (!list) return; const items = [...list.querySelectorAll('.bookedit-outline-item[data-page-id]')]; let cur = null; const idx = State.pages.findIndex((p) => p.id === State.currentId); for (const it of items) { const i = State.pages.findIndex((p) => p.id === it.dataset.pageId); if (i <= idx) cur = it.dataset.pageId; } items.forEach((it) => it.classList.toggle('active', it.dataset.pageId === cur)); };
+    if (canvas) canvas.addEventListener('scroll', () => { if (!raf) { raf = true; requestAnimationFrame(mark); } }, { passive: true });
+    setTimeout(mark, 300);
     const loading = document.getElementById('editorLoading');
     if (loading) loading.style.display = 'none';
     const bar = document.getElementById('slideBar'); if (bar) bar.hidden = true;

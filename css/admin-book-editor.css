@@ -631,3 +631,13 @@ body.bookedit-body {
 .bookedit-htmlmode .bookedit-html .twp > .page { outline: none; cursor: text; white-space: normal !important; } /* plaintext-only 가 쪽 html 의 줄바꿈을 빈 줄로 보이게 하는 것 막기 */
 .bookedit-htmlmode .bookedit-html .twp > .page:focus-within { box-shadow: 0 0 0 2px rgba(80, 201, 255, 0.35) !important; }
 .bookedit-htmlmode .bookedit-page.is-dirty .bookedit-paper { box-shadow: 0 0 0 2px rgba(229, 143, 174, 0.75), var(--amb); }
+
+/* 목차: "07 첫 단어 ~ 끝 단어" 제목 (단어장 v2 단어 쪽) — 작은 알약 칩 + 두 줄 (admin-book-html-mode.js) 2026-11-13 */
+.bookedit-outline-item.bo-range { display: flex; align-items: flex-start; gap: 8px; white-space: normal; padding: 6px 10px; font-weight: 400; }
+.bookedit-outline-item.bo-range .bo-chip { flex: none; box-sizing: border-box; height: 17px; min-width: 24px; padding: 0 5px; margin-top: 1px; border-radius: 99px; background: #F1EDF8; color: #6B5C8E; font: 500 10px/17px Outfit, Pretendard, sans-serif; text-align: center; font-variant-numeric: tabular-nums; }
+.bookedit-outline-item.bo-range .bo-tx { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.bookedit-outline-item.bo-range .bo-tx b { font-size: 12.5px; font-weight: 600; color: #2E2A3A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bookedit-outline-item.bo-range .bo-tx span { font-size: 11px; color: #A39BB8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bookedit-outline-item.bo-range.active { background: transparent; }
+.bookedit-outline-item.bo-range.active .bo-chip { background: #5B4A7D; color: #fff; }
+.bookedit-outline-item.bo-range.active .bo-tx b { color: #5B4A7D; }
