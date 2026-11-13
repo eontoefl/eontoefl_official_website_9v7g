@@ -4,7 +4,9 @@
 // 화면 구조: 왼쪽 목록 없이, 페이지(용지)들이 세로로 이어져 스크롤된다.
 //   - 용지 옆에 떠 있는 툴바로 페이지 조작 (이동/복제/추가/삭제)
 //   - 편집기는 화면에 가까워질 때만 켠다(지연 마운트) → 페이지 많아도 가벼움
-//   - 편집 중 localStorage 임시저장(크래시 복구). "저장" 눌러야 서버 반영
+//   - (2026-11-13 대표 결정, 모든 책 공통) 브라우저 임시저장 없음. 새로고침하면 항상 서버 저장본이 보인다.
+//     "저장" 눌러야 서버 반영. 저장 직전에 그 쪽이 열었을 때보다 서버에서 바뀌었으면
+//     (다른 사람·다른 창·AI가 먼저 저장) 저장을 멈추고 "새 버전이 있어요"를 띄운다.
 //
 // 데이터:
 //   tr_book_documents (kind='pages')
@@ -82,6 +84,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupPageHotkeys();
   setupArrowHotkey();
   setupOutline();
+  // 저장 안 한 쪽이 있으면 새로고침·닫기 전에 묻는다 (임시저장이 없으므로)
+  window.addEventListener("beforeunload", (e) => { if (!isCollab() && State.dirty.size) { e.preventDefault(); e.returnValue = ""; } });
 
   // 첫 페이지는 바로 켜 둔다
   if (State.pages.length) ensureMounted(State.pages[0].id);
@@ -90,7 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("slideBar").hidden = false;
   setCurrent(State.pages.length ? State.pages[0].id : null);
   if (isCollab()) { window.BookCollab.afterRender(); return; }
-  setStatus("saved", State.staleDrafts ? "서버 내용이 더 새로운 쪽은 서버 내용을 보여줘요 (예전 임시본 " + State.staleDrafts + "개는 따로 보관)" : "준비됨");
+  setStatus("saved", State.staleDrafts ? "서버 저장본을 보여줘요 (이 컴퓨터에 남아 있던 저장 안 한 내용 " + State.staleDrafts + "쪽은 따로 보관)" : "준비됨");
 });
 
 function isCollab() {
@@ -317,15 +321,8 @@ function onEditorChange(pageId) {
   scheduleOutline(); // 제목 편집이 목차에 반영되도록
   if (isCollab()) { window.BookCollab.onChange(pageId); return; }
 
-  clearTimeout(State.timers.get(pageId));
-  State.timers.set(pageId, setTimeout(() => {
-    const h = State.editors.get(pageId);
-    if (h) {
-      if (h.flush && !h.flush()) { setStatus('editing', '입력 중 · 아직 저장하지 않은 내용이 있습니다'); return; }
-      saveDraft(pageId, h.getBlocks());
-    }
-    setStatus("saved", "임시 저장됨 (브라우저)");
-  }, 800));
+  // 임시저장 없음: 고친 쪽 수만 알려 준다
+  setStatus("editing", "고친 쪽 " + State.dirty.size + "개 · 아직 저장 안 함");
 }
 
 // 저장 안 한 표시는 페이지 목록 팝오버에 (열려 있을 때만 갱신)
@@ -882,14 +879,16 @@ async function savePage() {
     for (const h of State.editors.values()) {
       if (h.flush && !h.flush()) throw new Error('입력을 마치거나 충돌 표시를 확인한 뒤 다시 저장해주세요.');
     }
-    // 켜져 있는 편집기의 최신 내용을 임시저장에 반영
-    State.dirty.forEach((id) => {
-      const h = State.editors.get(id);
-      if (h) saveDraft(id, h.getBlocks());
-    });
-
     const targets = State.dirty.size ? Array.from(State.dirty) : (State.currentId ? [State.currentId] : []);
     if (!targets.length) { setStatus("saved", "변경 없음"); return; }
+
+    // 저장 전 확인: 이 창이 불러온 뒤 서버에서 바뀐 쪽이 하나라도 있으면 아무것도 쓰지 않는다
+    const changed = await changedOnServer(targets);
+    if (changed.length) {
+      setStatus("error", "새 버전이 있어요 · 저장 안 함");
+      alert("새 버전이 있어요. 새로고침한 뒤 다시 고쳐 주세요.\n\n이 창을 연 뒤에 다른 곳에서 먼저 저장된 쪽이 있어요 (" + changed.join(", ") + "쪽).\n지금 저장하면 그 내용을 덮어쓰게 돼서 저장하지 않았어요.");
+      return;
+    }
 
     let conv = anyHandle() || ensureMounted(targets[0]);
     if (!conv) throw new Error("편집기가 아직 준비되지 않았어요. 잠시 후 다시 눌러주세요.");
@@ -915,7 +914,6 @@ async function savePage() {
 
       const p = State.pages.find((x) => x.id === pageId);
       if (p) { p.blocks = blocks; p.html = html; p.updated_at = savedAt; }
-      clearDraft(pageId);
       markPageDirty(pageId, false);
     }
     State.dirty.clear();
@@ -1167,11 +1165,27 @@ function serverUpdatedAt(pageId) {
   const p = State.pages.find((x) => x.id === pageId);
   return p && p.updated_at ? Date.parse(p.updated_at) : NaN;
 }
-function saveDraft(pageId, blocks) {
-  if (window.BookHtmlMode && window.BookHtmlMode.active) return; // HTML 책은 임시저장 없음
-  const p = State.pages.find((x) => x.id === pageId);
-  const draft = { v: 2, base: (p && p.updated_at) || null, at: new Date().toISOString(), blocks: blocks || [] };
-  try { localStorage.setItem(draftKey(pageId), JSON.stringify(draft)); } catch (_) {}
+// (2026-11-13) 임시저장을 쓰지 않는다. 예전에 이 컴퓨터에 남은 임시본은 화면에 보여 주지 않고
+// 보관 키(bookedit_draftbak_)로 옮겨만 둔다(지우지 않음).
+function saveDraft() { /* 임시저장 없음 */ }
+
+// 저장 직전 확인: targets 중 서버 updated_at이 이 창이 알고 있는 것과 다른 쪽의 쪽 번호 목록
+async function changedOnServer(targets) {
+  const rows = await supabaseAPI.query("tr_book_pages", { id: "in.(" + targets.join(",") + ")", select: "id,sort_order,updated_at" });
+  const out = [];
+  (rows || []).forEach((r) => {
+    const mine = serverUpdatedAt(r.id);
+    const now = r.updated_at ? Date.parse(r.updated_at) : NaN;
+    if (!isNaN(now) && (isNaN(mine) || now !== mine)) out.push(r.sort_order);
+  });
+  // 서버에서 사라진 쪽(다른 곳에서 삭제)도 멈춤
+  targets.forEach((id) => {
+    if (!(rows || []).some((r) => r.id === id)) {
+      const p = State.pages.find((x) => x.id === id);
+      out.push(p ? p.sort_order : "?");
+    }
+  });
+  return out.sort((a, b) => a - b);
 }
 function setDraftAside(pageId, raw, reason) {
   try {
@@ -1179,7 +1193,7 @@ function setDraftAside(pageId, raw, reason) {
     localStorage.removeItem(draftKey(pageId));
   } catch (_) {}
   State.staleDrafts = (State.staleDrafts || 0) + 1;
-  setStatus("saved", "서버 내용이 더 새로운 쪽은 서버 내용을 보여줘요 (예전 임시본 " + State.staleDrafts + "개는 따로 보관)");
+  setStatus("saved", "서버 저장본을 보여줘요 (이 컴퓨터에 남아 있던 저장 안 한 내용 " + State.staleDrafts + "쪽은 따로 보관)");
 }
 function loadDraft(pageId) {
   try {
@@ -1191,11 +1205,10 @@ function loadDraft(pageId) {
       else localStorage.removeItem(draftKey(pageId));
       return null;
     }
-    if (!d || !Array.isArray(d.blocks) || !d.blocks.length) return null;
-    const server = serverUpdatedAt(pageId);
-    const base = d.base ? Date.parse(d.base) : NaN;
-    if (!isNaN(server) && (isNaN(base) || server > base)) { setDraftAside(pageId, d, "server-newer"); return null; }
-    return d.blocks;
+    if (!d || !Array.isArray(d.blocks) || !d.blocks.length) { localStorage.removeItem(draftKey(pageId)); return null; }
+    // 임시저장을 쓰지 않으므로 남아 있던 임시본은 보관만 하고 서버본을 보여 준다
+    setDraftAside(pageId, d, "no-draft-mode");
+    return null;
   } catch (_) { return null; }
 }
 function clearDraft(pageId) {
