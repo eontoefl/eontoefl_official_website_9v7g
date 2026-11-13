@@ -335,7 +335,7 @@ function BookCompare({ block, editor, editable }) {
   return (
     <section
       {...designRootEvents(editor, block, editable)}
-      {...bookRootProps("compare", block.props.theme)}
+      {...bookRootProps("compare", block.props.theme, { "data-title": block.props.title || "", "data-left-title": block.props.leftTitle || "", "data-right-title": block.props.rightTitle || "" })}
       contentEditable={editable ? false : undefined}
     >
       <CompareBody block={block} editor={editor} editable={editable} />

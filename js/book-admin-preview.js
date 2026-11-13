@@ -145,7 +145,7 @@
   function frameShell() {
     const styles = ['css/book-font-notosanskr.css','css/book-font-voca2.css','css/book-design-system.css','css/book-design-viewer.css','css/private-book-preview.css','css/book-page-footer.css','css/book-theme-eon.css'].map(p => new URL(p,base).href);
     const assetPrefix = assetPrefixes(book).join(' ');
-    const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src ${assetPrefix}; style-src 'unsafe-inline' ${styles.join(' ')}; font-src 'self';`;
+    const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; img-src ${assetPrefix} data:; style-src 'unsafe-inline' ${styles.join(' ')}; font-src 'self';`;
     const escape = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
     return '<!doctype html><html lang="ko" class="preview-page"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + escape(policy) + '"><meta name="viewport" content="width=device-width, initial-scale=1">' + styles.map(u => '<link rel="stylesheet" href="'+escape(u)+'">').join('') + '</head><body><article class="book-content bookv2-content" id="admin-page-content"></article></body></html>';
   }
