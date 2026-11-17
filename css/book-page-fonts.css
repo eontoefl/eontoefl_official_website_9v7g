@@ -1,0 +1,10 @@
+/* 책 쪽 글꼴 (BookPage 공통). 쪽 html 안의 @font-face는 shadow DOM에서 무시되므로 바깥 문서에 선언한다. 2026-11-15
+   사이트 글꼴(SUIT, MaruBuri, Outfit, LeeSeoyun 등)은 book-design-system.css, Noto Sans KR·PretendardBook·GaeguBook은 book-font-*.css에 있다. */
+@font-face{font-family:TwSUIT;font-weight:500;font-display:swap;src:url(https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1794316133986_ugg5gg.woff2) format("woff2")}
+@font-face{font-family:TwSUIT;font-weight:700 800;font-display:swap;src:url(https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1794316134584_k09dwz.woff2) format("woff2")}
+@font-face{font-family:TwMaru;font-weight:400;font-display:swap;src:url(https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1794316134901_h3k3uy.woff2) format("woff2")}
+@font-face{font-family:TwMaru;font-weight:700;font-display:swap;src:url(https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1794316135182_j0k2mg.woff2) format("woff2")}
+@font-face{font-family:TwKyobo;font-display:swap;src:url(https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/1794316136179_n8qb3i.ttf) format("truetype")}
+
+/* 2026-11-15 손글씨 = 나눔손글씨 미니 손글씨 (대표 결정). 크기는 예전 손글씨(이서윤·교보)와 비슷하게 127% */
+@font-face { font-family: NanumMiniHand; src: url("https://qpqjevecjejvbeuogtbx.supabase.co/storage/v1/object/public/guide-images/book/fonts/NanumSonGeulssiMini_20261115.woff") format("woff"); size-adjust: 127%; font-display: swap; }

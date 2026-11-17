@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>입문서 관리 - 이온토플</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+<!-- 표지 작은 그림도 서재·에디터와 같은 BookPage로 그린다 -->
+<link rel="stylesheet" href="css/book-design-system.css?v=20261103c">
+<link rel="stylesheet" href="css/book-font-notosanskr.css">
+<link rel="stylesheet" href="css/book-font-voca2.css?v=20261110a">
+<link rel="stylesheet" href="css/book-page-fonts.css?v=20261115a">
+<link rel="stylesheet" href="css/admin-book-list-v2.css?v=20261117c">
+</head>
+<body class="bl2">
+<aside class="bl2-side">
+  <div class="bl2-side-top">
+    <a class="bl2-back" id="btnBack" href="admin-settings.html" title="관리자 설정으로"><i class="fas fa-arrow-left"></i></a>
+    <div class="bl2-title">입문서 관리</div>
+    <button class="bl2-new" id="btnNew" type="button"><i class="fas fa-plus"></i>새 책</button>
+  </div>
+  <label class="bl2-search"><i class="fas fa-magnifying-glass"></i><input id="q" placeholder="책 이름 검색" autocomplete="off"><kbd>/</kbd></label>
+  <div class="bl2-groups" id="groups"><div class="bl2-hint">불러오는 중…</div></div>
+  <button class="bl2-trash" id="btnTrash" type="button"><i class="fas fa-trash-can"></i>휴지통 <span id="trashN"></span></button>
+</aside>
+<main class="bl2-main" id="main"><div class="bl2-empty">불러오는 중…</div></main>
+<div class="bl2-menu" id="menu" hidden></div>
+<div class="bl2-modal" id="modal" hidden></div>
+<div class="bl2-toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="js/supabase-config.js?v=20261012"></script>
+<script src="js/book-page.js?v=20261115a"></script>
+<script src="js/book-markdown.js"></script>
+<script src="js/book-revision-client.js?v=20261102b"></script>
+<script src="js/admin-book-list-v2.js?v=20261117g"></script>
+</body>
+</html>
