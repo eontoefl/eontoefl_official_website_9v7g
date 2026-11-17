@@ -48,7 +48,12 @@
     document.title = (S.book.title || '책') + ' - 책 에디터 v2';
     const pages = await supabaseAPI.query('tr_book_pages', { book_id: 'eq.' + id, deleted_at: 'is.null', select: 'id,sort_order,updated_at,html,blocks', order: 'sort_order.asc' });
     S.pages = pages || [];
-    const pv = $('btnPreview'); pv.href = link('admin-book-preview-v2.html', { book: id }); pv.hidden = false;
+    // 2026-11-17 미리보기 대신: 학생 화면으로 보기(학생 서재 그대로) + PDF 저장(이름 없는 원본). 둘 다 "저장한 내용" 기준
+    const unsavedOk = () => !S.dirty.size || confirm('저장하지 않은 고침 ' + S.dirty.size + '쪽은 아직 반영되지 않아요.\n저장한 내용으로 보여 드릴까요?');
+    const sv = $('btnStudent'); sv.href = link('admin-book-student-view.html', { book: id }); sv.hidden = false;
+    sv.addEventListener('click', (e) => { if (!unsavedOk()) e.preventDefault(); });
+    const pd = $('btnPdf'); pd.hidden = false;
+    pd.addEventListener('click', () => { if (!unsavedOk() || !window.AdminBookPdf) return; AdminBookPdf.save(id, { dev: DEV, onState: (m, err) => { if (m) status(m, err ? 'err' : ''); else status(S.dirty.size ? '고친 쪽 ' + S.dirty.size + '개 · 저장 안 함' : '준비됨', S.dirty.size ? 'edit' : ''); } }); });
     if (!BP.isHtmlBook(S.pages)) {
       const n = document.createElement('div'); n.className = 'be2-note';
       n.innerHTML = '<b>아직 HTML 쪽으로 옮기지 않은 책이에요.</b><br>이 에디터는 HTML 쪽(인쇄 쪽 그대로)만 고칠 수 있어요. 옮긴 뒤에 여기서 글자를 고칠 수 있어요.<br><span style="color:#6b7280">(' + S.pages.filter(BP.isHtmlPage).length + ' / ' + S.pages.length + '쪽이 HTML)</span>';

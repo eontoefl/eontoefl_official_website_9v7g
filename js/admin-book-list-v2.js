@@ -244,7 +244,8 @@
       (S.editing[b.id] !== undefined ? '<div class="bl2-note"><i class="fas fa-pen"></i> ' + esc(S.editing[b.id] || '누군가') + ' 님이 지금 이 책 에디터를 열어 두었어요. 같이 고치면 한쪽 저장이 막혀요.</div>' : '') +
       '<div class="bl2-acts">' +
         '<a class="bl2-btn pri" id="btnEdit" target="_blank" rel="noopener" href="' + link('admin-book-editor-v2.html', { book: b.id }) + '"' + (html ? '' : ' aria-disabled="true"') + '><i class="fas fa-pen-to-square"></i>에디터로 편집</a>' +
-        '<a class="bl2-btn sec" href="' + link('admin-book-preview-v2.html', { book: b.id }) + '" target="_blank"' + (html ? '' : ' aria-disabled="true"') + '><i class="fas fa-book-open"></i>미리보기·인쇄</a>' +
+        '<a class="bl2-btn sec" id="btnStudent" href="' + link('admin-book-student-view.html', { book: b.id }) + '" target="_blank"' + (html ? '' : ' aria-disabled="true"') + '><i class="fas fa-eye"></i>학생 화면으로 보기</a>' +
+        '<button class="bl2-btn sec" id="btnPdf" type="button"' + (html ? '' : ' aria-disabled="true"') + ' title="이름 없는 원본 PDF (인쇄소·보관용)"><i class="fas fa-file-arrow-down"></i>PDF 저장</button>' +
         '<button class="bl2-btn sec icon" id="btnMore" type="button" title="더 보기"><i class="fas fa-ellipsis"></i></button>' +
       '</div>' +
       (!html ? '<div class="bl2-note">' + (empty ? '쪽이 아직 없어요. 쪽을 만들어 넣은 뒤에 에디터로 고칠 수 있어요.' : '아직 새 형식(210×280 쪽)이 아닌 책이라 새 에디터로 열 수 없어요. <a href="admin-book-editor.html?book=' + b.id + '">옛 에디터로 열기</a>') + '</div>' : '');
@@ -267,6 +268,7 @@
     main.appendChild(sets);
     // 동작
     $('btnMore').addEventListener('click', (e) => openMenu(b, e.currentTarget));
+    $('btnPdf').addEventListener('click', () => { if (window.AdminBookPdf) AdminBookPdf.save(b.id, { dev: DEV, onState: (m, err) => { if (m) toast(m, err ? { err: true } : { icon: 'fa-spinner fa-spin', ms: 120000 }); else { clearTimeout(toastT); $('toast').hidden = true; } } }); });
     $('btnCat').addEventListener('click', (e) => openCatMenu(b, e.currentTarget));
     sets.querySelectorAll('.bl2-sw[data-k]').forEach((sw) => sw.addEventListener('click', () => onSwitch(b, sw.dataset.k)));
     const seg = $('audSeg'); if (seg) seg.querySelectorAll('button').forEach((x) => x.addEventListener('click', () => setAudMode(b, x.dataset.m)));
@@ -486,7 +488,7 @@
     el.className = 'bl2-toast' + (o.err ? ' err' : '');
     el.innerHTML = '<i class="fas ' + (o.icon || (o.err ? 'fa-circle-exclamation' : 'fa-check')) + '"></i><span>' + esc(text) + '</span>' + (o.undo ? '<button type="button">되돌리기</button><small></small>' : '');
     el.hidden = false;
-    const ms = o.undo ? UNDO_MS : (o.err ? 5000 : 2600);
+    const ms = o.ms || (o.undo ? UNDO_MS : (o.err ? 5000 : 2600));
     toastEnd = o.onEnd || null;
     const done = () => { el.hidden = true; clearInterval(toastTick); if (toastEnd) { const f = toastEnd; toastEnd = null; f(); } };
     if (o.undo) {

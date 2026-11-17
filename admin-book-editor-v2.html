@@ -13,18 +13,19 @@
 <link rel="stylesheet" href="css/book-font-notosanskr.css">
 <link rel="stylesheet" href="css/book-font-voca2.css?v=20261110a">
 <link rel="stylesheet" href="css/book-page-fonts.css?v=20261115a">
-<link rel="stylesheet" href="css/admin-book-editor-v2.css?v=20261115a">
+<link rel="stylesheet" href="css/admin-book-editor-v2.css?v=20261117p">
 </head>
 <body class="be2">
 <header class="be2-top">
   <div class="be2-top-l">
-    <a class="be2-btn ghost" id="btnBack" href="admin-book-list-v2.html"><i class="fas fa-arrow-left"></i> 책 목록</a>
+    <a class="be2-btn ghost" id="btnBack" href="admin-book-list-v2.html"><i class="fas fa-arrow-left"></i> 교재 관리</a>
     <h1 id="bookTitle">책 에디터 v2</h1>
     <span class="be2-status" id="status">불러오는 중…</span>
   </div>
   <div class="be2-top-r">
     <label class="be2-zoom">배율 <select id="zoomSel"><option value="0.6">60%</option><option value="0.75">75%</option><option value="0.9">90%</option><option value="1" selected>100%</option><option value="1.25">125%</option></select></label>
-    <a class="be2-btn ghost" id="btnPreview" target="_blank" hidden><i class="fas fa-book-open"></i> 미리보기·인쇄</a>
+    <a class="be2-btn ghost" id="btnStudent" target="_blank" hidden><i class="fas fa-eye"></i> 학생 화면으로 보기</a>
+    <button class="be2-btn ghost" id="btnPdf" type="button" hidden title="이름 없는 원본 PDF (인쇄소·보관용)"><i class="fas fa-file-arrow-down"></i> PDF 저장</button>
     <button class="be2-btn grad" id="btnSave" hidden><i class="fas fa-floppy-disk"></i> 저장</button>
   </div>
 </header>
@@ -35,6 +36,7 @@
 <div class="be2-toast" id="toast" role="status" aria-live="polite"></div>
 <script src="js/supabase-config.js?v=20261012"></script>
 <script src="js/book-page.js?v=20261115a"></script>
-<script src="js/admin-book-editor-v2.js?v=20261117a"></script>
+<script src="js/admin-book-pdf.js?v=20261117a"></script>
+<script src="js/admin-book-editor-v2.js?v=20261117b"></script>
 </body>
 </html>
