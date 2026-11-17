@@ -44,7 +44,7 @@
       var el = els[i], cs = getComputedStyle(el);
       var rb = el.getBoundingClientRect();
       if (rb.height > 0 && rb.bottom - top - H > over) over = rb.bottom - top - H;
-      if ((cs.overflowY === 'hidden' || cs.overflow === 'hidden') && el.clientHeight > 0) {
+      if ((cs.overflowY === 'hidden' || cs.overflow === 'hidden') && el.clientHeight > 0 && !(el.classList && el.classList.contains('book-score-gauge'))) {   // 점수판 반원은 아래 반을 일부러 가린 것 (2026-11-17)
         var d = el.scrollHeight - el.clientHeight; if (d > over) over = d;
       }
     }
