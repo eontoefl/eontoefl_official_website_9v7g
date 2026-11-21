@@ -298,15 +298,18 @@ async function countPendingGifty(): Promise<number> {
 
 // ===== 버튼 콜백 입구 판정 설정 =====
 // 버튼 콜백은 아래 설정으로 먼저 판정하고(callback-guard.ts), 통과한 것만 handleCallback으로 넘긴다.
-// - TELEGRAM_CALLBACK_MODE: "open"일 때만 버튼을 처리한다. 없거나 다른 값이면 모든 버튼을 받지 않는다(닫힘이 기본).
+// 값은 환경값의 문자열 그대로 넘긴다. 형식 확인과 해석은 판정이 한다(여기서 숫자로 바꾸지 않는다).
+// - TELEGRAM_CALLBACK_OPEN: 처리할 버튼 동작 이름을 쉼표로 구분한 허용 목록(예: "confirm_deposit,send_guide").
+//   없거나 비면 모든 버튼을 받지 않는다(닫힘이 기본). 모르는 이름이 하나라도 있으면 전부 받지 않는다.
+//   목록에 없는 동작은 헤더·대표 확인을 통과해도 처리하지 않고 보류한다.
 // - TELEGRAM_WEBHOOK_SECRET: 웹훅 등록 때 정한 헤더 값. 없으면 "" → 설정 불량으로 전부 거절.
 // - CS_TELEGRAM_OWNER_USER_ID: 버튼을 누를 수 있는 사람의 번호. 이름은 후기 봇 접두어(CS_)지만
 //   값은 대표의 텔레그램 사용자 번호이고, 알림 목적지(TELEGRAM_CHAT_ID)와 독립된 설정이라 이것을 쓴다.
 //   (알림 목적지가 잘못 바뀌어도 그 채팅의 상대가 버튼을 누를 수 있게 되지 않는다.)
 const CALLBACK_GUARD_CONFIG = {
-  mode: Deno.env.get("TELEGRAM_CALLBACK_MODE") ?? "",
+  openActions: Deno.env.get("TELEGRAM_CALLBACK_OPEN") ?? "",
   webhookSecret: Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "",
-  ownerUserId: Number(Deno.env.get("CS_TELEGRAM_OWNER_USER_ID") ?? ""),
+  ownerUserId: Deno.env.get("CS_TELEGRAM_OWNER_USER_ID") ?? "",
   chatId: CHAT_ID ?? "",
 };
 
