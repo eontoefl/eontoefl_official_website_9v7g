@@ -1,7 +1,8 @@
 // ===== 텔레그램 알림 Edge Function =====
 // 역할: 텔레그램 메시지 발송 + 콜백 버튼 처리 (입금 확인, 이용방법 전달)
 
-import "@supabase/functions-js/edge-runtime.d.ts";
+
+import { checkTelegramCallback } from "./callback-guard.ts";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID")!;
@@ -295,6 +296,20 @@ async function countPendingGifty(): Promise<number> {
   return pending;
 }
 
+// ===== 버튼 콜백 입구 판정 설정 =====
+// 버튼 콜백은 아래 설정으로 먼저 판정하고(callback-guard.ts), 통과한 것만 handleCallback으로 넘긴다.
+// - TELEGRAM_CALLBACK_MODE: "open"일 때만 버튼을 처리한다. 없거나 다른 값이면 모든 버튼을 받지 않는다(닫힘이 기본).
+// - TELEGRAM_WEBHOOK_SECRET: 웹훅 등록 때 정한 헤더 값. 없으면 "" → 설정 불량으로 전부 거절.
+// - CS_TELEGRAM_OWNER_USER_ID: 버튼을 누를 수 있는 사람의 번호. 이름은 후기 봇 접두어(CS_)지만
+//   값은 대표의 텔레그램 사용자 번호이고, 알림 목적지(TELEGRAM_CHAT_ID)와 독립된 설정이라 이것을 쓴다.
+//   (알림 목적지가 잘못 바뀌어도 그 채팅의 상대가 버튼을 누를 수 있게 되지 않는다.)
+const CALLBACK_GUARD_CONFIG = {
+  mode: Deno.env.get("TELEGRAM_CALLBACK_MODE") ?? "",
+  webhookSecret: Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "",
+  ownerUserId: Number(Deno.env.get("CS_TELEGRAM_OWNER_USER_ID") ?? ""),
+  chatId: CHAT_ID ?? "",
+};
+
 // ===== 메인 핸들러 =====
 Deno.serve(async (req) => {
   const corsHeaders = {
@@ -317,6 +332,21 @@ Deno.serve(async (req) => {
 
       // 텔레그램 webhook update (콜백 버튼 클릭)
       if (body.callback_query) {
+        // 입구 판정: 거절이면 DB 조회·텔레그램 호출·알림톡·n8n 호출 없이 여기서 끝낸다.
+        // 거절된 요청은 아래 알림(type) 분기로 넘어가지 않는다.
+        const verdict = checkTelegramCallback(
+          req.headers.get("x-telegram-bot-api-secret-token"),
+          body.callback_query,
+          CALLBACK_GUARD_CONFIG,
+        );
+        if (!verdict.ok) {
+          // 고정된 사유 이름만 남긴다(요청 원문·헤더·사람 번호·data는 남기지 않는다).
+          console.warn("callback rejected:", verdict.reason);
+          return new Response(
+            JSON.stringify(verdict.status === 401 ? { error: "unauthorized" } : { accepted: false }),
+            { status: verdict.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
         return await handleCallback(body.callback_query, corsHeaders);
       }
 
