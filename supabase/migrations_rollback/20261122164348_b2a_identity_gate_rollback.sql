@@ -1,7 +1,10 @@
 -- =====================================================================
 -- 보안작업 묶음 2 — 계약 2-가 되돌리기
 -- 대상: supabase/migrations/20261122164348_b2a_identity_gate.sql 이 만든 것만 지운다.
---   * 공개 함수 2개, security_private 의 함수 7개·표 5개, security_private 스키마.
+--   * 공개 함수 2개, security_private 의 함수 8개(도우미 current_session 포함)·표 5개, security_private 스키마.
+--   * 이 파일은 2차 판(도우미가 있는 판)의 짝이다. 1차 판(fa172b2)이 적용된 곳에는 쓰지 않는다
+--     (없는 도우미를 지우려다 실패한다). 1차 판은 fa172b2 의 되돌리기 SQL 로만 걷어낸다 —
+--     두 판의 되돌리기를 섞지 않는다.
 --   * cascade 를 쓰지 않는다(전부 restrict). 다른 객체(정책·뷰·외래키 등)가 기대고 있으면
 --     그 자리에서 실패하고, 한 트랜잭션이므로 아무것도 지워지지 않는다.
 --   * security_private 안에 이 마이그레이션이 만들지 않은 객체가 있으면 마지막 drop schema 가 실패한다.
@@ -48,6 +51,7 @@ drop function security_private.is_current_admin() restrict;
 drop function security_private.current_member_email() restrict;
 drop function security_private.current_member_id_text() restrict;
 drop function security_private.current_member_id() restrict;
+drop function security_private.current_session() restrict;
 
 -- 3. 표
 drop table security_private.maintenance_exception restrict;

@@ -4,7 +4,8 @@
 -- 만드는 것(전부 새 객체. 기존 표·열·정책·함수·권한은 하나도 바꾸지 않는다)
 --   * 비공개 스키마 security_private (PostgREST 노출 스키마에 넣지 않는다)
 --   * 표 5개: member_identity, admin_principal, access_grant, site_state, maintenance_exception
---   * 비공개 함수 7개: current_member_id, current_member_id_text, current_member_email,
+--   * 비공개 함수 8개: current_session(로그인 상태 판정 도우미 — 어떤 역할에도 실행 권한 없음),
+--     current_member_id, current_member_id_text, current_member_email,
 --     is_current_admin, request_allowed, check_api_request, resolve_grant
 --   * 공개 함수 2개: public.site_status, public.my_site_access
 --   * 파일 끝의 자기 점검(DO 블록). 어긋나면 예외로 전체가 되돌아간다.
@@ -22,6 +23,12 @@
 --     뒤 계약에서 따로 설계한다.
 --   * 외래키 때문에 적용하는 순간 auth.users 와 public.users 에 잠깐 잠금이 걸린다
 --     (그 표의 열·정책·권한은 바뀌지 않는다).
+--   * 새 표가 기존 삭제 동작을 막지 않는다. 새 표의 외래키는 전부 on delete cascade 다:
+--     회원 행(public.users)이 지워지면 그 회원의 연결(member_identity)과 그 회원을 대상으로 한
+--     사용 자격(access_grant)이 함께 지워지고, 로그인 계정(auth.users)이 지워지면 그 계정의 연결·
+--     명부·예외 명단과 그 계정이 행위자인 대리 자격이 함께 지워진다.
+--   * "지금 살아 있는 로그인 상태"는 current_session() 한 곳에서만 정한다
+--     (auth.sessions 에 행이 있고 not_after 가 NULL 이거나 지금보다 뒤).
 --   * 되돌리기: supabase/migrations_rollback/20261122164348_b2a_identity_gate_rollback.sql
 -- =====================================================================
 
@@ -37,6 +44,7 @@ create schema security_private;
 -- ---------------------------------------------------------------------
 
 -- 로그인 계정 ↔ 회원번호 1:1. 이메일은 복사하지 않는다.
+-- 회원 행이 지워지면 연결도 함께 지워진다(남은 로그인 계정은 "대응 없는 계정"이 된다).
 create table security_private.member_identity (
   auth_user_id        uuid        not null,
   member_id           uuid        not null,
@@ -49,7 +57,7 @@ create table security_private.member_identity (
   constraint member_identity_auth_user_id_fkey
     foreign key (auth_user_id) references auth.users (id) on delete cascade,
   constraint member_identity_member_id_fkey
-    foreign key (member_id) references public.users (id)
+    foreign key (member_id) references public.users (id) on delete cascade
 );
 
 -- 관리자 명부. 회원 대응표와 별개.
@@ -64,6 +72,8 @@ create table security_private.admin_principal (
 
 -- 대리·책 공통 장부(서버 중계 전용). 자격 원문은 저장하지 않고 지문(sha-256 16진수)만 둔다.
 -- 발급·중계 자체는 이 계약 범위 밖이다.
+-- 이 표는 "지금 쓸 수 있는 자격" 장부이지 감사 기록이 아니다. 대상 회원이나 행위자 계정이 지워지면
+-- 그 자격도 함께 지워진다. 감사 기록은 뒤 계약의 별도 표에 두며, 이 삭제에 딸려 지워지면 안 된다.
 create table security_private.access_grant (
   id                 uuid        not null default pg_catalog.gen_random_uuid(),
   credential_digest  text        not null,
@@ -91,10 +101,13 @@ create table security_private.access_grant (
       )
     ),
   constraint access_grant_actor_auth_user_id_fkey
-    foreign key (actor_auth_user_id) references auth.users (id),
+    foreign key (actor_auth_user_id) references auth.users (id) on delete cascade,
   constraint access_grant_target_member_id_fkey
-    foreign key (target_member_id) references public.users (id)
+    foreign key (target_member_id) references public.users (id) on delete cascade
 );
+
+comment on table security_private.access_grant is
+  '지금 쓸 수 있는 자격 장부(감사 기록 아님). 대상 회원·행위자 계정이 지워지면 함께 지워진다. 감사 기록은 별도 표에 두며 이 삭제에 딸려 지워지면 안 된다.';
 
 -- 점검 스위치 한 줄. 시각이 지났다고 스스로 phase가 바뀌지 않는다.
 -- "그 번호의 점검이 끝났다"는 last_ended_maintenance_id 로 명시한다.
@@ -133,15 +146,22 @@ alter table security_private.maintenance_exception enable row level security;
 
 -- ---------------------------------------------------------------------
 -- 3. 판정 함수 (전부 security definer, search_path 비움, 이름마다 스키마)
---    자격 값은 request.jwt.claims 를 jsonb로 읽는다. 없거나 비었거나 jsonb가 아니면 비로그인,
---    sub·session_id가 uuid 모양이 아니면 NULL(예외를 내지 않는다).
---    auth.sessions 는 이 함수들 안에서만 읽는다(다른 역할에 권한을 주지 않는다).
+--    자격(request.jwt.claims)과 auth.sessions 는 도우미 current_session() 한 곳에서만 읽는다.
+--    회원 판정·관리자 판정·점검 예외 판정은 그 도우미의 결과만 쓰고 자격을 직접 읽지 않는다.
+--    auth.sessions 에 대한 권한을 다른 역할에 주지 않는다.
 -- ---------------------------------------------------------------------
 
--- 현재 회원번호. 자격의 sub·session_id가 auth.sessions 에 지금 있고 대응표에 있으면 그 member_id.
--- 그 밖(비로그인, 대응 없음, 로그아웃한 자격)은 NULL.
-create function security_private.current_member_id()
-returns uuid
+-- 지금 살아 있는 로그인 상태(비공개 도우미). 0행 또는 1행.
+--   * 자격 값 request.jwt.claims 를 jsonb로 읽는다. 값이 없거나 비었거나 jsonb가 아니면 0행,
+--     sub·session_id가 빠졌거나 uuid 모양이 아니면 0행(예외를 내지 않는다).
+--   * auth.sessions 에 id = session_id·user_id = sub 인 행이 있고,
+--     not_after 가 NULL 이거나 지금보다 뒤일 때만 1행(not_after = 지금 은 만료다).
+--   * 돌려주는 값: 계정 번호, 로그인 상태 번호, 자격에 적힌 aal, 로그인 상태 행의 aal.
+--     aal 열의 형(열거형·글자형)에 기대지 않도록 글자로 바꿔 돌려준다.
+--   * 실행 권한은 PUBLIC·anon·authenticated·service_role 어디에도 주지 않는다.
+--     아래 판정 함수(소유자 권한으로 실행) 안에서만 불린다.
+create function security_private.current_session()
+returns table (auth_user_id uuid, session_id uuid, claim_aal text, session_aal text)
 language plpgsql
 stable
 security definer
@@ -154,41 +174,68 @@ declare
   v_sid_text text;
   v_sub      uuid;
   v_sid      uuid;
-  v_member   uuid;
 begin
   v_raw := pg_catalog.current_setting('request.jwt.claims', true);
   if v_raw is null or v_raw = '' then
-    return null;
+    return;
   end if;
 
   begin
     v_claims := v_raw::pg_catalog.jsonb;
   exception when others then
-    return null;
+    return;
   end;
 
   v_sub_text := v_claims ->> 'sub';
   v_sid_text := v_claims ->> 'session_id';
   if v_sub_text is null or v_sid_text is null then
-    return null;
+    return;
   end if;
   if v_sub_text !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
      or v_sid_text !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
-    return null;
+    return;
   end if;
   v_sub := v_sub_text::pg_catalog.uuid;
   v_sid := v_sid_text::pg_catalog.uuid;
 
+  return query
+    select s.user_id,
+           s.id,
+           v_claims ->> 'aal',
+           s.aal::pg_catalog.text
+      from auth.sessions s
+     where s.id = v_sid
+       and s.user_id = v_sub
+       and (s.not_after is null or s.not_after > pg_catalog.now());
+end;
+$b2a$;
+
+revoke all on function security_private.current_session() from public, anon, authenticated, service_role;
+
+-- 현재 회원번호. 살아 있는 로그인 상태가 있고 그 계정이 대응표에 있으면 그 member_id.
+-- 그 밖(비로그인, 대응 없음, 로그아웃한 자격, 만료된 로그인 상태)은 NULL.
+create function security_private.current_member_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $b2a$
+declare
+  v_user   uuid;
+  v_member uuid;
+begin
+  select cs.auth_user_id
+    into v_user
+    from security_private.current_session() cs;
+  if v_user is null then
+    return null;
+  end if;
+
   select mi.member_id
     into v_member
     from security_private.member_identity mi
-   where mi.auth_user_id = v_sub
-     and exists (
-           select 1
-             from auth.sessions s
-            where s.id = v_sid
-              and s.user_id = v_sub
-         );
+   where mi.auth_user_id = v_user;
 
   return v_member;
 end;
@@ -228,7 +275,7 @@ revoke all on function security_private.current_member_email() from public, anon
 grant execute on function security_private.current_member_email() to authenticated;
 
 -- 관리자 여부. 명부에 enabled로 있음 AND 자격의 aal = 'aal2'
--- AND auth.sessions 에 같은 계정·같은 session_id가 지금 aal2. 항상 참/거짓(NULL 없음).
+-- AND 살아 있는 로그인 상태(같은 계정·같은 session_id, 만료 전)의 aal 이 지금 aal2. 항상 참/거짓(NULL 없음).
 create function security_private.is_current_admin()
 returns boolean
 language plpgsql
@@ -237,56 +284,30 @@ security definer
 set search_path = ''
 as $b2a$
 declare
-  v_raw      text;
-  v_claims   jsonb;
-  v_sub_text text;
-  v_sid_text text;
-  v_sub      uuid;
-  v_sid      uuid;
+  v_user        uuid;
+  v_claim_aal   text;
+  v_session_aal text;
 begin
-  v_raw := pg_catalog.current_setting('request.jwt.claims', true);
-  if v_raw is null or v_raw = '' then
+  select cs.auth_user_id, cs.claim_aal, cs.session_aal
+    into v_user, v_claim_aal, v_session_aal
+    from security_private.current_session() cs;
+  if v_user is null then
     return false;
   end if;
 
-  begin
-    v_claims := v_raw::pg_catalog.jsonb;
-  exception when others then
-    return false;
-  end;
-
-  if (v_claims ->> 'aal') is distinct from 'aal2' then
+  -- 이중 확인: 자격에 적힌 aal 과 로그인 상태 행의 aal 이 둘 다 aal2 여야 한다.
+  if v_claim_aal is distinct from 'aal2' then
     return false;
   end if;
-
-  v_sub_text := v_claims ->> 'sub';
-  v_sid_text := v_claims ->> 'session_id';
-  if v_sub_text is null or v_sid_text is null then
+  if v_session_aal is distinct from 'aal2' then
     return false;
   end if;
-  if v_sub_text !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-     or v_sid_text !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
-    return false;
-  end if;
-  v_sub := v_sub_text::pg_catalog.uuid;
-  v_sid := v_sid_text::pg_catalog.uuid;
 
   if not exists (
        select 1
          from security_private.admin_principal ap
-        where ap.auth_user_id = v_sub
+        where ap.auth_user_id = v_user
           and ap.enabled
-     ) then
-    return false;
-  end if;
-
-  -- aal 열의 형(열거형·글자형)에 기대지 않도록 글자로 바꿔 견준다.
-  if not exists (
-       select 1
-         from auth.sessions s
-        where s.id = v_sid
-          and s.user_id = v_sub
-          and s.aal::pg_catalog.text = 'aal2'
      ) then
     return false;
   end if;
@@ -302,7 +323,7 @@ grant execute on function security_private.is_current_admin() to authenticated;
 --   * site_state 행이 없으면 거짓.
 --   * phase가 'maintenance'가 아니면 참.
 --   * 'maintenance'면: 관리자(6자리 완료) → 참 / 현재 점검 번호의 예외 명단에 있고(만료 전)
---     그 계정의 로그인 상태가 auth.sessions 에 살아 있음 → 참 / 그 밖은 전부 거짓.
+--     그 계정의 로그인 상태가 살아 있음(current_session) → 참 / 그 밖은 전부 거짓.
 --     service_role도 거짓이다(같은 열쇠를 쓰는 호출자를 가릴 수 없으므로 일괄 통과시키지 않는다).
 create function security_private.request_allowed()
 returns boolean
@@ -314,12 +335,7 @@ as $b2a$
 declare
   v_phase          text;
   v_maintenance_id integer;
-  v_raw            text;
-  v_claims         jsonb;
-  v_sub_text       text;
-  v_sid_text       text;
-  v_sub            uuid;
-  v_sid            uuid;
+  v_user           uuid;
 begin
   select ss.phase, ss.maintenance_id
     into v_phase, v_maintenance_id
@@ -338,44 +354,19 @@ begin
     return true;
   end if;
 
-  v_raw := pg_catalog.current_setting('request.jwt.claims', true);
-  if v_raw is null or v_raw = '' then
+  select cs.auth_user_id
+    into v_user
+    from security_private.current_session() cs;
+  if v_user is null then
     return false;
   end if;
-
-  begin
-    v_claims := v_raw::pg_catalog.jsonb;
-  exception when others then
-    return false;
-  end;
-
-  v_sub_text := v_claims ->> 'sub';
-  v_sid_text := v_claims ->> 'session_id';
-  if v_sub_text is null or v_sid_text is null then
-    return false;
-  end if;
-  if v_sub_text !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-     or v_sid_text !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
-    return false;
-  end if;
-  v_sub := v_sub_text::pg_catalog.uuid;
-  v_sid := v_sid_text::pg_catalog.uuid;
 
   if not exists (
        select 1
          from security_private.maintenance_exception me
         where me.maintenance_id = v_maintenance_id
-          and me.auth_user_id = v_sub
+          and me.auth_user_id = v_user
           and (me.expires_at is null or me.expires_at > pg_catalog.now())
-     ) then
-    return false;
-  end if;
-
-  if not exists (
-       select 1
-         from auth.sessions s
-        where s.id = v_sid
-          and s.user_id = v_sub
      ) then
     return false;
   end if;
@@ -603,12 +594,14 @@ begin
     end loop;
   end loop;
 
-  -- (다) 함수 9개: security definer, PUBLIC 실행 없음, 역할별 실행 권한이 계약서 표와 정확히 같음.
+  -- (다) 함수 10개: security definer, PUBLIC 실행 없음, 역할별 실행 권한이 계약서 표와 정확히 같음.
+  --      도우미 current_session() 은 세 역할 모두 실행 권한이 없어야 한다.
   for v_fn in
     select t.sig, t.want_anon, t.want_authenticated, t.want_service_role
       from (
         values
           ('security_private.current_member_id()'::pg_catalog.text,      false, true,  false),
+          ('security_private.current_session()',                         false, false, false),
           ('security_private.current_member_id_text()',                  false, true,  false),
           ('security_private.current_member_email()',                    false, true,  false),
           ('security_private.is_current_admin()',                        false, true,  false),

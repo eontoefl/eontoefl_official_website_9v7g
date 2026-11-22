@@ -2,6 +2,8 @@
 -- 보안작업 묶음 2 — 계약 2-가 시험 전용 객체 올리기 (시험 프로젝트 hmncdheiwqwekdbtijar 전용)
 --
 -- 이 파일은 작업방이 실행해 보지 않았다. 순서와 기대 결과는 같은 폴더의 절차.md 를 따른다.
+-- (1차 판 fa172b2 의 이 파일은 브레인방이 시험 프로젝트에서 실행했다. 2차에서 바뀐 곳은
+--  zz_b2a_call_invoker 의 'current_session' 갈래 하나이고, 그 갈래는 아직 실행된 적이 없다.)
 -- 운영에는 절대 실행하지 않는다(비로그인도 고칠 수 있는 표와 판정 값을 돌려주는 함수가 생긴다).
 --
 -- 전제: 20261122164348_b2a_identity_gate.sql 이 먼저 적용돼 있어야 한다.
@@ -18,6 +20,7 @@
 --   표   zz_b2a_member_row_text 본인 행만 보이는 표(정책: current_member_id_text()). 회원번호 열 글자형.
 --   함수 zz_b2a_probe()                 판정 값 5개를 그대로 돌려준다(security definer — 어느 자격으로든 값이 나온다).
 --   함수 zz_b2a_call_invoker(text)      부르는 역할의 권한 그대로 비공개 함수 하나를 불러 본다(security invoker).
+--                                       'current_session' 은 어느 역할로 불러도 42501 이어야 한다(도우미는 실행 권한 없음).
 --   함수 zz_b2a_resolve_grant_invoker(text, text)  부르는 역할의 권한 그대로 resolve_grant 를 부른다.
 --   함수 zz_b2a_private_table_probe()   부르는 역할의 권한 그대로 비공개 표 5개에 읽기·넣기·고치기·지우기를 시도한다
 --                                       (성공해도 실제 변화가 생기지 않는 문장만 쓴다).
@@ -169,6 +172,11 @@ begin
   elsif p_fn = 'check_api_request' then
     perform security_private.check_api_request();
     v_value := null;
+  elsif p_fn = 'current_session' then
+    -- 도우미는 어떤 역할에도 실행 권한이 없다. 여기까지 와서 값이 나오면 권한이 열려 있다는 뜻이다.
+    select coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(cs)), '[]'::pg_catalog.jsonb)
+      into v_value
+      from security_private.current_session() as cs;
   else
     return pg_catalog.jsonb_build_object('fn', p_fn, 'ok', false, 'error', 'unknown_fn');
   end if;
