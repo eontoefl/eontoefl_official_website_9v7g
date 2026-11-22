@@ -1,23 +1,36 @@
 // =====================================================================
 // 보안작업 묶음 2 — 계약 2-나-2b: 파일 규칙 대조표 도구 (시험 프로젝트 hmncdheiwqwekdbtijar 전용)
 //
-// 이 도구는 작업방이 실제 Storage 에 한 번도 실행해 보지 않았다. 작업방 컴퓨터 안의 가짜 응답(네트워크 없음)으로만
-// 돌려 봤고, 그 가짜 응답은 작업방이 짐작으로 흉내 낸 것이라 실제 동작을 대신하지 않는다.
-// 2a 3차 도구(measure.mjs, c3b2cf2)에서 실행으로 확인된 요청 형식·응답 모양(올리기·목록·정보 조회·삭제·이동,
-// 권한 오류 400/403, 객체 없음 400/404/NoSuchKey, 중복 400/409)은 그대로 가져왔다.
-// 이번에 새로 쓰는 것(복사 요청, 꾸민 경로를 그대로 보내는 원시 요청, 올리기 응답의 Key·Id, 목록의 쪽 나눔,
-// 객체 식별자 필드)은 실행으로 확인된 적이 없다 — 도구는 원 응답을 그대로 남긴다.
+// 1차 판(9cff0e7)은 브레인방이 시험 프로젝트에서 --state before --actors anon 의 upload-new 를 끝까지 돌렸다(요청 1,471건).
+// 거기서 확인된 것: 원시 요청 통로, 올리기 응답의 Key·Id, 정보 조회·목록의 식별자 필드, 저장소가 이름을 다루는 방식 일부
+// (보낸 대소문자를 그대로 저장한다 / 빈 구간은 합쳐지고 ".." 은 풀려서 도착한다 / %2F 는 빗금이 된다 /
+//  %2F 가 남은 이름과 한글 이름은 InvalidKey / 파일 이름이 빈 경로는 그 이름의 객체로 저장된다).
+// 그리고 드러난 것: 소문자 폴더의 목록 조회에 대문자 폴더의 객체가 함께 나왔다 — 목록으로는 전체 이름을 글자 그대로
+// 가릴 수 없다. 2차에서 "도착한 이름"을 올리기 응답의 Key·Id 와 글자 그대로의 정보 조회로 정하도록 고쳤다.
+// 2차에서 바꾼 부분은 아직 실제 Storage 에 실행된 적이 없다(작업방은 그 관측에 맞춘 가짜 응답으로만 돌려 봤다 —
+// 가짜 응답은 실제 동작을 대신하지 않는다). 복사 요청과 목록의 쪽 나눔도 실행으로 확인된 적이 없다.
 //
-// 판정 방식 (2a 3차에서 가져오고 고친 것)
-//   * 저장 정보는 서비스 열쇠의 목록 조회 + 정보 조회로만 읽는다(cf-cache-status 가 DYNAMIC 일 때만 인정,
-//     eTag 를 올린 내용의 md5 와 대조). 이것은 저장 정보(메타데이터)다 — 본문을 다시 받아 확인한 것이 아니다.
-//   * "객체 없음"으로 인정하는 응답은 관측된 모양 하나뿐이다: HTTP 400 · 본문 statusCode 404 · code NoSuchKey.
+// 판정 방식
+//   * 도착한 이름은 글자 그대로 정한다: 올리기가 성공하면 응답의 Key(버킷/전체 이름)와 Id 가 근거이고, 그 정확한
+//     전체 이름에 대한 서비스 열쇠의 정보 조회가 준 식별자·저장 정보와 대조한다. 어긋나면 미확인이다.
+//     거절된 요청에는 Key 가 없는 것이 정상이다. 목록이 준 파일 이름에 조회한 폴더 이름을 붙여 전체 이름으로 삼지 않는다.
+//   * 있음·없음은 글자 그대로의 정보 조회로 읽는다(cf-cache-status 가 DYNAMIC 일 때만 인정, eTag 를 올린 내용의 md5 와 대조).
+//     "객체 없음"으로 인정하는 응답은 관측된 모양 하나뿐이다: HTTP 400 · 본문 statusCode 404 · code NoSuchKey.
 //     일반 404, 그 밖의 "not found" 문구, 서버 오류, 통신 오류는 전부 "미확인"이다.
+//     이것은 저장 정보(메타데이터)다 — 본문을 다시 받아 확인한 것이 아니다.
+//   * 거절 칸 하나하나의 "저장 변화 0"은 그 요청 직후, 정리하기 전에 확인한다: 그 요청이 가리킨 정확한 이름과 꾸민 경로가
+//     도착할 수 있는 후보 이름들의 정보 조회가 "객체 없음"이고, 대조 객체의 식별자·저장 정보가 그대로임. 못 하면 미확인이다.
+//   * 꾸민 경로의 ③(허용된 경로로 저장)·④(권한 밖 위치에 저장)는 글자 그대로의 도착 이름으로 가른다.
 //   * 기대값 대조는 올리기·정보 조회·덮어쓰기·삭제·이동·복사·목록으로 한다. 본문 GET 은 관측이다.
-//     다만 새로 생긴 객체는 본문(md5)도 따로 견준다 — 서비스 열쇠가 그 객체를 처음 읽는 값 없는 인증 주소 한 번.
+//     다만 새로 생긴 객체는 본문(md5)도 따로 견준다 — 서비스 열쇠의 값 없는 인증 주소 GET 한 번.
+//     이름이 칸마다 다른 줄에서는 그것이 그 객체의 첫 읽기이고 판정에 든다. 여러 칸이 같은 이름을 쓰는 줄(파일 이름이 빈 경로)
+//     에서는 "새 객체의 저장 정보 일치"가 판정의 근거이고, 본문 GET 의 결과(올린 내용 / 옛 본문의 재전달 / 그 밖)는 관측이다.
 //     올린 사람의 읽기는 올리기 성공의 조건이 아니다(올린 사람은 읽기 규칙이 없어 못 읽는 것이 정상이다).
 //   * 거절로 적는 칸에는 같은 입력의 서비스 열쇠 대조군이 성공해야 한다. 아니면 "권한 미판정"이다.
 //   * 미확인은 통과 수에 넣지 않는다. 미확인이나 기대와 다른 칸이 하나라도 있으면 종료 값 1 이다.
+//     기대값 없이 잰 칸(비로그인)도 도착 이름·저장 여부를 확인하지 못했으면 종료 값 1 이다(기준선으로 쓸 수 없다).
+//   * "대상 밖 객체의 변화 0"은 이 도구의 목록 집계로 말하지 않는다. 단계 앞뒤로 뜬 fingerprint.sql 결과(DB 의 객체 행)를
+//     outside 단계(요청 0)에 넘겨 확인한다. 그 비교는 단계가 끝났을 때 남은 변화만 본다.
 //   * 소유자는 Storage API 로 볼 수 없다. 단계가 끝난 뒤 fingerprint.sql 을 떠서 owners 단계(요청 0)로 견준다.
 //
 // 상태 (--state): 지금 시험 프로젝트에 어떤 규칙이 올라가 있는가. 기대값이 이것으로 정해진다.
@@ -47,18 +60,23 @@
 //   upload-existing  있는 이름에 다시 올리기: 경로 × 먼저 만든 쪽 × 요청 방식 × 자격   있음
 //   actions          정보 조회·목록·삭제·이동·복사 + 공개 주소                        있음
 //   revoked          만료·로그아웃한 A 의 올리기: --kind expired|loggedout --step pre|post|restored
-//   cleanup          이 도구의 합성 객체(이름에 zzb2n2b)를 지우고 남은 객체를 적는다    있음
+//   cleanup          이 도구의 합성 객체를 지운다: [--fingerprint <json>] [--ledger <결과 json>[,…]]   있음
+//                    정확한 이름은 fingerprint.sql 의 객체 행과 장부에서 얻는다(인자 없이 돌면 목록만 쓴다 — 어림).
+//                    표식(zzb2n2b) 없는 이름은 장부의 식별자가 지금 그 객체와 같을 때만 지운다
 //   table-ref        표 쪽 기준 요청(비로그인 GET): --compare <앞 결과>                있음
-//   compare          두 결과 파일의 칸을 견준다: --base <json> --with <json> [--actors anon]   0
+//   compare          두 결과 파일의 칸을 견준다: --base <json> --with <json> [--actors anon,public]   0
 //   owners           결과의 객체 장부를 fingerprint.sql 결과와 견준다(식별자·소유자·저장 정보):
 //                    --result <json>[,<json>…] --fingerprint <json>                   0
+//   outside          대상 밖 객체의 변화를 DB 의 객체 행으로 본다:                     0
+//                    --fingerprint-before <json> --fingerprint-after <json> --result <그 사이에 돈 단계들의 결과 json>[,…]
 // 공통 인자: --state <상태>  --out <결과 JSON>  [--actors a,b,…]  [--rows 시작-끝]  [--bucket <버킷>]
 //            [--min-seconds N]  자격의 남은 유효 시간 하한(기본 1200초. 긴 단계가 도는 동안 자격이 살아 있어야 한다)
 // 긴 단계는 줄마다 진행 상황을 표준 출력에 한 줄씩 적는다. 자격의 남은 시간이 90초 아래로 내려가면 그 줄 앞에서
 // 멈추고 거기까지의 결과를 적는다(--rows 로 이어서 잰다).
 //
 // 종료 값: 0 = 끝까지 했고 기대값 있는 칸이 전부 통과(미확인 0) / 1 = 기대와 다르거나 미확인인 칸이 있음 /
-//          2 = 대상·입력 확인에서 멈춤(요청 0) / 3 = 실행 중 멈춤
+//          2 = 대상·입력 확인에서 멈춤(요청 0) / 3 = 실행 중 멈춤 /
+//          4 = cleanup: 표식 없는 이름의 객체가 장부의 객체와 달라 아무것도 지우지 않고 멈춤
 // =====================================================================
 
 import { writeFile, readFile } from 'node:fs/promises';
@@ -115,9 +133,9 @@ function decodeJwtPayload(token) {
   }
 }
 
-const PHASES = ['plan', 'upload-new', 'upload-existing', 'actions', 'revoked', 'cleanup', 'table-ref', 'compare', 'owners'];
+const PHASES = ['plan', 'upload-new', 'upload-existing', 'actions', 'revoked', 'cleanup', 'table-ref', 'compare', 'owners', 'outside'];
 const MEASURE_PHASES = ['upload-new', 'upload-existing', 'actions'];
-const NO_REQUEST_PHASES = ['plan', 'compare', 'owners'];
+const NO_REQUEST_PHASES = ['plan', 'compare', 'owners', 'outside'];
 const args = parseArgs(process.argv.slice(2));
 const phase = args.phase;
 if (!PHASES.includes(phase)) stop(2, `--phase 는 다음 중 하나여야 한다: ${PHASES.join(', ')}`);
@@ -130,7 +148,7 @@ if (phase === 'revoked') {
   if (!(kind === 'expired' ? ['pre', 'post', 'restored'] : ['pre', 'post']).includes(step)) stop(2, 'revoked 는 --step pre|post (만료는 restored 도) 가 필요하다');
 }
 const outPath = args.out ?? null;
-if (!outPath && !['compare', 'owners'].includes(phase)) stop(2, '--out <결과 JSON 경로> 가 필요하다');
+if (!outPath && !['compare', 'owners', 'outside'].includes(phase)) stop(2, '--out <결과 JSON 경로> 가 필요하다');
 const minSeconds = Number.isFinite(Number(args['min-seconds'])) ? Math.max(120, Number(args['min-seconds'])) : 1200;
 const onlyBucket = args.bucket ?? null;
 if (onlyBucket && !BUCKETS.includes(onlyBucket)) stop(2, `--bucket 은 다음 중 하나여야 한다: ${BUCKETS.join(', ')}`);
@@ -442,42 +460,27 @@ const infoRaw = (actor, bucket, path) => (needsRaw(path)
   : http(actor, 'GET', `/storage/v1/object/info/authenticated/${bucket}/${encPath(path)}`));
 
 // ---------------------------------------------------------------------
-// 저장 정보 읽기 (서비스 열쇠의 목록 조회 + 정보 조회. 본문을 내려받지 않는다)
+// 저장 정보 읽기 (서비스 열쇠. 본문을 내려받지 않는다)
 // ---------------------------------------------------------------------
 const normEtag = (v) => (v == null ? null : String(v).trim().replace(/^W\//, '').replace(/^"+|"+$/g, '').toLowerCase());
 const MD5_RE = /^[0-9a-f]{32}$/;
+let noListCorroboration = 0; // "있음"으로 읽었지만 목록에서 같은 식별자의 항목을 찾지 못한 읽기의 수
 const notDynamic = (cf) => (cf === 'DYNAMIC' ? null : `cf-cache-status 가 DYNAMIC 이 아님(${cf ?? '머리글 없음'})`);
 
-// 저장 정보를 읽는 함수는 이것 하나다.
-//   있음 = 정확한 경로가 목록에 있고, 정보 조회도 200 이고, 둘의 eTag·크기·형식이 같고, eTag 가 md5 모양임
-//   없음 = 정확한 경로가 목록에 없고(목록을 끝까지 읽었고), 정보 조회도 관측된 "객체 없음" 모양(400·404·NoSuchKey)임
-//   그 밖(DYNAMIC 이 아님, 시간 초과·서버 오류, 일반 404 나 다른 문구, 목록이 잘림, eTag 모양이 다름, 둘이 어긋남)은 "미확인"
-//   object_id·created_at·updated_at 은 목록 조회가 준 값이다(객체가 같은 것인지 — 식별자 — 를 견주는 데 쓴다).
+// 저장 정보를 읽는 함수는 이것 하나다. path 는 글자 그대로의 전체 이름이다.
+//   있음·없음의 근거는 정보 조회다(글자 그대로 찾는다 — 실측).
+//     있음 = 200 이고 식별자·eTag(md5 모양)·크기가 옴
+//     없음 = 관측된 "객체 없음" 모양(HTTP 400·statusCode 404·code NoSuchKey)
+//     그 밖(DYNAMIC 이 아님, 시간 초과·서버 오류, 일반 404 나 다른 문구) = 미확인
+//   목록 조회는 이름을 정하는 데 쓰지 않는다. 실측에서 소문자 폴더의 목록에 대문자 폴더의 객체가 함께 나왔다 —
+//   목록이 돌려준 파일 이름에 조회한 폴더 이름을 붙여 전체 이름으로 삼으면 틀린다.
+//   "있음"일 때만 목록을 불러, 정보 조회가 준 식별자와 같은 항목을 골라 eTag·크기·형식을 한 번 더 견주고
+//   만든 시각·고친 시각을 읽는다. 같은 식별자의 항목이 있는데 값이 어긋나면 미확인이다.
+//   같은 식별자의 항목을 목록에서 찾지 못하면 정보 조회만으로 적고(list_corroborated: false),
+//   만든 시각·고친 시각은 비워 둔다 — 그 읽기가 몇 건이었는지를 결과에 적는다.
+//   ※ 이것은 저장 정보(메타데이터)다. 본문을 다시 받아 확인한 것이 아니다.
 async function readTrue(bucket, path) {
-  const i = path.lastIndexOf('/');
-  const folder = i < 0 ? '' : path.slice(0, i);
-  const name = i < 0 ? path : path.slice(i + 1);
   const doubts = [];
-
-  const lr = await listRaw('service', bucket, folder, name);
-  const list = { http_status: lr.status, cf_cache_status: lr.cf, returned: Array.isArray(lr.json) ? lr.json.length : null, present: null };
-  if (!lr.ok || !Array.isArray(lr.json)) doubts.push(`목록 조회 실패(${lr.status} ${responseInfo(lr).kind})`);
-  else {
-    if (notDynamic(lr.cf)) doubts.push('목록: ' + notDynamic(lr.cf));
-    const it = lr.json.find((x) => x.id && String(x.name) === name);
-    list.present = !!it;
-    if (it) {
-      list.object_id = String(it.id);
-      list.etag = normEtag(it.metadata?.eTag);
-      list.size = it.metadata?.size ?? null;
-      list.mimetype = it.metadata?.mimetype != null ? String(it.metadata.mimetype).toLowerCase() : null;
-      list.created_at = it.created_at ?? null;
-      list.updated_at = it.updated_at ?? null;
-    } else if (lr.json.length >= LIST_LIMIT) {
-      doubts.push(`목록이 한도(${LIST_LIMIT})까지 차서 끝까지 읽지 못함 — "없음"을 말할 수 없다`);
-    }
-  }
-
   const ir = await infoRaw('service', bucket, path);
   const ii = responseInfo(ir);
   const info = { http_status: ir.status, cf_cache_status: ir.cf, present: null, kind: ii.kind };
@@ -496,22 +499,53 @@ async function readTrue(bucket, path) {
     doubts.push(`정보 조회가 끝나지 않았거나 관측된 "객체 없음" 모양이 아닌 응답(${ir.status} ${ii.body_statusCode ?? '-'} ${ii.body_code ?? '-'} ${ii.kind})`);
   }
 
+  let list = null;
   let core = null;
-  if (!doubts.length) {
-    if (list.present === true && info.present === true) {
-      if (!list.etag || !MD5_RE.test(list.etag)) doubts.push(`목록의 eTag 가 없거나 md5 모양이 아님(${list.etag ?? '없음'})`);
-      else if (list.etag !== info.etag) doubts.push(`목록의 eTag(${list.etag})와 정보 조회의 eTag(${info.etag})가 어긋남`);
-      else if (list.size == null || Number(list.size) !== Number(info.size)) doubts.push(`목록의 크기(${list.size})와 정보 조회의 크기(${info.size})가 어긋남`);
-      else if (list.mimetype && info.content_type && list.mimetype !== info.content_type) doubts.push(`목록의 형식(${list.mimetype})과 정보 조회의 형식(${info.content_type})이 어긋남`);
-      else if (info.object_id && info.object_id !== list.object_id) doubts.push(`목록의 식별자(${list.object_id})와 정보 조회의 식별자(${info.object_id})가 어긋남`);
-      else core = { exists: true, md5: list.etag, size: Number(list.size), content_type: list.mimetype ?? info.content_type, object_id: list.object_id, created_at: list.created_at, updated_at: list.updated_at };
-    } else if (list.present === false && info.present === false) {
-      core = { exists: false };
-    } else {
-      doubts.push(`목록(${list.present ? '있음' : '없음'})과 정보 조회(${info.present ? '있음' : '없음'})가 어긋남`);
+  if (!doubts.length && info.present === false) {
+    core = { exists: false };
+  } else if (!doubts.length && info.present === true) {
+    if (!info.object_id) doubts.push('정보 조회에 객체 식별자가 없음');
+    else if (!info.etag || !MD5_RE.test(info.etag)) doubts.push(`정보 조회의 eTag 가 없거나 md5 모양이 아님(${info.etag ?? '없음'})`);
+    else if (info.size == null) doubts.push('정보 조회에 크기가 없음');
+    else {
+      const i = path.lastIndexOf('/');
+      const folder = i < 0 ? '' : path.slice(0, i);
+      const name = i < 0 ? path : path.slice(i + 1);
+      const lr = await listRaw('service', bucket, folder, name || undefined);
+      list = { http_status: lr.status, cf_cache_status: lr.cf, returned: Array.isArray(lr.json) ? lr.json.length : null, found_same_id: null };
+      if (!lr.ok || !Array.isArray(lr.json)) doubts.push(`목록 조회 실패(${lr.status} ${responseInfo(lr).kind})`);
+      else {
+        if (notDynamic(lr.cf)) doubts.push('목록: ' + notDynamic(lr.cf));
+        const it = lr.json.find((x) => x.id != null && String(x.id) === info.object_id); // 이름이 아니라 식별자로 고른다
+        list.found_same_id = !!it;
+        if (it) {
+          list.item_name = String(it.name);
+          list.etag = normEtag(it.metadata?.eTag);
+          list.size = it.metadata?.size ?? null;
+          list.mimetype = it.metadata?.mimetype != null ? String(it.metadata.mimetype).toLowerCase() : null;
+          list.created_at = it.created_at ?? null;
+          list.updated_at = it.updated_at ?? null;
+          if (list.etag !== info.etag) doubts.push(`목록의 eTag(${list.etag})와 정보 조회의 eTag(${info.etag})가 어긋남`);
+          else if (list.size == null || Number(list.size) !== Number(info.size)) doubts.push(`목록의 크기(${list.size})와 정보 조회의 크기(${info.size})가 어긋남`);
+          else if (list.mimetype && info.content_type && list.mimetype !== info.content_type) doubts.push(`목록의 형식(${list.mimetype})과 정보 조회의 형식(${info.content_type})이 어긋남`);
+        }
+      }
+      // 목록 조회 자체가 실패했거나 DYNAMIC 이 아니거나 값이 어긋나면 위에서 미확인이 됐다. 여기까지 왔으면 정보 조회는 믿을 수 있다.
+      if (!doubts.length) {
+        const corroborated = list.found_same_id === true;
+        if (!corroborated) noListCorroboration += 1;
+        core = {
+          exists: true, md5: info.etag, size: Number(info.size), content_type: info.content_type ?? null, object_id: info.object_id,
+          created_at: corroborated ? list.created_at : null, updated_at: corroborated ? list.updated_at : null, list_corroborated: corroborated,
+        };
+      }
     }
   }
-  return { known: !!core, ...(core ?? {}), unverified: core ? null : doubts.join(' / '), basis: '저장 정보(서비스 열쇠의 목록 조회 + 정보 조회)', list, info };
+  return {
+    name: path, known: !!core, ...(core ?? {}), unverified: core ? null : doubts.join(' / '),
+    basis: '저장 정보(서비스 열쇠의 정보 조회 — 글자 그대로의 이름. 있으면 같은 식별자의 목록 항목과 대조)',
+    info, list,
+  };
 }
 // 기대한 저장 정보와 정확히 같은가. 읽기가 "미확인"이면 같다고 하지 않는다.
 function stateIs(st, want) {
@@ -576,12 +610,13 @@ async function publicBody(bucket, path, bytes) {
 }
 
 // ---------------------------------------------------------------------
-// 버킷 전체의 저장 정보 한 벌(서비스 열쇠의 목록 조회만. 폴더를 따라 내려가고, 1000개를 넘으면 쪽을 넘긴다)
-//   "대상 밖 객체의 변화 0"과 "꾸민 경로가 실제로 어디에 도착했는가"를 이것의 전후 비교로 본다.
-//   응답이 하나라도 DYNAMIC 이 아니거나 실패하면 ok: false 이고, 그 비교는 "미확인"이다.
+// 목록 조회로 훑은 객체 식별자 한 벌 — "어림"으로만 쓴다
+//   목록은 객체의 전체 이름을 글자 그대로 가려 주지 못한다(실측: 소문자 폴더의 목록에 대문자 폴더의 객체가 함께 나왔다).
+//   그래서 이름이 아니라 식별자로 모으고, 이것으로 "어디에 도착했는가"나 "대상 밖 변화 0"을 정하지 않는다.
+//   listed_as 는 "조회한 폴더 + 목록이 준 파일 이름"일 뿐 실제 전체 이름이 아닐 수 있다.
 // ---------------------------------------------------------------------
-async function snapshot(bucket) {
-  const objects = new Map();
+async function listIds(bucket) {
+  const ids = new Map();
   const doubts = [];
   async function walk(prefix, depth) {
     if (depth > 8) {
@@ -598,8 +633,8 @@ async function snapshot(bucket) {
       for (const it of r.json) {
         const full = prefix ? `${prefix}/${it.name}` : String(it.name);
         if (it.id) {
-          objects.set(full, { id: String(it.id), etag: normEtag(it.metadata?.eTag), size: it.metadata?.size ?? null, mimetype: it.metadata?.mimetype ?? null, created_at: it.created_at ?? null, updated_at: it.updated_at ?? null });
-        } else {
+          if (!ids.has(String(it.id))) ids.set(String(it.id), { listed_as: full, etag: normEtag(it.metadata?.eTag), size: it.metadata?.size ?? null, updated_at: it.updated_at ?? null });
+        } else if (String(it.name) !== '') {
           await walk(full, depth + 1);
         }
       }
@@ -611,25 +646,36 @@ async function snapshot(bucket) {
     }
   }
   await walk('', 0);
-  return { bucket, ok: doubts.length === 0, doubts, objects };
+  return { bucket, ok: doubts.length === 0, doubts, ids };
 }
-function diffSnapshots(a, b) {
-  const added = [];
-  const removed = [];
-  const changed = [];
-  for (const [name, m] of b.objects) {
-    const p = a.objects.get(name);
-    if (!p) added.push(name);
-    else if (p.id !== m.id || p.etag !== m.etag || p.size !== m.size || p.updated_at !== m.updated_at) changed.push(name);
-  }
-  for (const name of a.objects.keys()) if (!b.objects.has(name)) removed.push(name);
-  return { ok: a.ok && b.ok, doubts: [...a.doubts, ...b.doubts], added: added.sort(), removed: removed.sort(), changed: changed.sort() };
-}
-async function snapshotAll() {
+async function listIdsAll() {
   const out = {};
-  for (const b of BUCKETS) out[b] = await snapshot(b);
+  for (const b of BUCKETS) out[b] = await listIds(b);
   return out;
 }
+// 단계 전후의 목록(식별자)을 견줘 눈에 띄는 것을 적는다. 어림이다 — 이것이 비어 있어도 "대상 밖 변화 0"이 아니다.
+function listingHint(before, after, ledger) {
+  const mine = new Set(ledger.map((e) => e.object_id).filter(Boolean));
+  const out = { listings_complete: true, doubts: [], new_ids_not_in_ledger: [], gone_ids: [], changed_ids: [] };
+  for (const b of BUCKETS) {
+    const A = before[b];
+    const B = after[b];
+    if (!A.ok || !B.ok) {
+      out.listings_complete = false;
+      out.doubts.push(...A.doubts, ...B.doubts);
+    }
+    for (const [id, m] of B.ids) {
+      const p = A.ids.get(id);
+      if (!p) {
+        if (!mine.has(id)) out.new_ids_not_in_ledger.push({ bucket: b, id, listed_as: m.listed_as });
+      } else if (!mine.has(id) && (p.etag !== m.etag || p.size !== m.size || p.updated_at !== m.updated_at)) out.changed_ids.push({ bucket: b, id, listed_as: m.listed_as });
+    }
+    for (const [id, m] of A.ids) if (!B.ids.has(id)) out.gone_ids.push({ bucket: b, id, listed_as: m.listed_as });
+  }
+  out.nothing_noticed = !out.new_ids_not_in_ledger.length && !out.gone_ids.length && !out.changed_ids.length;
+  return out;
+}
+const snapshotAll = listIdsAll; // 다른 단계가 쓰는 이름
 
 // ---------------------------------------------------------------------
 // 규칙의 모형 — 기대값은 여기서 나온다
@@ -682,7 +728,6 @@ const hasExpectation = (actor) => actor !== 'anon' || state === 'rehearsal';
 // ---------------------------------------------------------------------
 let runTs = Date.now(); // 합성 파일 이름의 "시각" 자리(실행마다 다르다)
 const fileFor = (tag, suffix = '.png') => `${runTs}_${MARK}_${tag}${suffix}`;
-const tagRe = (tag) => new RegExp(`${MARK}_${tag}(?![a-z0-9])`);
 const join = (dir, file) => (dir ? `${dir}/${file}` : file);
 const MODES = [
   { id: 'upsert', upsert: true, label: 'x-upsert: true(지금 화면의 방식)' },
@@ -715,13 +760,13 @@ function uploadShapes() {
     normal('score-admin-a', SCORE, A, '<A>/<파일> — 관리자 경로'),
     normal('score-admin-upper', SCORE, UPPER_UUID, '<대문자 uuid>/<파일> — 관리자 경로의 uuid 는 대문자도 허용이 기대값'),
     normal('score-admin-nomember', SCORE, NO_MEMBER, '<없는 회원번호>/<파일> — 관리자 경로는 모양만 본다(남은 허용: 없는 회원번호 폴더)', { remaining: true }),
-    con('score-c-upper-prefix', SCORE, '꾸밈: 대문자 EXAM-REG/<A>/<파일>', (t) => same(`EXAM-REG/${A}/${fileFor(t)}`)),
+    con('score-c-upper-prefix', SCORE, '꾸밈: 대문자 EXAM-REG/<A>/<파일> — 저장소는 보낸 대소문자 그대로 저장한다(실측)', (t) => same(`EXAM-REG/${A}/${fileFor(t)}`), { arrival: 'as_sent' }),
     con('score-c-extra-folder', SCORE, '꾸밈: exam-reg/<A>/sub/<파일> — 폴더가 더 있음', (t) => same(`exam-reg/${A}/sub/${fileFor(t)}`)),
     con('score-c-member-case', SCORE, '꾸밈: exam-reg/<A 의 대소문자를 바꾼 번호>/<파일> — 글자 그대로 비교하므로 거절이 기대값', (t) => same(`exam-reg/${AU}/${fileFor(t)}`),
-      { must: { member_a: 'not_stored' }, skip: AU === A ? 'A 의 회원번호에 영문자가 없어 대소문자를 바꿀 수 없다' : null }),
+      { arrival: 'as_sent', must: { member_a: 'not_stored' }, skip: AU === A ? 'A 의 회원번호에 영문자가 없어 대소문자를 바꿀 수 없다' : null }),
     con('score-c-empty-seg', SCORE, '꾸밈: exam-reg//<파일> — 빈 구간', (t) => same(`exam-reg//${fileFor(t)}`)),
     con('score-c-empty-seg2', SCORE, '꾸밈: exam-reg/<A>//<파일> — 빈 구간', (t) => same(`exam-reg/${A}//${fileFor(t)}`)),
-    con('score-c-empty-file', SCORE, '꾸밈: exam-reg/<A>/ — 파일 이름이 빔', () => same(`exam-reg/${A}/`), { noTag: true }),
+    con('score-c-empty-file', SCORE, '꾸밈: exam-reg/<A>/ — 파일 이름이 빔(서비스 열쇠·비로그인에게는 이 이름의 객체가 만들어진다 — 기존 동작, 실측)', () => same(`exam-reg/${A}/`), { noTag: true }),
     con('score-c-dotdot', SCORE, '꾸밈: exam-reg/<B>/../<A>/<파일> — ".." 로 A 의 폴더를 가리킴', (t) => same(`exam-reg/${B}/../${A}/${fileFor(t)}`)),
     con('score-c-enc-slash', SCORE, '꾸밈: exam-reg%2F<A>%2F<파일> — 인코딩한 빗금', (t) => ({ raw: `exam-reg%2F${A}%2F${fileFor(t)}`, literal: `exam-reg/${A}/${fileFor(t)}` })),
     con('score-c-enc-twice', SCORE, '꾸밈: exam-reg%252F<A>%252F<파일> — 두 번 인코딩한 빗금', (t) => ({ raw: `exam-reg%252F${A}%252F${fileFor(t)}`, literal: `exam-reg%2F${A}%2F${fileFor(t)}` })),
@@ -743,10 +788,10 @@ function uploadShapes() {
     con('board-c-other-key', BOARD, '꾸밈: free/<파일> — 허용 밖의 키', (t) => same(`free/${fileFor(t)}`)),
     con('board-c-extra-seg', BOARD, '꾸밈: reviews/sub/<파일> — 구간이 하나 더', (t) => same(`reviews/sub/${fileFor(t)}`)),
     con('board-c-empty-seg', BOARD, '꾸밈: reviews//<파일> — 빈 구간', (t) => same(`reviews//${fileFor(t)}`)),
-    con('board-c-upper', BOARD, '꾸밈: REVIEWS/<파일> — 대문자 키', (t) => same(`REVIEWS/${fileFor(t)}`)),
+    con('board-c-upper', BOARD, '꾸밈: REVIEWS/<파일> — 대문자 키(저장소는 보낸 대소문자 그대로 저장한다 — 실측)', (t) => same(`REVIEWS/${fileFor(t)}`), { arrival: 'as_sent' }),
     con('board-c-dotdot', BOARD, '꾸밈: reviews/../notice/<파일> — ".." 로 관리자 게시판을 가리킴', (t) => same(`reviews/../notice/${fileFor(t)}`)),
     con('board-c-enc-slash', BOARD, '꾸밈: reviews%2F<파일> — 인코딩한 빗금', (t) => ({ raw: `reviews%2F${fileFor(t)}`, literal: `reviews/${fileFor(t)}` })),
-    con('board-c-empty-file', BOARD, '꾸밈: reviews/ — 파일 이름이 빔', () => same('reviews/'), { noTag: true }),
+    con('board-c-empty-file', BOARD, '꾸밈: reviews/ — 파일 이름이 빔(서비스 열쇠·비로그인에게는 이 이름의 객체가 만들어진다 — 기존 동작, 실측)', () => same('reviews/'), { noTag: true }),
     con('board-c-root-file', BOARD, '꾸밈: <파일> — 폴더 없이 버킷 바로 아래', (t) => same(fileFor(t))),
     // ---- guide-images · materials (새 규칙 없음) ----
     normal('guide-root', GUIDE, '', '<파일> — 안내서 편집의 경로 모양(남은 허용: 모든 역할 올리기 규칙)', { remaining: true }),
@@ -841,22 +886,6 @@ function expiringSoon(list) {
   for (const a of list) if (jwtInfo[a] && jwtInfo[a].exp - now < 90) return a;
   return null;
 }
-// 단계 전후의 버킷 네 개 전체를 견줘, 이 단계가 만든다고 알고 있는 이름(known) 밖의 변화를 찾는다
-function outsideChange(before, after, known) {
-  const out = { ok: true, doubts: [], unaccounted_new: [], removed: [], changed: [] };
-  for (const b of BUCKETS) {
-    const d = diffSnapshots(before[b], after[b]);
-    if (!d.ok) {
-      out.ok = false;
-      out.doubts.push(...d.doubts);
-    }
-    for (const n of d.added) if (!known.has(`${b}/${n}`)) out.unaccounted_new.push(`${b}/${n}`);
-    for (const n of d.removed) if (!known.has(`${b}/${n}`)) out.removed.push(`${b}/${n}`);
-    for (const n of d.changed) if (!known.has(`${b}/${n}`)) out.changed.push(`${b}/${n}`);
-  }
-  out.zero = out.ok && !out.unaccounted_new.length && !out.removed.length && !out.changed.length;
-  return out;
-}
 async function removeMany(bucket, paths) {
   for (let i = 0; i < paths.length; i += 100) {
     const r = await http('service', 'DELETE', `/storage/v1/object/${bucket}`, { json: { prefixes: paths.slice(i, i + 100) } });
@@ -867,44 +896,122 @@ const ledgerEntry = (bucket, name, st, expectOwner, why) => ({ bucket, name, obj
 
 // ---------------------------------------------------------------------
 // upload-new: 새 이름 올리기 (경로 모양 × 요청 방식 × 자격)
-//   한 줄의 칸들을 다 보낸 뒤 그 버킷 전체의 저장 정보를 줄 앞과 견줘, 칸마다 "실제로 어디에 무엇이 생겼는가"를 정한다
-//   (파일 이름에 칸의 꼬리표가 들어 있다). 꼬리표를 둘 수 없는 모양(파일 이름이 빈 것)은 칸마다 전후를 뜬다.
+//   도착한 이름은 글자 그대로 정한다: 올리기가 성공하면 응답의 Key(버킷/전체 이름)와 Id 를 근거로 삼고,
+//   그 정확한 전체 이름에 대한 서비스 열쇠의 정보 조회가 준 식별자·저장 정보와 대조한다. 어긋나면 미확인이다.
+//   거절된 요청에는 Key 가 없는 것이 정상이다. 거절 칸의 "저장 변화 0"은 그 요청 직후(정리 전)에 확인한다:
+//   그 요청이 가리킨 정확한 이름과 꾸민 경로가 도착할 수 있는 후보 이름들의 정보 조회가 "객체 없음"이고,
+//   그 줄의 대조 객체(서비스 열쇠가 줄 앞에서 만든 것)의 식별자·저장 정보가 그대로임. 못 하면 미확인이다.
+//   목록 조회로 도착 위치를 정하지 않는다.
 // ---------------------------------------------------------------------
-async function inspectArrived(bucket, names, bytes) {
+function keyOfResponse(r) {
+  const j = r.json && typeof r.json === 'object' && !Array.isArray(r.json) ? r.json : null;
+  const Key = j?.Key != null ? String(j.Key) : null;
+  const Id = j?.Id != null ? String(j.Id) : null;
+  return Key || Id ? { Key, Id } : null;
+}
+// 성공한 올리기가 실제로 도착한 곳(글자 그대로)과 그 객체의 저장 정보
+async function resolveArrival(bucket, r, bytes) {
+  const key = keyOfResponse(r);
+  if (!key || !key.Key || !key.Id) return { key, problem: '성공 응답에 Key 또는 Id 가 없음' };
+  if (!key.Key.startsWith(`${bucket}/`)) return { key, problem: `응답의 Key 가 이 버킷으로 시작하지 않음(${key.Key})` };
+  const name = key.Key.slice(bucket.length + 1); // 글자 그대로. 대소문자·끝의 빗금을 바꾸지 않는다
+  const stored = await readTrue(bucket, name);
+  return {
+    key, name, id: key.Id, problem: null, stored,
+    id_matches: stored.known && stored.exists ? stored.object_id === key.Id : null,
+    stored_matches_upload: stateIs(stored, present(bytes)),
+  };
+}
+// 실측에서 본 정리(빈 구간이 합쳐지고 "."·".." 이 풀림)를 흉내 낸 이름. 근거가 아니라 "없음을 확인할 이름"을 늘리는 데만 쓴다.
+function normalizeName(name) {
+  const trailing = name.endsWith('/');
+  const out = [];
+  for (const s of name.split('/')) {
+    if (s === '' || s === '.') continue;
+    if (s === '..') out.pop();
+    else out.push(s);
+  }
+  return out.join('/') + (trailing && out.length ? '/' : '');
+}
+const swapTag = (name, from, to) => name.replace(new RegExp(`${MARK}_${from}(?![a-z0-9])`), `${MARK}_${to}`);
+// 거절된 요청이 저장됐다면 있었을 이름들: 적은 이름 그대로, 그것을 정리한 이름, 같은 입력의 서비스 열쇠 대조군이 실제로 도착한 이름(꼬리표만 이 칸의 것으로)
+function candidateNames(cell, control) {
+  const set = new Set([cell.literal, normalizeName(cell.literal)]);
+  if (control?.arrival?.name) set.add(swapTag(control.arrival.name, control.tag, cell.tag));
+  set.delete('');
+  return [...set];
+}
+async function checkAbsent(bucket, names) {
   const out = [];
   for (const name of names) {
-    const stored = await readTrue(bucket, name);
-    const body = stateIs(stored, present(bytes)) ? await firstBodyByService(bucket, name, bytes) : null;
-    out.push({ name, stored, stored_matches_upload: stateIs(stored, present(bytes)), body });
+    const st = await readTrue(bucket, name);
+    out.push({ name, known: st.known, exists: st.known ? st.exists : null, unverified: st.unverified, info_status: st.info.http_status, info_cf: st.info.cf_cache_status });
   }
   return out;
 }
-function judgeNormalUpload(row, cell, control, integrity) {
+const allAbsent = (checks) => checks.length > 0 && checks.every((x) => x.known && x.exists === false);
+const absentProblem = (checks) => {
+  const there = checks.filter((x) => x.known && x.exists);
+  if (there.length) return { kind: 'exists', text: there.map((x) => x.name).join(', ') };
+  const unk = checks.filter((x) => !x.known);
+  if (unk.length || !checks.length) return { kind: 'unknown', text: unk.map((x) => `${x.name}: ${x.unverified}`).join(' / ') || '확인한 이름이 없음' };
+  return null;
+};
+// 견주기용: 실행·계정마다 달라지는 것(시각·꼬리표·회원번호)을 뺀 이름의 모양. 대소문자는 남긴다.
+function shapeOfName(name) {
+  if (name == null) return null;
+  let s = String(name).replace(new RegExp(`\\d{10,}_${MARK}_[a-z0-9]+`, 'g'), '<파일>');
+  for (const [id, label] of [[memberA, 'A'], [memberB, 'B'], [memberGM, 'GM']]) {
+    if (!id) continue;
+    s = s.split(id).join(`<${label}>`);
+    if (id.toUpperCase() !== id) s = s.split(id.toUpperCase()).join(`<${label} 대문자>`);
+  }
+  return s;
+}
+// 대조 객체를 두는 폴더: 보통 경로는 그 폴더, 꾸민 경로는 그 버킷의 보통 폴더
+const controlDirOf = (row) => (row.shape.kind === 'normal' ? row.shape.dir : row.bucket === SCORE ? `exam-reg/${memberA}` : row.bucket === BOARD ? 'reviews' : '');
+
+// 올리기 한 칸의 공통 확인(대조 객체·도착·저장 변화 0). 문제가 있으면 그 말을, 없으면 null 을 돌려준다.
+function arrivalProblem(cell, shared) {
+  const a = cell.arrival;
+  if (!a || a.problem) return ['unknown', `응답의 Key·Id 로 도착한 이름을 정하지 못함: ${a?.problem ?? '응답에 Key·Id 가 없음'}`];
+  if (!a.stored.known) return ['unknown', `도착한 이름(${a.name})의 저장 정보 미확인: ${a.stored.unverified}`];
+  if (!a.stored.exists) return ['bad', `성공 응답인데 응답의 Key 가 가리킨 이름(${a.name})에 객체가 없음`];
+  if (!a.id_matches) return ['unknown', `응답의 Id(${a.id})와 정보 조회의 식별자(${a.stored.object_id})가 어긋남`];
+  if (!a.stored_matches_upload) return ['bad', '도착한 객체의 저장 정보(eTag·크기·형식)가 올린 내용과 다름'];
+  if (!shared) {
+    // 이름이 칸마다 다른 줄: 서비스 열쇠의 첫 본문 GET 이 올린 내용과 같아야 한다
+    if (!a.body || a.body.match === null) return ['unknown', `본문을 받지 못함: ${a.body?.http_status} ${a.body?.error?.kind ?? ''}`];
+    if (a.body.match === false) return ['bad', '본문의 md5 가 올린 내용과 다름'];
+  }
+  return null;
+}
+function judgeNormalUpload(row, cell, control, rowCtl) {
   const c = ctxOf(cell.actor);
   const says = verdictWord(M.uploadNew(state, c, row.bucket, cell.literal, row.mode.upsert));
   cell.model_says = says;
   cell.expect = hasExpectation(cell.actor) ? says : null;
   const ri = cell.response;
   let o;
-  if (!integrity.ok) o = `undetermined(줄 전후의 목록 비교를 믿을 수 없음: ${integrity.why})`;
+  if (!rowCtl.ok) o = `undetermined(이 줄의 대조 객체를 만들지 못했거나 확인하지 못함: ${rowCtl.why})`;
+  else if (!cell.control_after?.known) o = `undetermined(대조 객체의 저장 정보 미확인: ${doubtOf(cell.control_after)})`;
+  else if (!cell.control_unchanged) o = 'anomaly(대조 객체가 바뀜)';
   else if (cell.request_ok) {
-    if (cell.arrived.length !== 1) o = `anomaly(성공 응답인데 새 객체가 ${cell.arrived.length}개)`;
-    else if (cell.arrived[0].name !== cell.literal) o = `anomaly(다른 이름에 저장됨: ${cell.arrived[0].name})`;
-    else if (!cell.arrived[0].stored.known) o = `undetermined(저장 정보 미확인: ${cell.arrived[0].stored.unverified})`;
-    else if (!cell.arrived[0].stored_matches_upload) o = 'anomaly(저장 정보가 올린 내용의 지문·크기·형식과 다름)';
-    else if (cell.arrived[0].body.match === null) o = `undetermined(본문을 받지 못함: ${cell.arrived[0].body.http_status} ${cell.arrived[0].body.error?.kind})`;
-    else if (cell.arrived[0].body.match === false) o = 'anomaly(본문의 md5 가 올린 내용과 다름)';
+    const p = arrivalProblem(cell, false);
+    if (p) o = `${p[0] === 'unknown' ? 'undetermined' : 'anomaly'}(${p[1]})`;
+    else if (cell.arrival.name !== cell.literal) o = `anomaly(보낸 이름과 다른 이름에 저장됨: ${cell.arrival.name})`;
     else o = 'allow';
-  } else if (cell.arrived.length) o = `anomaly(거절 응답인데 객체가 생김: ${cell.arrived.map((x) => x.name).join(', ')})`;
-  else if (inconclusive(ri.kind)) o = `undetermined(요청이 끝나지 않았거나 서버 오류·자격 자체의 거절: ${ri.kind})`;
-  else if (!cell.literal_state?.known) o = `undetermined(그 이름의 저장 정보 미확인: ${doubtOf(cell.literal_state)})`;
-  else if (cell.literal_state.exists) o = 'anomaly(거절 응답인데 그 이름에 객체가 있음)';
-  else if (!DENY_KINDS.upload.includes(ri.kind)) o = `undetermined(권한 오류의 관측된 모양이 아닌 거절: ${ri.http_status}/${ri.body_statusCode ?? '-'} ${ri.kind})`;
-  else if (cell.actor !== 'service' && !(control && control.observed === 'allow')) o = 'undetermined(권한 미판정 — 같은 입력의 서비스 열쇠 대조군이 성공하지 못함)';
-  else o = 'deny';
+  } else {
+    const ap = absentProblem(cell.absent_checks ?? []);
+    if (inconclusive(ri.kind)) o = `undetermined(요청이 끝나지 않았거나 서버 오류·자격 자체의 거절: ${ri.kind})`;
+    else if (ap?.kind === 'exists') o = `anomaly(거절 응답인데 객체가 있음: ${ap.text})`;
+    else if (ap) o = `undetermined(저장 변화 0을 확인하지 못함: ${ap.text})`;
+    else if (!DENY_KINDS.upload.includes(ri.kind)) o = `undetermined(권한 오류의 관측된 모양이 아닌 거절: ${ri.http_status}/${ri.body_statusCode ?? '-'} ${ri.kind})`;
+    else if (cell.actor !== 'service' && !(control && control.observed === 'allow')) o = 'undetermined(권한 미판정 — 같은 입력의 서비스 열쇠 대조군이 성공하지 못함)';
+    else o = 'deny';
+  }
   cell.observed = o;
   cell.pass = cell.expect == null ? null : o === cell.expect ? true : o.startsWith('undetermined') ? null : false;
-  cell.cmp = { observed: o.replace(/\(.*$/s, ''), response: respSig(ri), stored: cell.arrived.length, as_sent: cell.arrived.length === 1 && cell.arrived[0].name === cell.literal };
 }
 const CLASS = {
   input: '① 입력 오류(저장소가 이름 자체를 받지 않음)',
@@ -913,48 +1020,59 @@ const CLASS = {
   outside: '④ 권한 밖 위치에 실제로 저장됨(실패)',
   control: '저장됨(서비스 열쇠 — 대조군)',
 };
-function judgeContrivedUpload(row, cell, control, integrity) {
+function judgeContrivedUpload(row, cell, control, rowCtl) {
   const c = ctxOf(cell.actor);
   const ri = cell.response;
+  const shared = !!row.shape.noTag;
   cell.model_says_for_name_as_sent = verdictWord(M.uploadNew(state, c, row.bucket, cell.literal, row.mode.upsert));
   const must = row.shape.must?.[cell.actor] ?? null;
-  cell.expect = hasExpectation(cell.actor) ? (cell.actor === 'service' ? '저장됨 또는 ①' : must === 'not_stored' ? '① 또는 ②(저장되지 않음)' : '①·②·③ 중 하나(④가 아님)') : null;
+  const asSent = row.shape.arrival === 'as_sent';
+  cell.expect = hasExpectation(cell.actor)
+    ? (cell.actor === 'service' ? (asSent ? '보낸 글자 그대로 저장됨' : '저장됨 또는 ①') : must === 'not_stored' ? '① 또는 ②(저장되지 않음)' : '①·②·③ 중 하나(④가 아님)')
+    : null;
   let cls;
   let key;
-  if (!integrity.ok) [key, cls] = ['unknown', `미확인(줄 전후의 목록 비교를 믿을 수 없음: ${integrity.why})`];
+  if (!rowCtl.ok) [key, cls] = ['unknown', `미확인(이 줄의 대조 객체를 만들지 못했거나 확인하지 못함: ${rowCtl.why})`];
+  else if (cell.start_not_clean) [key, cls] = ['unknown', `미확인(요청 전에 그 이름이 비어 있음을 확인하지 못함: ${cell.start_not_clean})`];
+  else if (!cell.control_after?.known) [key, cls] = ['unknown', `미확인(대조 객체의 저장 정보 미확인: ${doubtOf(cell.control_after)})`];
+  else if (!cell.control_unchanged) [key, cls] = ['bad', '이상(대조 객체가 바뀜)'];
   else if (cell.request_ok) {
-    const a = cell.arrived;
-    if (a.length !== 1) [key, cls] = ['unknown', `미확인(성공 응답인데 새 객체가 ${a.length}개)`];
-    else if (!a[0].stored.known) [key, cls] = ['unknown', `미확인(도착한 객체의 저장 정보 미확인: ${a[0].stored.unverified})`];
-    else if (!a[0].stored_matches_upload) [key, cls] = ['bad', '이상(도착한 객체의 저장 정보가 올린 내용과 다름)'];
-    else if (a[0].body.match === null) [key, cls] = ['unknown', `미확인(본문을 받지 못함: ${a[0].body.http_status})`];
-    else if (a[0].body.match === false) [key, cls] = ['bad', '이상(본문의 md5 가 올린 내용과 다름)'];
-    else if (cell.actor === 'service') [key, cls] = ['control', CLASS.control];
-    else if (M.uploadNew(state, c, row.bucket, a[0].name, row.mode.upsert)) [key, cls] = ['allowed', CLASS.allowed];
+    const p = arrivalProblem(cell, shared);
+    cell.arrived_full_name = cell.arrival?.name ?? null; // 저장소에 실제로 도착한 전체 이름(응답의 Key, 글자 그대로)
+    if (p) [key, cls] = [p[0], `${p[0] === 'unknown' ? '미확인' : '이상'}(${p[1]})`];
+    else if (shared && cell.removed_after_inspect && !cell.removed_after_inspect.verified_absent) [key, cls] = ['unknown', '미확인(살핀 뒤 그 객체를 지웠는지 확인하지 못함 — 같은 이름을 쓰는 다음 칸을 믿을 수 없다)'];
+    else if (cell.actor === 'service') {
+      if (asSent && cell.arrival.name !== cell.literal) [key, cls] = ['bad', `이상(보낸 글자 그대로 저장되지 않음: ${cell.arrival.name})`];
+      else [key, cls] = ['control', CLASS.control];
+    } else if (M.uploadNew(state, c, row.bucket, cell.arrival.name, row.mode.upsert)) [key, cls] = ['allowed', CLASS.allowed]; // 글자 그대로의 도착 이름으로 가른다
     else [key, cls] = ['outside', CLASS.outside];
-    cell.arrived_full_name = a.length === 1 ? a[0].name : null; // 저장소에 실제로 도착한 전체 이름
-  } else if (cell.arrived.length) [key, cls] = ['bad', `이상(거절 응답인데 객체가 생김: ${cell.arrived.map((x) => x.name).join(', ')})`];
-  else if (inconclusive(ri.kind)) [key, cls] = ['unknown', `미확인(요청이 끝나지 않았거나 서버 오류·자격 자체의 거절: ${ri.kind})`];
-  else if (cell.actor === 'service') {
-    // 서비스 열쇠는 규칙을 거치지 않는다. 저장되지 않았다면 저장소가 그 이름 자체를 받지 않은 것이다.
-    if (ri.kind === 'rls' || ri.kind === 'access_denied') [key, cls] = ['bad', '이상(서비스 열쇠인데 권한 오류)'];
-    else [key, cls] = ['input', CLASS.input];
-  } else if (control && control.class_key === 'input') {
-    // 같은 입력을 서비스 열쇠도 저장하지 못했다 → 입력 오류. 이 자격에게 온 응답은 권한 오류일 수도 있다(그대로 적는다).
-    [key, cls] = ['input', CLASS.input];
-    cell.same_response_as_control = JSON.stringify(respSig(control.response)) === JSON.stringify(respSig(ri));
-  } else if (ri.kind === 'rls') {
-    if (control && control.class_key === 'control') [key, cls] = ['denied', CLASS.denied];
-    else [key, cls] = ['unknown', '권한 미판정(같은 입력의 서비스 열쇠 대조군이 저장도 입력 오류도 아님)'];
-  } else [key, cls] = ['unknown', `미확인(서비스 열쇠로는 저장되는 이름인데 권한 오류의 관측된 모양이 아닌 거절: ${ri.http_status}/${ri.body_statusCode ?? '-'} ${ri.body_code ?? ''} ${ri.kind})`];
+  } else {
+    const ap = absentProblem(cell.absent_checks ?? []);
+    if (inconclusive(ri.kind)) [key, cls] = ['unknown', `미확인(요청이 끝나지 않았거나 서버 오류·자격 자체의 거절: ${ri.kind})`];
+    else if (ap?.kind === 'exists') [key, cls] = ['bad', `이상(거절 응답인데 객체가 있음: ${ap.text})`];
+    else if (ap) [key, cls] = ['unknown', `미확인(저장 변화 0을 확인하지 못함: ${ap.text})`];
+    else if (cell.actor === 'service') {
+      // 서비스 열쇠는 규칙을 거치지 않는다. 저장되지 않았다면 저장소가 그 이름 자체를 받지 않은 것이다.
+      if (ri.kind === 'rls' || ri.kind === 'access_denied') [key, cls] = ['bad', '이상(서비스 열쇠인데 권한 오류)'];
+      else if (asSent) [key, cls] = ['bad', `이상(보낸 글자 그대로 저장되는 것이 기대인데 저장소가 받지 않음: ${ri.http_status}/${ri.body_statusCode ?? '-'} ${ri.body_code ?? ''})`];
+      else [key, cls] = ['input', CLASS.input];
+    } else if (control && control.class_key === 'input') {
+      // 같은 입력을 서비스 열쇠도 저장하지 못했다 → 입력 오류. 이 자격에게 온 응답은 권한 오류일 수도 있다(그대로 적는다).
+      [key, cls] = ['input', CLASS.input];
+      cell.same_response_as_control = JSON.stringify(respSig(control.response)) === JSON.stringify(respSig(ri));
+    } else if (ri.kind === 'rls') {
+      if (control && control.class_key === 'control') [key, cls] = ['denied', CLASS.denied];
+      else [key, cls] = ['unknown', '권한 미판정(같은 입력의 서비스 열쇠 대조군이 저장도 입력 오류도 아님)'];
+    } else [key, cls] = ['unknown', `미확인(서비스 열쇠로는 저장되는 이름인데 권한 오류의 관측된 모양이 아닌 거절: ${ri.http_status}/${ri.body_statusCode ?? '-'} ${ri.body_code ?? ''} ${ri.kind})`];
+  }
   cell.class_key = key;
   cell.observed = cls;
   if (cell.expect == null) cell.pass = null;
   else if (key === 'unknown') cell.pass = null;
   else if (key === 'bad' || key === 'outside') cell.pass = false;
   else if (must === 'not_stored') cell.pass = key === 'input' || key === 'denied';
+  else if (cell.actor === 'service' && asSent) cell.pass = key === 'control';
   else cell.pass = true;
-  cell.cmp = { observed: key, response: respSig(ri), stored: cell.arrived.length, arrived_shape: (cell.arrived[0]?.name ?? '').replace(new RegExp(`\\d+_${MARK}_[a-z0-9]+`), '<파일>') };
 }
 
 async function phaseUploadNew(run) {
@@ -963,11 +1081,10 @@ async function phaseUploadNew(run) {
   const skipped = selectRows(all).filter((r) => r.shape.skip).map((r) => ({ row: r.id, why: r.shape.skip }));
   const cells = [];
   const ledger = [];
-  const known = new Set();
-  const rowNotes = [];
   let stopped = null;
-  const before = await snapshotAll();
-  const snaps = { ...before };
+  const before = await listIdsAll();
+  const sharedBodies = new Map(); // 같은 이름을 여러 칸이 쓰는 경로: 버킷/이름 → 이 실행에서 그 이름에 올렸던 내용들의 md5(요청 방식이 다른 줄끼리도 이름이 같다)
+  const order = ['service', ...actors.filter((a) => a !== 'service')]; // 대조군(서비스 열쇠)을 먼저 보낸다 — 그 도착 이름이 다른 칸의 "없음을 확인할 이름"이 된다
   let done = 0;
   for (const row of rows) {
     const soon = expiringSoon(actors);
@@ -975,69 +1092,90 @@ async function phaseUploadNew(run) {
       stopped = `${who(soon)} 의 자격이 90초 안에 끝난다 — ${row.no}번 줄 앞에서 멈춤(--rows ${row.no}-${all.length} 로 이어서 잰다)`;
       break;
     }
-    const rowCells = [];
-    for (const actor of actors) {
+    const shared = !!row.shape.noTag; // 칸마다 이름을 다르게 할 수 없는 줄(파일 이름이 빈 경로)
+    // 이 줄의 대조 객체: 서비스 열쇠가 줄 앞에서 만든다. 칸마다 요청 뒤에 그대로인지 읽는다.
+    const ctlName = join(controlDirOf(row), fileFor(`u${row.no}ctl`));
+    const ctlBytes = makePng(`${run} ${row.id} control`);
+    const cu = await upload('service', row.bucket, ctlName, ctlBytes, { upsert: false });
+    const ctlStart = await readTrue(row.bucket, ctlName);
+    const rowCtl = { name: ctlName, start: ctlStart, ok: cu.ok && stateIs(ctlStart, present(ctlBytes)), why: cu.ok ? doubtOf(ctlStart) ?? '저장 정보가 올린 내용과 다름' : `올리기 ${cu.status} ${responseInfo(cu).kind}` };
+    if (rowCtl.ok) ledger.push(ledgerEntry(row.bucket, ctlName, ctlStart, null, `${row.id} · 이 줄의 대조 객체(서비스 열쇠)`));
+
+    const byActor = new Map();
+    let controlCell = null;
+    for (const actor of order) {
       const tag = `u${row.no}${ACTOR_CODE[actor]}`;
       const bytes = makePng(`${run} ${row.id} ${actor}`);
       const target = row.shape.make(tag);
       const literal = row.shape.kind === 'normal' ? target.name : target.literal;
-      const cell = { row: row.no, row_id: row.id, bucket: row.bucket, shape: row.shape.id, path_kind: row.shape.kind, request_mode: row.mode.id, actor, tag, sent_path: row.shape.kind === 'normal' ? target.name : target.raw, literal, uploaded: describe(bytes), arrived: [] };
-      const pre = row.shape.noTag ? await snapshot(row.bucket) : null;
+      const cell = {
+        row: row.no, row_id: row.id, bucket: row.bucket, shape: row.shape.id, path_kind: row.shape.kind, request_mode: row.mode.id, actor, tag,
+        sent_path: row.shape.kind === 'normal' ? target.name : target.raw, literal, shares_name_with_other_cells: shared, uploaded: describe(bytes),
+        control_path: ctlName, arrival: null,
+      };
+      byActor.set(actor, cell);
+      if (actor === 'service') controlCell = cell;
+      if (!rowCtl.ok) continue;
+      if (shared) {
+        // 같은 이름을 쓰는 줄: 요청 전에 그 이름(과 후보 이름)이 비어 있어야 한다(앞 칸의 것은 살핀 뒤 지웠다)
+        const pre = await checkAbsent(row.bucket, candidateNames(cell, controlCell === cell ? null : controlCell));
+        cell.shared_name_start = pre;
+        const ap = absentProblem(pre);
+        if (ap) {
+          cell.start_not_clean = ap.kind === 'exists' ? `이미 객체가 있음(${ap.text}) — 앞 실행의 것이면 cleanup 뒤 다시 잰다` : ap.text;
+          continue;
+        }
+      }
       const r = row.shape.kind === 'normal' ? await upload(actor, row.bucket, target.name, bytes, { upsert: row.mode.upsert }) : await uploadRaw(actor, row.bucket, target.raw, bytes, { upsert: row.mode.upsert });
       cell.response = responseInfo(r);
       cell.request_ok = r.ok;
-      cell.response_key = r.ok && r.json && typeof r.json === 'object' ? { Key: r.json.Key ?? null, Id: r.json.Id ?? null } : null;
-      cell._bytes = bytes;
-      if (row.shape.noTag) {
-        // 꼬리표가 없는 이름: 이 칸의 전후를 바로 뜨고, 생긴 것이 있으면 살핀 뒤 지워서 다음 칸이 같은 상태에서 시작하게 한다
-        const post = await snapshot(row.bucket);
-        const d = diffSnapshots(pre, post);
-        cell.cell_diff = { ok: d.ok, doubts: d.doubts, added: d.added, removed: d.removed, changed: d.changed };
-        cell.arrived = await inspectArrived(row.bucket, d.added, bytes);
-        if (d.added.length) {
-          await removeMany(row.bucket, d.added);
-          cell.removed_after_inspect = d.added;
+      cell.response_key = keyOfResponse(r); // 거절된 요청에는 없는 것이 정상이다
+      if (r.ok) {
+        const a = await resolveArrival(row.bucket, r, bytes);
+        cell.arrival = a;
+        if (!a.problem && a.stored_matches_upload && a.id_matches) {
+          // 본문 GET: 서비스 열쇠, 값 없는 인증 주소. 이름이 칸마다 다른 줄에서는 이 객체의 첫 읽기다(판정에 든다).
+          // 같은 이름을 쓰는 줄에서는 앞 칸 때 같은 주소를 이미 읽었을 수 있다 — 결과를 관측으로 따로 적는다.
+          const b = await firstBodyByService(row.bucket, a.name, bytes);
+          a.body = b;
+          a.body_observation = {
+            is: b.match === true ? '올린 내용' : b.match === null ? '본문 없음' : (sharedBodies.get(`${row.bucket}/${a.name}`) ?? []).includes(b.body_md5) ? '옛 본문의 재전달(이 실행의 앞 칸이 같은 이름에 올렸던 내용)' : '그 밖(이 실행이 그 이름에 올린 적 없는 내용 — 앞 실행 때 전달된 본문일 수 있다)',
+            http_status: b.http_status, cf_cache_status: b.cf_cache_status, age: b.age,
+            used_for_verdict: !shared,
+          };
+        }
+      } else {
+        // 거절: 저장 변화 0 을 이 요청 직후에 확인한다(정확한 이름과 후보 이름들의 정보 조회가 "객체 없음")
+        cell.absent_checks = await checkAbsent(row.bucket, candidateNames(cell, controlCell === cell ? null : controlCell));
+      }
+      cell.control_after = await readTrue(row.bucket, ctlName);
+      cell.control_unchanged = sameObject(rowCtl.start, cell.control_after);
+      if (shared && r.ok) {
+        const a = cell.arrival;
+        if (a && !a.problem) sharedBodies.set(`${row.bucket}/${a.name}`, [...(sharedBodies.get(`${row.bucket}/${a.name}`) ?? []), md5(bytes)]);
+        if (a && !a.problem && a.stored.known && a.stored.exists) {
+          // 살핀 뒤 정확한 이름으로 지워, 같은 이름을 쓰는 다음 칸이 빈 상태에서 시작하게 한다
+          await removeMany(row.bucket, [a.name]);
+          const gone = await readTrue(row.bucket, a.name);
+          cell.removed_after_inspect = { name: a.name, object_id: a.id, verified_absent: gone.known && gone.exists === false };
         }
       }
-      rowCells.push(cell);
     }
-    // 줄 전후의 버킷 전체 비교
-    const after = await snapshot(row.bucket);
-    const d = diffSnapshots(snaps[row.bucket], after);
-    snaps[row.bucket] = after;
-    const claimed = new Set();
-    for (const cell of rowCells) {
-      if (row.shape.noTag) continue;
-      const mine = d.added.filter((n) => tagRe(cell.tag).test(n));
-      mine.forEach((n) => claimed.add(n));
-      cell.arrived = await inspectArrived(row.bucket, mine, cell._bytes);
-    }
-    const unattributed = d.added.filter((n) => !claimed.has(n));
-    const integrity = { ok: d.ok && !unattributed.length && !d.removed.length && !d.changed.length, why: null };
-    if (!integrity.ok) integrity.why = [...d.doubts, unattributed.length ? `어느 칸의 것인지 알 수 없는 새 객체 ${unattributed.join(', ')}` : null, d.removed.length ? `없어진 객체 ${d.removed.join(', ')}` : null, d.changed.length ? `바뀐 객체 ${d.changed.join(', ')}` : null].filter(Boolean).join(' / ');
-    if (row.shape.noTag) {
-      const bad = rowCells.find((x) => !x.cell_diff.ok || x.cell_diff.removed.length || x.cell_diff.changed.length);
-      if (bad) {
-        integrity.ok = false;
-        integrity.why = `칸 전후의 목록 비교를 믿을 수 없음(${bad.actor})`;
-      }
-    }
-    rowNotes.push({ row: row.no, row_id: row.id, bucket_diff: { ok: d.ok, added: d.added.length, unattributed, removed: d.removed, changed: d.changed } });
-    // 거절 응답이고 생긴 것이 없는 칸(normal): 적은 이름 그대로가 비어 있는지를 저장 정보로 따로 확인한다.
-    // 꾸민 경로는 적은 이름을 그대로 가리킬 수 없는 경우가 있어, 줄 전후의 버킷 전체 비교로만 "저장 변화 없음"을 본다.
-    for (const cell of rowCells) {
-      if (row.shape.kind === 'normal' && !cell.request_ok && !cell.arrived.length) cell.literal_state = await readTrue(row.bucket, cell.literal);
-    }
-    const control = rowCells.find((x) => x.actor === 'service');
     const judge = row.shape.kind === 'normal' ? judgeNormalUpload : judgeContrivedUpload;
-    judge(row, control, null, integrity);
-    for (const cell of rowCells) if (cell !== control) judge(row, cell, control, integrity);
+    judge(row, controlCell, null, rowCtl);
+    for (const cell of byActor.values()) if (cell !== controlCell) judge(row, cell, controlCell, rowCtl);
+    const rowCells = actors.map((a) => byActor.get(a));
     for (const cell of rowCells) {
-      delete cell._bytes;
+      const a = cell.arrival;
       cell.remaining_allowance = !!row.shape.remaining;
-      for (const a of cell.arrived) {
-        if (cell.removed_after_inspect?.includes(a.name)) continue;
-        known.add(`${row.bucket}/${a.name}`);
+      cell.cmp = {
+        observed: row.shape.kind === 'normal' ? String(cell.observed).replace(/\(.*$/s, '') : cell.class_key,
+        response: respSig(cell.response ?? null),
+        stored: !!(a && !a.problem && a.stored?.known && a.stored.exists),
+        arrived_shape: a && !a.problem ? shapeOfName(a.name) : null,   // 글자 그대로의 도착 이름(시각·꼬리표·회원번호만 가림)
+        as_sent: a && !a.problem ? a.name === cell.literal : null,
+      };
+      if (a && !a.problem && a.stored?.known && a.stored.exists && !cell.removed_after_inspect) {
         ledger.push(ledgerEntry(row.bucket, a.name, a.stored, ownerOf(cell.actor), `${row.id} · ${cell.actor} 가 올림`));
       }
       cells.push(cell);
@@ -1045,8 +1183,8 @@ async function phaseUploadNew(run) {
     done += 1;
     say(`upload-new ${done}/${rows.length} (${row.no}번 줄) — ${row.label} — ${tallyLine(tally(rowCells))}`);
   }
-  const after = await snapshotAll();
-  return finishMeasure({ rows, cells, ledger, known, before, after, stopped, extra: { skipped_rows: skipped, row_notes: rowNotes } });
+  const after = await listIdsAll();
+  return finishMeasure({ rows, cells, ledger, before, after, stopped, extra: { skipped_rows: skipped } });
 }
 
 // ---------------------------------------------------------------------
@@ -1407,9 +1545,10 @@ async function phaseRevoked(run) {
   });
 }
 
-// 실측 단계의 마무리: 셈, 표, 대상 밖 변화
-function finishMeasure({ rows, cells, ledger, known, before, after, stopped, extra }) {
-  const outside = outsideChange(before, after, known);
+// 실측 단계의 마무리: 셈, 표, 목록으로 본 어림
+//   "대상 밖 객체의 변화 0"은 여기서 말하지 않는다. 그것은 단계 앞뒤로 뜬 fingerprint.sql 결과를 outside 단계에 넘겨 확인한다.
+function finishMeasure({ rows, cells, ledger, before, after, stopped, extra }) {
+  const hint = listingHint(before, after, ledger);
   const summary = tally(cells);
   const table = {};
   const labels = new Map(rows.map((r) => [r.id, r.label]));
@@ -1417,14 +1556,23 @@ function finishMeasure({ rows, cells, ledger, known, before, after, stopped, ext
     const mark = c.not_applicable ? '해당 없음' : c.expect == null ? `(잰 값) ${c.observed}` : `${c.expect} → ${c.observed}${c.pass === true ? '' : c.pass === false ? '  ✗' : '  ?'}`;
     (table[`${String(c.row).padStart(3, '0')} ${labels.get(c.row_id) ?? c.row_id}`] ??= {})[c.actor] = mark;
   }
-  const bad = summary.mismatch > 0 || summary.undetermined > 0 || !outside.zero;
-  if (!outside.zero) say(`대상 밖 객체의 변화가 있거나 확인하지 못함 — 새 객체 ${outside.unaccounted_new.length}, 없어진 것 ${outside.removed.length}, 바뀐 것 ${outside.changed.length}${outside.ok ? '' : ', 목록 비교를 믿을 수 없음'}`);
+  const bad = summary.mismatch > 0 || summary.undetermined > 0;
+  if (!hint.nothing_noticed) say(`목록으로 본 어림에 눈에 띄는 것이 있다 — 장부에 없는 새 식별자 ${hint.new_ids_not_in_ledger.length}, 없어진 식별자 ${hint.gone_ids.length}, 바뀐 식별자 ${hint.changed_ids.length}. fingerprint.sql 을 떠서 --phase outside 로 확인할 것`);
+  // 비로그인처럼 기대값 없이 잰 칸 중, 도착 이름이나 저장 여부를 확인하지 못한 칸(기준선으로 쓸 수 없다)
+  const measuredUnverified = cells.filter((c) => c.expect == null && !c.not_applicable && /^(undetermined|anomaly|미확인|권한 미판정|이상)/.test(String(c.observed)));
   return {
-    exit: stopped ? 3 : bad ? 1 : 0,
+    exit: stopped ? 3 : bad || measuredUnverified.length ? 1 : 0,
     result: {
       state, stopped,
       summary,
-      outside_objects: outside,
+      measured_cells_unverified: measuredUnverified.map((c) => ({ row_id: c.row_id, actor: c.actor, observed: c.observed })),
+      outside_objects: {
+        verified: false,
+        how_to_verify: '이 단계 앞과 뒤에 fingerprint.sql 을 떠서: node storage_matrix.mjs --phase outside --result <이 결과 파일> --fingerprint-before <앞> --fingerprint-after <뒤>. DB 의 객체 행(정확한 이름·식별자)으로 본다. 그 비교는 단계가 끝났을 때 남은 변화만 본다 — 거절 칸 하나하나의 "저장 변화 0"은 칸마다 요청 직후에 확인했다(absent_checks·control_unchanged, 또는 대상·대조·도착지의 저장 정보).',
+        listing_hint: hint,
+        listing_hint_note: '목록 조회로 본 어림이다. 목록은 전체 이름을 글자 그대로 가려 주지 못하므로(실측) 식별자로만 견줬다. 이 값이 비어 있어도 "대상 밖 변화 0"이 아니다.',
+      },
+      reads_without_list_corroboration: noListCorroboration,
       fourth_class_cells: cells.filter((c) => c.class_key === 'outside').map((c) => `${c.row_id} · ${c.actor} → ${c.arrived_full_name}`),
       mismatches: cells.filter((c) => c.pass === false).map((c) => ({ row_id: c.row_id, actor: c.actor, expect: c.expect, observed: c.observed, response: c.response ?? null })),
       undetermined: cells.filter((c) => c.expect != null && c.pass === null && !c.not_applicable).map((c) => ({ row_id: c.row_id, actor: c.actor, expect: c.expect, observed: c.observed })),
@@ -1451,7 +1599,7 @@ function phasePlan() {
       for (const a of ALL_ACTORS) {
         cellsOut[a] = r.shape.kind === 'normal'
           ? cellExp(a, (c) => exp(M.uploadNew(state, c, r.bucket, literal, r.mode.upsert)))
-          : hasExpectation(a) ? (a === 'service' ? '저장됨 또는 ①' : r.shape.must?.[a] === 'not_stored' ? '① 또는 ②(저장되지 않음)' : `①·②·③ 중 하나(④가 아님) — 적은 이름 그대로라면 ${exp(M.uploadNew(state, ctxOf(a), r.bucket, literal, r.mode.upsert))}`) : '(잰 값)';
+          : hasExpectation(a) ? (a === 'service' ? (r.shape.arrival === 'as_sent' ? '보낸 글자 그대로 저장됨' : '저장됨 또는 ①') : r.shape.must?.[a] === 'not_stored' ? '① 또는 ②(저장되지 않음)' : `①·②·③ 중 하나(④가 아님) — 적은 이름 그대로라면 ${exp(M.uploadNew(state, ctxOf(a), r.bucket, literal, r.mode.upsert))}`) : '(잰 값)';
       }
       return { no: r.no, id: r.id, label: r.label, path_kind: r.shape.kind, sent_path: r.shape.kind === 'normal' ? t.name : t.raw, skip: r.shape.skip ?? null, cells: cellsOut };
     });
@@ -1489,39 +1637,112 @@ function phasePlan() {
     }));
     out.groups.revoked = { rows: rows.length, cells: rows.length * 2, rough_requests: 60, table: rows };
   }
-  out.note = 'rough_requests 는 모든 자격으로 잴 때의 어림이다(2a 실행에서는 초당 12건쯤이었다). 비로그인 칸은 before·applied·rolledback 에서 기대값이 없다 — 잰 값을 compare 단계로 서로 견준다. 꾸민 경로의 기대값은 "전부 거절"이 아니다: 저장소가 이름을 어떻게 다루는지에 따라 ①·②·③이 될 수 있고, ④(권한 밖 위치에 저장)만 실패다.';
+  out.note = 'rough_requests 는 모든 자격으로 잴 때의 어림이다(2a 실행에서는 초당 12건쯤이었다). 비로그인 칸은 before·applied·rolledback 에서 기대값이 없다 — 잰 값을 compare 단계로 서로 견준다. 꾸민 경로의 기대값은 "전부 거절"이 아니다: 저장소가 이름을 어떻게 다루는지에 따라 ①·②·③이 될 수 있고, ④(권한 밖 위치에 저장)만 실패다. ③·④는 글자 그대로의 도착 이름(올리기 응답의 Key)으로 가른다. 대문자가 든 경로는 서비스 열쇠·비로그인에게 보낸 글자 그대로 저장되는 것이 실제 동작이다(실측).';
   for (const [g, v] of Object.entries(out.groups)) say(`plan ${g}: 줄 ${v.rows}, 칸 ${v.cells}, 요청 어림 ${v.rough_requests}`);
   return { exit: 0, result: out };
 }
 
 // ---------------------------------------------------------------------
-// cleanup: 이 도구가 만든 합성 객체(이름에 zzb2n2b)를 지우고 남은 객체를 적는다
+// cleanup: 이 도구가 만든 합성 객체를 지운다
+//   지울 객체의 "정확한 전체 이름"을 아는 길은 셋이다.
+//     --fingerprint <fingerprint.sql 결과>   DB 의 객체 행(정확한 이름·식별자). 이름에 표식(zzb2n2b)이 있는 것을 지운다.
+//                                            대소문자만 다른 폴더(EXAM-REG/…, REVIEWS/… 등)의 객체도 여기서 글자 그대로 나온다.
+//     --ledger <결과 json>[,<json>…]         단계가 남긴 장부(정확한 이름·식별자). 표식 있는 것은 지우고,
+//                                            표식 없는 이름(reviews/ 처럼 파일 이름이 빈 것)은 지금 그 이름의 객체 식별자가
+//                                            장부와 같을 때만 지운다. 다르면 아무것도 지우지 않고 멈춘다(종료 값 4).
+//     (인자 없음) 목록 조회                   표식 있는 이름을 찾는다. 어림이다 — 대소문자가 다른 폴더의 객체는 틀린 이름으로
+//                                            나와 지워지지 않을 수 있다. 이것만으로는 "남은 것 0"을 말하지 않는다.
+//   표식도 없고 장부에도 없는 객체는 지우지 않고 적는다.
 // ---------------------------------------------------------------------
 async function phaseCleanup() {
+  const loadJson = async (p) => JSON.parse((await readFile(p, 'utf8')).replace(/^\uFEFF/, ''));
+  let fp = null;
+  if (args.fingerprint) {
+    fp = await loadJson(args.fingerprint);
+    if (Array.isArray(fp)) fp = fp[0];
+    if (fp && fp.result) fp = fp.result;
+    if (!Array.isArray(fp?.objects)) stop(2, '--fingerprint 파일에 objects 가 없다(fingerprint.sql 의 결과여야 한다)');
+  }
+  const ledgerEntries = [];
+  if (args.ledger) {
+    for (const p of args.ledger.split(',').map((s) => s.trim()).filter(Boolean)) ledgerEntries.push(...((await loadJson(p)).result?.ledger ?? []));
+  }
+
+  // 1) 지울 정확한 이름을 모은다(아직 아무것도 지우지 않는다)
+  const exact = Object.fromEntries(BUCKETS.map((b) => [b, new Map()])); // 이름 → { id, source }
+  const unmarkedInDb = [];
+  for (const o of fp?.objects ?? []) {
+    if (!BUCKETS.includes(o.bucket_id)) continue;
+    if (String(o.name).includes(MARK)) exact[o.bucket_id].set(String(o.name), { id: o.id ?? null, source: 'fingerprint(표식)' });
+    else unmarkedInDb.push({ bucket: o.bucket_id, name: String(o.name), id: o.id ?? null });
+  }
+  const conflicts = [];
+  const unmarkedSeen = new Set();
+  for (const e of ledgerEntries) {
+    if (!BUCKETS.includes(e.bucket)) continue;
+    if (String(e.name).includes(MARK)) {
+      if (!exact[e.bucket].has(e.name)) exact[e.bucket].set(e.name, { id: e.object_id ?? null, source: '장부(표식)' });
+      continue;
+    }
+    // 표식 없는 이름: 지금 그 이름의 객체가 장부의 그 객체일 때만
+    const k = `${e.bucket}/${e.name}/${e.object_id}`;
+    if (unmarkedSeen.has(k)) continue;
+    unmarkedSeen.add(k);
+    const st = await readTrue(e.bucket, e.name);
+    if (!st.known) conflicts.push({ bucket: e.bucket, name: e.name, ledger_id: e.object_id, problem: `지금 상태를 확인하지 못함: ${st.unverified}` });
+    else if (!st.exists) continue; // 이미 없다
+    else if (e.object_id && st.object_id === e.object_id) exact[e.bucket].set(e.name, { id: st.object_id, source: '장부(표식 없음 — 식별자 일치)' });
+    else conflicts.push({ bucket: e.bucket, name: e.name, ledger_id: e.object_id, current_id: st.object_id, problem: '지금 그 이름의 객체가 장부의 객체가 아니다(식별자가 다름)' });
+  }
+  if (conflicts.length) {
+    say(`cleanup 멈춤: 표식 없는 이름 ${conflicts.length}건이 장부와 맞지 않는다. 아무것도 지우지 않았다`);
+    return { exit: 4, result: { stopped: '표식 없는 이름의 객체가 장부의 객체와 다르다. 아무것도 지우지 않았다 — 무엇인지 확인하기 전에는 손대지 않는다', conflicts } };
+  }
+
+  // 2) 지운다. 정확한 이름을 아는 것은 그 이름으로, 그다음 목록으로 찾은 표식 있는 이름(어림)
   const report = {};
   for (const b of BUCKETS) {
-    let found = 0;
-    let deleted = 0;
-    for (let round = 0; round < 50; round += 1) {
-      const s = await snapshot(b);
-      if (!s.ok) throw new Error(`목록을 믿을 수 없다(${b}): ${s.doubts.join(' / ')}`);
-      const names = [...s.objects.keys()];
-      if (round === 0) found = names.length;
-      const mine = names.filter((n) => n.includes(MARK));
-      if (!mine.length) break;
-      await removeMany(b, mine);
-      deleted += mine.length;
+    const names = [...exact[b].keys()];
+    if (names.length) await removeMany(b, names);
+    let listedDeleted = 0;
+    const tried = new Set(names);
+    for (let round = 0; round < 20; round += 1) {
+      const s = await listIds(b);
+      const more = [...s.ids.values()].map((m) => m.listed_as).filter((n) => n.includes(MARK) && !tried.has(n));
+      if (!more.length) break;
+      more.forEach((n) => tried.add(n));
+      await removeMany(b, more);
+      listedDeleted += more.length;
     }
-    const left = [...(await snapshot(b)).objects.keys()];
-    report[b] = { found_first_pass: found, deleted, left: left.length, left_names: left.slice(0, 100) };
-    say(`cleanup ${b}: 지움 ${deleted}, 남음 ${left.length}`);
+    // 3) 정확한 이름마다 정보 조회로 "없음"을 확인한다
+    const notGone = [];
+    for (const n of names) {
+      const st = await readTrue(b, n);
+      if (!(st.known && st.exists === false)) notGone.push({ name: n, state: st.known ? '아직 있음' : `미확인: ${st.unverified}` });
+    }
+    const leftListing = [...(await listIds(b)).ids.entries()].map(([id, m]) => ({ id, listed_as: m.listed_as }));
+    report[b] = {
+      exact_names_deleted: names.length, exact_names_verified_absent: names.length - notGone.length, exact_names_not_gone: notGone,
+      names_from_listing_tried: listedDeleted,
+      left_by_listing: leftListing.length, left_by_listing_sample: leftListing.slice(0, 100),
+    };
+    say(`cleanup ${b}: 정확한 이름 ${names.length}건 지움(없음 확인 ${names.length - notGone.length}), 목록으로 찾아 지우려 한 이름 ${listedDeleted}건, 목록에 남은 것 ${leftListing.length}`);
   }
-  const leftTotal = Object.values(report).reduce((s, r) => s + r.left, 0);
+  const ledgerUnmarked = new Set(ledgerEntries.filter((e) => !String(e.name).includes(MARK)).map((e) => `${e.bucket}/${e.name}`));
+  const unmarkedNotDeleted = unmarkedInDb.filter((o) => !exact[o.bucket].has(o.name)).map((o) => ({ ...o, in_ledger: ledgerUnmarked.has(`${o.bucket}/${o.name}`) }));
+  const notGoneTotal = Object.values(report).reduce((s, r) => s + r.exact_names_not_gone.length, 0);
+  const leftTotal = Object.values(report).reduce((s, r) => s + r.left_by_listing, 0);
+  if (unmarkedNotDeleted.length) say(`cleanup: 표식 없는 객체 ${unmarkedNotDeleted.length}건은 지우지 않았다 — ${unmarkedNotDeleted.slice(0, 5).map((o) => `${o.bucket}/${o.name}`).join(', ')}`);
+  if (!fp) say('cleanup: --fingerprint 없이 돌았다. 목록만으로는 대소문자가 다른 폴더의 객체를 빠뜨릴 수 있다 — "남은 것 0"이 확인된 것이 아니다');
   return {
-    exit: leftTotal === 0 ? 0 : 1,
+    exit: notGoneTotal || leftTotal || unmarkedNotDeleted.length ? 1 : 0,
     result: {
-      note: `업무 버킷 4개에서 이름에 ${MARK} 가 든 객체만 지운다(이 도구의 합성 파일은 전부 그 표식을 가진다). 그 밖의 객체가 남아 있으면 지우지 않고 left_names 에 적는다 — 무엇인지 확인하기 전에는 손대지 않는다. 남은 수는 목록 조회로 센다. 지운 뒤에도 같은 주소의 본문 GET 은 한동안 옛 내용을 줄 수 있다(2a 관측).`,
-      all_zero: leftTotal === 0, report,
+      note: `정확한 이름(fingerprint.sql 의 객체 행이나 단계의 장부)을 아는 객체는 그 이름으로 지우고 이름마다 정보 조회로 "없음"을 확인한다. 표식(${MARK}) 없는 이름은 장부의 식별자가 지금 그 객체와 같을 때만 지운다. 목록 조회로 찾은 이름은 어림이다(대소문자가 다른 폴더의 객체는 틀린 이름으로 나와 지워지지 않을 수 있다). 남은 객체 0 의 확인은 정리 뒤에 다시 뜬 fingerprint.sql 의 object_counts 로 한다 — 이 도구의 집계만으로 0 이라고 적지 않는다. 지운 뒤에도 같은 주소의 본문 GET 은 한동안 옛 내용을 줄 수 있다(2a 관측).`,
+      used: { fingerprint: !!fp, ledger_entries: ledgerEntries.length },
+      verified_by: fp ? 'fingerprint.sql 의 정확한 이름마다 정보 조회로 없음을 확인(그 fingerprint 를 뜬 뒤에 생긴 객체는 모른다)' : '목록 조회만 — 확인이 아니다',
+      nothing_left_as_far_as_known: !(notGoneTotal || leftTotal || unmarkedNotDeleted.length),
+      unmarked_not_deleted: unmarkedNotDeleted,
+      report,
     },
   };
 }
@@ -1624,6 +1845,68 @@ async function phaseOwners() {
 }
 
 // ---------------------------------------------------------------------
+// outside (요청 0): 단계 앞뒤로 뜬 fingerprint.sql 결과(DB 의 객체 행 — 정확한 이름·식별자)로 "대상 밖 객체의 변화"를 본다
+//   --fingerprint-before <앞>  --fingerprint-after <뒤>  --result <그 사이에 돈 단계들의 결과 json>[,<json>…]
+//   통과: 뒤에 새로 생긴 객체가 전부 장부에 있고(식별자와 버킷·전체 이름이 글자 그대로 같음), 장부의 객체가 전부 뒤에 있으며,
+//         앞에 있던 객체가 없어지거나 바뀌지 않았다. 버킷을 가리지 않고 전부 본다.
+//   이 비교는 단계가 끝났을 때 남은 변화만 본다(중간에 만들었다 지운 객체는 보지 못한다).
+// ---------------------------------------------------------------------
+async function phaseOutside() {
+  if (!args['fingerprint-before'] || !args['fingerprint-after'] || !args.result) stop(2, 'outside 는 --fingerprint-before <json> --fingerprint-after <json> --result <결과 json>[,<json>…] 이 필요하다');
+  const loadFp = async (p) => {
+    let fp = JSON.parse((await readFile(p, 'utf8')).replace(/^\uFEFF/, ''));
+    if (Array.isArray(fp)) fp = fp[0];
+    if (fp && fp.result) fp = fp.result;
+    if (!Array.isArray(fp?.objects)) stop(2, `${p} 에 objects 가 없다(fingerprint.sql 의 결과여야 한다)`);
+    return fp;
+  };
+  const A = await loadFp(args['fingerprint-before']);
+  const B = await loadFp(args['fingerprint-after']);
+  const ledger = new Map(); // 식별자 → 장부 줄
+  const noId = [];
+  const files = args.result.split(',').map((s) => s.trim()).filter(Boolean);
+  for (const p of files) {
+    const f = JSON.parse((await readFile(p, 'utf8')).replace(/^\uFEFF/, ''));
+    for (const e of f.result?.ledger ?? []) {
+      if (e.object_id) ledger.set(String(e.object_id), e);
+      else noId.push(`${e.bucket}/${e.name}`);
+    }
+  }
+  const key = (o) => `${o.bucket_id}/${o.name}`;
+  const beforeById = new Map(A.objects.map((o) => [String(o.id), o]));
+  const afterById = new Map(B.objects.map((o) => [String(o.id), o]));
+  const unexplainedNew = [];
+  const wrongName = [];
+  const removed = [];
+  const changed = [];
+  const ledgerMissing = [];
+  for (const [id, o] of afterById) {
+    const was = beforeById.get(id);
+    if (!was) {
+      const e = ledger.get(id);
+      if (!e) unexplainedNew.push({ object: key(o), id });
+      else if (e.bucket !== o.bucket_id || e.name !== o.name) wrongName.push({ id, ledger: `${e.bucket}/${e.name}`, db: key(o), why: e.why }); // 글자 그대로 견준다
+    } else if (key(was) !== key(o) || was.etag !== o.etag || was.size !== o.size || (was.owner_id ?? null) !== (o.owner_id ?? null) || was.updated_at !== o.updated_at) {
+      changed.push({ id, before: key(was), after: key(o), etag_same: was.etag === o.etag, owner_same: (was.owner_id ?? null) === (o.owner_id ?? null), updated_at_same: was.updated_at === o.updated_at });
+    }
+  }
+  for (const [id, o] of beforeById) if (!afterById.has(id)) removed.push({ object: key(o), id });
+  for (const [id, e] of ledger) if (!afterById.has(id)) ledgerMissing.push({ id, ledger: `${e.bucket}/${e.name}`, why: e.why });
+  const ok = !unexplainedNew.length && !wrongName.length && !removed.length && !changed.length && !ledgerMissing.length && !noId.length;
+  console.log(`[b2n2b] outside: 앞 ${A.objects.length}개 → 뒤 ${B.objects.length}개, 장부 ${ledger.size}건 · 장부에 없는 새 객체 ${unexplainedNew.length} · 이름이 장부와 다른 객체 ${wrongName.length} · 없어진 객체 ${removed.length} · 바뀐 객체 ${changed.length} · 장부에는 있는데 DB 에 없는 것 ${ledgerMissing.length} — ${ok ? '대상 밖 변화 0' : '확인 필요'}`);
+  for (const d of [...unexplainedNew, ...wrongName, ...removed, ...changed, ...ledgerMissing].slice(0, 20)) console.log('  ' + JSON.stringify(d));
+  return {
+    exit: ok ? 0 : 1,
+    result: {
+      outside_change_zero: ok,
+      objects_before: A.objects.length, objects_after: B.objects.length, ledger_objects: ledger.size, results_used: files,
+      unexplained_new: unexplainedNew, name_differs_from_ledger: wrongName, removed, changed, in_ledger_but_not_in_db: ledgerMissing, ledger_entries_without_id: noId,
+      note: 'DB 의 객체 행(fingerprint.sql 의 objects — 정확한 이름·식별자·소유자)으로 견줬다. 두 fingerprint 사이에 돈 단계의 결과 파일을 전부 --result 에 줘야 한다(빠뜨리면 그 단계의 객체가 "장부에 없는 새 객체"로 나온다). 단계가 끝났을 때 남은 변화만 본다 — 중간에 만들었다 지운 객체(같은 이름을 쓰는 줄의 객체, 삭제·이동 칸의 대상)는 보지 못한다. 소유자가 기대와 같은지는 owners 단계가 본다.',
+    },
+  };
+}
+
+// ---------------------------------------------------------------------
 // 본 실행
 // ---------------------------------------------------------------------
 async function main() {
@@ -1639,6 +1922,7 @@ async function main() {
   else if (phase === 'cleanup') res = await phaseCleanup();
   else if (phase === 'compare') res = await phaseCompare();
   else if (phase === 'owners') res = await phaseOwners();
+  else if (phase === 'outside') res = await phaseOutside();
   else res = await phaseTableRef();
 
   const out = {
@@ -1655,7 +1939,7 @@ async function main() {
     // sub·session_id 는 식별값이다(자격이 아니다)
     credentials: Object.fromEntries(Object.entries(jwtInfo).map(([k, v]) => [k, { sub: v.sub, session_id: v.session_id, aal: v.aal, seconds_left_at_start: v.seconds_left_at_start }])),
     members: memberA ? { A: memberA, B: memberB, GM: memberGM } : undefined,
-    how_read: '저장 정보는 서비스 열쇠의 목록 조회 + 정보 조회로만 읽는다(DYNAMIC 일 때만 인정, eTag 를 올린 내용의 md5 와 대조). "객체 없음"은 관측된 모양(HTTP 400·statusCode 404·code NoSuchKey)만 인정한다. 이것은 저장 정보이지 본문의 재확인이 아니다 — 새로 생긴 객체의 본문은 서비스 열쇠의 첫 읽기(값 없는 인증 주소) 한 번으로 따로 견준다. 미확인은 통과에 넣지 않는다.',
+    how_read: '도착한 이름은 올리기 응답의 Key(버킷/전체 이름)와 Id 로 글자 그대로 정하고, 그 정확한 이름에 대한 서비스 열쇠의 정보 조회가 준 식별자·저장 정보와 대조한다. 있음·없음은 글자 그대로의 정보 조회로 읽는다(DYNAMIC 일 때만 인정, eTag 를 올린 내용의 md5 와 대조, "객체 없음"은 관측된 모양 — HTTP 400·statusCode 404·code NoSuchKey — 만 인정). 목록 조회는 이름을 정하는 데 쓰지 않는다(실측: 소문자 폴더의 목록에 대문자 폴더의 객체가 함께 나왔다). 이것은 저장 정보이지 본문의 재확인이 아니다 — 새로 생긴 객체의 본문은 서비스 열쇠의 본문 GET(값 없는 인증 주소)으로 따로 견준다. 대상 밖 객체의 변화는 이 결과가 말하지 않는다(outside 단계). 미확인은 통과에 넣지 않는다.',
     exit_code: res.exit,
     result: res.result,
   };
