@@ -6,6 +6,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // 평소에는 site_settings.platform_url 을 쓰고, 조회 실패 시에만 이 값으로 폴백한다.
 const DEFAULT_PLATFORM_URL = 'https://testroom.eonfl.com';
 
+// Supabase 요청 헤더를 만드는 한 곳. 이 파일 안에서만 쓴다.
+// extra 의 헤더는 기본 3개 뒤에 순서대로 붙고, 이름이 같으면 그 자리의 값만 바뀐다.
+const supabaseHeaders = function (extra) {
+    return Object.assign({
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+    }, extra);
+};
+
 // Supabase REST API 헬퍼 함수
 const supabaseAPI = {
     // GET: 데이터 조회
@@ -33,12 +43,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-            }
+            headers: supabaseHeaders({ 'Prefer': 'return=representation' })
         });
         
         if (!response.ok) {
@@ -55,11 +60,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            }
+            headers: supabaseHeaders()
         });
         
         if (!response.ok) {
@@ -76,12 +77,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-            },
+            headers: supabaseHeaders({ 'Prefer': 'return=representation' }),
             body: JSON.stringify(data)
         });
         
@@ -100,12 +96,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-            },
+            headers: supabaseHeaders({ 'Prefer': 'return=representation' }),
             body: JSON.stringify(data)
         });
         
@@ -132,11 +123,7 @@ const supabaseAPI = {
         const url = `${SUPABASE_URL}/rest/v1/rpc/${fnName}`;
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            },
+            headers: supabaseHeaders(),
             body: JSON.stringify(args || {})
         });
         const text = await response.text();
@@ -155,11 +142,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            },
+            headers: supabaseHeaders(),
             body: JSON.stringify({ deleted: true })
         });
         
@@ -176,11 +159,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'DELETE',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            }
+            headers: supabaseHeaders()
         });
         
         if (!response.ok) {
@@ -203,11 +182,7 @@ const supabaseAPI = {
         
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            }
+            headers: supabaseHeaders()
         });
         
         if (!response.ok) {
@@ -228,12 +203,7 @@ const supabaseAPI = {
 
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'count=exact'
-            }
+            headers: supabaseHeaders({ 'Prefer': 'count=exact' })
         });
 
         if (!response.ok) {
@@ -276,12 +246,10 @@ const supabaseStorage = {
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            headers: supabaseHeaders({
                 'Content-Type': mime,
                 'x-upsert': 'true'      // 같은 이름 파일 덮어쓰기
-            },
+            }),
             body: blob
         });
 
