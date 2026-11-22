@@ -10,8 +10,12 @@
 // 2차 판(a20554b)도 브레인방이 같은 단계를 돌렸다(요청 1,269건): 대문자 세 경로가 보낸 글자 그대로 도착한 것으로 읽혔고,
 // cleanup --fingerprint 가 앞 실행의 객체 148개를 정확한 이름으로 지웠다. 남은 미확인은 "저장소가 받지 않는 이름" 두 줄이었다 —
 // 올리기 응답도, 그 이름의 정보 조회도 HTTP 400·statusCode 400·InvalidKey 였다. 3차에서 그 모양을 분류하도록 고쳤다.
-// 3차에서 바꾼 부분은 아직 실제 Storage 에 실행된 적이 없다(작업방은 그 관측에 맞춘 가짜 응답으로만 돌려 봤다 —
-// 가짜 응답은 실제 동작을 대신하지 않는다). upload-existing·actions·revoked 단계와 복사 요청, 목록의 쪽 나눔도 실행된 적이 없다.
+// 3차 판(848d3dd)은 브레인방이 적용 전 묶음 전체와, 마이그레이션 적용 뒤의 upload-new·upload-existing·actions 까지 돌렸다.
+// 거기서 드러난 것: (1) 공개 버킷의 합성 객체는 읽기 규칙이 없는 로그인 자격에게도 정확한 이름의 정보 조회가 허용됐다 —
+// 도구의 기대값(거절)이 틀렸다 (2) 정리 단계가 일부만 지우라는 뜻의 파일을 받고도 표식 있는 객체를 전부 지웠다
+// (3) 시험한 관리자 계정에서 6자리 확인이 끝나자 먼저 받아 둔 다른 aal1 로그인 기록이 사라졌다. 4차에서 이 셋을 고쳤다.
+// 4차에서 바꾼 부분은 아직 실제 Storage 에 실행된 적이 없다(작업방은 그 관측에 맞춘 가짜 응답으로만 돌려 봤다 —
+// 가짜 응답은 실제 동작을 대신하지 않는다). revoked 단계와 목록의 쪽 나눔도 실행된 적이 없다.
 //
 // 판정 방식
 //   * 도착한 이름은 글자 그대로 정한다: 올리기가 성공하면 응답의 Key(버킷/전체 이름)와 Id 가 근거이고, 그 정확한
@@ -30,6 +34,10 @@
 //     이 도구는 모른다 — 그런 칸은 통과로도 미확인으로도 세지 않고 "입력 오류 확인 / 저장 변화 검증 대기"로 result.input_error_cells 에 모은다.
 //     이 갈래만 남으면 종료 값은 0 이지만 "전부 확인됨"이 아니다: 칸마다 그 요청 하나만 다시 보내(--no-control) 앞뒤의 fingerprint.sql 을
 //     outside 단계(--result 없이)로 견줘 "생긴 객체 0·없어진 객체 0·바뀐 객체 0"이 나와야 확인된 것이다.
+//   * 공개 버킷의 "정보 조회"는 모든 자격·모든 상태에서 허용이 기대값이다(이 계약의 네 버킷은 전부 공개 버킷 — 실측한 기존 동작이고
+//     새 규칙의 성과가 아니다). 허용 = 200 이고 돌려준 객체 식별자·eTag·크기가 서비스 열쇠로 읽은 것과 같음.
+//     actions 단계는 시작할 때 서비스 열쇠의 버킷 조회로 네 버킷이 공개인지 읽고, 하나라도 아니거나 읽지 못하면
+//     기대값을 바꾸지 않고 "기준선 불일치"로 멈춘다. 목록은 읽기 규칙을 따른다(로그인 자격은 빈 목록).
 //   * 기대값 대조는 올리기·정보 조회·덮어쓰기·삭제·이동·복사·목록으로 한다. 본문 GET 은 관측이다.
 //     다만 새로 생긴 객체는 본문(md5)도 따로 견준다 — 서비스 열쇠의 값 없는 인증 주소 GET 한 번.
 //     이름이 칸마다 다른 줄에서는 그것이 그 객체의 첫 읽기이고 판정에 든다. 여러 칸이 같은 이름을 쓰는 줄(파일 이름이 빈 경로)
@@ -71,9 +79,11 @@
 //   upload-existing  있는 이름에 다시 올리기: 경로 × 먼저 만든 쪽 × 요청 방식 × 자격   있음
 //   actions          정보 조회·목록·삭제·이동·복사 + 공개 주소                        있음
 //   revoked          만료·로그아웃한 A 의 올리기: --kind expired|loggedout --step pre|post|restored
-//   cleanup          이 도구의 합성 객체를 지운다: [--fingerprint <json>] [--ledger <결과 json>[,…]]   있음
-//                    정확한 이름은 fingerprint.sql 의 객체 행과 장부에서 얻는다(인자 없이 돌면 목록만 쓴다 — 어림).
-//                    표식(zzb2n2b) 없는 이름은 장부의 식별자가 지금 그 객체와 같을 때만 지운다
+//   cleanup          이 도구의 합성 객체를 지운다. 기본값은 "적힌 것만": --fingerprint <json> 그리고/또는 --ledger <결과 json>[,…]   있음
+//                    에 적힌 객체만 지운다. 지우기 전에 대상마다 지문·장부·지금의 객체가 버킷·정확한 이름·식별자까지 같은지 보고,
+//                    하나라도 다르면 아무것도 지우지 않고 멈춘다(종료 값 4). 지운 뒤 대상은 "없음", 대상이 아닌 객체는 그대로인지 본다.
+//                    --all-marked 를 명시했을 때만 버킷을 훑어 표식(zzb2n2b) 있는 객체를 전부 지운다(앞 실행의 잔여·끝 상태 정리).
+//                    인자 없이는 요청 0 으로 멈춘다
 //   table-ref        표 쪽 기준 요청(비로그인 GET): --compare <앞 결과>                있음
 //   compare          두 결과 파일의 칸을 견준다: --base <json> --with <json> [--actors anon,public]   0
 //   owners           결과의 객체 장부를 fingerprint.sql 결과와 견준다(식별자·소유자·저장 정보):
@@ -81,7 +91,15 @@
 //   outside          대상 밖 객체의 변화를 DB 의 객체 행으로 본다:                     0
 //                    --fingerprint-before <json> --fingerprint-after <json> --result <그 사이에 돈 단계들의 결과 json>[,…]
 //                    --result 를 주지 않으면 장부 없이 두 지문만 견준다: 생긴 객체·없어진 객체·바뀐 객체를 전부 변화로 센다
+//                    --removed <cleanup 결과 json>: 그 정리가 지웠다고 적은 객체는 "없어진 객체"로 세지 않는다
+//                    --write-leftover <경로>: 장부에 없는 새 객체의 행만 담은 파일을 쓴다(끊긴 실행의 객체만 cleanup 할 때)
+//   merge            --rows 로 나눠 잰 구간 결과를 합친다: --parts <json>,<json>,… [--actors …] [--plan <plan json>]   0
+//                    예정표의 "줄 번호 + 자격"마다 정확히 한 번 쟀는지 본다(빠진 칸·겹친 칸이 있으면 종료 값 1)
+//   sessions-sql     환경 변수의 로그인 자격들의 로그인 기록이 살아 있는지 읽는 SQL 을 적는다                    0
 // 공통 인자: --state <상태>  --out <결과 JSON>  [--actors a,b,…]  [--rows 시작-끝]  [--bucket <버킷>]
+//            --sessions-alive <json>  브레인방이 sessions-sql 의 SQL 로 읽어 저장한 파일. 관리자 자격을 쓰는 실측 단계는 이것이 없으면
+//                                     요청 0 으로 멈춘다(로그인 기록이 없거나 죽었거나 aal 이 다르면 역시 멈춘다). 30분보다 오래된 파일은 받지 않는다.
+//                                     --sessions-unchecked 를 명시하면 확인 없이 돌고 결과에 그렇게 적힌다
 //            [--min-seconds N]  자격의 남은 유효 시간 하한(기본 1200초. 긴 단계가 도는 동안 자격이 살아 있어야 한다)
 // 긴 단계는 줄마다 진행 상황을 표준 출력에 한 줄씩 적는다. 자격의 남은 시간이 90초 아래로 내려가면 그 줄 앞에서
 // 멈추고 거기까지의 결과를 적는다(--rows 로 이어서 잰다).
@@ -89,13 +107,15 @@
 // 종료 값: 0 = 끝까지 했고 기대와 다른 칸·미확인 칸이 없음("검증 대기" 칸은 남아 있을 수 있다 — 표준 출력과
 //              result.input_error_cells 를 볼 것) / 1 = 기대와 다르거나 미확인인 칸이 있음 /
 //          2 = 대상·입력 확인에서 멈춤(요청 0) / 3 = 실행 중 멈춤 /
-//          4 = cleanup: 표식 없는 이름의 객체가 장부의 객체와 달라 아무것도 지우지 않고 멈춤
+//          3 은 actions 의 "기준선 불일치"(네 업무 버킷이 공개 버킷임을 확인하지 못함)에도 쓴다 /
+//          4 = cleanup: 지문·장부·지금의 객체가 어긋나 아무것도 지우지 않고 멈춤
 // =====================================================================
 
 import { writeFile, readFile } from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import { deflateSync, crc32 } from 'node:zlib';
 import https from 'node:https';
+import { readFileSync } from 'node:fs';
 
 const REF = 'hmncdheiwqwekdbtijar';
 const HOST = `${REF}.supabase.co`;
@@ -146,9 +166,9 @@ function decodeJwtPayload(token) {
   }
 }
 
-const PHASES = ['plan', 'upload-new', 'upload-existing', 'actions', 'revoked', 'cleanup', 'table-ref', 'compare', 'owners', 'outside'];
+const PHASES = ['plan', 'upload-new', 'upload-existing', 'actions', 'revoked', 'cleanup', 'table-ref', 'compare', 'owners', 'outside', 'merge', 'sessions-sql'];
 const MEASURE_PHASES = ['upload-new', 'upload-existing', 'actions'];
-const NO_REQUEST_PHASES = ['plan', 'compare', 'owners', 'outside'];
+const NO_REQUEST_PHASES = ['plan', 'compare', 'owners', 'outside', 'merge', 'sessions-sql'];
 const args = parseArgs(process.argv.slice(2));
 const phase = args.phase;
 if (!PHASES.includes(phase)) stop(2, `--phase 는 다음 중 하나여야 한다: ${PHASES.join(', ')}`);
@@ -161,7 +181,7 @@ if (phase === 'revoked') {
   if (!(kind === 'expired' ? ['pre', 'post', 'restored'] : ['pre', 'post']).includes(step)) stop(2, 'revoked 는 --step pre|post (만료는 restored 도) 가 필요하다');
 }
 const outPath = args.out ?? null;
-if (!outPath && !['compare', 'owners', 'outside'].includes(phase)) stop(2, '--out <결과 JSON 경로> 가 필요하다');
+if (!outPath && !['compare', 'owners', 'outside', 'sessions-sql'].includes(phase)) stop(2, '--out <결과 JSON 경로> 가 필요하다');
 const minSeconds = Number.isFinite(Number(args['min-seconds'])) ? Math.max(120, Number(args['min-seconds'])) : 1200;
 const onlyBucket = args.bucket ?? null;
 if (onlyBucket && !BUCKETS.includes(onlyBucket)) stop(2, `--bucket 은 다음 중 하나여야 한다: ${BUCKETS.join(', ')}`);
@@ -292,6 +312,60 @@ if (!NO_REQUEST_PHASES.includes(phase)) {
   memberA = or('B2N2B_MEMBER_A', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   memberB = or('B2N2B_MEMBER_B', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   memberGM = or('B2N2B_MEMBER_GM', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+}
+
+// ---------------------------------------------------------------------
+// 재기 전: 이 실행이 쓰는 로그인 자격의 "로그인 기록"이 살아 있는가 (요청을 보내기 전에 본다)
+//   시험한 관리자 계정에서, 6자리 확인이 끝나자 먼저 받아 둔 다른 aal1 로그인 기록이 DB 에서 사라졌다(실측).
+//   기록이 죽은 자격은 회원·관리자 판정이 전부 "아님"이 되어, 규칙이 아니라 자격 때문에 거절된다.
+//   도구는 DB 를 읽지 못한다. 브레인방이 sessions-sql 단계가 적어 준 SQL 로 읽은 결과를 --sessions-alive <파일> 로 넘긴다.
+//   관리자 자격을 쓰는 실측 단계는 이 파일이 없으면 요청 0 으로 멈춘다(--sessions-unchecked 를 명시하면 확인 없이 돌고, 그렇게 적힌다).
+// ---------------------------------------------------------------------
+let sessionCheck = null;
+if (MEASURE_PHASES.includes(phase)) {
+  const used = Object.keys(jwtInfo);
+  // 실제로 요청을 보내게 되는 관리자 자격: 잴 자격에 든 것, 그리고 "먼저 만드는 쪽"으로 쓰이는 관리자 G 6자리 후
+  // (새 규칙이 있는 상태의 upload-existing·actions 에서만 그 자격이 먼저 올린다 — 그 밖의 상태에서는 그 줄이 "해당 없음"이다).
+  const admins = [...new Set([
+    ...actors.filter((a) => a.startsWith('admin_')),
+    ...(phase !== 'upload-new' && (state === 'applied' || state === 'rehearsal') ? ['admin_g_post'] : []),
+  ])].filter((a) => used.includes(a));
+  if (args['sessions-alive']) {
+    let f;
+    try {
+      f = JSON.parse(readFileSync(args['sessions-alive'], 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      stop(2, `--sessions-alive 파일을 읽지 못했다: ${e?.message ?? e}`);
+    }
+    if (Array.isArray(f) && f.length === 1 && f[0] && !f[0].session_id) f = f[0];
+    if (f && f.result) f = f.result;
+    const rowsIn = Array.isArray(f) ? f : f?.sessions;
+    if (!Array.isArray(rowsIn)) stop(2, '--sessions-alive 파일에 sessions 가 없다(sessions-sql 단계가 적어 준 SQL 의 결과여야 한다)');
+    const age = f?.read_at ? Math.round((Date.now() - Date.parse(f.read_at)) / 1000) : NaN;
+    if (!Number.isFinite(age)) stop(2, '--sessions-alive 파일에 read_at 이 없다(언제 읽은 것인지 알 수 없다)');
+    if (age > 1800 || age < -300) stop(2, `--sessions-alive 가 ${age}초 전에 읽은 것이다. 재기 직전(30분 안)에 다시 읽을 것. 아무 요청도 보내지 않았다`);
+    const rowsOut = [];
+    const bad = [];
+    for (const label of used) {
+      const j = jwtInfo[label];
+      const row = rowsIn.find((x) => String(x.session_id ?? x.id) === j.session_id);
+      const rec = { credential: label, account: j.sub, session_id: j.session_id, aal_in_credential: j.aal, record_found: !!row, record_account: row ? String(row.user_id) : null, record_aal: row ? String(row.aal) : null, not_after: row ? row.not_after ?? null : null, alive: null };
+      if (row) rec.alive = row.alive === true || (row.alive == null && (row.not_after == null || Date.parse(row.not_after) > Date.now()));
+      if (!row) bad.push(`${label}: 로그인 기록이 없다(지워졌다 — 6자리 확인을 끝낸 뒤에 받은 자격인지 볼 것)`);
+      else if (rec.record_account !== j.sub) bad.push(`${label}: 로그인 기록의 계정이 자격의 계정과 다르다`);
+      else if (!rec.alive) bad.push(`${label}: 로그인 기록이 만료됐다(not_after ${rec.not_after})`);
+      else if (rec.record_aal !== String(j.aal)) bad.push(`${label}: 로그인 기록의 aal(${rec.record_aal})이 자격의 aal(${j.aal})과 다르다`);
+      rowsOut.push(rec);
+    }
+    if (bad.length) stop(2, `로그인 기록 확인에서 어긋남 — ${bad.join(' / ')}. 아무 요청도 보내지 않았다`);
+    sessionCheck = { checked: true, source: '브레인방이 DB 에서 읽어 넘긴 파일(--sessions-alive)', read_at: f.read_at, seconds_before_this_run: age, credentials: rowsOut };
+  } else if (args['sessions-unchecked'] === 'true') {
+    sessionCheck = { checked: false, note: '--sessions-unchecked: 로그인 기록이 살아 있는지 확인하지 않고 쟀다. 관리자 6자리 전 자격의 거절이 규칙 때문인지 죽은 기록 때문인지 이 결과로는 가릴 수 없다' };
+  } else if (admins.length) {
+    stop(2, `관리자 자격(${admins.join(', ')})을 쓰는 단계다. 재기 전에 그 로그인 기록이 살아 있음을 DB 로 확인한 파일이 필요하다: node storage_matrix.mjs --phase sessions-sql 이 적어 주는 SQL 의 결과를 저장해 --sessions-alive <파일> 로 넘길 것. 아무 요청도 보내지 않았다`);
+  } else {
+    sessionCheck = { checked: false, note: '관리자 자격을 쓰지 않는 실행이라 확인을 요구하지 않았다' };
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -593,22 +667,24 @@ const doubtOf = (st) => (st?.known ? null : st?.unverified ?? '읽지 못함');
 async function infoAs(actor, bucket, path) {
   const r = await infoRaw(actor, bucket, path);
   const ri = responseInfo(r);
-  const out = { who: actor, http_status: r.status, ok: r.ok, cf_cache_status: r.cf, etag: null, size: null, error: r.ok ? null : ri };
+  const out = { who: actor, http_status: r.status, ok: r.ok, cf_cache_status: r.cf, object_id: null, etag: null, size: null, error: r.ok ? null : ri };
   if (r.ok && r.json && typeof r.json === 'object') {
+    out.object_id = r.json.id != null ? String(r.json.id) : null;
     out.etag = normEtag(r.json.etag ?? r.json.eTag ?? r.json.metadata?.eTag);
     out.size = r.json.size ?? r.json.metadata?.size ?? null;
   }
   return out;
 }
-// 정보 조회의 허용·거절.  허용 = 200 이고 eTag·크기가 저장 정보와 같음 / 거절 = 관측된 "객체 없음" 모양이고 같은 순간 파일은 정상으로 있음
+// 정보 조회의 허용·거절.  허용 = 200 이고 돌려준 객체 식별자·eTag·크기가 서비스 열쇠로 읽은 저장 정보와 같음(200 만으로는 허용이 아니다)
+//                        거절 = 관측된 "객체 없음" 모양이고 같은 순간 파일은 정상으로 있음
 // 이 결과는 "그 자격으로 그 파일의 정보를 볼 수 있는가"까지만 뜻한다.
 function infoVerdict(rd, trueState) {
   if (!trueState?.known) return `undetermined(저장 정보 미확인: ${trueState?.unverified ?? ''})`;
   if (!trueState.exists) return 'undetermined(그 순간 파일이 없음 — "객체 없음"을 거절로 세지 않는다)';
   if (notDynamic(rd.cf_cache_status)) return `undetermined(정보 조회 응답: ${notDynamic(rd.cf_cache_status)})`;
   if (rd.ok) {
-    if (rd.etag === trueState.md5 && Number(rd.size) === trueState.size) return 'allow';
-    return `undetermined(정보 조회는 200 인데 eTag·크기가 저장 정보와 다름: ${rd.etag}/${rd.size})`;
+    if (rd.object_id === trueState.object_id && rd.etag === trueState.md5 && Number(rd.size) === trueState.size) return 'allow';
+    return `undetermined(정보 조회는 200 인데 식별자·eTag·크기가 저장 정보와 다름: ${rd.object_id}/${rd.etag}/${rd.size})`;
   }
   if (rd.error.kind === 'no_such_key') return 'deny';
   return `undetermined(정보 조회가 끝나지 않았거나 관측된 "객체 없음" 모양이 아닌 응답: ${rd.http_status} ${rd.error.body_statusCode ?? '-'} ${rd.error.body_code ?? '-'})`;
@@ -742,7 +818,12 @@ function can(st, c, op, bucket, name) {
 const M = {
   uploadNew: (st, c, bucket, name, upsert) => can(st, c, 'a', bucket, name) && (!upsert || can(st, c, 'r', bucket, name)),
   overwrite: (st, c, bucket, name) => can(st, c, 'a', bucket, name) && can(st, c, 'r', bucket, name) && can(st, c, 'w', bucket, name),
-  read: (st, c, bucket, name) => can(st, c, 'r', bucket, name),
+  read: (st, c, bucket, name) => can(st, c, 'r', bucket, name),   // 읽기 규칙이 있는가 — 목록 조회의 기대값이 이것을 따른다
+  // 정확한 이름의 정보 조회: 이 계약의 네 버킷은 전부 공개 버킷이고, 시험한 공개 버킷에서는 읽기 규칙이 없는 자격에게도
+  // 존재하는 객체의 정확한 이름 정보 조회가 허용됐다(실측 — 적용 뒤 actions 의 63칸, 비공개 버킷에서는 규칙대로 거절).
+  // 그래서 모든 자격·모든 상태에서 허용이 기대값이다. 기존 동작이지 새 규칙의 성과가 아니다.
+  // 버킷이 공개가 아니면 이 기대값은 성립하지 않는다 — actions 단계는 시작할 때 버킷 설정을 읽고, 넷 중 하나라도 공개가 아니면 멈춘다.
+  info: () => true,
   remove: (st, c, bucket, name) => can(st, c, 'r', bucket, name) && can(st, c, 'd', bucket, name),
   move: (st, c, bucket, from) => can(st, c, 'r', bucket, from) && can(st, c, 'w', bucket, from),
   copy: (st, c, bucket, from, to) => can(st, c, 'r', bucket, from) && can(st, c, 'a', bucket, to),
@@ -1383,6 +1464,35 @@ async function phaseUploadExisting(run) {
 // ---------------------------------------------------------------------
 // actions: 정보 조회·목록·삭제·이동·복사 + 공개 주소
 // ---------------------------------------------------------------------
+// 네 업무 버킷이 지금 공개 버킷인가(서비스 열쇠의 버킷 조회). 정보 조회의 기대값이 여기에 기댄다.
+async function checkBucketsPublic() {
+  const r = await http('service', 'GET', '/storage/v1/bucket');
+  const out = { request: 'GET /storage/v1/bucket(서비스 열쇠)', http_status: r.status, buckets: {}, problems: [], ok: false };
+  if (!r.ok || !Array.isArray(r.json)) {
+    out.problems.push(`버킷 설정을 읽지 못함(${r.status} ${responseInfo(r).kind})`);
+    return out;
+  }
+  for (const b of BUCKETS) {
+    const it = r.json.find((x) => x.id === b);
+    out.buckets[b] = it ? { public: it.public ?? null } : null;
+    if (!it) out.problems.push(`${b}: 버킷이 없다`);
+    else if (it.public !== true) out.problems.push(`${b}: 공개 버킷이 아니다(public: ${JSON.stringify(it.public ?? null)})`);
+  }
+  out.ok = out.problems.length === 0;
+  return out;
+}
+// 그 자격이 그 객체에 처음 보내는 본문 GET(값 없는 인증 주소). 관측이다 — 판정에 쓰지 않는다.
+async function bodyObserve(actor, bucket, path, bytes) {
+  const r = await http(actor, 'GET', `/storage/v1/object/authenticated/${bucket}/${encPath(path)}`);
+  const got = r.ok ? md5(r.buf) : null;
+  return {
+    request: '본문 GET(그 자격, 값 없는 인증 주소 — 그 자격이 이 객체에 처음 보내는 것)', who: actor,
+    http_status: r.status, cf_cache_status: r.cf, age: r.age, delivered: r.ok,
+    is: r.ok ? (got === md5(bytes) && r.buf.length === bytes.length ? '올린 내용' : '그 밖') : '본문 없음',
+    error: r.ok ? null : respSig(responseInfo(r)), used_for_verdict: false,
+  };
+}
+
 async function actionCell(run, row, actor) {
   const { bucket } = row;
   const tag = `a${row.no}${ACTOR_CODE[actor] ?? 'pb'}`;
@@ -1403,7 +1513,9 @@ async function actionCell(run, row, actor) {
   let r = null;
   if (row.action === 'info') {
     cell.info_lookup = await infoAs(actor, bucket, target);
-    cell.model_says = verdictWord(M.read(state, c, bucket, target));
+    cell.has_read_rule = M.read(state, c, bucket, target);       // 이 자격에 읽기 규칙이 있는가(참고)
+    cell.model_says = verdictWord(M.info(state, c, bucket, target)); // 공개 버킷: 정확한 이름의 정보 조회는 읽기 규칙과 무관하게 허용(기존 동작)
+    cell.body_observation = await bodyObserve(actor, bucket, target, original); // 관측만
   } else if (row.action === 'list') {
     r = await listRaw(actor, bucket, row.place.dir, `${base}-`);
     cell.list_cf = r.cf;
@@ -1433,7 +1545,8 @@ async function actionCell(run, row, actor) {
 }
 function judgeAction(row, cell, control) {
   const ri = cell.response ?? null;
-  cell.expect = hasExpectation(cell.actor) ? cell.model_says ?? null : null;
+  // 정보 조회 줄은 모든 자격·모든 상태에서 허용이 기대값이다(비로그인도). 그 밖의 줄은 전과 같다.
+  cell.expect = row.action === 'info' ? 'allow' : hasExpectation(cell.actor) ? cell.model_says ?? null : null;
   const original = cell._original;
   let o;
   const st = cell.start;
@@ -1476,7 +1589,10 @@ function judgeAction(row, cell, control) {
   }
   cell.observed = o;
   cell.pass = cell.expect == null ? null : o === cell.expect ? true : o.startsWith('undetermined') ? null : false;
-  cell.cmp = { observed: o.replace(/\(.*$/s, ''), response: respSig(ri), info_status: cell.info_lookup?.http_status ?? null, returned: cell.returned_names?.length ?? null, target_unchanged: cell.target_unchanged ?? null };
+  cell.cmp = { observed: o.replace(/\(.*$/s, ''), response: respSig(ri), info_status: cell.info_lookup?.http_status ?? null, body_status: cell.body_observation?.http_status ?? null, returned: cell.returned_names?.length ?? null, target_unchanged: cell.target_unchanged ?? null };
+  if (row.action === 'info' && o === 'allow' && cell.actor !== 'service' && cell.has_read_rule === false) {
+    cell.existing_behavior = '공개 버킷의 합성 객체는 읽기 규칙이 없는 자격에게도 정확한 이름의 정보 조회가 허용됨(기존 동작 — 새 규칙의 성과가 아니다)';
+  }
 }
 async function publicCell(run, row) {
   const { bucket } = row;
@@ -1504,6 +1620,12 @@ async function publicCell(run, row) {
 async function phaseActions(run) {
   const all = rowsActions();
   const rows = selectRows(all);
+  // 기준선 확인: 네 업무 버킷은 전부 공개 버킷이어야 한다. 아니거나 읽지 못하면 기대값을 바꾸지 않고 여기서 멈춘다.
+  const pub = await checkBucketsPublic();
+  if (!pub.ok) {
+    say(`기준선 불일치 — ${pub.problems.join(' / ')}. 요청을 더 보내지 않고 멈춘다`);
+    return { exit: 3, result: { state, stopped: `기준선 불일치: 네 업무 버킷이 전부 공개 버킷이라는 것을 확인하지 못했다(${pub.problems.join(' / ')}). 정보 조회의 기대값은 공개 버킷일 때의 것이다 — 기대값을 바꾸지 않고 멈췄다`, buckets_public_check: pub } };
+  }
   const cells = [];
   const ledger = [];
   const known = new Set();
@@ -1552,7 +1674,14 @@ async function phaseActions(run) {
     say(`actions ${done}/${rows.length} (${row.no}번 줄) — ${row.label} — ${tallyLine(tally(rowCells))}`);
   }
   const after = await snapshotAll();
-  return finishMeasure({ rows, cells, ledger, known, before, after, stopped, extra: { note: '정보 조회의 거절은 "그 자격으로 그 파일의 정보를 볼 수 없다"까지만 뜻한다(본문 내려받기의 차단을 뜻하지 않는다). 목록의 거절은 "응답은 성공이고 목록이 빔"이다. 이동·복사의 거절은 출발지와 대조 객체가 식별자·저장 정보까지 그대로이고 도착지가 생기지 않은 것이다 — 소유자는 owners 단계가 견준다.' } });
+  const bodyObs = {};
+  for (const c of cells) {
+    if (!c.body_observation) continue;
+    const a = (bodyObs[c.actor] ??= { 본문_전달됨: 0, 본문_없음: 0, has_read_rule: null });
+    a[c.body_observation.delivered ? '본문_전달됨' : '본문_없음'] += 1;
+    a.has_read_rule = c.has_read_rule ?? null;
+  }
+  return finishMeasure({ rows, cells, ledger, known, before, after, stopped, extra: { buckets_public_check: pub, body_get_observations: bodyObs, body_get_observations_note: '정보 조회 줄에서 그 자격이 그 객체에 처음 보낸 본문 GET(값 없는 인증 주소)의 결과를 자격별로 센 것이다. 관측이다 — 기대값이 없고 판정에 쓰지 않는다.', note_info: '정보 조회 줄: 네 업무 버킷은 공개 버킷이고(buckets_public_check), 존재가 확인된 합성 객체의 정확한 이름 정보 조회는 모든 자격·모든 상태에서 허용이 기대값이다. 허용 = 200 + 돌려준 식별자·eTag·크기가 서비스 열쇠로 읽은 것과 같음. 기존 동작이다(existing_behaviors) — 새 규칙의 성과로 세지 않는다. 목록 조회는 읽기 규칙을 따른다(로그인 자격은 빈 목록).', note: '정보 조회의 거절은 "그 자격으로 그 파일의 정보를 볼 수 없다"까지만 뜻한다(본문 내려받기의 차단을 뜻하지 않는다). 목록의 거절은 "응답은 성공이고 목록이 빔"이다. 이동·복사의 거절은 출발지와 대조 객체가 식별자·저장 정보까지 그대로이고 도착지가 생기지 않은 것이다 — 소유자는 owners 단계가 견준다.' } });
 }
 
 // ---------------------------------------------------------------------
@@ -1622,8 +1751,8 @@ async function phaseRevoked(run) {
 
 // 실측 단계의 마무리: 셈, 표, 목록으로 본 어림
 //   "대상 밖 객체의 변화 0"은 여기서 말하지 않는다. 그것은 단계 앞뒤로 뜬 fingerprint.sql 결과를 outside 단계에 넘겨 확인한다.
-function finishMeasure({ rows, cells, ledger, before, after, stopped, extra }) {
-  const hint = listingHint(before, after, ledger);
+function finishMeasure({ rows, cells, ledger, before, after, stopped, extra, st }) {
+  const hint = before && after ? listingHint(before, after, ledger) : null; // 구간 결과를 합칠 때(merge)는 없다
   const summary = tally(cells);
   const table = {};
   const labels = new Map(rows.map((r) => [r.id, r.label]));
@@ -1632,7 +1761,7 @@ function finishMeasure({ rows, cells, ledger, before, after, stopped, extra }) {
     (table[`${String(c.row).padStart(3, '0')} ${labels.get(c.row_id) ?? c.row_id}`] ??= {})[c.actor] = mark;
   }
   const bad = summary.mismatch > 0 || summary.undetermined > 0;
-  if (!hint.nothing_noticed) say(`목록으로 본 어림에 눈에 띄는 것이 있다 — 장부에 없는 새 식별자 ${hint.new_ids_not_in_ledger.length}, 없어진 식별자 ${hint.gone_ids.length}, 바뀐 식별자 ${hint.changed_ids.length}. fingerprint.sql 을 떠서 --phase outside 로 확인할 것`);
+  if (hint && !hint.nothing_noticed) say(`목록으로 본 어림에 눈에 띄는 것이 있다 — 장부에 없는 새 식별자 ${hint.new_ids_not_in_ledger.length}, 없어진 식별자 ${hint.gone_ids.length}, 바뀐 식별자 ${hint.changed_ids.length}. fingerprint.sql 을 떠서 --phase outside 로 확인할 것`);
   // 비로그인처럼 기대값 없이 잰 칸 중, 도착 이름이나 저장 여부를 확인하지 못한 칸(기준선으로 쓸 수 없다)
   const measuredUnverified = cells.filter((c) => c.expect == null && !c.not_applicable && !c.pending_db_check && /^(undetermined|anomaly|미확인|권한 미판정|이상)/.test(String(c.observed)));
   // "입력 오류 확인 / 저장 변화 검증 대기": 올리기 응답도, 그 이름의 정보 조회도 "받지 않는 이름"이라 그 이름에 객체가 없는지를 이 도구가 확인하지 못한 칸
@@ -1641,7 +1770,7 @@ function finishMeasure({ rows, cells, ledger, before, after, stopped, extra }) {
   return {
     exit: stopped ? 3 : bad || measuredUnverified.length ? 1 : 0,
     result: {
-      state, stopped,
+      state: st ?? state, stopped,
       summary,
       measured_cells_unverified: measuredUnverified.map((c) => ({ row_id: c.row_id, actor: c.actor, observed: c.observed })),
       input_error_pending_note: pending.length
@@ -1712,7 +1841,7 @@ function phasePlan() {
       else {
         const feasible = M.uploadNew(state, ctxOf(r.creator), r.bucket, name, false);
         const f = { info: (c) => M.read(state, c, r.bucket, name), list: (c) => M.read(state, c, r.bucket, name), delete: (c) => M.remove(state, c, r.bucket, name), move: (c) => M.move(state, c, r.bucket, name), copy: (c) => M.copy(state, c, r.bucket, name, dest) }[r.action];
-        for (const a of ALL_ACTORS) cellsOut[a] = !feasible ? '해당 없음(먼저 만들 수 없음)' : cellExp(a, (c) => exp(f(c)));
+        for (const a of ALL_ACTORS) cellsOut[a] = !feasible ? '해당 없음(먼저 만들 수 없음)' : r.action === 'info' ? 'allow(공개 버킷의 기존 동작 — 모든 자격·모든 상태. 새 규칙의 성과가 아니다)' : cellExp(a, (c) => exp(f(c)));
       }
       return { no: r.no, id: r.id, label: r.label, cells: cellsOut };
     });
@@ -1732,17 +1861,37 @@ function phasePlan() {
 
 // ---------------------------------------------------------------------
 // cleanup: 이 도구가 만든 합성 객체를 지운다
-//   지울 객체의 "정확한 전체 이름"을 아는 길은 셋이다.
-//     --fingerprint <fingerprint.sql 결과>   DB 의 객체 행(정확한 이름·식별자). 이름에 표식(zzb2n2b)이 있는 것을 지운다.
-//                                            대소문자만 다른 폴더(EXAM-REG/…, REVIEWS/… 등)의 객체도 여기서 글자 그대로 나온다.
-//     --ledger <결과 json>[,<json>…]         단계가 남긴 장부(정확한 이름·식별자). 표식 있는 것은 지우고,
-//                                            표식 없는 이름(reviews/ 처럼 파일 이름이 빈 것)은 지금 그 이름의 객체 식별자가
-//                                            장부와 같을 때만 지운다. 다르면 아무것도 지우지 않고 멈춘다(종료 값 4).
-//     (인자 없음) 목록 조회                   표식 있는 이름을 찾는다. 어림이다 — 대소문자가 다른 폴더의 객체는 틀린 이름으로
-//                                            나와 지워지지 않을 수 있다. 이것만으로는 "남은 것 0"을 말하지 않는다.
-//   표식도 없고 장부에도 없는 객체는 지우지 않고 적는다.
+//
+//   기본값은 "적힌 것만"이다. --fingerprint 와 --ledger 에 적힌 객체만 지우고, 버킷을 훑지 않는다.
+//     --ledger <결과 json>[,<json>…]         단계가 남긴 장부(버킷·정확한 이름·식별자). 적힌 객체가 지울 대상이다.
+//     --fingerprint <fingerprint.sql 결과>   DB 의 객체 행(버킷·정확한 이름·식별자).
+//         장부 없이 이것만 주면: 그 파일에 적힌 객체 중 이름에 표식(zzb2n2b)이 있는 것이 지울 대상이다
+//                               (일부만 지우려면 그 객체들의 행만 남긴 파일을 준다).
+//         장부와 함께 주면:     장부에 적힌 객체가 대상이고, 지문에 같은 버킷·이름·식별자로 있어야 한다.
+//                               지문에만 있는 객체는 대상이 아니다(건드리지 않는다).
+//     지우기 전에 대상마다 "지문·장부·지금의 객체"가 버킷·정확한 이름·식별자까지 모두 같은지 본다.
+//     하나라도 다르면 아무것도 지우기 전에 멈춘다(종료 값 4).
+//     지운 뒤에는 대상이 전부 "없음"이고, 대상이 아닌 객체(선택 밖의 대조 객체 등)가 식별자·저장 정보 그대로인지 본다.
+//     표식 없는 이름(reviews/ 처럼 파일 이름이 빈 것)은 장부에 적혀 있을 때만 대상이 된다.
+//
+//   --all-marked 를 명시했을 때만 버킷을 훑어 표식 있는 객체를 전부 지운다(앞 실행의 잔여 정리, 끝 상태 정리에만 쓴다).
+//     그때도 정확한 이름은 --fingerprint 에서 얻는 것이 먼저다 — 목록 조회로 찾은 이름은 어림이다
+//     (대소문자가 다른 폴더의 객체는 틀린 이름으로 나와 지워지지 않을 수 있다).
 // ---------------------------------------------------------------------
-async function phaseCleanup() {
+// 지금 그 이름에 있는 객체(정보 조회 한 번. 글자 그대로 찾는다)
+async function currentObject(bucket, name) {
+  const r = await infoRaw('service', bucket, name);
+  const ri = responseInfo(r);
+  if (notDynamic(r.cf)) return { known: false, why: notDynamic(r.cf) };
+  if (r.ok && r.json && typeof r.json === 'object') {
+    const id = r.json.id != null ? String(r.json.id) : null;
+    if (!id) return { known: false, why: '정보 조회에 객체 식별자가 없음' };
+    return { known: true, exists: true, id, etag: normEtag(r.json.etag ?? r.json.eTag ?? r.json.metadata?.eTag), size: r.json.size ?? r.json.metadata?.size ?? null };
+  }
+  if (ri.kind === 'no_such_key') return { known: true, exists: false };
+  return { known: false, why: `정보 조회 ${r.status} ${ri.body_statusCode ?? '-'} ${ri.body_code ?? '-'} ${ri.kind}` };
+}
+async function loadCleanupSources() {
   const loadJson = async (p) => JSON.parse((await readFile(p, 'utf8')).replace(/^\uFEFF/, ''));
   let fp = null;
   if (args.fingerprint) {
@@ -1755,7 +1904,136 @@ async function phaseCleanup() {
   if (args.ledger) {
     for (const p of args.ledger.split(',').map((s) => s.trim()).filter(Boolean)) ledgerEntries.push(...((await loadJson(p)).result?.ledger ?? []));
   }
+  return { fp, ledgerEntries };
+}
 
+async function phaseCleanup() {
+  const allMarked = args['all-marked'] === 'true';
+  const { fp, ledgerEntries } = await loadCleanupSources();
+  if (allMarked) return cleanupAllMarked(fp, ledgerEntries);
+  if (!fp && !args.ledger) stop(2, 'cleanup 은 지울 객체를 적은 파일이 필요하다: --ledger <결과 json> 그리고/또는 --fingerprint <fingerprint.sql 결과>. 버킷을 훑어 표식 있는 객체를 전부 지우려면 --all-marked 를 명시할 것. 아무 요청도 보내지 않았다');
+
+  // 1) 지울 대상을 정한다(아직 아무 요청도 보내지 않는다)
+  const fpMap = new Map();          // 버킷/이름 → 지문의 행(네 업무 버킷만)
+  let fpOutside = 0;
+  for (const o of fp?.objects ?? []) {
+    if (!BUCKETS.includes(o.bucket_id)) fpOutside += 1;
+    else fpMap.set(`${o.bucket_id}/${o.name}`, o);
+  }
+  const conflicts = [];
+  const targets = new Map();        // 버킷/이름 → { bucket, name, id, from }
+  const inLedgerNotInFingerprint = [];
+  const unmarkedNotDeleted = [];
+  if (args.ledger) {
+    for (const e of ledgerEntries) {
+      if (!BUCKETS.includes(e.bucket)) {
+        conflicts.push({ object: `${e.bucket}/${e.name}`, problem: '장부의 객체가 네 업무 버킷 밖에 있다' });
+        continue;
+      }
+      const k = `${e.bucket}/${e.name}`;
+      if (!e.object_id) {
+        conflicts.push({ object: k, problem: '장부에 객체 식별자가 없다' });
+        continue;
+      }
+      const prev = targets.get(k);
+      if (prev && prev.id !== String(e.object_id)) {
+        conflicts.push({ object: k, problem: '장부 안에서 같은 이름의 식별자가 서로 다르다', ids: [prev.id, String(e.object_id)] });
+        continue;
+      }
+      if (fp) {
+        const f = fpMap.get(k);
+        if (!f) {
+          if (!inLedgerNotInFingerprint.some((x) => x.object === k)) inLedgerNotInFingerprint.push({ object: k, bucket: e.bucket, name: e.name, ledger_id: String(e.object_id) });
+          continue; // 지문에 없으면 대상이 아니다(이미 없거나, 그 지문을 뜬 뒤의 일이다) — 아래에서 "지금 없음"을 확인한다
+        }
+        if (String(f.id) !== String(e.object_id)) {
+          conflicts.push({ object: k, problem: '장부와 지문의 식별자가 다르다', ledger_id: String(e.object_id), fingerprint_id: String(f.id) });
+          continue;
+        }
+      }
+      targets.set(k, { bucket: e.bucket, name: e.name, id: String(e.object_id), from: fp ? '장부 + 지문' : '장부' });
+    }
+  } else {
+    for (const [k, o] of fpMap) {
+      if (String(o.name).includes(MARK)) targets.set(k, { bucket: o.bucket_id, name: String(o.name), id: String(o.id), from: '지문(표식 있음)' });
+      else unmarkedNotDeleted.push({ bucket: o.bucket_id, name: String(o.name), id: String(o.id) });
+    }
+  }
+  const fingerprintNotTargeted = fp ? [...fpMap.keys()].filter((k) => !targets.has(k)).length : null;
+
+  // 2) 지우기 전에: 대상마다 지금의 객체가 그 버킷·이름·식별자인가. 하나라도 다르면 아무것도 지우지 않는다.
+  let n = 0;
+  for (const [k, t] of targets) {
+    const cur = await currentObject(t.bucket, t.name);
+    if (!cur.known) conflicts.push({ object: k, problem: `지금 상태를 확인하지 못함: ${cur.why}` });
+    else if (!cur.exists) conflicts.push({ object: k, problem: '적힌 객체가 지금 그 이름에 없다(지문·장부가 지금 상태와 다르다 — 지문을 새로 뜰 것)', listed_id: t.id });
+    else if (cur.id !== t.id) conflicts.push({ object: k, problem: '지금 그 이름의 객체가 적힌 객체가 아니다(식별자가 다름)', listed_id: t.id, current_id: cur.id });
+    n += 1;
+    if (n % 300 === 0) say(`cleanup 지우기 전 확인 ${n}/${targets.size}`);
+  }
+  for (const x of inLedgerNotInFingerprint) {
+    const cur = await currentObject(x.bucket, x.name);
+    if (!cur.known) conflicts.push({ object: x.object, problem: `장부에는 있고 지문에는 없는 객체의 지금 상태를 확인하지 못함: ${cur.why}` });
+    else if (cur.exists) conflicts.push({ object: x.object, problem: '지문에는 없는데 지금 그 이름에 객체가 있다(지문이 지금 상태와 다르다 — 지문을 새로 뜰 것)', ledger_id: x.ledger_id, current_id: cur.id });
+  }
+  if (conflicts.length) {
+    say(`cleanup 멈춤: 지문·장부·지금의 객체가 어긋나는 것이 ${conflicts.length}건이다. 아무것도 지우지 않았다`);
+    for (const c of conflicts.slice(0, 10)) say('  ' + JSON.stringify(c));
+    return { exit: 4, result: { mode: '적힌 것만', stopped: '지문·장부·지금의 객체가 버킷·정확한 이름·식별자까지 일치하지 않는다. 아무것도 지우지 않았다', targets: targets.size, conflicts } };
+  }
+
+  // 3) 대상이 아닌 객체의 지금 모습(목록을 식별자로 — 어림. 지운 뒤 그대로인지 견준다)
+  const targetIds = new Set([...targets.values()].map((t) => t.id));
+  const before = await listIdsAll();
+
+  // 4) 지운다(정확한 이름으로)
+  const byBucket = Object.fromEntries(BUCKETS.map((b) => [b, []]));
+  for (const t of targets.values()) byBucket[t.bucket].push(t.name);
+  for (const b of BUCKETS) if (byBucket[b].length) await removeMany(b, byBucket[b]);
+
+  // 5) 지운 뒤: 대상은 전부 "없음", 대상이 아닌 객체는 식별자·저장 정보 그대로
+  const notGone = [];
+  n = 0;
+  for (const [k, t] of targets) {
+    const cur = await currentObject(t.bucket, t.name);
+    if (!(cur.known && cur.exists === false)) notGone.push({ object: k, state: cur.known ? `아직 객체가 있음(식별자 ${cur.id})` : `미확인: ${cur.why}` });
+    n += 1;
+    if (n % 300 === 0) say(`cleanup 지운 뒤 확인 ${n}/${targets.size}`);
+  }
+  const after = await listIdsAll();
+  const untouched = { listings_complete: true, seen_before: 0, still_same: 0, problems: [] };
+  for (const b of BUCKETS) {
+    if (!before[b].ok || !after[b].ok) untouched.listings_complete = false;
+    for (const [id, m] of before[b].ids) {
+      if (targetIds.has(id)) continue;
+      untouched.seen_before += 1;
+      const now = after[b].ids.get(id);
+      if (!now) untouched.problems.push({ bucket: b, id, listed_as: m.listed_as, problem: '대상이 아닌 객체가 지운 뒤 목록에 없다' });
+      else if (now.etag !== m.etag || now.size !== m.size || now.updated_at !== m.updated_at) untouched.problems.push({ bucket: b, id, listed_as: m.listed_as, problem: '대상이 아닌 객체의 저장 정보가 바뀌었다' });
+      else untouched.still_same += 1;
+    }
+  }
+  const deleted = [...targets.values()].map((t) => ({ bucket: t.bucket, name: t.name, id: t.id }));
+  const bad = notGone.length > 0 || untouched.problems.length > 0 || !untouched.listings_complete;
+  say(`cleanup(적힌 것만): 대상 ${targets.size}건 지움, 없음 확인 ${targets.size - notGone.length}건 · 대상이 아닌 객체 ${untouched.seen_before}건 중 그대로 ${untouched.still_same}건${unmarkedNotDeleted.length ? ` · 표식 없어 지우지 않은 객체 ${unmarkedNotDeleted.length}건` : ''}`);
+  return {
+    exit: bad ? 1 : 0,
+    result: {
+      mode: '적힌 것만(--fingerprint·--ledger 에 적힌 객체만. 버킷을 훑지 않는다)',
+      note: `지우기 전에 대상마다 지금의 객체가 적힌 버킷·정확한 이름·식별자와 같은지 봤고(정보 조회), 지운 뒤 대상마다 "없음"을 확인했다. 대상이 아닌 객체가 그대로인지는 지우기 전후의 목록 조회를 식별자로 견준 것이다(목록은 전체 이름을 글자 그대로 가려 주지 못하므로 어림이다). 대상 밖 객체가 그대로임과 남은 객체 수의 확인은 정리 뒤에 뜬 fingerprint.sql 로 한다: node storage_matrix.mjs --phase outside --fingerprint-before <정리 전 지문> --fingerprint-after <정리 뒤 지문> --removed <이 결과 파일>. 지운 뒤에도 같은 주소의 본문 GET 은 한동안 옛 내용을 줄 수 있다(2a 관측).`,
+      used: { fingerprint: !!fp, ledger_entries: ledgerEntries.length },
+      targets: targets.size, verified_absent: targets.size - notGone.length, not_gone: notGone,
+      untouched_objects: untouched,
+      fingerprint_objects_not_targeted: fingerprintNotTargeted, fingerprint_objects_in_other_buckets: fpOutside,
+      in_ledger_not_in_fingerprint: inLedgerNotInFingerprint.map((x) => x.object),
+      unmarked_not_deleted: unmarkedNotDeleted,
+      deleted,
+    },
+  };
+}
+
+// --all-marked: 버킷을 훑어 표식 있는 객체를 전부 지운다(명시했을 때만)
+async function cleanupAllMarked(fp, ledgerEntries) {
   // 1) 지울 정확한 이름을 모은다(아직 아무것도 지우지 않는다)
   const exact = Object.fromEntries(BUCKETS.map((b) => [b, new Map()])); // 이름 → { id, source }
   const unmarkedInDb = [];
@@ -1776,37 +2054,40 @@ async function phaseCleanup() {
     const k = `${e.bucket}/${e.name}/${e.object_id}`;
     if (unmarkedSeen.has(k)) continue;
     unmarkedSeen.add(k);
-    const st = await readTrue(e.bucket, e.name);
-    if (!st.known) conflicts.push({ bucket: e.bucket, name: e.name, ledger_id: e.object_id, problem: `지금 상태를 확인하지 못함: ${st.unverified}` });
-    else if (!st.exists) continue; // 이미 없다
-    else if (e.object_id && st.object_id === e.object_id) exact[e.bucket].set(e.name, { id: st.object_id, source: '장부(표식 없음 — 식별자 일치)' });
-    else conflicts.push({ bucket: e.bucket, name: e.name, ledger_id: e.object_id, current_id: st.object_id, problem: '지금 그 이름의 객체가 장부의 객체가 아니다(식별자가 다름)' });
+    const cur = await currentObject(e.bucket, e.name);
+    if (!cur.known) conflicts.push({ bucket: e.bucket, name: e.name, ledger_id: e.object_id, problem: `지금 상태를 확인하지 못함: ${cur.why}` });
+    else if (!cur.exists) continue; // 이미 없다
+    else if (e.object_id && cur.id === String(e.object_id)) exact[e.bucket].set(e.name, { id: cur.id, source: '장부(표식 없음 — 식별자 일치)' });
+    else conflicts.push({ bucket: e.bucket, name: e.name, ledger_id: e.object_id, current_id: cur.id, problem: '지금 그 이름의 객체가 장부의 객체가 아니다(식별자가 다름)' });
   }
   if (conflicts.length) {
     say(`cleanup 멈춤: 표식 없는 이름 ${conflicts.length}건이 장부와 맞지 않는다. 아무것도 지우지 않았다`);
-    return { exit: 4, result: { stopped: '표식 없는 이름의 객체가 장부의 객체와 다르다. 아무것도 지우지 않았다 — 무엇인지 확인하기 전에는 손대지 않는다', conflicts } };
+    return { exit: 4, result: { mode: '--all-marked', stopped: '표식 없는 이름의 객체가 장부의 객체와 다르다. 아무것도 지우지 않았다 — 무엇인지 확인하기 전에는 손대지 않는다', conflicts } };
   }
 
   // 2) 지운다. 정확한 이름을 아는 것은 그 이름으로, 그다음 목록으로 찾은 표식 있는 이름(어림)
   const report = {};
+  const deleted = [];
   for (const b of BUCKETS) {
     const names = [...exact[b].keys()];
     if (names.length) await removeMany(b, names);
+    for (const nm of names) deleted.push({ bucket: b, name: nm, id: exact[b].get(nm).id });
     let listedDeleted = 0;
     const tried = new Set(names);
     for (let round = 0; round < 20; round += 1) {
       const s = await listIds(b);
-      const more = [...s.ids.values()].map((m) => m.listed_as).filter((n) => n.includes(MARK) && !tried.has(n));
+      const more = [...s.ids.entries()].filter(([, m]) => m.listed_as.includes(MARK) && !tried.has(m.listed_as));
       if (!more.length) break;
-      more.forEach((n) => tried.add(n));
-      await removeMany(b, more);
+      more.forEach(([, m]) => tried.add(m.listed_as));
+      await removeMany(b, more.map(([, m]) => m.listed_as));
+      for (const [id, m] of more) deleted.push({ bucket: b, name: m.listed_as, id, from_listing: true });
       listedDeleted += more.length;
     }
     // 3) 정확한 이름마다 정보 조회로 "없음"을 확인한다
     const notGone = [];
-    for (const n of names) {
-      const st = await readTrue(b, n);
-      if (!(st.known && st.exists === false)) notGone.push({ name: n, state: st.known ? '아직 있음' : `미확인: ${st.unverified}` });
+    for (const nm of names) {
+      const cur = await currentObject(b, nm);
+      if (!(cur.known && cur.exists === false)) notGone.push({ name: nm, state: cur.known ? '아직 있음' : `미확인: ${cur.why}` });
     }
     const leftListing = [...(await listIds(b)).ids.entries()].map(([id, m]) => ({ id, listed_as: m.listed_as }));
     report[b] = {
@@ -1814,7 +2095,7 @@ async function phaseCleanup() {
       names_from_listing_tried: listedDeleted,
       left_by_listing: leftListing.length, left_by_listing_sample: leftListing.slice(0, 100),
     };
-    say(`cleanup ${b}: 정확한 이름 ${names.length}건 지움(없음 확인 ${names.length - notGone.length}), 목록으로 찾아 지우려 한 이름 ${listedDeleted}건, 목록에 남은 것 ${leftListing.length}`);
+    say(`cleanup(--all-marked) ${b}: 정확한 이름 ${names.length}건 지움(없음 확인 ${names.length - notGone.length}), 목록으로 찾아 지우려 한 이름 ${listedDeleted}건, 목록에 남은 것 ${leftListing.length}`);
   }
   const ledgerUnmarked = new Set(ledgerEntries.filter((e) => !String(e.name).includes(MARK)).map((e) => `${e.bucket}/${e.name}`));
   const unmarkedNotDeleted = unmarkedInDb.filter((o) => !exact[o.bucket].has(o.name)).map((o) => ({ ...o, in_ledger: ledgerUnmarked.has(`${o.bucket}/${o.name}`) }));
@@ -1825,12 +2106,13 @@ async function phaseCleanup() {
   return {
     exit: notGoneTotal || leftTotal || unmarkedNotDeleted.length ? 1 : 0,
     result: {
-      note: `정확한 이름(fingerprint.sql 의 객체 행이나 단계의 장부)을 아는 객체는 그 이름으로 지우고 이름마다 정보 조회로 "없음"을 확인한다. 표식(${MARK}) 없는 이름은 장부의 식별자가 지금 그 객체와 같을 때만 지운다. 목록 조회로 찾은 이름은 어림이다(대소문자가 다른 폴더의 객체는 틀린 이름으로 나와 지워지지 않을 수 있다). 남은 객체 0 의 확인은 정리 뒤에 다시 뜬 fingerprint.sql 의 object_counts 로 한다 — 이 도구의 집계만으로 0 이라고 적지 않는다. 지운 뒤에도 같은 주소의 본문 GET 은 한동안 옛 내용을 줄 수 있다(2a 관측).`,
+      mode: '--all-marked(버킷을 훑어 표식 있는 객체를 전부 지움 — 명시했을 때만. 앞 실행의 잔여 정리와 끝 상태 정리에만 쓴다)',
+      note: `네 업무 버킷에서 표식(${MARK}) 있는 객체를 전부 지웠다. 정확한 이름(fingerprint.sql 의 객체 행이나 장부)을 아는 객체는 그 이름으로 지우고 이름마다 정보 조회로 "없음"을 확인했다. 표식 없는 이름은 장부의 식별자가 지금 그 객체와 같을 때만 지운다. 목록 조회로 찾은 이름은 어림이다(대소문자가 다른 폴더의 객체는 틀린 이름으로 나와 지워지지 않을 수 있다). 남은 객체 0 의 확인은 정리 뒤에 다시 뜬 fingerprint.sql 의 object_counts 로 한다 — 이 도구의 집계만으로 0 이라고 적지 않는다.`,
       used: { fingerprint: !!fp, ledger_entries: ledgerEntries.length },
       verified_by: fp ? 'fingerprint.sql 의 정확한 이름마다 정보 조회로 없음을 확인(그 fingerprint 를 뜬 뒤에 생긴 객체는 모른다)' : '목록 조회만 — 확인이 아니다',
       nothing_left_as_far_as_known: !(notGoneTotal || leftTotal || unmarkedNotDeleted.length),
       unmarked_not_deleted: unmarkedNotDeleted,
-      report,
+      report, deleted,
     },
   };
 }
@@ -1980,16 +2262,34 @@ async function phaseOutside() {
       changed.push({ id, before: key(was), after: key(o), etag_same: was.etag === o.etag, owner_same: (was.owner_id ?? null) === (o.owner_id ?? null), updated_at_same: was.updated_at === o.updated_at });
     }
   }
-  for (const [id, o] of beforeById) if (!afterById.has(id)) removed.push({ object: key(o), id });
+  // --removed <cleanup 결과 json>[,…]: 그 정리가 지웠다고 적은 객체(식별자)는 "없어진 객체"로 세지 않는다. 적힌 것이 뒤 지문에 남아 있으면 문제로 적는다.
+  const listedRemoved = new Map();
+  if (args.removed) {
+    for (const rp of args.removed.split(',').map((s) => s.trim()).filter(Boolean)) {
+      const cj = JSON.parse((await readFile(rp, 'utf8')).replace(/^\uFEFF/, ''));
+      for (const d of cj.result?.deleted ?? []) if (d.id) listedRemoved.set(String(d.id), d);
+    }
+  }
+  const removedAsListed = [];
+  for (const [id, o] of beforeById) if (!afterById.has(id)) (listedRemoved.has(id) ? removedAsListed : removed).push({ object: key(o), id });
+  const listedButStillThere = [...listedRemoved.keys()].filter((id) => afterById.has(id)).map((id) => ({ id, object: key(afterById.get(id)) }));
+  // --write-leftover <경로>: 장부에 없는 새 객체의 행만 담은 지문 모양의 파일을 쓴다(끊긴 실행이 남긴 객체만 cleanup --fingerprint 로 지울 때 쓴다)
+  if (args['write-leftover']) {
+    const ids = new Set(unexplainedNew.map((x) => x.id));
+    await writeFile(args['write-leftover'], JSON.stringify({ note: 'outside 단계가 쓴 파일: 뒤 지문에 새로 생겼는데 넘겨준 장부에는 없는 객체의 행만 담았다. cleanup --fingerprint 에 넘기면 이 객체들만 지운다(표식 있는 것).', objects: B.objects.filter((o) => ids.has(String(o.id))) }, null, 2), 'utf8');
+  }
   for (const [id, e] of ledger) if (!afterById.has(id)) ledgerMissing.push({ id, ledger: `${e.bucket}/${e.name}`, why: e.why });
-  const ok = !unexplainedNew.length && !wrongName.length && !removed.length && !changed.length && !ledgerMissing.length && !noId.length;
-  if (strict) console.log(`[b2n2b] outside(장부 없이 — 어떤 변화도 허용하지 않음): 앞 ${A.objects.length}개 → 뒤 ${B.objects.length}개 · 생긴 객체 ${unexplainedNew.length} · 없어진 객체 ${removed.length} · 바뀐 객체 ${changed.length} — ${ok ? '변화 0' : '변화 있음'}`);
+  const ok = !unexplainedNew.length && !wrongName.length && !removed.length && !changed.length && !ledgerMissing.length && !noId.length && !listedButStillThere.length;
+  if (strict) console.log(`[b2n2b] outside(장부 없이 — 어떤 변화도 허용하지 않음): 앞 ${A.objects.length}개 → 뒤 ${B.objects.length}개 · 생긴 객체 ${unexplainedNew.length} · 없어진 객체 ${removed.length}${args.removed ? `(정리가 지웠다고 적은 ${removedAsListed.length}개는 빼고, 적혔는데 남은 것 ${listedButStillThere.length})` : ''} · 바뀐 객체 ${changed.length} — ${ok ? '변화 0' : '변화 있음'}`);
   else console.log(`[b2n2b] outside: 앞 ${A.objects.length}개 → 뒤 ${B.objects.length}개, 장부 ${ledger.size}건 · 장부에 없는 새 객체 ${unexplainedNew.length} · 이름이 장부와 다른 객체 ${wrongName.length} · 없어진 객체 ${removed.length} · 바뀐 객체 ${changed.length} · 장부에는 있는데 DB 에 없는 것 ${ledgerMissing.length} — ${ok ? '대상 밖 변화 0' : '확인 필요'}`);
   for (const d of [...unexplainedNew, ...wrongName, ...removed, ...changed, ...ledgerMissing].slice(0, 20)) console.log('  ' + JSON.stringify(d));
   return {
     exit: ok ? 0 : 1,
     result: {
       outside_change_zero: ok,
+      removed_as_listed_by_cleanup: args.removed ? removedAsListed.length : undefined,
+      listed_by_cleanup_but_still_there: args.removed ? listedButStillThere : undefined,
+      leftover_file: args['write-leftover'] ?? undefined,
       mode: strict ? '장부 없이 두 지문만 견줌 — 생긴 객체·없어진 객체·바뀐 객체를 전부 변화로 센다(요청 하나의 앞뒤를 볼 때 쓴다)' : '장부와 견줌 — 장부에 있는 새 객체는 이 도구가 만든 것으로 본다',
       created: strict ? unexplainedNew : undefined,
       objects_before: A.objects.length, objects_after: B.objects.length, ledger_objects: ledger.size, results_used: files,
@@ -1997,6 +2297,140 @@ async function phaseOutside() {
       note: 'DB 의 객체 행(fingerprint.sql 의 objects — 정확한 이름·식별자·소유자)으로 견줬다. 두 fingerprint 사이에 돈 단계의 결과 파일을 전부 --result 에 줘야 한다(빠뜨리면 그 단계의 객체가 "장부에 없는 새 객체"로 나온다). 단계가 끝났을 때 남은 변화만 본다 — 중간에 만들었다 지운 객체(같은 이름을 쓰는 줄의 객체, 삭제·이동 칸의 대상)는 보지 못한다. 소유자가 기대와 같은지는 owners 단계가 본다.',
     },
   };
+}
+
+// ---------------------------------------------------------------------
+// merge (요청 0): 한 단계를 --rows 로 나눠 잰 구간 결과들을 하나로 합친다
+//   --parts <구간 결과 json>,<json>,…  --out <합친 결과 json>  [--actors a,b,…]  [--plan <plan 결과 json>]
+//   같은 상태·같은 단계의 구간이어야 한다. 예정표(이 도구의 줄 × 자격 — plan 단계와 같은 것)와 견줘
+//   "줄 번호 + 자격"마다 실제로 잰 횟수가 정확히 한 번인지 본다. 0번(빠짐)이나 2번 이상(겹침)이 하나라도 있으면 종료 값 1.
+//   (줄 번호의 합집합만 보지 않는다 — 한 줄에서 자격 한 칸이 빠지거나 두 번 들어간 것도 잡는다.)
+//   합친 결과는 그 단계의 결과와 같은 모양이라 compare·outside·owners·cleanup 에 그대로 넘길 수 있다.
+// ---------------------------------------------------------------------
+async function phaseMerge() {
+  if (!args.parts) stop(2, 'merge 는 --parts <구간 결과 json>,<json>,… 가 필요하다');
+  const files = args.parts.split(',').map((s) => s.trim()).filter(Boolean);
+  const parts = [];
+  for (const f of files) parts.push({ file: f, json: JSON.parse((await readFile(f, 'utf8')).replace(/^\uFEFF/, '')) });
+  const problems = [];
+  const ph = parts[0].json.phase;
+  const st = parts[0].json.result?.state ?? null;
+  if (!MEASURE_PHASES.includes(ph)) stop(2, `합칠 수 있는 단계가 아니다: ${ph} (${MEASURE_PHASES.join(', ')})`);
+  for (const p of parts) {
+    if (p.json.phase !== ph) problems.push(`${p.file}: 단계가 다르다(${p.json.phase} / ${ph})`);
+    if ((p.json.result?.state ?? null) !== st) problems.push(`${p.file}: 상태가 다르다(${p.json.result?.state} / ${st})`);
+    if (p.json.result?.single_request) problems.push(`${p.file}: 요청 하나만 보낸 결과(--no-control)는 합칠 수 없다`);
+    if (p.json.merged) problems.push(`${p.file}: 이미 합친 결과다`);
+    if (!Array.isArray(p.json.result?.cells)) problems.push(`${p.file}: cells 가 없다`);
+    if (JSON.stringify(p.json.members ?? null) !== JSON.stringify(parts[0].json.members ?? null)) problems.push(`${p.file}: 회원번호(A·B·GM)가 첫 구간과 다르다`);
+  }
+  if (problems.length) {
+    for (const x of problems) console.log('[b2n2b] merge: ' + x);
+    return { exit: 1, result: { stopped: '구간 결과들을 합칠 수 없다', problems } };
+  }
+  // 예정표: 이 도구의 줄(plan 단계가 적는 것과 같다)
+  memberA = parts[0].json.members?.A ?? memberA;
+  memberB = parts[0].json.members?.B ?? memberB;
+  memberGM = parts[0].json.members?.GM ?? memberGM;
+  const planRows = (ph === 'upload-new' ? rowsUploadNew().filter((r) => !r.shape.skip) : ph === 'upload-existing' ? rowsUploadExisting() : rowsActions());
+  if (args.plan) {
+    const pl = JSON.parse((await readFile(args.plan, 'utf8')).replace(/^\uFEFF/, ''));
+    const table = pl.result?.groups?.[ph]?.table ?? [];
+    const mine = new Map(planRows.map((r) => [r.no, r.id]));
+    const theirs = new Map(table.filter((r) => !r.skip).map((r) => [r.no, r.id]));
+    if (mine.size !== theirs.size || [...mine].some(([no, id]) => theirs.get(no) !== id)) problems.push('--plan 파일의 줄(번호·이름)이 이 도구의 예정표와 다르다(도구의 판이 다르다)');
+  }
+  const list = args.actors ? args.actors.split(',').map((s) => s.trim()).filter(Boolean) : null;
+  const expectedActors = list ? ALL_ACTORS.filter((a) => list.includes(a) || a === 'service') : ALL_ACTORS;
+  const expected = new Map(); // "줄 번호|자격" → 줄 이름
+  for (const r of planRows) {
+    if (r.action === 'public') expected.set(`${r.no}|public`, r.id);
+    else for (const a of expectedActors) expected.set(`${r.no}|${a}`, r.id);
+  }
+  const counts = new Map();
+  const wrongRowId = [];
+  const cells = [];
+  const ledger = [];
+  const subs = {};
+  for (const p of parts) {
+    for (const c of p.json.result.cells) {
+      const k = `${c.row}|${c.actor}`;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+      if (expected.has(k) && expected.get(k) !== c.row_id) wrongRowId.push({ cell: k, in_part: c.row_id, in_plan: expected.get(k), file: p.file });
+      cells.push(c);
+    }
+    ledger.push(...(p.json.result.ledger ?? []));
+    for (const [label, v] of Object.entries(p.json.credentials ?? {})) (subs[label] ??= new Set()).add(v.sub);
+  }
+  const missing = [...expected.keys()].filter((k) => !counts.has(k));
+  const duplicated = [...counts].filter(([, n]) => n > 1).map(([k, n]) => ({ cell: k, times: n }));
+  const unexpected = [...counts.keys()].filter((k) => !expected.has(k));
+  const accountsDiffer = Object.entries(subs).filter(([, s]) => s.size > 1).map(([label, s]) => ({ credential: label, accounts: [...s] }));
+  const once = !missing.length && !duplicated.length && !unexpected.length && !wrongRowId.length;
+  const order = new Map([...ALL_ACTORS, 'public'].map((a, i) => [a, i]));
+  cells.sort((x, y) => x.row - y.row || (order.get(x.actor) ?? 99) - (order.get(y.actor) ?? 99));
+  const label = (k) => { const [no, a] = k.split('|'); return `${no}번 줄 · ${a}`; };
+  console.log(`[b2n2b] merge ${ph}(${st}): 구간 ${parts.length}개 · 예정 ${expected.size}칸 · 정확히 한 번 잰 칸 ${[...expected.keys()].filter((k) => counts.get(k) === 1).length} · 빠진 칸 ${missing.length} · 겹친 칸 ${duplicated.length} · 예정에 없는 칸 ${unexpected.length} — ${once ? '빠진 칸 0·겹친 칸 0' : '합칠 수 없음'}`);
+  for (const k of missing.slice(0, 10)) console.log('  빠짐: ' + label(k));
+  for (const d of duplicated.slice(0, 10)) console.log(`  겹침: ${label(d.cell)} (${d.times}번)`);
+  for (const x of problems) console.log('  ' + x);
+  if (accountsDiffer.length) console.log('  구간마다 계정이 다른 자격: ' + accountsDiffer.map((x) => x.credential).join(', '));
+
+  const res = finishMeasure({
+    rows: planRows, cells, ledger, before: null, after: null, stopped: null, st,
+    extra: {
+      merged_from: parts.map((p) => ({
+        file: p.file, run: p.json.run, started_at: p.json.started_at, finished_at: p.json.finished_at, request_count: p.json.request_count,
+        rows_filter: p.json.rows_filter, actors: p.json.actors, stopped: p.json.result.stopped ?? null, exit_code: p.json.exit_code,
+        cells: p.json.result.cells.length, credentials: p.json.credentials, session_check: p.json.session_check ?? null,
+        listing_hint: p.json.result.outside_objects?.listing_hint ?? null,
+      })),
+      coverage: {
+        expected_cells: expected.size, expected_actors: expectedActors, every_cell_exactly_once: once,
+        missing: missing.map(label), duplicated: duplicated.map((d) => ({ cell: label(d.cell), times: d.times })), unexpected: unexpected.map(label), row_name_differs: wrongRowId,
+        note: '예정표(이 도구의 줄 × 자격)의 칸마다 구간 결과들에 실제로 들어 있는 횟수를 셌다. 줄 번호의 합집합이 아니라 "줄 번호 + 자격"으로 센다.',
+      },
+      accounts_differ_between_parts: accountsDiffer,
+      merge_problems: problems,
+    },
+  });
+  const bad = !once || accountsDiffer.length > 0 || problems.length > 0;
+  return { exit: bad ? 1 : res.exit, result: res.result, as_phase: ph, merged: true, merged_actors: expectedActors, merged_credentials: parts[0].json.credentials, merged_members: parts[0].json.members, merged_requests: parts.reduce((s, p) => s + (p.json.request_count ?? 0), 0) };
+}
+
+// ---------------------------------------------------------------------
+// sessions-sql (요청 0): 지금 환경 변수에 든 로그인 자격들의 "로그인 기록이 살아 있는가"를 읽는 SQL 을 적는다
+//   브레인방이 그 SQL 을 SQL 통로로 실행해 결과를 파일로 저장하고, 재는 단계에 --sessions-alive <그 파일> 로 넘긴다.
+//   (시험한 관리자 계정에서, 6자리 확인이 끝나자 먼저 받아 둔 다른 aal1 로그인 기록이 사라졌다 — 실측.)
+// ---------------------------------------------------------------------
+function phaseSessionsSql() {
+  const names = { B2N2B_JWT_A: 'member_a', B2N2B_JWT_B: 'member_b', B2N2B_JWT_N: 'no_map', B2N2B_JWT_G1: 'admin_g_pre', B2N2B_JWT_G2: 'admin_g_post', B2N2B_JWT_GM1: 'admin_gm_pre', B2N2B_JWT_GM2: 'admin_gm_post', B2N2B_JWT_A_EXP: 'subject(만료용)', B2N2B_JWT_A_OUT: 'subject(로그아웃용)' };
+  const found = [];
+  const skipped = [];
+  for (const [envName, label] of Object.entries(names)) {
+    const p = env[envName] ? decodeJwtPayload(env[envName]) : null;
+    if (!p) { skipped.push(`${envName}: 없거나 JWT 모양이 아님`); continue; }
+    if (typeof p.iss !== 'string' || !p.iss.startsWith(`${ORIGIN}/`)) { skipped.push(`${envName}: 발급자가 시험 프로젝트가 아님`); continue; }
+    if (!UUID_RE.test(String(p.sub ?? '')) || !UUID_RE.test(String(p.session_id ?? ''))) { skipped.push(`${envName}: sub·session_id 가 없음`); continue; }
+    found.push({ env: envName, credential: label, sub: p.sub, session_id: p.session_id, aal_in_credential: p.aal ?? null, seconds_left: (p.exp ?? 0) - Math.floor(Date.now() / 1000) });
+  }
+  if (!found.length) stop(2, '환경 변수에서 읽을 수 있는 로그인 자격이 없다(B2N2B_JWT_*)');
+  const sql = [
+    '-- 읽기만: 이 로그인 기록들이 지금 살아 있는가(계정·aal·만료). 결과를 파일로 저장해 --sessions-alive 로 넘긴다.',
+    'select pg_catalog.jsonb_build_object(',
+    "  'read_at', pg_catalog.now(),",
+    "  'sessions', coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(",
+    "     'session_id', s.id, 'user_id', s.user_id, 'aal', s.aal, 'not_after', s.not_after,",
+    "     'alive', (s.not_after is null or s.not_after > pg_catalog.now())) order by s.created_at), '[]'::pg_catalog.jsonb)",
+    ') as result',
+    '  from auth.sessions s',
+    ' where s.id in (',
+    found.map((f) => `   '${f.session_id}'::uuid`).join(',\n'),
+    ' );',
+  ].join('\n');
+  console.log(sql);
+  console.log(`[b2n2b] sessions-sql: 자격 ${found.length}개의 로그인 기록 번호를 적었다(식별값이다 — 자격이 아니다)${skipped.length ? ' · 건너뜀: ' + skipped.join(' / ') : ''}`);
+  return { exit: 0, result: { sql, credentials: found, skipped, note: '이 SQL 을 SQL 통로로 실행한 결과(jsonb 한 칸)를 파일로 저장해 재는 단계에 --sessions-alive <파일> 로 넘긴다. 도구는 요청을 보내기 전에, 이 실행이 쓰는 자격마다 그 로그인 기록이 있고(계정이 같고) 살아 있으며 기록의 aal 이 자격의 aal 과 같은지 본다.' } };
 }
 
 // ---------------------------------------------------------------------
@@ -2016,22 +2450,27 @@ async function main() {
   else if (phase === 'compare') res = await phaseCompare();
   else if (phase === 'owners') res = await phaseOwners();
   else if (phase === 'outside') res = await phaseOutside();
+  else if (phase === 'merge') res = await phaseMerge();
+  else if (phase === 'sessions-sql') res = phaseSessionsSql();
   else res = await phaseTableRef();
 
   const out = {
     tool: 'b2n2b storage_matrix',
     ref: REF,
-    phase, state, kind, step,
+    phase: res.as_phase ?? phase, state: res.merged ? res.result.state : state, kind, step,
+    merged: res.merged ? true : undefined,
     run,
     started_at: startedAt,
     finished_at: new Date().toISOString(),
-    request_count: requestCount,
+    request_count: res.merged ? res.merged_requests : requestCount,
     key_notes: keyNotes,
-    actors: [...MEASURE_PHASES].includes(phase) ? actors : undefined,
+    actors: res.merged ? res.merged_actors : [...MEASURE_PHASES].includes(phase) ? actors : undefined,
+    // 재기 전에 본 로그인 기록(계정·로그인 기록 번호·aal·살아 있음). 합친 결과에서는 result.merged_from 의 구간마다 있다
+    session_check: sessionCheck ?? undefined,
     rows_filter: { bucket: onlyBucket, rows: rowRange },
     // sub·session_id 는 식별값이다(자격이 아니다)
-    credentials: Object.fromEntries(Object.entries(jwtInfo).map(([k, v]) => [k, { sub: v.sub, session_id: v.session_id, aal: v.aal, seconds_left_at_start: v.seconds_left_at_start }])),
-    members: memberA ? { A: memberA, B: memberB, GM: memberGM } : undefined,
+    credentials: res.merged ? res.merged_credentials : Object.fromEntries(Object.entries(jwtInfo).map(([k, v]) => [k, { sub: v.sub, session_id: v.session_id, aal: v.aal, seconds_left_at_start: v.seconds_left_at_start }])),
+    members: res.merged ? res.merged_members : memberA ? { A: memberA, B: memberB, GM: memberGM } : undefined,
     how_read: '도착한 이름은 올리기 응답의 Key(버킷/전체 이름)와 Id 로 글자 그대로 정하고, 그 정확한 이름에 대한 서비스 열쇠의 정보 조회가 준 식별자·저장 정보와 대조한다. 있음·없음은 글자 그대로의 정보 조회로 읽는다(DYNAMIC 일 때만 인정, eTag 를 올린 내용의 md5 와 대조, "객체 없음"은 관측된 모양 — HTTP 400·statusCode 404·code NoSuchKey — 만 인정). 목록 조회는 이름을 정하는 데 쓰지 않는다(실측: 소문자 폴더의 목록에 대문자 폴더의 객체가 함께 나왔다). 이것은 저장 정보이지 본문의 재확인이 아니다 — 새로 생긴 객체의 본문은 서비스 열쇠의 본문 GET(값 없는 인증 주소)으로 따로 견준다. 대상 밖 객체의 변화는 이 결과가 말하지 않는다(outside 단계). 미확인은 통과에 넣지 않는다.',
     exit_code: res.exit,
     result: res.result,
