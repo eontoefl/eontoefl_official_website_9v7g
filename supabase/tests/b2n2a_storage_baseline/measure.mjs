@@ -1,11 +1,11 @@
 // =====================================================================
 // 보안작업 묶음 2 — 계약 2-나-2a 파일 기준선·실측 도구 (시험 프로젝트 hmncdheiwqwekdbtijar 전용)
 //
-// 2차(중간 저장 구분): 인증 읽기 주소의 응답은 중간 저장(캐시)된다 — 같은 주소를 다시 읽으면 덮어쓴 뒤·지운 뒤에도
-// 옛 바이트가 올 수 있다. 그래서 "실제 저장 상태"는 readTrue 하나로만 읽고(서비스 열쇠 + 매번 다른 임의 값,
-// cf-cache-status·age 기록, HIT 이거나 불명확·충돌이면 "미확인"), 재려는 자격의 내려받기는 fresh(판정 근거)와
-// same_url(같은 주소 재요청의 관측)로 나눠 적는다. 1차 판(3cd2408)은 브레인방이 시험 프로젝트에서 upsert 단계까지
-// 실행했다(올리기·인증 내려받기·버킷 관리의 요청 형식, 권한 오류 400/403, 중복 409 확인). 2차에서 바꾼 것은 아직 실행된 적이 없다.
+// 3차(정보 조회 판정): 본문을 받는 GET 은 임의 값을 붙여도 중간 저장(캐시)된 응답이 올 수 있다 — 어떤 모양의 주소로도
+// 실제 상태나 현재 권한의 근거가 될 수 없다. 그래서 셋을 따로 잰다. ① 저장 정보 = 서비스 열쇠의 목록 조회 + 정보 조회
+// (cf-cache-status 가 DYNAMIC 일 때만 인정, eTag 를 md5 와 대조) ② 정보 조회의 허용·거절 = 재려는 자격의 정보 조회
+// (기대값 대조는 이것으로만) ③ 실제 전달된 본문 = 재려는 자격의 본문 GET 을 값 없는 주소와 임의 값 주소로(관측만).
+// 1·2차 판은 브레인방이 시험 프로젝트에서 실행했다(요청 형식·오류 모양·목록과 정보 조회의 DYNAMIC·eTag = md5 확인). 3차에서 바꾼 것은 아직 실행된 적이 없다.
 //
 // 이 파일은 작업방이 시험 프로젝트에 실행해 보지 않았다(문법 확인, "대상이 다르면 요청 0으로 멈춤" 확인,
 // 작업방 컴퓨터 안의 가짜 응답으로 흐름이 끝까지 도는지만 봤다). Storage API 의 요청 형식과 오류 모양은
@@ -30,9 +30,9 @@
 //   baseline-buckets          기준선 버킷 10개를 버킷 관리 API 로 만든다(설정은 운영 원자료 그대로)
 //   probe-buckets             임시 버킷 5개(전부 비공개)를 만든다
 //   upsert                    임시 4개 버킷에서 올리기 요건 실측(48칸)                     — 잰 값 표
-//   side                      임시 4개 버킷에서 목록·내려받기·삭제·이동 실측                — 잰 값 표
+//   side                      임시 4개 버킷에서 목록·정보 조회(+본문 GET 관측)·삭제·이동 실측  — 잰 값 표
 //   business                  기준선의 업무 버킷 4개에 화면과 같은 요청으로 새 이름 올리기  — 잰 값 표
-//   fn-live                   판정 함수 버킷: 본인·남·대응 없음·관리자 전/후               — 기대값 대조
+//   fn-live                   판정 함수 버킷: 본인·남·대응 없음·관리자 전/후. 읽기는 "정보 조회"로 대조  — 기대값 대조
 //   cache  [--max-seconds N]  중간 저장의 관측: 같은 주소 재읽기, 덮어쓴 뒤·지운 뒤, 다른 자격,
 //                             같은 사람의 다른 로그인 상태, 유지 시간(0·10·30·60·120·300초), 공개 주소  — 잰 값 표
 //   fn-expired  --step pre|post|restored   만료(로그인 상태 한 행의 not_after)           — 기대값 대조
@@ -244,8 +244,9 @@ function makePng(label) {
   ]);
 }
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+const md5 = (buf) => createHash('md5').update(buf).digest('hex'); // 저장 정보의 eTag 와 견주는 지문
 const PNG = 'image/png';
-const describe = (buf) => ({ sha256: sha256(buf), size: buf.length, content_type: PNG });
+const describe = (buf) => ({ md5: md5(buf), size: buf.length, content_type: PNG });
 
 // ---------------------------------------------------------------------
 // HTTP
@@ -254,6 +255,7 @@ const say = (msg) => console.log(`[b2n2a] ${msg}`);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let nonceCounter = 0;
 const newNonce = () => `${Date.now().toString(36)}${(nonceCounter += 1).toString(36)}${randomBytes(6).toString('hex')}`;
+const TIMEOUT_MS = 30000;
 
 function authFor(actor) {
   if (actor === null) return {}; // 공개 주소: 자격 없이
@@ -263,6 +265,7 @@ function authFor(actor) {
 }
 const encPath = (p) => p.split('/').map(encodeURIComponent).join('/');
 
+// 시간 초과·네트워크 오류는 예외로 던지지 않고 status 0 의 응답으로 돌려준다(netError). 부르는 쪽이 "미확인"으로 적는다.
 async function http(actor, method, urlPath, { headers = {}, body, json } = {}) {
   const h = { ...authFor(actor), ...headers };
   let payload = body;
@@ -271,8 +274,14 @@ async function http(actor, method, urlPath, { headers = {}, body, json } = {}) {
     payload = JSON.stringify(json);
   }
   requestCount += 1;
-  const res = await fetch(`${ORIGIN}${urlPath}`, { method, headers: h, body: payload });
-  const buf = Buffer.from(await res.arrayBuffer());
+  let res;
+  let buf;
+  try {
+    res = await fetch(`${ORIGIN}${urlPath}`, { method, headers: h, body: payload, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    buf = Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    return { status: 0, ok: false, buf: Buffer.alloc(0), contentType: null, json: null, cf: null, age: null, cacheControl: null, netError: String(e?.name ?? 'Error') + ': ' + String(e?.message ?? e).slice(0, 120) };
+  }
   const rawContentType = res.headers.get('content-type');
   // 형식은 매개변수(; charset 등)를 떼고 소문자로 견준다
   const contentType = rawContentType ? rawContentType.split(';')[0].trim().toLowerCase() : null;
@@ -287,10 +296,10 @@ async function http(actor, method, urlPath, { headers = {}, body, json } = {}) {
   const cf = res.headers.get('cf-cache-status');
   return {
     status: res.status, ok: res.status >= 200 && res.status < 300, buf, contentType, json: parsed,
-    // 중간 저장(캐시) 관측용 머리글 — 읽기마다 함께 적는다
     cf: cf ? cf.trim().toUpperCase() : null,
     age: res.headers.get('age'),
     cacheControl: res.headers.get('cache-control'),
+    netError: null,
   };
 }
 
@@ -304,25 +313,30 @@ function responseInfo(r) {
   let kind = null;
   if (!r.ok) {
     const all = `${r.status} ${bodyStatus ?? ''} ${bodyError ?? ''} ${bodyCode ?? ''} ${message ?? ''}`.toLowerCase();
-    if (all.includes('row-level security') || all.includes('row level security')) kind = 'rls';
+    if (r.netError) kind = 'network';                                   // 시간 초과·연결 실패
+    else if (r.status >= 500 || (bodyStatus && Number(bodyStatus) >= 500)) kind = 'server_error';
+    else if (all.includes('row-level security') || all.includes('row level security')) kind = 'rls';
     else if (all.includes('duplicate') || all.includes('already exists') || bodyStatus === '409' || r.status === 409) kind = 'duplicate';
-    else if (all.includes('not found') || all.includes('not_found') || bodyStatus === '404' || r.status === 404) kind = 'not_found';
+    else if (all.includes('not found') || all.includes('not_found') || all.includes('nosuchkey') || bodyStatus === '404' || r.status === 404) kind = 'not_found';
     else if (all.includes('mime') || bodyStatus === '415' || r.status === 415) kind = 'mime';
-    else if (all.includes('too large') || all.includes('size') || bodyStatus === '413' || r.status === 413) kind = 'size';
+    else if (all.includes('too large') || bodyStatus === '413' || r.status === 413) kind = 'size';
     else if (all.includes('jwt') || all.includes('token') || all.includes('signature') || all.includes('jws')) kind = 'jwt';
     else if (bodyStatus === '403' || r.status === 403 || r.status === 401 || bodyStatus === '401') kind = 'forbidden_other';
     else kind = 'other';
   }
   return {
     http_status: r.status,
+    cf_cache_status: r.cf,
     body_statusCode: bodyStatus,
     body_error: bodyError,
     body_code: bodyCode,
     body_message: message,
-    body_snippet: r.ok ? null : r.buf.toString('utf8').slice(0, 300),
+    body_snippet: r.ok ? null : (r.netError ?? r.buf.toString('utf8').slice(0, 300)),
     kind,
   };
 }
+// 권한 거절로 셀 수 없는 응답(요청이 끝나지 않았거나 서버 오류, 자격 자체의 거절)
+const inconclusiveKind = (kind) => kind === 'network' || kind === 'server_error' || kind === 'jwt';
 
 // --- Storage 객체 API ---
 function upload(actor, bucket, path, bytes, { upsert }) {
@@ -332,117 +346,169 @@ function upload(actor, bucket, path, bytes, { upsert }) {
 }
 const removeOne = (actor, bucket, path) => http(actor, 'DELETE', `/storage/v1/object/${bucket}/${encPath(path)}`);
 const move = (actor, bucket, from, to) => http(actor, 'POST', '/storage/v1/object/move', { json: { bucketId: bucket, sourceKey: from, destinationKey: to } });
+const LIST_LIMIT = 1000;
 const listRaw = (actor, bucket, prefix, search) => http(actor, 'POST', `/storage/v1/object/list/${bucket}`, {
-  json: { prefix, limit: 1000, offset: 0, sortBy: { column: 'name', order: 'asc' }, ...(search ? { search } : {}) },
+  json: { prefix, limit: LIST_LIMIT, offset: 0, sortBy: { column: 'name', order: 'asc' }, ...(search ? { search } : {}) },
 });
+const infoRaw = (actor, bucket, path) => http(actor, 'GET', `/storage/v1/object/info/authenticated/${bucket}/${encPath(path)}`);
 
 // ---------------------------------------------------------------------
-// 중간 저장(캐시)을 구분해 읽기
-//   인증 읽기 주소의 응답은 중간 저장된다(같은 주소를 다시 읽으면 덮어쓴 뒤·지운 뒤에도 옛 바이트가 올 수 있다).
-//   그래서 읽기를 두 종류로 나눈다.
-//     fresh    : 주소에 매번 다른 임의 값을 붙인 새 주소 — 규칙 판정과 "실제 저장 상태"의 근거
-//     same_url : 임의 값을 붙이지 않은 그대로의 주소 — 중간 저장의 관측(판정에 쓰지 않는다)
+// 셋을 따로 잰다 (3차)
+//   ① 저장 정보           readTrue  — 서비스 열쇠의 목록 조회 + 정보 조회. 본문을 내려받지 않는다.
+//   ② 정보 조회의 허용·거절  infoAs    — 재려는 자격의 정보 조회. 기대값 대조는 이것으로만 한다.
+//   ③ 실제 전달된 본문      bodyGet   — 재려는 자격의 본문 GET(값 없는 주소 / 임의 값을 붙인 주소). 관측만 한다.
+//   본문을 받는 GET 은 어떤 모양의 주소로도 실제 상태나 현재 권한의 근거로 쓰지 않는다(중간 저장되기 때문이다).
+//   정보 조회가 본문 GET 과 같은 규칙을 거친다는 것은 입증되지 않았다 — ②의 거절을 "파일 접근이 막혔다"로 읽지 않는다.
 // ---------------------------------------------------------------------
-const CLEAR_CACHE_STATUS = new Set(['MISS', 'BYPASS', 'DYNAMIC']);
-// 이 응답을 "원 서버가 지금 낸 답"으로 믿을 수 없는 까닭(믿을 수 있으면 null)
-function cacheDoubt(cf) {
-  if (cf == null) return 'cf-cache-status 머리글이 없음';
-  if (cf === 'HIT') return 'cf-cache-status 가 HIT(중간 저장된 응답)';
-  if (!CLEAR_CACHE_STATUS.has(cf)) return `cf-cache-status 의 뜻이 불명확(${cf})`;
-  return null;
-}
-function objectUrl(bucket, path, { fresh, pub }) {
-  const base = `/storage/v1/object/${pub ? 'public' : 'authenticated'}/${bucket}/${encPath(path)}`;
-  return fresh ? `${base}?t=${newNonce()}` : base;
-}
-// 한 번의 읽기를 그대로 적는다(누가, 어떤 주소로, 무엇이 왔는가)
-async function readAs(actor, bucket, path, { fresh, pub = false }) {
-  const r = await http(pub ? null : actor, 'GET', objectUrl(bucket, path, { fresh, pub }));
-  const info = responseInfo(r);
-  return {
-    who: pub ? '공개 주소(자격 없음)' : actor,
-    url: fresh ? 'fresh' : 'same_url',
-    http_status: r.status, ok: r.ok,
-    cf_cache_status: r.cf, age: r.age, cache_control: r.cacheControl,
-    body: r.ok ? { sha256: sha256(r.buf), size: r.buf.length, content_type: r.contentType } : null,
-    error: r.ok ? null : { body_statusCode: info.body_statusCode, body_error: info.body_error, body_message: info.body_message, kind: info.kind },
-    cache_doubt: cacheDoubt(r.cf),
-  };
-}
-// 받은 본문이 어느 바이트인가(이름표: original·new 등)
-function bodyIs(read, named) {
-  if (!read.body) return null;
-  for (const [label, bytes] of Object.entries(named)) {
-    if (bytes && read.body.sha256 === sha256(bytes) && read.body.size === bytes.length) return label;
-  }
-  return 'other';
-}
+const normEtag = (v) => (v == null ? null : String(v).trim().replace(/^W\//, '').replace(/^"+|"+$/g, '').toLowerCase());
+const MD5_RE = /^[0-9a-f]{32}$/;
+const notDynamic = (cf) => (cf === 'DYNAMIC' ? null : `cf-cache-status 가 DYNAMIC 이 아님(${cf ?? '머리글 없음'})`);
 
-// 객체 정보(서비스 열쇠의 목록 조회 — POST 라 주소 단위의 중간 저장을 타지 않는다): 있는지·크기·형식·수정 시각
-async function listEntry(bucket, path) {
+// ① 저장 정보를 읽는 함수는 이것 하나다.
+//   있음 = 정확한 경로가 목록에 있고, 정보 조회도 200 이고, 둘의 eTag·크기·형식이 같고, eTag 가 md5 모양임
+//   없음 = 정확한 경로가 목록에 없고(목록을 끝까지 읽었고), 정보 조회도 "객체 없음"임
+//   그 밖(응답이 DYNAMIC 이 아님, 시간 초과·서버 오류, 목록이 잘림, eTag 모양이 다름, 둘이 어긋남)은 전부 "미확인"(known: false)
+//   ※ 이것은 저장 정보(메타데이터)를 읽은 것이다. 본문 바이트를 다시 받아 확인한 것이 아니다.
+async function readTrue(bucket, path) {
   const i = path.lastIndexOf('/');
   const folder = i < 0 ? '' : path.slice(0, i);
   const name = i < 0 ? path : path.slice(i + 1);
-  const r = await listRaw('service', bucket, folder, name);
-  if (!r.ok || !Array.isArray(r.json)) return { error: `${r.status} ${r.buf.toString('utf8').slice(0, 120)}` };
-  const it = r.json.find((x) => x.id && String(x.name) === name);
-  if (!it) return { present: false };
-  return {
-    present: true,
-    size: it.metadata?.size ?? null,
-    mimetype: it.metadata?.mimetype ?? null,
-    etag: it.metadata?.eTag ?? null,
-    updated_at: it.updated_at ?? null,
-  };
-}
+  const doubts = [];
 
-// ★ 실제 저장 상태를 읽는 함수는 이것 하나다.
-//   서비스 열쇠 + 매번 다른 임의 값을 붙인 주소로 읽고, cf-cache-status·age 를 함께 적는다.
-//   다음 중 하나면 그 읽기는 "실제 상태 미확인"(known: false)이고 값을 믿지 않는다:
-//     cf-cache-status 가 HIT / 머리글이 없거나 뜻이 불명확 / 읽기 오류 / 내려받은 바이트와 객체 정보(목록의 크기·형식·있음)가 어긋남
-//   시작 상태 확인·요청 뒤 확인·대조군 확인이 전부 이 함수를 쓴다.
-async function readTrue(bucket, path) {
-  const rd = await readAs('service', bucket, path, { fresh: true });
+  const lr = await listRaw('service', bucket, folder, name);
+  const list = { http_status: lr.status, cf_cache_status: lr.cf, returned: Array.isArray(lr.json) ? lr.json.length : null, present: null };
+  if (!lr.ok || !Array.isArray(lr.json)) doubts.push(`목록 조회 실패(${lr.status} ${responseInfo(lr).kind})`);
+  else {
+    if (notDynamic(lr.cf)) doubts.push('목록: ' + notDynamic(lr.cf));
+    const it = lr.json.find((x) => x.id && String(x.name) === name);
+    list.present = !!it;
+    if (it) {
+      list.etag = normEtag(it.metadata?.eTag);
+      list.size = it.metadata?.size ?? null;
+      list.mimetype = it.metadata?.mimetype != null ? String(it.metadata.mimetype).toLowerCase() : null;
+      list.updated_at = it.updated_at ?? null;
+    } else if (lr.json.length >= LIST_LIMIT) {
+      doubts.push(`목록이 한도(${LIST_LIMIT})까지 차서 끝까지 읽지 못함 — "없음"을 말할 수 없다`);
+    }
+  }
+
+  const ir = await infoRaw('service', bucket, path);
+  const ii = responseInfo(ir);
+  const info = { http_status: ir.status, cf_cache_status: ir.cf, present: null, kind: ii.kind };
+  if (ir.ok && ir.json && typeof ir.json === 'object') {
+    info.present = true;
+    info.etag = normEtag(ir.json.etag ?? ir.json.eTag ?? ir.json.metadata?.eTag);
+    info.size = ir.json.size ?? ir.json.metadata?.size ?? null;
+    const ct = ir.json.content_type ?? ir.json.contentType ?? ir.json.metadata?.mimetype ?? null;
+    info.content_type = ct != null ? String(ct).toLowerCase() : null;
+    if (notDynamic(ir.cf)) doubts.push('정보 조회: ' + notDynamic(ir.cf));
+  } else if (ii.kind === 'not_found') {
+    info.present = false;
+    if (notDynamic(ir.cf)) doubts.push('정보 조회: ' + notDynamic(ir.cf));
+  } else {
+    doubts.push(`정보 조회가 끝나지 않았거나 알 수 없는 응답(${ir.status} ${ii.kind})`);
+  }
+
   let core = null;
-  let doubt = rd.cache_doubt;
-  if (rd.ok) core = { exists: true, ...rd.body };
-  else if (rd.error.kind === 'not_found') core = { exists: false };
-  else doubt = doubt ?? `읽기 오류(${rd.http_status} ${rd.error.kind})`;
-
-  const li = await listEntry(bucket, path);
-  if (core && !doubt) {
-    if (li.error) doubt = `객체 정보(목록)를 읽지 못함: ${li.error}`;
-    else if (core.exists !== li.present) doubt = `내려받기(${core.exists ? '있음' : '없음'})와 객체 정보(${li.present ? '있음' : '없음'})가 어긋남`;
-    else if (core.exists && li.size != null && Number(li.size) !== core.size) doubt = `내려받은 크기(${core.size})와 객체 정보의 크기(${li.size})가 어긋남`;
-    else if (core.exists && li.mimetype && String(li.mimetype).toLowerCase() !== core.content_type) doubt = `내려받은 형식(${core.content_type})과 객체 정보의 형식(${li.mimetype})이 어긋남`;
+  if (!doubts.length) {
+    if (list.present === true && info.present === true) {
+      if (!list.etag || !MD5_RE.test(list.etag)) doubts.push(`목록의 eTag 가 없거나 md5 모양이 아님(${list.etag ?? '없음'})`);
+      else if (list.etag !== info.etag) doubts.push(`목록의 eTag(${list.etag})와 정보 조회의 eTag(${info.etag})가 어긋남`);
+      else if (list.size == null || Number(list.size) !== Number(info.size)) doubts.push(`목록의 크기(${list.size})와 정보 조회의 크기(${info.size})가 어긋남`);
+      else if (list.mimetype && info.content_type && list.mimetype !== info.content_type) doubts.push(`목록의 형식(${list.mimetype})과 정보 조회의 형식(${info.content_type})이 어긋남`);
+      else core = { exists: true, md5: list.etag, size: Number(list.size), content_type: list.mimetype ?? info.content_type };
+    } else if (list.present === false && info.present === false) {
+      core = { exists: false };
+    } else {
+      doubts.push(`목록(${list.present ? '있음' : '없음'})과 정보 조회(${info.present ? '있음' : '없음'})가 어긋남`);
+    }
   }
   return {
-    known: !doubt && !!core,
+    known: !!core,
     ...(core ?? {}),
-    unverified: doubt ?? null,
-    http_status: rd.http_status,
-    cf_cache_status: rd.cf_cache_status, age: rd.age, cache_control: rd.cache_control,
-    object_info: li,
+    unverified: core ? null : doubts.join(' / '),
+    basis: '저장 정보(서비스 열쇠의 목록 조회 + 정보 조회)',
+    list, info,
   };
 }
 // 기대한 상태와 정확히 같은가. 읽기가 "미확인"이면 같다고 하지 않는다.
-//   want: { exists: false }  또는  { exists: true, sha256, size, content_type }
+//   want: { exists: false }  또는  { exists: true, md5, size, content_type }
 function stateIs(st, want) {
   if (!st || !st.known) return false;
   if (!want.exists) return st.exists === false;
-  return st.exists === true && st.sha256 === want.sha256 && st.size === want.size && st.content_type === want.content_type;
+  return st.exists === true && st.md5 === want.md5 && st.size === want.size && st.content_type === want.content_type;
 }
 const present = (bytes) => ({ exists: true, ...describe(bytes) });
 const ABSENT = { exists: false };
-const coreOf = (st) => (st?.known ? (st.exists ? { exists: true, sha256: st.sha256, size: st.size, content_type: st.content_type } : { exists: false }) : null);
+const coreOf = (st) => (st?.known ? (st.exists ? { exists: true, md5: st.md5, size: st.size, content_type: st.content_type } : { exists: false }) : null);
 const sameKnown = (a, b) => !!a?.known && !!b?.known && JSON.stringify(coreOf(a)) === JSON.stringify(coreOf(b));
 const allKnown = (state) => Object.values(state).every((s) => s.known);
-const doubtsOf = (state) => Object.entries(state).filter(([, s]) => !s.known).map(([p, s]) => `${p.split('/').pop()}: ${s.unverified}`).join(' / ');
+const doubtsOf = (state) => Object.entries(state).filter(([, s]) => !s.known).map(([p, s]) => `${p.split('/').pop()}: ${s.unverified}`).join(' ‖ ');
 
-// 폴더 안의 파일 이름(서비스 열쇠). 폴더(하위 묶음)는 id 가 없는 항목이다.
+// ② 정보 조회(재려는 자격). 원 응답을 그대로 적는다.
+async function infoAs(actor, bucket, path) {
+  const r = await infoRaw(actor, bucket, path);
+  const ri = responseInfo(r);
+  const out = {
+    who: actor, request: '정보 조회(GET /object/info/authenticated/…)',
+    http_status: r.status, ok: r.ok, cf_cache_status: r.cf,
+    etag: null, size: null, content_type: null,
+    error: r.ok ? null : { body_statusCode: ri.body_statusCode, body_error: ri.body_error, body_code: ri.body_code, body_message: ri.body_message, kind: ri.kind, snippet: ri.body_snippet },
+  };
+  if (r.ok && r.json && typeof r.json === 'object') {
+    out.etag = normEtag(r.json.etag ?? r.json.eTag ?? r.json.metadata?.eTag);
+    out.size = r.json.size ?? r.json.metadata?.size ?? null;
+    const ct = r.json.content_type ?? r.json.contentType ?? r.json.metadata?.mimetype ?? null;
+    out.content_type = ct != null ? String(ct).toLowerCase() : null;
+  }
+  return out;
+}
+// 정보 조회의 허용·거절(기대값 대조는 이것으로만 한다)
+//   허용  = 200 이고 돌려준 eTag·크기가 저장 정보와 같음
+//   거절  = "객체 없음" 모양의 거절 응답이고, 같은 순간 저장 정보로는 그 파일이 정상으로 있음
+//   미확인 = 응답이 DYNAMIC 이 아님 / 시간 초과·서버 오류·그 밖의 응답 / 저장 정보가 미확인이거나 파일이 없음
+// 이 결과는 "그 자격으로 그 파일의 정보를 볼 수 있는가"까지만 뜻한다.
+function infoVerdict(rd, trueState) {
+  if (!trueState?.known) return `undetermined(저장 정보 미확인: ${trueState?.unverified ?? ''})`;
+  if (!trueState.exists) return 'undetermined(그 순간 파일이 없음 — "객체 없음"을 거절로 세지 않는다)';
+  if (notDynamic(rd.cf_cache_status)) return `undetermined(정보 조회 응답: ${notDynamic(rd.cf_cache_status)})`;
+  if (rd.ok) {
+    if (rd.etag === trueState.md5 && Number(rd.size) === trueState.size) return 'allow';
+    return `undetermined(정보 조회는 200 인데 eTag·크기가 저장 정보와 다름: ${rd.etag}/${rd.size})`;
+  }
+  if (rd.error.kind === 'not_found') return 'deny';
+  return `undetermined(정보 조회가 끝나지 않았거나 "객체 없음"이 아닌 응답: ${rd.http_status} ${rd.error.kind})`;
+}
+
+// ③ 본문을 받는 GET(관측만). shape: 'same_url'(값 없는 주소) / 'with_query'(임의 값을 붙인 주소)
+//   contents: { current: 지금 저장된 내용의 바이트(없으면 null), old: [예전 내용의 바이트…] }
+async function bodyGet(actor, bucket, path, shape, contents, { pub = false } = {}) {
+  const base = `/storage/v1/object/${pub ? 'public' : 'authenticated'}/${bucket}/${encPath(path)}`;
+  const r = await http(pub ? null : actor, 'GET', shape === 'with_query' ? `${base}?t=${newNonce()}` : base);
+  const ri = responseInfo(r);
+  let bodyIs = '본문 없음';
+  let m = null;
+  if (r.ok) {
+    m = md5(r.buf);
+    if (contents?.current && m === md5(contents.current) && r.buf.length === contents.current.length) bodyIs = '현재 내용';
+    else if ((contents?.old ?? []).some((b) => b && m === md5(b) && r.buf.length === b.length)) bodyIs = '옛 내용';
+    else bodyIs = '그 밖';
+  }
+  return {
+    who: pub ? '공개 주소(자격 없음)' : actor,
+    request: '본문 GET', url_shape: shape,
+    http_status: r.status, ok: r.ok,
+    cf_cache_status: r.cf, age: r.age, cache_control: r.cacheControl,
+    body_md5: m, body_size: r.ok ? r.buf.length : null, body_is: bodyIs,
+    error: r.ok ? null : { body_statusCode: ri.body_statusCode, body_error: ri.body_error, body_code: ri.body_code, body_message: ri.body_message, kind: ri.kind },
+  };
+}
+const bodyLine = (x) => `${x.http_status} ${x.cf_cache_status ?? '머리글 없음'}${x.age != null ? ' age ' + x.age : ''} ${x.body_is}`;
+
+// 폴더 안의 파일 이름(서비스 열쇠의 목록 조회). 폴더(하위 묶음)는 id 가 없는 항목이다.
 async function listFolder(bucket, prefix) {
   const r = await listRaw('service', bucket, prefix);
-  if (!r.ok || !Array.isArray(r.json)) throw new Error(`목록 읽기 실패(${bucket}/${prefix}): ${r.status} ${r.buf.toString('utf8').slice(0, 200)}`);
+  if (!r.ok || !Array.isArray(r.json)) throw new Error(`목록 읽기 실패(${bucket}/${prefix}): ${r.status} ${r.netError ?? r.buf.toString('utf8').slice(0, 200)}`);
   return r.json;
 }
 async function folderFileNames(bucket, prefix, startsWith = '') {
@@ -463,15 +529,15 @@ async function walk(bucket, prefix = '') {
 async function removeMany(bucket, paths) {
   for (let i = 0; i < paths.length; i += 100) {
     const r = await http('service', 'DELETE', `/storage/v1/object/${bucket}`, { json: { prefixes: paths.slice(i, i + 100) } });
-    if (!r.ok) throw new Error(`지우기 실패(${bucket}): ${r.status} ${r.buf.toString('utf8').slice(0, 200)}`);
+    if (!r.ok) throw new Error(`지우기 실패(${bucket}): ${r.status} ${r.netError ?? r.buf.toString('utf8').slice(0, 200)}`);
   }
 }
 const sameNames = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // 칸의 시작 상태를 되돌린다(서비스 열쇠): 대상 이름을 지우고, 있어야 하는 칸이면 원본 바이트로 다시 만든다.
 // 서비스 열쇠로 만든 객체의 소유자는 비어 있다(원래 소유 상태). 대조군 파일도 같은 방식으로 둔다.
-// 그런 다음 readTrue 로 "있어야 하는 것은 정확히 그 바이트로 있고, 없어야 하는 것은 없음"을 확인한다.
-// 읽기가 "미확인"이면 시작 상태도 확인되지 않은 것이다(ok: false).
+// 그런 다음 readTrue(저장 정보)로 "있어야 하는 것은 정확히 그 지문으로 있고, 없어야 하는 것은 없음"을 확인한다.
+// 저장 정보가 "미확인"이면 시작 상태도 확인되지 않은 것이다(ok: false).
 async function restoreStart(bucket, spec) {
   // spec: [{ path, bytes|null }]  bytes 가 null 이면 "없어야 함"
   for (const s of spec) {
@@ -562,6 +628,7 @@ async function phaseBucketsRemove(wanted) {
 
 // ---------------------------------------------------------------------
 // upsert: 올리기 요건 실측 (4 버킷 × 새 이름/있는 이름 × x-upsert 있음/없음 × 자격 3)
+//   저장 상태는 readTrue(저장 정보)로만 읽는다. 본문을 내려받지 않는다.
 // ---------------------------------------------------------------------
 const pad = (n) => String(n).padStart(3, '0');
 
@@ -576,7 +643,7 @@ async function uploadCell({ run, phaseName, no, bucket, actor, nameState, upsert
   const start = await restoreStart(bucket, [{ path: target, bytes: original }, { path: control, bytes: controlBytes }]);
   const namesBefore = await folderFileNames(bucket, folder);
   const r = await upload(actor, bucket, target, uploaded, { upsert });
-  const after = await readAllTrue(bucket, [target, control]); // 실제 저장 상태(임의 값을 붙인 새 주소)
+  const after = await readAllTrue(bucket, [target, control]);
   const namesAfter = await folderFileNames(bucket, folder);
 
   let stored;
@@ -597,21 +664,29 @@ async function uploadCell({ run, phaseName, no, bucket, actor, nameState, upsert
     after, after_known: allKnown(after), stored, control_unchanged: controlUnchanged,
     object_names_before: namesBefore, object_names_after: namesAfter,
     object_count_before: namesBefore.length, object_count_after: namesAfter.length,
+    // 대상이 전후 같은 상태(새 이름 칸: 전후 모두 비어 있음 / 있는 이름 칸: 전후 모두 같은 지문)이고 대조군·이름 집합도 그대로
     state_unchanged: sameKnown(after[target], start.state[target]) && controlUnchanged && sameNames(namesBefore, namesAfter),
   };
 }
 
-// 잰 값을 읽는 말(통과·실패가 아니다). 권한 거절로 적으려면 같은 입력의 서비스 열쇠 대조군이 성공해야 한다.
+// 잰 값을 읽는 말(통과·실패가 아니다).
+//   성공: 새로 올리기 = 없음 → 올린 지문 / 덮어쓰기 = 옛 지문 → 새 지문
+//   권한 거절: 같은 입력의 서비스 열쇠 대조군이 성공 + 대상(새 이름은 전후 모두 비어 있음, 있는 이름은 전후 모두 같은 지문)·대조군이 변하지 않음
 function readingOfUpload(cell, control) {
   if (!cell.start_ok) return `시작 상태가 확인되지 않음(이 칸은 읽지 않는다) ${doubtsOf(cell.start)}`;
-  if (!cell.after_known) return `미확인 — 요청 뒤의 실제 저장 상태를 읽지 못함(${doubtsOf(cell.after)})`;
-  if (cell.request_ok && cell.stored === 'uploaded_bytes') return '받아들여짐 — 올린 바이트가 정확히 저장됨';
-  if (cell.request_ok) return `받아들여졌다고 응답했으나 저장값이 올린 바이트가 아님(${cell.stored})`;
+  if (!cell.after_known) return `미확인 — 요청 뒤의 저장 정보를 읽지 못함(${doubtsOf(cell.after)})`;
+  if (cell.request_ok && cell.stored === 'uploaded_bytes') {
+    return cell.name_state === 'new' ? '받아들여짐 — 없음 → 올린 지문(저장 정보의 eTag 가 올린 바이트의 md5 와 같음)' : '받아들여짐 — 옛 지문 → 새 지문(저장 정보의 eTag 가 올린 바이트의 md5 와 같음)';
+  }
+  if (cell.request_ok) return `받아들여졌다고 응답했으나 저장 정보가 올린 지문이 아님(${cell.stored})`;
+  if (inconclusiveKind(cell.response.kind)) return `미확인 — 요청이 끝나지 않았거나 서버 오류·자격 자체의 거절(${cell.response.kind}). 권한 거절로 세지 않는다`;
   if (cell.response.kind === 'duplicate') return '권한 미판정(중복) — 이름이 이미 있어 생긴 오류';
   if (!cell.state_unchanged) return `거절 응답인데 저장 상태가 바뀜(${cell.stored})`;
   if (cell.response.kind === 'rls') {
     if (cell.actor === 'service') return '서비스 열쇠인데 권한 오류(대조군이 성립하지 않음)';
-    if (control && control.request_ok && control.stored === 'uploaded_bytes') return '권한 거절 — 같은 입력이 서비스 열쇠로는 성공(대조군 있음), 변화 0';
+    if (control && control.request_ok && control.stored === 'uploaded_bytes') {
+      return cell.name_state === 'new' ? '권한 거절 — 같은 입력이 서비스 열쇠로는 성공(대조군 있음), 그 이름이 전후 모두 비어 있음' : '권한 거절 — 같은 입력이 서비스 열쇠로는 성공(대조군 있음), 대상이 전후 모두 같은 지문';
+    }
     return '권한 미판정 — 같은 입력의 서비스 열쇠 대조군도 성공하지 못함';
   }
   return `거절(권한 오류로 분류되지 않음: ${cell.response.kind}) — 원 응답을 볼 것, 변화 0`;
@@ -639,7 +714,6 @@ async function phaseUpsert(run) {
       }
     }
   }
-  // 한눈에 보는 표: 버킷(규칙 조합) × 이름 상태 × x-upsert → 자격별 읽는 말
   const table = {};
   for (const c of cells) {
     const key = `${c.bucket} [${c.rule_set}] | ${c.name_state === 'new' ? '새 이름' : '있는 이름'} | x-upsert ${c.x_upsert}`;
@@ -648,7 +722,7 @@ async function phaseUpsert(run) {
   return {
     exit: 0,
     result: {
-      note: '기대값 없음 — 잰 값을 그대로 적은 표다. 저장 상태는 전부 readTrue(서비스 열쇠 + 임의 값을 붙인 새 주소)로 읽었고 읽기마다 cf_cache_status 가 적혀 있다. 소유자는 fingerprint.sql 의 objects 에서 path 로 찾아 본다.',
+      note: '기대값 없음 — 잰 값을 그대로 적은 표다. 저장 상태는 전부 readTrue(서비스 열쇠의 목록 조회 + 정보 조회, eTag 를 md5 와 대조)로 읽었다 — 저장 정보를 읽은 것이지 본문 바이트를 다시 받아 확인한 것이 아니다. 소유자는 fingerprint.sql 의 objects 에서 path 로 찾아 본다.',
       unverified_cells: cells.filter((c) => !c.start_ok || !c.after_known).map((c) => c.cell),
       table, cells,
     },
@@ -656,7 +730,7 @@ async function phaseUpsert(run) {
 }
 
 // ---------------------------------------------------------------------
-// side: 그 규칙 조합이 함께 여는 것 — 목록·인증 내려받기·삭제·이동 (로그인 회원, 대조군 = 서비스 열쇠)
+// side: 그 규칙 조합이 함께 여는 것 — 목록·정보 조회(+본문 GET 관측)·삭제·이동 (로그인 회원, 대조군 = 서비스 열쇠)
 // ---------------------------------------------------------------------
 async function sideCell({ run, no, bucket, ruleSet, action, actor, origin }) {
   const folder = `r${run}/side/${pad(no)}`;
@@ -693,20 +767,20 @@ async function sideCell({ run, no, bucket, ruleSet, action, actor, origin }) {
   if (action === 'list') r = await listRaw(actor, bucket, folder);
   else if (action === 'delete') r = await removeOne(actor, bucket, target);
   else if (action === 'move') r = await move(actor, bucket, target, dest);
-  if (action === 'download') {
-    // 내려받기만 둘로 나눠 적는다: fresh(판정 근거) / same_url(중간 저장 관측 — 그 자격의 첫 읽기와 바로 다음 읽기)
-    rec.download = {
-      fresh: await readAs(actor, bucket, target, { fresh: true }),
-      same_url: [await readAs(actor, bucket, target, { fresh: false }), await readAs(actor, bucket, target, { fresh: false })],
+  if (action === 'info') {
+    // 정보 조회(읽는 말의 근거)와, 같은 자격·같은 객체에 "처음 보내는 본문 GET"(관측)을 나란히
+    rec.info_lookup = await infoAs(actor, bucket, target);
+    const contents = { current: original, old: [] };
+    rec.body_get = {
+      same_url: await bodyGet(actor, bucket, target, 'same_url', contents),
+      with_query: await bodyGet(actor, bucket, target, 'with_query', contents),
     };
-    rec.download.fresh.body_is = bodyIs(rec.download.fresh, { original });
-    for (const x of rec.download.same_url) x.body_is = bodyIs(x, { original });
   } else {
     rec.response = responseInfo(r);
     rec.request_ok = r.ok;
   }
 
-  // 응답만으로 판정하지 않는다: 그 뒤 실제 저장 상태(readTrue)로 본 이름·바이트·크기·형식
+  // 응답만으로 판정하지 않는다: 그 뒤 저장 정보(readTrue)로 본 있음·지문·크기·형식
   const after = await readAllTrue(bucket, [target, control, dest]);
   const namesAfter = await folderFileNames(bucket, folder);
   rec.after = after;
@@ -715,35 +789,43 @@ async function sideCell({ run, no, bucket, ruleSet, action, actor, origin }) {
   const ctrlSame = stateIs(after[control], present(controlBytes));
   rec.control_unchanged = ctrlSame;
   if (!rec.after_known) {
-    rec.reading = `미확인 — 요청 뒤의 실제 저장 상태를 읽지 못함(${doubtsOf(after)})`;
+    rec.reading = `미확인 — 요청 뒤의 저장 정보를 읽지 못함(${doubtsOf(after)})`;
     return rec;
   }
+  const targetSame = stateIs(after[target], present(original));
 
   if (action === 'list') {
     const returned = r.ok && Array.isArray(r.json) ? r.json.filter((x) => x.id).map((x) => String(x.name)).sort() : null;
     rec.returned_names = returned;
     rec.returned_all = !!returned && sameNames(returned, namesBefore);
-    rec.reading = !r.ok ? `목록 요청이 거절됨(${rec.response.kind})`
+    rec.reading = !r.ok ? (inconclusiveKind(rec.response.kind) ? `미확인 — 목록 요청이 끝나지 않았거나 서버 오류(${rec.response.kind})` : `목록 요청이 거절됨(${rec.response.kind})`)
       : rec.returned_all ? `목록에 그 폴더의 파일 이름이 전부 나옴(${returned.length}개)`
         : returned.length === 0 ? '응답은 성공이지만 목록이 비어 있음(파일은 실제로 있다)'
           : `목록에 일부만 나옴(${returned.length}/${namesBefore.length})`;
-  } else if (action === 'download') {
-    const f = rec.download.fresh;
-    rec.downloaded_exact = f.ok && !f.cache_doubt && f.body_is === 'original';
-    rec.reading = f.cache_doubt ? `미확인 — fresh 응답을 믿을 수 없음(${f.cache_doubt})`
-      : rec.downloaded_exact ? '내려받아짐(fresh) — 바이트가 정확히 같음'
-        : f.ok ? '응답은 성공이지만 받은 바이트가 원본과 다름(fresh)'
-          : `내려받기가 거절됨(fresh, ${f.error.kind}) — 파일은 실제로 있다`;
-    rec.same_url_note = rec.download.same_url.map((x, i) => `${i + 1}회: ${x.http_status} ${x.cf_cache_status ?? '머리글 없음'} ${x.body_is ?? '본문 없음'}`).join(' / ');
+  } else if (action === 'info') {
+    const v = targetSame ? infoVerdict(rec.info_lookup, start.state[target]) : 'undetermined(요청 전후로 대상의 저장 정보가 달라짐)';
+    rec.info_verdict = v;
+    rec.info_allowed = v === 'allow';
+    rec.reading = v === 'allow' ? '정보 조회 허용 — 돌려준 eTag·크기가 저장 정보와 같음'
+      : v === 'deny' ? '정보 조회 거절("객체 없음" 모양) — 같은 순간 저장 정보로는 파일이 정상으로 있음'
+        : `미확인 — ${v}`;
+    rec.body_get_note = `본문 GET(이 자격이 이 객체에 처음 보내는 것): 값 없는 주소 ${bodyLine(rec.body_get.same_url)} / 임의 값 주소 ${bodyLine(rec.body_get.with_query)}`;
+    const delivered = rec.body_get.same_url.ok || rec.body_get.with_query.ok;
+    rec.info_vs_body = v === 'deny' && delivered ? '정보 조회 거절·본문 전달'
+      : v === 'deny' ? '같은 방향(정보 조회 거절·본문 없음)'
+        : v === 'allow' && delivered ? '같은 방향(정보 조회 허용·본문 전달)'
+          : v === 'allow' ? '정보 조회 허용·본문 없음' : '판단 불가(정보 조회 미확인)';
   } else if (action === 'delete') {
+    // 성공: 있음 → 없음 / 거절: 대상이 전후 모두 같은 지문
     rec.deleted = after[target].exists === false;
-    rec.reading = rec.deleted ? '지워짐 — 실제 저장 상태에서 대상이 없음'
-      : stateIs(after[target], present(original)) ? `지워지지 않음 — 대상이 원본 그대로(응답 ${rec.response.http_status}${r.ok ? ', 성공이라고 응답' : ', ' + rec.response.kind})`
+    rec.reading = rec.deleted ? '지워짐 — 있음 → 없음(저장 정보)'
+      : targetSame ? (inconclusiveKind(rec.response.kind) ? `미확인 — 요청이 끝나지 않았거나 서버 오류(${rec.response.kind}). 대상은 같은 지문 그대로` : `지워지지 않음 — 대상이 전후 모두 같은 지문(응답 ${rec.response.http_status}${r.ok ? ', 성공이라고 응답' : ', ' + rec.response.kind})`)
         : '대상이 원본과 다른 상태로 남음';
   } else {
+    // 성공: 출발지 없어짐 + 도착지 지문 일치 / 거절: 출발지가 전후 모두 같은 지문, 도착지 없음
     rec.moved = after[target].exists === false && stateIs(after[dest], present(original));
-    rec.reading = rec.moved ? '옮겨짐 — 출발지 없음, 도착지에 같은 바이트'
-      : stateIs(after[target], present(original)) && after[dest].exists === false ? `옮겨지지 않음 — 출발지 원본 그대로, 도착지 없음(응답 ${rec.response.http_status}${r.ok ? ', 성공이라고 응답' : ', ' + rec.response.kind})`
+    rec.reading = rec.moved ? '옮겨짐 — 출발지 없어짐, 도착지의 지문이 원본과 같음'
+      : targetSame && after[dest].exists === false ? (inconclusiveKind(rec.response.kind) ? `미확인 — 요청이 끝나지 않았거나 서버 오류(${rec.response.kind}). 출발지는 같은 지문 그대로` : `옮겨지지 않음 — 출발지가 전후 모두 같은 지문, 도착지 없음(응답 ${rec.response.http_status}${r.ok ? ', 성공이라고 응답' : ', ' + rec.response.kind})`)
         : '출발지·도착지가 기대하지 않은 상태(after 를 볼 것)';
   }
   if (!ctrlSame) rec.reading += ' / 대조군 파일이 바뀜';
@@ -755,7 +837,7 @@ async function phaseSide(run) {
   let no = 0;
   for (const b of UP_BUCKETS) {
     for (const origin of ['service', 'member']) {
-      for (const action of ['list', 'download', 'delete', 'move']) {
+      for (const action of ['list', 'info', 'delete', 'move']) {
         const group = [];
         for (const actor of ['service', 'member_a']) {
           no += 1;
@@ -763,7 +845,7 @@ async function phaseSide(run) {
         }
         const control = group.find((c) => c.actor === 'service');
         const controlOk = control.start_ok !== false && control.after_known && (
-          (action === 'list' && control.returned_all) || (action === 'download' && control.downloaded_exact)
+          (action === 'list' && control.returned_all) || (action === 'info' && control.info_allowed)
           || (action === 'delete' && control.deleted) || (action === 'move' && control.moved));
         for (const c of group) {
           c.control_cell = control.cell;
@@ -778,13 +860,14 @@ async function phaseSide(run) {
   const table = {};
   for (const c of cells.filter((x) => x.actor === 'member_a')) {
     const key = `${c.bucket} [${c.rule_set}] | 대상 파일을 만든 쪽: ${c.origin === 'service' ? '서비스 열쇠' : '회원 A'}`;
-    (table[key] ??= {})[c.action] = c.reading + (c.same_url_note ? ` ‖ 같은 주소 재요청: ${c.same_url_note}` : '');
+    (table[key] ??= {})[c.action] = c.reading + (c.body_get_note ? ` ‖ ${c.body_get_note} ‖ ${c.info_vs_body}` : '');
   }
   return {
     exit: 0,
     result: {
-      note: '기대값 없음 — 잰 값을 그대로 적은 표다. 삭제·이동 뒤의 상태는 readTrue 로 읽었다. 내려받기는 fresh(판정 근거)와 same_url(같은 주소 재요청의 관측)을 따로 적는다. 소유자는 fingerprint.sql 의 objects 에서 path 로 찾아 본다.',
-      unverified_cells: cells.filter((c) => c.start_ok === false || c.after_known === false).map((c) => c.cell),
+      note: '기대값 없음 — 잰 값을 그대로 적은 표다. 삭제·이동 뒤의 상태는 readTrue(저장 정보)로 읽었다. "info" 칸은 정보 조회의 허용·거절이고, 본문 GET(값 없는 주소 / 임의 값 주소)은 전달 관측으로 따로 적는다 — 정보 조회의 결과를 "파일 접근이 막혔다"로 읽지 않는다. 소유자는 fingerprint.sql 의 objects 에서 path 로 찾아 본다.',
+      unverified_cells: cells.filter((c) => c.start_ok === false || c.after_known === false || String(c.info_verdict ?? '').startsWith('undetermined')).map((c) => c.cell),
+      info_denied_but_body_delivered: cells.filter((c) => c.info_vs_body === '정보 조회 거절·본문 전달').map((c) => c.cell),
       table, cells,
     },
   };
@@ -826,20 +909,21 @@ async function phaseBusiness() {
       const before = await readTrue(s.bucket, s.path); // 새 이름이어야 한다(비어 있음)
       const r = await upload(actor, s.bucket, s.path, bytes, { upsert: true }); // 화면과 같이 x-upsert: true
       const after = await readTrue(s.bucket, s.path);
-      const pub = await readAs(null, s.bucket, s.path, { fresh: true, pub: true });
+      const pub = await bodyGet(null, s.bucket, s.path, 'with_query', { current: bytes, old: [] }, { pub: true });
       const rec = {
         cell: `business-${pad(no)}`, bucket: s.bucket, actor, path_shape: s.shape, path: s.path, screen: s.screen, x_upsert: 'true',
         uploaded: describe(bytes), before, name_was_empty: stateIs(before, ABSENT),
         response: responseInfo(r), request_ok: r.ok, after,
         stored_exact: stateIs(after, present(bytes)),
-        public_url: { http_status: pub.http_status, cf_cache_status: pub.cf_cache_status, age: pub.age, cache_control: pub.cache_control },
+        public_url: { note: '참고(공개 주소의 본문 GET, 임의 값 주소) — 규칙의 증거가 아니다', line: bodyLine(pub), ...pub },
         how_to_read: s.how_to_read,
       };
-      rec.reading = !before.known || !after.known ? `미확인 — 실제 저장 상태를 읽지 못함(${before.unverified ?? after.unverified})`
+      rec.reading = !before.known || !after.known ? `미확인 — 저장 정보를 읽지 못함(${before.unverified ?? after.unverified})`
         : !rec.name_was_empty ? '시작 상태가 기대와 다름(이름이 비어 있지 않았다)'
-          : rec.request_ok && rec.stored_exact ? '받아들여짐 — 올린 바이트가 정확히 저장됨'
-            : rec.request_ok ? '받아들여졌다고 응답했으나 저장값이 올린 바이트가 아님'
-              : after.exists ? '거절 응답인데 파일이 생김' : `거절(${rec.response.kind}) — 요청 전후 모두 이름이 비어 있음`;
+          : rec.request_ok && rec.stored_exact ? '받아들여짐 — 없음 → 올린 지문(저장 정보의 eTag 가 올린 바이트의 md5 와 같음)'
+            : rec.request_ok ? '받아들여졌다고 응답했으나 저장 정보가 올린 지문이 아님'
+              : inconclusiveKind(rec.response.kind) ? `미확인 — 요청이 끝나지 않았거나 서버 오류·자격 자체의 거절(${rec.response.kind})`
+                : after.exists ? '거절 응답인데 파일이 생김' : `거절(${rec.response.kind}) — 그 이름이 전후 모두 비어 있음`;
       cells.push(rec);
     }
     say(`business ${no}/24 — 자격 ${actor}`);
@@ -850,7 +934,7 @@ async function phaseBusiness() {
     c.control_cell = control.cell;
     c.control_ok = control.request_ok && control.stored_exact;
     if (c.actor !== 'service' && !c.request_ok && c.response.kind === 'rls' && c.before.known && c.after.known && c.name_was_empty && c.after.exists === false) {
-      c.reading = c.control_ok ? '권한 거절 — 같은 모양의 요청이 서비스 열쇠로는 성공(대조군 있음), 요청 전후 모두 이름이 비어 있음' : '권한 미판정 — 서비스 열쇠 대조군도 성공하지 못함';
+      c.reading = c.control_ok ? '권한 거절 — 같은 모양의 요청이 서비스 열쇠로는 성공(대조군 있음), 그 이름이 전후 모두 비어 있음' : '권한 미판정 — 서비스 열쇠 대조군도 성공하지 못함';
     }
   }
   const table = {};
@@ -858,11 +942,12 @@ async function phaseBusiness() {
   return {
     exit: 0,
     result: {
-      note: '기대값 없음 — 지금 규칙 그대로의 실측이다. 비로그인 칸은 2b 의 "옛 경로" 기준, 로그인 칸은 "지금 새 로그인으로 보내면 무엇이 되고 안 되는가"다. public_url 은 참고일 뿐 규칙의 증거가 아니다(공개 버킷의 공개 주소는 규칙과 무관하게 열린다).',
+      note: '기대값 없음 — 지금 규칙 그대로의 실측이다. 비로그인 칸은 2b 의 "옛 경로" 기준, 로그인 칸은 "지금 새 로그인으로 보내면 무엇이 되고 안 되는가"다. 저장 상태는 readTrue(저장 정보)로 읽었다. public_url 은 참고일 뿐 규칙의 증거가 아니다(공개 버킷의 공개 주소는 규칙과 무관하게 열리고, 중간 저장도 된다).',
       how_to_read_general: [
         'materials 에 올리는 요청은 확인된 화면 호출이 없는 합성 진단 요청이다(업무 보존의 증거가 아님).',
         'guide-images 와 성적표의 관리자 경로(<회원번호>/…)에 회원 자격으로 보낸 요청이 되더라도, 그것은 "관리자 업무가 된다"가 아니라 "지금 그 경로가 회원에게도 열려 있다"는 사실이다.',
       ],
+      unverified_cells: cells.filter((c) => !c.before.known || !c.after.known).map((c) => c.cell),
       table, cells,
     },
   };
@@ -870,43 +955,39 @@ async function phaseBusiness() {
 
 // ---------------------------------------------------------------------
 // fn-*: 판정 함수 버킷 (기대값을 대조하는 단계)
-//   올리기·덮어쓰기·삭제의 판정은 readTrue 로 한다.
-//   내려받기의 판정은 fresh(임의 값을 붙인 새 주소)로만 하고, same_url(같은 주소 재요청)은 따로 적는다.
+//   올리기·덮어쓰기·삭제: readTrue(저장 정보)의 전후 비교로 판정한다.
+//   읽기: "정보 조회"의 허용·거절로 기대값을 대조한다. 본문 GET 은 전달 관측으로만 나란히 적는다.
 // ---------------------------------------------------------------------
-const FN_ACTIONS = ['upload', 'download', 'overwrite', 'delete'];
+const FN_ACTIONS = ['upload', 'info', 'overwrite', 'delete'];
 
-async function fnAttempt({ run, tag, no, folder, actor, action, primer }) {
+async function fnAttempt({ run, tag, no, folder, actor, action, withBody }) {
   const base = `${folder}/r${run}-${tag}-${pad(no)}`;
   const target = `${base}-t.png`;
   const control = `${base}-c.png`;
   const original = action === 'upload' ? null : makePng(`${run} ${tag} ${no} original`);
   const controlBytes = makePng(`${run} ${tag} ${no} control`);
-  const fresh = makePng(`${run} ${tag} ${no} new by ${actor}`);
+  const newBytes = makePng(`${run} ${tag} ${no} new by ${actor}`);
   const namePrefix = `r${run}-${tag}-${pad(no)}-`;
 
-  // 시작 상태 되돌리기 + 확인(readTrue): 내려받기·덮어쓰기·삭제는 대상 파일이 실제로 있음, 새로 올리기는 이름이 비어 있음
+  // 시작 상태 되돌리기 + 확인(readTrue): 정보 조회·덮어쓰기·삭제는 대상 파일이 실제로 있음, 새로 올리기는 이름이 비어 있음
   const start = await restoreStart(FN_BUCKET, [{ path: target, bytes: original }, { path: control, bytes: controlBytes }]);
   const namesBefore = await folderFileNames(FN_BUCKET, folder, namePrefix);
 
   let r = null;
-  let dl = null;
-  if (action === 'upload' || action === 'overwrite') r = await upload(actor, FN_BUCKET, target, fresh, { upsert: true });
+  let lookup = null;
+  let body = null;
+  if (action === 'upload' || action === 'overwrite') r = await upload(actor, FN_BUCKET, target, newBytes, { upsert: true });
   else if (action === 'delete') r = await removeOne(actor, FN_BUCKET, target);
   else {
-    dl = { primed_by: null, prime_reads: [] };
-    // 같은 주소를 "앞서 읽은 주소"로 만들어 둔다: 그 폴더에 권한이 있는 자격이 같은 주소를 두 번 읽는다(1회·2회).
-    if (primer) {
-      dl.primed_by = primer;
-      for (let i = 0; i < 2; i += 1) {
-        const p = await readAs(primer, FN_BUCKET, target, { fresh: false });
-        p.body_is = bodyIs(p, { original });
-        dl.prime_reads.push(p);
-      }
+    lookup = await infoAs(actor, FN_BUCKET, target);                 // ② 정보 조회 — 기대값 대조의 근거
+    if (withBody) {
+      // ③ 같은 자격이 같은 객체에 "처음 보내는 본문 GET"(관측만). 이 객체의 본문은 아직 누구도 받은 적이 없다.
+      const contents = { current: original, old: [] };
+      body = {
+        same_url: await bodyGet(actor, FN_BUCKET, target, 'same_url', contents),
+        with_query: await bodyGet(actor, FN_BUCKET, target, 'with_query', contents),
+      };
     }
-    dl.fresh = await readAs(actor, FN_BUCKET, target, { fresh: true });      // 규칙 판정의 근거
-    dl.fresh.body_is = bodyIs(dl.fresh, { original });
-    dl.same_url = await readAs(actor, FN_BUCKET, target, { fresh: false });  // 같은 주소 재요청의 응답(판정에 쓰지 않는다)
-    dl.same_url.body_is = bodyIs(dl.same_url, { original });
   }
 
   const after = await readAllTrue(FN_BUCKET, [target, control]);
@@ -917,34 +998,30 @@ async function fnAttempt({ run, tag, no, folder, actor, action, primer }) {
   const controlSame = stateIs(after[control], present(controlBytes));
   const targetAsStart = stateIs(after[target], original ? present(original) : ABSENT);
   const unchanged = targetAsStart && controlSame && sameNames(namesBefore, namesAfter);
+  const noReply = info && inconclusiveKind(info.kind) ? `undetermined(요청이 끝나지 않았거나 서버 오류·자격 자체의 거절: ${info.kind} — 권한 거절로 세지 않는다)` : null;
 
   let outcome;
   if (!start.ok) {
     outcome = `undetermined(시작 상태 미확인: ${doubtsOf(start.state) || '기대한 상태가 아님'})`;
   } else if (!allKnown(after)) {
-    outcome = `undetermined(요청 뒤의 실제 상태 미확인: ${doubtsOf(after)})`;
-  } else if (action === 'download') {
-    const f = dl.fresh;
-    if (f.cache_doubt) outcome = `undetermined(fresh 응답을 믿을 수 없음: ${f.cache_doubt})`;
-    else if (f.ok && f.body_is === 'original' && unchanged) outcome = 'allow';
-    // 거절 인정: fresh 가 받아들여지지 않았고, 같은 파일이 그 순간 독립 읽기(readTrue)로는 정상으로 읽힘(시작·요청 뒤 모두)
-    else if (!f.ok && unchanged) outcome = f.error.kind === 'jwt' ? 'undetermined(자격 자체가 거절됨 — 규칙의 거절이 아님)' : 'deny';
-    else outcome = 'anomaly';
+    outcome = `undetermined(요청 뒤의 저장 정보 미확인: ${doubtsOf(after)})`;
+  } else if (action === 'info') {
+    // 같은 순간(요청 전과 후 모두) 저장 정보로 파일이 정상이어야 거절·허용을 말한다
+    outcome = unchanged ? infoVerdict(lookup, start.state[target]) : 'anomaly(정보 조회 전후로 저장 상태가 달라짐)';
   } else if (action === 'upload') {
-    if (r.ok && stateIs(after[target], present(fresh)) && controlSame && sameNames(namesAfter, [cName, tName].sort())) outcome = 'allow';
-    // 거절 인정: 받아들여지지 않았고, 그 이름이 요청 전과 후 모두 비어 있음
-    else if (!r.ok && stateIs(start.state[target], ABSENT) && stateIs(after[target], ABSENT) && controlSame && sameNames(namesBefore, namesAfter)) {
-      outcome = info.kind === 'jwt' ? 'undetermined(자격 자체가 거절됨 — 규칙의 거절이 아님)' : 'deny';
-    } else outcome = 'anomaly';
+    // 성공: 없음 → 기대한 파일(지문 일치) / 거절: 그 이름이 전후 모두 비어 있음
+    if (r.ok && stateIs(start.state[target], ABSENT) && stateIs(after[target], present(newBytes)) && controlSame && sameNames(namesAfter, [cName, tName].sort())) outcome = 'allow';
+    else if (!r.ok && stateIs(start.state[target], ABSENT) && stateIs(after[target], ABSENT) && controlSame && sameNames(namesBefore, namesAfter)) outcome = noReply ?? 'deny';
+    else outcome = 'anomaly';
   } else if (action === 'overwrite') {
-    if (r.ok && stateIs(after[target], present(fresh)) && controlSame && sameNames(namesAfter, [cName, tName].sort())) outcome = 'allow';
-    // 거절 인정: 받아들여지지 않았고, 같은 파일이 그 순간 독립 읽기로 원본 그대로 읽힘
-    else if (!r.ok && unchanged) outcome = info.kind === 'jwt' ? 'undetermined(자격 자체가 거절됨 — 규칙의 거절이 아님)' : 'deny';
+    // 성공: 옛 지문 → 새 지문 / 거절: 대상이 전후 모두 같은 지문
+    if (r.ok && stateIs(start.state[target], present(original)) && stateIs(after[target], present(newBytes)) && controlSame && sameNames(namesAfter, [cName, tName].sort())) outcome = 'allow';
+    else if (!r.ok && unchanged) outcome = noReply ?? 'deny';
     else outcome = 'anomaly';
   } else {
-    if (r.ok && stateIs(after[target], ABSENT) && controlSame && sameNames(namesAfter, [cName])) outcome = 'allow';
-    // 거절 인정: 같은 파일이 그 순간 독립 읽기로 원본 그대로 읽힘(성공이라고 응답했더라도 지워진 것이 없으면 거절)
-    else if (unchanged) outcome = !r.ok && info.kind === 'jwt' ? 'undetermined(자격 자체가 거절됨 — 규칙의 거절이 아님)' : 'deny';
+    // 성공: 있음 → 없음 / 거절: 대상이 전후 모두 같은 지문(성공이라고 응답했더라도 지워진 것이 없으면 거절)
+    if (r.ok && stateIs(start.state[target], present(original)) && stateIs(after[target], ABSENT) && controlSame && sameNames(namesAfter, [cName])) outcome = 'allow';
+    else if (unchanged) outcome = noReply ?? 'deny';
     else outcome = 'anomaly';
   }
 
@@ -952,27 +1029,39 @@ async function fnAttempt({ run, tag, no, folder, actor, action, primer }) {
     actor, action, folder, path: target, control_path: control,
     start_ok: start.ok, start: start.state,
     target_existed_before: original ? stateIs(start.state[target], present(original)) : false, name_was_empty_before: stateIs(start.state[target], ABSENT),
-    response: info, request_ok: r ? r.ok : null, download: dl, after,
+    response: info, request_ok: r ? r.ok : null, info_lookup: lookup, body_get: body, after,
     object_names_before: namesBefore, object_names_after: namesAfter,
     state_unchanged: unchanged, outcome,
   };
 }
 
+// 정보 조회와 본문 GET 이 같은 방향인가(관측을 읽는 말 — 판정이 아니다)
+function infoVsBody(outcome, bodyRead) {
+  if (!bodyRead) return null;
+  const delivered = bodyRead.ok;
+  if (outcome === 'deny') return delivered ? `정보 조회 거절·본문 전달(${bodyRead.body_is})` : '같은 방향(정보 조회 거절·본문 없음)';
+  if (outcome === 'allow') return delivered ? `같은 방향(정보 조회 허용·본문 전달: ${bodyRead.body_is})` : '정보 조회 허용·본문 없음';
+  return '판단 불가(정보 조회 미확인)';
+}
+
 // 한 줄(자격·폴더·동작) = 시도 1번 + (거절이 기대인 줄은) 같은 입력의 서비스 열쇠 대조군 1번
-async function fnRow({ run, tag, counter, caseName, folder, actor, action, expect, primer }) {
-  const attempt = await fnAttempt({ run, tag, no: counter.next(), folder, actor, action, primer });
+async function fnRow({ run, tag, counter, caseName, folder, actor, action, expect }) {
+  const attempt = await fnAttempt({ run, tag, no: counter.next(), folder, actor, action, withBody: true });
   const row = { case: caseName, actor, folder, action, expect, ...attempt, control: null };
   if (expect === 'deny') {
-    const c = await fnAttempt({ run, tag, no: counter.next(), folder, actor: 'service', action, primer: null });
-    row.control = { outcome: c.outcome, response: c.response, download_fresh: c.download?.fresh ?? null, path: c.path };
+    const c = await fnAttempt({ run, tag, no: counter.next(), folder, actor: 'service', action, withBody: false });
+    row.control = { outcome: c.outcome, response: c.response, info_lookup: c.info_lookup, path: c.path };
     if (c.outcome !== 'allow' && row.outcome === 'deny') row.outcome = 'undetermined(권한 미판정 — 같은 입력의 서비스 열쇠 대조군도 성공하지 못함)';
   }
   row.match = row.outcome === expect;
-  // 내려받기 줄: 같은 주소 재요청에 본문이 왔는가(판정과 따로 적는다)
-  if (action === 'download') {
-    const s = row.download.same_url;
-    row.same_url_delivered_body = !!s.body;
-    row.same_url_note = `${s.http_status} ${s.cf_cache_status ?? '머리글 없음'}${s.age != null ? ' age ' + s.age : ''} — ${s.body ? `본문이 옴(${s.body_is})` : '본문 없음'}`;
+  if (action === 'info') {
+    // 줄 이름은 "정보 조회". 같은 자격·같은 객체에 처음 보내는 본문 GET 을 나란히 적는다(판정과 따로).
+    row.first_body_get = {
+      same_url: bodyLine(row.body_get.same_url), with_query: bodyLine(row.body_get.with_query),
+      same_url_vs_info: infoVsBody(row.outcome, row.body_get.same_url),
+      with_query_vs_info: infoVsBody(row.outcome, row.body_get.with_query),
+    };
+    row.info_denied_but_body_delivered = row.outcome === 'deny' && (row.body_get.same_url.ok || row.body_get.with_query.ok);
   }
   return row;
 }
@@ -980,52 +1069,56 @@ const makeCounter = () => {
   let n = 0;
   return { next: () => (n += 1) };
 };
+const ACTION_KO = { upload: '새로 올리기', info: '정보 조회', overwrite: '덮어쓰기', delete: '삭제' };
 function fnSummary(rows) {
   const table = {};
-  for (const r of rows) (table[r.case] ??= {})[r.action] = `${r.expect} → ${r.outcome}${r.match ? '' : '  ✗'}`;
+  for (const r of rows) (table[r.case] ??= {})[ACTION_KO[r.action]] = `${r.expect} → ${r.outcome}${r.match ? '' : '  ✗'}`;
   const mismatch = rows.filter((r) => !r.match);
-  const dls = rows.filter((r) => r.action === 'download');
+  const infos = rows.filter((r) => r.action === 'info');
   return {
     total: rows.length, mismatch: mismatch.length, table,
-    mismatches: mismatch.map((r) => ({ case: r.case, action: r.action, expect: r.expect, outcome: r.outcome, response: r.response, download_fresh: r.download?.fresh ?? null })),
-    // 판정(fresh)과 따로 적는 관측: 같은 주소 재요청
-    same_url_observations: Object.fromEntries(dls.map((r) => [r.case, `정책 판정(fresh): ${r.outcome} ‖ 같은 주소 재요청: ${r.same_url_note}`])),
-    denied_but_same_url_delivered: dls.filter((r) => r.outcome === 'deny' && r.same_url_delivered_body).map((r) => r.case),
+    mismatches: mismatch.map((r) => ({ case: r.case, action: r.action, expect: r.expect, outcome: r.outcome, response: r.response, info_lookup: r.info_lookup })),
+    // 정보 조회(판정)와 처음 보내는 본문 GET(관측)을 나란히
+    info_and_first_body_get: Object.fromEntries(infos.map((r) => [r.case, {
+      '정보 조회': r.outcome,
+      '본문 GET(값 없는 주소)': `${r.first_body_get.same_url} → ${r.first_body_get.same_url_vs_info}`,
+      '본문 GET(임의 값 주소)': `${r.first_body_get.with_query} → ${r.first_body_get.with_query_vs_info}`,
+    }])),
+    info_denied_but_body_delivered: infos.filter((r) => r.info_denied_but_body_delivered).map((r) => r.case),
   };
 }
 
 async function phaseFnLive(run) {
-  // primer: 그 폴더에 권한이 있는 자격. 내려받기 줄에서 같은 주소를 먼저 두 번 읽어 "앞서 읽은 주소"로 만든다.
   const cases = [
-    { name: 'A 가 자기 폴더', actor: 'member_a', folder: memberA, expect: 'allow', primer: 'member_a' },
-    { name: 'B 가 A 의 폴더', actor: 'member_b', folder: memberA, expect: 'deny', primer: 'member_a' },
-    { name: 'A 가 B 의 폴더', actor: 'member_a', folder: memberB, expect: 'deny', primer: 'member_b' },
-    { name: '대응 없는 계정이 A 의 폴더', actor: 'no_map', folder: memberA, expect: 'deny', primer: 'member_a' },
-    { name: '관리자 6자리 전이 admin 폴더', actor: 'admin_pre', folder: 'admin', expect: 'deny', primer: 'admin_post' },
-    { name: '관리자 6자리 후가 admin 폴더', actor: 'admin_post', folder: 'admin', expect: 'allow', primer: 'admin_post' },
+    { name: 'A 가 자기 폴더', actor: 'member_a', folder: memberA, expect: 'allow' },
+    { name: 'B 가 A 의 폴더', actor: 'member_b', folder: memberA, expect: 'deny' },
+    { name: 'A 가 B 의 폴더', actor: 'member_a', folder: memberB, expect: 'deny' },
+    { name: '대응 없는 계정이 A 의 폴더', actor: 'no_map', folder: memberA, expect: 'deny' },
+    { name: '관리자 6자리 전이 admin 폴더', actor: 'admin_pre', folder: 'admin', expect: 'deny' },
+    { name: '관리자 6자리 후가 admin 폴더', actor: 'admin_post', folder: 'admin', expect: 'allow' },
     // 아래 둘은 계약서 목록 밖의 보탬: 임시 규칙이 "회원은 자기 폴더만, 관리자는 admin 폴더만"인지
-    { name: '(보탬) A 가 admin 폴더', actor: 'member_a', folder: 'admin', expect: 'deny', primer: 'admin_post' },
-    { name: '(보탬) 관리자 6자리 후가 A 의 폴더', actor: 'admin_post', folder: memberA, expect: 'deny', primer: 'member_a' },
+    { name: '(보탬) A 가 admin 폴더', actor: 'member_a', folder: 'admin', expect: 'deny' },
+    { name: '(보탬) 관리자 6자리 후가 A 의 폴더', actor: 'admin_post', folder: memberA, expect: 'deny' },
   ];
   const counter = makeCounter();
   const rows = [];
   for (const c of cases) {
-    for (const action of FN_ACTIONS) rows.push(await fnRow({ run, tag: 'live', counter, caseName: c.name, folder: c.folder, actor: c.actor, action, expect: c.expect, primer: c.primer }));
+    for (const action of FN_ACTIONS) rows.push(await fnRow({ run, tag: 'live', counter, caseName: c.name, folder: c.folder, actor: c.actor, action, expect: c.expect }));
     say(`fn-live ${rows.length}/32 — ${c.name}`);
   }
   const summary = fnSummary(rows);
-  if (summary.denied_but_same_url_delivered.length) say(`fn-live 관측: 정책 판정은 거절인데 같은 주소 재요청에 본문이 온 줄 — ${summary.denied_but_same_url_delivered.join(' / ')}`);
+  if (summary.info_denied_but_body_delivered.length) say(`fn-live 관측: 정보 조회 거절·본문 전달인 줄 — ${summary.info_denied_but_body_delivered.join(' / ')}`);
   return {
     exit: summary.mismatch ? 1 : 0,
     result: {
       credentials: jwtInfo,
-      note: '종료 값과 summary.mismatch 는 정책 판정(올리기·덮어쓰기·삭제는 readTrue, 내려받기는 fresh)만 센다. 같은 주소 재요청(same_url)은 summary.same_url_observations 에 따로 적는다 — 둘을 합쳐 하나의 통과로 만들지 않는다.',
+      note: '종료 값과 summary.mismatch 는 기대값 대조만 센다: 새로 올리기·덮어쓰기·삭제는 저장 정보의 전후 비교, 읽기는 "정보 조회"의 허용·거절. 본문 GET 은 summary.info_and_first_body_get 에 관측으로 나란히 적는다. 정보 조회의 거절은 "그 자격으로 그 파일의 정보를 볼 수 없다"까지만 뜻한다 — 정보 조회가 거절인데 본문이 온 줄은 "정보 조회 거절·본문 전달"이고 파일 접근 차단 성공이 아니다.',
       summary, rows,
     },
   };
 }
 
-// 만료·로그아웃 시험의 "앞서 읽은 주소": pre 와 post 가 서로 다른 실행이므로, 로그인 상태 번호로 정해지는 이름과 바이트를 쓴다.
+// 만료·로그아웃 시험의 "pre 에서 이미 읽은 주소": pre 와 post 가 서로 다른 실행이므로, 로그인 상태 번호로 정해지는 이름과 바이트를 쓴다.
 function revocationProbe(kind) {
   const sid = jwtInfo.subject.session_id;
   return { path: `${memberA}/zzrev-${kind}-${sid.slice(0, 8)}.png`, bytes: makePng(`revocation probe ${kind} ${sid}`) };
@@ -1038,71 +1131,96 @@ async function phaseFnSubject(run, kind) {
     ? { pre: '만료 전(먼저 허용 확인)', post: 'not_after 를 과거로 바꾼 뒤 — 이미 받아 둔 같은 자격', restored: 'not_after 를 원래 값으로 되돌린 뒤' }[step]
     : { pre: '로그아웃 전(먼저 허용 확인)', post: '로그아웃한 뒤 — 이미 받아 둔 같은 자격' }[step];
   const probe = revocationProbe(kind);
+  const contents = { current: probe.bytes, old: [] };
   const pr = { path: probe.path, bytes: describe(probe.bytes) };
 
   if (step === 'pre') {
-    // 정상 자격으로 "바로 그 주소"에서 본문을 받아 둔다(그래야 post 의 same_url 이 "앞서 읽은 주소"다).
+    // 정상 자격으로 "바로 그 주소"에서 본문을 받아 둔다(그래야 post 의 재전달이 "이미 읽은 주소"다).
     const start = await restoreStart(FN_BUCKET, [{ path: probe.path, bytes: probe.bytes }]);
     pr.true_state = start.state[probe.path];
-    pr.same_url_reads = [];
-    for (let i = 0; i < 2; i += 1) {
-      const x = await readAs('subject', FN_BUCKET, probe.path, { fresh: false });
-      x.body_is = bodyIs(x, { original: probe.bytes });
-      pr.same_url_reads.push(x);
-    }
-    pr.body_received_at_same_url = pr.same_url_reads.some((x) => x.body_is === 'original');
-    pr.statement = !start.ok ? '앞서 읽을 파일을 만들지 못했거나 확인하지 못함'
-      : pr.body_received_at_same_url ? '정상 자격으로 그 주소에서 본문을 받았다(post 의 same_url 이 "앞서 읽은 주소"가 된다)'
+    pr.info_lookup = await infoAs('subject', FN_BUCKET, probe.path);
+    pr.info = { expect: 'allow', outcome: infoVerdict(pr.info_lookup, pr.true_state) };
+    pr.info.match = pr.info.outcome === 'allow';
+    pr.body_reads = [
+      await bodyGet('subject', FN_BUCKET, probe.path, 'same_url', contents),
+      await bodyGet('subject', FN_BUCKET, probe.path, 'same_url', contents),
+      await bodyGet('subject', FN_BUCKET, probe.path, 'with_query', contents),
+    ];
+    pr.body_received_at_same_url = pr.body_reads.filter((x) => x.url_shape === 'same_url').some((x) => x.body_is === '현재 내용');
+    pr.statement = !start.ok ? '앞서 읽을 파일을 만들지 못했거나 저장 정보를 확인하지 못함'
+      : pr.body_received_at_same_url ? `정상 자격으로 그 주소(값 없는 주소)에서 본문을 받았다 — ${pr.body_reads.map(bodyLine).join(' / ')}`
         : '정상 자격인데 그 주소에서 본문을 받지 못함 — post 의 재전달 관측은 뜻이 없다';
   } else {
-    // 파일이 그 순간 실제로 있는가(readTrue) → 정책 판정(fresh) → 실제 재전달(same_url). 둘을 따로 적는다.
+    // 셋을 따로: ① 정보 조회(기대값 대조) ② 처음 보내는 주소의 본문 GET(아래 rows 의 "정보 조회" 줄에 있다) ③ pre 에서 이미 읽은 주소의 재전달
     pr.true_state = await readTrue(FN_BUCKET, probe.path);
     const fileThere = stateIs(pr.true_state, present(probe.bytes));
-    const f = await readAs('subject', FN_BUCKET, probe.path, { fresh: true });
-    f.body_is = bodyIs(f, { original: probe.bytes });
-    const s = await readAs('subject', FN_BUCKET, probe.path, { fresh: false });
-    s.body_is = bodyIs(s, { original: probe.bytes });
-    let outcome;
-    if (!fileThere) outcome = `undetermined(pre 단계의 파일이 그대로 있는지 확인하지 못함: ${pr.true_state.unverified ?? '없거나 다른 바이트'})`;
-    else if (f.cache_doubt) outcome = `undetermined(fresh 응답을 믿을 수 없음: ${f.cache_doubt})`;
-    else if (f.ok && f.body_is === 'original') outcome = 'allow';
-    else if (!f.ok) outcome = f.error.kind === 'jwt' ? 'undetermined(자격 자체가 거절됨 — 규칙의 거절이 아님)' : 'deny';
-    else outcome = 'anomaly';
-    pr.policy = { basis: 'fresh(임의 값을 붙인 새 주소)', expect, outcome, match: outcome === expect, fresh: f };
+    pr.info_lookup = await infoAs('subject', FN_BUCKET, probe.path);
+    const v = fileThere ? infoVerdict(pr.info_lookup, pr.true_state) : `undetermined(pre 단계의 파일이 그대로 있는지 확인하지 못함: ${pr.true_state.unverified ?? '없거나 다른 지문'})`;
+    pr.info = { expect, outcome: v, match: v === expect };
+    const s = await bodyGet('subject', FN_BUCKET, probe.path, 'same_url', contents);
+    const q = await bodyGet('subject', FN_BUCKET, probe.path, 'with_query', contents);
     pr.redelivery = {
-      basis: 'same_url(pre 단계에서 이 자격이 본문을 받은 바로 그 주소)',
-      delivered_body: !!s.body, body_is: s.body_is,
-      http_status: s.http_status, cf_cache_status: s.cf_cache_status, age: s.age, cache_control: s.cache_control, same_url: s,
+      what: 'pre 단계에서 이 자격이 본문을 받은 객체. same_url 이 "이미 읽은 바로 그 주소"이고, with_query 는 같은 객체의 새 주소다',
+      same_url: s, with_query: q,
+      delivered_at_read_url: s.ok, body_is_at_read_url: s.body_is,
+      line: `이미 읽은 주소 ${bodyLine(s)} / 임의 값 주소 ${bodyLine(q)}`,
     };
-    if (step === 'post') {
-      pr.statement = outcome !== 'deny' ? `정책 판정이 거절이 아님(${outcome})` + (s.body ? ' / 같은 주소 재요청에는 본문이 옴' : '')
-        : s.body ? '정책 시험은 통과, 즉시 회수는 실패 — 새 주소 요청은 거절됐지만, 앞서 읽은 같은 주소에는 본문이 다시 전달됨'
-          : '정책 시험은 통과 — 새 주소 요청이 거절됐고, 앞서 읽은 같은 주소에도 본문이 오지 않음(이 시점·이 주소·이 자격에 대한 관측)';
-    } else {
-      pr.statement = outcome === 'allow' ? '되돌린 뒤 새 주소 요청이 다시 허용됨' : `되돌린 뒤인데 허용이 아님(${outcome})`;
-    }
   }
 
   const counter = makeCounter();
   const rows = [];
   for (const action of FN_ACTIONS) {
-    rows.push(await fnRow({ run, tag: `${kind}-${step}`, counter, caseName, folder: memberA, actor: 'subject', action, expect, primer: null }));
-    say(`fn-${kind} ${step} ${rows.length}/4 — ${action}`);
+    rows.push(await fnRow({ run, tag: `${kind}-${step}`, counter, caseName, folder: memberA, actor: 'subject', action, expect }));
+    say(`fn-${kind} ${step} ${rows.length}/4 — ${ACTION_KO[action]}`);
   }
   const summary = fnSummary(rows);
-  const probePolicyMismatch = pr.policy ? !pr.policy.match : false;
+  const infoRow = rows.find((r) => r.action === 'info');
+
+  // post·restored: 셋을 따로 적는다(합쳐서 하나의 통과로 만들지 않는다)
+  let three = null;
+  if (step !== 'pre') {
+    const firstDelivered = infoRow.body_get.same_url.ok || infoRow.body_get.with_query.ok;
+    three = {
+      '1_정보_조회': {
+        expect,
+        '이미 읽은 객체': pr.info.outcome,
+        '새 객체': infoRow.outcome,
+        match: pr.info.match && infoRow.match,
+      },
+      '2_처음_보내는_주소의_본문_GET': {
+        what: '이 자격이 본문을 받은 적 없는 새 객체(rows 의 "정보 조회" 줄)',
+        same_url: infoRow.first_body_get.same_url, with_query: infoRow.first_body_get.with_query,
+        delivered: firstDelivered,
+        reading: infoRow.outcome === 'deny' && firstDelivered ? '정보 조회 거절·본문 전달' : infoRow.first_body_get.same_url_vs_info,
+      },
+      '3_pre에서_이미_읽은_주소의_재전달': {
+        line: pr.redelivery.line,
+        delivered: pr.redelivery.delivered_at_read_url, body_is: pr.redelivery.body_is_at_read_url,
+        reading: pr.info.outcome === 'deny' && pr.redelivery.delivered_at_read_url ? '정보 조회 거절·본문 전달'
+          : pr.info.outcome === 'deny' ? '정보 조회 거절·본문 없음(이 시점·이 주소·이 자격에 대한 관측)'
+            : infoVsBody(pr.info.outcome, pr.redelivery.same_url),
+      },
+    };
+    pr.statement = step === 'post'
+      ? `정보 조회: ${pr.info.outcome}(기대 ${expect}) ‖ 처음 보내는 주소의 본문 GET: ${three['2_처음_보내는_주소의_본문_GET'].reading} ‖ 이미 읽은 주소의 재전달: ${three['3_pre에서_이미_읽은_주소의_재전달'].reading}`
+      : `되돌린 뒤 정보 조회: ${pr.info.outcome}(기대 allow) ‖ 이미 읽은 주소: ${pr.redelivery.line}`;
+  }
+
+  const probeMismatch = pr.info ? !pr.info.match : false;
   const preProbeFailed = step === 'pre' && !pr.body_received_at_same_url;
   const left = decodeJwtPayload(jwts.subject).exp - Math.floor(Date.now() / 1000);
-  say(`fn-${kind} ${step} — 정책 판정: 다른 것 ${summary.mismatch + (probePolicyMismatch ? 1 : 0)}건 ‖ 앞서 읽은 주소: ${pr.statement}`);
+  say(`fn-${kind} ${step} — 기대값 대조(정보 조회·올리기·덮어쓰기·삭제): 다른 것 ${summary.mismatch + (probeMismatch ? 1 : 0)}건`);
+  say(`fn-${kind} ${step} — ${pr.statement}`);
   return {
-    exit: summary.mismatch || probePolicyMismatch || preProbeFailed ? 1 : 0,
+    exit: summary.mismatch || probeMismatch || preProbeFailed ? 1 : 0,
     result: {
       credential: { ...jwtInfo.subject, seconds_left_at_end: left },
       note: step === 'post'
-        ? '두 가지를 따로 읽는다. ① 정책 판정(summary 와 revocation_probe.policy — 기대값 거절, 종료 값은 이것만 센다) ② 실제 재전달(revocation_probe.redelivery — pre 에서 본문을 받은 같은 주소에 본문이 다시 왔는가). ①이 거절이고 ②에 본문이 오면 "정책 시험은 통과, 즉시 회수는 실패"다. 둘을 합쳐 하나의 통과로 만들지 않는다. 거절이 규칙 때문인지 보려면 seconds_left_at_end 가 0보다 크고, 응답 종류가 jwt 가 아니며, 서비스 열쇠 대조군이 allow 여야 한다.'
+        ? '셋을 따로 읽는다(three_way). ① 정보 조회 — 기대값 거절. 종료 값과 expectation_mismatch_total 은 이것과 올리기·덮어쓰기·삭제의 기대값 대조만 센다 ② 처음 보내는 주소의 본문 GET — 관측 ③ pre 에서 이미 읽은 주소의 재전달 — 관측. 정보 조회가 거절인데 본문이 오면 그 줄은 "정보 조회 거절·본문 전달"이고, 파일 접근 차단 성공으로 적지 않는다. 정보 조회의 거절이 본문 내려받기의 차단을 뜻하는지는 이 도구가 입증하지 않는다. 거절이 규칙 때문인지 보려면 seconds_left_at_end 가 0보다 크고, 응답 종류가 jwt 가 아니며, 서비스 열쇠 대조군이 allow 여야 한다.'
         : step === 'pre' ? '같은 자격으로 네 동작이 모두 허용됨을 확인하고, revocation_probe 에 "정상 자격으로 그 주소에서 본문을 받았음"을 적는다.'
           : '원래 값으로 되돌린 뒤 다시 허용되는지 본다.',
-      policy_mismatch_total: summary.mismatch + (probePolicyMismatch ? 1 : 0),
+      expectation_mismatch_total: summary.mismatch + (probeMismatch ? 1 : 0),
+      three_way: three,
       revocation_probe: pr,
       summary, rows,
     },
@@ -1111,122 +1229,134 @@ async function phaseFnSubject(run, kind) {
 
 // ---------------------------------------------------------------------
 // cache: 중간 저장의 관측 (잰 값 표, 기대값 없음)
+//   실제 상태(목록 + 정보 조회)와 전달된 것(본문 GET, 값 없는 주소 / 임의 값 주소)을 나란히 적는다.
 //   인증 경로: 판정 함수 버킷, 회원 A 의 자기 폴더 파일. 공개 주소: 기준선의 공개 버킷 하나(guide-images) — 표를 따로 낸다.
 // ---------------------------------------------------------------------
 const RETENTION_OFFSETS = [0, 10, 30, 60, 120, 300];
-
-function shortRead(label, rd, named) {
-  return {
-    label, who: rd.who, url: rd.url, http_status: rd.http_status,
-    cf_cache_status: rd.cf_cache_status, age: rd.age, cache_control: rd.cache_control,
-    body_sha256: rd.body?.sha256 ?? null, body_is: bodyIs(rd, named) ?? '본문 없음',
-    error_kind: rd.error?.kind ?? null, error_message: rd.error?.body_message ?? null,
-  };
-}
 
 async function phaseCache(run) {
   const maxSeconds = Number.isFinite(Number(args['max-seconds'])) ? Math.max(0, Number(args['max-seconds'])) : 300;
   const offsets = RETENTION_OFFSETS.filter((t) => t <= maxSeconds);
   const lastOffset = offsets[offsets.length - 1];
-  const A = memberA;
-  const file = (n) => `${A}/r${run}-cache-${n}.png`;
-  const auth = {};   // 인증 경로의 표
-  const mk = async (bucket, path, bytes) => {
-    const st = await restoreStart(bucket, [{ path, bytes }]);
-    return { start_ok: st.ok, start: st.state[path] };
-  };
-  const trueRow = async (label, bucket, path, named) => {
-    const t = await readTrue(bucket, path);
-    return {
-      label, who: 'service(readTrue)', url: 'fresh', http_status: t.http_status, cf_cache_status: t.cf_cache_status, age: t.age, cache_control: t.cache_control,
-      known: t.known, unverified: t.unverified,
-      body_sha256: t.sha256 ?? null,
-      body_is: !t.known ? '미확인' : !t.exists ? '없음' : (Object.entries(named).find(([, b]) => b && t.sha256 === sha256(b))?.[0] ?? 'other'),
-    };
-  };
+  const file = (n) => `${memberA}/r${run}-cache-${n}.png`;
+  const auth = {};
 
-  // E1. 같은 주소 재읽기: 1회·2회·3회, 그리고 새 주소
+  const make = async (bucket, path, bytes) => {
+    const st = await restoreStart(bucket, [{ path, bytes }]);
+    return { start_ok: st.ok };
+  };
+  // 실제 상태(저장 정보): 어느 내용인가
+  const actual = async (label, bucket, path, named) => {
+    const t = await readTrue(bucket, path);
+    const is = !t.known ? '미확인' : !t.exists ? '없음' : (Object.entries(named).find(([, b]) => b && t.md5 === md5(b))?.[0] ?? '그 밖');
+    return { label, row: '실제 상태(목록 + 정보 조회)', known: t.known, unverified: t.unverified, is, md5: t.md5 ?? null, list_cf: t.list.cf_cache_status, info_cf: t.info.cf_cache_status, list_updated_at: t.list.updated_at ?? null };
+  };
+  // 전달된 것(본문 GET)
+  const got = async (label, actor, bucket, path, shape, contents, pub = false) => {
+    const b = await bodyGet(actor, bucket, path, shape, contents, { pub });
+    return { label, row: '전달된 본문(GET)', who: b.who, url_shape: shape, http_status: b.http_status, cf_cache_status: b.cf_cache_status, age: b.age, cache_control: b.cache_control, body_md5: b.body_md5, body_is: b.body_is, error_kind: b.error?.kind ?? null };
+  };
+  // 정보 조회(재려는 자격)
+  const look = async (label, actor, bucket, path) => {
+    const i = await infoAs(actor, bucket, path);
+    return { label, row: '정보 조회', who: actor, http_status: i.http_status, cf_cache_status: i.cf_cache_status, etag: i.etag, error_kind: i.error?.kind ?? null };
+  };
+  const brief = (x) => (x.row === '전달된 본문(GET)' ? `${x.http_status} ${x.cf_cache_status ?? '-'} ${x.body_is}` : x.row === '정보 조회' ? `정보 ${x.http_status}` : `실제 ${x.is}`);
+
+  // E1. 같은 주소 재읽기(값 없는 주소 1·2·3회), 임의 값 주소도 매번 다른 값으로 1·2·3회
   {
     const p = file('e1');
     const original = makePng(`${run} cache e1 original`);
-    const s = await mk(FN_BUCKET, p, original);
-    const reads = [];
-    for (let i = 1; i <= 3; i += 1) reads.push(shortRead(`A 같은 주소 ${i}회`, await readAs('member_a', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('A 새 주소', await readAs('member_a', FN_BUCKET, p, { fresh: true }), { original }));
-    auth.e1_same_url_rereads = { path: p, ...s, reads };
-    say('cache E1 같은 주소 재읽기 — ' + reads.map((x) => `${x.cf_cache_status ?? '-'}`).join(' → '));
+    const c = { current: original, old: [] };
+    const s = await make(FN_BUCKET, p, original);
+    const rows = [await actual('처음', FN_BUCKET, p, { original })];
+    for (let i = 1; i <= 3; i += 1) rows.push(await got(`A 값 없는 주소 ${i}회`, 'member_a', FN_BUCKET, p, 'same_url', c));
+    for (let i = 1; i <= 3; i += 1) rows.push(await got(`A 임의 값 주소 ${i}회(매번 다른 값)`, 'member_a', FN_BUCKET, p, 'with_query', c));
+    auth.e1_rereads = { path: p, ...s, rows };
+    say('cache E1 재읽기 — ' + rows.slice(1).map((x) => x.cf_cache_status ?? '-').join(' → '));
   }
 
-  // E2. 덮어쓴 뒤: 같은 주소와 새 주소
+  // E2. 덮어쓴 뒤: 실제 상태와 두 주소 모양
   {
     const p = file('e2');
     const original = makePng(`${run} cache e2 original`);
     const replaced = makePng(`${run} cache e2 replaced`);
     const named = { original, replaced };
-    const s = await mk(FN_BUCKET, p, original);
-    const reads = [];
-    for (let i = 1; i <= 2; i += 1) reads.push(shortRead(`덮어쓰기 전 A 같은 주소 ${i}회`, await readAs('member_a', FN_BUCKET, p, { fresh: false }), named));
+    const s = await make(FN_BUCKET, p, original);
+    const before = { current: original, old: [] };
+    const afterC = { current: replaced, old: [original] };
+    const rows = [];
+    for (let i = 1; i <= 2; i += 1) rows.push(await got(`덮어쓰기 전 A 값 없는 주소 ${i}회`, 'member_a', FN_BUCKET, p, 'same_url', before));
+    rows.push(await got('덮어쓰기 전 A 임의 값 주소', 'member_a', FN_BUCKET, p, 'with_query', before));
     const ow = await upload('service', FN_BUCKET, p, replaced, { upsert: true });
-    reads.push({ label: '서비스 열쇠로 덮어씀(x-upsert: true)', http_status: ow.status, ok: ow.ok });
-    reads.push(await trueRow('덮어쓴 뒤 실제 저장 상태', FN_BUCKET, p, named));
-    reads.push(shortRead('덮어쓴 뒤 A 같은 주소', await readAs('member_a', FN_BUCKET, p, { fresh: false }), named));
-    reads.push(shortRead('덮어쓴 뒤 A 새 주소', await readAs('member_a', FN_BUCKET, p, { fresh: true }), named));
-    auth.e2_after_overwrite = { path: p, ...s, reads };
-    say('cache E2 덮어쓴 뒤 — 같은 주소: ' + reads[4].body_is + ', 새 주소: ' + reads[5].body_is);
+    rows.push({ label: '서비스 열쇠로 덮어씀(x-upsert: true)', row: '쓰기', http_status: ow.status, ok: ow.ok });
+    rows.push(await actual('덮어쓴 뒤', FN_BUCKET, p, named));
+    rows.push(await got('덮어쓴 뒤 A 값 없는 주소', 'member_a', FN_BUCKET, p, 'same_url', afterC));
+    rows.push(await got('덮어쓴 뒤 A 임의 값 주소 1회', 'member_a', FN_BUCKET, p, 'with_query', afterC));
+    rows.push(await got('덮어쓴 뒤 A 임의 값 주소 2회(다른 값)', 'member_a', FN_BUCKET, p, 'with_query', afterC));
+    auth.e2_after_overwrite = { path: p, ...s, rows };
+    say('cache E2 덮어쓴 뒤 — ' + rows.slice(4).map(brief).join(' | '));
   }
 
-  // E4. 다른 사람이 같은 주소를 요청했을 때 (A 가 읽어 둔 주소)
+  // E4. 다른 사람이 요청했을 때(A 가 읽어 둔 객체): 정보 조회와 본문 GET 두 모양
   {
     const p = file('e4');
     const original = makePng(`${run} cache e4 original`);
-    const s = await mk(FN_BUCKET, p, original);
-    const reads = [];
-    for (let i = 1; i <= 2; i += 1) reads.push(shortRead(`A 같은 주소 ${i}회(먼저 읽어 둠)`, await readAs('member_a', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('B 같은 주소', await readAs('member_b', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('대응 없는 계정 같은 주소', await readAs('no_map', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('비로그인 같은 주소', await readAs('anon', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('A 같은 주소(다른 사람들 뒤)', await readAs('member_a', FN_BUCKET, p, { fresh: false }), { original }));
-    auth.e4_other_people_same_url = { path: p, ...s, reads };
-    say('cache E4 다른 사람 — ' + reads.slice(2, 5).map((x) => `${x.who}: ${x.http_status} ${x.cf_cache_status ?? '-'} ${x.body_is}`).join(' / '));
+    const c = { current: original, old: [] };
+    const s = await make(FN_BUCKET, p, original);
+    const rows = [];
+    for (let i = 1; i <= 2; i += 1) rows.push(await got(`A 값 없는 주소 ${i}회(먼저 읽어 둠)`, 'member_a', FN_BUCKET, p, 'same_url', c));
+    rows.push(await got('A 임의 값 주소(먼저 읽어 둠)', 'member_a', FN_BUCKET, p, 'with_query', c));
+    for (const [who, label] of [['member_b', 'B'], ['no_map', '대응 없는 계정'], ['anon', '비로그인']]) {
+      rows.push(await look(`${label} 정보 조회`, who, FN_BUCKET, p));
+      rows.push(await got(`${label} 값 없는 주소`, who, FN_BUCKET, p, 'same_url', c));
+      rows.push(await got(`${label} 임의 값 주소`, who, FN_BUCKET, p, 'with_query', c));
+    }
+    rows.push(await got('A 값 없는 주소(다른 사람들 뒤)', 'member_a', FN_BUCKET, p, 'same_url', c));
+    auth.e4_other_people = { path: p, ...s, rows };
+    say('cache E4 다른 사람 — ' + rows.slice(3, 12).map((x) => `${x.label}: ${brief(x)}`).join(' | '));
   }
 
-  // E5. 같은 사람의 다른 로그인 상태에서 받은 자격으로 같은 주소
+  // E5. 같은 사람의 다른 로그인 상태에서 받은 자격
   {
     const p = file('e5');
     const original = makePng(`${run} cache e5 original`);
-    const s = await mk(FN_BUCKET, p, original);
-    const reads = [];
-    for (let i = 1; i <= 2; i += 1) reads.push(shortRead(`A(평소 로그인 상태) 같은 주소 ${i}회`, await readAs('member_a', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('A(다른 로그인 상태) 같은 주소 — 이 자격의 첫 읽기', await readAs('member_a_other', FN_BUCKET, p, { fresh: false }), { original }));
-    reads.push(shortRead('A(다른 로그인 상태) 새 주소', await readAs('member_a_other', FN_BUCKET, p, { fresh: true }), { original }));
-    auth.e5_same_person_other_login = { path: p, ...s, sessions: { usual: jwtInfo.member_a.session_id, other: jwtInfo.member_a_other.session_id }, reads };
-    say('cache E5 같은 사람의 다른 로그인 상태 — ' + `${reads[2].http_status} ${reads[2].cf_cache_status ?? '-'} ${reads[2].body_is}`);
+    const c = { current: original, old: [] };
+    const s = await make(FN_BUCKET, p, original);
+    const rows = [];
+    for (let i = 1; i <= 2; i += 1) rows.push(await got(`A(평소 로그인 상태) 값 없는 주소 ${i}회`, 'member_a', FN_BUCKET, p, 'same_url', c));
+    rows.push(await look('A(다른 로그인 상태) 정보 조회', 'member_a_other', FN_BUCKET, p));
+    rows.push(await got('A(다른 로그인 상태) 값 없는 주소 — 이 자격의 첫 읽기', 'member_a_other', FN_BUCKET, p, 'same_url', c));
+    rows.push(await got('A(다른 로그인 상태) 임의 값 주소', 'member_a_other', FN_BUCKET, p, 'with_query', c));
+    auth.e5_same_person_other_login = { path: p, ...s, sessions: { usual: jwtInfo.member_a.session_id, other: jwtInfo.member_a_other.session_id }, rows };
+    say('cache E5 같은 사람의 다른 로그인 상태 — ' + rows.slice(2).map(brief).join(' | '));
   }
 
-  // E3(인증)·E6(공개): 지운 뒤 같은 주소·새 주소, 그리고 유지 시간. 두 경로를 같은 시간표로 함께 잰다(표는 따로).
+  // E3(인증)·E6(공개): 지운 뒤의 실제 상태와 두 주소 모양, 그리고 유지 시간. 두 경로를 같은 시간표로 함께 잰다(표는 따로).
   const p3 = file('e3');
   const o3 = makePng(`${run} cache e3 original`);
-  const s3 = await mk(FN_BUCKET, p3, o3);
-  const reads3 = [];
-  for (let i = 1; i <= 2; i += 1) reads3.push(shortRead(`지우기 전 A 같은 주소 ${i}회`, await readAs('member_a', FN_BUCKET, p3, { fresh: false }), { original: o3 }));
+  const s3 = await make(FN_BUCKET, p3, o3);
+  const live3 = { current: o3, old: [] };
+  const gone3 = { current: null, old: [o3] };
+  const rows3 = [];
+  for (let i = 1; i <= 2; i += 1) rows3.push(await got(`지우기 전 A 값 없는 주소 ${i}회`, 'member_a', FN_BUCKET, p3, 'same_url', live3));
+  rows3.push(await got('지우기 전 A 임의 값 주소', 'member_a', FN_BUCKET, p3, 'with_query', live3));
 
   const PUB_BUCKET = 'guide-images';
   const p6 = `${Date.now()}_${BUSINESS_MARK}_cache.png`; // cleanup 이 표식(_zzb2n2)으로 지운다
   const o6 = makePng(`${run} cache e6 public original`);
-  const s6 = await mk(PUB_BUCKET, p6, o6);
-  const reads6 = [];
-  for (let i = 1; i <= 2; i += 1) reads6.push(shortRead(`지우기 전 공개 주소 같은 주소 ${i}회`, await readAs(null, PUB_BUCKET, p6, { fresh: false, pub: true }), { original: o6 }));
-  reads6.push(shortRead('지우기 전 공개 주소 새 주소', await readAs(null, PUB_BUCKET, p6, { fresh: true, pub: true }), { original: o6 }));
+  const s6 = await make(PUB_BUCKET, p6, o6);
+  const live6 = { current: o6, old: [] };
+  const gone6 = { current: null, old: [o6] };
+  const rows6 = [];
+  for (let i = 1; i <= 2; i += 1) rows6.push(await got(`지우기 전 공개 주소 값 없는 주소 ${i}회`, null, PUB_BUCKET, p6, 'same_url', live6, true));
+  rows6.push(await got('지우기 전 공개 주소 임의 값 주소', null, PUB_BUCKET, p6, 'with_query', live6, true));
 
   const d3 = await removeOne('service', FN_BUCKET, p3);
   const d6 = await removeOne('service', PUB_BUCKET, p6);
   const deletedAt = Date.now();
-  reads3.push({ label: '서비스 열쇠로 지움', http_status: d3.status, ok: d3.ok });
-  reads6.push({ label: '서비스 열쇠로 지움', http_status: d6.status, ok: d6.ok });
-  reads3.push(await trueRow('지운 뒤 실제 저장 상태', FN_BUCKET, p3, { original: o3 }));
-  reads6.push(await trueRow('지운 뒤 실제 저장 상태(인증 경로로 읽음)', PUB_BUCKET, p6, { original: o6 }));
-  reads3.push(shortRead('지운 뒤 A 새 주소', await readAs('member_a', FN_BUCKET, p3, { fresh: true }), { original: o3 }));
-  reads6.push(shortRead('지운 뒤 공개 주소 새 주소', await readAs(null, PUB_BUCKET, p6, { fresh: true, pub: true }), { original: o6 }));
+  rows3.push({ label: '서비스 열쇠로 지움', row: '쓰기', http_status: d3.status, ok: d3.ok });
+  rows6.push({ label: '서비스 열쇠로 지움', row: '쓰기', http_status: d6.status, ok: d6.ok });
 
   const ret3 = [];
   const ret6 = [];
@@ -1234,38 +1364,51 @@ async function phaseCache(run) {
     const wait = deletedAt + t * 1000 - Date.now();
     if (wait > 0) await sleep(wait);
     const elapsed = Math.round((Date.now() - deletedAt) / 100) / 10;
-    const a = shortRead(`삭제 후 ${t}초 시점 A 같은 주소`, await readAs('member_a', FN_BUCKET, p3, { fresh: false }), { original: o3 });
-    const b = shortRead(`삭제 후 ${t}초 시점 공개 주소 같은 주소`, await readAs(null, PUB_BUCKET, p6, { fresh: false, pub: true }), { original: o6 });
-    ret3.push({ scheduled_seconds: t, elapsed_seconds: elapsed, ...a });
-    ret6.push({ scheduled_seconds: t, elapsed_seconds: elapsed, ...b });
-    say(`cache 유지 시간 — 삭제 후 ${t}초: 인증 ${a.http_status} ${a.cf_cache_status ?? '-'} ${a.body_is} / 공개 ${b.http_status} ${b.cf_cache_status ?? '-'} ${b.body_is}`);
+    const a = {
+      scheduled_seconds: t, elapsed_seconds: elapsed,
+      actual: await actual(`삭제 후 ${t}초 시점`, FN_BUCKET, p3, { original: o3 }),
+      same_url: await got(`삭제 후 ${t}초 시점 A 값 없는 주소`, 'member_a', FN_BUCKET, p3, 'same_url', gone3),
+      with_query: await got(`삭제 후 ${t}초 시점 A 임의 값 주소`, 'member_a', FN_BUCKET, p3, 'with_query', gone3),
+    };
+    const b = {
+      scheduled_seconds: t, elapsed_seconds: elapsed,
+      actual: await actual(`삭제 후 ${t}초 시점`, PUB_BUCKET, p6, { original: o6 }),
+      same_url: await got(`삭제 후 ${t}초 시점 공개 주소 값 없는 주소`, null, PUB_BUCKET, p6, 'same_url', gone6, true),
+      with_query: await got(`삭제 후 ${t}초 시점 공개 주소 임의 값 주소`, null, PUB_BUCKET, p6, 'with_query', gone6, true),
+    };
+    ret3.push(a);
+    ret6.push(b);
+    say(`cache 유지 시간 — 삭제 후 ${t}초: 인증[실제 ${a.actual.is} | 값 없는 주소 ${brief(a.same_url)} | 임의 값 주소 ${brief(a.with_query)}] 공개[실제 ${b.actual.is} | 값 없는 주소 ${brief(b.same_url)} | 임의 값 주소 ${brief(b.with_query)}]`);
   }
-  // 유지 시간을 읽는 말: 마지막 시점에도 옛 바이트가 오면 "그 시점에도 관측, 끝나는 시각 미확인"이다(더 기다리지 않는다).
-  const retentionStatement = (rows) => {
-    const got = rows.filter((x) => x.body_is === 'original');
-    if (got.length === 0) return '지운 뒤 같은 주소에서 옛 바이트가 한 번도 오지 않음(0초 시점부터)';
-    const lastGot = got[got.length - 1].scheduled_seconds;
-    const firstGone = rows.find((x) => x.scheduled_seconds > lastGot && x.body_is !== 'original');
+  // 유지 시간을 읽는 말: "아직 옛 내용이 오는가"는 GET 으로 본다. 마지막 시점에도 오면 "그 시점에도 관측, 끝나는 시각 미확인"(더 기다리지 않는다).
+  const retentionStatement = (rows, shape) => {
+    const seq = rows.map((x) => ({ t: x.scheduled_seconds, old: x[shape].body_is === '옛 내용' }));
+    const got2 = seq.filter((x) => x.old);
+    if (got2.length === 0) return '지운 뒤 옛 내용이 한 번도 오지 않음(0초 시점부터)';
+    const lastGot = got2[got2.length - 1].t;
+    const firstGone = seq.find((x) => x.t > lastGot && !x.old);
     if (!firstGone) return `삭제 후 ${lastGot}초 시점에도 관측, 끝나는 시각 미확인`;
-    return `삭제 후 ${lastGot}초 시점까지 옛 바이트가 관측됐고, ${firstGone.scheduled_seconds}초 시점에는 오지 않음(끝난 시각은 그 사이 — 정확한 시각은 재지 않음)`;
+    return `삭제 후 ${lastGot}초 시점까지 옛 내용이 관측됐고, ${firstGone.t}초 시점에는 오지 않음(끝난 시각은 그 사이 — 정확한 시각은 재지 않음)`;
   };
-  auth.e3_after_delete = { path: p3, ...s3, reads: reads3, retention: ret3, retention_statement: retentionStatement(ret3) };
+  const actualStatement = (rows) => (rows.every((x) => x.actual.known && x.actual.is === '없음') ? '모든 시점에서 실제 상태는 "없음"(목록에 없고 정보 조회도 객체 없음)' : '실제 상태가 "없음"으로 확인되지 않은 시점이 있음(retention 의 actual 을 볼 것)');
+  auth.e3_after_delete = {
+    path: p3, ...s3, rows: rows3, retention: ret3,
+    statements: { 실제_상태: actualStatement(ret3), 값_없는_주소: retentionStatement(ret3, 'same_url'), 임의_값_주소: retentionStatement(ret3, 'with_query') },
+  };
   const pub = {
-    bucket: PUB_BUCKET, path: p6, ...s6, reads: reads6, retention: ret6, retention_statement: retentionStatement(ret6),
+    bucket: PUB_BUCKET, path: p6, ...s6, rows: rows6, retention: ret6,
+    statements: { 실제_상태: actualStatement(ret6), 값_없는_주소: retentionStatement(ret6, 'same_url'), 임의_값_주소: retentionStatement(ret6, 'with_query') },
     note: '공개 주소(/object/public/…)의 관측이다. 인증 경로의 표와 섞어 읽지 않는다. 공개 버킷의 공개 주소는 규칙과 무관하게 열린다.',
   };
 
   return {
     exit: 0,
     result: {
-      note: '기대값 없음 — 잰 값을 그대로 적은 표다. 각 읽기에 상태·cf_cache_status·age·cache_control·바이트 지문(body_sha256)과 그것이 어느 바이트인지(body_is)를 적는다. 여기서 본 것은 이 버킷·이 파일·이 자격들에 대한 관측이다(중간 저장이 어떤 단위로 나뉘는지의 원리나 운영의 설정을 입증하지 않는다).',
+      note: '기대값 없음 — 잰 값을 그대로 적은 표다. 줄마다 "실제 상태(목록 + 정보 조회)"·"전달된 본문(GET)"·"정보 조회" 중 무엇인지(row)를 적는다. 전달된 본문은 상태·cf_cache_status·age·cache_control·바이트의 md5 와 그것이 현재 내용/옛 내용/그 밖 중 무엇인지(body_is)를 적는다. 여기서 본 것은 이 버킷·이 파일·이 자격들에 대한 관측이다(중간 저장이 어떤 단위로 나뉘는지의 원리나 운영의 설정을 입증하지 않는다).',
       max_seconds: maxSeconds, retention_offsets: offsets, last_offset: lastOffset,
       authenticated_path: auth,
       public_path: pub,
-      statements: {
-        인증_지운_뒤_유지: auth.e3_after_delete.retention_statement,
-        공개_지운_뒤_유지: pub.retention_statement,
-      },
+      statements: { 인증_지운_뒤: auth.e3_after_delete.statements, 공개_지운_뒤: pub.statements },
     },
   };
 }
@@ -1420,8 +1563,8 @@ async function main() {
     finished_at: new Date().toISOString(),
     request_count: requestCount,
     key_notes: keyNotes,
-    independent_read: '실제 저장 상태는 readTrue 하나로만 읽는다: 서비스 열쇠의 인증 내려받기를 매번 다른 임의 값을 붙인 새 주소로 보내고(바이트 지문·크기·형식) cf_cache_status·age 를 함께 적는다. cf_cache_status 가 HIT 이거나 없거나 뜻이 불명확하거나, 내려받은 것과 객체 정보(서비스 열쇠의 목록 조회: 있음·크기·형식)가 어긋나면 known: false(미확인)이고 판정에 쓰지 않는다. 소유자는 Storage API 로 볼 수 없어 fingerprint.sql 의 objects 로 본다.',
-    cache_reading_rule: '내려받기는 fresh(임의 값을 붙인 새 주소 — 규칙 판정의 근거)와 same_url(같은 주소 재요청의 관측 — 판정에 쓰지 않음)로 나눠 적는다.',
+    independent_read: '저장 상태는 readTrue 하나로만 읽는다: 서비스 열쇠의 목록 조회(POST)와 정보 조회(GET /object/info/authenticated/…)로 있음·eTag·크기·형식을 읽고 eTag 를 기대한 바이트의 md5 와 견준다. 두 응답의 cf_cache_status 가 DYNAMIC 이 아니거나, 시간 초과·서버 오류이거나, 목록이 한도까지 차서 끝까지 읽지 못했거나, eTag 가 md5 모양이 아니거나, 둘이 어긋나면 known: false(미확인)이고 판정에 쓰지 않는다. "없음"은 정확한 경로가 목록에 없고 정보 조회도 객체 없음일 때만이다. 이것은 저장 정보를 읽은 것이지 본문 바이트를 다시 받아 확인한 것이 아니다. 소유자는 Storage API 로 볼 수 없어 fingerprint.sql 의 objects 로 본다.',
+    three_separate_readings: '셋을 따로 잰다: ① 저장 정보(readTrue) ② 정보 조회의 허용·거절(infoAs — 기대값 대조는 이것으로만) ③ 실제 전달된 본문(bodyGet: 값 없는 주소 same_url / 임의 값 주소 with_query — 관측만, 받은 바이트가 현재 내용/옛 내용/그 밖). 본문을 받는 GET 은 어떤 모양의 주소로도 판정에 쓰지 않는다. 정보 조회의 거절은 "그 자격으로 그 파일의 정보를 볼 수 없다"까지만 뜻하고, 본문 내려받기의 차단을 뜻하는지는 입증하지 않는다.',
     has_expectations: ['fn-live', 'fn-expired', 'fn-loggedout', 'compare-facts'].includes(phase),
     exit_code: res.exit,
     result: res.result,
