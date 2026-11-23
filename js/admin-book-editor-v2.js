@@ -1,6 +1,8 @@
 // =====================================================================
 // 책 에디터 v2 (관리자)  2026-11-15 — 에디터 정본 화면 통일
 //  - 모든 책 = HTML 쪽(<div class="twp">). 글자만 고친다. 구조 변경(쪽 추가·삭제 등)은 어시스턴트 도구로.
+//  - 예외 하나: 형광펜(2026-11-20). 글자를 드래그하면 뜨는 [형광펜]/[빼기] 또는 Ctrl+B. 책의 강조 태그(<strong>)로 감싸거나 푼다.
+//    입문서 v2는 <strong>이 노랑 형광펜(POINT 안은 연분홍)으로 보인다. 글자 자체는 바뀌지 않는다.
 //  - 쪽은 BookPage(공통 모듈)로 그린다 = 학생 서재 v2·PDF 저장·미리보기·인쇄와 같은 그림.
 //  - 글 칸을 넘치게 하는 입력·붙여넣기는 들어가지 않고 토스트로 알린다(이미 넘친 쪽은 더 길어질 때만).
 //  - 저장 = 고친 쪽만 서버(tr_book_pages.html). 저장 직전 서버 updated_at이 연 뒤 바뀌었으면 멈춘다. 버전 기록.
@@ -65,7 +67,7 @@
     await new Promise((r) => setTimeout(r, 200));
     S.pages.forEach((p) => { const root = S.roots.get(p.id); const ov = BP.overflowOf(root); S.base.set(p.id, ov); showOver(p.id, ov); root.querySelectorAll('.twp > .page').forEach((r) => S.good.set(r, r.innerHTML)); });
     buildOutline(); applyScale();
-    status('준비됨 · 보이는 그대로 글자만 고쳐요 (저장해야 반영)');
+    status('준비됨 · 보이는 그대로 글자만 고쳐요 · 글자를 드래그하면 형광펜 (저장해야 반영)');
   }
 
   function buildPage(p, i) {
@@ -95,7 +97,7 @@
     const remember = () => { S.pre = caretOffset(root, r); };
     r.addEventListener('compositionstart', () => { S.composing = true; remember(); });
     r.addEventListener('compositionend', () => { S.composing = false; setTimeout(() => check(p, root, r), 0); });
-    r.addEventListener('input', (e) => { if (e.isComposing || S.composing) { setDirty(p.id, true); return; } check(p, root, r); });
+    r.addEventListener('input', (e) => { S.hlUndo = null; hideBubble(); if (e.isComposing || S.composing) { setDirty(p.id, true); return; } check(p, root, r); });
     r.addEventListener('beforeinput', (e) => {
       const t = e.inputType || '';
       if (!S.composing) remember();
@@ -105,8 +107,13 @@
       if (e.isComposing) return;
       if (e.key === 'Enter') { e.preventDefault(); toast(MSG_ENTER); return; }
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && ['b', 'i', 'u'].includes(String(e.key).toLowerCase())) e.preventDefault();
+      const k = String(e.key).toLowerCase();
+      if (mod && k === 'b') { e.preventDefault(); hlToggle(); return; }
+      if (mod && !e.shiftKey && k === 'z' && S.hlUndo && S.hlUndo.r === r) { e.preventDefault(); hlUndo(); return; }
+      if (mod && ['i', 'u'].includes(k)) e.preventDefault();
     });
+    r.addEventListener('mouseup', () => setTimeout(showBubble, 0));
+    r.addEventListener('keyup', (e) => { if (e.shiftKey || e.key.indexOf('Arrow') === 0) showBubble(); });
     r.addEventListener('paste', (e) => { e.preventDefault(); remember(); const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || ''; document.execCommand('insertText', false, t.replace(/\s*\r?\n\s*/g, ' ')); });
     r.addEventListener('drop', (e) => e.preventDefault());
     r.addEventListener('dragstart', (e) => e.preventDefault());
@@ -210,6 +217,91 @@
     finally { btn.disabled = false; }
   }
 
+  // ---------- 형광펜 (2026-11-20) ----------
+  // 고른 글자만 <strong>으로 감싸거나(칠하기) 강조 태그 밖으로 꺼낸다(빼기). 글자·다른 태그는 그대로 둔다.
+  const HL = 'strong,b,mark';
+  let bubble = null;
+  function selCtx() {
+    for (const [id, root] of S.roots) {
+      const sel = selOf(root); if (!sel || !sel.rangeCount || sel.isCollapsed) continue;
+      const rg = sel.getRangeAt(0); let n = rg.commonAncestorContainer; if (n.nodeType !== 1) n = n.parentElement;
+      const r = n && n.closest('[contenteditable="true"]');
+      if (!r || r.getRootNode() !== root) continue;
+      const p = S.pages.find((x) => x.id === id); if (!p) continue;
+      return { p, root, r, rg };
+    }
+    return null;
+  }
+  function editableText(n, r) { const e = n.parentElement; return e && r.contains(e) && !e.closest('[contenteditable="false"]'); }
+  function hlOf(n, r) { let e = n.parentElement; while (e && e !== r) { if (e.matches(HL)) return e; e = e.parentElement; } return null; }
+  // 고른 범위 안 글자 조각들을 각자 따로 떼어 낸다 (앞뒤 빈칸은 뺀다)
+  function pieces(c) {
+    const { rg, r } = c; const sc = rg.startContainer, so = rg.startOffset, ec = rg.endContainer, eo = rg.endOffset;
+    const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT); const list = []; let n;
+    while ((n = w.nextNode())) if (n.data.length && rg.intersectsNode(n) && editableText(n, r)) list.push(n);
+    const out = [];
+    list.forEach((t) => {
+      let s = t === sc ? so : 0, e = t === ec ? eo : t.data.length;
+      const seg = t.data.slice(s, e); if (!seg.trim()) return;
+      s += seg.length - seg.replace(/^\s+/, '').length; e -= seg.length - seg.replace(/\s+$/, '').length;
+      let mid = t; if (s > 0) mid = t.splitText(s); if (e - s < mid.data.length) mid.splitText(e - s);
+      out.push(mid);
+    });
+    return out;
+  }
+  function allHl(c) { const w = document.createTreeWalker(c.r, NodeFilter.SHOW_TEXT); let n, any = false; while ((n = w.nextNode())) { if (!c.rg.intersectsNode(n) || !editableText(n, c.r) || !n.data.trim()) continue; any = true; if (!hlOf(n, c.r)) return false; } return any; }
+  function liftOut(anc, mid) {
+    const after = document.createRange(); after.setStartAfter(mid); after.setEnd(anc, anc.childNodes.length);
+    const afterFrag = after.extractContents();
+    const mr = document.createRange(); mr.setStartBefore(mid); mr.setEnd(anc, anc.childNodes.length);
+    const midFrag = mr.extractContents();
+    const par = anc.parentNode, next = anc.nextSibling;
+    par.insertBefore(midFrag, next);
+    if (afterFrag.textContent) { const a2 = anc.cloneNode(false); a2.appendChild(afterFrag); par.insertBefore(a2, next); }
+    if (!anc.textContent) anc.remove();
+  }
+  function hlApply(on) {
+    const c = selCtx(); if (!c) { toast('형광펜을 칠할 글자를 먼저 드래그해 주세요.'); return; }
+    const before = c.r.innerHTML; S.pre = caretOffset(c.root, c.r);
+    const segs = pieces(c); if (!segs.length) return;
+    segs.forEach((t) => {
+      if (on) { if (hlOf(t, c.r)) return; const st = document.createElement('strong'); t.parentNode.insertBefore(st, t); st.appendChild(t); let pv = st.previousSibling; const gap = pv && pv.nodeType === 3 && !pv.data.trim() ? pv : null; if (gap) pv = gap.previousSibling; if (pv && pv.nodeType === 1 && pv.tagName === 'STRONG' && !pv.attributes.length) { if (gap) pv.appendChild(gap); while (st.firstChild) pv.appendChild(st.firstChild); st.remove(); } }
+      else { let h; let guard = 0; while ((h = hlOf(t, c.r)) && guard++ < 6) liftOut(h, t); }
+    });
+    c.r.querySelectorAll(HL).forEach((el) => { if (!el.textContent) el.remove(); });
+    const first = segs[0], last = segs[segs.length - 1];
+    check(c.p, c.root, c.r);
+    if (c.r.innerHTML === before) { hideBubble(); return; }
+    if (!c.r.contains(first)) { S.hlUndo = null; hideBubble(); return; }   // 넘쳐서 되돌려짐(토스트는 check가 띄움)
+    S.hlUndo = { r: c.r, html: before, p: c.p, root: c.root };
+    try { const sel = selOf(c.root); const rg = document.createRange(); rg.setStart(first, 0); rg.setEnd(last, last.data.length); sel.removeAllRanges(); sel.addRange(rg); } catch (_) {}
+    showBubble();
+  }
+  function hlToggle() { const c = selCtx(); if (!c) { toast('형광펜을 칠할 글자를 먼저 드래그해 주세요.'); return; } hlApply(!allHl(c)); }
+  function hlUndo() { const u = S.hlUndo; if (!u) return; S.hlUndo = null; u.r.innerHTML = u.html; check(u.p, u.root, u.r); hideBubble(); }
+  function ensureBubble() {
+    if (bubble) return bubble;
+    bubble = document.createElement('div'); bubble.className = 'be2-hl'; bubble.hidden = true;
+    bubble.innerHTML = '<button type="button" data-on="1" title="고른 글자에 형광펜 (Ctrl+B)"><span class="sw"></span>형광펜</button><button type="button" data-on="0" title="고른 글자의 형광펜 빼기 (Ctrl+B)">빼기</button>';
+    bubble.addEventListener('mousedown', (e) => e.preventDefault());
+    bubble.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) hlApply(b.dataset.on === '1'); });
+    document.body.appendChild(bubble);
+    $('canvas').addEventListener('scroll', hideBubble, { passive: true });
+    document.addEventListener('mousedown', (e) => { if (!bubble.contains(e.target)) hideBubble(); });
+    return bubble;
+  }
+  function hideBubble() { if (bubble) bubble.hidden = true; }
+  function showBubble() {
+    const c = selCtx(); const b = ensureBubble(); if (!c) { b.hidden = true; return; }
+    const rects = [...c.rg.getClientRects()].filter((x) => x.width > 0); if (!rects.length) { b.hidden = true; return; }
+    const top = Math.min(...rects.map((x) => x.top)), left = Math.min(...rects.map((x) => x.left)), right = Math.max(...rects.map((x) => x.right));
+    const all = allHl(c); b.querySelector('[data-on="1"]').classList.toggle('dim', all); b.querySelector('[data-on="0"]').classList.toggle('dim', !all && !hasHl(c));
+    b.hidden = false; const bw = b.offsetWidth, bh = b.offsetHeight;
+    b.style.left = Math.max(8, Math.min(window.innerWidth - bw - 8, (left + right) / 2 - bw / 2)) + 'px';
+    b.style.top = Math.max(64, top - bh - 8) + 'px';
+  }
+  function hasHl(c) { const w = document.createTreeWalker(c.r, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (c.rg.intersectsNode(n) && n.data.trim() && hlOf(n, c.r)) return true; return false; }
+
   function buildOutline() {
     const list = $('outlineList'); list.innerHTML = ''; let n = 0;
     S.pages.forEach((p, i) => {
@@ -259,6 +351,6 @@
     document.addEventListener('visibilitychange', beat);
     window.addEventListener('pagehide', () => { if (!on) return; try { fetch(SUPABASE_URL + '/rest/v1/tr_book_editing?book_id=eq.' + id + '&editor=eq.' + encodeURIComponent(userEmail()), { method: 'DELETE', keepalive: true, headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } }); } catch (_) {} });
   }
-  window.BookEditorV2 = { get state() { return S; }, htmlOf, save };
+  window.BookEditorV2 = { get state() { return S; }, htmlOf, save, hlApply };
   document.addEventListener('DOMContentLoaded', start);
 })();
