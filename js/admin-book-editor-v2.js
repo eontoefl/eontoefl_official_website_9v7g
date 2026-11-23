@@ -222,7 +222,7 @@
   //  - 형광펜 = <strong> (입문서 v2는 노랑 형광펜, POINT 안은 연분홍)
   //  - 서브텍스트 = <span class="bp-sub" style="..."> 글자 15% 작게, 색 20% 연하게(흰색 20% 섞음).
   //    모양을 태그 안에 직접 적어서 학생 서재·PDF·인쇄 어디서나 같게 보인다(따로 CSS를 안 올려도 됨).
-  const SUB_STYLE = 'font-size:0.85em;color:color-mix(in srgb, currentColor 80%, #fff)';
+  const SUB_STYLE = 'font-size:0.78em;color:color-mix(in srgb, currentColor 65%, #fff)';
   const FMT = {
     hl: { sel: 'strong,b,mark', make: () => document.createElement('strong'), name: '형광펜' },
     sub: { sel: 'span.bp-sub', make: () => { const s = document.createElement('span'); s.className = 'bp-sub'; s.setAttribute('style', SUB_STYLE); return s; }, name: '서브텍스트' }
