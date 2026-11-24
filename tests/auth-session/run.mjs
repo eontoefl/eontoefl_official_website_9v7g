@@ -1164,6 +1164,101 @@ async function testWithdrawKeepsOthers(opt) {
     }
     return c.problems;
 }
+// 기다린 일(SDK 받기·저장된 로그인 읽기)이 실패로 끝난 세 길.
+// 정리는 "기다리기 전에 잡아 둔 기록"으로만 한다 — 기다리는 사이 다른 탭이 B 로 바꿨으면 B 의 호환 값·표식은 글자 그대로 남고,
+// B 는 거절된 기록으로 남지 않는다(다음 상태 맞추기에서 별도의 확인으로 그린다).
+async function testFailedWaitKeepsOthers(opt) {
+    const c = checker();
+    const compatKeys = ['eon_auth_v1:compat', 'iontoefl_user', 'iontoefl_login_time'];
+    // 다른 탭이 B 로 로그인해 확인까지 끝낸 것처럼: 저장된 로그인·호환 값·표식을 B 의 것으로(이 탭에는 알림이 오지 않는다)
+    const switchToB = (w) => {
+        const sB = w.seed('B');
+        const user = JSON.stringify({ id: 'm-B', name: '다른 탭이 쓴 B', nickname: '', email: ACCOUNTS.B.email, phone: null, role: 'user' });
+        const values = { 'eon_auth_v1:compat': JSON.stringify({ v: 1, sid: sB.sid, sub: 'auth-B', user, time: '1795500000001' }), iontoefl_user: user, iontoefl_login_time: '1795500000001' };
+        for (const [k, v] of Object.entries(values)) w.browser.local.set(k, v);
+        return { sB, values, raw: w.browser.local.get('eon_auth_v1') };
+    };
+    const kept = (w, b) => Object.entries(b.values).every(([k, v]) => w.browser.local.get(k) === v) && w.browser.local.get('eon_auth_v1') === b.raw;
+    const expire = (w) => { const s = JSON.parse(w.browser.local.get('eon_auth_v1')); s.expires_at = Math.floor(w.browser.now / 1000) - 60; w.browser.local.set('eon_auth_v1', JSON.stringify(s)); };
+    const subsSince = (w, mark) => w.browser.requests.slice(mark).filter((r) => r.url === PROFILE_URL || r.url === ACCESS_URL).map((r) => (readFakeJwt(bearerOf(r)) || {}).sub);
+    const noName = (page) => (st(page) === 'signed_in' ? page.evaluate('EonAuth.profile().id') === 'm-B' : page.evaluate('EonAuth.displayUserRaw()') === null);
+
+    // (1) SDK 를 쓸 수 없음: SDK 파일을 받는 사이
+    for (const swap of [true, false]) {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const label = `SDK 를 쓸 수 없음(${swap ? '기다리는 사이 B 로 바뀜' : '그대로'})`;
+        c.ok(compatKeys.every((k) => w.browser.local.has(k)), `${label}: 시험이 호환 값이 있는 상태를 만들지 못함`);
+        let b = null;
+        const sent = w.server.log.length;
+        const page = await w.open('index', 'index.html', {
+            beforeLoad: (p) => {
+                const orig = p.files;
+                p.files = (f) => { if (f !== SDK_FILE) return orig(f); if (swap && !b) b = switchToB(w); return null; };
+            },
+        });
+        await w.browser.advance(5 * 1000);
+        c.ok(st(page) === 'signed_out' && why(page) === 'unavailable', `${label}: signed_out·unavailable 가 아님(${st(page)}·${why(page)})`);
+        c.ok(page.evaluate('EonAuth.displayUserRaw()') === null && !menuHistory(page).some((e) => /합성|다른 탭/.test(e.html)), `${label}: 표시를 내줌`);
+        c.ok(w.routes().slice(sent).filter((r) => r.includes('/auth/v1/') || r.includes('/rpc/my_')).length === 0, `${label}: 인증 요청을 보냄`);
+        if (swap) {
+            c.ok(!!b, `${label}: 시험이 로그인을 바꾸지 못함`);
+            c.ok(!!b && kept(w, b), `${label}: 다른 계정(B)의 호환 값·표식을 지우거나 바꿈`);
+        } else {
+            c.ok(compatKeys.every((k) => !w.browser.local.has(k)) && w.browser.local.has('eon_auth_v1'), `${label}: 시작할 때의 그 기록으로 만든 호환 값이 남음(또는 저장된 로그인을 지움)`);
+        }
+        audit(w, c, label);
+    }
+
+    // (2) 복원에서 저장된 로그인을 읽지 못함 / (3) 다시 확인(recheck): 갱신의 답을 기다리는 사이
+    for (const path of ['복원에서 저장된 로그인을 읽지 못함', '다시 확인(recheck)']) {
+        for (const swap of [true, false]) {
+            if (!swap && path !== '다시 확인(recheck)') continue;      // 복원의 "그대로"는 "복원 오류" 시험이 본다
+            const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+            const login = await loginAs(w, 'A');
+            login.close();
+            const label = `${path}(${swap ? '기다리는 사이 B 로 바뀜' : '그대로'})`;
+            let page = null;
+            if (path === '다시 확인(recheck)') {
+                page = await w.open('index', 'index.html');
+                c.ok(st(page) === 'signed_in', `${label}: 시험이 확인된 상태를 만들지 못함(${st(page)})`);
+            }
+            expire(w);
+            let b = null;
+            let atVerify = null;        // B 의 확인이 시작될 때 B 의 값이 글자 그대로였는가
+            w.server.faults.token = (req, u) => {
+                if (u.searchParams.get('grant_type') !== 'refresh_token') return null;
+                if (swap && !b) b = switchToB(w);
+                return 'network';
+            };
+            w.server.faults.my_profile = () => { if (b && atVerify === null) atVerify = kept(w, b); return null; };
+            const mark = w.browser.requests.length;
+            if (page) page.evaluate('EonAuth.recheck()');
+            else page = await w.open('index', 'index.html', { noIdle: true });
+            await w.browser.advance(90 * 1000);
+            c.ok(w.count(R.refresh) === 1, `${label}: 갱신이 한 번이 아님(${w.count(R.refresh)}번)`);
+            c.ok(w.count(R.logout) === 0, `${label}: 종료 요청을 보냄`);
+            c.ok(!menuHistory(page).slice(-1).some((e) => /합성 회원 A/.test(e.html)), `${label}: A 의 이름이 남음`);
+            if (swap) {
+                const subs = subsSince(w, mark);
+                c.ok(!!b, `${label}: 시험이 로그인을 바꾸지 못함`);
+                c.ok(!!b && !(atVerify === false || (atVerify === null && !kept(w, b))), `${label}: 다른 계정(B)의 호환 값·표식을 지우거나 바꿈`);
+                c.ok(JSON.stringify(subs) === JSON.stringify(['auth-B', 'auth-B']) && st(page) === 'signed_in' && page.evaluate('EonAuth.profile().id') === 'm-B',
+                    `${label}: B 가 거절된 기록으로 남음 — 별도의 확인(두 요청)으로 그리지 않음(${subs.join(',')}·${st(page)}·${why(page)})`);
+                c.ok(!!b && b.sB.alive && b.sB.prevRefresh === null, `${label}: B 의 로그인 기록이 달라짐`);
+            } else {
+                c.ok(st(page) === 'rejected' && why(page) === 'network' && page.evaluate('EonAuth.profile()') === null, `${label}: rejected·network 가 아님(${st(page)}·${why(page)})`);
+                c.ok(compatKeys.every((k) => !w.browser.local.has(k)) && w.browser.local.has('eon_auth_v1'), `${label}: 시작할 때의 그 기록으로 만든 호환 값이 남음(또는 저장된 로그인을 지움)`);
+                c.ok(subsSince(w, mark).length === 0, `${label}: 결과를 모르는데 확인 요청을 보냄`);
+            }
+            c.ok(noName(page), `${label}: A 의 표시를 내줌`);
+            audit(w, c, label);
+        }
+    }
+    return c.problems;
+}
+
 // 알림(갱신·저장소 변화)이 올 때마다 공식 클라이언트에 물어 갱신을 일으키지 않는다 — 기기의 시계가 앞서 있어도 갱신이 되풀이되지 않게
 async function testNoRefreshLoop(opt) {
     const c = checker();
@@ -1198,6 +1293,7 @@ const ON_TESTS = [
     ['로그아웃(결과를 봄 — 모름이면 확인 상태를 거둠)과 재로그인', testLogout],
     ['저장된 로그인 값을 읽을 수 없게 됨', testUnreadableStored],
     ['확인을 거둘 때 다른 계정의 호환 값을 지우지 않음', testWithdrawKeepsOthers],
+    ['기다린 일이 실패했을 때 시작할 때의 기록으로만 정리(그 사이 바뀐 계정의 값은 그대로)', testFailedWaitKeepsOthers],
     ['옛 방식의 로그인 상태가 있는 브라우저', testLegacyPresent],
     ['저장소 상태 다섯 × 켜짐', testFiveStatesOn],
     ['자격을 싣는 조건·연결점·리디렉션', testCredentialRules],
@@ -1347,7 +1443,7 @@ const MUTANTS = [
     },
     {
         name: '복원이 오류로 끝난 길에 호환 값을 남김', tests: [testExpiry], expect: /복원 오류\([^)]*\): 새 모듈이 만든 호환 값이 남음/,
-        edits: [[AUTH_FILE, "            clearCompat(held && held.claims ? held.claims.sid : null, true);     // 이 탭이 복원하려던 그 기록으로 만든 값만\n", '']],
+        edits: [[AUTH_FILE, "        clearCompat(began.sid, true);\n        return true;", '        return true;']],
     },
     {
         name: '상태를 맞출 때마다 공식 클라이언트에 물어 갱신을 일으킴', tests: [testNoRefreshLoop], expect: /갱신 되풀이: 알림마다 갱신 요청이 나감/,
@@ -1394,6 +1490,30 @@ const MUTANTS = [
     {
         name: '주인 없는 값(저장된 로그인이 없음을 확인)도 정리하지 않음', tests: [testWithdrawKeepsOthers], expect: /저장된 로그인이 없는 화면: 주인 없는/,
         edits: [[AUTH_FILE, "            const stale = slot.stored === 'absent' || (slot.stored === 'ok' && slot.mark.sid !== slot.storedSid);", '            const stale = false;']],
+    },
+    {
+        name: '실패한 뒤 다시 읽은 기록으로 정리(SDK 를 쓸 수 없는 길)', tests: [testFailedWaitKeepsOthers], expect: /SDK 를 쓸 수 없음\(기다리는 사이 B 로 바뀜\): 다른 계정\(B\)의 호환 값·표식을 지우거나 바꿈/,
+        edits: [[AUTH_FILE, '            cleanAfterFailedWait(beganLoad);       // 확인할 수 없다', '            cleanAfterFailedWait(heldClaims());       // 확인할 수 없다']],
+    },
+    {
+        name: '실패한 뒤 다시 읽은 기록으로 정리(복원에서 읽지 못한 길)', tests: [testFailedWaitKeepsOthers], expect: /복원에서 저장된 로그인을 읽지 못함\(기다리는 사이 B 로 바뀜\): 다른 계정\(B\)의 호환 값·표식을 지우거나 바꿈/,
+        edits: [[AUTH_FILE, 'if (cur.error) { failedRead(beganRead); return; }', 'if (cur.error) { failedRead(heldClaims()); return; }']],
+    },
+    {
+        name: '기다린 뒤에 기록을 잡음(복원에서 읽지 못한 길)', tests: [testFailedWaitKeepsOthers], expect: /복원에서 저장된 로그인을 읽지 못함\(기다리는 사이 B 로 바뀜\): (다른 계정\(B\)의 호환 값·표식을 지우거나 바꿈|B 가 거절된 기록으로 남음)/,
+        edits: [[AUTH_FILE, "        const beganRead = heldClaims();            // 기다리기 전에: 이 탭이 복원하려던 기록\n        const cur = await readSession();", "        const cur = await readSession();\n        const beganRead = heldClaims();"]],
+    },
+    {
+        name: '실패한 뒤 다시 읽은 기록으로 정리(다시 확인의 길)', tests: [testFailedWaitKeepsOthers], expect: /다시 확인\(recheck\)\(기다리는 사이 B 로 바뀜\): 다른 계정\(B\)의 호환 값·표식을 지우거나 바꿈/,
+        edits: [[AUTH_FILE, 'if (cur.error) { failedRead(began); return state; }', 'if (cur.error) { failedRead(heldClaims()); return state; }']],
+    },
+    {
+        name: '실패한 뒤 다시 읽은 기록을 거절된 기록으로 남김', tests: [testFailedWaitKeepsOthers], expect: /B 가 거절된 기록으로 남음/,
+        edits: [[AUTH_FILE, "        lastRejected = null;\n        const now = heldClaims();", "        lastRejected = heldClaims();\n        const now = heldClaims();"]],
+    },
+    {
+        name: '기다린 일이 실패해도 시작할 때의 기록으로 만든 값을 정리하지 않음(SDK·다시 확인)', tests: [testFailedWaitKeepsOthers], expect: /\(그대로\): 시작할 때의 그 기록으로 만든 호환 값이 남음/,
+        edits: [[AUTH_FILE, "        clearCompat(began.sid, true);\n        return true;", '        return true;']],
     },
     {
         name: '전역 로그아웃', tests: [testLogout], expect: /이 로그인만 끝내는 것이 아님/,
