@@ -16,7 +16,9 @@
 --       body_md5         본문(prosrc)에서 줄 끝의 CR 을 뺀 글자의 md5 — 되돌리기 SQL 이 견주는 값과 같은 계산
 --       language · returns · volatility(v = volatile) · security_definer · config · owner · acl
 --       execute          실행 권한(역할 넷): public · anon · authenticated · service_role
---   my_profile           3-0 의 public.my_profile(): named_count · exists · def_md5 · acl · execute — 이 계약 앞뒤로 같아야 한다
+--   my_profile           3-0 의 public.my_profile(): named_count · exists · def_md5 · body_md5 · acl · execute — 이 계약 앞뒤로 같아야 한다.
+--                        **시작 기준은 3-0 의 끝 상태다**: exists true · body_md5 ea1fd98d18ba93cb4944e7a00c86bc7c · 실행 권한은 authenticated 뿐
+--                        (도구의 start-check 단계가 본다)
 --   public_functions     public 의 함수 전체에서 위 다섯을 뺀 것(my_profile 포함): n, fp(이름·인자·정의 md5·권한 목록의 지문)
 --   private_functions    security_private 의 함수: n, fp(같은 계산)
 --   check_api_request    공통 확인 함수: body_md5, mentions(다섯 이름 가운데 본문에 나오는 것 — [] 여야 한다)
@@ -57,7 +59,7 @@ routines as (
      and p.prokind = 'f'
 ),
 prof as (
-  select p.oid, p.proacl
+  select p.oid, p.proacl, p.prosrc
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'my_profile' and p.pronargs = 0
@@ -106,6 +108,7 @@ select pg_catalog.jsonb_build_object(
                      where n.nspname = 'public' and p.proname = 'my_profile'),
     'exists', exists (select 1 from prof),
     'def_md5', (select pg_catalog.md5(pg_catalog.pg_get_functiondef(prof.oid)) from prof),
+    'body_md5', (select pg_catalog.md5(pg_catalog.replace(prof.prosrc, pg_catalog.chr(13), '')) from prof),
     'acl', (select prof.proacl::pg_catalog.text from prof),
     'execute', (select pg_catalog.jsonb_build_object(
                          'public', pg_catalog.has_function_privilege('public'::pg_catalog.name, prof.oid, 'EXECUTE'),

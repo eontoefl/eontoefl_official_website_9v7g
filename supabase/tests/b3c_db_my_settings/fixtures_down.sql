@@ -1,6 +1,7 @@
 -- =====================================================================
 -- 보안작업 묶음 2 — 계약 3C-DB 합성 회원 자료 내리기 (시험 프로젝트 hmncdheiwqwekdbtijar 전용)
--- (3-0 의 같은 이름 파일(6dad1f1)을 옮긴 것이다. 바꾼 것: 표식 zzb3p0 → zzb3c, 설정 이름 b3_0.* → b3c.*, 점검 번호 301 → 311, 도구 이름. 로직은 그대로다)
+-- (3-0 의 같은 이름 파일(6dad1f1)을 옮긴 것이다. 바꾼 것: 표식 zzb3p0 → zzb3c, 설정 이름 b3_0.* → b3c.*, 도구 이름.
+--  2차에서 더한 것: 넘겨받은 로그인 계정 여덟의 "계정 번호 + 로그인 이메일 + 합성 표식" 대조 — 아래 2-가 · 3-가)
 --
 -- ★★★ 운영 경고 ★★★
 --   시험 프로젝트 전용이다. 실행 직전에 SQL 통로가 가리키는 프로젝트의 ref 가 hmncdheiwqwekdbtijar 인지 다시 확인한다.
@@ -11,7 +12,8 @@
 --   같은 요청에서 넘겨받은 정확한 값(fixtures_up.sql 의 마지막 결과 down_input)과 일치하는 행만 지운다.
 --     set b3c.test_project_ref = 'hmncdheiwqwekdbtijar';
 --     set b3c.created = '<expect.json 의 down_input 글자 그대로>';
---   그 값의 모양: {"users":[{"id":…,"email":…} ×7], "mappings":[{"auth_user_id":…,"member_id":…} ×6], "admins":[계정 번호 ×2]}
+--   그 값의 모양: {"users":[{"id":…,"email":…} ×7], "mappings":[{"auth_user_id":…,"member_id":…} ×6], "admins":[계정 번호 ×2],
+--                  "accounts":[{"label":…,"auth_user_id":…,"email":…} ×8]}
 --   * public.users                      회원번호와 전체 이메일이 둘 다 같은 행 — 정확히 7행
 --   * security_private.member_identity  계정 번호와 회원번호가 둘 다 같은 행 — 정확히 6행
 --   * security_private.admin_principal  계정 번호가 같은 행 — 정확히 2행
@@ -23,7 +25,11 @@
 --   1. 점검 상태가 normal 이고 공통 확인 설정(pgrst.db_pre_request)이 걸려 있지 않다(원복을 먼저 한다)
 --   2. 넘겨받은 값의 모양: 수가 정확히 7·6·2, 번호가 uuid 모양, 이메일이 이 시험의 일곱 이메일 중 하나이고 서로 다름,
 --      대응의 회원번호가 전부 넘겨받은 회원 행의 번호
+--   2-가. 넘겨받은 로그인 계정 여덟(accounts): 번호가 uuid 모양이고 서로 다름, 이메일에 합성 표식 zzb3c 가 있음.
+--      **대응 6건의 계정 번호와 명부 2건의 계정 번호가 전부 이 여덟 안에 있다**
 --   3. 넘겨받은 목록의 행이 **지금 그 값 그대로 전부 있다**(회원 행 7 · 대응 6 · 명부 2)
+--   3-가. **로그인 계정 여덟이 지금 auth.users 에 그 계정 번호 · 그 이메일로 전부 있다**(대소문자만 무시).
+--      하나라도 다르면(계정이 없거나 이메일이 다르면) 명부·대응을 지우지 않는다 — 이번에 만든 계정의 행임을 확인하지 못한 것이다
 --   4. 넘겨받은 계정·회원에 이 목록 밖의 대응 행이 없다, 그 계정의 점검 예외 행이 남아 있지 않다
 -- 지운 뒤: 지워진 수가 정확히 7·6·2 가 아니면 전체가 되돌아간다.
 --
@@ -80,6 +86,22 @@ begin
      or pg_catalog.jsonb_array_length(v_j -> 'admins') <> 2 then
     raise exception 'zzb3c 내리기 중단: b3c.created 의 모양이 users 7 · mappings 6 · admins 2 가 아니다. 아무것도 바꾸지 않았다';
   end if;
+  -- 2-가. 로그인 계정 여덟
+  if pg_catalog.jsonb_typeof(v_j -> 'accounts') is distinct from 'array'
+     or pg_catalog.jsonb_array_length(v_j -> 'accounts') <> 8 then
+    raise exception 'zzb3c 내리기 중단: b3c.created 에 accounts 8(로그인 계정의 번호와 이메일)이 없다(fixtures_up.sql 2차 판의 결과여야 한다). 아무것도 바꾸지 않았다';
+  end if;
+  select pg_catalog.count(*) into v_n
+    from pg_catalog.jsonb_array_elements(v_j -> 'accounts') as e(x)
+   where coalesce(e.x ->> 'auth_user_id', '') !~ v_uuid
+      or pg_catalog.strpos(pg_catalog.lower(coalesce(e.x ->> 'email', '')), 'zzb3c') = 0;
+  if v_n <> 0 then
+    raise exception 'zzb3c 내리기 중단: b3c.created 의 accounts 에 계정 번호 모양이 아니거나 이메일에 합성 표식 zzb3c 가 없는 것이 %개 있다. 아무것도 바꾸지 않았다', v_n;
+  end if;
+  select pg_catalog.count(distinct pg_catalog.lower(e.x ->> 'auth_user_id')) into v_n from pg_catalog.jsonb_array_elements(v_j -> 'accounts') as e(x);
+  if v_n <> 8 then
+    raise exception 'zzb3c 내리기 중단: b3c.created 의 accounts 의 계정 번호가 서로 다른 여덟 개가 아니다. 아무것도 바꾸지 않았다';
+  end if;
   select pg_catalog.count(*) into v_n
     from pg_catalog.jsonb_array_elements(v_j -> 'users') as e(x)
    where coalesce(e.x ->> 'id', '') !~ v_uuid or not (coalesce(e.x ->> 'email', '') = any (v_emails));
@@ -103,6 +125,27 @@ begin
    where e.x !~ v_uuid;
   if v_n <> 0 then
     raise exception 'zzb3c 내리기 중단: b3c.created 의 admins 에 계정 번호 모양이 아닌 것이 있다. 아무것도 바꾸지 않았다';
+  end if;
+  -- 대응 · 명부의 계정 번호가 전부 넘겨받은 로그인 계정 여덟 안에 있는가
+  select pg_catalog.count(*) into v_n
+    from (
+      select pg_catalog.lower(e.x ->> 'auth_user_id') as acct from pg_catalog.jsonb_array_elements(v_j -> 'mappings') as e(x)
+      union all
+      select pg_catalog.lower(e.x) from pg_catalog.jsonb_array_elements_text(v_j -> 'admins') as e(x)
+    ) as t
+   where not exists (select 1 from pg_catalog.jsonb_array_elements(v_j -> 'accounts') as a(x) where pg_catalog.lower(a.x ->> 'auth_user_id') = t.acct);
+  if v_n <> 0 then
+    raise exception 'zzb3c 내리기 중단: b3c.created 의 대응 · 명부에 넘겨받은 로그인 계정 여덟에 없는 계정 번호가 %개 있다. 아무것도 바꾸지 않았다', v_n;
+  end if;
+
+  -- 3-가. 로그인 계정 여덟이 지금 auth.users 에 그 계정 번호 · 그 이메일로 전부 있는가(이번에 만든 합성 계정인가)
+  select pg_catalog.count(*) into v_n
+    from auth.users au
+    join pg_catalog.jsonb_array_elements(v_j -> 'accounts') as e(x)
+      on au.id = (e.x ->> 'auth_user_id')::pg_catalog.uuid
+     and pg_catalog.lower(au.email) = pg_catalog.lower(e.x ->> 'email');
+  if v_n <> 8 then
+    raise exception 'zzb3c 내리기 중단: 넘겨받은 로그인 계정 여덟이 지금 그 계정 번호 · 그 이메일로 있지 않다(%/8). 이번에 만든 계정의 행임을 확인하지 못했다 — 아무것도 지우지 않았다', v_n;
   end if;
 
   -- 3. 넘겨받은 목록의 행이 지금 그 값 그대로 전부 있는가

@@ -9,13 +9,18 @@
 --
 -- 이 파일은 작업방이 실행해 보지 않았다(문법 확인도 하지 못했다). 순서와 기대 결과는 절차.md 를 따른다.
 --
--- 받는 값(같은 요청의 맨 앞에서 정한다). 계정은 이메일의 이름으로 찾지 않는다 — 브레인방이 로그인 서버로 만든
--- 합성 로그인 계정 8개의 **정확한 계정 번호**를 넘긴다.
+-- 받는 값(같은 요청의 맨 앞에서 정한다). 브레인방이 로그인 서버로 만든 합성 로그인 계정 8개의
+-- **정확한 계정 번호와, 만들 때 받은 로그인 이메일(auth.users.email)을 함께** 넘긴다(2차).
+-- (node settings_matrix.mjs --phase set-lines --for fixtures-up --accounts accounts.json 이 그 17줄을 만들어 준다)
 --     set b3c.test_project_ref = 'hmncdheiwqwekdbtijar';
---     set b3c.acct_a   = '<계정 번호>';     set b3c.acct_b   = '<계정 번호>';
---     set b3c.acct_n   = '<계정 번호>';     set b3c.acct_g   = '<계정 번호>';
---     set b3c.acct_gm  = '<계정 번호>';     set b3c.acct_blk = '<계정 번호>';
---     set b3c.acct_wd  = '<계정 번호>';     set b3c.acct_bw  = '<계정 번호>';
+--     set b3c.acct_a   = '<계정 번호>';     set b3c.acct_a_email   = '<로그인 이메일>';
+--     … b · n · g · gm · blk · wd · bw 도 같은 두 줄씩
+-- "이번에 만든 합성 계정인가"의 확인(하나라도 다르면 아무것도 쓰기 전에 전체를 멈춘다):
+--   * 여덟 계정 번호가 서로 다르고 로그인 계정에 있다
+--   * auth.users 에서 그 계정 번호의 이메일이 넘겨받은 이메일과 같다(대소문자만 무시)
+--   * 그 이메일에 합성 표식 zzb3c 가 들어 있다(이름 부분이든 도메인이든 — 예: zzb3c_a_<무작위>@…)
+--   * 여덟 이메일이 서로 다르다
+-- 관리자 명부에 넣는 g · gm 도 이 확인을 지난 계정 번호다.
 --
 -- 만드는 것
 --   public.users 7행(전체 이메일이 zzb3c_<이름>@member.zzb3c.invalid. 회원번호는 새로 만든 값 — 함정 행만 예외)
@@ -36,9 +41,13 @@
 -- 덮어쓰지 않는다: 위 일곱 이메일의 회원 행, 넘겨받은 여덟 계정의 대응·명부 행이 하나라도 있으면 멈춘다.
 --
 -- 마지막 결과(한 칸 jsonb): 만든 것의 정확한 값. expect.json 으로 저장한다.
---   accounts · trap   도구(settings_matrix.mjs --expect)가 쓴다. 회원마다 member(여섯 값 — 이 함수들의 응답에 나오면 안 되는 값)와
---                     settings(설정 열 넷의 처음 값)
+--   accounts · trap   도구(settings_matrix.mjs --expect)가 쓴다. 계정마다 auth_email(로그인 이메일), 회원마다 member(여섯 값 —
+--                     이 함수들의 응답에 나오면 안 되는 값)와 settings(설정 열 넷의 처음 값)
+--                     **회원 표 비밀번호 열의 원문은 내보내지 않는다**(합성 값이라도 옛 길의 비밀번호 열 원문이다).
+--                     password_column = { prefix(고정 접두사 zzb3c-pwcol-) · has_prefix · sha256(그 값의 sha256 16진 글자) } 만 싣는다.
+--                     도구는 응답 글자에서 접두사를 찾고, 응답의 글자 값 하나하나의 sha256 을 이 값과 견준다
 --   created           만든 행의 정확한 값: users[{id,email}] 7 · mappings[{auth_user_id,member_id}] 6 · admins[auth_user_id] 2
+--                     · accounts[{label,auth_user_id,email}] 8(넘겨받은 로그인 계정 — 내릴 때 같은 대조를 한다)
 --   down_input        created 를 한 줄 글자로 쓴 것 — fixtures_down.sql · fixtures_reset.sql · answers_variant.sql 에 그대로 넘긴다
 -- 설정 열을 처음 값으로 되돌리기: fixtures_reset.sql (이 파일과 같은 값을 쓴다 — 한쪽을 고치면 다른 쪽도 고친다)
 -- 내리기: fixtures_down.sql
@@ -51,7 +60,9 @@ declare
   v_labels constant text[] := array['a', 'b', 'n', 'g', 'gm', 'blk', 'wd', 'bw'];
   v_label  text;
   v_raw    text;
+  v_email  text;
   v_ids    pg_catalog.uuid[] := '{}';
+  v_emails text[] := '{}';
   v_n      bigint;
 begin
   if coalesce(pg_catalog.current_setting('b3c.test_project_ref', true), '') <> 'hmncdheiwqwekdbtijar' then
@@ -69,7 +80,9 @@ begin
     raise exception 'zzb3c 합성 자료 중단: 2-가(b2a_identity_gate)가 적용돼 있지 않다';
   end if;
 
-  -- 넘겨받은 계정 번호 여덟 개: 모양, 서로 다름, 로그인 계정으로 있음
+  -- 넘겨받은 계정 번호 여덟 개: 모양, 서로 다름, 로그인 계정으로 있음.
+  -- 그리고 "이번에 만든 합성 계정인가": 그 계정 번호의 로그인 이메일이 넘겨받은 이메일과 같고 합성 표식 zzb3c 를 가졌다.
+  -- (이 블록이 끝날 때까지 아무것도 쓰지 않는다 — 하나라도 다르면 여기서 전체가 멈춘다)
   foreach v_label in array v_labels loop
     v_raw := coalesce(pg_catalog.current_setting('b3c.acct_' || v_label, true), '');
     if v_raw !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
@@ -82,7 +95,25 @@ begin
     if v_n <> 1 then
       raise exception 'zzb3c 합성 자료 중단: b3c.acct_% 의 계정 번호가 로그인 계정에 없다. 아무것도 바꾸지 않았다', v_label;
     end if;
+    v_email := pg_catalog.lower(coalesce(pg_catalog.current_setting('b3c.acct_' || v_label || '_email', true), ''));
+    if v_email = '' or pg_catalog.strpos(v_email, '@') < 2 or pg_catalog.char_length(v_email) > 320 then
+      raise exception 'zzb3c 합성 자료 중단: b3c.acct_%_email 에 로그인 이메일이 없다(계정을 만들 때 받은 이메일을 함께 넘길 것). 아무것도 바꾸지 않았다', v_label;
+    end if;
+    if pg_catalog.strpos(v_email, 'zzb3c') = 0 then
+      raise exception 'zzb3c 합성 자료 중단: b3c.acct_%_email 에 합성 표식 zzb3c 가 없다 — 이 시험이 만든 합성 계정이 아닐 수 있다. 아무것도 바꾸지 않았다', v_label;
+    end if;
+    if v_email = any (v_emails) then
+      raise exception 'zzb3c 합성 자료 중단: b3c.acct_%_email 이 다른 계정의 이메일과 같다. 아무것도 바꾸지 않았다', v_label;
+    end if;
+    select pg_catalog.count(*) into v_n
+      from auth.users au
+     where au.id = v_raw::pg_catalog.uuid
+       and pg_catalog.lower(au.email) = v_email;
+    if v_n <> 1 then
+      raise exception 'zzb3c 합성 자료 중단: b3c.acct_% 의 계정 번호의 로그인 이메일이 넘겨받은 이메일과 다르다 — 이번에 만든 계정이 아니다. 아무것도 바꾸지 않았다', v_label;
+    end if;
     v_ids := pg_catalog.array_append(v_ids, v_raw::pg_catalog.uuid);
+    v_emails := pg_catalog.array_append(v_emails, v_email);
   end loop;
 
   -- 덮어쓰지 않는다
@@ -240,7 +271,7 @@ commit;
 
 reset b3c.test_project_ref;
 
--- 만든 것의 정확한 값(expect.json). password_column_marker 는 옛 비밀번호 열의 합성 표식이다(로그인 비밀번호가 아니다).
+-- 만든 것의 정확한 값(expect.json). 회원 표 비밀번호 열의 원문은 싣지 않는다 — 접두사가 있다는 사실과 sha256 만(password_column).
 with acct(label, auth_id) as (
   values
     ('a'::pg_catalog.text, pg_catalog.current_setting('b3c.acct_a')::pg_catalog.uuid),
@@ -270,6 +301,11 @@ made as (
       select pg_catalog.jsonb_agg(ap.auth_user_id order by ap.auth_user_id)
         from security_private.admin_principal ap
        where ap.auth_user_id in (select a.auth_id from acct a where a.label in ('g', 'gm'))
+    ),
+    'accounts', (
+      select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('label', a.label, 'auth_user_id', a.auth_id, 'email', au.email) order by a.label)
+        from acct a
+        join auth.users au on au.id = a.auth_id
     )
   ) as j
 )
@@ -280,7 +316,10 @@ select pg_catalog.jsonb_build_object(
     select pg_catalog.jsonb_build_object(
              'meaning', '회원번호가 계정 n 의 로그인 계정 번호와 같은 회원 행(대응 없음). 어느 응답에도 나오면 안 되고, 어느 요청으로도 고쳐지면 안 된다',
              'id', u.id, 'name', u.name, 'nickname', u.nickname, 'email', u.email, 'phone', u.phone,
-             'password_column_marker', u.password,
+             'password_column', pg_catalog.jsonb_build_object(
+               'prefix', 'zzb3c-pwcol-',
+               'has_prefix', pg_catalog.strpos(u.password, 'zzb3c-pwcol-') = 1,
+               'sha256', pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(u.password, 'UTF8')), 'hex')),
              'settings', pg_catalog.jsonb_build_object(
                'intro_book_track', u.intro_book_track, 'marketing_consent', u.marketing_consent,
                'marketing_consent_at', u.marketing_consent_at, 'pending_book_request', u.pending_book_request))
@@ -292,6 +331,7 @@ select pg_catalog.jsonb_build_object(
              a.label,
              pg_catalog.jsonb_build_object(
                'auth_user_id', a.auth_id,
+               'auth_email', (select au.email from auth.users au where au.id = a.auth_id),
                'listed_admin', exists (select 1 from security_private.admin_principal ap where ap.auth_user_id = a.auth_id and ap.enabled),
                'member', case when u.id is null then null else pg_catalog.jsonb_build_object(
                            'id', u.id, 'name', u.name, 'nickname', u.nickname,
@@ -304,7 +344,10 @@ select pg_catalog.jsonb_build_object(
                                    when u.blocked is true then 'blocked'
                                    when u.withdrawal_requested_at is not null then 'withdrawal_pending'
                                    else 'ok' end,
-               'password_column_marker', u.password,
+               'password_column', case when u.id is null then null else pg_catalog.jsonb_build_object(
+                           'prefix', 'zzb3c-pwcol-',
+                           'has_prefix', pg_catalog.strpos(u.password, 'zzb3c-pwcol-') = 1,
+                           'sha256', pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(u.password, 'UTF8')), 'hex')) end,
                'withdrawal_markers', case when u.id is null then null
                                           else pg_catalog.jsonb_build_array(u.withdrawal_reason, u.withdrawal_reason_detail) end
              ))

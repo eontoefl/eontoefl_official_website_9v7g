@@ -1,6 +1,7 @@
 -- =====================================================================
 -- 보안작업 묶음 2 — 계약 3C-DB 시험: 점검 켜기 (시험 프로젝트 hmncdheiwqwekdbtijar 전용)
--- (3-0 의 같은 이름 파일(6dad1f1)을 옮긴 것이다. 바꾼 것: 표식 zzb3p0 → zzb3c, 설정 이름 b3_0.* → b3c.*, 점검 번호 301 → 311, 도구 이름. 로직은 그대로다)
+-- (3-0 의 같은 이름 파일(6dad1f1)을 옮긴 것이다. 바꾼 것: 표식 zzb3p0 → zzb3c, 설정 이름 b3_0.* → b3c.*, 점검 번호 301 → 311, 도구 이름.
+--  2차에서 더한 것: 예외 명단에 넣을 A 의 계정이 "이번에 만든 합성 계정인가"를 계정 번호 + 로그인 이메일 + 합성 표식으로 확인 — 아래 3)
 --
 -- ★★★ 운영 경고 ★★★  운영에서 실행하지 않는다(사이트가 점검 상태가 된다).
 --   실행 직전에 SQL 통로가 가리키는 프로젝트의 ref 가 hmncdheiwqwekdbtijar 인지 직접 확인한다.
@@ -10,6 +11,7 @@
 -- 받는 값(같은 요청의 맨 앞. node settings_matrix.mjs --phase set-lines --for maint-on 이 만들어 준다)
 --     set b3c.test_project_ref = 'hmncdheiwqwekdbtijar';
 --     set b3c.acct_a = '<회원 A 의 정확한 계정 번호>';
+--     set b3c.acct_a_email = '<회원 A 의 로그인 이메일 — expect.json 의 accounts.a.auth_email>';
 --     set b3c.saved_site_state = '<켜기 전에 뜬 state_snapshot.sql 의 site_state_row 를 글자 그대로>';   -- 시작 행 전체
 -- 하는 일(한 트랜잭션)
 --   security_private.site_state (id = 1)        phase 'maintenance' · maintenance_id 311 · message 'zzb3c 시험 점검' · updated_at 지금
@@ -23,7 +25,8 @@
 --   0. 대상 확인 값, 계정 번호의 모양
 --   1. 넘겨받은 시작 행이 JSON 이고, 그 키가 지금 site_state 의 열 여덟 개와 정확히 같으며, id 가 1 이고 phase 가 'normal' 이다
 --   2. 점검 번호 311 의 예외 행이 하나도 없다
---   3. A 의 계정 번호가 로그인 계정에 있다
+--   3. A 의 계정 번호가 로그인 계정에 있고, **그 계정의 로그인 이메일이 넘겨받은 이메일과 같으며(대소문자만 무시)
+--      합성 표식 zzb3c 를 가졌다** — 이번에 만든 합성 계정일 때만 예외 명단에 넣는다
 -- 원복: maint_off.sql — **이 파일의 마지막 결과(켠 직후의 행 전체)를 저장해 그대로 넘긴다.**
 -- 마지막 결과(한 칸 jsonb): site_state_row = 켠 직후의 행 전체(maint-on.json 으로 저장한다), 311 의 예외 행
 -- =====================================================================
@@ -35,6 +38,7 @@ declare
   v_cols     constant text[] := array['id', 'last_ended_at', 'last_ended_maintenance_id', 'maintenance_id', 'message', 'phase', 'starts_at', 'updated_at'];
   v_acct_raw text := coalesce(pg_catalog.current_setting('b3c.acct_a', true), '');
   v_raw      text := coalesce(pg_catalog.current_setting('b3c.saved_site_state', true), '');
+  v_email    text := pg_catalog.lower(coalesce(pg_catalog.current_setting('b3c.acct_a_email', true), ''));
   v_acct     pg_catalog.uuid;
   v_j        pg_catalog.jsonb;
   v_keys     text[];
@@ -49,6 +53,9 @@ begin
     raise exception 'zzb3c 점검 켜기 중단: b3c.acct_a 에 회원 A 의 계정 번호가 없다. 아무것도 바꾸지 않았다';
   end if;
   v_acct := v_acct_raw::pg_catalog.uuid;
+  if v_email = '' or pg_catalog.strpos(v_email, 'zzb3c') = 0 then
+    raise exception 'zzb3c 점검 켜기 중단: b3c.acct_a_email 에 회원 A 의 로그인 이메일이 없거나 합성 표식 zzb3c 가 없다. 아무것도 바꾸지 않았다';
+  end if;
 
   -- 1. 넘겨받은 시작 행
   if v_raw = '' then
@@ -88,9 +95,9 @@ begin
   if v_n <> 0 then
     raise exception 'zzb3c 점검 켜기 중단: 점검 번호 311 의 예외 행이 이미 %개 있다. 아무것도 바꾸지 않았다', v_n;
   end if;
-  select pg_catalog.count(*) into v_n from auth.users au where au.id = v_acct;
+  select pg_catalog.count(*) into v_n from auth.users au where au.id = v_acct and pg_catalog.lower(au.email) = v_email;
   if v_n <> 1 then
-    raise exception 'zzb3c 점검 켜기 중단: b3c.acct_a 의 계정 번호가 로그인 계정에 없다. 아무것도 바꾸지 않았다';
+    raise exception 'zzb3c 점검 켜기 중단: b3c.acct_a 의 계정 번호가 로그인 계정에 없거나, 그 계정의 로그인 이메일이 넘겨받은 이메일과 다르다 — 이번에 만든 합성 계정임을 확인하지 못했다. 아무것도 바꾸지 않았다';
   end if;
 
   -- 비교와 쓰기를 한 문장으로: 지금 행의 모든 열이 저장해 둔 시작 행과 같을 때만 바꾼다

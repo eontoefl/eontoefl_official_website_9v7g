@@ -9,10 +9,10 @@
 -- 왜: public.my_book_answers() 가 "보관 없음"(SQL NULL) · 파손 · 옛 형식을 섞지 않는지 보려면 그런 값이 저장돼 있어야 한다.
 --     함수(my_book_answers_hold)로는 그런 값을 넣을 수 없다(넣을 수 있으면 그것이 결함이다). 그래서 SQL 로 직접 넣는다.
 --
--- 받는 값(같은 요청의 맨 앞. node settings_matrix.mjs --phase set-lines --for answers-variant --expect expect.json --round <1~4> 가 만들어 준다)
+-- 받는 값(같은 요청의 맨 앞. node settings_matrix.mjs --phase set-lines --for answers-variant --expect expect.json --round <1~6> 이 만들어 준다)
 --     set b3c.test_project_ref = 'hmncdheiwqwekdbtijar';
 --     set b3c.created = '<expect.json 의 down_input 글자 그대로>';
---     set b3c.variant_round = '1';      -- 1 · 2 · 3 · 4
+--     set b3c.variant_round = '1';      -- 1 · 2 · 3 · 4 · 5 · 6
 --
 -- 고치는 것: 합성 회원 a · b · gm 세 행(회원번호와 전체 이메일이 둘 다 넘겨받은 값과 같은 행)의 pending_book_request **한 열만**.
 --   차수(round)마다 세 회원에게 넣는 모양(도구의 variants 단계가 같은 표로 기대값을 정한다 — 한쪽을 고치면 다른 쪽도 고친다):
@@ -21,6 +21,8 @@
 --     2      number                missing_key            wrong_type        → 셋 다 answers_corrupt
 --     3      required_null         answered_at_number     sql_null          → corrupt · corrupt · ok(answers null)
 --     4      extra_keys            no_answered_at         nullable_all_null → 셋 다 ok(열두 항목 + answered_at 만)
+--     5      utm_extra_key         utm_nested             utm_nonstring     → ok(utm 의 정해 둔 키만) · corrupt · corrupt        (2차)
+--     6      answered_at_not_time  answered_at_bad_date   answered_at_offset → corrupt · corrupt · ok(그 글자 그대로)             (2차)
 --   모양의 뜻
 --     json_null            열의 값이 JSON null(SQL NULL 이 아니다)     array   '[]'     string  글자 하나     number  숫자 하나
 --     missing_key          열두 항목 가운데 user_agent 가 없다
@@ -30,7 +32,13 @@
 --     sql_null             SQL NULL — 보관 없음
 --     extra_keys           열두 항목 + answered_at + 그 밖의 키 둘(옛 형식) — 그 밖의 키는 응답에 없어야 한다
 --     no_answered_at       열두 항목만(answered_at 없음) — 응답의 answered_at 은 null
---     nullable_all_null    널을 허용하는 항목 다섯이 전부 null
+--     nullable_all_null    널을 허용하는 항목 여섯이 전부 null
+--     utm_extra_key        utm_data 안에 정해 둔 키(utm_medium) + 그 밖의 키(zz_other, 값은 글자) — 그 밖의 키는 응답에 없어야 한다
+--     utm_nested           utm_data.utm_source 의 값이 겹친 객체다
+--     utm_nonstring        utm_data.utm_term 의 값이 숫자다
+--     answered_at_not_time answered_at 이 시각으로 읽히지 않는 글자다
+--     answered_at_bad_date answered_at 이 모양은 시각인데 없는 날짜·시각이다(13월 45일 99시)
+--     answered_at_offset   answered_at 이 소수 6자리와 +09:00 을 가진 시각 글자다 — 그 글자 그대로 돌려준다
 --   고쳐진 행이 정확히 3 이 아니면 예외로 끝나 전체가 되돌아간다. 끝나면 fixtures_reset.sql 로 처음 값으로 되돌린다.
 --
 -- 마지막 결과(한 칸 jsonb): 차수와, 세 회원에게 넣은 모양의 이름
@@ -50,8 +58,8 @@ begin
   if coalesce(pg_catalog.current_setting('b3c.test_project_ref', true), '') <> 'hmncdheiwqwekdbtijar' then
     raise exception 'zzb3c 답변 모양 중단: 대상 확인 값이 없다. 시험 프로젝트에서만, 같은 요청의 맨 앞에 set b3c.test_project_ref = ''hmncdheiwqwekdbtijar''; 를 둘 것. 아무것도 바꾸지 않았다';
   end if;
-  if v_round not in ('1', '2', '3', '4') then
-    raise exception 'zzb3c 답변 모양 중단: b3c.variant_round 가 1 · 2 · 3 · 4 가운데 하나가 아니다. 아무것도 바꾸지 않았다';
+  if v_round not in ('1', '2', '3', '4', '5', '6') then
+    raise exception 'zzb3c 답변 모양 중단: b3c.variant_round 가 1~6 가운데 하나가 아니다. 아무것도 바꾸지 않았다';
   end if;
   if v_raw = '' then
     raise exception 'zzb3c 답변 모양 중단: 대상의 정확한 값을 받지 못했다(set b3c.created). 아무것도 바꾸지 않았다';
@@ -107,6 +115,15 @@ begin
                                             'current_score', null::pg_catalog.jsonb, 'referral_source_detail', null::pg_catalog.jsonb,
                                             'referrer_url', null::pg_catalog.jsonb, 'landing_url', null::pg_catalog.jsonb,
                                             'utm_data', null::pg_catalog.jsonb, 'user_agent', null::pg_catalog.jsonb)
+           when 'utm_extra_key'      then v_base || pg_catalog.jsonb_build_object('utm_data', pg_catalog.jsonb_build_object(
+                                            'utm_medium', 'zzb3c-utm-variant', 'zz_other', 'zzb3c-variant-utm-extra'))
+           when 'utm_nested'         then v_base || pg_catalog.jsonb_build_object('utm_data', pg_catalog.jsonb_build_object(
+                                            'utm_source', pg_catalog.jsonb_build_object('nested', 'zzb3c-variant-utm-nested')))
+           when 'utm_nonstring'      then v_base || pg_catalog.jsonb_build_object('utm_data', pg_catalog.jsonb_build_object(
+                                            'utm_medium', 'zzb3c-utm-variant', 'utm_term', 5))
+           when 'answered_at_not_time' then v_base || pg_catalog.jsonb_build_object('answered_at', 'zzb3c-variant-not-a-time')
+           when 'answered_at_bad_date' then v_base || pg_catalog.jsonb_build_object('answered_at', '2026-13-45T99:99:99.000Z')
+           when 'answered_at_offset'   then v_base || pg_catalog.jsonb_build_object('answered_at', '2026-02-03T13:05:06.789012+09:00')
            -- 'sql_null' 과 그 밖: SQL NULL
          end
     from (
@@ -122,7 +139,13 @@ begin
         ('3', 'gm', 'sql_null'),
         ('4', 'a',  'extra_keys'),
         ('4', 'b',  'no_answered_at'),
-        ('4', 'gm', 'nullable_all_null')
+        ('4', 'gm', 'nullable_all_null'),
+        ('5', 'a',  'utm_extra_key'),
+        ('5', 'b',  'utm_nested'),
+        ('5', 'gm', 'utm_nonstring'),
+        ('6', 'a',  'answered_at_not_time'),
+        ('6', 'b',  'answered_at_bad_date'),
+        ('6', 'gm', 'answered_at_offset')
     ) as t(round, label, variant)
     join pg_catalog.jsonb_array_elements(v_j -> 'users') as e(x)
       on e.x ->> 'email' = 'zzb3c_' || t.label || '@member.zzb3c.invalid'
@@ -149,6 +172,8 @@ select pg_catalog.jsonb_build_object(
                 when '2' then pg_catalog.jsonb_build_object('a', 'number', 'b', 'missing_key', 'gm', 'wrong_type')
                 when '3' then pg_catalog.jsonb_build_object('a', 'required_null', 'b', 'answered_at_number', 'gm', 'sql_null')
                 when '4' then pg_catalog.jsonb_build_object('a', 'extra_keys', 'b', 'no_answered_at', 'gm', 'nullable_all_null')
+                when '5' then pg_catalog.jsonb_build_object('a', 'utm_extra_key', 'b', 'utm_nested', 'gm', 'utm_nonstring')
+                when '6' then pg_catalog.jsonb_build_object('a', 'answered_at_not_time', 'b', 'answered_at_bad_date', 'gm', 'answered_at_offset')
               end,
   'stored_typeof', (
     select pg_catalog.jsonb_object_agg(
