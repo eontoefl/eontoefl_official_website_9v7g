@@ -9,11 +9,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (window.EonAuth && window.EonAuth.isOn()) {
+        // 새 로그인 스위치가 켜진 화면: 로그인 기록을 다시 확인한 뒤에만 이름·관리자 표시를 그린다
+        window.EonAuth.bindDisplay(eonAuthDrawNavigation);
+    } else {
     // Update navigation based on login status
     updateNavigation();
     
     // Create floating dashboard buttons if not exist
     createFloatingButtons();
+    }
 
     // Smooth scroll for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -210,12 +215,53 @@ function formatDate(timestamp) {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+// 화면이 그릴 로그인 표시 값.
+// 새 로그인 스위치가 켜진 화면에서는 인증 모듈이 확인한 값만 쓴다(꺼짐·인증 모듈을 싣지 않은 화면은 지금 그대로).
+function eonMainUserRaw() {
+    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();
+    return localStorage.getItem('iontoefl_user');
+}
+
+// 켜진 화면 전용: 확인된 표시(없으면 로그인 전 모양)로 머리말과 대시보드 버튼을 다시 그린다
+function eonAuthHideDashboardButtons(user) {
+    const adminBtn = document.getElementById('adminDashboardBtn');
+    if (adminBtn && !(user && user.role === 'admin')) adminBtn.style.display = 'none';
+    const studentBtn = document.getElementById('studentDashboardBtn');
+    if (studentBtn && !(user && user.role !== 'admin')) studentBtn.style.display = 'none';
+}
+function eonAuthDrawNavigation() {
+    const drawnFor = eonMainUserRaw();
+    updateNavigation();
+    eonAuthHideDashboardButtons(getCurrentUser());
+    createFloatingButtons().then(() => {
+        // 버튼을 만드는 사이에 표시가 바뀌었으면 지금 표시에 맞춘다
+        if (eonMainUserRaw() !== drawnFor) eonAuthHideDashboardButtons(getCurrentUser());
+    });
+}
+
+// 켜진 화면 전용 로그아웃: 인증 모듈이 이 사이트의 이 로그인만 끝내고, 자기가 만든 호환 값만 정리한다
+async function eonAuthLogout() {
+    if (!confirm('로그아웃 하시겠습니까?')) return;
+    let result = null;
+    try {
+        result = await window.EonAuth.signOut();
+    } catch (e) {
+        result = null;
+    }
+    if (!result || result.outcome !== 'signed_out') {
+        alert('로그아웃하지 못했습니다. 다시 시도해주세요.');
+        return;
+    }
+    alert('로그아웃되었습니다.');
+    window.location.reload();
+}
+
 // Update Navigation based on login status
 function updateNavigation() {
     const authMenu = document.getElementById('authMenu');
     if (!authMenu) return;
     
-    const userData = localStorage.getItem('iontoefl_user');
+    const userData = eonMainUserRaw();
     
     if (userData) {
         // User is logged in
@@ -258,6 +304,10 @@ function updateNavigation() {
 
 // Logout function
 function logout() {
+    if (window.EonAuth && window.EonAuth.isOn()) {
+        eonAuthLogout();
+        return;
+    }
     if (confirm('로그아웃 하시겠습니까?')) {
         localStorage.removeItem('iontoefl_user');
         localStorage.removeItem('iontoefl_login_time');
@@ -268,12 +318,12 @@ function logout() {
 
 // Check login status
 function isLoggedIn() {
-    return localStorage.getItem('iontoefl_user') !== null;
+    return eonMainUserRaw() !== null;
 }
 
 // Get current user
 function getCurrentUser() {
-    const userData = localStorage.getItem('iontoefl_user');
+    const userData = eonMainUserRaw();
     return userData ? JSON.parse(userData) : null;
 }
 

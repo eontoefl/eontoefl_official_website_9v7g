@@ -1,11 +1,18 @@
 // Common JavaScript for all pages
 
+// 화면이 그릴 로그인 표시 값.
+// 새 로그인 스위치가 켜진 화면에서는 인증 모듈이 확인한 값만 쓴다(꺼짐·인증 모듈을 싣지 않은 화면은 지금 그대로).
+function eonCommonUserRaw() {
+    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();
+    return localStorage.getItem('iontoefl_user');
+}
+
 // 로그인 상태 확인 및 네비게이션 업데이트
 function updateAuthMenu() {
     const authMenu = document.getElementById('authMenu');
     if (!authMenu) return;
     
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(eonCommonUserRaw() || 'null');
     
     if (userData) {
         // 로그인 상태
@@ -72,11 +79,38 @@ function initHamburgerMenu() {
 
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.EonAuth && window.EonAuth.isOn()) {
+        // 새 로그인 스위치가 켜진 화면: 로그인 기록을 다시 확인하기 전에는 로그인 전 모양으로 둔다
+        initHamburgerMenu();
+        window.EonAuth.bindDisplay(eonAuthDrawCommon);
+        // 신청 링크는 확인이 끝난 뒤에 한 번만 바꾼다
+        window.EonAuth.ready().then(() => getFunnelSegment()).then(applyFunnelGating).catch(e => console.warn('퍼널 게이팅 실패:', e));
+        return;
+    }
     updateAuthMenu();
     initHamburgerMenu();
     hideMaterialsForNonAdmin();
     getFunnelSegment().then(applyFunnelGating).catch(e => console.warn('퍼널 게이팅 실패:', e));
 });
+
+// 켜진 화면 전용: 확인된 표시(없으면 로그인 전 모양)로 머리말과 학습 자료 링크를 다시 그린다
+const eonAuthMaterialsPrev = new Map();
+function eonAuthDrawCommon() {
+    updateAuthMenu();
+    const userData = JSON.parse(eonCommonUserRaw() || 'null');
+    const isAdmin = !!(userData && userData.role === 'admin');
+    document.querySelectorAll('a[href="materials.html"], a[href="materials.html?id"]').forEach(link => {
+        if (isAdmin) {
+            if (eonAuthMaterialsPrev.has(link)) {
+                link.style.display = eonAuthMaterialsPrev.get(link);
+                eonAuthMaterialsPrev.delete(link);
+            }
+        } else {
+            if (!eonAuthMaterialsPrev.has(link)) eonAuthMaterialsPrev.set(link, link.style.display);
+            link.style.display = 'none';
+        }
+    });
+}
 
 // ==================== 입문서 → 개별분석 퍼널 게이팅 ====================
 // 외부에 노출된 모든 '신청' 진입점을 사용자 상태에 따라 재지정한다.
@@ -91,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * 세션 동안 캐시(sessionStorage)하여 페이지마다 재조회하지 않는다.
  */
 async function getFunnelSegment() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(eonCommonUserRaw() || 'null');
     if (!userData) return 'guest';
     if (userData.role === 'admin') return 'admin';
 
@@ -200,7 +234,7 @@ function applyFunnelGating(segment) {
  * 관리자가 아니면 모든 페이지에서 학습 자료 링크 숨김
  */
 function hideMaterialsForNonAdmin() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(eonCommonUserRaw() || 'null');
     if (userData && userData.role === 'admin') return;
 
     // 네비게이션 드롭다운, 사이드바, 푸터 등 모든 materials.html 링크 숨김
@@ -323,7 +357,7 @@ async function goToMyApplication(event) {
     event.preventDefault();
     
     // 1. 로그인 여부 확인
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(eonCommonUserRaw() || 'null');
     
     if (!userData) {
         alert('⚠️ 로그인 후 이용해주세요.\n\n내 신청서를 확인하려면 로그인이 필요합니다.');

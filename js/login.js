@@ -1,6 +1,12 @@
 // Login Form Handler
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // 새 로그인 스위치가 켜진 화면은 인증 모듈로 로그인한다(꺼짐이면 아래 그대로)
+    if (window.EonAuth && window.EonAuth.isOn()) {
+        await eonAuthLoginSubmit();
+        return;
+    }
     
     const loginBtn = document.getElementById('loginBtn');
     const email = document.getElementById('email').value.trim();
@@ -123,8 +129,58 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     }
 });
 
+// 새 로그인 스위치가 켜진 화면의 로그인.
+// 회원 표를 읽지 않고, 비밀번호를 브라우저에서 비교하지 않는다. 주소의 redirect 값으로 이동하지 않는다.
+async function eonAuthLoginSubmit() {
+    const loginBtn = document.getElementById('loginBtn');
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!email || !password) {
+        showAlert('이메일과 비밀번호를 입력해주세요.', 'error');
+        return;
+    }
+
+    showLoading(true);
+    loginBtn.disabled = true;
+
+    try {
+        const result = await window.EonAuth.signIn(email, password);
+        const outcome = result ? result.outcome : 'error';
+
+        if (outcome === 'signed_in') {
+            // 같은 로그인 기록에서 본인 정보와 사이트 접근을 둘 다 확인한 뒤다
+            showAlert('로그인 성공! 환영합니다.', 'success');
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        } else if (outcome === 'legacy_present') {
+            showAlert('기존 방식의 로그인 상태가 있습니다. 기존 방식에서 로그아웃한 뒤 다시 로그인해 주세요.', 'error');
+        } else if (outcome === 'invalid_credentials' || outcome === 'no_member') {
+            showAlert('이메일 또는 비밀번호가 일치하지 않습니다.', 'error');
+        } else if (outcome === 'blocked') {
+            showAlert('🚫 차단된 계정입니다.\n\n관리자에게 문의해주세요.', 'error');
+        } else if (outcome === 'withdrawal_pending') {
+            showAlert('탈퇴 처리 중인 계정입니다.', 'error');
+        } else if (outcome === 'maintenance' || outcome === 'not_allowed') {
+            showAlert('지금은 점검 중입니다. 잠시 뒤 다시 시도해주세요.', 'error');
+        } else {
+            showAlert('로그인 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
+        }
+    } catch (error) {
+        console.error('Login error:', error && error.message);
+        showAlert('로그인 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
+    } finally {
+        showLoading(false);
+        loginBtn.disabled = false;
+    }
+}
+
 // Check if already logged in
 document.addEventListener('DOMContentLoaded', () => {
+    // 새 로그인 스위치가 켜진 화면은 저장된 옛 값만 보고 이동하지 않는다
+    if (window.EonAuth && window.EonAuth.isOn()) return;
+
     const userData = localStorage.getItem('iontoefl_user');
     if (userData) {
         // Already logged in, redirect
