@@ -157,6 +157,32 @@ async function sectionOff(mutate) {
     return { problems, compared };
 }
 
+// 꺼짐의 화면이 기준보다 더 받는 정적 파일: 같은 출처의 인증 모듈 파일 1개뿐이어야 한다.
+// 이것은 "기준과 같음"이 아니다 — 지금과 다른 것으로 적어 두는 차이다(업무 요청의 불변과는 별개).
+function staticRefs(html) {
+    const out = [];
+    const re = /<(script|link|img|iframe|source|audio|video|embed|object)\b[^>]*?\b(?:src|href|data)="([^"]+)"/g;
+    let m;
+    while ((m = re.exec(html))) out.push(`${m[1]} ${m[2]}`);
+    return out;
+}
+function sectionOffStatic(mutate) {
+    const problems = [];
+    const files = provider(V.OFF, mutate);
+    const info = { added: [], bytes: Buffer.byteLength(workFile(AUTH_FILE), 'utf8') };
+    for (const f of ['index.html', 'login.html']) {
+        const base = staticRefs(baseFile(f));
+        const now = staticRefs(files(f));
+        const left = base.slice();
+        const added = [];
+        for (const ref of now) { const i = left.indexOf(ref); if (i >= 0) left.splice(i, 1); else added.push(ref); }
+        if (left.length) problems.push(`꺼짐의 화면(${f}): 기준에 있던 정적 요청이 없어짐`);
+        const only = added.length === 1 && /^script js\/auth-session\.js(\?v=\d+)?$/.test(added[0]);
+        if (!only) problems.push(`꺼짐의 화면(${f}): 기준보다 더 받는 것이 같은 출처의 인증 모듈 파일 1개가 아님(${added.length}개)`);
+        info.added.push(`${f}: ${added.length}개`);
+    }
+    return { problems, info };
+}
 // 인증 모듈을 싣지 않는 화면(index·login 밖의 화면들이 이 경우다): js/common.js·js/main.js·js/login.js 가 기준과 같은가.
 // 화면의 script 태그에서 인증 모듈만 뺀 사본으로 본다 — 저장소의 파일 그대로(꺼짐)와 시험 서버가 켜짐으로 내주는 사본 둘 다.
 async function sectionNoModule() {
@@ -725,7 +751,9 @@ async function testLogout(opt) {
         c.ok(!w.browser.local.has('eon_auth_v1') && !w.browser.local.has('eon_auth_v1:compat'), '바뀐 호환 값: 새 모듈의 로그인·표식이 남음');
         audit(w, c, '바뀐 호환 값');
     }
-    // 로그아웃의 답이 실패·모름이면 "끝냈다"로 처리하지 않는다(안내·새로 고침·정리 없음, 다시 보내지도 않음)
+    // 로그아웃의 답이 실패·모름이면 "끝냈다"로 처리하지 않는다(안내·새로 고침 없음, 다시 보내지도 않음).
+    // 그렇다고 "확인된 로그인"으로 남겨 두지도 않는다: 이 탭의 확인 상태·표시는 즉시 거둔다.
+    // 서버의 로그인 기록과 저장된 로그인 값은 지우지 않는다.
     const unknowns = [
         ['응답 없음', () => 'network'],
         ['5xx', () => ({ status: 500, headers: {}, body: '{}' })],
@@ -738,16 +766,20 @@ async function testLogout(opt) {
         const login = await loginAs(w, 'A');
         login.close();
         const page = await w.open('index', 'index.html');
+        const rawA = w.browser.local.get('eon_auth_v1');
         w.server.faults.logout = fault;
         page.evaluate('logout()');
         await w.browser.idle();
         await w.browser.advance(20 * 1000);
         const label = `로그아웃 모름(${name})`;
-        c.ok(st(page) === 'signed_in', `${label}: 끝내지 못했는데 상태가 바뀜(${st(page)})`);
         c.ok(page.trace.some((e) => e.t === 'alert' && e.text === MSG.logoutUnknown) && !page.trace.some((e) => e.t === 'alert' && e.text === MSG.logoutDone), `${label}: 끝내지 못했는데 "로그아웃되었습니다"로 안내함`);
         c.ok(navs(page).length === 0, `${label}: 끝내지 못했는데 새로 고침함`);
-        c.ok(NEW_KEYS.every((k) => w.browser.local.has(k)) && /합성 회원 A/.test(lastMenu(page)), `${label}: 끝내지 못했는데 로그인·호환 값·표시를 지움`);
+        c.ok(w.browser.local.get('eon_auth_v1') === rawA && [...w.server.sessions.values()].every((s) => s.alive), `${label}: 끝내지 못했는데 저장된 로그인·서버의 로그인 기록을 지움`);
         c.ok(w.count(R.logout) === 1, `${label}: 종료 요청이 한 번이 아님(다시 보냈을 수 있음)`);
+        c.ok(st(page) === 'rejected' && why(page) === 'logout_unknown', `${label}: 로그아웃 모름인데 확인 상태가 남음(${st(page)}·${why(page)})`);
+        c.ok(page.evaluate('EonAuth.profile()') === null && page.evaluate('EonAuth.siteAccess()') === null && page.evaluate('EonAuth.displayUserRaw()') === null, `${label}: 로그아웃 모름인데 본인 정보·사이트 접근·표시를 내줌`);
+        c.ok(/LOGIN/.test(lastMenu(page)) && !/합성/.test(lastMenu(page)), `${label}: 로그아웃 모름인데 이름이 남음`);
+        c.ok(!w.browser.local.has('iontoefl_user') && !w.browser.local.has('eon_auth_v1:compat'), `${label}: 그 로그인 기록으로 만든 호환 값이 남음`);
         audit(w, c, label);
     }
     // 서버가 "그 로그인 기록은 없다"고 답한 것은 끝난 것이다
@@ -762,7 +794,7 @@ async function testLogout(opt) {
         c.ok(st(page) === 'signed_out' && !NEW_KEYS.some((k) => w.browser.local.has(k)), `로그아웃(이미 없는 기록): signed_out 이 아님(${st(page)})`);
         audit(w, c, '로그아웃(이미 없는 기록)');
     }
-    // 새 로그인 전에 앞의 로그인을 끝내지 못하면(모름) 새 로그인 요청을 보내지 않는다
+    // 새 로그인 전에 앞의 로그인을 끝내지 못하면(모름) 새 로그인 요청을 보내지 않는다. 이 탭이 앞 로그인에 대해 확인해 둔 것도 거둔다
     {
         const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
         const page = await loginAs(w, 'A');
@@ -772,9 +804,42 @@ async function testLogout(opt) {
         await w.browser.advance(20 * 1000);
         c.ok(boxes(page)[boxes(page).length - 1] === MSG.previous, '이전 로그인 모름: 안내가 기대와 다름');
         c.ok(w.count(R.login) === 1, `이전 로그인 모름: 앞의 것을 끝내지 못했는데 새 로그인 요청을 보냄(${w.count(R.login)}번)`);
-        c.ok(w.browser.local.get('eon_auth_v1') === rawA && st(page) === 'signed_in' && page.evaluate('EonAuth.profile().id') === 'm-A', '이전 로그인 모름: 앞의 로그인을 지우거나 상태를 바꿈');
+        c.ok(w.browser.local.get('eon_auth_v1') === rawA, '이전 로그인 모름: 앞의 로그인(저장값)을 지우거나 바꿈');
+        c.ok(st(page) === 'rejected' && why(page) === 'logout_unknown' && page.evaluate('EonAuth.profile()') === null, `이전 로그인 모름: 로그아웃 모름인데 확인 상태·본인 정보가 남음(${st(page)}·${why(page)})`);
         c.ok(JSON.stringify(navs(page)) === JSON.stringify(['index.html']), '이전 로그인 모름: 화면 이동이 더 있음');
         audit(w, c, '이전 로그인 모름');
+    }
+    return c.problems;
+}
+
+// 저장된 로그인 값을 읽을 수 없게 되면(다른 것이 덮어썼거나 깨졌으면) 앞서 확인한 것을 그대로 믿지 않는다:
+// 본인 정보·사이트 접근·표시를 즉시 거둔다. 그 값 자체는 지우지 않는다.
+async function testUnreadableStored(opt) {
+    const c = checker();
+    const cases = [
+        ['JSON 이 아님', 'zz-not-json'],
+        ['JWT 를 풀 수 없음', JSON.stringify({ access_token: 'aaa.bbb.ccc', refresh_token: 'zz', expires_at: 4102444800 })],
+        ['로그인 기록 번호가 없는 JWT', JSON.stringify({ access_token: fakeJwt({ sub: 'auth-A', role: 'authenticated', exp: 4102444800 }), refresh_token: 'zz', expires_at: 4102444800 })],
+    ];
+    for (const [name, value] of cases) {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const page = await w.open('index', 'index.html');
+        const label = `읽을 수 없는 저장값(${name})`;
+        c.ok(st(page) === 'signed_in' && page.evaluate('EonAuth.profile().id') === 'm-A', `${label}: 시험이 확인된 상태를 만들지 못함`);
+        const before = w.server.log.length;
+        w.browser.local.set('eon_auth_v1', value);                 // 알림 없이 저장값만 바뀐 순간
+        c.ok(page.evaluate('EonAuth.profile()') === null && page.evaluate('EonAuth.siteAccess()') === null && page.evaluate('EonAuth.displayUserRaw()') === null, `${label}: 알림이 오기 전인데 본인 정보·사이트 접근·표시를 내줌`);
+        page.dispatchWindow('storage', { key: 'eon_auth_v1' });
+        await w.browser.idle();
+        c.ok(st(page) === 'rejected' && why(page) === 'unreadable', `${label}: 확인 상태가 남음(${st(page)}·${why(page)})`);
+        c.ok(page.evaluate('EonAuth.profile()') === null && page.evaluate('EonAuth.siteAccess()') === null, `${label}: 알림 뒤에도 본인 정보·사이트 접근을 내줌`);
+        c.ok(/LOGIN/.test(lastMenu(page)) && !/합성/.test(lastMenu(page)), `${label}: 이름이 남음`);
+        c.ok(w.browser.local.get('eon_auth_v1') === value, `${label}: 읽을 수 없는 저장값을 지우거나 바꿈`);
+        c.ok(w.server.log.length === before, `${label}: 요청을 보냄(갱신·종료·확인)`);
+        c.ok([...w.server.sessions.values()].every((s) => s.alive), `${label}: 서버의 로그인 기록을 끝냄`);
+        audit(w, c, label);
     }
     return c.problems;
 }
@@ -1064,7 +1129,8 @@ const ON_TESTS = [
     ['한 시도의 실패 처리가 다른 로그인을 건드리지 않음', testAttemptBinding],
     ['만료·종료된 로그인 기록(갱신 거절과 끝남을 나눔)', testExpiry],
     ['알림마다 갱신을 일으키지 않음', testNoRefreshLoop],
-    ['로그아웃(결과를 봄)과 재로그인', testLogout],
+    ['로그아웃(결과를 봄 — 모름이면 확인 상태를 거둠)과 재로그인', testLogout],
+    ['저장된 로그인 값을 읽을 수 없게 됨', testUnreadableStored],
     ['옛 방식의 로그인 상태가 있는 브라우저', testLegacyPresent],
     ['저장소 상태 다섯 × 켜짐', testFiveStatesOn],
     ['자격을 싣는 조건·연결점·리디렉션', testCredentialRules],
@@ -1184,7 +1250,7 @@ const MUTANTS = [
     },
     {
         name: '앞의 로그인을 끝냈는지 모르는데 새 로그인을 보냄', tests: [testLogout], expect: /이전 로그인 모름: 앞의 것을 끝내지 못했는데 새 로그인 요청을 보냄/,
-        edits: [[AUTH_FILE, "                if ((await boundEnd(st.claims)) !== 'ended') return { outcome: 'previous_unknown' };\n", "                await boundEnd(st.claims);\n"]],
+        edits: [[AUTH_FILE, "                if ((await boundEnd(st.claims)) !== 'ended') {\n", "                if ((await boundEnd(st.claims)) === 'never') {\n"]],
     },
     {
         name: '갱신이 그 시도의 로그인 기록에 묶이지 않음(직전 확인도, 나가는 곳의 확인도 없음)', tests: [testAttemptBinding], expect: /묶기·갱신[^:]*: B 에 대한 갱신 요청이 나감/,
@@ -1206,7 +1272,7 @@ const MUTANTS = [
     },
     {
         name: '이 탭이 확인하지 않은 로그인도 끝냄', tests: [testAttemptBinding], expect: /표시 직전: 이 탭이 확인하지 않은 로그인\(B\)에 대한 종료 요청이 나감/,
-        edits: [[AUTH_FILE, "            if (!st || !st.claims || !same(st.claims, mine)) return { outcome: 'changed' };", "            if (!st || !st.claims) return { outcome: 'changed' };"]],
+        edits: [[AUTH_FILE, "            if (!st || !st.claims || !same(st.claims, mine)) {\n                // 저장된 로그인이 이 탭이 확인한 것이 아니다", "            if (!st || !st.claims) {\n                // 저장된 로그인이 이 탭이 확인한 것이 아니다"]],
     },
     {
         name: '이동 직전에 다시 보지 않음', tests: [testMoveRecheck], expect: /이동 직전\([^)]*\): 다시 보지 않고 이동함/,
@@ -1218,7 +1284,30 @@ const MUTANTS = [
     },
     {
         name: '상태를 맞출 때마다 공식 클라이언트에 물어 갱신을 일으킴', tests: [testNoRefreshLoop], expect: /갱신 되풀이: 알림마다 갱신 요청이 나감/,
-        edits: [[AUTH_FILE, "        const st = present ? storedSession() : null;\n        const s = st && typeof st.accessToken === 'string'", "        await readSession();\n        const st = present ? storedSession() : null;\n        const s = st && typeof st.accessToken === 'string'"]],
+        edits: [[AUTH_FILE, "        const st = present ? storedSession() : null;\n        const s = st && st.claims && typeof st.accessToken === 'string'", "        await readSession();\n        const st = present ? storedSession() : null;\n        const s = st && st.claims && typeof st.accessToken === 'string'"]],
+    },
+    {
+        name: '로그아웃 모름에서 이 탭의 확인 상태를 남김', tests: [testLogout], expect: /로그아웃 모름\([^)]*\): 로그아웃 모름인데 (확인 상태가 남음|본인 정보)/,
+        edits: [[AUTH_FILE, "                withdraw(e === 'changed' ? 'session_changed' : 'logout_unknown', st.claims.sid);\n", '']],
+    },
+    {
+        name: '앞 로그인을 끝내지 못했는데 이 탭의 확인 상태를 남김', tests: [testLogout], expect: /이전 로그인 모름: 로그아웃 모름인데 확인 상태·본인 정보가 남음/,
+        edits: [[AUTH_FILE, "                    if (same(verified, st.claims) || state === 'signed_in') { lastRejected = st.claims; withdraw('logout_unknown', st.claims.sid); }\n", '']],
+    },
+    {
+        name: '읽을 수 없는 저장값인데 profile()·siteAccess() 가 값을 줌', tests: [testUnreadableStored], expect: /읽을 수 없는 저장값\([^)]*\): 알림이 오기 전인데 본인 정보/,
+        edits: [
+            [AUTH_FILE, "state === 'signed_in' && verified && storedIs(verified) ? Object.assign({}, verified.profile) : null;", "state === 'signed_in' && verified ? Object.assign({}, verified.profile) : null;"],
+            [AUTH_FILE, "state === 'signed_in' && verified && storedIs(verified) ? { allowed: true, is_admin: verified.isAdmin } : null;", "state === 'signed_in' && verified ? { allowed: true, is_admin: verified.isAdmin } : null;"],
+        ],
+    },
+    {
+        name: '읽을 수 없는 저장값인데 확인 상태를 남김(상태 맞추기가 그대로 돌아감)', tests: [testUnreadableStored], expect: /읽을 수 없는 저장값\([^)]*\): 확인 상태가 남음/,
+        edits: [[AUTH_FILE, "            if (state === 'signed_in') withdraw('unreadable', verified ? verified.sid : null);\n            return;\n        }\n        const c = st.claims;", "            return;\n        }\n        const c = st.claims;"]],
+    },
+    {
+        name: '꺼짐의 화면이 정적 파일을 하나 더 받음(차이 장부 밖)', tests: [], section: 'off-static', expect: /기준보다 더 받는 것이 같은 출처의 인증 모듈 파일 1개가 아님/,
+        edits: [['index.html', '</head>', '    <script src="vendor/supabase-2.116.0.js"></script>\n</head>']],
     },
     {
         name: '전역 로그아웃', tests: [testLogout], expect: /이 로그인만 끝내는 것이 아님/,
@@ -1326,6 +1415,7 @@ async function sectionMutants() {
         const crashes = [];
         const run = async (fn) => { try { found.push(...(await fn())); } catch (e) { crashes.push(String(e && e.message)); } };
         if (m.section === 'off') await run(async () => (await sectionOff(applyEdits(m.edits, []))).problems);
+        if (m.section === 'off-static') await run(async () => sectionOffStatic(applyEdits(m.edits, [])).problems);
         if (m.section === 'request-log') await run(async () => (await sectionRequestLog(applyEdits(m.edits, []))).problems);
         for (const test of m.tests) await run(() => test({ mutate: applyEdits(m.edits, []) }));
         const hit = found.filter((p) => m.expect.test(p));
@@ -1614,6 +1704,11 @@ async function main() {
     fail('꺼짐', offSwitch);
     out(`    - 주소의 꼬리표·저장소의 값으로는 켜지지 않음, 꺼진 모듈의 제공 함수: 어긋남 ${offSwitch.length}`);
     listSome(offSwitch);
+
+    const offStatic = sectionOffStatic();
+    fail('꺼짐', offStatic.problems);
+    out(`    - 지금과 다른 것(차이 장부): 꺼짐의 화면이 기준보다 더 받는 정적 파일은 같은 출처의 js/auth-session.js 1개뿐(${offStatic.info.added.join(', ')}. ${offStatic.info.bytes}바이트 — 화면을 그리기 전에 받는다): 어긋남 ${offStatic.problems.length}`);
+    listSome(offStatic.problems);
 
     const noModule = await sectionNoModule();
     fail('모듈 없는 화면', noModule.problems);
