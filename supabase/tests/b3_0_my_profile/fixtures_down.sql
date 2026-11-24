@@ -7,7 +7,7 @@
 -- 이 파일은 작업방이 실행해 보지 않았다(문법 확인도 하지 못했다).
 --
 -- 지우는 것: fixtures_up.sql 이 만든 것만.
---   * public.users 의 표식 있는 합성 회원 행(email 이 zzb3p0_…@member.zzb3p0.invalid) — 많아야 6행
+--   * public.users 의 표식 있는 합성 회원 행(email 이 zzb3p0_…@member.zzb3p0.invalid) — 많아야 7행(함정 행 포함)
 --   * 그 회원들의 security_private.member_identity 행
 --   * 합성 로그인 계정 zzb3p0_g · zzb3p0_gm 의 security_private.admin_principal 행 — 많아야 2행
 --   * 절차의 점검 단계가 넣은, 합성 로그인 계정의 security_private.maintenance_exception 행(남아 있으면)
@@ -66,7 +66,7 @@ begin
    where u.email like 'zzb3p0\_%@member.zzb3p0.invalid';
   get diagnostics v_users = row_count;
 
-  if v_users > 6 or v_maps > 6 or v_admin > 2 then
+  if v_users > 7 or v_maps > 6 or v_admin > 2 then
     raise exception 'zzb3p0 내리기 중단: 지워질 행이 만든 수보다 많다(회원 % · 대응 % · 명부 %). 전부 되돌린다', v_users, v_maps, v_admin;
   end if;
   raise notice 'zzb3p0 내리기: 회원 % · 대응 % · 명부 % · 예외 % 행을 지웠다', v_users, v_maps, v_admin, v_exc;
