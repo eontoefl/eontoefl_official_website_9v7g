@@ -39,8 +39,13 @@
 --                                 {"state":"ok","answers":{열두 항목 + answered_at}}   정상
 --                                 {"state":"answers_corrupt"}                 객체가 아니거나, 열두 항목 가운데 빠진 것이 있거나,
 --                                                                             형식이 틀림 — 값을 주지 않는다
---       읽을 때의 규칙은 지금 화면(js/dashboard.js loadPendingBookAnswers)의 것과 같다: 열두 항목이 전부 있고 형이 맞는가.
---       저장된 값에 그 밖의 키가 있어도 돌려주지 않는다. answered_at 은 글자면 그대로, 없으면 null, 글자가 아닌 값이면 파손.
+--       읽을 때의 규칙: 열두 항목이 전부 있고 형이 맞는가(지금 화면 js/dashboard.js loadPendingBookAnswers 의 것) + 아래 둘.
+--       저장된 값에 그 밖의 키가 있어도 돌려주지 않는다.
+--       utm_data 의 안쪽도 좁힌다: 쓰기에서 정한 다섯 키(utm_source · utm_medium · utm_campaign · utm_content · utm_term)
+--         가운데 있는 것만 돌려준다. utm_data 안의 값이 하나라도 글자가 아니면(숫자 · 참거짓 · null · 배열 · 겹친 객체 —
+--         어느 키든) 파손이다. 다섯 밖의 키(값이 글자)는 돌려주지 않는다.
+--       answered_at: 없거나 JSON null 이면 null. 글자면 **시각으로 읽히는 글자일 때만** 그 글자를 그대로 돌려준다 —
+--         모양이 YYYY-MM-DDTHH:MM:SS[.소수 1~6자리](Z 또는 ±HH:MM) 이고 timestamptz 로 바뀌는 값. 그 밖의 글자 · 글자가 아닌 값은 파손.
 --       이 함수는 아무것도 고치지 않는다.
 --   my_intro_track_set(p_track)   {"state":"ok","intro_book_track":<저장된 값>}
 --       p_track 은 'regular' 또는 'australia'. 널·그 밖의 값은 400 · message 'invalid_track'.
@@ -62,7 +67,9 @@
 --   stuck_area              '리딩' · '리스닝' · '라이팅' · '스피킹'
 --   goal_timeframe          '한 달 안에' · '3개월 안에' · '6개월 안에'
 --   referral_source         '블로그' · '인스타그램' · '지인추천' · '기타'
---   referral_source_detail  referral_source 가 '기타'면 글자(1~200자, 공백만은 안 됨), 아니면 null
+--   referral_source_detail  referral_source 가 '기타'면 글자(1~200자. 공백 글자만으로 된 값은 안 됨 — 공백 글자는
+--                           화면의 trim() 이 지우는 것과 같은 목록: 탭 · 줄바꿈 · 빈칸 · U+00A0 · U+3000(전각 빈칸) 등),
+--                           아니면 null. 글자 수는 코드 포인트로 센다(char_length)
 --   is_au_nz_direct_submit  'yes' · 'no'
 --   referrer_url            글자(1~2048자) 또는 null — 주소를 열어 보거나 풀어 보지 않는다
 --   landing_url             글자(1~2048자) 또는 null — 주소를 열어 보거나 풀어 보지 않는다
@@ -266,6 +273,7 @@ declare
   v_nullable constant boolean[] := array[
     true, false, false, false, false, false,
     true, false, true, true, true, true];
+  v_utm_keys constant text[] := array['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
   v_method     text;
   v_member     uuid;
   v_blocked    boolean;
@@ -273,7 +281,12 @@ declare
   v_raw        jsonb;
   v_val        jsonb;
   v_type       text;
+  v_key        text;
+  v_utm        jsonb;
+  v_utm_out    jsonb;
   v_at         jsonb;
+  v_at_text    text;
+  v_ts         timestamptz;
 begin
   v_method := pg_catalog.current_setting('request.method', true);
   if v_method is not null and v_method <> '' and v_method <> 'POST' then
@@ -336,12 +349,44 @@ begin
     end if;
   end loop;
 
-  -- answered_at: 글자면 그대로, 없거나 JSON null 이면 null, 그 밖의 형이면 파손
+  -- utm_data 의 안쪽: 정해 둔 다섯 키 가운데 있는 것만 돌려준다(여기까지 왔으면 utm_data 는 객체이거나 JSON null 이다).
+  --   값이 하나라도 글자가 아니면(어느 키든 — 숫자 · 참거짓 · null · 배열 · 겹친 객체) 파손.
+  --   다섯 밖의 키(값이 글자)는 돌려주지 않는다.
+  v_utm := v_raw -> 'utm_data';
+  if pg_catalog.jsonb_typeof(v_utm) = 'object' then
+    v_utm_out := '{}'::pg_catalog.jsonb;
+    for v_key, v_type in
+      select t.key, pg_catalog.jsonb_typeof(t.value) from pg_catalog.jsonb_each(v_utm) as t(key, value)
+    loop
+      if v_type <> 'string' then
+        return pg_catalog.jsonb_build_object('state', 'answers_corrupt');
+      end if;
+      if v_key = any (v_utm_keys) then
+        v_utm_out := v_utm_out || pg_catalog.jsonb_build_object(v_key, v_utm -> v_key);
+      end if;
+    end loop;
+  else
+    v_utm_out := 'null'::pg_catalog.jsonb;
+  end if;
+
+  -- answered_at: 없거나 JSON null 이면 null. 글자면 시각으로 읽히는 글자일 때만 그 글자 그대로. 그 밖은 파손.
+  --   시각으로 읽히는 글자 = 모양이 YYYY-MM-DDTHH:MM:SS[.소수 1~6자리](Z 또는 ±HH:MM) 이고 timestamptz 로 바뀌는 값
+  --   (모양만 맞고 날짜가 없는 값 — 13월 · 99시 — 은 바꾸다 실패한다 → 파손)
   v_at := v_raw -> 'answered_at';
   if v_at is null or pg_catalog.jsonb_typeof(v_at) = 'null' then
     v_at := 'null'::pg_catalog.jsonb;
   elsif pg_catalog.jsonb_typeof(v_at) <> 'string' then
     return pg_catalog.jsonb_build_object('state', 'answers_corrupt');
+  else
+    v_at_text := v_raw ->> 'answered_at';
+    if v_at_text !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,6})?(Z|[+-][0-9]{2}:[0-9]{2})$' then
+      return pg_catalog.jsonb_build_object('state', 'answers_corrupt');
+    end if;
+    begin
+      v_ts := v_at_text::pg_catalog.timestamptz;
+    exception when others then
+      return pg_catalog.jsonb_build_object('state', 'answers_corrupt');
+    end;
   end if;
 
   -- 정해 둔 열두 항목과 answered_at 만(저장된 값에 그 밖의 키가 있어도 돌려주지 않는다)
@@ -358,7 +403,7 @@ begin
       'is_au_nz_direct_submit', v_raw -> 'is_au_nz_direct_submit',
       'referrer_url', v_raw -> 'referrer_url',
       'landing_url', v_raw -> 'landing_url',
-      'utm_data', v_raw -> 'utm_data',
+      'utm_data', v_utm_out,
       'user_agent', v_raw -> 'user_agent',
       'answered_at', v_at
     )
@@ -542,6 +587,8 @@ declare
   c_max_agent     constant integer := 512;    -- user_agent 의 글자 수
   c_max_detail    constant integer := 200;    -- referral_source_detail 의 글자 수
   c_max_utm_value constant integer := 200;    -- utm_data 의 값 하나의 글자 수
+  -- 화면의 trim() 이 지우는 공백 글자(ECMAScript 의 WhiteSpace + LineTerminator)
+  c_space constant text := E'\u0009\u000A\u000B\u000C\u000D\u0020\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF';
   v_keys     constant text[] := array[
     'current_score', 'target_score', 'no_target_score', 'stuck_area', 'goal_timeframe', 'referral_source',
     'referral_source_detail', 'is_au_nz_direct_submit', 'referrer_url', 'landing_url', 'utm_data', 'user_agent'];
@@ -667,7 +714,7 @@ begin
     raise exception using errcode = 'PT400', message = 'invalid_answers', detail = 'referral_source';
   end if;
 
-  -- (10) referral_source_detail: '기타'면 글자(1~200자, 공백만은 안 됨), 아니면 null
+  -- (10) referral_source_detail: '기타'면 글자(1~200자, 공백 글자만으로 된 값은 안 됨), 아니면 null
   v_val := p_answers -> 'referral_source_detail';
   v_type := pg_catalog.jsonb_typeof(v_val);
   if (p_answers ->> 'referral_source') = '기타' then
@@ -676,7 +723,7 @@ begin
     end if;
     v_text := p_answers ->> 'referral_source_detail';
     if pg_catalog.char_length(v_text) < 1 or pg_catalog.char_length(v_text) > c_max_detail
-       or pg_catalog.btrim(v_text) = '' then
+       or pg_catalog.btrim(v_text, c_space) = '' then
       raise exception using errcode = 'PT400', message = 'invalid_answers', detail = 'referral_source_detail';
     end if;
   elsif v_type <> 'null' then

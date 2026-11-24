@@ -29,12 +29,15 @@
 --   5. 본문이 마이그레이션의 것과 같다. 본문(pg_proc.prosrc)에서 줄 끝의 CR 을 뺀 글자의 md5 를 아래 값과 견준다
 --      (작업방이 마이그레이션 파일의 본문으로 계산한 값 — node settings_matrix.mjs --phase body-md5 가 같은 계산을 한다):
 --          my_settings                1b860ef5b7f7ff1a78492f1206b7a113
---          my_book_answers            1c0a893c696653474c14472822b53901
+--          my_book_answers            da4a5694b1a0e37c9f95524e1f9cb04a
 --          my_intro_track_set         9d28cb0a39eaca18e65c517b587802c4
 --          my_marketing_consent_set   4a63406377aa6ec78a9e235d84486c47
---          my_book_answers_hold       c3c9d2fc23e2692c1eed363306a57764
---      SQL 통로가 본문의 글자를 바꿔 보낸 경우(줄 끝 말고)에는 이 값이 맞지 않을 수 있다. 그때만, 적용 직후의 지문에서
---      적어 둔 body_md5 를 같은 요청에서 넘긴다(이름 → md5 의 JSON. 넘긴 이름만 그 값으로 견준다):
+--          my_book_answers_hold       8db28a1bcf35981ccc44ec27078baf58
+--      이 값이 지금의 함수와 다르면 이 파일은 멈춘다. **도구(set-lines --for rollback)도 지문의 body_md5 가 파일에서 계산한
+--      값과 다르면 멈추고, 견줄 값을 스스로 바꿔 넘기지 않는다.** 원인을 사람이 확인해야 한다(누가 함수를 바꿨는가,
+--      SQL 통로가 본문의 글자를 바꿔 보냈는가).
+--      사람이 원인을 확인하고 "적용한 그 함수가 맞다"고 판단한 경우에만, 적용 직후의 지문에서 적어 둔 body_md5 를
+--      손으로 같은 요청에 넘길 수 있다(이름 → md5 의 JSON. 넘긴 이름만 그 값으로 견준다). 도구는 이 줄을 만들지 않는다:
 --          set b3c.applied_body_md5 = '{"my_settings":"<적어 둔 값>"}';
 -- =====================================================================
 
@@ -47,10 +50,10 @@ declare
   v_args   constant text[] := array['', '', 'text', 'boolean', 'jsonb'];   -- pg_get_function_identity_arguments 에서 인자 이름을 뺀 것
   v_bodies constant text[] := array[
     '1b860ef5b7f7ff1a78492f1206b7a113',
-    '1c0a893c696653474c14472822b53901',
+    'da4a5694b1a0e37c9f95524e1f9cb04a',
     '9d28cb0a39eaca18e65c517b587802c4',
     '4a63406377aa6ec78a9e235d84486c47',
-    'c3c9d2fc23e2692c1eed363306a57764'];
+    '8db28a1bcf35981ccc44ec27078baf58'];
   v_raw_applied text := coalesce(pg_catalog.current_setting('b3c.applied', true), '');
   v_raw_bodies  text := coalesce(pg_catalog.current_setting('b3c.applied_body_md5', true), '');
   v_applied     jsonb;
