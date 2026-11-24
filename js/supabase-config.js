@@ -8,7 +8,16 @@ const DEFAULT_PLATFORM_URL = 'https://testroom.eonfl.com';
 
 // Supabase 요청 헤더를 만드는 한 곳. 이 파일 안에서만 쓴다.
 // extra 의 헤더는 기본 3개 뒤에 순서대로 붙고, 이름이 같으면 그 자리의 값만 바뀐다.
+// 둘째 인자로 요청 등급을 받으면 인증 모듈(js/auth-session.js)에 맡긴다. 등급을 받지 않으면 아래 그대로다.
+// (계약 3A: 등급을 넘기는 호출은 아직 없다. 모듈이 없거나 등급이 열려 있지 않으면 공개 키로 떨어지지 않고 오류다.)
 const supabaseHeaders = function (extra) {
+    if (arguments.length > 1 && arguments[1] !== undefined && arguments[1] !== null) {
+        const auth = globalThis.EonAuth;
+        if (!auth || typeof auth.headersForGrade !== 'function') {
+            throw new Error('요청 등급을 처리할 인증 모듈이 없습니다');
+        }
+        return auth.headersForGrade(arguments[1], extra);
+    }
     return Object.assign({
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
