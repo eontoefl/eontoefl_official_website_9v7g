@@ -9,8 +9,9 @@
 -- 결과의 키
 --   site_state_rows            security_private.site_state 의 행 수(1 이어야 한다)
 --   site_state_columns         그 표의 열 이름(순서대로)
---   site_state_row             id = 1 인 행 전체(모든 열, updated_at 포함) — maint_off.sql 에 그대로 넘긴다
---   site_state_row_md5         그 행을 글자로 바꾼 것의 md5 — maint_on.sql 에 넘긴다("저장한 뒤 바뀌지 않았다"의 확인)
+--   site_state_row             id = 1 인 행 전체(모든 열, updated_at 포함) — 시작 행. maint_on.sql 과 maint_off.sql 에 그대로 넘긴다
+--                              (maint_on: 지금 행이 이 값일 때만 켠다 / maint_off: 이 값으로 되돌린다)
+--   site_state_row_md5         그 행을 글자로 바꾼 것의 md5(참고용 — 접속의 시간대 설정에 따라 달라질 수 있어 SQL 의 비교에는 쓰지 않는다)
 --   authenticator_rolconfig    authenticator 역할의 설정 전체(pg_roles.rolconfig)
 --   authenticator_settings     authenticator 역할의 설정 행 전체(pg_db_role_setting: database 0 = 모든 DB)
 --   pre_request_items          그중 pgrst.db_pre_request 로 시작하는 항목(없으면 [])

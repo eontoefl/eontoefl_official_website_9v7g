@@ -25,7 +25,8 @@
 //   body-md5        마이그레이션 파일의 함수 본문 md5 를 계산한다(되돌리기 SQL·지문의 body_md5 와 견줄 값)   0
 //   set-lines       SQL 파일 앞에 둘 set 줄을 저장해 둔 파일에서 글자 그대로 만들어 적는다(손으로 옮겨 적다 틀리지 않게)   0
 //                   --for fixtures-up --accounts <계정 번호 json: {"a":"…","b":"…",… 여덟}>
-//                   --for maint-on|maint-off --expect <json> --snapshot <state_snapshot 결과>
+//                   --for maint-on  --expect <json> --snapshot <켜기 전의 state_snapshot 결과>
+//                   --for maint-off --expect <json> --snapshot <켜기 전의 state_snapshot 결과> --on <maint_on.sql 의 결과>
 //                   --for fixtures-down --expect <json>
 //                   --for rollback --fingerprint <적용 직후의 지문>
 //                   --for session-expire --expect <json> --sessions-sql <sessions-sql 결과> --not-after-before <값|null>
@@ -633,11 +634,22 @@ function phaseSetLines() {
     if (new Set(['a', 'b', 'n', 'g', 'gm', 'blk', 'wd', 'bw'].map((l) => String(acc[l]).toLowerCase())).size !== 8) stop(2, '--accounts 의 계정 번호 여덟 개가 서로 다르지 않다');
   } else if (what === 'maint-on' || what === 'maint-off') {
     const snap = loadResult(arg('--snapshot'), '--snapshot');
-    if (!snap.site_state_row || !/^[0-9a-f]{32}$/.test(String(snap.site_state_row_md5 ?? ''))) stop(2, '--snapshot 이 state_snapshot.sql 의 결과가 아니다');
+    const COLS = ['id', 'last_ended_at', 'last_ended_maintenance_id', 'maintenance_id', 'message', 'phase', 'starts_at', 'updated_at'];
+    const isRow = (r) => r && typeof r === 'object' && JSON.stringify(Object.keys(r).sort()) === JSON.stringify(COLS);
+    if (!isRow(snap.site_state_row) || !Array.isArray(snap.site_state_columns)) stop(2, '--snapshot 이 state_snapshot.sql 의 결과가 아니다(site_state_row 의 열이 여덟 개가 아니다)');
     if (snap.site_state_row.phase !== 'normal') stop(2, `--snapshot 의 phase 가 normal 이 아니다(${snap.site_state_row.phase}) — 켜기 전에 뜬 것이어야 한다`);
     lines.push(`set b3_0.acct_a = ${q(acctA())};`);
-    if (what === 'maint-on') lines.push(`set b3_0.saved_row_md5 = ${q(snap.site_state_row_md5)};`);
-    else lines.push(`set b3_0.saved_site_state = ${q(JSON.stringify(snap.site_state_row))};`);
+    // 시작 행 전체: maint_on 은 지금 행이 이 값일 때만 켜고, maint_off 는 이 값으로 되돌린다
+    lines.push(`set b3_0.saved_site_state = ${q(JSON.stringify(snap.site_state_row))};`);
+    if (what === 'maint-off') {
+      // 켠 직후의 행 전체: maint_off 는 지금 행이 이 값일 때만 되돌린다
+      const on = loadResult(arg('--on'), '--on(maint_on.sql 의 마지막 결과)');
+      const r = on.site_state_row;
+      if (!isRow(r)) stop(2, '--on 이 maint_on.sql 의 결과가 아니다(site_state_row 의 열이 여덟 개가 아니다)');
+      if (r.phase !== 'maintenance' || r.maintenance_id !== 301 || r.message !== 'zzb3p0 시험 점검') stop(2, '--on 의 행이 이 시험이 켠 값(maintenance · 301 · zzb3p0 시험 점검)이 아니다');
+      if (on.row_now_is_the_same === false) stop(2, '--on 의 row_now_is_the_same 이 false 다 — 켠 직후에 이미 행이 바뀌어 있었다. 사람이 확인할 것');
+      lines.push(`set b3_0.on_site_state = ${q(JSON.stringify(r))};`);
+    }
   } else if (what === 'fixtures-down') {
     const e = loadResult(arg('--expect'), '--expect');
     const c = e.created;
