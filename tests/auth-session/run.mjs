@@ -1098,6 +1098,72 @@ async function testTabs(opt) {
     return c.problems;
 }
 
+// 확인을 거둘 때 다른 계정의 호환 값을 지우지 않는다.
+// 다른 탭이 B 를 확인해 호환 값·표식을 써 둔 상태에서(이 탭에는 알림이 오지 않았다) A 를 확인했던 이 탭이 확인을 거둔다.
+async function testWithdrawKeepsOthers(opt) {
+    const c = checker();
+    const plantB = (w) => {
+        const sB = w.server.createSession(ACCOUNTS.B.email);
+        const user = JSON.stringify({ id: 'm-B', name: '합성 회원 B', nickname: '', email: ACCOUNTS.B.email, phone: null, role: 'user' });
+        const values = { 'eon_auth_v1:compat': JSON.stringify({ v: 1, sid: sB.sid, sub: 'auth-B', user, time: '1795500000001' }), iontoefl_user: user, iontoefl_login_time: '1795500000001' };
+        for (const [k, v] of Object.entries(values)) w.browser.local.set(k, v);
+        return values;
+    };
+    const kept = (w, values) => Object.entries(values).every(([k, v]) => w.browser.local.get(k) === v);
+    const unreadable = [
+        ['JSON 이 아님', 'zz-not-json'],
+        ['JWT 를 풀 수 없음', JSON.stringify({ access_token: 'aaa.bbb.ccc', refresh_token: 'zz', expires_at: 4102444800, user: { id: 'x' } })],
+    ];
+    // (1) 저장된 로그인 값을 읽을 수 없게 됨 → unreadable 로 거둠
+    for (const [name, value] of unreadable) {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const page = await w.open('index', 'index.html');
+        const values = plantB(w);
+        w.browser.local.set('eon_auth_v1', value);
+        page.dispatchWindow('storage', { key: 'eon_auth_v1' });
+        await w.browser.idle();
+        const label = `거둘 때(읽을 수 없는 저장값·${name})`;
+        c.ok(st(page) === 'rejected' && why(page) === 'unreadable' && page.evaluate('EonAuth.profile()') === null, `${label}: 확인 상태가 남음(${st(page)}·${why(page)})`);
+        c.ok(kept(w, values), `${label}: 다른 계정(B)의 호환 값·표식을 지우거나 바꿈`);
+        c.ok(/LOGIN/.test(lastMenu(page)) && !/합성/.test(lastMenu(page)), `${label}: 이름이 남음`);
+        audit(w, c, label);
+    }
+    // (2) 로그아웃의 답을 모름 → logout_unknown 으로 거둠
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const page = await w.open('index', 'index.html');
+        const values = plantB(w);
+        w.server.faults.logout = () => 'network';
+        page.evaluate('EonAuth.signOut()');
+        await w.browser.idle();
+        await w.browser.advance(20 * 1000);
+        c.ok(st(page) === 'rejected' && why(page) === 'logout_unknown' && page.evaluate('EonAuth.profile()') === null, `거둘 때(로그아웃 모름): 확인 상태가 남음(${st(page)}·${why(page)})`);
+        c.ok(kept(w, values), '거둘 때(로그아웃 모름): 다른 계정(B)의 호환 값·표식을 지우거나 바꿈');
+        audit(w, c, '거둘 때(로그아웃 모름)');
+    }
+    // (3) 저장된 로그인을 읽을 수 없는 채로 화면을 엶: 표식의 주인을 알 수 없다 → 지우지 않고 표시만 하지 않는다
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const values = plantB(w);
+        w.browser.local.set('eon_auth_v1', unreadable[1][1]);
+        const page = await w.open('index', 'index.html');
+        c.ok(st(page) !== 'signed_in' && page.evaluate('EonAuth.displayUserRaw()') === null && !menuHistory(page).some((e) => /합성/.test(e.html)), `읽을 수 없는 저장값으로 연 화면: 표시를 내줌(${st(page)}·${why(page)})`);
+        c.ok(kept(w, values), '읽을 수 없는 저장값으로 연 화면: 주인을 알 수 없는 호환 값·표식을 지움');
+        audit(w, c, '읽을 수 없는 저장값으로 연 화면');
+    }
+    // (4) 대조: 저장된 로그인이 없음을 확인한 경우의 주인 없는 값은 지금처럼 정리된다
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        plantB(w);
+        const page = await w.open('index', 'index.html');
+        c.ok(st(page) === 'signed_out' && !w.browser.local.has('iontoefl_user') && !w.browser.local.has('eon_auth_v1:compat'), '저장된 로그인이 없는 화면: 주인 없는(새 모듈이 만든) 호환 값이 정리되지 않음');
+    }
+    return c.problems;
+}
 // 알림(갱신·저장소 변화)이 올 때마다 공식 클라이언트에 물어 갱신을 일으키지 않는다 — 기기의 시계가 앞서 있어도 갱신이 되풀이되지 않게
 async function testNoRefreshLoop(opt) {
     const c = checker();
@@ -1131,6 +1197,7 @@ const ON_TESTS = [
     ['알림마다 갱신을 일으키지 않음', testNoRefreshLoop],
     ['로그아웃(결과를 봄 — 모름이면 확인 상태를 거둠)과 재로그인', testLogout],
     ['저장된 로그인 값을 읽을 수 없게 됨', testUnreadableStored],
+    ['확인을 거둘 때 다른 계정의 호환 값을 지우지 않음', testWithdrawKeepsOthers],
     ['옛 방식의 로그인 상태가 있는 브라우저', testLegacyPresent],
     ['저장소 상태 다섯 × 켜짐', testFiveStatesOn],
     ['자격을 싣는 조건·연결점·리디렉션', testCredentialRules],
@@ -1280,7 +1347,7 @@ const MUTANTS = [
     },
     {
         name: '복원이 오류로 끝난 길에 호환 값을 남김', tests: [testExpiry], expect: /복원 오류\([^)]*\): 새 모듈이 만든 호환 값이 남음/,
-        edits: [[AUTH_FILE, "            // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다\n            clearCompat(null, true);\n", '']],
+        edits: [[AUTH_FILE, "            clearCompat(held && held.claims ? held.claims.sid : null, true);     // 이 탭이 복원하려던 그 기록으로 만든 값만\n", '']],
     },
     {
         name: '상태를 맞출 때마다 공식 클라이언트에 물어 갱신을 일으킴', tests: [testNoRefreshLoop], expect: /갱신 되풀이: 알림마다 갱신 요청이 나감/,
@@ -1308,6 +1375,25 @@ const MUTANTS = [
     {
         name: '꺼짐의 화면이 정적 파일을 하나 더 받음(차이 장부 밖)', tests: [], section: 'off-static', expect: /기준보다 더 받는 것이 같은 출처의 인증 모듈 파일 1개가 아님/,
         edits: [['index.html', '</head>', '    <script src="vendor/supabase-2.116.0.js"></script>\n</head>']],
+    },
+    {
+        name: '확인을 거둘 때 "주인 없는 값" 규칙으로도 지움(다른 계정의 값이 지워짐)', tests: [testWithdrawKeepsOthers], expect: /거둘 때\(로그아웃 모름\): 다른 계정\(B\)의 호환 값·표식을 지우거나 바꿈/,
+        edits: [[AUTH_FILE, "        clearCompat(sid === undefined ? null : sid, true);\n        setState('rejected', why);", "        clearCompat(sid === undefined ? null : sid);\n        setState('rejected', why);"]],
+    },
+    {
+        name: '읽지 못한 저장값을 "다르다"로 쳐서 거둘 때 지움(3차의 모양)', tests: [testWithdrawKeepsOthers], expect: /거둘 때\(읽을 수 없는 저장값[^)]*\): 다른 계정\(B\)의 호환 값·표식을 지우거나 바꿈/,
+        edits: [
+            [AUTH_FILE, "            const stale = slot.stored === 'absent' || (slot.stored === 'ok' && slot.mark.sid !== slot.storedSid);", '            const stale = slot.mark.sid !== slot.storedSid;'],
+            [AUTH_FILE, "        clearCompat(sid === undefined ? null : sid, true);\n        setState('rejected', why);", "        clearCompat(sid === undefined ? null : sid);\n        setState('rejected', why);"],
+        ],
+    },
+    {
+        name: '읽지 못한 저장값을 "다르다"로 침(주인 없는 값 규칙)', tests: [testWithdrawKeepsOthers], expect: /읽을 수 없는 저장값으로 연 화면: 주인을 알 수 없는 호환 값·표식을 지움/,
+        edits: [[AUTH_FILE, "            const stale = slot.stored === 'absent' || (slot.stored === 'ok' && slot.mark.sid !== slot.storedSid);", '            const stale = slot.mark.sid !== slot.storedSid;']],
+    },
+    {
+        name: '주인 없는 값(저장된 로그인이 없음을 확인)도 정리하지 않음', tests: [testWithdrawKeepsOthers], expect: /저장된 로그인이 없는 화면: 주인 없는/,
+        edits: [[AUTH_FILE, "            const stale = slot.stored === 'absent' || (slot.stored === 'ok' && slot.mark.sid !== slot.storedSid);", '            const stale = false;']],
     },
     {
         name: '전역 로그아웃', tests: [testLogout], expect: /이 로그인만 끝내는 것이 아님/,
