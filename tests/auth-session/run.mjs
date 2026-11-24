@@ -1515,6 +1515,26 @@ const MUTANTS = [
         edits: [['tests/auth-session/screen-core.mjs', "    const keys = Object.keys(session);\n", "    if (typeof session.access_token === 'string') return { ok: true };\n    const keys = Object.keys(session);\n"]],
     },
     {
+        name: '실행기: 예행의 예외가 메서드를 보지 않음(POST 를 보내 줌)', tests: [], section: 'screen-core', expect: /예행의 예외: POST 을\(를\) 내보내 줌/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (record.method !== 'GET' || String(req.method || '').toUpperCase() !== 'GET') return false;\n", '']],
+    },
+    {
+        name: '실행기: 예행의 예외가 자격을 보지 않음(공개 키·apikey 가 실린 요청을 보내 줌)', tests: [], section: 'screen-core', expect: /예행의 예외: (공개 키가|apikey 만) 실린 GET 을\(를\) 내보내 줌/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (record.credential !== 'none' || record.apikey !== false) return false;\n", '']],
+    },
+    {
+        name: '실행기: 예행의 예외가 본문을 보지 않음', tests: [], section: 'screen-core', expect: /예행의 예외: 본문이 실린 GET 을\(를\) 내보내 줌/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (req.postData !== null && req.postData !== undefined && req.postData !== '') return false;\n", '']],
+    },
+    {
+        name: '실행기: 예행의 예외가 자격 위반 판정보다 먼저(위반으로 판정된 요청을 보내 줌)', tests: [], section: 'screen-core', expect: /예행의 예외: 자격 위반으로 판정된 요청을 내보내 줌/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (record.leak !== false || !Array.isArray(record.leakKinds) || record.leakKinds.length !== 0) return false;\n", '']],
+    },
+    {
+        name: '실행기: 예행의 예외가 주소만 봄(3차의 모양)', tests: [], section: 'screen-core', expect: /예행의 예외: /,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (!record || !req) return false;\n    if (record.leak !== false", "    if (record && record.where === 'sink') return true;\n    if (!record || !req) return false;\n    if (record.leak !== false"]],
+    },
+    {
         name: '실행기: 브라우저에 환경 변수를 그대로 넘김', tests: [], section: 'screen-core', expect: /브라우저에 필요한 것 말고 다른 환경 변수/,
         edits: [['tests/auth-session/screen-core.mjs', "if (ENV_ALLOW.includes(k.toUpperCase()) && typeof v === 'string') out[k] = v;", "if (typeof v === 'string') out[k] = v;"]],
     },
@@ -1838,6 +1858,32 @@ async function sectionScreenCore(mutate) {
     // (4) 브라우저에 넘기는 환경 변수
     const env = browserEnv({ PATH: 'p', SystemRoot: 'C:\\Windows', TEMP: 't', B3A_PW: 'zzsecret', B3A_CONTROL_SECRET: 'zzsecret', B3A_TEST_ANON_KEY: 'zzsecret', B3A_EMAIL_A: 'zzsecret', B3A_PLAYWRIGHT: 'x', SUPABASE_SERVICE_ROLE_KEY: 'zzsecret', NODE_OPTIONS: 'x' });
     if (JSON.stringify(Object.keys(env).sort()) !== JSON.stringify(['PATH', 'SystemRoot', 'TEMP']) || JSON.stringify(env).includes('zzsecret')) problems.push('실행기: 브라우저에 필요한 것 말고 다른 환경 변수(비밀)가 넘어감');
+
+    // (5) 예행의 "정상 1건" 예외: 자격 위반 판정이 먼저다. 자격 없는·본문 없는 GET 만 내보낼 수 있다
+    {
+        const { makeDecider } = await import('./request-log.mjs');
+        const dec = makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: 'zz-anon' });
+        const pass = (req) => core.controlPassOk(dec(Object.assign({ url: 'http://127.0.0.1:8787/__b3a/sink/alive', resourceType: 'fetch' }, req)).record, req);
+        if (pass({ method: 'GET' }) !== true) problems.push('예행의 예외: 자격 없는·본문 없는 GET 을 내보내지 않음');
+        const refuse = [
+            ['POST', { method: 'POST' }],
+            ['본문이 실린 GET', { method: 'GET', postData: 'x=1' }],
+            ['공개 키가 실린 GET', { method: 'GET', headers: { apikey: 'zz-anon', Authorization: 'Bearer zz-anon' } }],
+            ['apikey 만 실린 GET', { method: 'GET', headers: { apikey: 'zz-anon' } }],
+            ['알 수 없는 자격이 실린 GET', { method: 'GET', headers: { Authorization: 'Bearer zz-opaque' } }],
+            ['회원 JWT 가 실린 GET', { method: 'GET', headers: { Authorization: 'Bearer ' + fakeJwt({ role: 'authenticated', sub: 'auth-A', session_id: 's' }) } }],
+            ['비밀번호가 실린 POST', { method: 'POST', postData: JSON.stringify({ password: 'zz' }) }],
+            ['갱신값이 실린 POST', { method: 'POST', postData: JSON.stringify({ refresh_token: 'zz' }) }],
+            ['화면 이동', { method: 'GET', isNavigation: true, resourceType: 'document' }],
+        ];
+        for (const [name, req] of refuse) if (pass(req) !== false) problems.push(`예행의 예외: ${name} 을(를) 내보내 줌`);
+        if (core.controlPassOk(null, { method: 'GET' }) !== false) problems.push('예행의 예외: 판정 기록이 없는데 내보내 줌');
+        const clean = dec({ url: 'http://127.0.0.1:8787/__b3a/sink/alive', resourceType: 'fetch', method: 'GET' }).record;
+        for (const over of [{ leak: true }, { leakKinds: ['unknown_credential'] }, { leak: undefined }]) {
+            if (core.controlPassOk(Object.assign({}, clean, over), { method: 'GET' }) !== false) problems.push('예행의 예외: 자격 위반으로 판정된 요청을 내보내 줌');
+        }
+        if (core.controlPassOk(Object.assign({}, clean, { where: 'self' }), { method: 'GET' }) !== false) problems.push('예행의 예외: 시험 목적지가 아닌 요청을 내보내 줌');
+    }
     return { problems };
 }
 // 차단기("보내기 전에 가르기"): 허용 밖·자격의 용도가 맞지 않는 요청은 전송 전에 중단하고, 기록에는 정해 둔 이름과 참/거짓만 남는다.
@@ -1951,6 +1997,7 @@ function sectionScreenText() {
         ['비밀번호를 보관함에서만 꺼냄', "vault.get('PW')"],
         ['받은 로그인 상태의 출처 확인', 'checkProvidedSession(session, {'],
         ['브라우저에 필요한 환경 변수만', 'env: browserEnv(process.env)'],
+        ['예행의 예외를 판단 부분에 맡김(자격 위반 판정이 먼저)', 'if (controlPassOk(rec, { method: r.method(), postData: r.postData() })) {'],
         ['회원 JWT 의 발급자·계정을 차단기에 넘김', 'issuer: ISSUER'],
         ['로그인 기록 만료는 원복 대상', "await pause('expire-session', { sid }, { needsRevert: true });"],
         ['점검 켜기는 원복 대상', "await pause('maintenance-on', { exception: 'A' }, { needsRevert: true });"],
@@ -1958,6 +2005,7 @@ function sectionScreenText() {
     for (const [name, needle] of must) if (!code.includes(needle)) problems.push(`실행기: ${name} — 그 줄이 없음`);
     if ((code.match(/process\.env\.B3A_PW/g) || []).length !== 1) problems.push('실행기: 비밀번호를 환경 변수에서 읽는 곳이 한 곳이 아님');
     if (/localStorage\.setItem\('eon_auth_v1'/.test(code) && code.indexOf("checkProvidedSession(session, {") > code.indexOf("localStorage.setItem('eon_auth_v1'")) problems.push('실행기: 출처를 확인하기 전에 로그인 상태를 브라우저에 넣음');
+    if ((code.match(/rec\.how = 'control-pass'/g) || []).length !== 1 || code.indexOf("rec.how = 'control-pass'") < code.indexOf('if (controlPassOk(rec, {') || code.indexOf('const d = decide({') > code.indexOf('if (controlPassOk(rec, {')) problems.push('실행기: 예행의 예외가 차단기의 판정과 판단 부분을 거치지 않고 나갈 수 있음');
     if (/screenshot|tracing\.start|recordHar|storageState\(/.test(code)) problems.push('실행기: 화면 캡처·추적·HAR·상태 내보내기를 씀');
     return { problems };
 }

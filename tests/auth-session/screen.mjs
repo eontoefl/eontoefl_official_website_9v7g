@@ -36,7 +36,7 @@ import { TEST_URL, TEST_REF, CONFIG_FILE, readProdConfig } from './rewrite.mjs';
 import { createCore, makeIgnore } from './serve-core.mjs';
 import { makeDecider, summarize } from './request-log.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
-import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv } from './screen-core.mjs';
+import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv, controlPassOk } from './screen-core.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -53,9 +53,10 @@ const PAUSE_TIMEOUT = Number(arg('--pause-timeout-ms', '600000'));
 //   --selftest leaky-blocker        차단기가 시험 목적지로 가는 요청을 보내 주게 한다 → 예행(P)이 잡고, 뒤의 경우를 시작하지 않아야 한다(종료 코드 4)
 //   --selftest silent-operator      가짜 조작자가 DB 변경이 남는 멈춤과 원복 확인에 답하지 않는다 → 다음 경우를 시작하지 않아야 한다(종료 코드 3)
 //   --selftest bad-session          가짜 조작자가 출처가 맞지 않는 로그인 상태(다른 계정·다른 aal·다른 발급자)를 준다 → 넣지 않아야 한다
+//   --selftest bad-control-pass     예행의 대조용 요청을 자격·본문이 실린 POST 로 보낸다 → 예외로 내보내지 않아야 한다(수신 0, 종료 코드 4)
 const SELFTEST = arg('--selftest', null);
 if (SELFTEST && !FAKE) stop('--selftest 는 --fake 에서만 쓴다');
-if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
+if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session', 'bad-control-pass'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
 const OUT = path.resolve(arg('--out', path.join(ROOT, 'tests', 'auth-session', '.run', `screen-${FAKE ? 'fake' : 'real'}.json`)));
 
 // ---------------------------------------------------------------------------
@@ -420,13 +421,18 @@ async function handleRoute(route, cx) {
     rec.sent = false;
     cx.records.push(rec);
     if (cx.sinkPass && rec.where === 'sink' && r.url() === cx.sinkPass) {
-        // 예행(P)의 대조: 차단하지 않은 정상 요청 1건을 같은 수신기(시험 목적지)가 실제로 받는지 본다 — 이 한 건만 일부러 보낸다
+        // 예행(P)의 대조: 차단하지 않은 정상 요청 1건을 같은 수신기(시험 목적지)가 실제로 받는지 본다 — 이 한 건만 일부러 보낸다.
+        // 자격 위반 판정(위의 decide)이 먼저다: 예외로 나갈 수 있는 것은 자격 없는·본문 없는 GET 한 번뿐.
+        // 그 조건을 벗어난 요청이 이 주소로 오면 예외를 거두고 아래의 보통 길로 중단한다(P 는 통과가 아니다).
         cx.sinkPass = null;
-        rec.aborted = false;
-        rec.how = 'control-pass';
-        const resp = await route.fetch({ maxRedirects: 0 });
-        rec.sent = true;
-        return route.fulfill({ response: resp });
+        if (controlPassOk(rec, { method: r.method(), postData: r.postData() })) {
+            rec.aborted = false;
+            rec.how = 'control-pass';
+            const resp = await route.fetch({ maxRedirects: 0 });
+            rec.sent = true;
+            return route.fulfill({ response: resp });
+        }
+        cx.sinkPassRefused = (cx.sinkPassRefused || 0) + 1;
     }
     if (SELFTEST === 'leaky-blocker' && rec.where === 'sink') {
         // 대조 실험(--fake 에서만): 차단기가 고장 나 시험 목적지로 가는 요청을 보내 준다
@@ -626,8 +632,11 @@ async function buildCases() {
         // 같은 수신기(시험 목적지)로: 먼저 차단하지 않은 정상 요청 1건을 실제로 받는지, 그 뒤 차단 시험 동안 추가 수신이 0 인지
         const sinkBefore = core.counts.sink;
         cx.sinkPass = ON + '/__b3a/sink/alive';
-        await page.evaluate(() => fetch('/__b3a/sink/alive').then((r) => r.status, () => 0));
+        // 대조 실험(--fake 에서만): 대조용 요청을 자격·본문이 실린 POST 로 보낸다 → 예외로 나가면 안 된다
+        const controlInit = SELFTEST === 'bad-control-pass' ? { method: 'POST', headers: { Authorization: 'Bearer zz-not-a-real-credential' }, body: 'x=1' } : null;
+        await page.evaluate((init) => fetch('/__b3a/sink/alive', init || undefined).then((r) => r.status, () => 0), controlInit);
         ck('수신기가 살아 있음: 차단하지 않은 정상 요청 1건을 시험 목적지가 실제로 받음', core.counts.sink === sinkBefore + 1);
+        ck('예행의 예외로 나간 것은 자격 없는·본문 없는 GET 한 번뿐(조건을 벗어난 요청 0, 예외는 거둬짐)', !cx.sinkPassRefused && cx.sinkPass === null && cx.records.filter((r) => r.how === 'control-pass').length === 1);
         const sink0 = core.counts.sink;
         const csp0 = core.counts.csp;
         const rejected0 = control.rejected;

@@ -158,6 +158,21 @@ export function checkProvidedSession(session, expect, nowMs) {
     return { ok: true };
 }
 
+// 예행(P)의 "정상 1건" 예외로 내보내도 되는 요청인가.
+//   record: 차단기(request-log.mjs)의 판정 기록, req: { method, postData }
+//   자격 위반 판정이 먼저다 — 차단기가 자격·비밀번호·갱신값의 위반으로 본 요청은 이 예외로 나갈 수 없다.
+//   그 다음: 시험 목적지로 가는, 화면 이동이 아닌, 자격 없는(Authorization·apikey 없음)·본문 없는 GET 만.
+export function controlPassOk(record, req) {
+    if (!record || !req) return false;
+    if (record.leak !== false || !Array.isArray(record.leakKinds) || record.leakKinds.length !== 0) return false;
+    if (record.where !== 'sink' || record.nav !== false) return false;
+    if (record.method !== 'GET' || String(req.method || '').toUpperCase() !== 'GET') return false;
+    if (record.credential !== 'none' || record.apikey !== false) return false;
+    if (record.password !== false || record.refreshToken !== false) return false;
+    if (req.postData !== null && req.postData !== undefined && req.postData !== '') return false;
+    return true;
+}
+
 // 브라우저(자식 프로세스)에 넘길 환경 변수: 실행에 필요한 것만. 비밀번호·제어 비밀·공개 키·이메일은 물려지지 않는다.
 const ENV_ALLOW = ['SYSTEMROOT', 'WINDIR', 'SYSTEMDRIVE', 'TEMP', 'TMP', 'TMPDIR', 'PATH', 'PATHEXT', 'COMSPEC', 'OS',
     'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'HOME', 'LOCALAPPDATA', 'APPDATA', 'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)',
