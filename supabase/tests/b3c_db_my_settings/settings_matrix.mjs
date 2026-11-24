@@ -12,6 +12,9 @@
 //   그리고 효과 대조에 쓰는 값 셋(도구가 보낸 종류 값, 서버가 돌려준 동의 시각, 보관 답변의 sha256).
 //
 // 단계(--phase)                                                                                  요청
+//   start-check     시작 지문(--fingerprint)이 이번 시작 기준과 같은가: 함수 다섯 없음 · my_profile 이 3-0 의 끝 상태     0
+//                   (본문 md5 ea1fd98d…) · 공통 확인 설정 없음 · 점검 normal · 예외 0 · 합성 행 0. 다르면 종료 값 3
+//   end-check       끝 확인을 한 표로: --p-start --p-end --g-start --g-end --leftover [--s-start --s-end] [--ignore 키,…]   0
 //   plan            그 상태(--state)의 칸과 기대값을 적는다                                         0
 //   sessions-sql    환경 변수의 로그인 자격들의 로그인 기록이 살아 있는지 읽는 SQL 을 적는다           0
 //   absent          적용 전 기준: 다섯 RPC 가 "등록되지 않은 함수"로 응답하는가                        있음
@@ -19,7 +22,7 @@
 //   matrix          대조표: 함수 5 × 자격 12 × 요청(POST·GET·HEAD) + 쓰기 뒤 다시 읽기 + 인자를 붙인 요청   있음(쓰기 있음)
 //                   --state normal | normal-hook | maint | maint-hook      --rows <재기 직전의 rows_md5.sql 결과>
 //   effect          쓰기의 효과: --step track | consent | hold | bounds | rejects | coercion | race     있음(쓰기 있음)
-//   variants        저장된 답변의 모양별 읽기: --round 1|2|3|4  --variant <answers_variant.sql 의 결과>   있음(읽기만)
+//   variants        저장된 답변의 모양별 읽기: --round 1~6  --variant <answers_variant.sql 의 결과>   있음(읽기만)
 //   revoked         --kind expired|loggedout  --step pre|post|restored   JWT 는 유효한데 로그인 기록이 끝난 경우   있음
 //                   --kind jwt-expired  --step pre|post [--pre <pre 결과>]  JWT 자체가 만료된 경우(같은 JWT 로 한 쌍)
 //   rows-effect     쓰기 단계의 앞뒤에 뜬 rows_md5.sql 결과 둘과 그 단계의 결과를 견준다                  0
@@ -29,17 +32,20 @@
 //   compare         지문 결과 둘을 견준다(--a --b, read_at 은 빼고. --ignore 로 더 뺄 키를 적는다)      0
 //   body-md5        마이그레이션 파일의 함수 다섯의 본문 md5 를 계산한다                                0
 //   set-lines       SQL 파일 앞에 둘 set 줄을 저장해 둔 파일에서 글자 그대로 만들어 적는다               0
-//                   --for fixtures-up --accounts <계정 번호 json: {"a":"…","b":"…",… 여덟}>
-//                   --for fixtures-reset | fixtures-down --expect <json>
-//                   --for answers-variant --expect <json> --round <1~4>
+//                   --for fixtures-up --accounts <json: {"a":{"id":"<계정 번호>","email":"<로그인 이메일>"}, … 여덟}>
+//                       (계정 번호와, 계정을 만들 때 받은 로그인 이메일을 함께. 이메일에 합성 표식 zzb3c 가 있어야 한다)
+//                   --for fixtures-reset | fixtures-down | leftover-check --expect <json>
+//                   --for answers-variant --expect <json> --round <1~6>
 //                   --for maint-on  --expect <json> --snapshot <켜기 전의 state_snapshot 결과>
 //                   --for maint-off --expect <json> --snapshot <켜기 전의 state_snapshot 결과> --on <maint_on.sql 의 결과>
 //                   --for rollback --fingerprint <적용 직후의 지문>
+//                       (지문의 본문 md5 가 파일에서 계산한 값과 다르면 줄을 만들지 않고 멈춘다 — 종료 값 3. 스스로 맞추지 않는다)
 //                   --for session-expire --expect <json> --sessions-sql <sessions-sql 결과> --not-after-before <값|null>
 //                   --for session-restore --expect <json> --expired <session_expire.sql 결과>
 //
 // 공통 인자
-//   --expect <json>          fixtures_up.sql 의 마지막 결과(합성 계정별 회원 값·설정의 처음 값·기대 상태)
+//   --expect <json>          fixtures_up.sql 의 마지막 결과(합성 계정별 회원 값·설정의 처음 값·기대 상태).
+//                            회원 표 비밀번호 열의 원문은 들어 있지 않다(접두사가 있다는 사실과 sha256 만). 원문이 든 파일은 받지 않는다
 //   --fingerprint <json>     재기 직전에 뜬 이 폴더의 fingerprint.sql 결과. 도구는 상태를 스스로 알 수 없다 —
 //                            이 파일로 함수의 존재·실행 권한·점검 상태·공통 확인 설정이 --state 와 맞는지 보고,
 //                            맞지 않으면 요청을 보내지 않는다(종료 값 3). 30분보다 오래된 파일은 받지 않는다
@@ -58,12 +64,16 @@
 //   통과    기대값과 전부 같다(상태 코드, 응답의 키 집합이 정확히 같음, 값, Cache-Control, 금지 키·금지 값 없음)
 //   기대와 다름   응답은 왔는데 하나라도 다르다
 //   미확인  네트워크 오류·시간 초과·429·기대하지 않은 5xx — 성공으로도 실패로도 세지 않는다
-//   금지 값 = 합성 회원 전원(함정 행 포함)의 회원번호·이름·별명·이메일·전화, 옛 비밀번호 열의 합성 표식, 탈퇴 사유 표식,
-//             로그인 계정 번호, **남의 보관 답변의 표식 글자**. 이 함수들은 본인의 이름·이메일도 돌려주지 않는다 —
+//   금지 값 = 합성 회원 전원(함정 행 포함)의 회원번호·이름·별명·이메일·전화, 탈퇴 사유 표식, 로그인 계정 번호·로그인 이메일,
+//             **남의 보관 답변의 표식 글자**, 회원 표 비밀번호 열의 값(원문 없이: 고정 접두사 zzb3c-pwcol- 가 응답 글자에 없는가 +
+//             응답의 글자 값 하나하나의 sha256 이 그 값의 sha256 과 같지 않은가). 이 함수들은 본인의 이름·이메일도 돌려주지 않는다 —
 //             ok 칸에서 허용하는 것은 본인의 보관 답변 글자뿐이다. 응답 본문의 글자 전체에서 찾는다.
 //   HEAD 는 본문이 비어 있다는 것으로 판정하지 않는다 — 상태 코드로 판정한다.
-//   인자를 붙여 남을 고치려는 요청: 어느 쪽이 먼저 거절하든 "값이 오지 않음(state·settings·answers 없음, 2xx 아님)"으로
-//     판정하고 관측한 상태·코드를 적는다. 남의 행이 고쳐지지 않았음은 rows-effect 가 본다.
+//   인자를 붙여 남을 고치려는 요청: 통과로 세는 거절은 둘뿐이다 — 함수를 찾지 못함(404·PGRST202) 또는 점검 거절(503·PT503).
+//     값이 왔으면(state·settings·answers) 기대와 다름, 2xx 거나 **예상한 거절 코드가 아닌 4xx 면 미확인**이다.
+//     남의 행이 고쳐지지 않았음은 rows-effect 가 본다.
+//   effect --step coercion: JSON true 가 아닌 값(글자 "true" · 숫자 1 등)이 동의로 받아들여져 동의 시각을 바꾸면 그 칸은 기대와 다름이다
+//     (결과의 json_true_only.holds 가 false — 인자의 형을 바꾸는 보완이 필요하다는 뜻).
 // 종료 값: 0 = 전부 통과 / 1 = 기대와 다름 또는 미확인이 있음 / 2 = 요청 전에 멈춤(주소·열쇠·자격·인자·로그인 기록) /
 //          3 = 기준선 불일치(지문·저장된 값이 그 단계의 전제와 맞지 않음)
 // =====================================================================
@@ -125,13 +135,22 @@ const MAINT_EXEMPT = ['member_a', 'admin_g_post', 'admin_gm_post'];
 const VARIANT_ROUNDS = {
   1: { a: 'json_null', b: 'array', gm: 'string' }, 2: { a: 'number', b: 'missing_key', gm: 'wrong_type' },
   3: { a: 'required_null', b: 'answered_at_number', gm: 'sql_null' }, 4: { a: 'extra_keys', b: 'no_answered_at', gm: 'nullable_all_null' },
+  5: { a: 'utm_extra_key', b: 'utm_nested', gm: 'utm_nonstring' }, 6: { a: 'answered_at_not_time', b: 'answered_at_bad_date', gm: 'answered_at_offset' },
 };
+const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+// 회원 표 비밀번호 열의 합성 값은 "고정 접두사 + 무작위"다. 원문은 어느 파일에도 없다 — 접두사와 sha256 으로만 찾는다
+const PWCOL_PREFIX = 'zzb3c-pwcol-';
+const SYNTH_MARK = 'zzb3c';
+// 3-0 의 끝 상태(이번 시작 기준): public.my_profile() 의 본문 md5
+const MY_PROFILE_BODY_MD5 = 'ea1fd98d18ba93cb4944e7a00c86bc7c';
+// 시각으로 읽히는 글자의 모양(마이그레이션의 my_book_answers() 와 같은 식)
+const TIME_TEXT_RE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})([.][0-9]{1,6})?(Z|[+-]([0-9]{2}):([0-9]{2}))$/;
 const VARIANT_BASE = {
   current_score: 60.5, target_score: 95, no_target_score: false, stuck_area: '라이팅', goal_timeframe: '6개월 안에', referral_source: '인스타그램', referral_source_detail: null,
   is_au_nz_direct_submit: 'no', referrer_url: 'https://ref.zzb3c.invalid/variant', landing_url: 'https://land.zzb3c.invalid/variant', utm_data: { utm_medium: 'zzb3c-utm-variant' },
   user_agent: 'zzb3c-agent-variant', answered_at: '2026-02-03T04:05:06.789Z',
 };
-const VARIANT_NEVER = ['zzb3c-variant-extra', 'zzb3c-variant-not-an-object', 'zz_legacy_note', 'privacy_agreement', 'zzb3c-legacy-'];
+const VARIANT_NEVER = ['zzb3c-variant-extra', 'zzb3c-variant-not-an-object', 'zz_legacy_note', 'privacy_agreement', 'zzb3c-legacy-', 'zzb3c-variant-utm-extra', 'zz_other', 'zzb3c-variant-utm-nested', 'zzb3c-variant-not-a-time'];
 
 const argv = process.argv.slice(2);
 const arg = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
@@ -216,8 +235,16 @@ function checkDistinctSessions(labels) {
   const seen = {};
   for (const l of labels) { const s = jwtInfo[l].session_id; if (seen[s]) stop(2, `${l} 와 ${seen[s]} 가 같은 로그인 기록의 자격이다. 서로 다른 로그인에서 받을 것`); seen[s] = l; }
 }
+const isHex64 = (v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 function checkExpectShape(expect) {
   for (const acc of ALL_ACCOUNTS) if (!expect.accounts?.[acc]) stop(2, `--expect 에 계정 ${acc} 가 없다(fixtures_up.sql 의 결과여야 한다)`);
+  // 비밀번호 열의 원문이 든 파일은 받지 않는다(1차 판의 expect.json). 접두사가 있다는 사실과 sha256 만 있어야 한다
+  const holders = [...ALL_ACCOUNTS.map((a) => [a, expect.accounts[a]]), ['trap', expect.trap ?? {}]];
+  for (const [name, h] of holders) {
+    if (h && 'password_column_marker' in h) stop(2, `--expect 에 비밀번호 열의 원문(password_column_marker)이 들어 있다(${name}). 2차 판 fixtures_up.sql 의 결과여야 한다 — 이 파일은 지울 것`);
+    if (name === 'trap' || h.member) { const pc = h.password_column; if (!pc || pc.prefix !== PWCOL_PREFIX || pc.has_prefix !== true || !isHex64(pc.sha256)) stop(2, `--expect 의 ${name} 에 password_column(prefix ${PWCOL_PREFIX} · has_prefix true · sha256)이 없다`); }
+  }
+  for (const acc of ALL_ACCOUNTS) { const em = expect.accounts[acc].auth_email; if (typeof em !== 'string' || !em.toLowerCase().includes(SYNTH_MARK)) stop(2, `--expect 의 ${acc} 에 합성 표식(${SYNTH_MARK})이 있는 로그인 이메일(auth_email)이 없다`); }
   for (const acc of ['a', 'b', 'gm']) if (!expect.accounts[acc].member || !expect.accounts[acc].settings) stop(2, `--expect 에 ${acc} 의 회원 값·설정 값이 없다`);
   if (!expect.trap?.id || String(expect.trap.id).toLowerCase() !== String(expect.accounts.n.auth_user_id).toLowerCase()) stop(2, '--expect 에 함정 행이 없거나, 그 회원번호가 계정 n 의 로그인 계정 번호와 다르다(fixtures_up.sql 의 결과여야 한다)');
 }
@@ -309,10 +336,62 @@ function projectStored(settings) {
     if (t === 'null') { if (!nullable) return { state: 'answers_corrupt' }; } else if (t !== type) return { state: 'answers_corrupt' };
     answers[k] = raw[k];
   }
+  // utm_data 의 안쪽: 값이 하나라도 글자가 아니면 파손. 정해 둔 다섯 키 가운데 있는 것만 돌려준다
+  if (answers.utm_data !== null) {
+    const utm = {};
+    for (const [k, v] of Object.entries(answers.utm_data)) { if (typeof v !== 'string') return { state: 'answers_corrupt' }; if (UTM_KEYS.includes(k)) utm[k] = v; }
+    answers.utm_data = utm;
+  }
+  // answered_at: 없거나 null 이면 null. 글자면 시각으로 읽히는 글자일 때만 그 글자 그대로. 그 밖은 파손
   const at = Object.prototype.hasOwnProperty.call(raw, 'answered_at') ? raw.answered_at : null;
-  if (at !== null && typeof at !== 'string') return { state: 'answers_corrupt' };
+  if (at !== null && !isTimeText(at)) return { state: 'answers_corrupt' };
   answers.answered_at = at;
   return { state: 'ok', answers };
+}
+// 시각으로 읽히는 글자인가(모양 + 있는 날짜·시각). DB 는 글자를 timestamptz 로 바꿔 보고, 도구는 같은 모양에 월·일·시·분·초의 범위를 본다.
+// 둘의 판정이 갈릴 수 있는 가장자리(24:00:00 · 윤초 60 · ±16시 넘는 시간대)는 시험 값으로 쓰지 않는다
+function isTimeText(s) {
+  if (typeof s !== 'string') return false;
+  const m = TIME_TEXT_RE.exec(s);
+  if (!m) return false;
+  const [y, mo, d, h, mi, se] = m.slice(1, 7).map(Number);
+  if (y < 1 || mo < 1 || mo > 12 || d < 1 || h > 23 || mi > 59 || se > 59) return false;
+  const dim = [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1];
+  if (d > dim) return false;
+  if (m[8] !== 'Z' && (Number(m[9]) > 15 || Number(m[10]) > 59)) return false;
+  return true;
+}
+// PostgreSQL 이 jsonb 를 글자로 바꾼 것(p_answers::text)의 바이트 수. 객체는 {"키": 값, "키": 값} — 콜론·쉼표 뒤에 빈칸 하나씩.
+// (도구가 계산한 값이다. DB 의 실제 길이와 다르면 "전체 바이트의 경계" 칸이 어긋난다 — 그래서 경계에서 64바이트 떨어진 칸을 함께 쟰다)
+function pgJsonbTextBytes(v) {
+  if (v === null || typeof v !== 'object') return Buffer.byteLength(JSON.stringify(v), 'utf8');
+  if (Array.isArray(v)) return 2 + v.reduce((a, x) => a + pgJsonbTextBytes(x), 0) + Math.max(0, v.length - 1) * 2;
+  const ks = Object.keys(v);
+  return 2 + ks.reduce((a, k) => a + Buffer.byteLength(JSON.stringify(k), 'utf8') + 2 + pgJsonbTextBytes(v[k]), 0) + Math.max(0, ks.length - 1) * 2;
+}
+const KO = '가'; // 한 글자 = 코드 포인트 1 · UTF-8 3바이트
+const ASTRAL = '\u{1F600}'; // 한 글자 = 코드 포인트 1 · UTF-16 단위 2 · UTF-8 4바이트
+// 코드 포인트 n 개짜리 글자: prefix 뒤를 ch 로 채운다(String.padEnd 는 UTF-16 단위로 세므로 쓰지 않는다)
+const fill = (prefix, n, ch) => prefix + ch.repeat(Math.max(0, n - [...prefix].length));
+const cpLen = (s) => [...s].length;
+// 전체가 정확히 target 바이트인 한 벌(항목별 상한은 전부 지킨다): 주소·상세·utm 을 상한까지 여러 바이트 글자로 채우고,
+// user_agent 의 ASCII 길이(상한 512자 안)로 맞춘다. 모자라면 상세·utm 값을 하나씩 4바이트 글자로 바꾸어 늘린다
+function payloadOfBytes(account, tag, target) {
+  const m = `zzb3c-hold-${account}-${tag}-`;
+  const slots = ['detail', ...UTM_KEYS];
+  const ch = Object.fromEntries(slots.map((s) => [s, KO]));
+  const build = (uaLen) => ({ current_score: 100, target_score: 110, no_target_score: false, stuck_area: '리딩', goal_timeframe: '6개월 안에', referral_source: '기타', referral_source_detail: fill(m, LIMITS.detail, ch.detail), is_au_nz_direct_submit: 'no',
+    referrer_url: fill(`https://ref.zzb3c.invalid/${m}`, LIMITS.url, KO), landing_url: fill(`https://land.zzb3c.invalid/${m}`, LIMITS.url, KO),
+    utm_data: Object.fromEntries(UTM_KEYS.map((k) => [k, fill(m, LIMITS.utm, ch[k])])), user_agent: fill(m, uaLen, 'u') });
+  const minUa = cpLen(m);
+  for (let i = 0; i <= slots.length; i++) {
+    const uaLen = minUa + (target - pgJsonbTextBytes(build(minUa)));
+    if (uaLen < minUa) break;
+    if (uaLen <= LIMITS.agent) { const p = build(uaLen); if (pgJsonbTextBytes(p) !== target) break; return p; }
+    if (i < slots.length) ch[slots[i]] = ASTRAL;
+  }
+  stop(2, `도구의 계산 오류: ${target}바이트의 한 벌을 항목 상한 안에서 만들지 못했다`);
+  return null;
 }
 // 도구가 보관하는 답변(계정·이름별로 표식이 다르다). 정해 둔 열두 항목, 전부 허용 범위 안
 function holdPayload(account, tag) {
@@ -368,9 +447,10 @@ function collectStrings(v, out) {
 // 저장된 답변에서 글자를 모은다: 정해 둔 열두 항목 + answered_at 아래의 글자(own — 주인의 응답에서만 허용)와
 // 그 밖의 글자(never — 옛 형식의 그 밖의 키, 객체가 아닌 값. 누구의 응답에도 나오면 안 된다)
 function answerStrings(pending) {
-  const own = []; const never = [];
-  if (jsonType(pending) === 'object') for (const [k, v] of Object.entries(pending)) collectStrings(v, ANSWER_KEYS_OUT.includes(k) ? own : never);
-  else collectStrings(pending ?? null, never);
+  // own = my_book_answers() 가 돌려줄 것(열두 항목 + answered_at, utm 은 정해 둔 키만) 안의 글자. 파손이면 하나도 없다
+  const proj = projectStored({ pending_book_request: pending, pending_is_sql_null: false });
+  const own = proj.state === 'ok' && proj.answers ? collectStrings(proj.answers, []) : [];
+  const never = collectStrings(pending ?? null, []).filter((s) => !own.includes(s));
   return { own: own.filter((s) => s.includes('zzb3c')), never: never.filter((s) => s.includes('zzb3c')) };
 }
 function forbiddenValues(expect, rowsBy) {
@@ -380,19 +460,22 @@ function forbiddenValues(expect, rowsBy) {
   for (const [acc, a] of Object.entries(expect.accounts ?? {})) {
     add(acc, 'auth_user_id', a.auth_user_id);
     for (const k of ['id', 'name', 'nickname', 'email', 'phone']) if (a.member) add(acc, `member.${k}`, a.member[k]);
-    add(acc, 'password_column_marker', a.password_column_marker);
+    add(acc, 'auth_email(로그인 이메일)', a.auth_email);
     for (const w of a.withdrawal_markers ?? []) add(acc, 'withdrawal_marker', w);
     addAnswers(acc, 'answers(처음 값)', a.settings?.pending_book_request ?? null);
     // 이 도구가 그 계정으로 보관하는 답변의 표식(다른 계정의 응답에 나오면 안 된다)
     add(acc, 'answers(도구가 보관한 값의 표식)', `zzb3c-hold-${acc}-`, true);
   }
   if (expect.trap) {
-    for (const k of ['name', 'nickname', 'email', 'phone', 'password_column_marker']) add('trap', k, expect.trap[k]);
+    for (const k of ['name', 'nickname', 'email', 'phone']) add('trap', k, expect.trap[k]);
     addAnswers('trap', 'answers(처음 값)', expect.trap.settings?.pending_book_request ?? null);
   }
   // 지금 저장돼 있는 답변의 글자(처음 값과 달라져 있을 수 있다)
   if (rowsBy) for (const [label, u] of Object.entries(rowsBy)) addAnswers(label, 'answers(지금 저장된 값)', u.settings?.pending_book_request ?? null);
   for (const s of VARIANT_NEVER) out.push({ owner: '(누구에게도)', field: '옛 형식의 그 밖의 키·파손 값', value: s, answers: false });
+  // 회원 표 비밀번호 열: 원문은 도구가 모른다. 고정 접두사가 응답 글자에 없는가 + 응답의 글자 값 하나하나의 sha256 이 그 값의 sha256 과 같지 않은가
+  out.push({ owner: '(누구에게도)', field: '회원 표 비밀번호 열의 합성 값(고정 접두사)', value: PWCOL_PREFIX, answers: false });
+  out.passwordHashes = [...Object.entries(expect.accounts ?? {}).map(([acc, a]) => [acc, a.password_column?.sha256]), ['trap', expect.trap?.password_column?.sha256]].filter(([, h]) => isHex64(h));
   return out;
 }
 function collectKeys(v, keys) {
@@ -409,6 +492,8 @@ function leakProblems(res, forbidden, owner, allowAnswers) {
   const lower = hay.toLowerCase();
   for (const k of FORBIDDEN_KEYS) if (keys.includes(k)) problems.push(`금지 키가 응답에 있다: ${k}`);
   if (lower.includes('password')) problems.push('응답 본문에 password 라는 글자가 있다');
+  // 비밀번호 열의 값(원문 없이): 응답의 글자 값 하나하나의 sha256 을 견준다(접두사는 아래의 금지 값 목록에서 찾는다)
+  if (forbidden.passwordHashes?.length && strings.length) { const hs = new Set(strings.map((s) => sha256(s))); for (const [who, h] of forbidden.passwordHashes) if (hs.has(h)) problems.push(`회원 표 비밀번호 열의 값이 응답에 있다(sha256 일치): ${who}`); }
   const allowed = forbidden.filter((f) => f.answers && allowAnswers && f.owner === owner).map((f) => f.value);
   for (const f of forbidden) {
     if (f.answers && allowAnswers && f.owner === owner) continue;
@@ -498,11 +583,15 @@ function judge(expected, res, method, ctx) {
       else if (out.code !== 'PGRST202') bad(`code 가 PGRST202 가 아니다(${out.code}) — 일반 404 는 "등록되지 않은 함수"의 증거가 아니다`);
       if (hasData) bad('함수를 찾지 못해야 하는데 state·값이 응답에 있다');
       break;
-    case 'args_no_data':
-      out.observed = res.status === 404 && out.code === 'PGRST202' ? '함수를 찾지 못함(404·PGRST202)' : maintenanceShape ? '점검 거절(503·PT503)' : `그 밖(${res.status}·${out.code})`;
+    case 'args_no_data': {
+      // 통과로 세는 거절은 둘뿐이다: 함수를 찾지 못함(404·PGRST202) · 점검 거절(503·PT503). 그 밖의 거절(다른 4xx)은 미확인이다
+      const notFound = res.status === 404 && out.code === 'PGRST202';
+      out.observed = notFound ? '함수를 찾지 못함(404·PGRST202)' : maintenanceShape ? '점검 거절(503·PT503)' : `그 밖(${res.status}·${out.code})`;
       if (hasData) bad('인자를 붙였는데 state·값이 응답에 있다(함수가 실행됐다)');
       else if (res.status >= 200 && res.status < 400) { out.verdict = 'unverified'; bad(`거절이 아니라 ${res.status} — 무엇이 실행됐는지 확인할 것`); }
+      else if (!notFound && !maintenanceShape && out.verdict !== 'unverified') { out.verdict = 'unverified'; bad(`예상한 거절(404·PGRST202 또는 503·PT503)이 아니다(${res.status}·${out.code}) — 무엇이 거절했는지 확인할 것`); }
       break;
+    }
     case 'invalid':
       out.observed_details = isObj && typeof j.details === 'string' ? j.details.slice(0, 40) : null; // 고정된 사유 이름이다(받은 값이 아니다)
       if (res.status !== 400) bad(`상태 ${res.status} (기대 400)`);
@@ -869,6 +958,17 @@ function invalidHoldCases(account) {
     ['referral_source 목록 밖', w({ referral_source: '유튜브' }), 'referral_source'], ['referral_source 빈 글자', w({ referral_source: '' }), 'referral_source'],
     ['기타인데 상세 null', w({ referral_source_detail: null }), 'referral_source_detail'], ['기타인데 상세 빈 글자', w({ referral_source_detail: '' }), 'referral_source_detail'], ['기타인데 상세 공백만', w({ referral_source_detail: '   ' }), 'referral_source_detail'],
     ['상세 201자', w({ referral_source_detail: strOf(LIMITS.detail + 1, 'zzb3c-hold-' + account + '-') }), 'referral_source_detail'], ['기타가 아닌데 상세 있음', w({ referral_source: '블로그' }), 'referral_source_detail'],
+    // 공백 글자만으로 된 상세: 화면의 trim() 이 빈 글자로 만드는 것은 서버도 거절해야 한다(SQL 의 기본 btrim 은 빈칸만 지운다)
+    ['기타인데 상세가 탭만', w({ referral_source_detail: '\t\t' }), 'referral_source_detail'], ['기타인데 상세가 줄바꿈만', w({ referral_source_detail: '\n\r\n' }), 'referral_source_detail'],
+    ['기타인데 상세가 전각 빈칸(U+3000)만', w({ referral_source_detail: '\u3000\u3000' }), 'referral_source_detail'], ['기타인데 상세가 U+00A0 만', w({ referral_source_detail: '\u00A0' }), 'referral_source_detail'],
+    ['기타인데 상세가 여러 공백 글자의 섞임', w({ referral_source_detail: ' \u3000\t\u00A0\u2003\uFEFF\n' }), 'referral_source_detail'],
+    // 여러 바이트 글자의 길이 경계(글자 수 = 코드 포인트): 상한 + 1
+    ['상세 한글 201자', w({ referral_source_detail: fill('zzb3c-hold-' + account + '-', LIMITS.detail + 1, KO) }), 'referral_source_detail'], ['상세 4바이트 글자 201자', w({ referral_source_detail: fill('zzb3c-hold-' + account + '-', LIMITS.detail + 1, ASTRAL) }), 'referral_source_detail'],
+    ['user_agent 한글 513자', w({ user_agent: fill('zzb3c-hold-' + account + '-', LIMITS.agent + 1, KO) }), 'user_agent'],
+    ['referrer_url 한글 2049자', w({ referrer_url: fill('https://ref.zzb3c.invalid/zzb3c-hold-' + account + '-', LIMITS.url + 1, KO) }), 'referrer_url'], ['landing_url 한글 2049자', w({ landing_url: fill('https://land.zzb3c.invalid/zzb3c-hold-' + account + '-', LIMITS.url + 1, KO) }), 'landing_url'],
+    ['utm_data 값 한글 201자', w({ utm_data: { utm_source: fill('zzb3c-hold-' + account + '-', LIMITS.utm + 1, KO) } }), 'utm_data'],
+    // 전체 바이트의 경계: 항목별 상한은 전부 지키면서 전체만 넘긴다(상한 + 1, 상한 + 64)
+    ['전체 16385 바이트(항목별 상한은 지킴)', payloadOfBytes(account, 'rejb1', LIMITS.bytes + 1), 'too_large'], ['전체 16448 바이트(항목별 상한은 지킴)', payloadOfBytes(account, 'rejb64', LIMITS.bytes + 64), 'too_large'],
     ['is_au_nz 목록 밖', w({ is_au_nz_direct_submit: 'maybe' }), 'is_au_nz_direct_submit'], ['is_au_nz 참거짓', w({ is_au_nz_direct_submit: true }), 'is_au_nz_direct_submit'],
     ['referrer_url 빈 글자', w({ referrer_url: '' }), 'referrer_url'], ['referrer_url 2049자', w({ referrer_url: strOf(LIMITS.url + 1, 'https://ref.zzb3c.invalid/') }), 'referrer_url'], ['referrer_url 숫자', w({ referrer_url: 123 }), 'referrer_url'], ['referrer_url 객체', w({ referrer_url: { href: 'x' } }), 'referrer_url'],
     ['landing_url 2049자', w({ landing_url: strOf(LIMITS.url + 1, 'https://land.zzb3c.invalid/') }), 'landing_url'], ['landing_url 배열', w({ landing_url: ['x'] }), 'landing_url'],
@@ -939,9 +1039,22 @@ async function phaseEffect() {
       referrer_url: strOf(LIMITS.url, `https://ref.zzb3c.invalid/${m}/`), landing_url: strOf(LIMITS.url, `https://land.zzb3c.invalid/${m}/`),
       utm_data: Object.fromEntries(['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].map((k) => [k, strOf(LIMITS.utm, m + '-')])), user_agent: strOf(LIMITS.agent, m + '-') };
     const pMin = { current_score: 0, target_score: 0.5, no_target_score: false, stuck_area: '리딩', goal_timeframe: '한 달 안에', referral_source: '지인추천', referral_source_detail: null, is_au_nz_direct_submit: 'no', referrer_url: null, landing_url: null, utm_data: null, user_agent: null };
-    result.meaning = '회원 A 가 상한에 딱 맞는 답변(주소 2048자 · user_agent 512자 · 상세 200자 · utm 값 200자 ×5 · 점수 120)과 하한(현재 0 · 목표 0.5 · 널 다섯)을 보관한다. 둘 다 받아야 한다';
-    result.sent_bytes = { max_payload_json: Buffer.byteLength(JSON.stringify(pMax), 'utf8'), limit: LIMITS.bytes };
+    result.meaning = '회원 A 가 상한에 딱 맞는 답변(주소 2048자 · user_agent 512자 · 상세 200자 · utm 값 200자 ×5 · 점수 120), 여러 바이트 글자로 상한에 딱 맞는 값(한글 · 4바이트 글자), 전체 16320 · 16384 바이트, 하한(현재 0 · 목표 0.5 · 널 다섯)을 보관한다. 전부 받아야 한다(상한 + 1 의 거절은 rejects 단계)';
+    result.sent_bytes = { max_payload_as_pg_text: pgJsonbTextBytes(pMax), limit: LIMITS.bytes, note: '도구가 계산한 "PostgreSQL 이 jsonb 를 글자로 바꾼 것"의 바이트 수다. DB 의 실제 길이와 다르면 정확히 16384 · 16385 칸이 어긋난다 — 그때는 64바이트 떨어진 칸(16320 통과 · 16448 거절)이 맞는지를 함께 본다' };
     await run('member_a', 'my_book_answers_hold', { p_answers: pMax }, okHold(pMax), 'POST {p_answers: 상한에 딱 맞는 한 벌}');
+    // 여러 바이트 글자의 길이 경계(글자 수 = 코드 포인트): 상한에 딱 맞는 값은 받는다
+    const mb = (patch) => ({ ...holdPayload('a', tag), ...patch });
+    const multi = [
+      ['상세 한글 200자', mb({ referral_source_detail: fill(m + '-', LIMITS.detail, KO) })],
+      ['상세 4바이트 글자 200자(UTF-16 단위로는 400 — 서버는 코드 포인트로 센다)', mb({ referral_source_detail: fill(m + '-', LIMITS.detail, ASTRAL) })],
+      ['user_agent 한글 512자', mb({ user_agent: fill(m + '-', LIMITS.agent, KO) })],
+      ['referrer_url 한글 2048자', mb({ referrer_url: fill(`https://ref.zzb3c.invalid/${m}/`, LIMITS.url, KO) })],
+      ['utm_data 값 한글 200자', mb({ utm_data: { utm_term: fill(m + '-', LIMITS.utm, KO) } })],
+      ['상세의 앞뒤에 전각 빈칸이 있고 가운데 글자가 있음(공백만이 아니다 — 받은 그대로 저장)', mb({ referral_source_detail: `\u3000${m}-가\u3000` })],
+      ['전체 16320 바이트(상한 - 64)', payloadOfBytes('a', `${tag}b64`, LIMITS.bytes - 64)],
+      ['전체 정확히 16384 바이트(상한)', payloadOfBytes('a', `${tag}b0`, LIMITS.bytes)],
+    ];
+    for (const [label, p] of multi) await run('member_a', 'my_book_answers_hold', { p_answers: p }, okHold(p), `POST {p_answers: ${label}}`);
     const r2 = await run('member_a', 'my_book_answers_hold', { p_answers: pMin }, okHold(pMin), 'POST {p_answers: 하한 한 벌}');
     await run('member_a', 'my_book_answers', {}, okAnswers({ ...pMin, answered_at: r2.cell.returned?.answered_at ?? null }), 'POST {} (다시 읽기: 하한 한 벌 전체)');
   } else if (step === 'rejects') {
@@ -958,17 +1071,21 @@ async function phaseEffect() {
     await run('member_b', 'my_marketing_consent_set', { p_consent: false }, inv('invalid_consent'), 'POST {"p_consent": false} (B — 철회는 없다)');
   } else if (step === 'coercion') {
     // PostgREST 가 JSON 값을 boolean 으로 어떻게 바꾸는지 모른다(글자 "true", 숫자 1 등). 관측해서 적는다.
-    result.meaning = '관측: p_consent 에 참이 아닌 JSON 값(글자·숫자)을 넣었을 때 PostgREST 가 참으로 바꿔 넘기는가. 받아들여졌으면 A 의 동의 시각이 새로 쓰인다(그 효과는 expected_effects 에 반영된다)';
-    for (const [label, v] of [['글자 "true"', 'true'], ['숫자 1', 1], ['글자 "yes"', 'yes'], ['글자 "false"', 'false'], ['숫자 0', 0]]) {
+    // 계약은 "참만"이다. JSON 의 true 가 아닌 값(글자 "true" · 숫자 1 등)이 동의로 받아들여져 동의 시각을 바꾸면 **통과가 아니다**.
+    result.meaning = 'p_consent 에 JSON true 가 아닌 값(글자·숫자)을 넣는다. 하나라도 동의로 받아들여지면(200 ok — 동의 시각이 새로 쓰인다) "JSON 참만"은 통과가 아니다(그 칸은 기대와 다름). 그 경우 인자의 형을 바꾸는 보완이 필요하다. 받아들여진 효과(A 의 동의 시각)는 expected_effects 에 반영된다 — rows-effect 는 그 효과가 A 의 그 열에만 있는지를 본다';
+    for (const [label, v] of [['글자 "true"', 'true'], ['숫자 1', 1], ['글자 "yes"', 'yes'], ['글자 "t"', 't'], ['글자 "false"', 'false'], ['숫자 0', 0]]) {
       const res = await call('member_a', 'my_marketing_consent_set', 'POST', { p_consent: v });
       const accepted = res.status === 200 && res.json && res.json.state === 'ok';
       const exp = accepted ? { ...okConsent(), kind: 'ok' } : { kind: 'observe' };
       const cell = cellOf(++no, 'member_a', 'my_marketing_consent_set', 'POST', `POST {"p_consent": ${label}}`, { kind: 'observe' }, judge(exp, res, 'POST', { forbidden, owner: 'a' }));
-      cell.observed = accepted ? '받아들여짐(200 ok — 참으로 바뀌어 넘어갔다)' : `거절(${res.status}·${cell.code})`;
-      applyReturned(ledger, 'a', 'my_marketing_consent_set', cell);
+      cell.expect_text = 'JSON true 가 아닌 값이다 — 거절(4xx)이어야 한다. 동의로 받아들여지면 기대와 다름';
+      cell.observed = accepted ? '받아들여짐(200 ok — 참으로 바뀌어 넘어갔고 동의 시각이 새로 쓰였다)' : `거절(${res.status}·${cell.code})`;
+      applyReturned(ledger, 'a', 'my_marketing_consent_set', cell); // 효과는 판정을 바꾸기 전에 장부에 적는다(실제로 쓰였으므로)
+      if (accepted) { cell.verdict = 'mismatch'; cell.problems.push('JSON true 가 아닌 값이 동의로 받아들여져 동의 시각을 바꿨다 — "JSON 참만"이 아니다'); }
       cells.push(cell);
     }
     result.accepted_non_boolean = cells.filter((c) => c.observed.startsWith('받아들여짐')).map((c) => c.request);
+    result.json_true_only = { holds: result.accepted_non_boolean.length === 0, accepted: result.accepted_non_boolean, meaning: result.accepted_non_boolean.length === 0 ? 'JSON true 가 아닌 값은 하나도 동의로 받아들여지지 않았다' : '"JSON 참만"이 아니다 — 인자의 형(boolean)을 바꾸는 보완이 필요하다(브레인방 판단)' };
   } else if (step === 'race') {
     // 두 창: A 가 서로 다른 두 벌을 동시에 보낸다. 남은 것이 둘 중 한 벌 "전체"인가(항목이 섞이지 않았는가)
     const rounds = 5; const winners = [];
@@ -1014,12 +1131,18 @@ function variantStored(name) {
     case 'extra_keys': o.zz_legacy_note = 'zzb3c-variant-extra'; o.privacy_agreement = true; return { pending_book_request: o };
     case 'no_answered_at': delete o.answered_at; return { pending_book_request: o };
     case 'nullable_all_null': for (const k of ['current_score', 'referral_source_detail', 'referrer_url', 'landing_url', 'utm_data', 'user_agent']) o[k] = null; return { pending_book_request: o };
+    case 'utm_extra_key': o.utm_data = { utm_medium: 'zzb3c-utm-variant', zz_other: 'zzb3c-variant-utm-extra' }; return { pending_book_request: o };
+    case 'utm_nested': o.utm_data = { utm_source: { nested: 'zzb3c-variant-utm-nested' } }; return { pending_book_request: o };
+    case 'utm_nonstring': o.utm_data = { utm_medium: 'zzb3c-utm-variant', utm_term: 5 }; return { pending_book_request: o };
+    case 'answered_at_not_time': o.answered_at = 'zzb3c-variant-not-a-time'; return { pending_book_request: o };
+    case 'answered_at_bad_date': o.answered_at = '2026-13-45T99:99:99.000Z'; return { pending_book_request: o };
+    case 'answered_at_offset': o.answered_at = '2026-02-03T13:05:06.789012+09:00'; return { pending_book_request: o };
     default: return null;
   }
 }
 async function phaseVariants() {
   const round = Number(arg('--round'));
-  if (!VARIANT_ROUNDS[round]) stop(2, '--round 는 1 | 2 | 3 | 4');
+  if (!VARIANT_ROUNDS[round]) stop(2, '--round 는 1 ~ 6');
   const expect = loadResult(arg('--expect'), '--expect');
   checkExpectShape(expect);
   const applied = loadResult(arg('--variant'), '--variant(answers_variant.sql 의 마지막 결과)');
@@ -1035,7 +1158,9 @@ async function phaseVariants() {
   const sessionCheck = checkSessions(arg('--sessions-alive'), Object.fromEntries(logins.map((l) => [l, 'alive'])));
   const result = baseResult({ phase: 'variants', round, variants: VARIANT_ROUNDS[round], fingerprint_check: fpCheck, session_check: sessionCheck, credentials: credentialsOut(), meaning: '저장된 값의 모양별로 my_book_answers() 가 "보관 없음"(SQL NULL → ok·answers null) · 파손(answers_corrupt, 값 없음) · 정상(열두 항목 + answered_at 만)을 섞지 않는가. 같은 때 my_settings() 는 그대로 ok 인가' });
   // 이 단계에서 본인 응답에 허용하는 답변 글자는 바탕 값의 것뿐이다
-  const forbidden = forbiddenValues(expect, null).filter((f) => !f.answers);
+  const allForbidden = forbiddenValues(expect, null);
+  const forbidden = allForbidden.filter((f) => !f.answers);
+  forbidden.passwordHashes = allForbidden.passwordHashes;
   for (const s of collectStrings(VARIANT_BASE, [])) if (s.includes('zzb3c')) for (const acc of ['a', 'b', 'gm']) forbidden.push({ owner: acc, field: 'answers(모양 시험의 바탕 값)', value: s, answers: true });
   const cells = []; let no = 0; const expectedStates = {};
   for (const [acc, name] of Object.entries(VARIANT_ROUNDS[round])) {
@@ -1234,17 +1359,30 @@ function phaseSetLines() {
   const created = () => {
     const c = loadResult(arg('--expect'), '--expect').created;
     if (!c || !Array.isArray(c.users) || c.users.length !== 7 || !Array.isArray(c.mappings) || c.mappings.length !== 6 || !Array.isArray(c.admins) || c.admins.length !== 2) stop(2, '--expect 에 created(users 7 · mappings 6 · admins 2)가 없다(fixtures_up.sql 의 결과여야 한다)');
+    if (!Array.isArray(c.accounts) || c.accounts.length !== 8 || !c.accounts.every((a) => UUID_RE.test(String(a?.auth_user_id ?? '')) && typeof a.email === 'string' && a.email.toLowerCase().includes(SYNTH_MARK))) stop(2, `--expect 의 created 에 accounts 8(로그인 계정의 번호와 합성 표식 ${SYNTH_MARK} 이 있는 이메일)이 없다(fixtures_up.sql 2차 판의 결과여야 한다)`);
     return `set b3c.created = ${q(JSON.stringify(c))};`;
   };
   if (what === 'fixtures-up') {
+    // accounts.json: {"a": {"id": "<계정 번호>", "email": "<계정을 만들 때 받은 로그인 이메일>"}, … 여덟}
     const acc = loadResult(arg('--accounts'), '--accounts');
-    for (const l of ALL_ACCOUNTS) lines.push(`set b3c.acct_${l} = ${q(uuid(acc[l], `--accounts 의 ${l}`))};`);
-    if (new Set(ALL_ACCOUNTS.map((l) => String(acc[l]).toLowerCase())).size !== 8) stop(2, '--accounts 의 계정 번호 여덟 개가 서로 다르지 않다');
+    for (const l of ALL_ACCOUNTS) {
+      const a = acc?.[l];
+      if (!a || typeof a !== 'object') stop(2, `--accounts 의 ${l} 가 {"id": …, "email": …} 모양이 아니다(계정 번호만 적은 1차 판의 모양은 받지 않는다)`);
+      const em = String(a.email ?? '').trim();
+      if (!/^[^@\s]+@[^@\s]+$/.test(em)) stop(2, `--accounts 의 ${l}.email 이 이메일 모양이 아니다`);
+      if (!em.toLowerCase().includes(SYNTH_MARK)) stop(2, `--accounts 의 ${l}.email 에 합성 표식(${SYNTH_MARK})이 없다 — 이 시험이 만든 합성 계정이 아닐 수 있다`);
+      lines.push(`set b3c.acct_${l} = ${q(uuid(a.id, `--accounts 의 ${l}.id`))};`, `set b3c.acct_${l}_email = ${q(em)};`);
+    }
+    if (new Set(ALL_ACCOUNTS.map((l) => String(acc[l].id).toLowerCase())).size !== 8) stop(2, '--accounts 의 계정 번호 여덟 개가 서로 다르지 않다');
+    if (new Set(ALL_ACCOUNTS.map((l) => String(acc[l].email).trim().toLowerCase())).size !== 8) stop(2, '--accounts 의 이메일 여덟 개가 서로 다르지 않다');
   } else if (what === 'fixtures-down' || what === 'fixtures-reset') {
+    lines.push(created());
+  } else if (what === 'leftover-check') {
+    lines.shift(); // 읽기만 하는 SQL 이다(대상 확인 값을 쓰지 않는다)
     lines.push(created());
   } else if (what === 'answers-variant') {
     const round = Number(arg('--round'));
-    if (!VARIANT_ROUNDS[round]) stop(2, '--round 는 1 | 2 | 3 | 4');
+    if (!VARIANT_ROUNDS[round]) stop(2, '--round 는 1 ~ 6');
     lines.push(created(), `set b3c.variant_round = '${round}';`);
   } else if (what === 'maint-on' || what === 'maint-off') {
     const snap = loadResult(arg('--snapshot'), '--snapshot');
@@ -1253,6 +1391,12 @@ function phaseSetLines() {
     if (!isRow(snap.site_state_row) || !Array.isArray(snap.site_state_columns)) stop(2, '--snapshot 이 state_snapshot.sql 의 결과가 아니다(site_state_row 의 열이 여덟 개가 아니다)');
     if (snap.site_state_row.phase !== 'normal') stop(2, `--snapshot 의 phase 가 normal 이 아니다(${snap.site_state_row.phase}) — 켜기 전에 뜬 것이어야 한다`);
     lines.push(`set b3c.acct_a = ${q(acctA())};`);
+    if (what === 'maint-on') {
+      // 예외 명단에 넣을 계정이 이번에 만든 합성 계정인가를 maint_on.sql 이 계정 번호 + 로그인 이메일로 대조한다
+      const em = loadResult(arg('--expect'), '--expect').accounts?.a?.auth_email;
+      if (typeof em !== 'string' || !em.toLowerCase().includes(SYNTH_MARK)) stop(2, `--expect 의 accounts.a.auth_email 이 없거나 합성 표식(${SYNTH_MARK})이 없다`);
+      lines.push(`set b3c.acct_a_email = ${q(em)};`);
+    }
     lines.push(`set b3c.saved_site_state = ${q(JSON.stringify(snap.site_state_row))};`);
     if (what === 'maint-off') {
       const on = loadResult(arg('--on'), '--on(maint_on.sql 의 마지막 결과)');
@@ -1264,17 +1408,22 @@ function phaseSetLines() {
     }
   } else if (what === 'rollback') {
     const fns = loadResult(arg('--fingerprint'), '--fingerprint').functions ?? {};
-    const applied = {}; const bodyOverride = {};
+    const applied = {}; const differs = [];
     const expected = bodyMd5OfMigration(arg('--migration') ?? MIGRATION);
+    if (!expected) stop(2, '마이그레이션 파일에서 함수 다섯의 본문을 찾지 못했다(견줄 기준이 없다)');
     for (const n of FN_ORDER) {
       const f = fns[n] ?? {};
       if (f.exists !== true || !/^[0-9]{1,10}$/.test(String(f.oid ?? '')) || !/^[0-9a-f]{32}$/.test(String(f.def_md5 ?? ''))) stop(2, `--fingerprint 에 ${n} 의 oid·def_md5 가 없다(적용 직후에 뜬 지문이어야 한다)`);
       applied[n] = { oid: String(f.oid), def_md5: f.def_md5 };
-      if (f.body_md5 && expected && f.body_md5 !== expected[n]) bodyOverride[n] = f.body_md5;
+      if (f.body_md5 !== expected[n]) differs.push(`${n}(지문 ${f.body_md5 ?? '없음'} / 파일 ${expected[n]})`);
+    }
+    // 기준이 다르면 스스로 맞추지 않는다: DB 에서 읽은 값을 견줄 값으로 대신 넘기지 않고 멈춘다. 그 뒤는 사람이 판단한다
+    if (differs.length) {
+      writeOut({ tool: TOOL, phase: 'set-lines', for: what, request_count: 0, stopped: '본문 md5 불일치', differs, lines: [], note: '지문의 함수 본문 md5 가 마이그레이션 파일에서 계산한 값과 다르다. 되돌리기의 set 줄을 만들지 않았다 — 원인(누가 함수를 바꿨는가, SQL 통로가 본문 글자를 바꿔 보냈는가)을 사람이 확인한다' });
+      stop(3, `되돌리기의 기준이 다르다 — 지문의 함수 본문 md5 가 파일에서 계산한 값과 다르다: ${differs.join(' · ')}. set 줄을 만들지 않았다. 사람이 원인을 확인할 것`);
     }
     lines.shift(); // 되돌리기 SQL 은 대상 확인 값을 쓰지 않는다(운영으로도 갈 수 있는 파일이다)
     lines.push(`set b3c.applied = ${q(JSON.stringify(applied))};`);
-    if (Object.keys(bodyOverride).length) lines.push(`set b3c.applied_body_md5 = ${q(JSON.stringify(bodyOverride))};   -- 지문의 body_md5 가 파일에서 계산한 값과 달라서 넘긴다(${Object.keys(bodyOverride).join(', ')})`);
   } else if (what === 'session-expire' || what === 'session-restore') {
     lines.push(`set b3c.account_id = ${q(acctA())};`);
     if (what === 'session-expire') {
@@ -1289,14 +1438,66 @@ function phaseSetLines() {
       if (!x.session_id || !x.not_after_expired) stop(2, '--expired 가 session_expire.sql 의 결과가 아니다');
       lines.push(`set b3c.session_id = ${q(uuid(x.session_id, '--expired 의 session_id'))};`, `set b3c.not_after_expired = ${q(x.not_after_expired)};`, `set b3c.not_after_before = ${q(x.not_after_before === null || x.not_after_before === undefined ? 'null' : x.not_after_before)};`);
     }
-  } else stop(2, '--for 는 fixtures-up | fixtures-reset | fixtures-down | answers-variant | maint-on | maint-off | rollback | session-expire | session-restore');
+  } else stop(2, '--for 는 fixtures-up | fixtures-reset | fixtures-down | leftover-check | answers-variant | maint-on | maint-off | rollback | session-expire | session-restore');
   console.log(lines.join('\n'));
   writeOut({ tool: TOOL, phase: 'set-lines', for: what, request_count: 0, lines, note: '이 줄들을 같은 요청의 맨 앞에 두고 그 뒤에 SQL 파일 전체를 붙인다. 값은 식별값이다(열쇠·자격이 아니다)' });
   log(`phase=set-lines for=${what} 요청 0건 — ${lines.length}줄`);
   return 0;
 }
 
-const PHASES = { 'set-lines': phaseSetLines, plan: phasePlan, 'sessions-sql': phaseSessionsSql, absent: phaseAbsent, matrix: phaseMatrix, effect: phaseEffect, variants: phaseVariants, revoked: phaseRevoked, 'rows-effect': phaseRowsEffect, compare: phaseCompare, 'body-md5': phaseBodyMd5 };
+// 시작 지문이 이번 시작 기준(3-0 의 끝 상태, 다른 조각의 시험이 진행 중이 아님)과 같은가. 요청 0
+function phaseStartCheck() {
+  const fp = loadResult(arg('--fingerprint'), '--fingerprint');
+  if (!fp?.functions || !fp.read_at) stop(2, '--fingerprint 가 이 폴더의 fingerprint.sql 결과가 아니다');
+  const age = ageSeconds(fp.read_at);
+  if (age > 1800 || age < -300) stop(2, `--fingerprint 가 ${age}초 전에 읽은 것이다. 방금 읽은 것이어야 한다`);
+  const mp = fp.my_profile ?? {}; const e = mp.execute ?? {};
+  const rows = [
+    ['이 계약의 함수 다섯이 없다', '다섯 모두 named_count 0', FN_ORDER.map((n) => `${n}:${fp.functions[n]?.named_count}`).join(' '), FN_ORDER.every((n) => Number(fp.functions[n]?.named_count) === 0 && fp.functions[n]?.exists === false)],
+    ['my_profile 이 3-0 의 끝 상태로 있다', `exists true · named_count 1 · body_md5 ${MY_PROFILE_BODY_MD5}`, `exists ${mp.exists} · named_count ${mp.named_count} · body_md5 ${mp.body_md5 ?? '없음'}`, mp.exists === true && Number(mp.named_count) === 1 && mp.body_md5 === MY_PROFILE_BODY_MD5],
+    ['my_profile 의 실행 권한이 authenticated 뿐', 'public·anon·service_role false, authenticated true', JSON.stringify(e), e.public === false && e.anon === false && e.authenticated === true && e.service_role === false],
+    ['공통 확인 설정이 걸려 있지 않다', '[]', JSON.stringify(fp.pre_request), Array.isArray(fp.pre_request) && fp.pre_request.length === 0],
+    ['점검 상태가 normal', 'normal', String(fp.site_state?.phase), fp.site_state?.phase === 'normal'],
+    ['점검 예외 명단이 비어 있다', '0', String(fp.maintenance_exception?.n), Number(fp.maintenance_exception?.n) === 0],
+    ['이 시험의 합성 회원 행이 없다', '0', String(fp.synthetic?.public_users), Number(fp.synthetic?.public_users) === 0],
+    ['공통 확인 함수의 본문에 이 계약의 함수 이름이 없다', '[]', JSON.stringify(fp.check_api_request?.mentions), Array.isArray(fp.check_api_request?.mentions) && fp.check_api_request.mentions.length === 0],
+  ].map(([item, expect, got, ok]) => ({ item, expect, got, ok }));
+  const ok = rows.every((r) => r.ok);
+  for (const r of rows) console.log(`${r.ok ? '같음' : '다름'}  ${r.item} — 기대 ${r.expect} / 지금 ${r.got}`);
+  writeOut({ tool: TOOL, phase: 'start-check', request_count: 0, ok, rows, note: ok ? '시작해도 된다(다른 조각의 시험이 진행 중이 아님은 브레인방의 진행 기록으로 따로 확인한다)' : '시작하지 않는다. 다른 작업의 행·설정을 이 절차가 지우거나 되돌리지 않는다' });
+  log(`phase=start-check 요청 0건 — ${ok ? '시작 기준과 같음' : '시작 기준과 다름: ' + rows.filter((r) => !r.ok).map((r) => r.item).join(' / ')}`);
+  return ok ? 0 : 3;
+}
+// 끝 확인을 한 표로: 새 함수 0 · 이번에 만든 것의 남은 것 0 · 끝 지문 = 시작 지문(이 계약의 지문, 표·파일 규칙 지문, 상태 저장). 요청 0
+function phaseEndCheck() {
+  const p0 = loadResult(arg('--p-start'), '--p-start(시작 지문 P0)'); const p9 = loadResult(arg('--p-end'), '--p-end(끝 지문)');
+  const g0 = loadResult(arg('--g-start'), '--g-start(표·파일 규칙의 시작 지문 G0)'); const g9 = loadResult(arg('--g-end'), '--g-end(표·파일 규칙의 끝 지문)');
+  const left = loadResult(arg('--leftover'), '--leftover(leftover_check.sql 의 결과)');
+  const sPair = arg('--s-start') || arg('--s-end') ? [loadResult(arg('--s-start'), '--s-start(켜기 전의 상태 저장 S0)'), loadResult(arg('--s-end'), '--s-end(끝의 상태 저장)')] : null;
+  const ignore = ['read_at', ...(arg('--ignore') ? arg('--ignore').split(',').map((s) => s.trim()) : [])];
+  if (!left?.exact || !left.marker) stop(2, '--leftover 가 leftover_check.sql 의 결과가 아니다');
+  const x = left.exact; const mk = left.marker;
+  const zero = (label, v) => ({ item: label, expect: '0', got: String(v), ok: Number(v) === 0 });
+  const same = (label, a, b, part) => { const d = diffJson(part ? a?.[part] : a, part ? b?.[part] : b, ignore); return { item: label, expect: '시작과 같음', got: d.length ? '다름: ' + d.slice(0, 6).join(', ') : '같음', ok: d.length === 0 }; };
+  const rows = [
+    zero('이 계약의 새 함수(다섯 가운데 남은 수)', left.new_functions),
+    { item: '끝 지문에도 함수 다섯이 없다', expect: '다섯 모두 named_count 0', got: FN_ORDER.map((n) => p9.functions?.[n]?.named_count).join(' '), ok: FN_ORDER.every((n) => Number(p9.functions?.[n]?.named_count) === 0) },
+    zero('이번 합성 회원 행(7 가운데 남은 수)', x.public_users), zero('이번 합성 로그인 계정(8 가운데 남은 수)', x.auth_users), zero('이번 대응 행(6 가운데 남은 수)', x.member_identity), zero('이번 관리자 명부 행(2 가운데 남은 수)', x.admin_principal),
+    zero('그 계정들의 로그인 기록', x.sessions), zero('그 계정들의 점검 예외 행', x.maintenance_exception), zero('그 계정들의 인증 앱 등록', x.mfa_factors),
+    zero(`회원 표에서 이메일에 ${SYNTH_MARK} 가 있는 행`, mk.public_users_email), zero(`로그인 계정에서 이메일에 ${SYNTH_MARK} 가 있는 행`, mk.auth_users_email), zero(`점검 번호 ${MAINT_ID} 의 예외 행`, mk.maintenance_exception_311),
+    same('이 계약의 지문 전체(함수 다섯 · my_profile · 다른 공개·비공개 함수 · 공통 확인 · 점검 · 회원 표의 열·권한·규칙·트리거 · 수)', p0, p9),
+    same('그 가운데 my_profile', p0, p9, 'my_profile'), same('그 가운데 판정 함수(비공개 스키마)', p0, p9, 'private_functions'), same('그 가운데 회원 표', p0, p9, 'users_table'),
+    same('표 규칙 · 파일 규칙의 지문(2-나-2b 의 fingerprint.sql)', g0, g9),
+    sPair ? same('상태 저장(점검 상태 행 전체 · authenticator 설정 · 예외 명단)', sPair[0], sPair[1]) : { item: '상태 저장', expect: '시작과 같음', got: '견주지 않음(S0 을 뜨기 전에 끝났으면 점검·설정을 켠 적이 없다 — 위 지문의 점검·설정이 시작과 같은지로 본다)', ok: true },
+  ];
+  const ok = rows.every((r) => r.ok);
+  for (const r of rows) console.log(`${r.ok ? '확인' : '다름'}  ${r.item} — 기대 ${r.expect} / 지금 ${r.got}`);
+  writeOut({ tool: TOOL, phase: 'end-check', request_count: 0, ok, ignored_keys: ignore, rows });
+  log(`phase=end-check 요청 0건 — ${ok ? '끝 상태가 시작 상태와 같고 남은 것이 없다' : '다름: ' + rows.filter((r) => !r.ok).map((r) => r.item).join(' / ')}`);
+  return ok ? 0 : 1;
+}
+
+const PHASES = { 'start-check': phaseStartCheck, 'end-check': phaseEndCheck, 'set-lines': phaseSetLines, plan: phasePlan, 'sessions-sql': phaseSessionsSql, absent: phaseAbsent, matrix: phaseMatrix, effect: phaseEffect, variants: phaseVariants, revoked: phaseRevoked, 'rows-effect': phaseRowsEffect, compare: phaseCompare, 'body-md5': phaseBodyMd5 };
 if (!PHASES[phase]) stop(2, `--phase 는 ${Object.keys(PHASES).join(' | ')}`);
 const code = await Promise.resolve(PHASES[phase]()).catch((e) => { log(`예외: ${String(e?.name ?? 'Error')} ${String(e?.message ?? '').slice(0, 200)}`); return 1; });
 process.exit(code);
