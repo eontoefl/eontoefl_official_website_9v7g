@@ -7,7 +7,8 @@
 --   hmncdheiwqwekdbtijar 여야 한다. 아래의 대상 확인 값(set b2n3.test_project_ref)은 그 확인을 대신하지 않는다 —
 --   DB 는 자기 프로젝트 ref 를 스스로 알지 못한다.
 --
--- 이 파일은 작업방이 실행해 보지 않았다(문법 확인도 하지 못했다). 순서와 기대 결과는 같은 폴더의 절차.md 를 따른다.
+-- 1차 판(0fd11de)의 이 파일은 브레인방이 시험 프로젝트에서 한 번 실행했다(통과). 2차에서 바꾼 것은 마지막 결과의 두 칸
+-- (whoami_oid · whoami_def_md5)뿐이고, 그 두 칸은 실행된 적이 없다. 작업방은 실행하지 않았다. 순서는 절차.md 를 따른다.
 --
 -- 하는 일(한 트랜잭션): 함수 하나를 만든다.
 --   public.zz_b2n3_whoami() returns text
@@ -26,7 +27,9 @@
 --
 -- 실행 방법: 같은 요청(같은 접속)의 맨 앞에  set b2n3.test_project_ref = 'hmncdheiwqwekdbtijar';  를 두고 이 파일 전체.
 -- 마지막 결과(한 행): done, anon_can_execute(false), authenticated_can_execute(true), service_role_can_execute(false),
---                     public_can_execute(false)
+--                     public_can_execute(false), whoami_oid, whoami_def_md5
+--   whoami_oid · whoami_def_md5 는 적어 둔다 — zz_b2n3_down.sql 이 "이 실행이 만든 그 함수"인지 확인하는 데 쓴다
+--   (같은 요청에서 set b2n3.whoami_oid / set b2n3.whoami_def_md5 로 넘긴다. 정의 md5 = md5(pg_get_functiondef(oid))).
 -- =====================================================================
 
 begin;
@@ -113,4 +116,6 @@ select
       from pg_catalog.pg_proc p
       cross join lateral pg_catalog.aclexplode(p.proacl) a
      where p.oid = 'public.zz_b2n3_whoami()'::pg_catalog.regprocedure and a.grantee = 0 and a.privilege_type = 'EXECUTE'
-  ) as public_can_execute;
+  ) as public_can_execute,
+  ('public.zz_b2n3_whoami()'::pg_catalog.regprocedure)::pg_catalog.oid::pg_catalog.text as whoami_oid,
+  pg_catalog.md5(pg_catalog.pg_get_functiondef(('public.zz_b2n3_whoami()'::pg_catalog.regprocedure)::pg_catalog.oid)) as whoami_def_md5;
