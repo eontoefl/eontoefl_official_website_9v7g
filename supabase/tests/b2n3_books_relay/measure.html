@@ -40,23 +40,24 @@
 <h2>1. 로컬 원본 열기 확인 <span class="note">(Supabase 요청 0 — 합성 PDF 를 이 PDF.js 가 여는가, 쪽 글자가 맞는가)</span></h2>
 <button id="btn-local">로컬 원본 확인</button> <div id="out-local"></div>
 
-<h2>2. 범위 응답 대조 <span class="note">(D·R 각각: 앞·중간·끝 구간, HEAD, 범위 없는 GET. 받은 바이트를 로컬 원본과 견준다)</span></h2>
-<label><input type="checkbox" id="opt-full" checked> 범위 없는 GET 을 끝까지 받아 길이·sha256 을 견준다(크기별·경로별 한 번씩 — 파일 전체만큼 전송된다)</label>
+<h2>2. 범위 응답 대조 <span class="note">(D·R 각각: 앞·중간·끝 구간, HEAD, 범위 없는 GET. 받은 바이트를 로컬 원본과 견준다. 바이트 대조와 머리글 관측은 따로 적힌다)</span></h2>
+<label><input type="checkbox" id="opt-full" checked> 범위 없는 GET 을 끝까지 받아 길이·sha256 을 견준다(크기별·경로별 한 번씩 — 파일 전체만큼 전송된다). <b>끄면 그 항목은 미판정이고, 필수 크기에서 끄면 전체 판정이 나오지 않는다</b></label>
 <button id="btn-range">범위 응답 대조 시작</button> <div id="out-range"></div>
 
-<h2>3. 표시 시간 측정 <span class="note">(크기별·열기 유형별로 D·R 각각 5회, D와 R 번갈아. 첫 쪽 = 열기 시작→1쪽 렌더 완료 / 중간·끝 쪽 = 이동 시작→렌더 완료)</span></h2>
+<h2>3. 표시 시간 측정 <span class="note">(크기별 5회차. 회차마다 [D 첫 요청 → D 같은 주소 바로 다시] / [R 첫 요청 → R 바로 다시]. 첫 쪽 = 열기 시작→1쪽 렌더 완료 / 중간·끝 쪽 = 이동 시작→렌더 완료)</span></h2>
+<p class="warn">이 창이 실제로 맨 앞에 보이는 전용 창이어야 한다. 측정 도중에 숨겨지거나 화면 갱신이 계속 느리면 그 회차는 무효로 하고 다시 잰다. 확보하지 못하면 표시 시간은 판정하지 못한다.</p>
 <button id="btn-timing">표시 시간 측정 시작</button> <button id="btn-stop">멈추기(지금 재는 것까지)</button> <button id="btn-resume" disabled>새 자격을 넣었다 — 이어 하기</button>
 <div id="out-timing"></div>
 <div id="viewer"><canvas id="pdf-canvas"></canvas></div>
 
-<h2>4. 종료 뒤 시험 <span class="note">(끝낼 로그인의 자격으로. 로그아웃은 측정자가 한다 — 절차.md)</span></h2>
+<h2>4. 종료 뒤 시험 <span class="note">(끝낼 로그인의 자격으로. 로그아웃은 측정자가 한다 — 절차.md. (1)에 쓴 바로 그 자격 글자를 고정해 (3)에 다시 쓴다 — (1)과 (3) 사이에 이 화면을 새로 고치지 않는다)</span></h2>
 <button id="btn-pre">(1) 종료 전 대조군</button>
 <div id="logout-box" class="note"></div>
 <label><input type="checkbox" id="chk-ended"> (2) 그 로그인 기록만 끝냈고, DB 에서 그 기록이 없어졌으며 끝내지 않는 로그인의 기록은 남아 있음을 확인했다</label>
 <button id="btn-post">(3) 종료 뒤 요청 + 같은 때의 대조군</button>
 <div id="out-logout"></div>
 
-<h2>5. 캐시 머리글 확인 <span class="note">(측정이 다 끝난 뒤에. "같은 주소로 다시 요청"에 쓴 주소에 1바이트 범위 요청을 보내 캐시 관련 머리글을 적는다)</span></h2>
+<h2>5. 캐시 머리글 확인 <span class="note">(측정이 다 끝난 뒤에. 크기·경로마다 마지막 회차에 쓴 주소에 1바이트 범위 요청을 보내 캐시 관련 머리글을 적는다)</span></h2>
 <button id="btn-probe">캐시 머리글 확인</button> <div id="out-probe"></div>
 
 <h2>6. 결과와 판정</h2>
