@@ -669,11 +669,14 @@
     }
 
     // 공식 클라이언트의 알림·저장소의 변화(이 탭·다른 탭의 로그인·로그아웃·갱신) 뒤에 상태를 맞춘다
+    // 여기서는 공식 클라이언트에 묻지 않고 저장된 로그인을 직접 본다 — 공식 클라이언트에 물으면 갱신이 일어날 수 있고,
+    // 갱신의 알림이 다시 이 함수를 부르므로(기기의 시계가 틀린 경우 등) 갱신이 되풀이될 수 있다.
     async function reconcile() {
-        const cur = await readSession();
-        if (cur.error) return;
-        const s = cur.session;
-        if (!s) {
+        let present = true;
+        try { present = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { return; }
+        const st = present ? storedSession() : null;
+        const s = st && typeof st.accessToken === 'string' ? { access_token: st.accessToken } : null;
+        if (!present) {
             if (state === 'signed_in') {
                 const sid = verified ? verified.sid : null;
                 verified = null;
@@ -682,7 +685,8 @@
             }
             return;
         }
-        const c = decodeClaims(s.access_token);
+        if (!s) return;                                            // 읽을 수 없는 값: 건드리지 않는다
+        const c = st.claims;
         if (verified && same(c, verified)) return;                 // 같은 로그인 기록(갱신 포함)
         if (!verified && same(c, lastRejected)) return;
         await settle(s, 'event');
@@ -753,6 +757,8 @@
         if (cur.error) {
             // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다
             clearCompat(null, true);
+            const held = storedSession();
+            lastRejected = held ? held.claims : null;      // 같은 기록을 알림마다 다시 묻지 않는다
             setState('rejected', 'network');
             return;
         }
@@ -845,6 +851,8 @@
             if (cur.error) {
                 verified = null;
                 clearCompat(null, true);
+                const held = storedSession();
+                lastRejected = held ? held.claims : null;
                 setState('rejected', 'network');
                 return state;
             }
