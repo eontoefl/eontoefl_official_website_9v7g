@@ -18,12 +18,9 @@ let svQuestions = [];      // 학생에게 보여줄 질문들
 document.addEventListener('DOMContentLoaded', async function() {
     // 로그인 강제하지 않음 (카톡 인앱 브라우저의 로그인 마찰 제거).
     // 로그인돼 있으면 이름·시험날짜를 자동으로 채워주는 편의만 취한다.
-    // 새 로그인 스위치가 켜진 화면: 로그인 상태가 정해진 뒤에 갈래를 고른다.
-    // 저장된 새 로그인이 없으면 기다릴 것이 없다 — 비회원 설문은 로그인 확인을 기다리지 않는다(꺼짐이면 이 줄을 타지 않는다)
-    if (EonLogin.on()) await EonLogin.settle();
+    // 새 로그인 스위치가 켜진 화면은 아래 eonSurveyStart 로 간다(꺼짐이면 이 줄을 타지 않고 지금 그대로 돈다)
+    if (EonLogin.on()) { await eonSurveyStart(); return; }
     svUser = JSON.parse(EonLogin.raw() || 'null');
-    // 회원 갈래로 시작했으면 그 확인된 계정을 기준으로 화면을 지킨다(계정이 달라지면 가리고 다시 받는다)
-    if (EonLogin.on() && svUser) EonLogin.watch();
     try {
         await loadSurvey();
     } catch (err) {
@@ -31,6 +28,65 @@ document.addEventListener('DOMContentLoaded', async function() {
         showState('svEmpty');
     }
 });
+
+// 켜진 화면: 비회원 설문(공개 부분)은 로그인 확인을 기다리지 않고 바로 연다.
+// 회원에게만 붙는 것(이름·전화·시험 날짜의 자동 채움, 회원 전용 조회)은 확인이 끝난 뒤에 붙이고, 이미 적은 칸은 덮지 않는다.
+const eonSurveyTouched = new Set();        // 사용자가 손댄 칸의 id('*' = 무엇이든 손댐)
+async function eonSurveyStart() {
+    svUser = null;
+    const touch = function (e) { eonSurveyTouched.add('*'); if (e && e.target && e.target.id) eonSurveyTouched.add(e.target.id); };
+    document.addEventListener('input', touch, true);
+    document.addEventListener('change', touch, true);
+    const loaded = (async function () {
+        try {
+            await loadSurvey();
+        } catch (err) {
+            console.warn('실전 리포트 로드 실패:', err);
+            showState('svEmpty');
+        }
+    })();
+    const settled = EonLogin.settle();
+    await loaded;
+    await settled;
+    const user = JSON.parse(EonLogin.raw() || 'null');
+    if (!user) return;                      // 방문자: 지금의 비회원 설문 그대로
+    svUser = user;                          // 제출할 때 회원번호·이메일이 함께 간다(지금의 회원 갈래와 같다)
+    EonLogin.watch();                       // 확인된 사람이 달라지면 가리고 다시 받는다
+    const fill = function (id, value) {
+        const el = document.getElementById(id);
+        if (el && value && !el.value && !eonSurveyTouched.has(id)) el.value = value;
+    };
+    fill('svName', user.name || '');
+    fill('svPhone', user.phone ? String(user.phone).replace(/[^0-9]/g, '') : '');
+    if (!user.id) return;
+    // 회원 전용 조회 1: 최근 응시한 시험 → 날짜 칸(손대지 않았을 때만)
+    try {
+        const exams = await supabaseAPI.query('toefl_exam_schedules', {
+            'user_id': 'eq.' + user.id,
+            'exam_datetime': 'lte.' + new Date().toISOString(),
+            'status': 'neq.cancelled',
+            'order': 'exam_datetime.desc',
+            'limit': '1'
+        });
+        if (exams && exams.length) {
+            svExamDate = exams[0].exam_datetime.slice(0, 10);
+            const dateEl = document.getElementById('svDate');
+            if (dateEl && !eonSurveyTouched.has('svDate')) { dateEl.value = svExamDate; updateSvDay(); }
+        }
+    } catch (e) { /* 일정 없어도 진행 */ }
+    // 회원 전용 조회 2: 이 시험에 이미 제출했는가 → 아직 아무것도 적지 않았을 때만 "이미 제출" 화면으로 바꾼다
+    if (svExamDate) {
+        try {
+            const mine = await supabaseAPI.query('toefl_survey_responses', {
+                'user_id': 'eq.' + user.id,
+                'exam_date': 'eq.' + svExamDate,
+                'select': 'id',
+                'limit': '1'
+            });
+            if (mine && mine.length && !eonSurveyTouched.has('*')) showState('svDone');
+        } catch (e) { /* 제출할 때 번호·날짜로 다시 본다 */ }
+    }
+}
 
 function showState(id) {
     ['svLoading', 'svEmpty', 'svDone', 'svForm'].forEach(function(s) {

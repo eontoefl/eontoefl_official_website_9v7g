@@ -272,8 +272,20 @@
     // 켜진 화면인데 모듈이 없으면 "꺼짐"이 아니라 "닫음"이다 — 저장된 옛 값을 믿지 않는다.
     function on() { return PAGE_ON || !!mod(); }
 
-    // 화면을 다시 받는다(확인된 계정이 달라졌을 때 인증 모듈이 부른다)
-    function reload() { window.location.reload(); }
+    // 화면을 다시 받는다(확인된 사람이 달라졌을 때 인증 모듈이 부른다).
+    // 그 전에 이 화면에 적혀 있던 값을 처음 값으로 돌린다 — 브라우저가 다시 받은 화면에 앞 사람이 적던 값을 되살리지 않게.
+    function reload() {
+        try {
+            var els = document.querySelectorAll('input, textarea, select');
+            for (var i = 0; i < els.length; i++) {
+                var el = els[i];
+                if (el.tagName === 'SELECT') { for (var j = 0; j < el.options.length; j++) el.options[j].selected = el.options[j].defaultSelected; }
+                else if (el.type === 'checkbox' || el.type === 'radio') el.checked = el.defaultChecked;
+                else if (el.type !== 'file') el.value = el.defaultValue;
+            }
+        } catch (e) { /* 비우지 못해도 다시 받는다 */ }
+        window.location.reload();
+    }
 
     // 화면 맨 위의 임시 안내(시험판 문구)
     function notice(text) {

@@ -62,7 +62,8 @@ export function provider(variant, mutate) {
         if (variant.base && variant.rev && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
         if (variant.test && p === CONFIG_FILE) text = rewriteConfig(text, { testUrl: TEST_URL, testKey: FAKE_ANON, sinkUrl: SINK });
         if (!variant.base && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
-        if (!variant.base && p.endsWith('.html')) text = rewritePageSwitch(text, variant.on ? 'on' : 'off');
+        // pageSwitch: 화면(게이트)의 스위치만 따로 정한다 — 화면과 모듈이 어긋난 경우를 보는 시험이 쓴다
+        if (!variant.base && p.endsWith('.html')) text = rewritePageSwitch(text, variant.pageSwitch || (variant.on ? 'on' : 'off'));
         if (mutate) text = mutate(p, text);
         return text;
     };

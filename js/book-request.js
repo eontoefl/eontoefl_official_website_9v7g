@@ -75,7 +75,8 @@ function eonBookRequestClosed(text) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-    // 새 로그인 스위치가 켜진 화면: 로그인 상태가 정해진 뒤에 갈래를 고른다.
+    // 새 로그인 스위치가 켜진 화면: 이 화면에서 스크립트가 여는 것은 "회원의 신청 폼"이거나 "닫힘 안내"(방문자) 둘 가운데 하나다 —
+    // 서로 바뀌는 부분이라 로그인 상태가 정해진 뒤에 고른다. 화면의 공개 부분(안내 글)은 HTML 에 있어 그 사이에도 그대로 보인다.
     // 저장된 새 로그인이 없으면 기다릴 것이 없다(꺼짐이면 이 줄을 타지 않는다)
     if (EonLogin.on()) await EonLogin.settle();
     const userData = JSON.parse(EonLogin.raw() || 'null');

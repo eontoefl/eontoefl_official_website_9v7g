@@ -311,13 +311,68 @@ function restoreBankSelection(app) {
     if (acctHolderInput && accountHolder) acctHolderInput.value = accountHolder;
 }
 
-document.addEventListener('DOMContentLoaded', async function() {
-    // 새 로그인 스위치가 켜진 화면: 로그인 상태가 정해진 뒤에 갈래를 고른다.
-    // 저장된 새 로그인이 없으면 기다릴 것이 없다 — 방문자 갈래는 로그인 확인을 기다리지 않는다(꺼짐이면 이 줄을 타지 않는다)
-    if (EonLogin.on()) await EonLogin.settle();
+// 켜진 화면: 공개 부분(안내·약관·입력 칸의 준비)은 로그인 확인을 기다리지 않고 바로 연다.
+// 계정에 따라 바뀌는 부분(계정 칸·닫힘 안내·기존 신청 확인·수정·제출·임시 저장)만 확인이 끝난 뒤에 붙인다.
+async function eonApplicationFormStart() {
+    const editId = new URLSearchParams(window.location.search).get('edit');
+    let accountReady = false;
+    // 계정 부분이 붙기 전에는 제출을 받지 않는다(브라우저의 기본 제출도 막는다)
+    const form = document.getElementById('applicationForm');
+    if (form) form.addEventListener('submit', function (e) { if (!accountReady) e.preventDefault(); });
+    // 가입 칸은 켜진 길의 어느 갈래에서도 쓰지 않는다(회원이면 필요 없고, 방문자의 가입을 겸한 신청은 닫아 둔 기능이다)
+    document.querySelectorAll('.signup-only').forEach(el => { el.style.display = 'none'; });
+
+    // 기존 신청 수정(?edit)은 회원 전용 진입이다: 확인이 끝나기 전에는 아무것도 시작하지 않는다(요청 0)
+    if (editId) {
+        await EonLogin.settle();
+        if (!EonLogin.raw()) {
+            const returnPath = `application-form.html?edit=${encodeURIComponent(editId)}`;
+            window.location.href = 'login.html?redirect=' + encodeURIComponent(returnPath);
+            return;
+        }
+    }
+
+    // ---- 공개 부분: 기다리지 않는다 ----
+    setupConditionalFields();
+    setupScoreTotalCalculation();
+    setupPrivacyModal();
+    setupTermsModal();
+    loadTermsContent();
+    setupDateDropdowns();
+    setupBankSelector();
+    cleanupInactiveTabRequired();
+
+    // ---- 계정에 따라 바뀌는 부분: 확인이 끝난 뒤 ----
+    await EonLogin.settle();
     const userData = JSON.parse(EonLogin.raw() || 'null');
-    // 회원 갈래로 시작했으면 그 확인된 계정을 기준으로 화면을 지킨다(계정이 달라지면 가리고 다시 받는다)
-    if (EonLogin.on() && userData) EonLogin.watch();
+    if (userData) EonLogin.watch();         // 확인된 사람이 달라지면 가리고 다시 받는다
+    if (editId && !userData) return;        // (위에서 확인된 뒤에 달라진 경우 — 지킴이 다시 받는다)
+
+    applicationState.user = userData;
+    applicationState.isAnonymous = !userData;
+    setupAccountFields(userData, Boolean(editId));
+
+    // 신규 로그인 회원은 기존 신청 확인이 끝난 뒤에만 제출할 수 있다.
+    if (userData && !editId) {
+        const mayContinue = await guardFormAccess(userData);
+        if (!mayContinue) return;
+    }
+
+    setupFormSubmission();
+    accountReady = true;
+    if (applicationState.restartOf) applyRestartMode(applicationState.restartOf);
+    cleanupInactiveTabRequired();
+    if (editId) {
+        initEditMode(editId);
+    } else {
+        setupAutoSave();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // 새 로그인 스위치가 켜진 화면은 위의 eonApplicationFormStart 로 간다(꺼짐이면 이 줄을 타지 않고 지금 그대로 돈다)
+    if (EonLogin.on()) { await eonApplicationFormStart(); return; }
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
 

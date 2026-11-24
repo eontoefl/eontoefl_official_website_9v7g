@@ -173,6 +173,8 @@ function setupEl(page, raw, node) {
     raw.files = [];
     raw.options = [];
     raw.selectedIndex = -1;
+    raw.defaultValue = node && node.attrs.value !== undefined ? node.attrs.value : '';
+    raw.defaultChecked = !!(node && 'checked' in node.attrs);
     raw.scrollTop = 0;
     raw.offsetHeight = 0;
     raw.offsetWidth = 0;
@@ -235,6 +237,9 @@ function setupEl(page, raw, node) {
     raw.hasAttribute = (name) => name in raw._attrs;
     raw.removeAttribute = (name) => { delete raw._attrs[name]; };
     raw.cloneNode = () => proxy;
+    Object.defineProperty(raw, 'parentNode', { get() { return raw.parentElement; }, configurable: true });
+    Object.defineProperty(raw, 'nextElementSibling', { get() { const s = raw.parentElement && raw.parentElement.children; const i = s ? s.indexOf(proxy) : -1; return i >= 0 && s[i + 1] ? s[i + 1] : null; }, configurable: true });
+    Object.defineProperty(raw, 'nextSibling', { get() { return raw.nextElementSibling; }, configurable: true });
     Object.defineProperty(raw, 'firstElementChild', { get() { return raw.children[0] || null; }, configurable: true });
     Object.defineProperty(raw, 'lastElementChild', { get() { return raw.children[raw.children.length - 1] || null; }, configurable: true });
     Object.defineProperty(raw, 'childNodes', { get() { return raw.children; }, configurable: true });

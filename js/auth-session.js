@@ -1032,10 +1032,11 @@
     }
 
     // ---- 회원 화면의 시작과 지킴 ----
-    // 확인이 끝난 뒤에 화면을 시작하고, 그 뒤 확인된 계정이 달라지면 화면을 가리고 다시 받는다
-    // (다시 받으면 앞 계정의 늦은 응답·작성 중이던 값이 새 계정의 화면에 남지 않는다).
+    // 확인이 끝난 뒤에 화면을 시작하고, 그 뒤 "확인된 사람"이 달라지면(다른 회원이 됨·로그인 전이 됨) 화면을 가리고 다시 받는다
+    // (다시 받으면 앞 사람의 늦은 응답·적던 값이 새 사람의 화면에 남지 않는다).
+    // 같은 사람이면 다시 받지 않는다 — 이름 같은 표시 값만 달라졌거나 같은 사람을 다시 확인한 것이면 적던 값이 그대로 남는다.
     let guardOn = false;
-    let guardFor = null;          // 화면을 시작할 때의 확인된 표시 값
+    let guardFor = null;          // 화면을 시작할 때의 확인된 사람(회원번호). 로그인 전이면 null
     let leaving = false;
     let ownSignOut = 0;           // 이 탭이 시작한 로그아웃이 진행 중인가
     let leaveAfterSignOut = false;
@@ -1049,10 +1050,16 @@
         hidePage();
         try { if (reloadPage) reloadPage(); } catch (e) { /* 다시 받지 못해도 가린 채로 둔다 */ }
     }
+    // 지금 확인된 사람(회원번호). 화면이 그려도 되는 확인된 표시가 있을 때만 — 없으면 null(로그인 전과 같다)
+    function whoNow() {
+        return displayUserRaw() !== null && verified && verified.profile ? verified.profile.id : null;
+    }
     function guardCheck() {
         if (!guardOn || leaving) return;
-        if (state === 'restoring') { hidePage(); return; }          // 다시 확인하는 동안은 가려 둔다
-        if (displayUserRaw() === guardFor) { showPage(); return; }
+        // 다시 확인하는 동안(뒤로 가기로 되살아난 화면이 다시 확인하는 동안 포함)은 가려 두고 기다린다
+        if (state === 'restoring' || displayHold) { hidePage(); return; }
+        // 같은 사람이면 그대로 둔다(표시 값만 달라진 것은 화면의 다시 그리기가 맞춘다)
+        if (whoNow() === guardFor) { showPage(); return; }
         hidePage();
         // 이 탭이 누른 로그아웃이면 그 화면의 코드가 안내·이동을 한다(끝났다고 확인되지 않은 경우만 아래에서 다시 받는다)
         if (ownSignOut > 0) { leaveAfterSignOut = true; return; }
@@ -1062,11 +1069,12 @@
         if (guardOn) return;
         guardOn = true;
         reloadPage = typeof reload === 'function' ? reload : null;
-        guardFor = displayUserRaw();
+        guardFor = whoNow();
         listeners.push(guardCheck);
         drawers.push(guardCheck);
+        // 화면을 떠날 때 가려 둔다. 뒤로 가기로 되살아나면 아래의 pageshow 처리(다시 확인)가 끝난 뒤에 guardCheck 가
+        // 정한다 — 확인된 사람이 같으면 다시 보이고, 다르거나 확인하지 못하면 가린 채 다시 받는다.
         window.addEventListener('pagehide', function () { hidePage(); });
-        window.addEventListener('pageshow', function (ev) { if (ev && ev.persisted) leave(); });
     }
     function memberPage(start, reload) {
         ready().then(function () {

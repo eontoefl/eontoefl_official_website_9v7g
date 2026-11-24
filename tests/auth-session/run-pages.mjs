@@ -218,16 +218,17 @@ async function sectionOffActions(mutate) {
 // =====================================================================
 
 // 새 방식의 로그인이 저장돼 있고(호환 값도 앞 화면이 남겨 둔 상태), 확인 응답을 붙잡은 채로 화면을 연다
-async function heldOpen(s, key, mutate, ownerEmail) {
+async function heldOpen(s, key, mutate, ownerEmail, opts = {}) {
     const acc = ACCOUNTS[key];
-    const w = world('빈 브라우저', V.ON, mutate, ownerEmail !== undefined ? ownerEmail : acc.email);
-    w.seed(key, { aal: key === 'GM' ? 'aal2' : 'aal1' });
+    const w = world('빈 브라우저', opts.variant || V.ON, mutate, ownerEmail !== undefined ? ownerEmail : acc.email);
+    const sess = w.seed(key, { aal: key === 'GM' ? 'aal2' : 'aal1' });
     (await w.open('before', 'index.html')).close();       // 앞 화면(3A 의 가짜 화면)이 호환 값을 남긴다
     const primed = w.browser.local.has('iontoefl_user');
+    if (opts.end) w.server.endSession(sess, 'session_not_found');      // 서버에서 끝난 로그인 기록(만료된 값이 남은 방문자)
     const mark = w.browser.requests.length;
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
-    w.server.faults.my_site_access = () => gate.then(() => null);
+    w.server.faults[opts.holdOn || 'my_site_access'] = () => gate.then(() => null);
     const page = await open(w, s, 't1', { noIdle: true });
     await w.browser.spin(80);
     const during = { business: w.browser.requests.slice(mark).filter((r) => r.page === 't1' && !isAuthUrl(r.url)), navs: navsOf(page), state: state(page), pending: w.browser.pending };
@@ -241,6 +242,10 @@ async function visitorBaseline(s) {
     await w.browser.advance(6000);
     return { requests: business(w, page).map(reqKey), navs: navsOf(page), alerts: alertsOf(page) };
 }
+
+// 방문자 기준의 요청 가운데 "공개 본문"의 것: 머리말·퍼널의 조회(로그인 값이 조건)는 빼고 본다.
+// 책 신청은 스크립트가 여는 것이 "회원의 폼 대 닫힘 안내"뿐이라(서로 바뀌는 부분) 확인 전에 나가는 공개 조회가 없다 — 공개 부분은 HTML 이다.
+const publicBody = (s, base) => (s.file === 'book-request.html' ? [] : base.requests.filter((k) => !/\/applications\?email=/.test(k)));
 
 // 확인 전: 보호 표시 0·자동 보호 요청 0. 공개 본문은 기다리지 않는다. 확인 뒤에만 회원 표시·회원 요청.
 async function testBeforeConfirm(opt) {
@@ -257,19 +262,13 @@ async function testBeforeConfirm(opt) {
         c.ok(!h.during.business.some((r) => who.test(decodeURIComponent(r.url)) || who.test(String(r.bodyText || ''))), `${label}: 확인 전에 회원의 값을 조건으로 한 요청이 나감`);
         const base = await visitorBaseline(s);
         const sent = h.during.business.map(reqKey);
-        if (isMemberEntry(s) || s.adminOnly || s.category === 'branch') {
-            // 회원 화면·회원 갈래: 확인이 끝나기 전에는 자동으로 나가는 업무 요청이 없다
-            // (갈래 화면은 저장된 새 로그인이 있으므로 갈래를 고르기 전이다 — 방문자 갈래의 요청도 아직 없다)
-            if (s.category === 'branch' && s.file === 'application.html') {
-                c.ok(sent.every((k) => base.requests.includes(k)), `${label}: 확인 전에 방문자 기준에 없는 요청이 나감`);
-            } else {
-                c.ok(sent.length === 0, `${label}: 확인 전에 업무 요청이 나감(${sent.length}건)`);
-            }
+        if (isMemberEntry(s) || s.adminOnly) {
+            // 회원 화면·회원 전용 진입·관리자 갈래: 확인이 끝나기 전에는 자동으로 나가는 업무 요청이 없다
+            c.ok(sent.length === 0, `${label}: 확인 전에 업무 요청이 나감(${sent.length}건)`);
         } else {
-            // 공개 화면: 본문의 요청은 확인을 기다리지 않고, 방문자 기준에 없는 요청은 없다
+            // 공개 화면과 갈래 화면(같은 규칙): 공개 부분의 요청은 확인을 기다리지 않고, 방문자 기준에 없는 요청은 없다
             c.ok(sent.every((k) => base.requests.includes(k)), `${label}: 확인 전에 방문자 기준에 없는 요청이 나감`);
-            const bodyOnly = base.requests.filter((k) => !/\/applications\?/.test(k));       // 머리말·퍼널의 조회(로그인 값이 조건)는 빼고 본다
-            if (bodyOnly.length) c.ok(sent.length > 0, `${label}: 공개 본문이 로그인 확인을 기다림(확인 전 요청 0)`);
+            if (publicBody(s, base).length) c.ok(sent.length > 0, `${label}: 공개 본문이 로그인 확인을 기다림(확인 전 요청 0)`);
         }
         h.release();
         await h.w.browser.idle();
@@ -284,6 +283,53 @@ async function testBeforeConfirm(opt) {
             c.ok(noticeShown(h.page, TEXT.closed), `${label}: 닫아 둔 기능의 임시 안내가 없음`);
         }
         if (s.file === 'my-dashboard.html' || s.file === 'my-profile.html') c.ok(drawnMatch(h.page, who), `${label}: 확인된 뒤 회원 정보가 그려지지 않음`);
+        // 갈래 화면: 회원에게만 붙는 것은 확인 뒤에 붙는다
+        if (s.file === 'survey.html') c.ok(!!h.page.byId.svName && h.page.byId.svName.value === h.acc.profile.name, `${label}: 확인된 뒤 이름 칸이 채워지지 않음`);
+        if (s.file === 'application-form.html' && !s.memberOnly) c.ok(h.page.byId.applicantName.value === h.acc.profile.name && business(h.w, h.page).some((r) => who.test(decodeURIComponent(r.url))), `${label}: 확인된 뒤 회원 갈래(계정 칸·기존 신청 확인)가 붙지 않음`);
+        auditOn(h.w, c, label);
+    }
+    // 비회원 설문: 확인 전에 이미 적은 칸은 자동 채움이 덮지 않는다(비어 있고 손대지 않은 칸만 채운다)
+    {
+        const h = await heldOpen({ file: 'survey.html', search: '', hash: '' }, 'A', opt.mutate);
+        const page = h.page;
+        const typed = '방문자가 적은 이름';
+        c.ok(!!page.byId.svName && !!page.byId.svPhone, '설문의 자동 채움: 확인 전에 설문의 입력 칸이 열리지 않음(공개 부분이 기다림)');
+        if (page.byId.svName) {
+            page.byId.svName.value = typed;
+            for (const l of page.docListeners.filter((x) => x.type === 'input')) l.fn({ target: page.byId.svName });
+            h.release();
+            await h.w.browser.idle();
+            await h.w.browser.advance(1500);
+            c.ok(page.byId.svName.value === typed, '설문의 자동 채움: 확인된 뒤 사용자가 이미 적은 칸을 덮음');
+            c.ok(page.byId.svPhone.value === String(h.acc.profile.phone).replace(/[^0-9]/g, ''), '설문의 자동 채움: 손대지 않은 빈 칸을 채우지 않음');
+            c.ok(!navsOf(page).length && page.byId.svForm.style.display !== 'none', '설문의 자동 채움: 적던 설문을 다른 화면으로 바꿈');
+        }
+    }
+    return c.problems;
+}
+
+// 만료된 값이 남은 방문자(저장된 새 로그인이 서버에서 끝난 기록): 공개·갈래 화면의 공개 부분은 그 확인을 기다리지 않고,
+// 확인이 "끝남"으로 정해진 뒤에도 방문자 그대로다(로그인 화면으로 가지 않는다).
+async function testStaleVisitor(opt) {
+    const c = checker();
+    for (const s of SCENARIOS.filter((x) => !isMemberEntry(x) && !x.adminOnly)) {
+        const h = await heldOpen(s, 'A', opt.mutate, 'owner@zz.invalid', { end: true, holdOn: 'my_profile' });
+        const label = `만료된 값이 남은 방문자(${s.name})`;
+        const base = await visitorBaseline(s);
+        const sent = h.during.business.map(reqKey);
+        c.ok(h.during.state === 'restoring' && h.during.pending > 0, `${label}: 시험이 확인 응답을 붙잡지 못함(${h.during.state})`);
+        c.ok(h.during.navs.length === 0, `${label}: 확인을 기다리는 동안 화면 이동이 있음`);
+        c.ok(sent.every((k) => base.requests.includes(k)), `${label}: 확인을 기다리는 동안 방문자 기준에 없는 요청이 나감`);
+        if (publicBody(s, base).length) c.ok(sent.length > 0, `${label}: 공개 본문이 끝난 로그인의 확인을 기다림(그동안 요청 0)`);
+        if (s.file === 'survey.html') c.ok(!!h.page.byId.svName, `${label}: 확인을 기다리는 동안 설문의 입력 칸이 열리지 않음`);
+        h.release();
+        await h.w.browser.idle();
+        await h.w.browser.advance(6000);
+        const after = business(h.w, h.page).map(reqKey);
+        c.ok(state(h.page) !== 'signed_in' && !toLogin(h.page), `${label}: 끝난 로그인인데 signed_in 이거나 로그인 화면으로 감(${state(h.page)})`);
+        c.ok(!drawnMatch(h.page, idOf(h.acc)), `${label}: 끝난 로그인의 회원 정보가 그려짐`);
+        if (s.branch === 'visitor-closed') c.ok(noticeShown(h.page, TEXT.closed) && !after.some((x) => /\/users|withdrawal_records/.test(x)), `${label}: 닫힘 안내가 없거나 계정 요청이 나감`);
+        else c.ok(JSON.stringify(after.slice().sort()) === JSON.stringify(base.requests.slice().sort()), `${label}: 끝난 뒤의 업무 요청이 방문자 기준과 다름(${after.length} ↔ ${base.requests.length})`);
         auditOn(h.w, c, label);
     }
     return c.problems;
@@ -362,6 +408,52 @@ async function testModuleMissing(opt) {
             }
             c.ok(w.browser.requests.every((r) => !isAuthUrl(r.url)), `${label}: 인증 요청이 나감`);
         }
+    }
+    return c.problems;
+}
+
+// 화면(게이트)의 스위치와 모듈의 스위치가 어긋난 두 방향.
+//   화면 켜짐 + 모듈 꺼짐(받았지만 꺼져 있음) → 모듈이 없는 것과 같다: 닫는다.
+//   화면 꺼짐 + 모듈 켜짐 → 닫는 것이 아니다. 켜진 화면으로 돈다(켜진 모듈이 확인한 값만 쓴다 — 저장된 옛 값을 믿지 않는다).
+async function testSwitchMismatch(opt) {
+    const c = checker();
+    const PAGE_ON_MODULE_OFF = { test: true, on: false, pageSwitch: 'on' };
+    const PAGE_OFF_MODULE_ON = { test: true, on: true, pageSwitch: 'off' };
+    for (const s of SCENARIOS) {
+        const base = await visitorBaseline(s);
+        {   // 화면 켜짐 + 모듈 꺼짐
+            const w = world('옛 학생', PAGE_ON_MODULE_OFF, opt.mutate, 'old@zz.invalid');
+            const page = await open(w, s);
+            await w.browser.advance(6000);
+            const label = `화면 켜짐 + 모듈 꺼짐(${s.name})`;
+            const sent = business(w, page).map(reqKey);
+            c.ok(page.evaluate('EonAuth.isOn()') === false && page.evaluate('EonLogin.on()') === true && page.evaluate('EonLogin.missing()') === true, `${label}: 시험이 그 상태를 만들지 못함`);
+            c.ok(!drawnMatch(page, OLD_NAMES) && !sent.some((x) => /old%40zz|old@zz|m-old-1|undefined/.test(x)), `${label}: 저장된 옛 값을 믿음`);
+            if (s.memberOnly) c.ok(sent.length === 0 && JSON.stringify(navsOf(page)) === JSON.stringify(base.navs), `${label}: 닫지 않음`);
+            else if (isMemberEntry(s) || s.adminOnly) c.ok(sent.length === 0 && navsOf(page).length === 0 && noticeShown(page, TEXT.missing), `${label}: 닫지 않음(요청 ${sent.length}건, 이동 ${navsOf(page).length}건)`);
+            else if (s.branch === 'visitor-closed') c.ok(!sent.some((x) => /\/users|withdrawal_records/i.test(x)) && !toLogin(page), `${label}: 닫지 않음`);
+            else c.ok(JSON.stringify(sent.slice().sort()) === JSON.stringify(base.requests.slice().sort()) && !toLogin(page), `${label}: 공개 본문·방문자 갈래가 방문자 기준과 다름`);
+            c.ok(w.browser.requests.every((r) => !isAuthUrl(r.url)), `${label}: 인증 요청이 나감`);
+        }
+        {   // 화면 꺼짐 + 모듈 켜짐: 옛 값만 있는 브라우저
+            const w = world('옛 학생', PAGE_OFF_MODULE_ON, opt.mutate, 'old@zz.invalid');
+            const page = await open(w, s);
+            await w.browser.advance(6000);
+            const label = `화면 꺼짐 + 모듈 켜짐(${s.name} · 옛 값만)`;
+            const sent = business(w, page).map(reqKey);
+            c.ok(page.evaluate('EonAuth.isOn()') === true && page.evaluate('EonLogin.on()') === true && page.evaluate('EonLogin.missing()') === false, `${label}: 시험이 그 상태를 만들지 못함(또는 켜진 화면으로 돌지 않음)`);
+            c.ok(!drawnMatch(page, OLD_NAMES) && !sent.some((x) => /old%40zz|old@zz|m-old-1|undefined/.test(x)), `${label}: 저장된 옛 값을 믿음`);
+            if (isMemberEntry(s)) c.ok(toLogin(page) && sent.length === 0, `${label}: 회원 전용 진입이 로그인 화면으로 가지 않거나 업무 요청을 보냄`);
+            else if (!s.adminOnly && s.branch !== 'visitor-closed') c.ok(!toLogin(page), `${label}: 공개 본문·방문자 갈래가 로그인 화면으로 감`);
+        }
+    }
+    {   // 화면 꺼짐 + 모듈 켜짐: 확인된 회원 — 닫히지 않고 켜진 화면으로 돈다
+        const h = await heldOpen({ file: 'my-dashboard.html', search: '', hash: '' }, 'A', opt.mutate, undefined, { variant: PAGE_OFF_MODULE_ON });
+        c.ok(h.during.state === 'restoring' && h.during.business.length === 0 && !drawnMatch(h.page, idOf(h.acc)), '화면 꺼짐 + 모듈 켜짐(확인된 회원): 확인 전에 회원 정보·업무 요청이 있음');
+        h.release();
+        await h.w.browser.idle();
+        await h.w.browser.advance(1500);
+        c.ok(state(h.page) === 'signed_in' && drawnMatch(h.page, idOf(h.acc)) && !toLogin(h.page) && !noticeShown(h.page, TEXT.missing), '화면 꺼짐 + 모듈 켜짐(확인된 회원): 켜진 화면으로 돌지 않음(닫히거나 로그인 화면으로 감)');
     }
     return c.problems;
 }
@@ -612,7 +704,27 @@ async function testAccountChange(opt) {
         c.ok(hidden(page), '늦은 응답: A 의 응답이 도착한 뒤 화면이 다시 보임');
         c.ok(!page.trace.slice(mark).some((e) => e.t === 'fetch' && !isAuthUrl(e.url) && decodeURIComponent(e.url).includes(B.email)), '늦은 응답: A 의 화면이 B 의 값으로 조회를 이어 감');
     }
-    {   // 뒤로 가기로 되살아난 화면
+    {   // 같은 사람: 표시 값만 달라짐(이름) / 같은 사람을 다시 확인 — 다시 받지 않고, 적던 값이 그대로다
+        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        w.seed('A');
+        (await w.open('before', 'index.html')).close();
+        const page = await openPage(w, 't1', 'write.html', { search: '?board=reviews' });
+        await w.browser.advance(1500);
+        const typed = 'A 가 적던 제목';
+        page.byId.writeSubject.value = typed;
+        const p1 = page.evaluate('EonAuth.recheck()');
+        await w.browser.idle();
+        await p1;
+        c.ok(state(page) === 'signed_in' && !hidden(page) && navsOf(page).length === 0 && page.byId.writeSubject.value === typed, `같은 사람을 다시 확인: 다시 받거나 가린 채이거나 적던 값이 달라짐(${navsOf(page).join(', ')})`);
+        w.server.accounts.get(A.email).profile.name = '합성 회원 A(이름 바뀜)';
+        const before = page.evaluate('EonAuth.displayUserRaw()');
+        const p2 = page.evaluate('EonAuth.recheck()');
+        await w.browser.idle();
+        await p2;
+        c.ok(page.evaluate('EonAuth.displayUserRaw()') !== before, '같은 사람의 표시 값이 달라짐: 시험이 표시 값을 바꾸지 못함');
+        c.ok(state(page) === 'signed_in' && !hidden(page) && navsOf(page).length === 0 && page.byId.writeSubject.value === typed, `같은 사람의 표시 값이 달라짐: 다시 받거나 가린 채이거나 적던 값이 달라짐(${navsOf(page).join(', ')})`);
+    }
+    {   // 뒤로 가기로 되살아난 화면: 확인된 사람이 같으면 그대로(다시 받지 않는다)
         const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
@@ -620,9 +732,41 @@ async function testAccountChange(opt) {
         await w.browser.advance(1500);
         page.dispatchWindow('pagehide', { persisted: true });
         c.ok(hidden(page), '되살아난 화면: 화면을 떠날 때 가리지 않음(보관된 화면이 A 의 내용을 보인 채로 남는다)');
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        w.server.faults.my_site_access = () => gate.then(() => null);
         page.dispatchWindow('pageshow', { persisted: true });
-        await w.browser.spin(20);
-        c.ok(hidden(page) && navsOf(page).includes('[새로 고침]'), '되살아난 화면: 가린 채로 다시 받지 않음');
+        await w.browser.spin(60);
+        c.ok(hidden(page) && navsOf(page).length === 0, '되살아난 화면(같은 사람): 다시 확인하는 동안 가려 두지 않음(또는 확인도 하기 전에 다시 받음)');
+        release();
+        delete w.server.faults.my_site_access;
+        await w.browser.idle();
+        c.ok(state(page) === 'signed_in' && !hidden(page) && navsOf(page).length === 0, `되살아난 화면(같은 사람): 확인된 뒤에도 가린 채이거나 다시 받음(${state(page)}, ${navsOf(page).join(', ')})`);
+    }
+    {   // 뒤로 가기로 되살아난 화면: 그 사이 다른 사람이 됨 → 가린 채 다시 받는다
+        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        w.seed('A');
+        (await w.open('before', 'index.html')).close();
+        const page = await openPage(w, 't1', 'my-dashboard.html', {});
+        await w.browser.advance(1500);
+        page.dispatchWindow('pagehide', { persisted: true });
+        w.seed('B');                                             // 보관돼 있는 사이 이 브라우저의 로그인이 B 로 바뀌었다
+        page.dispatchWindow('pageshow', { persisted: true });
+        await w.browser.idle();
+        c.ok(hidden(page) && navsOf(page).includes('[새로 고침]'), '되살아난 화면(다른 사람): 가린 채로 다시 받지 않음');
+    }
+    {   // 뒤로 가기로 되살아난 화면: 다시 확인하지 못함(모름) → 가린 채 다시 받는다
+        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        w.seed('A');
+        (await w.open('before', 'index.html')).close();
+        const page = await openPage(w, 't1', 'my-dashboard.html', {});
+        await w.browser.advance(1500);
+        page.dispatchWindow('pagehide', { persisted: true });
+        w.server.faults.my_profile = () => 'network';
+        page.dispatchWindow('pageshow', { persisted: true });
+        await w.browser.idle();
+        await w.browser.advance(1000);
+        c.ok(hidden(page) && navsOf(page).includes('[새로 고침]'), '되살아난 화면(확인하지 못함): 가린 채로 다시 받지 않음');
     }
     return c.problems;
 }
@@ -675,56 +819,70 @@ async function testBusinessGate(opt) {
     const c = checker();
     const log = await loadRequestLog(opt.mutate);
     const anon = 'zz-fake-anon';
-    const synth = [A.email, 'm-A', '00000000-0000-4000-8000-0000b3c1a001'];
-    const decide = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, business: { values: () => synth } });
+    const labels = { A: [A.email, 'm-A'], B: [B.email, 'm-B'] };
+    const decide = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, accountLabels: () => labels });
     const headers = { apikey: anon, Authorization: 'Bearer ' + anon };
     const rest = TEST_URL + '/rest/v1/';
     const rows = [
-        // [이름, 메서드, 주소, 본문, 기대 갈래, 기대 동작]
-        ['본인 신청서(이메일이 합성 값)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email) + '&deleted=neq.true&withdrawn_at=is.null&limit=100', null, 'synthetic-read', 'continue'],
-        ['합성 신청서 한 건(번호)', 'GET', rest + 'applications?id=eq.00000000-0000-4000-8000-0000b3c1a001&limit=1', null, 'synthetic-read', 'continue'],
-        ['합성 회원의 시험 일정(회원번호)', 'GET', rest + 'toefl_exam_schedules?user_id=eq.m-A&status=neq.cancelled&order=exam_datetime.desc&limit=1', null, 'synthetic-read', 'continue'],
-        ['이메일의 대소문자만 다른 합성 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email.toUpperCase()), null, 'synthetic-read', 'continue'],
-        ['신청서 전체 목록(조건 없음)', 'GET', rest + 'applications?limit=1000&order=created_at.desc', null, 'unconditioned', 'fake'],
-        ['공지 전체 목록', 'GET', rest + 'notices?order=published_at.desc&limit=1000', null, 'unconditioned', 'fake'],
-        ['회원 표 전체', 'GET', rest + 'users?limit=1000', null, 'unconditioned', 'fake'],
-        ['이름의 부분 검색', 'GET', rest + 'applications?name=ilike.*' + encodeURIComponent('합성') + '*&limit=20', null, 'partial-search', 'fake'],
-        ['or 조건(이메일·전화)', 'GET', rest + 'withdrawal_records?or=' + encodeURIComponent('(email.ilike.' + A.email + ',phone.eq.010)') + '&limit=1', null, 'partial-search', 'fake'],
-        ['합성 값이 아닌 이메일이 조건', 'GET', rest + 'applications?email=eq.' + encodeURIComponent('someone@zz.invalid'), null, 'not-synthetic', 'fake'],
-        ['합성 값이 들어 있지만 eq 가 아님(neq)', 'GET', rest + 'applications?email=neq.' + encodeURIComponent(A.email), null, 'not-synthetic', 'fake'],
-        ['합성 값으로 시작하는 다른 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email + '.evil'), null, 'not-synthetic', 'fake'],
-        ['상태만 조건(설문 질문)', 'GET', rest + 'toefl_survey_questions?status=eq.active&order=created_at.asc', null, 'not-synthetic', 'fake'],
-        ['쓰기(POST)', 'POST', rest + 'applications', '{"name":"x"}', 'write', 'fake'],
-        ['쓰기(PATCH — 조건이 합성 값이어도)', 'PATCH', rest + 'users?id=eq.m-A', '{"name":"x"}', 'write', 'fake'],
-        ['쓰기(DELETE)', 'DELETE', rest + 'reviews?id=eq.m-A', null, 'write', 'fake'],
-        ['다른 RPC', 'POST', rest + 'rpc/some_function', '{}', 'write', 'fake'],
-        ['다른 RPC(GET)', 'GET', rest + 'rpc/some_function?x=eq.m-A', null, 'other', 'fake'],
-        ['파일', 'GET', TEST_URL + '/storage/v1/object/public/x/y.png', null, 'other', 'fake'],
-        ['함수', 'POST', TEST_URL + '/functions/v1/send', '{}', 'write', 'fake'],
+        // [이름, 메서드, 주소, 본문, 기대 갈래, 기대 이름표] — 전부 "전송 전에 막고 가짜 응답"이어야 한다
+        ['본인 신청서(이메일이 A 의 값)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email) + '&deleted=neq.true&withdrawn_at=is.null&limit=100', null, 'read', 'A'],
+        ['신청서 한 건(번호)', 'GET', rest + 'applications?id=eq.00000000-0000-4000-8000-0000b3c1a001&limit=1', null, 'read', 'none'],
+        ['A 의 시험 일정(회원번호)', 'GET', rest + 'toefl_exam_schedules?user_id=eq.m-A&status=neq.cancelled&order=exam_datetime.desc&limit=1', null, 'read', 'A'],
+        ['B 의 신청서(이메일)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(B.email), null, 'read', 'B'],
+        ['대소문자만 다른 A 의 이메일', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email.toUpperCase()), null, 'read', 'A'],
+        ['A 의 값으로 시작하는 다른 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email + '.evil'), null, 'read', 'none'],
+        ['A 의 값이 들어 있지만 eq 가 아님(neq)', 'GET', rest + 'applications?email=neq.' + encodeURIComponent(A.email), null, 'read', 'none'],
+        ['신청서 전체 목록(조건 없음)', 'GET', rest + 'applications?limit=1000&order=created_at.desc', null, 'unconditioned', 'none'],
+        ['공지 전체 목록', 'GET', rest + 'notices?order=published_at.desc&limit=1000', null, 'unconditioned', 'none'],
+        ['회원 표 전체', 'GET', rest + 'users?limit=1000', null, 'unconditioned', 'none'],
+        ['이름의 부분 검색', 'GET', rest + 'applications?name=ilike.*' + encodeURIComponent('합성') + '*&limit=20', null, 'partial-search', 'none'],
+        ['or 조건(이메일·전화)', 'GET', rest + 'withdrawal_records?or=' + encodeURIComponent('(email.ilike.' + A.email + ',phone.eq.010)') + '&limit=1', null, 'partial-search', 'none'],
+        ['상태만 조건(설문 질문)', 'GET', rest + 'toefl_survey_questions?status=eq.active&order=created_at.asc', null, 'read', 'none'],
+        ['쓰기(POST)', 'POST', rest + 'applications', '{"name":"x"}', 'write', 'none'],
+        ['쓰기(PATCH — A 의 회원번호가 조건)', 'PATCH', rest + 'users?id=eq.m-A', '{"name":"x"}', 'write', 'A'],
+        ['쓰기(DELETE)', 'DELETE', rest + 'reviews?id=eq.zz-1', null, 'write', 'none'],
+        ['다른 RPC', 'POST', rest + 'rpc/some_function', '{}', 'write', 'none'],
+        ['다른 RPC(GET)', 'GET', rest + 'rpc/some_function?x=eq.m-B', null, 'other', 'B'],
+        ['파일', 'GET', TEST_URL + '/storage/v1/object/public/x/y.png', null, 'other', 'none'],
+        ['함수', 'POST', TEST_URL + '/functions/v1/send', '{}', 'write', 'none'],
     ];
-    for (const [name, method, url, postData, kind, action] of rows) {
+    const recs = [];
+    for (const [name, method, url, postData, kind, account] of rows) {
         const d = decide({ url, method, headers, postData, resourceType: 'fetch', isNavigation: false });
-        c.ok(d.record.business === kind && d.action === action && d.record.aborted === (action !== 'continue'), `차단기(${name}): 갈래·동작이 기대와 다름(${d.record.business}·${d.action})`);
+        recs.push(d.record);
+        c.ok(d.action === 'fake' && d.record.aborted === true, `차단기(${name}): 업무 요청을 전송 전에 막지 않음(${d.action})`);
+        c.ok(d.record.business === kind && d.record.account === account, `차단기(${name}): 기록의 갈래·이름표가 기대와 다름(${d.record.business}·${d.record.account})`);
     }
-    // 인증 모듈의 요청은 업무 요청으로 세지 않고, 자격 위반은 가짜 응답이 아니라 중단이다
-    const profile = decide({ url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', headers: { apikey: anon, Authorization: 'Bearer a.b.c' }, postData: '{}', resourceType: 'fetch', isNavigation: false });
-    c.ok(!('business' in profile.record), '차단기: 인증 모듈의 요청을 업무 요청으로 셈');
-    const leak = decide({ url: rest + 'applications?email=eq.' + encodeURIComponent(A.email), method: 'GET', headers: { apikey: anon, Authorization: 'Bearer zz-unknown' }, postData: null, resourceType: 'fetch', isNavigation: false });
+    // 인증 모듈의 다섯 요청만 나간다(업무 요청으로 세지 않는다). 자격 위반은 가짜 응답이 아니라 중단이다
+    const member = 'a.b.c';
+    const five = [
+        ['POST', TEST_URL + '/auth/v1/token?grant_type=password', '{"email":"x","password":"y"}', anon],
+        ['POST', TEST_URL + '/auth/v1/token?grant_type=refresh_token', '{"refresh_token":"y"}', anon],
+        ['POST', TEST_URL + '/rest/v1/rpc/my_profile', '{}', anon],
+        ['POST', TEST_URL + '/rest/v1/rpc/my_site_access', '{}', anon],
+    ];
+    for (const [method, url, postData, bearer] of five) {
+        const d = decide({ url, method, headers: { apikey: anon, Authorization: 'Bearer ' + bearer }, postData, resourceType: 'fetch', isNavigation: false });
+        c.ok(d.action === 'continue' && !('business' in d.record), '차단기: 인증 모듈의 요청을 막거나 업무 요청으로 셈');
+    }
+    void member;
+    const leak = decide({ url: rows[0][2], method: 'GET', headers: { apikey: anon, Authorization: 'Bearer zz-unknown' }, postData: null, resourceType: 'fetch', isNavigation: false });
     c.ok(leak.action === 'abort', '차단기: 알 수 없는 자격이 실린 업무 조회를 중단하지 않음');
-    // 합성 값을 아직 모르면(예행 전) 어떤 업무 요청도 내보내지 않는다
-    const closed = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, business: { values: () => [] } });
-    c.ok(closed({ url: rows[0][2], method: 'GET', headers, postData: null, resourceType: 'fetch', isNavigation: false }).action === 'fake', '차단기: 합성 값을 모르는데 업무 조회를 내보냄');
-    // 업무 기준을 주지 않으면 3A 와 같다(기록에 업무 항목이 없다)
-    const plain = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon });
-    const p = plain({ url: rows[4][2], method: 'GET', headers, postData: null, resourceType: 'fetch', isNavigation: false });
-    c.ok(p.action === 'continue' && !('business' in p.record) && !('businessBlocked' in p.record), '차단기: 업무 기준이 없는데 3A 와 다르게 가름');
-    // 셈
-    const recs = rows.map(([, method, url, postData]) => decide({ url, method, headers, postData, resourceType: 'fetch', isNavigation: false }).record);
+    // 끌 수 없다: 이름표를 주지 않아도, 끄려는 인자를 줘도 업무 요청은 나가지 않는다
+    for (const [what, extra] of [['이름표 없음', {}], ['business: false', { business: false }], ['business: { values }', { business: { values: () => [A.email] } }], ['real: false', { real: false, allowBusiness: true }]]) {
+        const dx = log.makeDecider(Object.assign({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon }, extra));
+        for (const i of [0, 7, 13]) {
+            const d = dx({ url: rows[i][2], method: rows[i][1], headers, postData: rows[i][3], resourceType: 'fetch', isNavigation: false });
+            c.ok(d.action === 'fake' && d.record.aborted === true, `차단기(${what}): 업무 요청을 내보냄(${rows[i][0]})`);
+        }
+    }
+    // 셈: 내보낸 업무 요청 0, 시도는 갈래마다
     const sum = log.summarize(recs);
-    c.ok(sum.businessSent === 4 && sum.businessSentNotSynthetic === 0 && sum.businessBlocked.write === 5 && sum.businessBlocked['partial-search'] === 2 && sum.businessBlocked.unconditioned === 3 && sum.businessBlocked['not-synthetic'] === 4 && sum.businessBlocked.other === 2, `차단기: 셈이 기대와 다름(${JSON.stringify([sum.businessSent, sum.businessBlocked])})`);
+    c.ok(sum.businessSent === 0 && sum.testProject === 0, `차단기: 업무 요청을 내보낸 것으로 셈(${sum.businessSent})`);
+    c.ok(sum.businessAttempts.read === 8 && sum.businessAttempts.unconditioned === 3 && sum.businessAttempts['partial-search'] === 2 && sum.businessAttempts.write === 5 && sum.businessAttempts.other === 2, `차단기: 시도의 셈이 기대와 다름(${JSON.stringify(sum.businessAttempts)})`);
     // 기록에는 정해 둔 이름만
-    const names = new Set([...log.BUSINESS_KINDS]);
-    c.ok(recs.every((r) => names.has(r.business) && typeof r.businessBlocked === 'boolean' && !JSON.stringify(r).includes('zz.invalid') && !JSON.stringify(r).includes('/rest/')), '차단기: 기록에 주소·값이 남음');
+    const kinds = new Set(log.BUSINESS_KINDS);
+    c.ok(recs.every((r) => kinds.has(r.business) && ['A', 'B', 'none'].includes(r.account) && !JSON.stringify(r).includes('zz.invalid') && !JSON.stringify(r).includes('/rest/')), '차단기: 기록에 주소·값이 남음');
     return c.problems;
 }
 
@@ -773,14 +931,16 @@ async function testSameAsMergeBase(opt) {
 
 const ON_PAGE_TESTS = [
     ['3A 가 다룬 두 화면(index·login)이 3A 를 합친 기준과 같음(꺼짐은 기록 전체, 켜짐은 요청·저장소·이동·안내·머리말)', testSameAsMergeBase],
-    ['실행기의 차단기: 업무 요청 가운데 내보내는 것은 합성 자료가 조건인 정확한 조회뿐(쓰기·부분 검색·전체 목록·조건 없는 조회는 전송 전에 막음)', testBusinessGate],
+    ['실행기의 차단기: 업무 요청은 하나도 내보내지 않는다(나가는 것은 인증 요청 다섯뿐 — 끄는 인자가 없다), 시도는 갈래·이름표로 적는다', testBusinessGate],
     ['확인 전 보호 표시 0·자동 보호 요청 0, 공개 본문은 기다리지 않음, 확인 뒤에만 회원 표시·조회', testBeforeConfirm],
     ['확인되지 않으면 회원 전용 갈래만 로그인 화면으로·그 뒤 보호 업무 요청 0, 공개 본문·방문자 갈래는 방문자 기준과 같음', testNotConfirmed],
+    ['만료된 값이 남은 방문자: 공개·갈래 화면의 공개 부분은 그 확인을 기다리지 않고, 끝난 뒤에도 방문자 그대로', testStaleVisitor],
+    ['화면의 스위치와 모듈의 스위치가 어긋난 두 방향(화면 켜짐 + 모듈 꺼짐 = 닫음 / 화면 꺼짐 + 모듈 켜짐 = 켜진 화면으로 돎)', testSwitchMismatch],
     ['켜진 화면인데 인증 모듈이 없음: 꺼짐이 아니라 닫음', testModuleMissing],
     ['닫아 둔 기능(가입·찾기·가입을 겸한 신청·비밀번호 변경·탈퇴·내 정보 고치기): 요청 0·로그인 값 쓰기 0·임시 안내', testClosedFeatures],
     ['회원 화면의 로그아웃: 인증 모듈이 이 로그인만 끝냄(모름이면 끝낸 것으로 하지 않음)', testLogoutOn],
     ['로그인 뒤 돌아갈 주소의 허용 목록', testReturnTarget],
-    ['확인된 계정이 달라짐·늦게 도착한 응답·되살아난 화면', testAccountChange],
+    ['확인된 사람이 달라짐(가리고 다시 받기)·같은 사람(그대로 — 적던 값 유지)·늦게 도착한 응답·되살아난 화면', testAccountChange],
     ['공개 화면의 회원·관리자 버튼은 확인된 값으로만', testPublicButtons],
 ];
 
@@ -830,14 +990,14 @@ const PAGE_MUTANTS = [
     },
     {
         name: '방문자 갈래가 로그인을 요구하게 된 사본(비회원 설문)', tests: [testNotConfirmed], expect: /공개 본문·방문자 갈래가 로그인 화면으로 감|업무 요청이 방문자 기준과 다름/,
-        edits: [['js/survey.js', '    if (EonLogin.on() && svUser) EonLogin.watch();', "    if (EonLogin.on() && !svUser) { window.location.href = 'login.html?redirect=survey.html'; return; }"]],
+        edits: [['js/survey.js', '    if (!user) return;                      // 방문자: 지금의 비회원 설문 그대로', "    if (!user) { window.location.href = 'login.html?redirect=survey.html'; return; }"]],
     },
     {
         name: '공개 본문이 로그인 확인을 기다리게 된 사본(공지)', tests: [testBeforeConfirm], expect: /공개 본문이 로그인 확인을 기다림/,
         edits: [['notice.html', '            if (noticeId) {\n                currentPostId = noticeId;\n                showDetailView(noticeId);\n            } else {\n                loadNotices();\n            }', '            EonLogin.settle().then(function () { if (noticeId) { currentPostId = noticeId; showDetailView(noticeId); } else { loadNotices(); } });']],
     },
     {
-        name: '모듈이 없는 켜진 화면을 "꺼짐"으로 처리하는 사본', tests: [testModuleMissing], expect: /"켜진 화면 \+ 모듈 없음"을 만들지 못함|저장된 옛 값이 그려짐|닫지 않음/,
+        name: '모듈이 없는 켜진 화면을 "꺼짐"으로 처리하는 사본', tests: [testModuleMissing, testSwitchMismatch], expect: /"켜진 화면 \+ 모듈 없음"을 만들지 못함|저장된 옛 값이 그려짐|닫지 않음|화면 켜짐 \+ 모듈 꺼짐/,
         edits: [[GATE, '    function on() { return PAGE_ON || !!mod(); }', '    function on() { return !!mod(); }']],
     },
     {
@@ -849,28 +1009,59 @@ const PAGE_MUTANTS = [
         edits: [['js/register.js', '    if (eonRegisterClosedText) return;       // 닫힌 길: 닉네임 조회를 보내지 않는다\n', '']],
     },
     {
-        name: '차단기가 이름의 부분 검색을 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(이름의 부분 검색\)|차단기\(or 조건/,
-        edits: [[LOG_FILE, "        if (k === 'or' || k === 'and' || k === 'not.or' || k === 'not.and' || PARTIAL_OPS.test(v)) return 'partial-search';\n", '']],
+        name: '차단기가 업무 요청을 내보내는 사본', tests: [testBusinessGate], expect: /업무 요청을 전송 전에 막지 않음|업무 요청을 내보냄/,
+        edits: [[LOG_FILE, "            action: !allowed ? 'abort' : (businessBlocked ? 'fake' : 'continue'),", "            action: !allowed ? 'abort' : 'continue',"]],
     },
     {
-        name: '차단기가 업무 쓰기를 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(쓰기/,
+        name: '차단기가 조건 있는 조회는 내보내는 사본(1차의 모양)', tests: [testBusinessGate], expect: /차단기\(본인 신청서|차단기\(상태만 조건/,
+        edits: [[LOG_FILE, '        const businessBlocked = allowed && isBusiness;', "        const businessBlocked = allowed && isBusiness && businessOf !== 'read';"]],
+    },
+    {
+        name: '차단기가 업무 차단을 끄는 인자를 받는 사본', tests: [testBusinessGate], expect: /차단기\(business: false\): 업무 요청을 내보냄/,
+        edits: [
+            [LOG_FILE, 'export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accountLabels }) {', 'export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accountLabels, business }) {'],
+            [LOG_FILE, "        const isBusiness = where === 'test-project' && !Object.values(NAMED).includes(target);", "        const isBusiness = business !== false && where === 'test-project' && !Object.values(NAMED).includes(target);"],
+        ],
+    },
+    {
+        name: '차단기가 쓰기를 조회로 적는 사본', tests: [testBusinessGate], expect: /차단기\(쓰기.*기록의 갈래/,
         edits: [[LOG_FILE, "    if (m !== 'GET' && m !== 'HEAD') return 'write';", "    if (false) return 'write';"]],
     },
     {
-        name: '차단기가 조건 없는 전체 조회를 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(신청서 전체 목록|차단기\(회원 표 전체/,
-        edits: [[LOG_FILE, "    if (conditions === 0) return 'unconditioned';", "    if (conditions === 0) return 'synthetic-read';"]],
-    },
-    {
-        name: '차단기가 합성 값이 조건이 아닌 조회를 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(합성 값이 아닌 이메일|차단기\(상태만 조건/,
-        edits: [[LOG_FILE, "    return synthetic ? 'synthetic-read' : 'not-synthetic';", "    return 'synthetic-read';"]],
-    },
-    {
-        name: '차단기가 합성 값을 "그 글자로 시작"으로 견주는 사본', tests: [testBusinessGate], expect: /합성 값으로 시작하는 다른 값/,
-        edits: [[LOG_FILE, "        if (v.startsWith('eq.') && values.includes(v.slice(3).trim().toLowerCase())) synthetic = true;", "        if (v.startsWith('eq.') && values.some((x) => v.slice(3).trim().toLowerCase().startsWith(x))) synthetic = true;"]],
+        name: '차단기가 조건의 값을 "그 글자로 시작"으로 견줘 이름표를 붙이는 사본', tests: [testBusinessGate], expect: /A 의 값으로 시작하는 다른 값/,
+        edits: [[LOG_FILE, "x.trim().toLowerCase() === value)) return label;", "value.startsWith(x.trim().toLowerCase()))) return label;"]],
     },
     {
         name: '확인된 계정이 달라져도 화면을 그대로 두는 사본', tests: [testAccountChange], expect: /가리지 않음|다시 받지 않음/,
-        edits: [[AUTH_FILE, '        if (displayUserRaw() === guardFor) { showPage(); return; }', '        if (true) { showPage(); return; }']],
+        edits: [[AUTH_FILE, '        if (whoNow() === guardFor) { showPage(); return; }', '        if (true) { showPage(); return; }']],
+    },
+    {
+        name: '같은 사람인데 표시 값이 달라지면 다시 받는 사본(1차의 모양 — 표시 값 전체를 견줌)', tests: [testAccountChange], expect: /같은 사람의 표시 값이 달라짐: 다시 받거나/,
+        edits: [[AUTH_FILE, '        return displayUserRaw() !== null && verified && verified.profile ? verified.profile.id : null;', '        return displayUserRaw();']],
+    },
+    {
+        name: '되살아난 화면을 확인도 하기 전에 다시 받는 사본(1차의 모양)', tests: [testAccountChange], expect: /되살아난 화면\(같은 사람\)/,
+        edits: [[AUTH_FILE, "        if (state === 'restoring' || displayHold) { hidePage(); return; }", "        if (state === 'restoring') { hidePage(); return; }"]],
+    },
+    {
+        name: '되살아난 화면을 다시 확인하지 않고 그대로 보이는 사본', tests: [testAccountChange], expect: /화면을 떠날 때 가리지 않음|되살아난 화면\(다른 사람\)|되살아난 화면\(확인하지 못함\)/,
+        edits: [[AUTH_FILE, "        window.addEventListener('pagehide', function () { hidePage(); });\n    }", '    }'], [AUTH_FILE, "        if (state === 'restoring' || displayHold) { hidePage(); return; }", "        if (state === 'restoring' || displayHold) { return; }"]],
+    },
+    {
+        name: '갈래 화면이 공개 부분까지 로그인 확인을 기다리는 사본(비회원 설문 — 1차의 모양)', tests: [testBeforeConfirm, testStaleVisitor], expect: /공개 본문이 로그인 확인을 기다림|공개 본문이 끝난 로그인의 확인을 기다림|입력 칸이 열리지 않음/,
+        edits: [['js/survey.js', '    svUser = null;\n    const touch', '    await EonLogin.settle();\n    svUser = null;\n    const touch']],
+    },
+    {
+        name: '갈래 화면이 공개 부분까지 로그인 확인을 기다리는 사본(신청서)', tests: [testBeforeConfirm, testStaleVisitor], expect: /공개 본문이 로그인 확인을 기다림|공개 본문이 끝난 로그인의 확인을 기다림/,
+        edits: [['js/application-form.js', '    // ---- 공개 부분: 기다리지 않는다 ----\n    setupConditionalFields();', '    await EonLogin.settle();\n    setupConditionalFields();']],
+    },
+    {
+        name: '설문의 자동 채움이 사용자가 적은 칸을 덮는 사본', tests: [testBeforeConfirm], expect: /사용자가 이미 적은 칸을 덮음/,
+        edits: [['js/survey.js', '        if (el && value && !el.value && !eonSurveyTouched.has(id)) el.value = value;', '        if (el && value) el.value = value;']],
+    },
+    {
+        name: '화면 꺼짐 + 모듈 켜짐에서 저장된 옛 값을 믿는 사본(게이트가 화면의 값만 봄)', tests: [testSwitchMismatch], expect: /화면 꺼짐 \+ 모듈 켜짐/,
+        edits: [[GATE, '    function on() { return PAGE_ON || !!mod(); }', '    function on() { return PAGE_ON; }']],
     },
     {
         name: '공개 화면이 저장된 값으로 관리자 버튼을 보이는 사본(공지)', tests: [testPublicButtons], expect: /저장된 옛 값만으로 버튼이 보임|확인 전에 회원·관리자 버튼이 보임/,

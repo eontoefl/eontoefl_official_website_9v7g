@@ -2072,7 +2072,7 @@ async function sectionRequestLog(mutate) {
     const pw = JSON.stringify({ email: 'a@zz.invalid', password: 'zzsecretpw' });
     const rt = JSON.stringify({ refresh_token: 'zzsecretrefresh' });
     const rows = [
-        // [설명, 요청, 기대 action, 기대 where, 기대 target, leak]
+        // [설명, 요청, 기대 action(continue 보냄 / abort 중단 / fake 전송 전에 막고 가짜 응답), 기대 where, 기대 target, leak]
         ['자기 화면', { url: SELF + '/login.html?redirect=zzsecret', method: 'GET', resourceType: 'document', isNavigation: true }, 'continue', 'self', 'file', false],
         ['꺼짐 서버의 화면', { url: 'http://127.0.0.1:8788/index.html', method: 'GET', resourceType: 'document', isNavigation: true }, 'continue', 'self', 'file', false],
         ['수신 확인용 끝점', { url: SELF + '/__b3a/probe', method: 'GET', resourceType: 'fetch' }, 'continue', 'self', 'test-endpoint', false],
@@ -2081,7 +2081,11 @@ async function sectionRequestLog(mutate) {
         ['로그아웃(이 로그인만)', { url: TEST_URL + '/auth/v1/logout?scope=local', method: 'POST', resourceType: 'fetch', headers: H(member) }, 'continue', 'test-project', 'logout', false],
         ['my_profile', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'continue', 'test-project', 'my_profile', false],
         ['my_site_access', { url: TEST_URL + '/rest/v1/rpc/my_site_access', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'continue', 'test-project', 'my_site_access', false],
-        ['업무 요청(공개 키)', { url: TEST_URL + '/rest/v1/applications?email=eq.zzsecret%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: H(anon) }, 'continue', 'test-project', 'rest-table', false],
+        ['업무 요청(공개 키)', { url: TEST_URL + '/rest/v1/applications?email=eq.zzsecret%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: H(anon) }, 'fake', 'test-project', 'rest-table', false],
+        ['업무 요청(공개 키, 조건 없는 전체 조회)', { url: TEST_URL + '/rest/v1/notices?order=published_at.desc&limit=1000', method: 'GET', resourceType: 'fetch', headers: H(anon) }, 'fake', 'test-project', 'rest-table', false],
+        ['업무 쓰기(공개 키)', { url: TEST_URL + '/rest/v1/applications', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: '{"name":"zzsecret"}' }, 'fake', 'test-project', 'rest-table', false],
+        ['다른 RPC(공개 키)', { url: TEST_URL + '/rest/v1/rpc/other_function', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: '{}' }, 'fake', 'test-project', 'rest-rpc-other', false],
+        ['파일(공개 키)', { url: TEST_URL + '/storage/v1/object/public/x/y.png', method: 'GET', resourceType: 'fetch', headers: H(anon) }, 'fake', 'test-project', 'storage', false],
         ['my_profile 을 공개 키로(기록만 — 자격이 새는 것은 아니다)', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: '{}' }, 'continue', 'test-project', 'my_profile', false],
         ['허용 목록의 글꼴', { url: 'https://fonts.gstatic.com/s/x.woff2', method: 'GET', resourceType: 'font' }, 'continue', 'static-allowed', 'static', false],
         ['허용 목록 호스트의 파비콘', { url: 'https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png', method: 'GET', resourceType: 'other' }, 'continue', 'static-allowed', 'static', false],
@@ -2120,9 +2124,11 @@ async function sectionRequestLog(mutate) {
         records.push(d.record);
         if (action === 'abort' && d.action !== 'abort') problems.push(`가르기: ${name} — 전송 전에 중단하지 않음`);
         if (action === 'continue' && d.action !== 'continue') problems.push(`가르기: ${name} — 보내야 하는 요청을 중단함`);
+        if (action === 'fake' && d.action !== 'fake') problems.push(`가르기: ${name} — 업무 요청을 "전송 전에 막고 가짜 응답"으로 가르지 않음(${d.action})`);
+        if ((action === 'fake' && !('business' in d.record)) || (['login', 'refresh', 'logout', 'my_profile', 'my_site_access'].includes(target) && ('business' in d.record))) problems.push(`가르기: ${name} — 업무 요청의 표시가 기대와 다름`);
         if (d.record.where !== where || d.record.target !== target) problems.push(`가르기: ${name} — 무리·이름이 ${d.record.where}/${d.record.target} (기대 ${where}/${target})`);
         if (d.record.leak !== leak) problems.push(`가르기: ${name} — 자격의 용도 판정이 ${d.record.leak} (기대 ${leak})`);
-        if (d.record.aborted !== (d.action === 'abort')) problems.push(`가르기: ${name} — 기록의 중단 표시가 결정과 다름`);
+        if (d.record.aborted !== (d.action !== 'continue')) problems.push(`가르기: ${name} — 기록의 "보내지 않음" 표시가 결정과 다름`);
     }
     // 기록에는 자유 형식의 글자가 없다: 정해 둔 이름·참/거짓만
     const allowedValues = new Set(['self', 'sink', 'test-project', 'static-allowed', 'outside', 'local',
@@ -2130,8 +2136,9 @@ async function sectionRequestLog(mutate) {
         'document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr', 'fetch', 'websocket', 'manifest',
         'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'OTHER',
         'none', 'anon', 'member', 'service_role',
+        'write', 'partial-search', 'unconditioned', 'read',
         'password', 'refresh_token', 'member_jwt', 'unknown_credential', 'foreign_member_jwt']);
-    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted', 'business', 'businessBlocked']);
+    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted', 'business', 'account']);
     for (const r of records) {
         for (const [k, v] of Object.entries(r)) {
             const values = Array.isArray(v) ? v : [v];
@@ -2143,7 +2150,11 @@ async function sectionRequestLog(mutate) {
     const s = summarize(records);
     const want = { leakBlocked: 15, leakSent: 0, publicRetry: 1, serviceRole: 1, sinkAttempts: 2, outsideSent: 0, staticAllowed: 2 };
     for (const [k, v] of Object.entries(want)) if (s[k] !== v) problems.push(`가르기: 요약의 ${k} 가 ${s[k]} (기대 ${v})`);
-    if (s.testProjectByTarget.login !== 1 || s.testProjectByTarget.my_profile !== 2 || s.testProjectByTarget['rest-table'] !== 1) problems.push('가르기: 요약의 이름별 수가 기대와 다름');
+    if (s.testProjectByTarget.login !== 1 || s.testProjectByTarget.my_profile !== 2 || s.testProjectByTarget['rest-table'] !== undefined) problems.push('가르기: 요약의 이름별 수가 기대와 다름');
+    // 업무 요청: 시도 5건(조건 있는 조회 1·조건 없는 조회 1·쓰기 2·그 밖 1), 내보낸 것 0. 자격 위반으로 중단한 것은 업무 시도로도 적힌다(그것도 보내지 않는다)
+    const sentBusiness = records.filter((r) => r.business && !r.aborted).length;
+    if (s.businessSent !== 0 || sentBusiness !== 0) problems.push('가르기: 업무 요청을 내보냄');
+    if (records.filter((r) => r.business && !r.leak && !r.nav).length !== 5) problems.push('가르기: 업무 요청의 시도 수가 기대와 다름');
     return { problems, rows: rows.length };
 }
 // 실행기(screen.mjs)가 판단 부분(screen-core.mjs)을 실제로 쓰는가 — 글자로 본다(브라우저를 띄우는 파일이라 여기서 돌리지 않는다)
