@@ -24,6 +24,7 @@
     const COMPAT_TIME = 'iontoefl_login_time';
     const SDK_SRC = 'vendor/supabase-2.116.0.js';
     const RPC_TIMEOUT_MS = 15000;
+    const SESSION_WAIT_MS = 20000;              // 공식 클라이언트의 복원·갱신을 기다리는 상한
 
     // 요청 등급
     const GRADES = Object.freeze({
@@ -170,6 +171,9 @@
         return undefined;
     }
 
+    // 결과를 모르는 갱신 요청에 쓴 갱신값(이 화면의 메모리에만). 같은 값으로는 다시 보내지 않는다.
+    const unknownRefresh = [];
+
     // 인증 모듈과 공식 클라이언트가 내는 모든 요청이 지나는 한 곳.
     // (전역 fetch 를 바꾸지 않는다 — 이 함수를 받은 호출만 지난다.)
     function guardedFetch(input, init) {
@@ -182,7 +186,14 @@
         if (headerValue(headers, 'apikey') !== ANON || typeof auth !== 'string' || auth.indexOf('Bearer ') !== 0) {
             return Promise.reject(EonAuthError('bad_headers'));
         }
-        return window.fetch(input, {
+        let refreshToken = null;
+        if (target.key === 'refresh') {
+            try { refreshToken = JSON.parse(opt.body).refresh_token; } catch (e) { refreshToken = null; }
+            if (typeof refreshToken !== 'string' || !refreshToken) return Promise.reject(EonAuthError('bad_body'));
+            // 공식 클라이언트는 응답을 못 받은 갱신을 스스로 다시 보내려 한다 — 결과를 모르는 요청은 다시 보내지 않는다
+            if (unknownRefresh.indexOf(refreshToken) >= 0) return Promise.reject(EonAuthError('refresh_unknown'));
+        }
+        const sent = window.fetch(input, {
             method: target.method,
             headers: headers,
             body: opt.body,
@@ -192,6 +203,28 @@
             referrerPolicy: 'no-referrer',
             signal: opt.signal
         });
+        if (refreshToken === null) return sent;
+        return sent.then(function (res) {
+            if (res.status >= 500) unknownRefresh.push(refreshToken);
+            return res;
+        }, function (err) {
+            unknownRefresh.push(refreshToken);
+            throw err;
+        });
+    }
+
+    function withTimeout(promise, ms) {
+        return new Promise(function (resolve, reject) {
+            const timer = setTimeout(function () { reject(EonAuthError('timeout')); }, ms);
+            promise.then(function (v) { clearTimeout(timer); resolve(v); }, function (e) { clearTimeout(timer); reject(e); });
+        });
+    }
+
+    // 서버가 분명히 거절한 갱신인가(응답을 못 받은 것과 구분한다)
+    function isDefiniteAuthFailure(err) {
+        if (!err) return false;
+        if (err.name === 'AuthSessionMissingError') return true;
+        return err.name === 'AuthApiError' && typeof err.status === 'number' && err.status >= 400 && err.status < 500;
     }
 
     // 공식 클라이언트에 주는 저장 어댑터: 자기 이름(eon_auth_v1…)만 읽고 쓴다.
@@ -360,7 +393,7 @@
     async function readSession() {
         if (!client) return { session: null, error: true };
         try {
-            const r = await client.getSession();
+            const r = await withTimeout(client.getSession(), SESSION_WAIT_MS);
             if (r && r.error) return { session: null, error: true };
             return { session: (r && r.data && r.data.session) || null, error: false };
         } catch (e) {
@@ -450,14 +483,14 @@
         if (first.ok || (first.reason !== 'jwt_rejected' && first.reason !== 'no_member')) return first;
         // JWT 가 만료됐거나 로그인 기록이 끝났을 수 있다 → 공식 클라이언트로 한 번만 갱신해 본다
         let refreshed = null;
+        let definite = false;
         try {
-            const r = await client.refreshSession();
+            const r = await withTimeout(client.refreshSession(), SESSION_WAIT_MS);
             if (r && !r.error && r.data && r.data.session) refreshed = r.data.session;
+            else definite = isDefiniteAuthFailure(r && r.error);
         } catch (e) { refreshed = null; }
-        if (!refreshed) {
-            const cur = await readSession();
-            return { ok: false, reason: (!cur.error && !cur.session) ? 'expired' : 'network' };
-        }
+        // 서버가 갱신을 거절했으면 이 로그인 기록은 끝났다. 응답을 못 받았으면 모른다(다시 보내지 않는다).
+        if (!refreshed) return { ok: false, reason: definite ? 'expired' : 'network', ended: definite };
         const second = await verifyOnce(refreshed);
         if (!second.ok && second.reason === 'no_member') return { ok: false, reason: 'no_member', definitive: true };
         if (!second.ok && second.reason === 'jwt_rejected') return { ok: false, reason: 'expired' };
@@ -501,6 +534,7 @@
             setState('signed_out', 'no_member');
             return 'no_member';
         }
+        if (r.ended) await endLocal();       // 끝난 로그인 기록을 이 브라우저에 남겨 두지 않는다
         clearCompat(c ? c.sid : null);
         lastRejected = c;
         setState('rejected', r.reason);
