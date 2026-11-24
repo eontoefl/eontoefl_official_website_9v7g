@@ -323,6 +323,9 @@ const STATES = ['off', 'signed_out', 'restoring', 'signed_in', 'rejected'];
 const REASONS = [null, 'blocked', 'withdrawal_pending', 'no_member', 'not_allowed', 'maintenance', 'network', 'rate_limited', 'expired', 'ended',
     'session_changed', 'legacy_present', 'unexpected', 'token_shape', 'unavailable', 'storage', 'error'];
 const PROFILE_KEYS = ['id', 'name', 'nickname', 'email', 'phone', 'timezone'];
+// 서버의 오류 코드는 이 목록의 이름으로만 적는다(그 밖은 other) — 끝난 기록의 갱신에 실제 서버가 무엇을 주는지 보려고
+const KNOWN_CODES = ['session_not_found', 'session_expired', 'refresh_token_not_found', 'refresh_token_already_used', 'invalid_credentials',
+    'over_request_rate_limit', 'bad_jwt', 'no_authorization', 'validation_failed', 'user_banned', 'PGRST301', 'PGRST303', 'PGRST202', 'PT503', 'PT405', '42501'];
 const KEY_BUCKETS = ['iontoefl_user', 'iontoefl_login_time', 'eon_book_auth_v1', 'eon_auth_v1', 'eon_auth_v1:compat', 'followup', 'eon_auth_other', 'other'];
 const bucketOf = (k) => (KEY_BUCKETS.includes(k) ? k : (/^sb-.*-auth-token$/.test(k) ? 'followup' : (k.startsWith('eon_auth_v1') ? 'eon_auth_other' : 'other')));
 
@@ -361,6 +364,10 @@ function observe(cx, rec, out) {
     try { body = JSON.parse(Buffer.isBuffer(out.body) ? out.body.toString('utf8') : String(out.body || '')); } catch (e) { body = null; }
     rec.status = [200, 204, 400, 401, 403, 404, 405, 409, 429, 500, 503].includes(out.status) ? out.status : (out.status >= 500 ? 500 : (out.status >= 400 ? 400 : 200));
     if (!body || typeof body !== 'object') return;
+    if (out.status >= 400) {
+        const code = typeof body.code === 'string' ? body.code : (typeof body.error_code === 'string' ? body.error_code : null);
+        rec.code = code === null ? 'none' : (KNOWN_CODES.includes(code) ? code : 'other');
+    }
     if ((rec.target === 'login' || rec.target === 'refresh') && out.status === 200 && typeof body.access_token === 'string') {
         try {
             const c = JSON.parse(Buffer.from(body.access_token.split('.')[1], 'base64url').toString('utf8'));
@@ -553,6 +560,7 @@ async function runCase(id, title, fn, { required = true } = {}) {
             entry.storage = cx.store;
             entry.records = cx.records;
             entry.pageshow = cx.events;
+            entry.notes = cx.notes || null;
             await cx.context.close().catch(() => {});
         }
         entry.verdict = entry.checks.some((c) => c.ok === false) ? 'differs' : (entry.checks.some((c) => c.ok === null) || entry.checks.length === 0 ? 'unknown' : 'pass');
@@ -807,12 +815,13 @@ async function allCases() {
             await settled(page, 40000);
             await sleep(600);
             const st = await stateOf(page);
-            cx.observed = { state: st.state, reason: st.reason };
             ck('my_profile 이 200 no_member', cx.seen.states.slice(before).includes('no_member'));
             ck('signed_in 이 아님', st.state === 'rejected' || st.state === 'signed_out');
             ck('갱신 1회, 공개 키 재시도 0', count(cx, 'refresh') === 1);
             ck('이름·관리자 표시 0', !anyNow(await marks(page)));
             ck('새 모듈이 만든 호환 값 없음', !(await keyBuckets(page)).some((k) => k === 'iontoefl_user' || k === 'iontoefl_login_time' || k === 'eon_auth_v1:compat'));
+            const refused = cx.records.filter((x) => x.target === 'refresh' && x.status >= 400)[0];
+            cx.notes = { refreshRefusalCode: refused ? refused.code : 'none', stateAfter: st.state, reasonAfter: st.reason };   // 끝난 기록의 갱신에 서버가 준 코드(정해 둔 이름)
             ck('서버가 "끝남"으로 답했으면(expired) 이 브라우저의 로그인도 지워짐 / 아니면 남음', st.reason === 'expired' ? !(await keyBuckets(page)).includes('eon_auth_v1') : (st.reason === 'no_member' ? true : (await keyBuckets(page)).includes('eon_auth_v1') || st.state === 'signed_out'));
         } finally {
             await pause('restore-session', { sid }, { revertOf: 'expire-session' });

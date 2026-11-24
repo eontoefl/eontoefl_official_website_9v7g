@@ -84,7 +84,8 @@ export function createCore(config) {
     const opts = { mode, testUrl: TEST_URL, testKey: config.testKey, sinkUrl, prodKey: config.prod.key, prodUrl: config.prod.url };
     const baseHeaders = () => ({
         'Content-Security-Policy': cspHeader(),
-        'Cache-Control': 'no-store',
+        // 다시 확인은 하되 보관은 허용한다(no-store 면 브라우저가 뒤로 가기용으로 화면을 보관하지 않아 그 경우를 잴 수 없다)
+        'Cache-Control': 'no-cache',
         'Referrer-Policy': 'no-referrer',
         'X-Content-Type-Options': 'nosniff',
         'X-B3a-Mode': mode,

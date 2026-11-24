@@ -1033,6 +1033,28 @@ async function testTabs(opt) {
     return c.problems;
 }
 
+// 알림(갱신·저장소 변화)이 올 때마다 공식 클라이언트에 물어 갱신을 일으키지 않는다 — 기기의 시계가 앞서 있어도 갱신이 되풀이되지 않게
+async function testNoRefreshLoop(opt) {
+    const c = checker();
+    const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+    const login = await loginAs(w, 'A');
+    login.close();
+    const page = await w.open('index', 'index.html');
+    // 저장된 만료 시각만 지난 것으로(기기의 시계가 앞선 것과 같은 효과): 공식 클라이언트에 물으면 그때마다 갱신하려 한다
+    const stored = JSON.parse(w.browser.local.get('eon_auth_v1'));
+    stored.expires_at = Math.floor(w.browser.now / 1000) - 60;
+    w.browser.local.set('eon_auth_v1', JSON.stringify(stored));
+    const before = w.count(R.refresh);
+    for (let i = 0; i < 6; i++) {
+        page.dispatchWindow('storage', { key: 'eon_auth_v1' });
+        await w.browser.idle();
+    }
+    c.ok(w.count(R.refresh) === before, `갱신 되풀이: 알림마다 갱신 요청이 나감(${w.count(R.refresh) - before}번)`);
+    c.ok(st(page) === 'signed_in', `갱신 되풀이: 같은 로그인 기록인데 상태가 바뀜(${st(page)}·${why(page)})`);
+    audit(w, c, '갱신 되풀이');
+    return c.problems;
+}
+
 const ON_TESTS = [
     ['로그인 성공 하나', testLoginOk],
     ['로그인 뒤 이동 직전의 재확인', testMoveRecheck],
@@ -1041,6 +1063,7 @@ const ON_TESTS = [
     ['signed_in 이 되지 않는 경우 13가지', testNotSignedIn],
     ['한 시도의 실패 처리가 다른 로그인을 건드리지 않음', testAttemptBinding],
     ['만료·종료된 로그인 기록(갱신 거절과 끝남을 나눔)', testExpiry],
+    ['알림마다 갱신을 일으키지 않음', testNoRefreshLoop],
     ['로그아웃(결과를 봄)과 재로그인', testLogout],
     ['옛 방식의 로그인 상태가 있는 브라우저', testLegacyPresent],
     ['저장소 상태 다섯 × 켜짐', testFiveStatesOn],
@@ -1192,6 +1215,10 @@ const MUTANTS = [
     {
         name: '복원이 오류로 끝난 길에 호환 값을 남김', tests: [testExpiry], expect: /복원 오류\([^)]*\): 새 모듈이 만든 호환 값이 남음/,
         edits: [[AUTH_FILE, "            // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다\n            clearCompat(null, true);\n", '']],
+    },
+    {
+        name: '상태를 맞출 때마다 공식 클라이언트에 물어 갱신을 일으킴', tests: [testNoRefreshLoop], expect: /갱신 되풀이: 알림마다 갱신 요청이 나감/,
+        edits: [[AUTH_FILE, "        const st = present ? storedSession() : null;\n        const s = st && typeof st.accessToken === 'string'", "        await readSession();\n        const st = present ? storedSession() : null;\n        const s = st && typeof st.accessToken === 'string'"]],
     },
     {
         name: '전역 로그아웃', tests: [testLogout], expect: /이 로그인만 끝내는 것이 아님/,
