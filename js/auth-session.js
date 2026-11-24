@@ -688,6 +688,39 @@
         setState('rejected', why);
     }
 
+    // 지금 저장된 로그인의 기록(sub·sid). 없거나 읽을 수 없으면 null
+    function heldClaims() {
+        const st = storedSession();
+        return st && st.claims ? st.claims : null;
+    }
+
+    // 기다린 일(SDK 받기·저장된 로그인 읽기)이 실패로 끝났을 때의 정리.
+    //   began: 기다리기 전에 잡아 둔, 이 탭이 복원·재확인하려던 기록. 실패한 뒤 다시 읽은 기록으로는 정리하지 않는다.
+    //   저장된 기록이 시작 때 그대로면 그 기록으로 만든 호환 값만 정리하고 참을 돌려준다.
+    //   그 사이 달라졌거나 시작 때 무엇이었는지 모르면 아무것도 지우지 않고 거짓을 돌려준다(이 탭의 표시만 거둔다).
+    function cleanAfterFailedWait(began) {
+        if (!began || !same(began, heldClaims())) return false;
+        clearCompat(began.sid, true);
+        return true;
+    }
+
+    // 저장된 로그인을 읽는 일이 실패로 끝남(갱신 실패 등) → 아무것도 확인할 수 없다.
+    function failedRead(began) {
+        verified = null;
+        if (cleanAfterFailedWait(began)) {
+            lastRejected = began;                  // 같은 기록을 알림마다 다시 묻지 않는다(시작 때의 그 기록만)
+            setState('rejected', 'network');
+            return;
+        }
+        // 기다리는 사이 저장된 로그인이 달라졌거나(다른 탭), 시작할 때 무엇이었는지 모른다:
+        // 아무것도 지우지 않고, 지금 저장된 기록을 거절된 기록으로 남기지도 않는다.
+        // 지금 저장된 것은 다음 상태 맞추기에서 별도의 확인으로만 그린다
+        lastRejected = null;
+        const now = heldClaims();
+        setState('rejected', began && now ? 'session_changed' : 'network');
+        if (now) scheduleReconcile();
+    }
+
     async function reconcile() {
         let present = true;
         try { present = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) {
@@ -758,6 +791,7 @@
         let hasStored = true;
         try { hasStored = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { hasStored = true; }
         if (!hasStored) { clearCompat(null); setState('signed_out', null); }
+        const beganLoad = hasStored ? heldClaims() : null;     // 기다리기 전에: 이 탭이 복원하려던 기록
         try {
             if (!ORIGIN || !ANON) throw EonAuthError('config');
             const sdk = await loadSdk();
@@ -774,20 +808,13 @@
             client.onAuthStateChange(function () { scheduleReconcile(); });
         } catch (e) {
             client = null;
-            const kept = storedSession();
-            clearCompat(kept && kept.claims ? kept.claims.sid : null, true);     // 확인할 수 없다: 지금 저장된 그 기록으로 만든 값만
+            cleanAfterFailedWait(beganLoad);       // 확인할 수 없다: 시작할 때 저장돼 있던 그 기록으로 만든 값만
             setState('signed_out', 'unavailable');
             return;
         }
+        const beganRead = heldClaims();            // 기다리기 전에: 이 탭이 복원하려던 기록
         const cur = await readSession();
-        if (cur.error) {
-            // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다
-            const held = storedSession();
-            clearCompat(held && held.claims ? held.claims.sid : null, true);     // 이 탭이 복원하려던 그 기록으로 만든 값만
-            lastRejected = held ? held.claims : null;      // 같은 기록을 알림마다 다시 묻지 않는다
-            setState('rejected', 'network');
-            return;
-        }
+        if (cur.error) { failedRead(beganRead); return; }
         if (!cur.session) { clearCompat(null); setState('signed_out', null); return; }
         await settle(cur.session, 'restore');
     }
@@ -894,15 +921,11 @@
         return enqueue(async function () {
             if (!client) return state;
             lastRejected = null;
+            // 기다리기 전에: 이 탭이 재확인하려던 기록(이 탭이 확인해 둔 것이 있으면 저장된 것이 그것일 때만)
+            const stored0 = heldClaims();
+            const began = !verified || same(verified, stored0) ? stored0 : null;
             const cur = await readSession();
-            if (cur.error) {
-                verified = null;
-                const held = storedSession();
-                clearCompat(held && held.claims ? held.claims.sid : null, true);
-                lastRejected = held ? held.claims : null;
-                setState('rejected', 'network');
-                return state;
-            }
+            if (cur.error) { failedRead(began); return state; }
             if (!cur.session) {
                 const sid = verified ? verified.sid : null;
                 const was = state;
