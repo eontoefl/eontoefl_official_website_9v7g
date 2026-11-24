@@ -7,6 +7,7 @@
 //   * 자격의 종류와 용도가 맞아야 한다 — 맞지 않으면 목적지가 시험 프로젝트여도 전송 전에 중단한다:
 //       비밀번호 → 로그인 요청에만 / 갱신값 → 갱신 요청에만 / 회원 JWT → 로그아웃(scope=local)과 두 RPC 에만
 //       service_role·알 수 없는 자격 → 어디로도 보내지 않는다
+//       회원 JWT 는 발급자가 시험 프로젝트이고 계정이 이번 실행의 합성 계정 가운데 하나일 때만(실행기가 그 기준을 넘겨줄 때)
 //   * 기록에는 자유 형식의 글자(주소·경로·키 이름·값)를 남기지 않는다. 정해 둔 이름과 참/거짓만 남긴다.
 
 import { TEST_URL } from './rewrite.mjs';
@@ -85,9 +86,11 @@ function targetName(method, u) {
     return 'other';
 }
 
-export function makeDecider({ selfOrigins, anonKey }) {
+// issuer·memberEmails(배열 또는 배열을 돌려주는 함수)를 주면 회원 JWT 의 출처도 본다
+export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails }) {
     const selves = new Set([].concat(selfOrigins || []));
     if (!selves.size) throw new Error('selfOrigins 가 필요하다');
+    const emailsNow = () => (typeof memberEmails === 'function' ? memberEmails() : (memberEmails || [])).map((e) => String(e).trim().toLowerCase());
     return function decide(req) {
         let u = null;
         try { u = new URL(req.url); } catch (e) { u = null; }
@@ -116,6 +119,10 @@ export function makeDecider({ selfOrigins, anonKey }) {
         if (items.password && !(where === 'test-project' && target === 'login')) problems.push('password');
         if (items.refreshToken && !(where === 'test-project' && target === 'refresh')) problems.push('refresh_token');
         if (cred === 'member' && !(where === 'test-project' && MEMBER_JWT_TARGETS.includes(target))) problems.push('member_jwt');
+        if (cred === 'member' && issuer) {
+            const c = claimsOf((headerOf(req.headers, 'authorization') || '').slice(7)) || {};
+            if (c.iss !== issuer || typeof c.email !== 'string' || !emailsNow().includes(c.email.trim().toLowerCase())) problems.push('foreign_member_jwt');
+        }
         if (cred === 'service_role') problems.push('service_role');
         if (cred === 'other') problems.push('unknown_credential');
         const leak = problems.length > 0;

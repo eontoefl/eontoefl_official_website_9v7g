@@ -1386,6 +1386,53 @@ const MUTANTS = [
         edits: [['tests/auth-session/request-log.mjs', '        const allowed = placeOk && !leak;', '        const allowed = placeOk;']],
     },
     {
+        name: '차단기가 회원 JWT 의 발급자·계정을 보지 않음', tests: [], section: 'request-log', expect: /가르기: (다른 발급자의 회원 JWT|합성 계정이 아닌 회원 JWT)[^—]*— 전송 전에 중단하지 않음/,
+        edits: [['tests/auth-session/request-log.mjs', "!emailsNow().includes(c.email.trim().toLowerCase())) problems.push('foreign_member_jwt');", "!emailsNow().includes(c.email.trim().toLowerCase())) problems.length;"]],
+    },
+    {
+        name: '실행기: 예행(P)이 실패해도 다음 경우로 감', tests: [], section: 'screen-core', expect: /실행기: 예행이 실패했는데 (뒤의 경우를 시작함|비밀 보관함이 열림)/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (!p || !allTrue(p.checks)) return { stopped: 'preflight', started };\n", '']],
+    },
+    {
+        name: '실행기: 미확인인 판정이 있어도 예행을 통과로 봄', tests: [], section: 'screen-core', expect: /실행기: 예행이 실패했는데 뒤의 경우를 시작함\(판정 하나가 미확인\)/,
+        edits: [['tests/auth-session/screen-core.mjs', 'checks.length > 0 && checks.every((c) => c.ok === true);', 'checks.length > 0 && checks.every((c) => c.ok !== false);']],
+    },
+    {
+        name: '실행기: 원복 대상의 표시를 "계속"을 받은 뒤에 세움', tests: [], section: 'screen-core', expect: /실행기: (답을 받지 못한 멈춤\([^)]*\)이 원복 대상으로|원복 확인을 받지 못했는데 다음 경우를 시작함)/,
+        edits: [
+            ['tests/auth-session/screen-core.mjs', '        if (needsRevert) this.pendingRevert = kind;\n', ''],
+            ['tests/auth-session/screen-core.mjs', "                    entry.result = 'answered';\n", "                    entry.result = 'answered';\n                    if (needsRevert) this.pendingRevert = kind;\n"],
+        ],
+    },
+    {
+        name: '실행기: 원복 확인 없이 다음 경우를 시작함', tests: [], section: 'screen-core', expect: /실행기: (원복 확인을 받지 못했는데 다음 경우를 시작함|원복 대상이 남은 채 다음 경우를 시작함)/,
+        edits: [['tests/auth-session/screen-core.mjs', "        if (board.pendingRevert && !(await confirmRevert(board))) return { stopped: 'revert', started };\n        started.push(c.id);", '        started.push(c.id);']],
+    },
+    {
+        name: '실행기: 원복했다는 답이 아닌데 원복 표시를 지움', tests: [], section: 'screen-core', expect: /실행기: 원복했다는 답이 아닌데/,
+        edits: [['tests/auth-session/screen-core.mjs', 'if (revertOf && this.pendingRevert === revertOf && body && body.reverted === true) this.pendingRevert = null;', 'if (revertOf && this.pendingRevert === revertOf) this.pendingRevert = null;']],
+    },
+    {
+        name: '실행기: 받은 로그인 상태의 발급자를 보지 않음', tests: [], section: 'screen-core', expect: /출처 확인: 발급자가 (다른|없는)/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (c.iss !== ISSUER) return no('issuer');\n    if (c.role", '    if (c.role']],
+    },
+    {
+        name: '실행기: 받은 로그인 상태의 계정을 보지 않음', tests: [], section: 'screen-core', expect: /출처 확인: 계정이 다른 로그인 상태/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (typeof c.email !== 'string' || lower(c.email) !== lower(expect.email)) return no('account');\n    if (typeof session.user.email !== 'string' || lower(session.user.email) !== lower(expect.email)) return no('account');\n", '']],
+    },
+    {
+        name: '실행기: 받은 로그인 상태의 aal 을 보지 않음', tests: [], section: 'screen-core', expect: /출처 확인: aal 이 다른/,
+        edits: [['tests/auth-session/screen-core.mjs', "    if (c.aal !== expect.aal) return no('aal');\n", '']],
+    },
+    {
+        name: '실행기: access_token 이 글자이기만 하면 넣음(2차의 모양)', tests: [], section: 'screen-core', expect: /출처 확인: /,
+        edits: [['tests/auth-session/screen-core.mjs', "    const keys = Object.keys(session);\n", "    if (typeof session.access_token === 'string') return { ok: true };\n    const keys = Object.keys(session);\n"]],
+    },
+    {
+        name: '실행기: 브라우저에 환경 변수를 그대로 넘김', tests: [], section: 'screen-core', expect: /브라우저에 필요한 것 말고 다른 환경 변수/,
+        edits: [['tests/auth-session/screen-core.mjs', "if (ENV_ALLOW.includes(k.toUpperCase()) && typeof v === 'string') out[k] = v;", "if (typeof v === 'string') out[k] = v;"]],
+    },
+    {
         name: '차단기가 기록에 주소를 남김', tests: [], section: 'request-log', expect: /가르기: 기록에/,
         edits: [['tests/auth-session/request-log.mjs', '                where, target, nav, type, method,', '                where, target, nav, type, method, url: req.url,']],
     },
@@ -1416,6 +1463,7 @@ async function sectionMutants() {
         const run = async (fn) => { try { found.push(...(await fn())); } catch (e) { crashes.push(String(e && e.message)); } };
         if (m.section === 'off') await run(async () => (await sectionOff(applyEdits(m.edits, []))).problems);
         if (m.section === 'off-static') await run(async () => sectionOffStatic(applyEdits(m.edits, [])).problems);
+        if (m.section === 'screen-core') await run(async () => (await sectionScreenCore(applyEdits(m.edits, []))).problems);
         if (m.section === 'request-log') await run(async () => (await sectionRequestLog(applyEdits(m.edits, []))).problems);
         for (const test of m.tests) await run(() => test({ mutate: applyEdits(m.edits, []) }));
         const hit = found.filter((p) => m.expect.test(p));
@@ -1558,6 +1606,154 @@ function sectionServer() {
     return { problems, info };
 }
 
+// 실행기의 판단 부분(screen-core.mjs): 예행이 통과하기 전에는 아무것도 시작하지 않음, 원복 대상의 표시, 받은 로그인 상태의 출처, 브라우저에 넘기는 환경 변수.
+// mutate 를 주면 그 파일의 사본을 바꿔서 본다(감도 점검). 브라우저는 쓰지 않는다.
+async function loadTestModule(rel, mutate) {
+    if (!mutate) return import('./' + rel.split('/').pop());
+    const here = path.join(ROOT, 'tests', 'auth-session');
+    let text = mutate(rel, workFile(rel));
+    text = text.replace(/from '\.\/([a-z-]+\.mjs)'/g, (m, name) => `from ${JSON.stringify(pathToFileURL(path.join(here, name)).href)}`);
+    const file = path.join(os.tmpdir(), `b3a-${rel.split('/').pop()}-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
+    fs.writeFileSync(file, text);
+    try { return await import(pathToFileURL(file).href); } finally { fs.unlinkSync(file); }
+}
+
+async function sectionScreenCore(mutate) {
+    const problems = [];
+    const core = await loadTestModule('tests/auth-session/screen-core.mjs', mutate);
+    const { PauseBoard, PauseTimeout, makeVault, runSequence, checkProvidedSession, browserEnv, memberJwtOrigin, ISSUER } = core;
+    let stepNo = 1000;
+    const newBoard = (timeoutMs) => new PauseBoard({ timeoutMs, randomStep: () => ++stepNo });
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const locked = (vault) => { try { vault.get('PW'); return false; } catch (e) { return true; } };
+
+    // (1) 예행(P)이 전부 참이 아니면 뒤의 경우를 시작하지 않고 보관함도 열지 않는다
+    const bad = [
+        ['판정 하나가 거짓', { checks: [{ name: 'a', ok: true }, { name: 'b', ok: false }] }],
+        ['판정 하나가 미확인', { checks: [{ name: 'a', ok: true }, { name: 'b', ok: null }] }],
+        ['판정이 없음(도중에 예외)', { checks: [] }],
+        ['결과가 없음', null],
+    ];
+    for (const [name, result] of bad) {
+        const vault = makeVault({ PW: 'zz' });
+        const ran = [];
+        const out = await runSequence({ preflight: async () => result, cases: [{ id: '1', run: async () => { ran.push('1'); } }, { id: '2', run: async () => { ran.push('2'); } }], vault, board: newBoard(30) });
+        if (ran.length || out.started.length) problems.push(`실행기: 예행이 실패했는데 뒤의 경우를 시작함(${name})`);
+        if (out.stopped !== 'preflight') problems.push(`실행기: 예행 실패를 따로 알리지 않음(${name})`);
+        if (!locked(vault)) problems.push(`실행기: 예행이 실패했는데 비밀 보관함이 열림(${name})`);
+    }
+    {
+        const vault = makeVault({ PW: 'zz' });
+        const ran = [];
+        let lockedDuring = null;
+        const out = await runSequence({
+            preflight: async () => { lockedDuring = locked(vault); return { checks: [{ name: 'a', ok: true }] }; },
+            cases: [{ id: '1', run: async () => { ran.push(vault.get('PW')); } }, { id: '2', run: async () => { throw new Error('x'); } }, { id: '3', run: async () => { ran.push('3'); } }],
+            vault, board: newBoard(30),
+        });
+        if (lockedDuring !== true) problems.push('실행기: 예행 도중에 비밀 보관함이 열려 있음');
+        if (JSON.stringify(ran) !== JSON.stringify(['zz', '3']) || out.stopped !== null || out.started.join() !== '1,2,3') problems.push('실행기: 예행이 통과했는데 경우들이 차례로 돌지 않음');
+    }
+
+    // (2) DB 변경이 남는 멈춤: 내놓는 순간 원복 대상. 원복 확인을 받기 전에는 다음 경우를 시작하지 않는다
+    {
+        const board = newBoard(25);
+        const p = board.open('expire-session', { sid: 's1' }, { needsRevert: true });
+        if (board.pendingRevert !== 'expire-session') problems.push('실행기: 답을 받지 못한 멈춤(내놓은 직후)이 원복 대상으로 표시되지 않음');
+        let timedOut = false;
+        try { await p; } catch (e) { timedOut = e instanceof PauseTimeout; }
+        if (!timedOut) problems.push('실행기: 멈춤의 기다림에 상한이 없음');
+        if (board.pendingRevert !== 'expire-session') problems.push('실행기: 답을 받지 못한 멈춤(시간 초과)이 원복 대상으로 남지 않음');
+    }
+    {   // 브레인방이 DB 를 바꾼 뒤 응답이 유실된 경우(실행기는 시간 초과로 본다) → 다음 경우 금지
+        const board = newBoard(25);
+        const ran = [];
+        const out = await runSequence({
+            preflight: async () => ({ checks: [{ name: 'a', ok: true }] }),
+            cases: [
+                { id: '14', run: async () => { ran.push('14'); await board.open('expire-session', {}, { needsRevert: true }); } },
+                { id: '15', run: async () => { ran.push('15'); } },
+            ],
+            vault: makeVault({}), board,
+        });
+        if (ran.includes('15') || out.started.includes('15')) problems.push('실행기: 원복 확인을 받지 못했는데 다음 경우를 시작함(멈춤의 답이 없었음)');
+        if (out.stopped !== 'revert') problems.push('실행기: 원복 확인을 받지 못한 것을 따로 알리지 않음');
+    }
+    {   // "계속"은 받았지만 되돌리는 단계에 이르지 못한 경우 → 원복 확인을 받은 뒤에만 다음 경우
+        const board = newBoard(400);
+        const ran = [];
+        const answered = [];
+        const operator = (async () => {
+            for (let i = 0; i < 60; i++) {
+                await wait(5);
+                const w = board.view();
+                if (!w) continue;
+                answered.push(w.kind);
+                if (w.kind === 'maintenance-on') board.answer(w.step, null);
+                else if (w.kind === 'revert-confirm' && answered.filter((k) => k === 'revert-confirm').length === 1) board.answer(w.step, null);          // 원복했다는 답이 아니다
+                else if (w.kind === 'revert-confirm') { if (ran.includes('next')) problems.push('실행기: 원복했다는 답이 아닌데 다음 경우를 시작함'); board.answer(w.step, { reverted: true }); }
+            }
+        })();
+        const out = await runSequence({
+            preflight: async () => ({ checks: [{ name: 'a', ok: true }] }),
+            cases: [
+                { id: '15', run: async () => { await board.open('maintenance-on', {}, { needsRevert: true }); throw new Error('도중 예외'); } },
+                { id: 'next', run: async () => { ran.push('next'); if (board.pendingRevert) problems.push('실행기: 원복 대상이 남은 채 다음 경우를 시작함'); } },
+            ],
+            vault: makeVault({}), board,
+        });
+        await operator;
+        if (answered.filter((k) => k === 'revert-confirm').length !== 2) problems.push('실행기: 원복했다는 답이 아닌데 원복 표시를 지움(원복 확인을 다시 묻지 않음)');
+        if (!ran.includes('next') || out.stopped !== null || board.pendingRevert !== null) problems.push('실행기: 원복 확인을 받았는데 이어 가지 않음');
+    }
+    {   // 단계 번호가 맞지 않으면 받지 않는다. 만든 것이 남을 수 있는 멈춤은 적어 둔다
+        const board = newBoard(200);
+        const p = board.open('provide-session', { account: 'GM', aal: 'aal2' }, { leaves: 'GM' });
+        const w = board.view();
+        if (board.answer(w.step + 1, {}) !== false || board.view() === null) problems.push('실행기: 단계 번호가 맞지 않는 답을 받음');
+        if (board.answer(w.step, { session: {} }) !== true || (await p).session === undefined) problems.push('실행기: 맞는 단계 번호의 답을 받지 못함');
+        if (board.pendingRevert !== null) problems.push('실행기: 원복 대상이 아닌 멈춤을 원복 대상으로 표시함');
+        if (JSON.stringify(board.leftovers) !== JSON.stringify([{ kind: 'provide-session', account: 'GM' }])) problems.push('실행기: 브레인방이 만든 것이 남을 수 있음을 적지 않음');
+    }
+
+    // (3) 제어 포트로 받은 로그인 상태의 출처
+    const now = 1795500000000;
+    const nowSec = Math.floor(now / 1000);
+    const EMAIL_GM = 'zzb3a_gm@member.zz.invalid';
+    const claims = (over) => Object.assign({ iss: ISSUER, aud: 'authenticated', role: 'authenticated', sub: 'auth-M', email: EMAIL_GM, session_id: 'sess-9', aal: 'aal2', exp: nowSec + 3600 }, over);
+    const session = (over, claimOver) => Object.assign({ access_token: fakeJwt(claims(claimOver || {})), token_type: 'bearer', expires_in: 3600, expires_at: nowSec + 3600, refresh_token: 'zz-r', user: { id: 'auth-M', email: EMAIL_GM } }, over || {});
+    const expect = { email: EMAIL_GM, aal: 'aal2' };
+    if (checkProvidedSession(session(), expect, now).ok !== true) problems.push('출처 확인: 맞는 로그인 상태를 거절함');
+    const refuse = [
+        ['발급자가 다른(운영 프로젝트의) 로그인 상태', session({}, { iss: 'https://qpqjevecjejvbeuogtbx.supabase.co/auth/v1' })],
+        ['발급자가 없는 로그인 상태', session({}, { iss: undefined })],
+        ['계정이 다른 로그인 상태(JWT 의 이메일)', session({}, { email: 'zzb3a_a@member.zz.invalid' })],
+        ['계정이 다른 로그인 상태(user 의 이메일)', session({ user: { id: 'auth-M', email: 'someone@zz.invalid' } })],
+        ['aal 이 다른 로그인 상태(aal1 을 aal2 로 달라고 했는데)', session({}, { aal: 'aal1' })],
+        ['로그인 기록 번호가 없는 로그인 상태', session({}, { session_id: undefined })],
+        ['역할이 다른 로그인 상태(service_role)', session({}, { role: 'service_role' })],
+        ['만료가 가까운 로그인 상태', session({}, { exp: nowSec + 60 })],
+        ['이미 만료된 로그인 상태', session({ expires_at: nowSec - 10 }, { exp: nowSec - 10 })],
+        ['정해 두지 않은 키가 있는 로그인 상태', session({ provider_token: 'zz' })],
+        ['계정 번호가 어긋나는 로그인 상태', session({ user: { id: 'auth-X', email: EMAIL_GM } })],
+        ['JWT 를 풀 수 없는 로그인 상태', session({ access_token: 'aaa.bbb.ccc' })],
+        ['access_token 만 글자인 것', { access_token: 'zz' }],
+        ['객체가 아닌 것', 'zz'],
+    ];
+    for (const [name, s] of refuse) if (checkProvidedSession(s, expect, now).ok !== false) problems.push(`출처 확인: ${name}를 넣으려 함`);
+    if (checkProvidedSession(session(), { email: '', aal: 'aal2' }, now).ok !== false) problems.push('출처 확인: 기대하는 계정을 모르는데 넣으려 함');
+    const reasons = refuse.map(([, s]) => checkProvidedSession(s, expect, now).why);
+    if (reasons.some((w) => !/^[a-z-]+$/.test(String(w)))) problems.push('출처 확인: 거절 이유가 정해 둔 이름이 아님');
+    const emails = ['zzb3a_a@member.zz.invalid', EMAIL_GM];
+    if (memberJwtOrigin(fakeJwt(claims()), { issuer: ISSUER, emails }) !== 'ok' ||
+        memberJwtOrigin(fakeJwt(claims({ iss: 'https://qpqjevecjejvbeuogtbx.supabase.co/auth/v1' })), { issuer: ISSUER, emails }) !== 'issuer' ||
+        memberJwtOrigin(fakeJwt(claims({ email: 'x@zz.invalid' })), { issuer: ISSUER, emails }) !== 'account') problems.push('출처 확인: 회원 JWT 의 발급자·계정 판정이 기대와 다름');
+
+    // (4) 브라우저에 넘기는 환경 변수
+    const env = browserEnv({ PATH: 'p', SystemRoot: 'C:\\Windows', TEMP: 't', B3A_PW: 'zzsecret', B3A_CONTROL_SECRET: 'zzsecret', B3A_TEST_ANON_KEY: 'zzsecret', B3A_EMAIL_A: 'zzsecret', B3A_PLAYWRIGHT: 'x', SUPABASE_SERVICE_ROLE_KEY: 'zzsecret', NODE_OPTIONS: 'x' });
+    if (JSON.stringify(Object.keys(env).sort()) !== JSON.stringify(['PATH', 'SystemRoot', 'TEMP']) || JSON.stringify(env).includes('zzsecret')) problems.push('실행기: 브라우저에 필요한 것 말고 다른 환경 변수(비밀)가 넘어감');
+    return { problems };
+}
 // 차단기("보내기 전에 가르기"): 허용 밖·자격의 용도가 맞지 않는 요청은 전송 전에 중단하고, 기록에는 정해 둔 이름과 참/거짓만 남는다.
 // mutate 를 주면 차단기의 사본을 바꿔서 본다(감도 점검).
 async function loadRequestLog(mutate) {
@@ -1574,10 +1770,13 @@ async function sectionRequestLog(mutate) {
     const problems = [];
     const { makeDecider, summarize } = await loadRequestLog(mutate);
     const anon = fakeJwt({ role: 'anon', ref: 'hmncdheiwqwekdbtijar' });
-    const member = fakeJwt({ role: 'authenticated', sub: 'auth-A', session_id: 'sess-1' });
+    const ISS = TEST_URL + '/auth/v1';
+    const member = fakeJwt({ iss: ISS, role: 'authenticated', sub: 'auth-A', email: 'zzb3a_a@member.zz.invalid', session_id: 'sess-1' });
+    const otherIssuer = fakeJwt({ iss: 'https://qpqjevecjejvbeuogtbx.supabase.co/auth/v1', role: 'authenticated', sub: 'auth-A', email: 'zzb3a_a@member.zz.invalid', session_id: 'sess-1' });
+    const otherAccount = fakeJwt({ iss: ISS, role: 'authenticated', sub: 'auth-Z', email: 'someone@zz.invalid', session_id: 'sess-2' });
     const service = fakeJwt({ role: 'service_role', ref: 'hmncdheiwqwekdbtijar' });
     const SELF = 'http://127.0.0.1:8787';
-    const decide = makeDecider({ selfOrigins: [SELF, 'http://127.0.0.1:8788'], anonKey: anon });
+    const decide = makeDecider({ selfOrigins: [SELF, 'http://127.0.0.1:8788'], anonKey: anon, issuer: ISS, memberEmails: () => ['zzb3a_a@member.zz.invalid'] });
     const H = (bearer) => ({ apikey: anon, Authorization: 'Bearer ' + bearer });
     const pw = JSON.stringify({ email: 'a@zz.invalid', password: 'zzsecretpw' });
     const rt = JSON.stringify({ refresh_token: 'zzsecretrefresh' });
@@ -1607,6 +1806,8 @@ async function sectionRequestLog(mutate) {
         ['RPC 에 갱신값', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(member), postData: rt }, 'abort', 'test-project', 'my_profile', true],
         ['다른 RPC 에 회원 JWT', { url: TEST_URL + '/rest/v1/rpc/other_function', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'abort', 'test-project', 'rest-rpc-other', true],
         ['Edge 함수에 회원 JWT', { url: TEST_URL + '/functions/v1/telegram-notify', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'abort', 'test-project', 'functions', true],
+        ['다른 발급자의 회원 JWT(허용된 주소로)', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(otherIssuer), postData: '{}' }, 'abort', 'test-project', 'my_profile', true],
+        ['합성 계정이 아닌 회원 JWT(허용된 주소로)', { url: TEST_URL + '/auth/v1/logout?scope=local', method: 'POST', resourceType: 'fetch', headers: H(otherAccount) }, 'abort', 'test-project', 'logout', true],
         ['service_role 자격', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(service), postData: '{}' }, 'abort', 'test-project', 'my_profile', true],
         ['알 수 없는 자격', { url: TEST_URL + '/rest/v1/reviews', method: 'GET', resourceType: 'fetch', headers: { apikey: anon, Authorization: 'Bearer zzsecretopaque' } }, 'abort', 'test-project', 'rest-table', true],
         ['자기 서버에 회원 JWT', { url: SELF + '/index.html', method: 'GET', resourceType: 'fetch', headers: H(member) }, 'abort', 'self', 'file', true],
@@ -1638,7 +1839,7 @@ async function sectionRequestLog(mutate) {
         'document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr', 'fetch', 'websocket', 'manifest',
         'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'OTHER',
         'none', 'anon', 'member', 'service_role',
-        'password', 'refresh_token', 'member_jwt', 'unknown_credential']);
+        'password', 'refresh_token', 'member_jwt', 'unknown_credential', 'foreign_member_jwt']);
     const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted']);
     for (const r of records) {
         for (const [k, v] of Object.entries(r)) {
@@ -1649,11 +1850,32 @@ async function sectionRequestLog(mutate) {
     const text = JSON.stringify(records);
     if (text.includes('zzsecret') || /eyJ[A-Za-z0-9_-]{8,}/.test(text) || /https?:/.test(text)) problems.push('가르기: 기록에 JWT·비밀번호·갱신값·주소가 남음');
     const s = summarize(records);
-    const want = { leakBlocked: 13, leakSent: 0, publicRetry: 1, serviceRole: 1, sinkAttempts: 2, outsideSent: 0, staticAllowed: 2 };
+    const want = { leakBlocked: 15, leakSent: 0, publicRetry: 1, serviceRole: 1, sinkAttempts: 2, outsideSent: 0, staticAllowed: 2 };
     for (const [k, v] of Object.entries(want)) if (s[k] !== v) problems.push(`가르기: 요약의 ${k} 가 ${s[k]} (기대 ${v})`);
     if (s.testProjectByTarget.login !== 1 || s.testProjectByTarget.my_profile !== 2 || s.testProjectByTarget['rest-table'] !== 1) problems.push('가르기: 요약의 이름별 수가 기대와 다름');
     return { problems, rows: rows.length };
 }
+// 실행기(screen.mjs)가 판단 부분(screen-core.mjs)을 실제로 쓰는가 — 글자로 본다(브라우저를 띄우는 파일이라 여기서 돌리지 않는다)
+function sectionScreenText() {
+    const problems = [];
+    const text = workFile('tests/auth-session/screen.mjs');
+    const code = text.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    const must = [
+        ['차례를 runSequence 에 맡김', 'seq = await runSequence({'],
+        ['비밀번호를 보관함에서만 꺼냄', "vault.get('PW')"],
+        ['받은 로그인 상태의 출처 확인', 'checkProvidedSession(session, {'],
+        ['브라우저에 필요한 환경 변수만', 'env: browserEnv(process.env)'],
+        ['회원 JWT 의 발급자·계정을 차단기에 넘김', 'issuer: ISSUER'],
+        ['로그인 기록 만료는 원복 대상', "await pause('expire-session', { sid }, { needsRevert: true });"],
+        ['점검 켜기는 원복 대상', "await pause('maintenance-on', { exception: 'A' }, { needsRevert: true });"],
+    ];
+    for (const [name, needle] of must) if (!code.includes(needle)) problems.push(`실행기: ${name} — 그 줄이 없음`);
+    if ((code.match(/process\.env\.B3A_PW/g) || []).length !== 1) problems.push('실행기: 비밀번호를 환경 변수에서 읽는 곳이 한 곳이 아님');
+    if (/localStorage\.setItem\('eon_auth_v1'/.test(code) && code.indexOf("checkProvidedSession(session, {") > code.indexOf("localStorage.setItem('eon_auth_v1'")) problems.push('실행기: 출처를 확인하기 전에 로그인 상태를 브라우저에 넣음');
+    if (/screenshot|tracing\.start|recordHar|storageState\(/.test(code)) problems.push('실행기: 화면 캡처·추적·HAR·상태 내보내기를 씀');
+    return { problems };
+}
+
 function sectionContract1() {
     const problems = [];
     let text = '';
@@ -1740,6 +1962,11 @@ async function main() {
     fail('서버', srv.problems);
     out(`[8] 화면 시험용 로컬 서버의 몸통(소켓 없이): 내줄 수 있는 파일 ${srv.info.servable}개를 꺼짐·켜짐으로 한 번씩 — 운영 흔적이 남은 채 내준 것 0, 내주지 않는 파일 ${srv.info.refused.length}개. 어긋남 ${srv.problems.length}`);
     listSome(srv.problems);
+    const sc = await sectionScreenCore();
+    const scText = sectionScreenText();
+    fail('실행기', sc.problems.concat(scText.problems));
+    out(`    - 실행기의 판단 부분(예행 통과 전 시작 금지·비밀 보관함, 원복 대상의 표시와 확인, 받은 로그인 상태의 출처, 브라우저에 넘기는 환경 변수): 어긋남 ${sc.problems.length + scText.problems.length}`);
+    listSome(sc.problems.concat(scText.problems));
     const rl = await sectionRequestLog();
     fail('가르기', rl.problems);
     out(`    - 차단기(보내기 전에 가르기: 목적지 + 자격의 종류·용도, 기록은 정해 둔 이름만) 요청 ${rl.rows}가지: 어긋남 ${rl.problems.length}`);

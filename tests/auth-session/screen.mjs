@@ -17,6 +17,10 @@
 //   * 경우마다 디스크에 남지 않는 새 브라우저 상태(context). 추적·HAR·상태 내보내기·화면 캡처를 하지 않는다.
 //   * 비밀번호·이메일·JWT·갱신값을 출력·파일에 쓰지 않는다. 결과에는 정해 둔 판정값·이름·수만 적는다.
 //   * --fake 에서는 시험 프로젝트·바깥으로 나가는 연결이 0 이어야 한다(실행기가 연 연결도 센다).
+//   * 차단의 예행(P)이 전부 통과하기 전에는 비밀번호를 꺼낼 수 없고(보관함), 뒤의 경우를 하나도 시작하지 않는다.
+//   * DB 변경이 남는 멈춤은 내놓는 순간 원복 대상으로 표시하고, 원복 확인을 받기 전에는 다음 경우를 시작하지 않는다.
+//   * 제어 포트로 받은 로그인 상태는 출처(발급자·합성 계정·aal·로그인 기록 번호·만료·키)를 확인한 뒤에만 브라우저에 넣는다.
+//   종료 코드: 0 통과 / 1 통과 아님 / 2 환경 / 3 원복 확인을 받지 못함·중단 / 4 예행(P) 실패 — 뒤의 경우를 돌리지 않음 / 5 결과에 비밀값의 흔적
 
 import fs from 'node:fs';
 import net from 'node:net';
@@ -32,6 +36,7 @@ import { TEST_URL, TEST_REF, CONFIG_FILE, readProdConfig } from './rewrite.mjs';
 import { createCore, makeIgnore } from './serve-core.mjs';
 import { makeDecider, summarize } from './request-log.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
+import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv } from './screen-core.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -44,6 +49,13 @@ const REAL = flag('--real');
 if (FAKE === REAL) stop('--fake 또는 --real 중 하나를 주세요');
 const ONLY = arg('--only') ? new Set(arg('--only').split(',')) : null;
 const PAUSE_TIMEOUT = Number(arg('--pause-timeout-ms', '600000'));
+// 실행기 자신의 대조 실험(--fake 에서만): 일부러 고장을 내고 실행기가 멈추는지 본다
+//   --selftest leaky-blocker        차단기가 시험 목적지로 가는 요청을 보내 주게 한다 → 예행(P)이 잡고, 뒤의 경우를 시작하지 않아야 한다(종료 코드 4)
+//   --selftest silent-operator      가짜 조작자가 DB 변경이 남는 멈춤과 원복 확인에 답하지 않는다 → 다음 경우를 시작하지 않아야 한다(종료 코드 3)
+//   --selftest bad-session          가짜 조작자가 출처가 맞지 않는 로그인 상태(다른 계정·다른 aal·다른 발급자)를 준다 → 넣지 않아야 한다
+const SELFTEST = arg('--selftest', null);
+if (SELFTEST && !FAKE) stop('--selftest 는 --fake 에서만 쓴다');
+if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
 const OUT = path.resolve(arg('--out', path.join(ROOT, 'tests', 'auth-session', '.run', `screen-${FAKE ? 'fake' : 'real'}.json`)));
 
 // ---------------------------------------------------------------------------
@@ -55,9 +67,12 @@ const FAKE_ACCOUNTS = {
     N: { member: 'none' }, G: { member: 'none', admin: true }, GM: { member: 'ok', admin: true, name: '합성 관리자 GM' },
 };
 let ANON;
-let PW;
-const EMAIL = {};
 let CONTROL_SECRET;
+let vault;                 // 비밀번호·이메일의 보관함: 예행(P)이 통과하기 전에는 꺼낼 수 없다
+const SCAN = [];           // 끝에서 결과에 흔적이 없는지 찾아볼 값들(찾는 데만 쓴다)
+{
+    let PW;
+    const EMAIL = {};
 if (FAKE) {
     ANON = fakeJwt({ role: 'anon', ref: TEST_REF, fake: true });      // 가짜 공개 키(서명 자리는 고정 글자)
     PW = 'zz-' + crypto.randomBytes(9).toString('hex');
@@ -75,7 +90,12 @@ if (FAKE) {
     CONTROL_SECRET = process.env.B3A_CONTROL_SECRET || '';
     if (CONTROL_SECRET.length < 16) stop('B3A_CONTROL_SECRET 이 없거나 16자보다 짧음(실행마다 새로 만든 값)');
 }
-const SECRETS = [PW, ANON, CONTROL_SECRET, ...Object.values(EMAIL)];
+    const values = { PW };
+    for (const k of ACCOUNT_KEYS) values['EMAIL_' + k] = EMAIL[k];
+    vault = makeVault(values);
+    SCAN.push(PW, ANON, CONTROL_SECRET, ...Object.values(EMAIL));
+}
+const fakeEmail = (k) => `zzb3a_${String(k).toLowerCase()}@member.zz.invalid`;      // --fake 의 합성 이메일(비밀이 아니다)
 
 const pwPath = process.env.B3A_PLAYWRIGHT;
 const chromePath = process.env.B3A_CHROMIUM;
@@ -149,7 +169,12 @@ async function startSite(mode) {
 
 // 제어 포트: 브레인방이 사이에 끼어야 하는 단계에서 멈춰 기다린다.
 // 127.0.0.1 이라는 것은 권한 확인이 아니다 — 실행마다의 비밀과 그 멈춤의 일회용 단계 번호가 둘 다 맞는 명령만 받는다.
-const control = { server: null, port: 0, waiting: null, arrivals: 0, rejected: 0 };
+const control = { server: null, port: 0, arrivals: 0, rejected: 0 };
+const board = new PauseBoard({
+    timeoutMs: PAUSE_TIMEOUT,
+    randomStep: () => crypto.randomInt(100000, 999999999),
+    onOpen: (w) => console.log(`  [멈춤] ${w.kind}${w.needsRevert ? ' (DB 변경이 남는다 — 원복 대상으로 표시함)' : ''} — 제어 포트 ${control.port} 에서 기다림(단계 번호는 GET /wait 로)`),
+});
 function secretOk(value) {
     const a = Buffer.from(String(value || ''));
     const b = Buffer.from(CONTROL_SECRET);
@@ -166,18 +191,14 @@ async function startControl() {
             if (!secretOk(req.headers['x-b3a-secret'])) { control.rejected++; return reply(403, { error: 'forbidden' }); }
             const u = new URL(req.url, 'http://127.0.0.1');
             if (req.method === 'GET' && u.pathname === '/wait') {
-                const w = control.waiting;
-                return reply(200, { waiting: w ? { step: w.step, kind: w.kind, info: w.info, needsRevert: w.needsRevert } : null });
+                return reply(200, { waiting: board.view(), pendingRevert: board.pendingRevert });
             }
             if (req.method === 'POST' && u.pathname === '/continue') {
-                const w = control.waiting;
-                if (!w || String(w.step) !== u.searchParams.get('step')) { control.rejected++; return reply(409, { error: 'no-such-step' }); }
                 let body = null;
                 if (size > 262144) return reply(413, { error: 'too-large' });
                 try { body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null; } catch (e) { return reply(400, { error: 'bad-json' }); }
-                control.waiting = null;
-                w.resolve(body);
-                return reply(200, { ok: true });
+                if (!board.answer(u.searchParams.get('step'), body)) { control.rejected++; return reply(409, { error: 'no-such-step' }); }
+                return reply(200, { ok: true, pendingRevert: board.pendingRevert });
             }
             control.rejected++;
             return reply(404, { error: 'not-found' });
@@ -188,25 +209,9 @@ async function startControl() {
     control.port = control.server.address().port;
 }
 
-class PauseTimeout extends Error {}
-let pendingRevert = null;       // 브레인방이 건 DB 변경이 남아 있을 수 있는 멈춤의 이름
-// kind: 정해 둔 이름. info: 비밀이 아닌 식별값(로그인 기록 번호·계정 이름표). 돌려주는 값: 브레인방이 보낸 본문(없으면 null)
-function pause(kind, info, { needsRevert = false, revertOf = null } = {}) {
-    return new Promise((resolve, reject) => {
-        const step = crypto.randomInt(100000, 999999999);
-        const timer = setTimeout(() => {
-            if (control.waiting && control.waiting.step === step) control.waiting = null;
-            reject(new PauseTimeout(kind));
-        }, PAUSE_TIMEOUT);
-        control.waiting = { step, kind, info: info || {}, needsRevert, resolve: (body) => {
-            clearTimeout(timer);
-            if (needsRevert) pendingRevert = kind;
-            if (revertOf && pendingRevert === revertOf) pendingRevert = null;
-            resolve(body);
-        } };
-        console.log(`  [멈춤] ${kind} — 제어 포트 ${control.port} 에서 기다림(단계 번호는 GET /wait 로)`);
-    });
-}
+// 멈춤(장부는 screen-core.mjs): kind 는 정해 둔 이름, info 는 비밀이 아닌 식별값(로그인 기록 번호·계정 이름표).
+//   needsRevert 인 멈춤은 내놓는 순간 원복 대상으로 표시된다. revertOf 인 멈춤은 본문 { "reverted": true } 를 받아야 그 표시를 지운다.
+const pause = (kind, info, opts) => board.open(kind, info, opts);
 
 // ---------------------------------------------------------------------------
 // --fake: 가짜 서버와, 브레인방 구실을 하는 가짜 조작자(제어 포트로 답한다)
@@ -218,8 +223,8 @@ function setupFake() {
     for (const k of ACCOUNT_KEYS) {
         const a = FAKE_ACCOUNTS[k];
         fake.addAccount({
-            email: EMAIL[k], password: PW, authId: 'auth-' + k, member: a.member, admin: !!a.admin,
-            profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: EMAIL[k], phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
+            email: fakeEmail(k), password: SCAN[0], authId: 'auth-' + k, member: a.member, admin: !!a.admin,
+            profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: fakeEmail(k), phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
         });
     }
     fake.business = () => ({ status: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' });
@@ -243,19 +248,36 @@ async function fakeOperator() {
         const r = await controlCall('GET', '/wait');
         const w = r && r.waiting;
         if (!w) continue;
+        if (SELFTEST === 'silent-operator' && (w.kind === 'expire-session' || w.kind === 'revert-confirm')) continue;      // 대조 실험: 답하지 않는다
         let body = null;
         const bySid = (sid) => fake.sessions.get(sid);
-        if (w.kind === 'other-session-create') fakeNotes.otherSession = fake.createSession(EMAIL[w.info.account]);
+        if (w.kind === 'other-session-create') fakeNotes.otherSession = fake.createSession(fakeEmail(w.info.account));
         else if (w.kind === 'check-logout-scope') {
             const ended = bySid(w.info.ended);
             body = { result: ended && !ended.alive && fakeNotes.otherSession && fakeNotes.otherSession.alive ? 'ok' : 'differs' };
         } else if (w.kind === 'check-records-intact') {
             body = { result: (w.info.sids || []).every((sid) => bySid(sid) && bySid(sid).alive) ? 'ok' : 'differs' };
         } else if (w.kind === 'expire-session') fake.endSession(bySid(w.info.sid), 'session_expired');
-        else if (w.kind === 'restore-session') { const s = bySid(w.info.sid); if (s) { s.alive = true; s.endCode = null; } }
+        else if (w.kind === 'restore-session') { const s = bySid(w.info.sid); if (s) { s.alive = true; s.endCode = null; } body = { reverted: true }; }
         else if (w.kind === 'maintenance-on') { fake.maintenance = true; fake.maintenanceExcept = new Set(['auth-A']); }
-        else if (w.kind === 'maintenance-off') { fake.maintenance = false; fake.maintenanceExcept = new Set(); }
-        else if (w.kind === 'provide-session') body = { session: fake.tokenBody(fake.createSession(EMAIL[w.info.account], { aal: w.info.aal })) };
+        else if (w.kind === 'maintenance-off') { fake.maintenance = false; fake.maintenanceExcept = new Set(); body = { reverted: true }; }
+        else if (w.kind === 'revert-confirm') {
+            fake.maintenance = false;
+            for (const s of fake.sessions.values()) if (s.endCode === 'session_expired') { s.alive = true; s.endCode = null; }
+            body = { reverted: true };
+        } else if (w.kind === 'provide-session') {
+            body = { session: fake.tokenBody(fake.createSession(fakeEmail(w.info.account), { aal: w.info.aal })) };
+            if (SELFTEST === 'bad-session') {
+                // 대조 실험: 경우마다 다른 방식으로 출처가 맞지 않는 로그인 상태를 준다
+                const n = (fakeNotes.bad = (fakeNotes.bad || 0) + 1);
+                if (n % 3 === 1) body = { session: fake.tokenBody(fake.createSession(fakeEmail('A'), { aal: w.info.aal })) };                       // 다른 계정
+                else if (n % 3 === 2) body = { session: fake.tokenBody(fake.createSession(fakeEmail(w.info.account), { aal: w.info.aal === 'aal2' ? 'aal1' : 'aal2' })) };   // 다른 aal
+                else {                                                                                                                         // 다른 발급자
+                    const c = JSON.parse(Buffer.from(body.session.access_token.split('.')[1], 'base64url').toString('utf8'));
+                    body.session.access_token = fakeJwt(Object.assign(c, { iss: 'https://other-project.invalid/auth/v1' }));
+                }
+            }
+        }
         await controlCall('POST', '/continue?step=' + w.step, body === null ? undefined : body);
     }
 }
@@ -320,7 +342,7 @@ const MESSAGES = {
 };
 const messageId = (text) => { for (const [id, t] of Object.entries(MESSAGES)) if (t === text) return id; return 'other'; };
 const STATES = ['off', 'signed_out', 'restoring', 'signed_in', 'rejected'];
-const REASONS = [null, 'blocked', 'withdrawal_pending', 'no_member', 'not_allowed', 'maintenance', 'network', 'rate_limited', 'expired', 'ended',
+const REASONS = [null, 'blocked', 'withdrawal_pending', 'no_member', 'not_allowed', 'maintenance', 'network', 'rate_limited', 'expired', 'ended', 'logout_unknown', 'unreadable',
     'session_changed', 'legacy_present', 'unexpected', 'token_shape', 'unavailable', 'storage', 'error'];
 const PROFILE_KEYS = ['id', 'name', 'nickname', 'email', 'phone', 'timezone'];
 // 서버의 오류 코드는 이 목록의 이름으로만 적는다(그 밖은 other) — 끝난 기록의 갱신에 실제 서버가 무엇을 주는지 보려고
@@ -397,6 +419,23 @@ async function handleRoute(route, cx) {
     const rec = d.record;
     rec.sent = false;
     cx.records.push(rec);
+    if (cx.sinkPass && rec.where === 'sink' && r.url() === cx.sinkPass) {
+        // 예행(P)의 대조: 차단하지 않은 정상 요청 1건을 같은 수신기(시험 목적지)가 실제로 받는지 본다 — 이 한 건만 일부러 보낸다
+        cx.sinkPass = null;
+        rec.aborted = false;
+        rec.how = 'control-pass';
+        const resp = await route.fetch({ maxRedirects: 0 });
+        rec.sent = true;
+        return route.fulfill({ response: resp });
+    }
+    if (SELFTEST === 'leaky-blocker' && rec.where === 'sink') {
+        // 대조 실험(--fake 에서만): 차단기가 고장 나 시험 목적지로 가는 요청을 보내 준다
+        rec.aborted = false;
+        rec.how = 'selftest-leak';
+        const resp = await route.fetch({ maxRedirects: 0 });
+        rec.sent = true;
+        return route.fulfill({ response: resp });
+    }
     if (d.action === 'abort') return route.abort('blockedbyclient');
     if (rec.where === 'local') return route.continue();                        // data:·blob:·about: — 네트워크로 나가지 않는다
     if (rec.where === 'static-allowed') {                                       // 허용 목록의 정적 자원: 보내지 않고 빈 응답(화면 시험에 필요 없다)
@@ -484,8 +523,8 @@ async function doLogin(cx, page, acct, { query = '?redirect=my-dashboard.html', 
     cx.account = acct;
     await page.goto(site + '/login.html' + query, { waitUntil: 'domcontentloaded' });
     await settled(page);
-    await page.fill('#email', EMAIL[acct]);
-    await page.fill('#password', wrongPassword ? PW + 'x' : PW);
+    await page.fill('#email', vault.get('EMAIL_' + acct));           // 예행(P)이 통과하기 전에는 여기서 예외가 난다
+    await page.fill('#password', wrongPassword ? vault.get('PW') + 'x' : vault.get('PW'));
     await page.click('#loginBtn');
     await until(page, "!!document.querySelector('.alert') || !location.pathname.endsWith('/login.html')", 25000);
     const message = pathOf(page).endsWith('/login.html') ? await alertId(page) : 'success';
@@ -532,13 +571,13 @@ const baseline = (cx, ck) => {
     // 대조 단계(P)는 일부러 용도가 맞지 않는 요청을 시켜 본다. 그 밖의 경우에는 그런 시도 자체가 없어야 한다
     if (cx.id !== 'P') ck('자격의 용도가 맞지 않는 요청을 시도한 것 0', s.leakBlocked === 0);
     else ck('대조: 자격의 용도가 맞지 않는 요청을 전송 전에 막음', s.leakBlocked >= 1);
+    // 대조 단계는 수신기가 살아 있음을 보이려고 정상 요청 1건을 일부러 시험 목적지로 보낸다
     ck('회원 자격이 필요한 주소에 공개 키로 나간 것 0', s.publicRetry === 0);
-    ck('허용 밖으로 보낸 것 0(차단기의 결정)', s.outsideSent === 0);
+    ck(cx.id === 'P' ? '허용 밖으로 보낸 것은 대조용 1건뿐(차단기의 결정)' : '허용 밖으로 보낸 것 0(차단기의 결정)', s.outsideSent === (cx.id === 'P' ? 1 : 0));
     ck('service_role 자격 0', s.serviceRole === 0);
     return s;
 };
-async function runCase(id, title, fn, { required = true } = {}) {
-    if (ONLY && !ONLY.has(id)) return;
+async function execCase(id, title, fn, { required = true } = {}) {
     const entry = { id, title, required, verdict: 'unknown', checks: [], summary: null, storage: null, records: [] };
     results.push(entry);
     let cx = null;
@@ -550,11 +589,10 @@ async function runCase(id, title, fn, { required = true } = {}) {
         const sink0 = siteOn.core.counts.sink + siteOff.core.counts.sink;
         await fn(cx, ck);
         entry.summary = baseline(cx, ck);
-        ck('로컬 시험 목적지 수신 0(차단기와 독립된 증거)', siteOn.core.counts.sink + siteOff.core.counts.sink === sink0);
+        ck(id === 'P' ? '로컬 시험 목적지 수신은 대조용 1건뿐(차단기와 독립된 증거)' : '로컬 시험 목적지 수신 0(차단기와 독립된 증거)', siteOn.core.counts.sink + siteOff.core.counts.sink === sink0 + (id === 'P' ? 1 : 0));
     } catch (e) {
         if (e instanceof PauseTimeout) entry.checks.push({ name: '멈춤의 기다림이 상한을 넘김', ok: null });
         else entry.checks.push({ name: '실행 도중 예외(경우를 끝까지 돌리지 못함)', ok: null });
-        if (e instanceof PauseTimeout && pendingRevert) throw e;
     } finally {
         if (cx) {
             entry.storage = cx.store;
@@ -576,15 +614,20 @@ async function runCase(id, title, fn, { required = true } = {}) {
 const NEW_KEYS = ['eon_auth_v1', 'eon_auth_v1:compat', 'iontoefl_login_time', 'iontoefl_user'];
 const sameSet = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
-async function allCases() {
+// 경우들의 차례표를 만든다(여기서는 아무것도 돌리지 않는다 — 돌리는 차례는 runSequence 가 정한다: P 가 먼저, 전부 참이어야 다음)
+async function buildCases() {
+    const plan = [];
+    const runCase = (id, title, fn, opts) => { plan.push({ id, run: () => execCase(id, title, fn, opts) }); };
     // ---- P. 로컬 대조: 차단이 실제로 듣는가(수신기가 살아 있음을 먼저 보인 뒤) ----
     await runCase('P', '차단기의 로컬 대조(첫 화면·새 창·리디렉션·폼·제어 포트)', async (cx, ck) => {
         const core = siteOn.core;
         const page = await cx.page();
         await page.goto(ON + '/__b3a/blank');
-        const probe0 = core.counts.probe;
-        await page.evaluate(() => fetch('/__b3a/probe').then((r) => r.status, () => 0));
-        ck('수신기가 살아 있음: 차단하지 않은 정상 요청 1건을 실제로 받음', core.counts.probe === probe0 + 1);
+        // 같은 수신기(시험 목적지)로: 먼저 차단하지 않은 정상 요청 1건을 실제로 받는지, 그 뒤 차단 시험 동안 추가 수신이 0 인지
+        const sinkBefore = core.counts.sink;
+        cx.sinkPass = ON + '/__b3a/sink/alive';
+        await page.evaluate(() => fetch('/__b3a/sink/alive').then((r) => r.status, () => 0));
+        ck('수신기가 살아 있음: 차단하지 않은 정상 요청 1건을 시험 목적지가 실제로 받음', core.counts.sink === sinkBefore + 1);
         const sink0 = core.counts.sink;
         const csp0 = core.counts.csp;
         const rejected0 = control.rejected;
@@ -625,7 +668,8 @@ async function allCases() {
         const cspBlocked = core.counts.csp - csp0;
         ck('시킨 시도가 전부 전송 전에 막힘(차단기가 센 수 + 내용 보안 정책이 먼저 막은 수 ≥ 시킨 수)', blocked + cspBlocked >= attempts);
         ck('차단기가 직접 막은 것: fetch·리디렉션·폼·화면 이동·새 창·첫 화면(11건 이상)', blocked >= 11);
-        ck('시험 목적지가 실제로 받은 수 0', core.counts.sink === sink0);
+        ck('차단 시험 동안 같은 수신기(시험 목적지)의 추가 수신 0', core.counts.sink === sink0);
+        ck('비밀 보관함이 아직 닫혀 있음(예행 중에는 비밀번호를 꺼낼 수 없다)', vault.armed() === false);
         ck('제어 포트가 화면에서 받은 요청 0(비밀 없이 온 요청 0)', control.rejected === rejected0);
     });
 
@@ -725,7 +769,7 @@ async function allCases() {
 
     // ---- 10·11. 로그아웃과 재로그인 ----
     await runCase('10', '로그아웃: 이 로그인만 + 재로그인', async (cx, ck) => {
-        await pause('other-session-create', { account: 'A' });
+        await pause('other-session-create', { account: 'A' }, { leaves: 'A' });
         const page = await cx.page();
         await doLogin(cx, page, 'A');
         const sid = cx.seen.lastLoginSid;
@@ -828,7 +872,8 @@ async function allCases() {
             cx.notes = { refreshRefusalCode: refused ? refused.code : 'none', stateAfter: st.state, reasonAfter: st.reason };   // 끝난 기록의 갱신에 서버가 준 코드(정해 둔 이름)
             ck('서버가 "끝남"으로 답했으면(expired) 이 브라우저의 로그인도 지워짐 / 아니면 남음', st.reason === 'expired' ? !(await keyBuckets(page)).includes('eon_auth_v1') : (st.reason === 'no_member' ? true : (await keyBuckets(page)).includes('eon_auth_v1') || st.state === 'signed_out'));
         } finally {
-            await pause('restore-session', { sid }, { revertOf: 'expire-session' });
+            const back = await pause('restore-session', { sid }, { revertOf: 'expire-session' });
+            ck('원복 확인: 로그인 기록을 되돌렸다는 답', !!back && back.reverted === true ? true : null);
         }
     });
 
@@ -850,7 +895,8 @@ async function allCases() {
                 cx.records.push(...cx2.records);
             } finally { await cx2.context.close(); }
         } finally {
-            await pause('maintenance-off', {}, { revertOf: 'maintenance-on' });
+            const back = await pause('maintenance-off', {}, { revertOf: 'maintenance-on' });
+            ck('원복 확인: 점검을 껐다는 답', !!back && back.reverted === true ? true : null);
         }
     });
 
@@ -867,9 +913,12 @@ async function allCases() {
 
     // ---- 17~19. 저장된 로그인으로 시작(aal2 는 화면으로 만들 수 없다) ----
     const seeded = (id, title, acct, aal, judge) => runCase(id, title, async (cx, ck) => {
-        const got = await pause('provide-session', { account: acct, aal });
+        const got = await pause('provide-session', { account: acct, aal }, { leaves: acct });
         const session = got && got.session;
-        if (!session || typeof session !== 'object' || typeof session.access_token !== 'string') { ck('브레인방이 로그인 상태를 줌', null); return; }
+        // 넣기 전에 출처를 확인한다: 발급자·합성 계정·aal·로그인 기록 번호·만료·키. 어긋나면 넣지도 보내지도 않는다(미확인)
+        const origin = checkProvidedSession(session, { email: vault.get('EMAIL_' + acct), aal }, Date.now());
+        if (!origin.ok) { cx.notes = { sessionRefused: origin.why }; ck('받은 로그인 상태의 출처 확인(어긋나서 넣지 않음)', null); return; }
+        ck('받은 로그인 상태의 출처 확인: 발급자·합성 계정·aal·로그인 기록 번호·만료·키', true);
         cx.account = acct;
         const page = await cx.page();
         await page.goto(ON + '/__b3a/blank');
@@ -943,8 +992,8 @@ async function allCases() {
             await settled(page);
             await sleep(1500);
             ck('옛 값만 보고 자동 이동하지 않음', pathOf(page).endsWith('/login.html'));
-            await page.fill('#email', EMAIL.A);
-            await page.fill('#password', PW);
+            await page.fill('#email', vault.get('EMAIL_A'));
+            await page.fill('#password', vault.get('PW'));
             await page.click('#loginBtn');
             await until(page, "!!document.querySelector('.alert')", 15000);
             await sleep(1500);
@@ -980,6 +1029,7 @@ async function allCases() {
         await runCase(id, `꺼짐 대조(${{ O1: '빈 브라우저', O2: '옛 학생', O3: '교재 편집만', O4: '후속메일만', O5: '섞임+만료' }[id]})`, async (cx, ck) => {
             const page = await cx.page();
             await seedStore(cx, page, OFF, seed);
+            const module0 = siteOff.core.counts.authModule;
             await page.goto(OFF + '/index.html?eon_auth=on&EON_AUTH_SWITCH=on', { waitUntil: 'domcontentloaded' });
             await sleep(1200);
             ck('EonAuth.state() 가 off(주소의 꼬리표로 켜지지 않음)', (await stateOf(page)).state === 'off');
@@ -991,11 +1041,13 @@ async function allCases() {
             ck(hasOld ? '옛 값이 있으면 redirect 주소로 자동 이동(지금 그대로)' : '자동 이동 없음', pathOf(page).endsWith(hasOld ? '/my-dashboard.html' : '/login.html'));
             ck('인증 모듈의 요청 0', cx.records.filter((x) => ['login', 'refresh', 'logout', 'my_profile', 'my_site_access', 'auth-other'].includes(x.target)).length === 0);
             ck('SDK 파일을 받는 요청 0(꺼짐 서버가 그 파일을 내준 횟수)', siteOff.core.counts.sdk === 0);
+            ck('지금과 다른 것(차이 장부): 꺼짐의 화면이 인증 모듈 파일을 화면마다 1번 받음(index.html·login.html)', siteOff.core.counts.authModule - module0 === 2);
             ck('새 모듈의 저장소 키 0', !(await keyBuckets(page)).some((k) => k.startsWith('eon_auth')));
             ck('새 모듈의 키·교재 편집·후속메일 키의 읽기·쓰기·지우기 0', ['eon_auth_v1', 'eon_auth_v1:compat', 'eon_auth_other', 'eon_book_auth_v1', 'followup'].every((b) => touched(cx, b, ['getItem', 'setItem', 'removeItem']) === 0));
             ck('넣어 둔 값이 글자 그대로', await unchanged(page, seed));
         });
     }
+    return plan;
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,14 +1062,24 @@ async function main() {
         const scan = site.core.scan();
         if (scan.repoSwitch !== 'off') stop('저장소의 스위치 값이 꺼짐이 아니다');
         site.core.counts.sdk = 0;
+        site.core.counts.authModule = 0;
     }
     // SDK 파일을 내준 횟수(꺼짐 서버에서는 0 이어야 한다)
     for (const site of [siteOn, siteOff]) {
         const respond = site.core.respond;
-        site.core.respond = (req) => { if (String(req.url).split('?')[0] === '/vendor/supabase-2.116.0.js') site.core.counts.sdk++; return respond(req); };
+        site.core.respond = (req) => {
+            const p = String(req.url).split('?')[0];
+            if (p === '/vendor/supabase-2.116.0.js') site.core.counts.sdk++;
+            if (p === '/js/auth-session.js') site.core.counts.authModule++;
+            return respond(req);
+        };
     }
     await startControl();
-    decide = makeDecider({ selfOrigins: [ON, OFF], anonKey: ANON });
+    // 회원 JWT 는 발급자가 시험 프로젝트이고 계정이 이번 실행의 합성 계정일 때만 내보낸다(보관함이 열리기 전에는 어떤 회원 JWT 도 내보내지 않는다)
+    decide = makeDecider({
+        selfOrigins: [ON, OFF], anonKey: ANON, issuer: ISSUER,
+        memberEmails: () => (vault.armed() ? ACCOUNT_KEYS.map((k) => vault.get('EMAIL_' + k)) : []),
+    });
     if (FAKE) fakeOperator();
     console.log(`  켜짐 ${ON}   꺼짐 ${OFF}   제어 포트 ${control.port}`);
 
@@ -1026,23 +1088,30 @@ async function main() {
         headless: !flag('--headed'),
         // 브라우저는 127.0.0.1 말고는 이름을 풀지 못한다(차단기를 거치지 않고 바깥으로 나가는 길을 막는다)
         args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'],
+        env: browserEnv(process.env),                              // 필요한 환경 변수만(비밀번호·제어 비밀·공개 키·이메일은 물려지지 않는다)
         ignoreDefaultArgs: ['--disable-back-forward-cache'],      // 보관된 화면이 되살아나는 경우도 재려고
     });
 
     let stopped = null;
+    let seq = { stopped: 'error', started: [] };
     try {
-        await allCases();
+        const plan = await buildCases();
+        const first = plan.find((c) => c.id === 'P');
+        const rest = plan.filter((c) => c.id !== 'P' && (!ONLY || ONLY.has(c.id)));
+        // 예행(P)은 언제나 먼저 돈다. P 의 판정이 전부 참이 아니면 뒤의 경우를 하나도 시작하지 않는다(보관함도 열리지 않는다)
+        seq = await runSequence({
+            preflight: async () => { await first.run(); return results.find((r) => r.id === 'P'); },
+            cases: rest, vault, board,
+        });
     } catch (e) {
-        stopped = e instanceof PauseTimeout ? `멈춤(${e.message})의 기다림이 상한을 넘김` : '실행 도중 예외';
+        stopped = '실행 도중 예외';
     } finally {
         await browser.close().catch(() => {});
     }
-    if (pendingRevert) {
-        // 브레인방이 건 DB 변경이 남아 있을 수 있다 → "원복 확인"을 받기 전에는 끝내지 않는다
-        console.log(`  원복 확인을 기다림: ${pendingRevert}`);
-        const kind = pendingRevert === 'maintenance-on' ? 'maintenance-off' : 'restore-session';
-        try { await pause(kind + '-confirm', { of: pendingRevert }, { revertOf: pendingRevert }); } catch (e) { stopped = `원복 확인(${pendingRevert})을 받지 못함`; }
-    }
+    if (seq.stopped === 'preflight') stopped = '차단의 예행(P)이 통과하지 못해 뒤의 경우를 시작하지 않음';
+    // 브레인방이 건 DB 변경이 남아 있을 수 있으면 "원복 확인"을 받기 전에는 끝내지 않는다
+    if (board.pendingRevert && seq.stopped !== 'revert') await confirmRevert(board);
+    if (board.pendingRevert) stopped = '원복 확인을 받지 못함 — 시험 프로젝트의 점검·로그인 기록을 직접 확인해 되돌릴 것';
 
     const sinkTotal = siteOn.core.counts.sink + siteOff.core.counts.sink;
     const required = results.filter((r) => r.required);
@@ -1050,10 +1119,15 @@ async function main() {
     const expectedIds = ['P', '1', '2', '3', '4', '5', '6', '7', '8', '9', '9b', '10', '12', 'T', '14', '15', 'AF', '17', '18', '19a', '19b', 'R1', 'R2', 'R3', 'I1', 'I4', 'I2', 'I3', 'O1', 'O2', 'O3', 'O4', 'O5'];
     const notRun = expectedIds.filter((id) => !results.some((r) => r.id === id));
     const all = results.flatMap((r) => r.records);
-    const overall = !stopped && notRun.length === 0 && required.every((r) => r.verdict === 'pass') && sinkTotal === 0 && egress.blocked === 0 && (!FAKE || egress.testProject === 0);
+    const controlPass = all.filter((r) => r.how === 'control-pass').length;         // 예행에서 일부러 보낸 대조용 정상 요청(1건)
+    const sinkUnexpected = sinkTotal - controlPass;
+    const overall = !stopped && notRun.length === 0 && required.every((r) => r.verdict === 'pass') && sinkUnexpected === 0 && controlPass === 1 && egress.blocked === 0 && (!FAKE || egress.testProject === 0);
     const output = {
         tool: 'tests/auth-session/screen.mjs',
         mode: FAKE ? 'fake-server' : 'test-project',
+        selftest: SELFTEST,                                 // null 이 아니면 일부러 고장을 낸 대조 실험이다(통과가 아닌 것이 기대)
+        vaultOpened: vault.armed(),                         // 예행이 통과해 비밀 보관함이 열렸는가
+        started: seq.started,
         note: FAKE ? '가짜 서버를 상대로 돌린 결과다 — 실제 서버·실제 응답의 증거가 아니다' : '시험 프로젝트를 상대로 돌린 결과',
         overall: overall ? 'pass' : 'not-pass',
         stopped,
@@ -1061,8 +1135,9 @@ async function main() {
         totals,
         independentEvidence: {
             // 차단기의 결정과 독립된 숫자들
-            sinkReceived: sinkTotal,
-            probeReceived: siteOn.core.counts.probe + siteOff.core.counts.probe,
+            sinkReceived: sinkTotal,                        // 시험 목적지가 실제로 받은 수
+            sinkControlPass: controlPass,                   // 그 가운데 예행이 일부러 보낸 대조용 정상 요청(1 이어야 한다)
+            sinkUnexpected,                                 // 그 밖(0 이어야 한다)
             controlArrivals: control.arrivals,
             controlRejected: control.rejected,
             runnerConnections: egress,                      // 실행기가 연 연결: local / testProject / blocked(막은 시도)
@@ -1071,25 +1146,30 @@ async function main() {
             staticAllowedFulfilledLocally: all.filter((r) => r.where === 'static-allowed').length,
         },
         summary: summarize(all),
+        pendingRevert: board.pendingRevert,                 // null 이 아니면 브레인방이 건 DB 변경이 남아 있을 수 있다
+        operatorLeftovers: board.leftovers,                 // 브레인방이 만든 것이 남아 있을 수 있음(로그인 기록 — 정리는 브레인방이 DB 로)
+        pauses: board.history,
         cases: results,
     };
     const text = JSON.stringify(output, null, 1);
     // 덧붙이는 점검: 결과에 비밀값·JWT 모양이 없는가(주된 보호는 "정해 둔 값만 적는다"이다)
-    const leaks = SECRETS.filter((s) => s && text.includes(s)).length + (/eyJ[A-Za-z0-9_-]{8,}/.test(text) ? 1 : 0);
-    if (leaks) { console.error('중단: 결과에 비밀값의 흔적이 있어 파일을 쓰지 않는다'); process.exitCode = 3; }
+    const leaks = SCAN.filter((s) => s && text.includes(s)).length + (/eyJ[A-Za-z0-9_-]{8,}/.test(text) ? 1 : 0);
+    if (leaks) { console.error('중단: 결과에 비밀값의 흔적이 있어 파일을 쓰지 않는다'); process.exitCode = 5; }
     else { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, text); }
 
     console.log('');
     console.log(`  경우: 통과 ${totals.pass} / 기대와 다름 ${totals.differs} / 미확인 ${totals.unknown}${notRun.length ? ` / 돌리지 않음 ${notRun.length}` : ''}`);
-    console.log(`  독립된 증거: 시험 목적지 수신 ${sinkTotal}, 실행기가 연 연결 — 로컬 ${egress.local}·시험 프로젝트 ${egress.testProject}·막은 시도 ${egress.blocked}`);
+    console.log(`  독립된 증거: 시험 목적지 수신 ${sinkTotal}(대조용 ${controlPass} + 그 밖 ${sinkUnexpected}), 실행기가 연 연결 — 로컬 ${egress.local}·시험 프로젝트 ${egress.testProject}·막은 시도 ${egress.blocked}`);
     console.log(`  시험 프로젝트로 실제 보낸 요청 ${output.independentEvidence.requestsSentToTestProject}건, 가짜 서버가 답한 요청 ${output.independentEvidence.requestsAnsweredByFakeServer}건`);
     if (!leaks) console.log(`  결과: ${OUT}`);
+    if (SELFTEST) console.log(`  대조 실험(${SELFTEST}): 일부러 고장을 냈다 — 통과가 아닌 것이 기대다`);
     console.log(`전체 판정: ${overall ? '통과' : '통과 아님'}${FAKE ? '  (가짜 서버 — 실제 서버의 증거가 아니다)' : ''}${stopped ? '  [' + stopped + ']' : ''}`);
     control.server.close();
     control.server = null;
     siteOn.server.close();
     siteOff.server.close();
-    if (!process.exitCode) process.exitCode = stopped ? 3 : (overall ? 0 : 1);
+    if (board.leftovers.length) console.log(`  브레인방이 만든 것이 남아 있을 수 있음: ${board.leftovers.map((x) => x.kind + '(' + x.account + ')').join(', ')}`);
+    if (!process.exitCode) process.exitCode = seq.stopped === 'preflight' ? 4 : (stopped ? 3 : (overall ? 0 : 1));
     setTimeout(() => process.exit(process.exitCode), 300);
 }
 

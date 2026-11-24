@@ -62,7 +62,7 @@ export class FakeSupabase {
     tokenBody(s) {
         const nowSec = Math.floor(this.now() / 1000);
         const exp = nowSec + s.expiresIn;
-        const access = fakeJwt({ sub: s.authId, session_id: s.sid, role: 'authenticated', aal: s.aal, exp, iat: nowSec, n: ++this.seq });
+        const access = fakeJwt({ iss: this.origin + '/auth/v1', aud: 'authenticated', sub: s.authId, email: s.email, session_id: s.sid, role: 'authenticated', aal: s.aal, exp, iat: nowSec, n: ++this.seq });
         return {
             access_token: access,
             token_type: 'bearer',
