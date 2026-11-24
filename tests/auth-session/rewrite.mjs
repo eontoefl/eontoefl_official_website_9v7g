@@ -13,6 +13,9 @@ const KEY_LINE = /^const SUPABASE_ANON_KEY = '([^']*)';(\r?)$/m;
 const PLATFORM_LINE = /^const DEFAULT_PLATFORM_URL = '([^']*)';(\r?)$/m;
 const SWITCH_LINE = /^( *)const EON_AUTH_SWITCH = '(off|on)';(\r?)$/m;
 
+// (계약 3C-2a) 업무 규약의 그 업무 한 칸: my-scores 의 회원 읽기가 열렸는가. 저장소의 값은 닫힘(false)이어야 한다.
+const MEMBER_TASK_LINE = /^( *)'my-scores': Object\.freeze\(\{ open: (false|true),(\r?)$/m;
+
 const countMatches = (text, re) => (text.match(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')) || []).length;
 
 function exactlyOne(text, re, what) {
@@ -70,6 +73,19 @@ export function pageSwitchValue(text) {
     return m && countMatches(text, PAGE_SWITCH_LINE) === 1 ? m[2] : null;
 }
 
+// (계약 3C-2a) 인증 모듈의 업무 규약에서 my-scores 의 회원 읽기를 연다(내주는 사본에서만). 저장소의 값은 닫힘이어야 한다.
+// 새 스위치 자리가 아니다 — 규약의 그 업무 한 칸이다.
+export function rewriteMemberTask(text, open) {
+    exactlyOne(text, MEMBER_TASK_LINE, "업무 규약의 'my-scores'");
+    if (text.match(MEMBER_TASK_LINE)[2] !== 'false') throw new Error('저장소의 업무 규약에서 my-scores 가 닫힘이 아니다');
+    if (!open) return text;
+    return text.replace(MEMBER_TASK_LINE, (m, indent, v, cr) => `${indent}'my-scores': Object.freeze({ open: true,${cr}`);
+}
+export function memberTaskValue(text) {
+    const m = text.match(MEMBER_TASK_LINE);
+    return m && countMatches(text, MEMBER_TASK_LINE) === 1 ? m[2] : null;
+}
+
 export function switchValue(text) {
     const m = text.match(SWITCH_LINE);
     return m && countMatches(text, SWITCH_LINE) === 1 ? m[2] : null;
@@ -98,17 +114,23 @@ export function findProdResidue(buffer, { prodKey, prodUrl } = {}) {
 export function transformForServe(relPath, buffer, { mode, testUrl, testKey, sinkUrl, prodKey, prodUrl }) {
     let body = buffer;
     const changed = [];
+    if (mode !== 'off' && mode !== 'on' && mode !== 'on-open') throw new Error('mode 는 off·on·on-open');
+    const sw = mode === 'off' ? 'off' : 'on';
     if (relPath === CONFIG_FILE) {
         body = Buffer.from(rewriteConfig(buffer.toString('utf8'), { testUrl, testKey, sinkUrl }), 'utf8');
         changed.push('Supabase 주소·공개 키 → 시험 프로젝트', '테스트룸 주소 → 로컬 시험 목적지');
     } else if (relPath === AUTH_FILE) {
-        body = Buffer.from(rewriteSwitch(buffer.toString('utf8'), mode), 'utf8');
-        if (mode === 'on') changed.push('새 로그인 스위치 → 켜짐');
+        // mode: off / on(새 로그인 켜짐, my-scores 닫힘 — 3C-1 의 켜짐) / on-open(새 로그인 켜짐 + my-scores 의 회원 읽기 열림 — 계약 3C-2a)
+        let text = rewriteSwitch(buffer.toString('utf8'), sw);
+        if (memberTaskValue(text) !== null || mode === 'on-open') text = rewriteMemberTask(text, mode === 'on-open');
+        body = Buffer.from(text, 'utf8');
+        if (sw === 'on') changed.push('새 로그인 스위치 → 켜짐');
+        if (mode === 'on-open') changed.push('업무 규약의 my-scores → 열림');
     } else if (/\.html$/i.test(relPath)) {
         const html = buffer.toString('utf8');
         if (hasPageSwitch(html)) {
-            body = Buffer.from(rewritePageSwitch(html, mode), 'utf8');
-            if (mode === 'on') changed.push('화면의 새 로그인 스위치 → 켜짐');
+            body = Buffer.from(rewritePageSwitch(html, sw), 'utf8');
+            if (sw === 'on') changed.push('화면의 새 로그인 스위치 → 켜짐');
         }
     }
     return { body, residue: findProdResidue(body, { prodKey, prodUrl }), changed };

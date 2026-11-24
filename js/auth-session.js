@@ -6,6 +6,7 @@
 // * 켜져 있을 때만 Supabase 공식 클라이언트의 Auth 기능(AuthClient)을 별도 저장 이름으로 쓴다.
 // * 이 모듈이 회원 자격을 싣는 요청은 자기 자신의 요청뿐이다:
 //   로그인·갱신·로그아웃, rpc/my_profile, rpc/my_site_access. 그 밖의 업무 요청은 지금 쓰는 자격 그대로다.
+//   (계약 3C-2a) 예외는 아래 "업무 규약"에 이름으로 적힌 읽기뿐이다 — 그 업무가 열려 있을 때만, 전송 담당 함수(memberRead)가 직접 보낸다.
 // * 교재 편집(eon_book_auth_v1)과 후속메일 화면(sb-…-auth-token)의 로그인 상태는 읽지도 쓰지도 지우지도 않는다.
 // * 이 파일은 화면의 head 에서 실린다(켜진 화면이 처음 그려질 때부터 관리자·회원 표시를 숨기기 위해).
 //   설정 파일(js/supabase-config.js)은 뒤에 실리므로 주소·공개 키는 쓸 때 읽는다.
@@ -966,6 +967,205 @@
     }
 
     // =================================================================
+    // (계약 3C-2a) 회원 자격으로 읽는 구조. **보호가 아니다** — 서버의 규칙은 이 조각이 바꾸지 않는다.
+    // 밖으로 머리글·JWT 를 내주는 길(headersForGrade·credentialFor)은 넓히지 않는다. 아래의 전송 담당 함수가
+    // 안에서 확인하고 직접 보내며, 호출자에게는 상태와 행만 돌려준다.
+    // =================================================================
+
+    // ---- 업무 규약(한 곳): 회원 자격으로 내보내도 되는 업무를 이름으로 적는다. 여기 없는 요청은 회원 자격으로 나가지 않는다.
+    // open: 그 업무의 회원 읽기가 열렸는가. **저장소의 값은 닫힘(false)이다** — 시험용 로컬 서버가 파일을 내줄 때만 바꾼다.
+    // 주인의 값(owner 열의 조건)은 이 모듈이 확인한 my_profile 의 회원번호다. 로그인 계정 번호·저장된 표시 값·호출이 넘긴 값을 쓰지 않는다.
+    const MEMBER_TASKS = Object.freeze({
+        'my-scores': Object.freeze({ open: false,
+            method: 'GET',
+            table: 'toefl_actual_scores',
+            owner: 'user_id',
+            columns: Object.freeze(['test_date', 'reading', 'listening', 'speaking', 'writing', 'overall', 'legacy_total']),
+            order: 'test_date.asc',
+            limit: '50'
+        })
+    });
+    const MEMBER_HEADER_NAMES = 'apikey,authorization,content-type';
+    const EXPIRED_CODE = 'PGRST303';          // 401 가운데 "JWT 가 만료됨"
+    const MAINTENANCE_CODE = 'PT503';         // 점검 중
+    const memberStatus = {};                  // 업무 이름 → 마지막 결과의 상태 이름(행·자격·응답 원문은 두지 않는다)
+    const DEFINITE_REASONS = ['blocked', 'withdrawal_pending', 'no_member', 'not_allowed', 'maintenance'];
+
+    function taskOf(name) {
+        return typeof name === 'string' && Object.prototype.hasOwnProperty.call(MEMBER_TASKS, name) ? MEMBER_TASKS[name] : null;
+    }
+    function memberTaskOpen(name) {
+        const task = taskOf(name);
+        return !!task && task.open === true;
+    }
+
+    // 화면이 회원 업무의 흐름을 시작할 때 붙드는 사람(아래 watchPage 가 잡는다): 확인된 회원번호·로그인 기록
+    let flowOwner = null;
+    // 지금 확인된 사람(확인된 로그인이 지금도 저장된 그 로그인일 때만)
+    function ownerNow() {
+        if (state !== 'signed_in' || !verified || !verified.profile || !storedIs(verified)) return null;
+        return { memberId: verified.profile.id, sub: verified.sub, sid: verified.sid };
+    }
+    function sameOwner(a, b) {
+        return !!a && !!b && a.memberId === b.memberId && a.sub === b.sub && a.sid === b.sid;
+    }
+
+    // 규약에서 요청을 만든다(호출이 넘긴 값은 들어가지 않는다)
+    function buildMemberRequest(task, owner, token) {
+        return {
+            method: task.method,
+            url: ORIGIN + '/rest/v1/' + task.table + '?' + task.owner + '=' + encodeURIComponent('eq.' + owner.memberId) +
+                '&select=' + encodeURIComponent(task.columns.join(',')) +
+                '&order=' + encodeURIComponent(task.order) +
+                '&limit=' + encodeURIComponent(task.limit),
+            headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+        };
+    }
+
+    // 보내기 직전에 다시 본다(만든 것을 믿지 않는다): 출처·경로·메서드·조건의 이름/연산/값·열·정렬·개수·머리글.
+    // 중복되거나 모르는 조건, 관계 확장, 다른 출처, 더해진 머리글, 그 흐름의 로그인 기록이 아닌 JWT 는 보내지 않는다.
+    function memberRequestOk(req, task, owner) {
+        if (!ORIGIN || !req || typeof req.url !== 'string' || req.url.indexOf('#') >= 0) return false;
+        if (req.method !== task.method) return false;
+        if (typeof owner.memberId !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(owner.memberId)) return false;
+        let u;
+        try { u = new URL(req.url); } catch (e) { return false; }
+        if (u.href !== req.url || u.protocol !== 'https:' || u.origin !== ORIGIN || u.username || u.password) return false;
+        if (u.pathname !== '/rest/v1/' + task.table) return false;
+        const want = [[task.owner, 'eq.' + owner.memberId], ['select', task.columns.join(',')], ['order', task.order], ['limit', task.limit]];
+        const got = [];
+        u.searchParams.forEach(function (value, key) { got.push([key, value]); });
+        if (got.length !== want.length) return false;
+        for (let i = 0; i < want.length; i++) {
+            if (got[i][0] !== want[i][0] || got[i][1] !== want[i][1]) return false;
+        }
+        if (/[()]/.test(got[1][1])) return false;                 // 관계 확장(select 안의 괄호)
+        const h = plainHeaders(req.headers);
+        if (!h) return false;
+        if (Object.keys(h).map(function (n) { return n.toLowerCase(); }).sort().join(',') !== MEMBER_HEADER_NAMES) return false;
+        if (headerValue(h, 'apikey') !== ANON || headerValue(h, 'content-type') !== 'application/json') return false;
+        const auth = headerValue(h, 'authorization');
+        if (typeof auth !== 'string' || auth.indexOf('Bearer ') !== 0 || auth.slice(7) === ANON) return false;
+        const c = decodeClaims(auth.slice(7));
+        return !!c && c.sub === owner.sub && c.sid === owner.sid;
+    }
+
+    // 보낸다. 돌려주는 값: { status, body } — 통신 실패·시간 초과는 status 0(결과를 모른다. 다시 보내지 않는다)
+    async function sendMemberRequest(req) {
+        const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+        const work = (async function () {
+            const res = await window.fetch(req.url, {
+                method: req.method,
+                headers: req.headers,
+                redirect: 'error',             // (회원 읽기) 리디렉션은 따라가지 않고 실패로 본다
+                credentials: 'omit',
+                cache: 'no-store',
+                referrerPolicy: 'no-referrer',
+                signal: ctl ? ctl.signal : undefined
+            });
+            let body = null;
+            try { body = await res.json(); } catch (e) { body = null; }
+            return { status: res.status, body: body };
+        })();
+        try {
+            return await withTimeout(work, RPC_TIMEOUT_MS);
+        } catch (e) {
+            if (ctl) { try { ctl.abort(); } catch (_) {} }
+            return { status: 0, body: null };
+        }
+    }
+
+    // 규약의 열만 골라 낸다(그 밖의 열이 와도 넘기지 않는다). 모양이 다르면 null
+    function pickRows(task, body) {
+        if (!Array.isArray(body)) return null;
+        const rows = [];
+        for (let i = 0; i < body.length; i++) {
+            const r = body[i];
+            if (!r || typeof r !== 'object') return null;
+            const o = {};
+            task.columns.forEach(function (k) { o[k] = r[k] === undefined ? null : r[k]; });
+            rows.push(o);
+        }
+        return rows;
+    }
+
+    // 한 번 보낸다. 돌려주는 값의 kind: ok(rows) / not_signed_in / discarded / expired / rejected / maintenance / unknown
+    async function memberAttempt(task, owner) {
+        // 한 동기 구간에서: 지금 확인된 사람이 흐름을 시작한 그 사람인가 → 저장된 로그인이 그 기록인가(3A 의 안쪽 확인) → 만들기 → 다시 보기 → 보내기
+        const now = ownerNow();
+        if (!now) return { kind: 'not_signed_in' };
+        if (!sameOwner(now, owner)) return { kind: 'discarded' };
+        const st = storedSession();
+        if (!st || !same(st.claims, owner) || typeof st.accessToken !== 'string') return { kind: 'discarded' };
+        const req = buildMemberRequest(task, owner, st.accessToken);
+        if (!memberRequestOk(req, task, owner)) return { kind: 'unknown' };      // 규약과 다른 요청은 보내지 않는다
+        const r = await sendMemberRequest(req);
+        // 응답을 반영하기 전에: 시작할 때의 사람이 지금도 확인된 그 사람인가. 아니면 본문을 넘기지 않는다
+        await ready();
+        if (!sameOwner(ownerNow(), owner)) return { kind: 'discarded' };
+        if (r.status === 200) {
+            const rows = pickRows(task, r.body);
+            return rows ? { kind: 'ok', rows: rows } : { kind: 'unknown' };
+        }
+        const code = r.body && typeof r.body === 'object' && typeof r.body.code === 'string' ? r.body.code : null;
+        if (r.status === 401) return { kind: code === EXPIRED_CODE ? 'expired' : 'rejected' };
+        if (r.status === 403) return { kind: 'rejected' };
+        if (r.status === 503 && code === MAINTENANCE_CODE) return { kind: 'maintenance' };
+        return { kind: 'unknown' };
+    }
+
+    // 만료 뒤: 그 흐름의 로그인 기록만 갱신 한 번 → 다시 확인 한 번. 돌려주는 값: ok / discarded / rejected
+    async function refreshForOwner(owner) {
+        if (!sameOwner(ownerNow(), owner)) return 'discarded';
+        const att = { sub: owner.sub, sid: owner.sid };
+        const rf = await boundRefresh(att);
+        if (rf.kind === 'changed') return 'discarded';
+        if (rf.kind !== 'ok') {
+            // 서버가 그 로그인 기록이 끝났다고 답했으면 이 탭이 확인해 둔 것을 거둔다(그 기록일 때만)
+            if (rf.kind === 'ended' && verified && same(verified, att)) { removeStoredIf(att); withdraw('expired', att.sid); }
+            return 'rejected';
+        }
+        const v = await verifyOnce(att, rf.session.access_token);
+        if (!v.ok) {
+            if (v.reason === 'session_changed') return 'discarded';
+            // 서버가 "이 사람은 지금 확인되지 않는다"고 답한 것이면(차단·탈퇴 처리 중·대응 없음·접근 불가·점검) 이 탭이 확인해 둔 것을 거둔다.
+            // 통신 실패 같은 "모름"이면 확인 상태를 건드리지 않고 이 읽기만 끝낸다
+            if (DEFINITE_REASONS.indexOf(v.reason) >= 0 && verified && same(verified, att)) withdraw(v.reason, att.sid);
+            return 'rejected';
+        }
+        if (v.profile.id !== owner.memberId) return 'discarded';
+        return sameOwner(ownerNow(), owner) ? 'ok' : 'discarded';
+    }
+
+    function memberResult(name, kind, rows) {
+        memberStatus[name] = kind;
+        return Object.freeze(kind === 'ok' ? { status: 'ok', rows: rows } : { status: kind });
+    }
+
+    // ---- 전송 담당 함수(한 곳). 호출은 업무 이름만 넘긴다. 돌려주는 것은 상태가 있는 결과다 — 실패를 0건으로 돌려주지 않는다.
+    //   ok(rows — 0건 포함) / not_signed_in(확인 전·확인되지 않음 — 보내지 않음) / rejected(401·403) / maintenance(PT503)
+    //   / unknown(통신 실패·시간 초과) / discarded(사람이 달라져 보내지 않았거나 응답을 버림)
+    // 공개 키·옛 읽기로 다시 보내지 않는다. 만료(401·PGRST303)일 때만 갱신 한 번 뒤 한 번 다시 보낸다.
+    async function memberRead(name) {
+        const task = taskOf(name);
+        if (!task || task.open !== true) throw EonAuthError('task_not_allowed');    // 규약에 없거나 닫힌 업무: 아무것도 보내지 않는다
+        const owner = flowOwner;
+        if (!owner) return memberResult(name, 'not_signed_in');
+        await ready();
+        let a = await memberAttempt(task, owner);
+        if (a.kind === 'expired') {
+            const again = await enqueue(function () { return refreshForOwner(owner); });
+            if (again === 'ok') {
+                a = await memberAttempt(task, owner);
+                if (a.kind === 'expired') a = { kind: 'rejected' };      // 다시 보낸 것도 만료: 거기서 끝낸다
+            } else {
+                a = { kind: again };
+            }
+        }
+        return memberResult(name, a.kind, a.rows);
+    }
+
+    // =================================================================
     // (계약 3C-1) 화면의 로그인 상태 통일에 쓰는 것들. 요청의 자격은 바꾸지 않는다.
     // =================================================================
 
@@ -1070,6 +1270,10 @@
         guardOn = true;
         reloadPage = typeof reload === 'function' ? reload : null;
         guardFor = whoNow();
+        // (계약 3C-2a) 이 화면의 회원 업무 흐름이 붙드는 사람: 시작할 때 확인된 회원번호·로그인 기록
+        // (저장소를 다시 읽지 않는다 — 3C-1 의 켜짐과 저장소 접근이 같아야 한다. 저장된 로그인이 그 기록인지는 보낼 때 본다)
+        flowOwner = guardFor !== null && state === 'signed_in' && verified && verified.profile && verified.profile.id === guardFor
+            ? { memberId: verified.profile.id, sub: verified.sub, sid: verified.sid } : null;
         listeners.push(guardCheck);
         drawers.push(guardCheck);
         // 화면을 떠날 때 가려 둔다. 뒤로 가기로 되살아나면 아래의 pageshow 처리(다시 확인)가 끝난 뒤에 guardCheck 가
@@ -1129,7 +1333,11 @@
         displayUserRaw: displayUserRaw,
         bindDisplay: bindDisplay,
         headersForGrade: headersForGrade,
-        credentialFor: credentialFor
+        credentialFor: credentialFor,
+        // (계약 3C-2a) 회원 자격으로 읽기: 업무 이름만 받는다. 머리글·JWT 는 내주지 않는다
+        memberTaskOpen: memberTaskOpen,
+        memberRead: memberRead,
+        memberReadStatus: function (name) { return typeof name === 'string' && Object.prototype.hasOwnProperty.call(memberStatus, name) ? memberStatus[name] : null; }
     });
 
     // 다른 탭이 호환 값이나 새 방식의 로그인을 바꾸면 표시를 다시 보고 상태를 맞춘다

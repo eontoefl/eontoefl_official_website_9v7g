@@ -2374,7 +2374,17 @@ async function setupRestartHistory(prevApp) {
     const uid = applicationState.user && (applicationState.user.id || applicationState.user.user_id);
     let actual = [];
     try {
-        if (uid) {
+        // (계약 3C-2a) 켜진 화면에서 이 업무(my-scores)의 회원 읽기가 열려 있으면 회원 자격으로 읽는다 — 업무 이름만 넘긴다.
+        // ok 가 아니면 지금 실패했을 때와 같다(성적 이력 없이 그대로 진행, 미리 채움 없음, 새 안내 없음). 공개 키로 다시 읽지 않는다.
+        // 켜진 화면인데 확인할 길이 없으면(모듈 없음) 성적 요청을 보내지 않는다. 꺼진 화면·닫힌 업무는 아래의 지금 그대로다.
+        const eonAuth = EonLogin.on() ? window.EonAuth : null;
+        const eonReads = !!eonAuth && typeof eonAuth.memberTaskOpen === 'function' && typeof eonAuth.memberRead === 'function';
+        if (EonLogin.on() && (EonLogin.missing() || !eonReads)) {
+            actual = [];
+        } else if (eonReads && eonAuth.memberTaskOpen('my-scores')) {
+            const read = await eonAuth.memberRead('my-scores');
+            actual = read && read.status === 'ok' && Array.isArray(read.rows) ? read.rows : [];
+        } else if (uid) {
             actual = await supabaseAPI.query('toefl_actual_scores', {
                 'user_id': `eq.${uid}`,
                 'select': 'test_date,reading,listening,speaking,writing,overall,legacy_total',

@@ -20,6 +20,7 @@ import { createCore, makeIgnore } from './serve-core.mjs';
 import { TEST_URL, CONFIG_FILE, AUTH_FILE, switchValue, pageSwitchValue, findProdResidue } from './rewrite.mjs';
 import { TARGET_FILES, GATE_SOURCE, GATE_COMMENT, MODULE_TAG, extractGate } from './pages.mjs';
 import { sectionPages } from './run-pages.mjs';
+import { sectionMember } from './run-member.mjs';
 import {
     ROOT, BASE, FAKE_ANON, SDK_FILE, PROD, V, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, STATE_NAMES, hasOldValue,
     baseFile, workFile, provider, extractScripts, makeWorld, snapshot, diffSnapshot, checker,
@@ -1782,7 +1783,14 @@ function sectionText() {
     const users = git(['grep', '-l', '-E', 'EonAuth|eon_auth_v1', '--', '*.js', '*.html']).split('\n').filter(Boolean).filter((f) => !f.startsWith('tests/')).sort();
     info.users = users;
     // 인증 모듈(EonAuth)을 직접 부르는 곳: 모듈 자신, 게이트(대상 화면의 head), 로그인 화면, 머리말의 로그아웃, 연결점
-    const allowedUsers = [...TARGET_FILES, 'js/auth-session.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js'];
+    // (계약 3C-2a) 회원 업무(my-scores)를 전송 담당 함수로 부르는 화면의 스크립트 하나가 더해졌다: js/application-form.js
+    const allowedUsers = [...TARGET_FILES, 'js/auth-session.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js', 'js/application-form.js'];
+    // 그 스크립트가 인증 모듈에서 부르는 것은 업무가 열렸는가(memberTaskOpen)와 전송 담당 함수(memberRead)뿐이다 — 머리글·자격을 받는 함수를 부르지 않는다
+    {
+        const form = workFile('js/application-form.js').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+        const called = [...new Set((form.match(/eonAuth\.([A-Za-z]+)/g) || []).map((x) => x.split('.')[1]))].sort();
+        if (JSON.stringify(called) !== '["memberRead","memberTaskOpen"]' || (form.match(/EonAuth/g) || []).length !== 1 || /headersForGrade|credentialFor/.test(form)) problems.push(`js/application-form.js 가 인증 모듈에서 부르는 것이 memberTaskOpen·memberRead 둘이 아님(${called.join(',')})`);
+    }
     if (users.some((f) => !allowedUsers.includes(f))) problems.push(`인증 모듈을 쓰는 파일이 범위 밖에 있음: ${users.filter((f) => !allowedUsers.includes(f)).join(', ')}`);
     // 한 길(EonLogin)을 쓰는 스크립트: 대상 화면만 싣거나, 대상이 아닌 화면도 싣는 파일이면 EonLogin 이 없을 때의 길을 둔다
     const gateUsers = git(['grep', '-l', 'EonLogin', '--', 'js/*.js']).split('\n').filter(Boolean).sort();
@@ -2283,8 +2291,14 @@ async function main() {
     pg.lines.forEach((l) => out(l));
     listSome(pg.problems, 40);
 
+    const mb = await sectionMember();
+    fail('회원 읽기', mb.problems);
+    out(`[10] 회원 자격으로 읽는 구조 + 성적 이력 읽기 하나(계약 3C-2a — 보호가 아니다. 가짜 서버의 "규칙"은 흉내다): ${mb.problems.length === 0 ? '통과' : `실패 ${mb.problems.length}`}`);
+    mb.lines.forEach((l) => out(l));
+    listSome(mb.problems, 40);
+
     if (realNetworkAttempts.length) fail('네트워크', `실제 네트워크 요청 시도 ${realNetworkAttempts.length}건`);
-    out(`[10] 실제 네트워크 요청 ${realNetworkAttempts.length}건`);
+    out(`[11] 실제 네트워크 요청 ${realNetworkAttempts.length}건`);
     out('');
     if (failures.length === 0) {
         out('결과: 통과  (가짜 화면·가짜 서버에서의 결과다 — 실제 화면 확인은 절차.md)');

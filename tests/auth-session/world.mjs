@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 
 import { FakeBrowser } from './browser.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
-import { TEST_URL, CONFIG_FILE, AUTH_FILE, readProdConfig, rewriteConfig, rewriteSwitch, rewritePageSwitch } from './rewrite.mjs';
+import { TEST_URL, CONFIG_FILE, AUTH_FILE, readProdConfig, rewriteConfig, rewriteSwitch, rewritePageSwitch, rewriteMemberTask } from './rewrite.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const BASE = '14455ae';       // 업무 동작의 기준(계약 3C-1: 3A 의 기준 d39c0ee 뒤에 main 이 움직였다)
@@ -52,6 +52,8 @@ export const V = {
     BASE_T: { base: true, test: true },
     OFF_T: { test: true },
     ON: { test: true, on: true },
+    // (계약 3C-2a) 새 로그인 켜짐 + 업무 규약의 my-scores 열림
+    ON_OPEN: { test: true, on: true, open: true },
 };
 
 export function provider(variant, mutate) {
@@ -60,8 +62,10 @@ export function provider(variant, mutate) {
         if (text === null) return null;
         // 둘째 기준(3A 를 합친 커밋)의 인증 모듈은 스위치가 있다 — 그 사본도 같은 방법으로 켠다
         if (variant.base && variant.rev && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
+        // 둘째 기준이 게이트가 든 화면(3C-1 의 커밋)이면 화면의 스위치도 같은 방법으로 맞춘다(게이트가 없는 커밋의 화면은 그대로다)
+        if (variant.base && variant.rev && p.endsWith('.html')) text = rewritePageSwitch(text, variant.on ? 'on' : 'off');
         if (variant.test && p === CONFIG_FILE) text = rewriteConfig(text, { testUrl: TEST_URL, testKey: FAKE_ANON, sinkUrl: SINK });
-        if (!variant.base && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
+        if (!variant.base && p === AUTH_FILE) text = rewriteMemberTask(rewriteSwitch(text, variant.on ? 'on' : 'off'), variant.open === true);
         // pageSwitch: 화면(게이트)의 스위치만 따로 정한다 — 화면과 모듈이 어긋난 경우를 보는 시험이 쓴다
         if (!variant.base && p.endsWith('.html')) text = rewritePageSwitch(text, variant.pageSwitch || (variant.on ? 'on' : 'off'));
         if (mutate) text = mutate(p, text);
