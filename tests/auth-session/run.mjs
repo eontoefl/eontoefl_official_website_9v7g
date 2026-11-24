@@ -7,11 +7,15 @@
 // 화면 스크립트(js/*.js)와 SDK 사본(vendor/supabase-2.116.0.js)은 실제 파일을 그대로 올린다.
 // 비밀값(열쇠·JWT 모양)은 출력하지 않는다.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 import { installNetworkGuard, verifyNetworkGuard, realNetworkAttempts, serialize } from '../supabase-config-headers/harness.mjs';
 import { targets, responses } from '../supabase-config-headers/cases.mjs';
-import { readFakeJwt } from './fake-supabase.mjs';
+import { readFakeJwt, fakeJwt } from './fake-supabase.mjs';
+import { createCore, makeIgnore } from './serve-core.mjs';
+import { makeDecider, summarize } from './request-log.mjs';
 import { TEST_URL, CONFIG_FILE, AUTH_FILE, switchValue, findProdResidue } from './rewrite.mjs';
 import {
     ROOT, BASE, FAKE_ANON, SDK_FILE, PROD, V, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, STATE_NAMES, hasOldValue,
@@ -1010,6 +1014,102 @@ function sectionText() {
     return { problems, info };
 }
 
+// 화면 시험용 로컬 서버의 몸통(소켓 없이 요청 → 응답만): 내줄 사본, 운영 흔적이 남는 파일 거절, 내용 보안 정책, 로컬 시험 목적지
+function sectionServer() {
+    const problems = [];
+    const info = {};
+    const tracked = git(['-c', 'core.quotepath=false', 'ls-files']).split('\n').filter(Boolean);
+    const ignored = makeIgnore(fs.readFileSync(path.join(ROOT, '.vercelignore'), 'utf8'));
+    const files = tracked.filter((f) => !ignored(f) && !f.startsWith('.'));
+    const readFile = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel)); } catch (e) { return null; } };
+    for (const mode of ['off', 'on']) {
+        const logs = [];
+        const core = createCore({ files, readFile, mode, testKey: FAKE_ANON, port: 8787, prod: PROD, log: (e) => logs.push(e) });
+        const scan = core.scan();
+        info.refused = scan.refused.map((r) => r.file);
+        info.servable = scan.servable;
+        if (scan.repoSwitch !== 'off') problems.push(`서버(${mode}): 저장소의 스위치 값을 꺼짐으로 읽지 못함`);
+        for (const must of ['admin-followup.html', 'note.html', 'js/book-admin-preview.js', 'usage-guide.html']) {
+            if (!info.refused.includes(must)) problems.push(`서버(${mode}): 운영 주소가 직접 적힌 파일(${must})을 내주지 않을 목록에 넣지 않음`);
+        }
+        // 내줄 수 있는 모든 파일을 한 번씩: 200 이면 운영 흔적이 없어야 하고, 아니면 409 여야 한다
+        let ok200 = 0;
+        let refused = 0;
+        for (const rel of files) {
+            const r = core.respond({ method: 'GET', url: '/' + rel.split('/').map(encodeURIComponent).join('/') });
+            if (r.status === 200) {
+                ok200++;
+                if (findProdResidue(r.body, { prodKey: PROD.key, prodUrl: PROD.url }).length) problems.push(`서버(${mode}): 운영 흔적이 남은 채 내줌 — ${rel}`);
+                if (!/connect-src 'self' https:\/\/hmncdheiwqwekdbtijar\.supabase\.co;/.test(r.headers['Content-Security-Policy'] || '')) problems.push(`서버(${mode}): 내용 보안 정책이 없음 — ${rel}`);
+            } else if (r.status === 409) {
+                refused++;
+                if (r.body.toString('utf8').includes(PROD.key)) problems.push(`서버(${mode}): 거절 응답에 운영 키가 실림 — ${rel}`);
+            } else {
+                problems.push(`서버(${mode}): ${rel} 의 응답이 200·409 가 아님(${r.status})`);
+            }
+        }
+        if (refused !== scan.refused.length || ok200 !== scan.servable) problems.push(`서버(${mode}): 시작할 때 훑은 목록과 실제 응답이 다름`);
+        const get = (url, method = 'GET', body = null) => core.respond({ method, url, body });
+        const cfg = get('/js/supabase-config.js?v=1').body.toString('utf8');
+        if (!cfg.includes(`const SUPABASE_URL = '${TEST_URL}';`) || !cfg.includes(`const SUPABASE_ANON_KEY = '${FAKE_ANON}';`) || !cfg.includes(`const DEFAULT_PLATFORM_URL = '${core.sinkUrl}';`)) problems.push(`서버(${mode}): 설정 파일을 시험 값으로 바꾸지 못함`);
+        if (switchValue(get('/js/auth-session.js').body.toString('utf8')) !== mode) problems.push(`서버(${mode}): 내준 인증 모듈의 스위치 값이 ${mode} 가 아님`);
+        if (get('/').status !== 200 || get('/login.html?redirect=x').status !== 200) problems.push(`서버(${mode}): 화면을 내주지 못함`);
+        for (const bad of ['/tests/auth-session/run.mjs', '/supabase/migrations/x.sql', '/.vercelignore', '/../x', '/%2e%2e/%2e%2e/x', '/js/..%5cx', '/없는파일.html']) {
+            if (get(bad).status !== 404) problems.push(`서버(${mode}): 내주면 안 되는 경로(${bad})의 응답이 404 가 아님`);
+        }
+        if (get('/login.html', 'POST').status !== 405) problems.push(`서버(${mode}): 파일에 대한 POST 가 405 가 아님`);
+        if (get('/__b3a/sink/testroom?token=zzsecret', 'POST').status !== 200 || core.counts.sink !== 1) problems.push(`서버(${mode}): 로컬 시험 목적지가 수신을 세지 못함`);
+        const report = Buffer.from(JSON.stringify({ 'csp-report': { 'effective-directive': 'connect-src', 'blocked-uri': 'https://api.telegram.org/botzzsecret/sendMessage?chat_id=zzsecret', 'document-uri': 'http://127.0.0.1:8787/index.html?x=zzsecret' } }));
+        if (get('/__b3a/csp-report', 'POST', report).status !== 204 || core.counts.csp !== 1) problems.push(`서버(${mode}): 막힌 요청의 보고를 받지 못함`);
+        const status = JSON.parse(get('/__b3a/status').body.toString('utf8'));
+        if (status.mode !== mode || status.counts.sink !== 1 || status.counts.refused !== refused) problems.push(`서버(${mode}): 상태 응답이 맞지 않음`);
+        const logText = JSON.stringify(logs);
+        if (logText.includes('zzsecret') || logText.includes(FAKE_ANON) || logText.includes(PROD.key)) problems.push(`서버(${mode}): 기록에 꼬리표의 값·키가 남음`);
+        if (!logs.some((e) => e.t === 'csp' && e.directive === 'connect-src' && e.blocked === 'https://api.telegram.org' && e.document === '/index.html')) problems.push(`서버(${mode}): 막힌 요청이 기록되지 않음`);
+        info['ok' + mode] = ok200;
+    }
+    return { problems, info };
+}
+
+// 자동화가 쓰는 "보내기 전에 가르기": 허용 밖은 중단, 기록에는 비밀값이 남지 않는다
+function sectionRequestLog() {
+    const problems = [];
+    const anon = fakeJwt({ role: 'anon', ref: 'hmncdheiwqwekdbtijar' });
+    const member = fakeJwt({ role: 'authenticated', sub: 'auth-A', session_id: 'sess-1' });
+    const decide = makeDecider({ selfOrigin: 'http://127.0.0.1:8787', anonKey: anon });
+    const rows = [
+        // [설명, 요청, 기대 action, 기대 where, 기대 속성]
+        ['자기 화면', { url: 'http://127.0.0.1:8787/login.html?redirect=x', method: 'GET', resourceType: 'document', isNavigation: true }, 'continue', 'self', {}],
+        ['로그인', { url: TEST_URL + '/auth/v1/token?grant_type=password', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, Authorization: 'Bearer ' + anon }, postData: JSON.stringify({ email: 'a@zz.invalid', password: 'zzsecretpw' }) }, 'continue', 'test-project', { memberTarget: true, leak: false }],
+        ['my_profile', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + member }, postData: '{}' }, 'continue', 'test-project', { memberTarget: true, leak: false, credential: 'member', publicRetry: false }],
+        ['my_profile 을 공개 키로', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + anon }, postData: '{}' }, 'continue', 'test-project', { publicRetry: true }],
+        ['업무 요청에 회원 자격', { url: TEST_URL + '/rest/v1/applications?email=eq.a%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + member } }, 'continue', 'test-project', { leak: true }],
+        ['업무 요청(공개 키)', { url: TEST_URL + '/rest/v1/applications?email=eq.a%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + anon } }, 'continue', 'test-project', { leak: false, credential: 'anon' }],
+        ['전역 로그아웃', { url: TEST_URL + '/auth/v1/logout?scope=global', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + member } }, 'continue', 'test-project', { leak: true, memberTarget: false }],
+        ['허용 목록의 글꼴', { url: 'https://fonts.gstatic.com/s/x.woff2', method: 'GET', resourceType: 'font' }, 'continue', 'static-allowed', {}],
+        ['허용 목록 호스트의 스크립트(목록 밖 종류)', { url: 'https://cdn.jsdelivr.net/npm/x.js', method: 'GET', resourceType: 'script' }, 'abort', 'outside', {}],
+        ['텔레그램 fetch', { url: 'https://api.telegram.org/botzzsecret/sendMessage', method: 'POST', resourceType: 'fetch', postData: '{"text":"x"}' }, 'abort', 'outside', {}],
+        ['운영 주소 fetch', { url: 'https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/users', method: 'GET', resourceType: 'fetch', headers: { apikey: 'x' } }, 'abort', 'outside', {}],
+        ['바깥으로 화면 이동', { url: 'https://testroom.eonfl.com/?t=zzsecret', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'outside', {}],
+        ['카카오 링크 이동', { url: 'http://pf.kakao.com/_FWxcZC', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'outside', {}],
+        ['시험 프로젝트로 화면 이동', { url: TEST_URL + '/auth/v1/authorize?provider=x', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'test-project', {}],
+        ['로컬 시험 목적지', { url: 'http://127.0.0.1:8787/__b3a/sink/testroom', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'sink', {}],
+        ['data 그림', { url: 'data:image/png;base64,AAAA', method: 'GET', resourceType: 'image' }, 'continue', 'local', {}],
+    ];
+    const records = [];
+    for (const [name, req, action, where, props] of rows) {
+        const d = decide(req);
+        records.push(d.record);
+        if (d.action !== action || d.record.where !== where) problems.push(`가르기: ${name} — ${d.action}/${d.record.where} (기대 ${action}/${where})`);
+        for (const [k, v] of Object.entries(props)) if (d.record[k] !== v) problems.push(`가르기: ${name} — ${k} 가 ${v} 가 아님`);
+    }
+    const text = JSON.stringify(records);
+    if (text.includes(anon) || text.includes(member) || text.includes('zzsecret') || /eyJ[A-Za-z0-9_-]{8,}/.test(text)) problems.push('가르기: 기록에 JWT·비밀번호·꼬리표의 값이 남음');
+    const s = summarize(records);
+    if (s.leak !== 2 || s.publicRetry !== 1 || s.sink !== 1 || s.outsideBlockedNavigation !== 2 || s.outsideBlockedRequest !== 3 || s.outsideSent !== 0 || s.staticAllowed !== 1) problems.push(`가르기: 요약 숫자가 기대와 다름(${JSON.stringify(s)})`);
+    return { problems, rows: rows.length };
+}
+
 function sectionContract1() {
     const problems = [];
     let text = '';
@@ -1082,8 +1182,17 @@ async function main() {
     mut.lines.forEach((l) => out(l));
     listSome(mut.problems);
 
+    const srv = sectionServer();
+    fail('서버', srv.problems);
+    out(`[8] 화면 시험용 로컬 서버의 몸통(소켓 없이): 내줄 수 있는 파일 ${srv.info.servable}개를 꺼짐·켜짐으로 한 번씩 — 운영 흔적이 남은 채 내준 것 0, 내주지 않는 파일 ${srv.info.refused.length}개. 어긋남 ${srv.problems.length}`);
+    listSome(srv.problems);
+    const rl = sectionRequestLog();
+    fail('가르기', rl.problems);
+    out(`    - 자동화용 "보내기 전에 가르기"·가린 기록(요청 ${rl.rows}가지): 어긋남 ${rl.problems.length}`);
+    listSome(rl.problems);
+
     if (realNetworkAttempts.length) fail('네트워크', `실제 네트워크 요청 시도 ${realNetworkAttempts.length}건`);
-    out(`[8] 실제 네트워크 요청 ${realNetworkAttempts.length}건`);
+    out(`[9] 실제 네트워크 요청 ${realNetworkAttempts.length}건`);
     out('');
     if (failures.length === 0) {
         out('결과: 통과  (가짜 화면·가짜 서버에서의 결과다 — 실제 화면 확인은 절차.md)');
