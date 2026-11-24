@@ -2131,7 +2131,7 @@ async function sectionRequestLog(mutate) {
         'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'OTHER',
         'none', 'anon', 'member', 'service_role',
         'password', 'refresh_token', 'member_jwt', 'unknown_credential', 'foreign_member_jwt']);
-    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted']);
+    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted', 'business', 'businessBlocked']);
     for (const r of records) {
         for (const [k, v] of Object.entries(r)) {
             const values = Array.isArray(v) ? v : [v];

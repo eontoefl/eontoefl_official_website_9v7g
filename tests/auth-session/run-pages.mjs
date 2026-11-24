@@ -5,12 +5,15 @@
 // 여기서 통과한 것은 "실제 브라우저·실제 서버에서 된다"의 증거가 아니다(그것은 실행기 screen.mjs --real, 브레인방).
 // 가짜 DOM 은 그리기·이벤트 전파를 흉내 내지 않는다 — 기준과 작업본을 같은 가짜 DOM 에서 돌려 견준다.
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { installNetworkGuard, realNetworkAttempts } from '../supabase-config-headers/harness.mjs';
 import { TEST_URL, AUTH_FILE } from './rewrite.mjs';
-import { V, STATE_NAMES, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, makeWorld, snapshot, diffSnapshot, checker, workFile } from './world.mjs';
+import { ROOT, V, STATE_NAMES, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, makeWorld, snapshot, diffSnapshot, checker, workFile } from './world.mjs';
 import { openPage, fire } from './pages-dom.mjs';
-import { TARGET_PAGES } from './pages.mjs';
+import { TARGET_PAGES, MERGE_BASE } from './pages.mjs';
 
 const A = ACCOUNTS.A;
 const B = ACCOUNTS.B;
@@ -257,13 +260,14 @@ async function testNotConfirmed(opt) {
         { name: '옛 값만 있음', state: '옛 학생', seed: null },
         { name: '옛 관리자 값만 있음', state: '옛 관리자', seed: null },
         { name: '차단된 계정의 로그인', state: '빈 브라우저', seed: 'BLK' },
+        { name: '서버에서 끝난 로그인 기록(만료)', state: '빈 브라우저', seed: 'A', end: true },
         { name: '빈 브라우저', state: '빈 브라우저', seed: null },
     ];
     for (const s of SCENARIOS) {
         const base = await visitorBaseline(s);
         for (const k of cases) {
             const w = world(k.state, V.ON, opt.mutate, 'old@zz.invalid');
-            if (k.seed) w.seed(k.seed);
+            if (k.seed) { const sess = w.seed(k.seed); if (k.end) w.server.endSession(sess, 'session_not_found'); }
             const page = await open(w, s);
             await w.browser.advance(6000);
             const label = `확인되지 않음(${s.name} · ${k.name})`;
@@ -619,7 +623,120 @@ async function testPublicButtons(opt) {
     return c.problems;
 }
 
+// 실행기의 차단기(request-log.mjs): 업무 요청 가운데 내보내는 것은 합성 자료가 조건인 정확한 조회뿐
+const LOG_FILE = 'tests/auth-session/request-log.mjs';
+async function loadRequestLog(mutate) {
+    if (!mutate) return import('./request-log.mjs');
+    const here = path.join(ROOT, 'tests', 'auth-session');
+    let text = mutate(LOG_FILE, workFile(LOG_FILE));
+    text = text.replace(/from '\.\/([a-z-]+\.mjs)'/g, (m, name) => `from ${JSON.stringify(pathToFileURL(path.join(here, name)).href)}`);
+    const file = path.join(os.tmpdir(), `b3c1-request-log-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
+    fs.writeFileSync(file, text);
+    try { return await import(pathToFileURL(file).href); } finally { fs.unlinkSync(file); }
+}
+async function testBusinessGate(opt) {
+    const c = checker();
+    const log = await loadRequestLog(opt.mutate);
+    const anon = 'zz-fake-anon';
+    const synth = [A.email, 'm-A', '00000000-0000-4000-8000-0000b3c1a001'];
+    const decide = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, business: { values: () => synth } });
+    const headers = { apikey: anon, Authorization: 'Bearer ' + anon };
+    const rest = TEST_URL + '/rest/v1/';
+    const rows = [
+        // [이름, 메서드, 주소, 본문, 기대 갈래, 기대 동작]
+        ['본인 신청서(이메일이 합성 값)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email) + '&deleted=neq.true&withdrawn_at=is.null&limit=100', null, 'synthetic-read', 'continue'],
+        ['합성 신청서 한 건(번호)', 'GET', rest + 'applications?id=eq.00000000-0000-4000-8000-0000b3c1a001&limit=1', null, 'synthetic-read', 'continue'],
+        ['합성 회원의 시험 일정(회원번호)', 'GET', rest + 'toefl_exam_schedules?user_id=eq.m-A&status=neq.cancelled&order=exam_datetime.desc&limit=1', null, 'synthetic-read', 'continue'],
+        ['이메일의 대소문자만 다른 합성 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email.toUpperCase()), null, 'synthetic-read', 'continue'],
+        ['신청서 전체 목록(조건 없음)', 'GET', rest + 'applications?limit=1000&order=created_at.desc', null, 'unconditioned', 'fake'],
+        ['공지 전체 목록', 'GET', rest + 'notices?order=published_at.desc&limit=1000', null, 'unconditioned', 'fake'],
+        ['회원 표 전체', 'GET', rest + 'users?limit=1000', null, 'unconditioned', 'fake'],
+        ['이름의 부분 검색', 'GET', rest + 'applications?name=ilike.*' + encodeURIComponent('합성') + '*&limit=20', null, 'partial-search', 'fake'],
+        ['or 조건(이메일·전화)', 'GET', rest + 'withdrawal_records?or=' + encodeURIComponent('(email.ilike.' + A.email + ',phone.eq.010)') + '&limit=1', null, 'partial-search', 'fake'],
+        ['합성 값이 아닌 이메일이 조건', 'GET', rest + 'applications?email=eq.' + encodeURIComponent('someone@zz.invalid'), null, 'not-synthetic', 'fake'],
+        ['합성 값이 들어 있지만 eq 가 아님(neq)', 'GET', rest + 'applications?email=neq.' + encodeURIComponent(A.email), null, 'not-synthetic', 'fake'],
+        ['합성 값으로 시작하는 다른 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email + '.evil'), null, 'not-synthetic', 'fake'],
+        ['상태만 조건(설문 질문)', 'GET', rest + 'toefl_survey_questions?status=eq.active&order=created_at.asc', null, 'not-synthetic', 'fake'],
+        ['쓰기(POST)', 'POST', rest + 'applications', '{"name":"x"}', 'write', 'fake'],
+        ['쓰기(PATCH — 조건이 합성 값이어도)', 'PATCH', rest + 'users?id=eq.m-A', '{"name":"x"}', 'write', 'fake'],
+        ['쓰기(DELETE)', 'DELETE', rest + 'reviews?id=eq.m-A', null, 'write', 'fake'],
+        ['다른 RPC', 'POST', rest + 'rpc/some_function', '{}', 'write', 'fake'],
+        ['다른 RPC(GET)', 'GET', rest + 'rpc/some_function?x=eq.m-A', null, 'other', 'fake'],
+        ['파일', 'GET', TEST_URL + '/storage/v1/object/public/x/y.png', null, 'other', 'fake'],
+        ['함수', 'POST', TEST_URL + '/functions/v1/send', '{}', 'write', 'fake'],
+    ];
+    for (const [name, method, url, postData, kind, action] of rows) {
+        const d = decide({ url, method, headers, postData, resourceType: 'fetch', isNavigation: false });
+        c.ok(d.record.business === kind && d.action === action && d.record.aborted === (action !== 'continue'), `차단기(${name}): 갈래·동작이 기대와 다름(${d.record.business}·${d.action})`);
+    }
+    // 인증 모듈의 요청은 업무 요청으로 세지 않고, 자격 위반은 가짜 응답이 아니라 중단이다
+    const profile = decide({ url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', headers: { apikey: anon, Authorization: 'Bearer a.b.c' }, postData: '{}', resourceType: 'fetch', isNavigation: false });
+    c.ok(!('business' in profile.record), '차단기: 인증 모듈의 요청을 업무 요청으로 셈');
+    const leak = decide({ url: rest + 'applications?email=eq.' + encodeURIComponent(A.email), method: 'GET', headers: { apikey: anon, Authorization: 'Bearer zz-unknown' }, postData: null, resourceType: 'fetch', isNavigation: false });
+    c.ok(leak.action === 'abort', '차단기: 알 수 없는 자격이 실린 업무 조회를 중단하지 않음');
+    // 합성 값을 아직 모르면(예행 전) 어떤 업무 요청도 내보내지 않는다
+    const closed = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, business: { values: () => [] } });
+    c.ok(closed({ url: rows[0][2], method: 'GET', headers, postData: null, resourceType: 'fetch', isNavigation: false }).action === 'fake', '차단기: 합성 값을 모르는데 업무 조회를 내보냄');
+    // 업무 기준을 주지 않으면 3A 와 같다(기록에 업무 항목이 없다)
+    const plain = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon });
+    const p = plain({ url: rows[4][2], method: 'GET', headers, postData: null, resourceType: 'fetch', isNavigation: false });
+    c.ok(p.action === 'continue' && !('business' in p.record) && !('businessBlocked' in p.record), '차단기: 업무 기준이 없는데 3A 와 다르게 가름');
+    // 셈
+    const recs = rows.map(([, method, url, postData]) => decide({ url, method, headers, postData, resourceType: 'fetch', isNavigation: false }).record);
+    const sum = log.summarize(recs);
+    c.ok(sum.businessSent === 4 && sum.businessSentNotSynthetic === 0 && sum.businessBlocked.write === 5 && sum.businessBlocked['partial-search'] === 2 && sum.businessBlocked.unconditioned === 3 && sum.businessBlocked['not-synthetic'] === 4 && sum.businessBlocked.other === 2, `차단기: 셈이 기대와 다름(${JSON.stringify([sum.businessSent, sum.businessBlocked])})`);
+    // 기록에는 정해 둔 이름만
+    const names = new Set([...log.BUSINESS_KINDS]);
+    c.ok(recs.every((r) => names.has(r.business) && typeof r.businessBlocked === 'boolean' && !JSON.stringify(r).includes('zz.invalid') && !JSON.stringify(r).includes('/rest/')), '차단기: 기록에 주소·값이 남음');
+    return c.problems;
+}
+
+// 둘째 기준: 3A 를 합친 직후의 커밋(MERGE_BASE)과 견준다 — 3A 가 다룬 두 화면(index·login)의 동작이 이번 조각으로 달라지지 않았는가.
+// 3A 의 가짜 화면(손으로 적은 요소)에서 본다. 꺼짐은 기록 전체, 켜짐은 요청·저장소·이동·안내·머리말.
+async function testSameAsMergeBase(opt) {
+    const c = checker();
+    const V3A_OFF = { base: true, rev: MERGE_BASE };
+    const V3A_ON = { base: true, rev: MERGE_BASE, test: true, on: true };
+    const view = (w, page) => JSON.stringify({
+        requests: w.browser.requests.map((r) => [r.page, r.method, r.url, r.headers.map(([n]) => n.toLowerCase()).sort(), r.bodyText ? r.bodyText.length : 0]),
+        storage: [...w.browser.local.keys()].sort(),
+        navs: page.trace.filter((e) => e.t === 'nav' || e.t === 'reload').map((e) => e.to || '[새로 고침]'),
+        boxes: page.trace.filter((e) => e.t === 'box' || e.t === 'alert').map((e) => e.text),
+        menu: page.trace.filter((e) => e.t === 'html' && e.el === '#authMenu').map((e) => e.html),
+        state: page.evaluate('EonAuth.state() + "/" + EonAuth.reason()'),
+    });
+    // 꺼짐: 기록 전체가 같다
+    for (const stateName of STATE_NAMES) {
+        for (const [file, search] of [['index.html', ''], ['login.html', '?redirect=my-dashboard.html']]) {
+            const run = async (variant, m) => { const w = makeWorld(stateName, { variant, mutate: m }); const page = await w.open('t1', file, { search }); await w.browser.advance(6000); return snapshot(w, page); };
+            for (const d of diffSnapshot(await run(V3A_OFF), await run(V.OFF, opt.mutate))) c.ok(false, `3A 를 합친 기준과 다름(꺼짐 · ${file} · ${stateName}): ${d}`);
+        }
+    }
+    // 켜짐
+    const scenes = [
+        { name: 'index 열기(빈 브라우저)', state: '빈 브라우저', run: async (w) => { const p = await w.open('t1', 'index.html'); await w.browser.advance(3000); return p; } },
+        { name: 'index 열기(옛 학생)', state: '옛 학생', run: async (w) => { const p = await w.open('t1', 'index.html'); await w.browser.advance(3000); return p; } },
+        { name: 'index 열기(A 의 저장된 로그인)', state: '빈 브라우저', run: async (w) => { w.seed('A'); const p = await w.open('t1', 'index.html'); await w.browser.advance(3000); return p; } },
+        { name: 'index 열기(GM·aal2)', state: '빈 브라우저', run: async (w) => { w.seed('GM', { aal: 'aal2' }); const p = await w.open('t1', 'index.html'); await w.browser.advance(3000); return p; } },
+        { name: 'index 열기(차단된 계정)', state: '빈 브라우저', run: async (w) => { w.seed('BLK'); const p = await w.open('t1', 'index.html'); await w.browser.advance(3000); return p; } },
+        { name: 'login 제출(A, 목록 밖 redirect)', state: '빈 브라우저', run: async (w) => { const p = await w.open('t1', 'login.html', { search: '?redirect=my-dashboard.html' }); await w.submit(p, A.email, A.password); await w.browser.advance(2000); return p; } },
+        { name: 'login 제출(틀린 비밀번호)', state: '빈 브라우저', run: async (w) => { const p = await w.open('t1', 'login.html'); await w.submit(p, A.email, 'zz-wrong'); await w.browser.advance(2000); return p; } },
+        { name: 'login 제출(옛 값이 있음)', state: '옛 학생', run: async (w) => { const p = await w.open('t1', 'login.html'); await w.submit(p, A.email, A.password); await w.browser.advance(2000); return p; } },
+        { name: 'index 로그아웃(A)', state: '빈 브라우저', run: async (w) => { w.seed('A'); const p = await w.open('t1', 'index.html'); await w.browser.advance(1500); p.evaluate('logout()'); await w.browser.idle(); await w.browser.advance(2000); return p; } },
+    ];
+    for (const k of scenes) {
+        const one = async (variant, m) => { const w = makeWorld(k.state, { variant, mutate: m }); const page = await k.run(w); return view(w, page); };
+        const a = await one(V3A_ON);
+        const b = await one(V.ON, opt.mutate);
+        // 가짜 서버의 JWT·로그인 기록 번호는 실행마다 같다(가짜 시계·차례) — 그대로 견준다
+        c.ok(a === b, `3A 를 합친 기준과 다름(켜짐 · ${k.name})`);
+    }
+    return c.problems;
+}
+
 const ON_PAGE_TESTS = [
+    ['3A 가 다룬 두 화면(index·login)이 3A 를 합친 기준과 같음(꺼짐은 기록 전체, 켜짐은 요청·저장소·이동·안내·머리말)', testSameAsMergeBase],
+    ['실행기의 차단기: 업무 요청 가운데 내보내는 것은 합성 자료가 조건인 정확한 조회뿐(쓰기·부분 검색·전체 목록·조건 없는 조회는 전송 전에 막음)', testBusinessGate],
     ['확인 전 보호 표시 0·자동 보호 요청 0, 공개 본문은 기다리지 않음, 확인 뒤에만 회원 표시·조회', testBeforeConfirm],
     ['확인되지 않으면 회원 전용 갈래만 로그인 화면으로·그 뒤 보호 업무 요청 0, 공개 본문·방문자 갈래는 방문자 기준과 같음', testNotConfirmed],
     ['켜진 화면인데 인증 모듈이 없음: 꺼짐이 아니라 닫음', testModuleMissing],
@@ -693,6 +810,26 @@ const PAGE_MUTANTS = [
     {
         name: '닫아 둔 기능이 닉네임 조회를 보내는 사본(가입)', tests: [testClosedFeatures], expect: /닫음\(가입\): 닫아 둔 기능에서 업무 요청이 나감/,
         edits: [['js/register.js', '    if (eonRegisterClosedText) return;       // 닫힌 길: 닉네임 조회를 보내지 않는다\n', '']],
+    },
+    {
+        name: '차단기가 이름의 부분 검색을 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(이름의 부분 검색\)|차단기\(or 조건/,
+        edits: [[LOG_FILE, "        if (k === 'or' || k === 'and' || k === 'not.or' || k === 'not.and' || PARTIAL_OPS.test(v)) return 'partial-search';\n", '']],
+    },
+    {
+        name: '차단기가 업무 쓰기를 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(쓰기/,
+        edits: [[LOG_FILE, "    if (m !== 'GET' && m !== 'HEAD') return 'write';", "    if (false) return 'write';"]],
+    },
+    {
+        name: '차단기가 조건 없는 전체 조회를 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(신청서 전체 목록|차단기\(회원 표 전체/,
+        edits: [[LOG_FILE, "    if (conditions === 0) return 'unconditioned';", "    if (conditions === 0) return 'synthetic-read';"]],
+    },
+    {
+        name: '차단기가 합성 값이 조건이 아닌 조회를 내보내는 사본', tests: [testBusinessGate], expect: /차단기\(합성 값이 아닌 이메일|차단기\(상태만 조건/,
+        edits: [[LOG_FILE, "    return synthetic ? 'synthetic-read' : 'not-synthetic';", "    return 'synthetic-read';"]],
+    },
+    {
+        name: '차단기가 합성 값을 "그 글자로 시작"으로 견주는 사본', tests: [testBusinessGate], expect: /합성 값으로 시작하는 다른 값/,
+        edits: [[LOG_FILE, "        if (v.startsWith('eq.') && values.includes(v.slice(3).trim().toLowerCase())) synthetic = true;", "        if (v.startsWith('eq.') && values.some((x) => v.slice(3).trim().toLowerCase().startsWith(x))) synthetic = true;"]],
     },
     {
         name: '확인된 계정이 달라져도 화면을 그대로 두는 사본', tests: [testAccountChange], expect: /가리지 않음|다시 받지 않음/,

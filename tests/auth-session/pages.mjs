@@ -32,6 +32,11 @@ export const TARGET_PAGES = [
 
 export const TARGET_FILES = TARGET_PAGES.map((p) => p.file);
 
+// 꺼짐의 대조 기준은 둘이다(계약 3C-1 의 6):
+//   업무 동작은 world.mjs 의 BASE(14455ae — main)와,
+//   이번 조각이 바꾼 것은 3A 를 합친 기준(가지를 만들고 main 을 합친 직후의 커밋)과.
+export const MERGE_BASE = 'c805b4c';
+
 // 화면의 head 에 들어가는 글자(게이트)의 표시
 export const GATE_BEGIN = '/* eon-login-gate:begin';
 export const GATE_END = '/* eon-login-gate:end */';

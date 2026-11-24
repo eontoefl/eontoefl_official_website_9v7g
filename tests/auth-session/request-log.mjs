@@ -9,6 +9,11 @@
 //       service_role·알 수 없는 자격 → 어디로도 보내지 않는다
 //       회원 JWT 는 발급자가 시험 프로젝트이고 계정이 이번 실행의 합성 계정 가운데 하나일 때만(실행기가 그 기준을 넘겨줄 때)
 //   * 기록에는 자유 형식의 글자(주소·경로·키 이름·값)를 남기지 않는다. 정해 둔 이름과 참/거짓만 남긴다.
+//   * (계약 3C-1) 실행기가 업무 기준(business)을 넘겨주면 시험 프로젝트로 가는 업무 요청도 가른다:
+//       내보내는 것 — 합성 자료가 조건인 정확한 업무 조회(GET, 표 하나, eq 조건의 값이 이번 실행의 합성 값)뿐
+//       전송 전에 막고 세는 것 — 업무 쓰기(POST·PATCH·PUT·DELETE), 이름 등의 부분 검색, 조건 없는 전체 조회,
+//                               합성 값이 조건이 아닌 조회, 그 밖(RPC·파일·함수)
+//       막은 요청에는 실행기가 가짜 응답을 준다(화면의 동작을 보려는 것이다 — 실제 업무 성공으로 세지 않는다).
 
 import { TEST_URL } from './rewrite.mjs';
 import { STATIC_ALLOW } from './serve-core.mjs';
@@ -86,8 +91,33 @@ function targetName(method, u) {
     return 'other';
 }
 
+// 업무 요청의 갈래. synth: 이번 실행의 합성 값(이메일·회원번호·신청서 번호)의 배열
+//   synthetic-read  합성 자료가 조건인 정확한 조회 → 내보낸다
+//   write / partial-search / unconditioned / not-synthetic / other → 전송 전에 막는다
+const CONTROL_PARAMS = ['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'];
+const PARTIAL_OPS = /^(not\.)?(ilike|like|imatch|match|fts|plfts|phfts|wfts)(\(|\.)/;
+export const BUSINESS_KINDS = ['synthetic-read', 'write', 'partial-search', 'unconditioned', 'not-synthetic', 'other'];
+export function businessKind(method, u, target, synth) {
+    const m = String(method).toUpperCase();
+    if (m !== 'GET' && m !== 'HEAD') return 'write';
+    if (target !== 'rest-table') return 'other';
+    if (!/^\/rest\/v1\/[A-Za-z0-9_]+$/.test(u.pathname)) return 'other';
+    const values = (synth || []).map((v) => String(v).trim().toLowerCase()).filter(Boolean);
+    let conditions = 0;
+    let synthetic = false;
+    for (const [k, v] of u.searchParams) {
+        if (CONTROL_PARAMS.includes(k)) continue;
+        if (k === 'or' || k === 'and' || k === 'not.or' || k === 'not.and' || PARTIAL_OPS.test(v)) return 'partial-search';
+        conditions++;
+        if (v.startsWith('eq.') && values.includes(v.slice(3).trim().toLowerCase())) synthetic = true;
+    }
+    if (conditions === 0) return 'unconditioned';
+    return synthetic ? 'synthetic-read' : 'not-synthetic';
+}
+
 // issuer·memberEmails(배열 또는 배열을 돌려주는 함수)를 주면 회원 JWT 의 출처도 본다
-export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails }) {
+// business({ values: 배열 또는 배열을 돌려주는 함수 })를 주면 업무 요청도 가른다(주지 않으면 3A 와 같다)
+export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, business }) {
     const selves = new Set([].concat(selfOrigins || []));
     if (!selves.size) throw new Error('selfOrigins 가 필요하다');
     const emailsNow = () => (typeof memberEmails === 'function' ? memberEmails() : (memberEmails || [])).map((e) => String(e).trim().toLowerCase());
@@ -131,9 +161,17 @@ export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails }) {
         // 시험 프로젝트로 가는 것이라도 화면 이동(최상위·폼)은 이 조각에 없다 → 중단
         const placeOk = where === 'self' || where === 'local' || where === 'static-allowed' || (where === 'test-project' && !nav);
         const allowed = placeOk && !leak;
+        // (계약 3C-1) 업무 요청: 인증 모듈의 다섯 요청이 아닌, 시험 프로젝트로 가는 요청
+        let businessOf = null;
+        if (business && where === 'test-project' && !Object.values(NAMED).includes(target)) {
+            const values = typeof business.values === 'function' ? business.values() : (business.values || []);
+            businessOf = u ? businessKind(rawMethod, u, target, values) : 'other';
+        }
+        const businessBlocked = allowed && businessOf !== null && businessOf !== 'synthetic-read';
         return {
-            action: allowed ? 'continue' : 'abort',
-            record: {
+            // fake: 전송 전에 막고, 실행기가 가짜 응답을 준다(보내지 않는다)
+            action: !allowed ? 'abort' : (businessBlocked ? 'fake' : 'continue'),
+            record: Object.assign(businessOf === null ? {} : { business: businessOf, businessBlocked }, {
                 where, target, nav, type, method,
                 apikey: headerOf(req.headers, 'apikey') !== null,
                 credential: cred,
@@ -142,8 +180,8 @@ export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails }) {
                 leak,
                 leakKinds: problems,
                 publicRetry,
-                aborted: !allowed,
-            },
+                aborted: !allowed || businessBlocked,
+            }),
         };
     };
 }
@@ -169,5 +207,9 @@ export function summarize(records) {
         outsideBlockedNavigation: is((r) => (r.where === 'outside' || r.where === 'sink' || (r.where === 'test-project' && r.nav)) && r.nav && r.aborted),
         outsideBlockedRequest: is((r) => (r.where === 'outside' || r.where === 'sink') && !r.nav && r.aborted),
         outsideSent: is((r) => (r.where === 'outside' || r.where === 'sink' || (r.where === 'test-project' && r.nav)) && !r.aborted),
+        // (계약 3C-1) 업무 요청: 내보낸 것은 합성 자료가 조건인 조회뿐이어야 한다. 막은 것은 갈래마다 센다(업무 성공으로 세지 않는다)
+        businessSent: is((r) => r.business && !r.aborted),
+        businessSentNotSynthetic: is((r) => r.business && r.business !== 'synthetic-read' && !r.aborted),
+        businessBlocked: Object.fromEntries(BUSINESS_KINDS.filter((k) => k !== 'synthetic-read').map((k) => [k, is((r) => r.business === k && r.businessBlocked)])),
     };
 }

@@ -35,6 +35,7 @@ import { execFileSync } from 'node:child_process';
 import { TEST_URL, TEST_REF, CONFIG_FILE, readProdConfig } from './rewrite.mjs';
 import { createCore, makeIgnore } from './serve-core.mjs';
 import { makeDecider, summarize } from './request-log.mjs';
+import { buildPageCases, PAGE_CASE_IDS } from './screen-pages.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
 import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv, controlPassOk } from './screen-core.mjs';
 
@@ -97,6 +98,19 @@ if (FAKE) {
     SCAN.push(PW, ANON, CONTROL_SECRET, ...Object.values(EMAIL));
 }
 const fakeEmail = (k) => `zzb3a_${String(k).toLowerCase()}@member.zz.invalid`;      // --fake 의 합성 이메일(비밀이 아니다)
+
+// (계약 3C-1) 합성 업무 자료의 번호: 회원 화면이 조회할 합성 신청서(A 의 것)와 합성 회원번호.
+// --real 에서는 브레인방이 합성 자료를 넣은 뒤(절차.md) 환경 변수로 준다. 이 값이 조건인 조회만 시험 프로젝트로 나간다.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SYNTH = { appA: '00000000-0000-4000-8000-0000b3c1a001', ids: [] };
+if (REAL) {
+    SYNTH.appA = process.env.B3C_APP_A || '';
+    if (!UUID.test(SYNTH.appA)) stop('B3C_APP_A(합성 신청서의 번호 — tests/auth-session/b3c1_fixtures_up.sql 이 넣은 것)가 없거나 모양이 맞지 않음');
+    SYNTH.ids = String(process.env.B3C_MEMBER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (SYNTH.ids.some((s) => !UUID.test(s))) stop('B3C_MEMBER_IDS(합성 회원번호들, 쉼표로)의 모양이 맞지 않음');
+} else {
+    SYNTH.ids = ['m-A', 'm-B', 'm-GM'];
+}
 
 const pwPath = process.env.B3A_PLAYWRIGHT;
 const chromePath = process.env.B3A_CHROMIUM;
@@ -228,7 +242,18 @@ function setupFake() {
             profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: fakeEmail(k), phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
         });
     }
-    fake.business = () => ({ status: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' });
+    // 가짜 업무 응답: 합성 자료가 조건인 조회(차단기가 내보낸 것)만 여기까지 온다. A 의 합성 신청서 한 건을 돌려준다
+    fake.business = (req, u) => {
+        const q = u.searchParams;
+        const eq = (k) => (q.get(k) || '').replace(/^eq\./, '');
+        let rows = [];
+        if (u.pathname === '/rest/v1/applications' && (eq('id') === SYNTH.appA || eq('email') === fakeEmail('A'))) {
+            rows = [{ id: SYNTH.appA, email: fakeEmail('A'), user_email: fakeEmail('A'), user_id: 'm-A', name: '합성 회원 A', phone: '010-0000-0000', application_type: 'challenge', deleted: false, withdrawn_at: null, analysis_status: '승인', analysis_content: '합성 분석', created_at: '2026-11-01T00:00:00Z' }];
+        } else if (u.pathname === '/rest/v1/users' && (eq('id') === 'm-A' || eq('email') === fakeEmail('A'))) {
+            rows = [{ id: 'm-A', name: '합성 회원 A', nickname: '합성닉', email: fakeEmail('A'), phone: '010-0000-0000', role: 'user', intro_book_track: 'regular' }];
+        }
+        return { status: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows) };
+    };
 }
 function controlCall(method, pathAndQuery, body) {
     return new Promise((resolve) => {
@@ -443,6 +468,17 @@ async function handleRoute(route, cx) {
         return route.fulfill({ response: resp });
     }
     if (d.action === 'abort') return route.abort('blockedbyclient');
+    if (d.action === 'fake') {
+        // (계약 3C-1) 합성 자료가 조건이 아닌 업무 요청: 전송 전에 막고 가짜 응답을 준다(화면의 동작을 보려는 것 — 업무 성공으로 세지 않는다)
+        rec.how = 'business-blocked-fake-response';
+        return route.fulfill({ status: 200, headers: Object.assign({ 'content-type': 'application/json', 'content-range': '*/0' }, CORS), body: '[]' });
+    }
+    if (rec.where === 'self' && cx.dropAuthModule && rec.target === 'file' && new URL(r.url()).pathname === '/js/auth-session.js') {
+        // (계약 3C-1) 경우 C11: 인증 모듈 파일을 받지 못한 켜진 화면
+        rec.how = 'dropped-auth-module';
+        rec.aborted = true;
+        return route.abort('failed');
+    }
     if (rec.where === 'local') return route.continue();                        // data:·blob:·about: — 네트워크로 나가지 않는다
     if (rec.where === 'static-allowed') {                                       // 허용 목록의 정적 자원: 보내지 않고 빈 응답(화면 시험에 필요 없다)
         rec.how = 'fulfilled-empty';
@@ -581,6 +617,8 @@ const baseline = (cx, ck) => {
     ck('회원 자격이 필요한 주소에 공개 키로 나간 것 0', s.publicRetry === 0);
     ck(cx.id === 'P' ? '허용 밖으로 보낸 것은 대조용 1건뿐(차단기의 결정)' : '허용 밖으로 보낸 것 0(차단기의 결정)', s.outsideSent === (cx.id === 'P' ? 1 : 0));
     ck('service_role 자격 0', s.serviceRole === 0);
+    // (계약 3C-1) 업무 요청: 시험 프로젝트로 내보낸 것은 합성 자료가 조건인 정확한 조회뿐
+    ck('내보낸 업무 요청은 합성 자료가 조건인 조회뿐(쓰기·부분 검색·전체 목록·조건 없는 조회는 전송 전에 막음)', s.businessSentNotSynthetic === 0);
     return s;
 };
 async function execCase(id, title, fn, { required = true } = {}) {
@@ -1050,12 +1088,21 @@ async function buildCases() {
             ck(hasOld ? '옛 값이 있으면 redirect 주소로 자동 이동(지금 그대로)' : '자동 이동 없음', pathOf(page).endsWith(hasOld ? '/my-dashboard.html' : '/login.html'));
             ck('인증 모듈의 요청 0', cx.records.filter((x) => ['login', 'refresh', 'logout', 'my_profile', 'my_site_access', 'auth-other'].includes(x.target)).length === 0);
             ck('SDK 파일을 받는 요청 0(꺼짐 서버가 그 파일을 내준 횟수)', siteOff.core.counts.sdk === 0);
-            ck('지금과 다른 것(차이 장부): 꺼짐의 화면이 인증 모듈 파일을 화면마다 1번 받음(index.html·login.html)', siteOff.core.counts.authModule - module0 === 2);
+            // (계약 3C-1) 옛 값이 있으면 login.html 이 지금처럼 my-dashboard.html 로 넘어가고, 그 화면도 이제 인증 모듈 파일을 받는다
+            ck('지금과 다른 것(차이 장부): 꺼짐의 화면이 인증 모듈 파일을 화면마다 1번 받음(index.html·login.html, 넘어간 화면이 있으면 그 화면도)', siteOff.core.counts.authModule - module0 === (hasOld ? 3 : 2));
             ck('새 모듈의 저장소 키 0', !(await keyBuckets(page)).some((k) => k.startsWith('eon_auth')));
             ck('새 모듈의 키·교재 편집·후속메일 키의 읽기·쓰기·지우기 0', ['eon_auth_v1', 'eon_auth_v1:compat', 'eon_auth_other', 'eon_book_auth_v1', 'followup'].every((b) => touched(cx, b, ['getItem', 'setItem', 'removeItem']) === 0));
             ck('넣어 둔 값이 글자 그대로', await unchanged(page, seed));
         });
     }
+    // ---- C. 계약 3C-1: 대상 화면의 로그인 상태 통일 ----
+    await buildPageCases({
+        runCase, pause, doLogin, until, settled, stateOf, sleep, pathOf, count, vault, seedStore, SEEDS, newCx,
+        synth: () => SYNTH,
+        sites: () => ({ on: ON, off: OFF }),
+        authModuleCount: () => siteOff.core.counts.authModule,
+        sdkCountOff: () => siteOff.core.counts.sdk,
+    });
     return plan;
 }
 
@@ -1088,6 +1135,9 @@ async function main() {
     decide = makeDecider({
         selfOrigins: [ON, OFF], anonKey: ANON, issuer: ISSUER,
         memberEmails: () => (vault.armed() ? ACCOUNT_KEYS.map((k) => vault.get('EMAIL_' + k)) : []),
+        // (계약 3C-1) 업무 요청: 합성 자료(합성 계정의 이메일·합성 회원번호·합성 신청서 번호)가 조건인 정확한 조회만 내보낸다.
+        // 보관함이 열리기 전(예행 P)에는 어떤 업무 요청도 내보내지 않는다
+        business: { values: () => (vault.armed() ? ACCOUNT_KEYS.map((k) => vault.get('EMAIL_' + k)).concat([SYNTH.appA], SYNTH.ids) : []) },
     });
     if (FAKE) fakeOperator();
     console.log(`  켜짐 ${ON}   꺼짐 ${OFF}   제어 포트 ${control.port}`);
@@ -1126,6 +1176,7 @@ async function main() {
     const required = results.filter((r) => r.required);
     const totals = { pass: results.filter((r) => r.verdict === 'pass').length, differs: results.filter((r) => r.verdict === 'differs').length, unknown: results.filter((r) => r.verdict === 'unknown').length };
     const expectedIds = ['P', '1', '2', '3', '4', '5', '6', '7', '8', '9', '9b', '10', '12', 'T', '14', '15', 'AF', '17', '18', '19a', '19b', 'R1', 'R2', 'R3', 'I1', 'I4', 'I2', 'I3', 'O1', 'O2', 'O3', 'O4', 'O5'];
+    expectedIds.push(...PAGE_CASE_IDS);
     const notRun = expectedIds.filter((id) => !results.some((r) => r.id === id));
     const all = results.flatMap((r) => r.records);
     const controlPass = all.filter((r) => r.how === 'control-pass').length;         // 예행에서 일부러 보낸 대조용 정상 요청(1건)
@@ -1170,6 +1221,7 @@ async function main() {
     console.log(`  경우: 통과 ${totals.pass} / 기대와 다름 ${totals.differs} / 미확인 ${totals.unknown}${notRun.length ? ` / 돌리지 않음 ${notRun.length}` : ''}`);
     console.log(`  독립된 증거: 시험 목적지 수신 ${sinkTotal}(대조용 ${controlPass} + 그 밖 ${sinkUnexpected}), 실행기가 연 연결 — 로컬 ${egress.local}·시험 프로젝트 ${egress.testProject}·막은 시도 ${egress.blocked}`);
     console.log(`  시험 프로젝트로 실제 보낸 요청 ${output.independentEvidence.requestsSentToTestProject}건, 가짜 서버가 답한 요청 ${output.independentEvidence.requestsAnsweredByFakeServer}건`);
+    console.log(`  업무 요청: 내보낸 것 ${output.summary.businessSent}건(합성 자료가 조건이 아닌 것 ${output.summary.businessSentNotSynthetic}건) / 전송 전에 막고 가짜 응답을 준 것 — ${Object.entries(output.summary.businessBlocked).map(([k, n]) => k + ' ' + n).join(', ')}`);
     if (!leaks) console.log(`  결과: ${OUT}`);
     if (SELFTEST) console.log(`  대조 실험(${SELFTEST}): 일부러 고장을 냈다 — 통과가 아닌 것이 기대다`);
     console.log(`전체 판정: ${overall ? '통과' : '통과 아님'}${FAKE ? '  (가짜 서버 — 실제 서버의 증거가 아니다)' : ''}${stopped ? '  [' + stopped + ']' : ''}`);

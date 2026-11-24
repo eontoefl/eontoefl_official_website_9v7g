@@ -19,11 +19,12 @@ export const SDK_FILE = 'vendor/supabase-2.116.0.js';
 const lf = (t) => t.replace(/\r\n/g, '\n');
 const cache = new Map();
 
-export function baseFile(p) {
-    const key = 'base:' + p;
+// 기준의 파일. rev 를 주면 그 커밋의 것(계약 3C-1 의 둘째 기준 — 3A 를 합친 직후의 커밋 — 과 견줄 때 쓴다)
+export function baseFile(p, rev = BASE) {
+    const key = 'base:' + rev + ':' + p;
     if (!cache.has(key)) {
         let text = null;
-        try { text = lf(execFileSync('git', ['show', `${BASE}:${p}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })); } catch (e) { text = null; }
+        try { text = lf(execFileSync('git', ['show', `${rev}:${p}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })); } catch (e) { text = null; }
         cache.set(key, text);
     }
     return cache.get(key);
@@ -55,8 +56,10 @@ export const V = {
 
 export function provider(variant, mutate) {
     return (p) => {
-        let text = variant.base ? baseFile(p) : workFile(p);
+        let text = variant.base ? baseFile(p, variant.rev || BASE) : workFile(p);
         if (text === null) return null;
+        // 둘째 기준(3A 를 합친 커밋)의 인증 모듈은 스위치가 있다 — 그 사본도 같은 방법으로 켠다
+        if (variant.base && variant.rev && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
         if (variant.test && p === CONFIG_FILE) text = rewriteConfig(text, { testUrl: TEST_URL, testKey: FAKE_ANON, sinkUrl: SINK });
         if (!variant.base && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
         if (!variant.base && p.endsWith('.html')) text = rewritePageSwitch(text, variant.on ? 'on' : 'off');
