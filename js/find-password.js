@@ -1,6 +1,13 @@
+// 켜진 길에서는 비밀번호 찾기를 닫아 둔다(계약 4에서 연다). 꺼짐이면 null 이고 아래는 지금 그대로 돈다.
+const eonFindPasswordClosedText = EonLogin.closed('find_password');
+if (eonFindPasswordClosedText) EonLogin.notice(eonFindPasswordClosedText);
+
 // Find Password Handler
 document.getElementById('findPasswordForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // 닫힌 길: 회원 조회·비밀번호 바꾸기를 보내지 않는다
+    if (eonFindPasswordClosedText) { alert(eonFindPasswordClosedText); return; }
     
     const email = document.getElementById('email').value.trim();
     const name = document.getElementById('name').value.trim();

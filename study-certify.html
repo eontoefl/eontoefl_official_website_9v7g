@@ -50,6 +50,9 @@
     // 켜진 화면인데 모듈이 없으면 "꺼짐"이 아니라 "닫음"이다 — 저장된 옛 값을 믿지 않는다.
     function on() { return PAGE_ON || !!mod(); }
 
+    // 화면을 다시 받는다(확인된 계정이 달라졌을 때 인증 모듈이 부른다)
+    function reload() { window.location.reload(); }
+
     // 화면 맨 위의 임시 안내(시험판 문구)
     function notice(text) {
         try {
@@ -99,13 +102,13 @@
         // 모듈이 없으면 시작하지 않는다(보호 표시·보호 요청 0).
         member: function (start) {
             var m = mod();
-            if (m) { m.memberPage(start); return; }
+            if (m) { m.memberPage(start, reload); return; }
             notice(MISSING_TEXT);
         },
         // 회원 갈래로 시작한 화면: 지금의 확인된 계정을 기준으로 지킨다
         watch: function () {
             var m = mod();
-            if (m) m.watchPage();
+            if (m) m.watchPage(reload);
         },
         // 이 사이트의 이 로그인만 끝낸다. 서버가 끝났다고 답했을 때만 done 을 부른다
         signOutThen: function (done) {
@@ -119,7 +122,7 @@
         // 로그인 뒤 돌아갈 주소: 허용 목록에 맞으면 그 주소, 아니면 null
         returnTarget: function (value) {
             var m = mod();
-            return m ? m.returnTarget(value) : null;
+            return m ? m.returnTarget(value, window.location.href) : null;
         },
         notice: notice
     });
@@ -382,7 +385,7 @@
             const postId = params.get('id');
             const pageParam = parseInt(params.get('page')) || 1;
 
-            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            const userData = JSON.parse(EonLogin.raw() || 'null');
             isAdmin = !!(userData && userData.role === 'admin');
             currentUserEmail = userData ? userData.email : null;
 
@@ -390,6 +393,8 @@
             if (userData) {
                 document.getElementById('writeBtn').style.display = 'block';
             }
+            // 새 로그인 스위치가 켜진 화면: 본문은 기다리지 않고, 회원·관리자 표시는 확인된 값이 정해지거나 바뀔 때 맞춘다
+            if (EonLogin.on()) EonLogin.display(eonCertifyDrawMember);
 
             if (postId) {
                 currentPostId = postId;
@@ -398,6 +403,29 @@
                 loadPage(pageParam);
             }
         });
+
+        // 켜진 화면 전용: 확인된 값으로 글쓰기 버튼, 본인·관리자의 수정·삭제 버튼, 비공개 글의 열람을 맞춘다
+        let eonCertifyShown = null;         // 화면에 그려진 글 한 편
+        let eonCertifyBlocked = null;       // 방문자 모양으로 "비공개"라고 막아 둔 글
+        function eonCertifyDrawMember() {
+            const u = JSON.parse(EonLogin.raw() || 'null');
+            isAdmin = !!(u && u.role === 'admin');
+            currentUserEmail = u ? u.email : null;
+            document.getElementById('writeBtn').style.display = u ? 'block' : 'none';
+            if (eonCertifyShown) {
+                if (eonCertifyShown.is_private && !isAdmin && eonCertifyShown.author_email !== currentUserEmail) {
+                    // 비공개 글이 그려져 있는데 더는 볼 수 있는 계정이 아니다: 화면을 다시 받는다
+                    window.location.reload();
+                    return;
+                }
+                const canEdit = !!(u && (isAdmin || (eonCertifyShown.author_email && eonCertifyShown.author_email === u.email)));
+                document.getElementById('postActions').style.display = canEdit ? 'flex' : 'none';
+            } else if (eonCertifyBlocked && (isAdmin || eonCertifyBlocked.author_email === currentUserEmail)) {
+                // 확인된 작성자·관리자다: 막아 둔 비공개 글을 다시 불러 그린다
+                eonCertifyBlocked = null;
+                showDetailView(currentPostId);
+            }
+        }
 
         // ==================== 목록 (서버 사이드 페이지네이션) ====================
 
@@ -555,6 +583,7 @@
 
                 // 잠금글 접근 제어: 관리자 또는 본인만 접근 가능
                 if (post.is_private && !isAdmin && post.author_email !== currentUserEmail) {
+                    eonCertifyBlocked = post;
                     document.getElementById('detailLoading').innerHTML = `
                         <div style="text-align:center; color:#94a3b8;">
                             <i class="fas fa-lock" style="font-size:32px; margin-bottom:12px;"></i>
@@ -599,7 +628,8 @@
                 }
 
                 // 수정/삭제 버튼 표시: 관리자 또는 본인 글
-                const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                eonCertifyShown = post;
+                const userData = JSON.parse(EonLogin.raw() || 'null');
                 if (userData) {
                     const canEdit = isAdmin || (post.author_email && post.author_email === userData.email);
                     if (canEdit) {

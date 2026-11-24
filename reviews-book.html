@@ -50,6 +50,9 @@
     // 켜진 화면인데 모듈이 없으면 "꺼짐"이 아니라 "닫음"이다 — 저장된 옛 값을 믿지 않는다.
     function on() { return PAGE_ON || !!mod(); }
 
+    // 화면을 다시 받는다(확인된 계정이 달라졌을 때 인증 모듈이 부른다)
+    function reload() { window.location.reload(); }
+
     // 화면 맨 위의 임시 안내(시험판 문구)
     function notice(text) {
         try {
@@ -99,13 +102,13 @@
         // 모듈이 없으면 시작하지 않는다(보호 표시·보호 요청 0).
         member: function (start) {
             var m = mod();
-            if (m) { m.memberPage(start); return; }
+            if (m) { m.memberPage(start, reload); return; }
             notice(MISSING_TEXT);
         },
         // 회원 갈래로 시작한 화면: 지금의 확인된 계정을 기준으로 지킨다
         watch: function () {
             var m = mod();
-            if (m) m.watchPage();
+            if (m) m.watchPage(reload);
         },
         // 이 사이트의 이 로그인만 끝낸다. 서버가 끝났다고 답했을 때만 done 을 부른다
         signOutThen: function (done) {
@@ -119,7 +122,7 @@
         // 로그인 뒤 돌아갈 주소: 허용 목록에 맞으면 그 주소, 아니면 null
         returnTarget: function (value) {
             var m = mod();
-            return m ? m.returnTarget(value) : null;
+            return m ? m.returnTarget(value, window.location.href) : null;
         },
         notice: notice
     });
@@ -416,12 +419,14 @@
             const reviewId = params.get('id');
 
             // 로그인한 사용자에게 글쓰기 버튼 표시
-            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            const userData = JSON.parse(EonLogin.raw() || 'null');
             if (userData) {
                 document.getElementById('writeBtn').style.display = 'block';
             }
 
             isAdmin = !!(userData && userData.role === 'admin');
+            // 새 로그인 스위치가 켜진 화면: 본문은 기다리지 않고, 회원·관리자 표시는 확인된 값이 정해지거나 바뀔 때 맞춘다
+            if (EonLogin.on()) EonLogin.display(eonReviewsDrawMember);
 
             if (reviewId) {
                 currentPostId = reviewId;
@@ -430,6 +435,21 @@
                 loadReviews();
             }
         });
+
+        // 켜진 화면 전용: 확인된 값으로 글쓰기 버튼, 본인·관리자의 수정·삭제 버튼, 관리자에게만 보이는 실명을 맞춘다
+        let eonReviewShown = null;      // 화면에 그려진 글 한 편
+        function eonReviewsDrawMember() {
+            const u = JSON.parse(EonLogin.raw() || 'null');
+            const wasAdmin = isAdmin;
+            isAdmin = !!(u && u.role === 'admin');
+            document.getElementById('writeBtn').style.display = u ? 'block' : 'none';
+            if (eonReviewShown) {
+                const can = !!(u && (isAdmin || (eonReviewShown.author_email && eonReviewShown.author_email === u.email)));
+                document.getElementById('postActions').style.display = can ? 'flex' : 'none';
+            } else if (wasAdmin !== isAdmin && !currentPostId && allReviews.length > 0) {
+                renderPage(currentPage);      // 이미 받은 목록을 다시 그린다(조회를 다시 보내지 않는다)
+            }
+        }
 
         // ==================== 목록 ====================
 
@@ -572,7 +592,8 @@
                 document.getElementById('shareBtn').style.display = 'inline-flex';
 
                 // 수정/삭제 버튼 표시: 관리자 또는 본인 글
-                const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                eonReviewShown = review;
+                const userData2 = JSON.parse(EonLogin.raw() || 'null');
                 if (userData2) {
                     const isAdmin = userData2.role === 'admin';
                     const isAuthor = review.author_email && review.author_email === userData2.email;

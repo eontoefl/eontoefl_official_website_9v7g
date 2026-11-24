@@ -51,6 +51,9 @@
     // 켜진 화면인데 모듈이 없으면 "꺼짐"이 아니라 "닫음"이다 — 저장된 옛 값을 믿지 않는다.
     function on() { return PAGE_ON || !!mod(); }
 
+    // 화면을 다시 받는다(확인된 계정이 달라졌을 때 인증 모듈이 부른다)
+    function reload() { window.location.reload(); }
+
     // 화면 맨 위의 임시 안내(시험판 문구)
     function notice(text) {
         try {
@@ -100,13 +103,13 @@
         // 모듈이 없으면 시작하지 않는다(보호 표시·보호 요청 0).
         member: function (start) {
             var m = mod();
-            if (m) { m.memberPage(start); return; }
+            if (m) { m.memberPage(start, reload); return; }
             notice(MISSING_TEXT);
         },
         // 회원 갈래로 시작한 화면: 지금의 확인된 계정을 기준으로 지킨다
         watch: function () {
             var m = mod();
-            if (m) m.watchPage();
+            if (m) m.watchPage(reload);
         },
         // 이 사이트의 이 로그인만 끝낸다. 서버가 끝났다고 답했을 때만 done 을 부른다
         signOutThen: function (done) {
@@ -120,7 +123,7 @@
         // 로그인 뒤 돌아갈 주소: 허용 목록에 맞으면 그 주소, 아니면 null
         returnTarget: function (value) {
             var m = mod();
-            return m ? m.returnTarget(value) : null;
+            return m ? m.returnTarget(value, window.location.href) : null;
         },
         notice: notice
     });
@@ -393,10 +396,12 @@
             const noticeId = params.get('id');
 
             // 관리자에게만 글쓰기 버튼 표시
-            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            const userData = JSON.parse(EonLogin.raw() || 'null');
             if (userData && userData.role === 'admin') {
                 document.getElementById('writeBtn').style.display = 'block';
             }
+            // 새 로그인 스위치가 켜진 화면: 본문은 기다리지 않고, 관리자 버튼은 확인된 값이 정해지거나 바뀔 때 맞춘다
+            if (EonLogin.on()) EonLogin.display(eonNoticeDrawAdmin);
 
             if (noticeId) {
                 currentPostId = noticeId;
@@ -405,6 +410,15 @@
                 loadNotices();
             }
         });
+
+        // 켜진 화면 전용: 확인된 관리자에게만 글쓰기·수정·삭제 버튼
+        let eonNoticeDetailShown = false;      // 글 한 편(샘플 제외)이 화면에 그려졌는가
+        function eonNoticeDrawAdmin() {
+            const u = JSON.parse(EonLogin.raw() || 'null');
+            const admin = !!(u && u.role === 'admin');
+            document.getElementById('writeBtn').style.display = admin ? 'block' : 'none';
+            if (eonNoticeDetailShown) document.getElementById('adminActions').style.display = admin ? 'flex' : 'none';
+        }
 
         // ==================== 목록 ====================
 
@@ -556,7 +570,8 @@
 
                 // 관리자 수정/삭제 버튼 표시 (샘플 데이터 제외)
                 if (!String(noticeId).startsWith('sample-')) {
-                    const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                    eonNoticeDetailShown = true;
+                    const userData2 = JSON.parse(EonLogin.raw() || 'null');
                     if (userData2 && userData2.role === 'admin') {
                         document.getElementById('adminActions').style.display = 'flex';
                     }

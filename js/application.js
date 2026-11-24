@@ -19,7 +19,7 @@ function maskName(name) {
  * 현재 로그인한 사용자의 이메일 가져오기
  */
 function getCurrentUserEmail() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     return userData ? userData.email : null;
 }
 
@@ -27,7 +27,7 @@ function getCurrentUserEmail() {
  * 현재 사용자가 관리자인지 확인
  */
 function isAdmin() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     return userData && userData.role === 'admin';
 }
 
@@ -194,18 +194,8 @@ async function showNoticeDetail(noticeId) {
         }
 
         // 관리자 수정/삭제 버튼
-        const adminBtns = document.getElementById('noticeAdminBtns');
-        if (isAdmin()) {
-            adminBtns.style.display = 'flex';
-            adminBtns.innerHTML = `
-                <button onclick="editNotice('${notice.id}')" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'" title="수정">
-                    <i class="fas fa-pen" style="font-size:13px;"></i>
-                </button>
-                <button onclick="deleteNotice('${notice.id}')" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'; this.style.background='#fef2f2'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'" title="삭제">
-                    <i class="fas fa-trash-alt" style="font-size:13px;"></i>
-                </button>
-            `;
-        }
+        eonAppNoticeShown = notice;
+        eonAppDrawNoticeAdmin(false);
 
         document.getElementById('noticeDetailLoading').style.display = 'none';
         document.getElementById('noticeDetailArticle').style.display = 'block';
@@ -271,6 +261,37 @@ function renderNoticeRows(notices) {
     }).join('');
 }
 
+// 공지 한 편의 관리자 버튼(수정·삭제).
+// 켜진 화면에서는 확인된 값이 정해지거나 바뀔 때 다시 부른다(redraw 가 참이면 관리자가 아닐 때 버튼을 거둔다).
+let eonAppNoticeShown = null;
+function eonAppDrawNoticeAdmin(redraw) {
+    const notice = eonAppNoticeShown;
+    if (!notice) return;
+    const adminBtns = document.getElementById('noticeAdminBtns');
+    if (isAdmin()) {
+            adminBtns.style.display = 'flex';
+            adminBtns.innerHTML = `
+                <button onclick="editNotice('${notice.id}')" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#9480c5'; this.style.color='#9480c5'; this.style.background='#f8f4ff'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'" title="수정">
+                    <i class="fas fa-pen" style="font-size:13px;"></i>
+                </button>
+                <button onclick="deleteNotice('${notice.id}')" style="width:32px; height:32px; border:1px solid #e2e8f0; background:white; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#64748b; transition:all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'; this.style.background='#fef2f2'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'; this.style.background='white'" title="삭제">
+                    <i class="fas fa-trash-alt" style="font-size:13px;"></i>
+                </button>
+            `;
+    } else if (redraw) {
+        adminBtns.style.display = 'none';
+        adminBtns.innerHTML = '';
+    }
+}
+
+// 켜진 화면 전용: 확인된 값이 정해지거나 바뀔 때 관리자·본인 표시를 다시 맞춘다(목록의 조회는 다시 보내지 않는다)
+function eonAppDrawMember() {
+    const btn = document.getElementById('adminNoticeBtn');
+    if (btn) btn.style.display = isAdmin() ? 'inline-flex' : 'none';
+    eonAppDrawNoticeAdmin(true);
+    if (!eonAppNoticeShown && (allApplications.length > 0 || allAppNotices.length > 0)) displayApplications();
+}
+
 // ==================== 초기화 ====================
 
 // 삭제 확인 버튼 이벤트
@@ -286,7 +307,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 관리자면 공지 작성 버튼 표시
-    if (isAdmin()) {
+    if (EonLogin.on()) {
+        // 켜진 화면: 목록(지금 그대로)은 기다리지 않고, 관리자·본인 표시는 확인된 값이 정해지거나 바뀔 때 그린다
+        EonLogin.display(eonAppDrawMember);
+    } else if (isAdmin()) {
         const btn = document.getElementById('adminNoticeBtn');
         if (btn) btn.style.display = 'inline-flex';
     }

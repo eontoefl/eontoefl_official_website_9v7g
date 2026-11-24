@@ -1,6 +1,13 @@
+// 켜진 길에서는 아이디 찾기를 닫아 둔다(계약 4에서 연다). 꺼짐이면 null 이고 아래는 지금 그대로 돈다.
+const eonFindIdClosedText = EonLogin.closed('find_id');
+if (eonFindIdClosedText) EonLogin.notice(eonFindIdClosedText);
+
 // Find ID Handler
 document.getElementById('findIdForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // 닫힌 길: 회원 조회를 보내지 않는다
+    if (eonFindIdClosedText) { alert(eonFindIdClosedText); return; }
     
     const name = document.getElementById('name').value.trim();
     const phone = document.getElementById('phone').value.trim();

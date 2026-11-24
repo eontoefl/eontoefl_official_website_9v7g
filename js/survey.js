@@ -18,7 +18,12 @@ let svQuestions = [];      // 학생에게 보여줄 질문들
 document.addEventListener('DOMContentLoaded', async function() {
     // 로그인 강제하지 않음 (카톡 인앱 브라우저의 로그인 마찰 제거).
     // 로그인돼 있으면 이름·시험날짜를 자동으로 채워주는 편의만 취한다.
-    svUser = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    // 새 로그인 스위치가 켜진 화면: 로그인 상태가 정해진 뒤에 갈래를 고른다.
+    // 저장된 새 로그인이 없으면 기다릴 것이 없다 — 비회원 설문은 로그인 확인을 기다리지 않는다(꺼짐이면 이 줄을 타지 않는다)
+    if (EonLogin.on()) await EonLogin.settle();
+    svUser = JSON.parse(EonLogin.raw() || 'null');
+    // 회원 갈래로 시작했으면 그 확인된 계정을 기준으로 화면을 지킨다(계정이 달라지면 가리고 다시 받는다)
+    if (EonLogin.on() && svUser) EonLogin.watch();
     try {
         await loadSurvey();
     } catch (err) {

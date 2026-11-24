@@ -52,6 +52,24 @@ export function rewriteSwitch(text, mode) {
     return text.replace(SWITCH_LINE, (m, indent, v, cr) => `${indent}const EON_AUTH_SWITCH = 'on';${cr}`);
 }
 
+// 화면(HTML)의 head 에 든 스위치(게이트의 EON_LOGIN_PAGE). 저장소의 값은 'off' 여야 한다.
+// mode 가 'on' 일 때만 내주는 사본에서 'on' 으로 바꾼다. 게이트가 없는 화면(대상이 아닌 화면)은 그대로 둔다.
+const PAGE_SWITCH_LINE = /^( *)var EON_LOGIN_PAGE = '(off|on)';(\r?)$/m;
+export function hasPageSwitch(text) { return countMatches(text, PAGE_SWITCH_LINE) > 0; }
+export function rewritePageSwitch(text, mode) {
+    if (!hasPageSwitch(text)) return text;
+    exactlyOne(text, PAGE_SWITCH_LINE, 'EON_LOGIN_PAGE');
+    const current = text.match(PAGE_SWITCH_LINE)[2];
+    if (current !== 'off') throw new Error('저장소의 화면 스위치 값이 꺼짐이 아니다');
+    if (mode === 'off') return text;
+    if (mode !== 'on') throw new Error('mode 는 on 또는 off');
+    return text.replace(PAGE_SWITCH_LINE, (m, indent, v, cr) => `${indent}var EON_LOGIN_PAGE = 'on';${cr}`);
+}
+export function pageSwitchValue(text) {
+    const m = text.match(PAGE_SWITCH_LINE);
+    return m && countMatches(text, PAGE_SWITCH_LINE) === 1 ? m[2] : null;
+}
+
 export function switchValue(text) {
     const m = text.match(SWITCH_LINE);
     return m && countMatches(text, SWITCH_LINE) === 1 ? m[2] : null;
@@ -86,6 +104,12 @@ export function transformForServe(relPath, buffer, { mode, testUrl, testKey, sin
     } else if (relPath === AUTH_FILE) {
         body = Buffer.from(rewriteSwitch(buffer.toString('utf8'), mode), 'utf8');
         if (mode === 'on') changed.push('새 로그인 스위치 → 켜짐');
+    } else if (/\.html$/i.test(relPath)) {
+        const html = buffer.toString('utf8');
+        if (hasPageSwitch(html)) {
+            body = Buffer.from(rewritePageSwitch(html, mode), 'utf8');
+            if (mode === 'on') changed.push('화면의 새 로그인 스위치 → 켜짐');
+        }
     }
     return { body, residue: findProdResidue(body, { prodKey, prodUrl }), changed };
 }

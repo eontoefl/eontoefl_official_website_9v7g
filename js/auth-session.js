@@ -1000,14 +1000,14 @@
         { file: 'book-request.html', params: {}, required: [], hashes: [''] }
     ]);
     // 값을 해석한 뒤의 출처·경로·인자·# 이 목록과 정확히 맞을 때만, 해석한 조각으로 다시 만든 주소를 돌려준다(아니면 null).
-    // 글자의 앞부분을 견주지 않는다.
-    function returnTarget(value) {
+    // 글자의 앞부분을 견주지 않는다. 지금 화면의 주소(pageUrl)는 부르는 쪽이 넘긴다 — 이 모듈은 화면의 주소를 읽지 않는다.
+    function returnTarget(value, pageUrl) {
         if (typeof value !== 'string' || !value || value.length > 300) return null;
         if (/[\u0000-\u0020\\]/.test(value)) return null;
         let u;
         let here;
         try {
-            here = new URL(window.location.href);
+            here = new URL(pageUrl);
             u = new URL(value, here.href);
         } catch (e) { return null; }
         if (u.origin !== here.origin || u.username || u.password) return null;
@@ -1039,6 +1039,7 @@
     let leaving = false;
     let ownSignOut = 0;           // 이 탭이 시작한 로그아웃이 진행 중인가
     let leaveAfterSignOut = false;
+    let reloadPage = null;        // 화면을 다시 받는 일(부르는 쪽이 넘긴다 — 이 모듈은 화면을 옮기지 않는다)
 
     function hidePage() { document.documentElement.classList.add('eon-auth-away'); }
     function showPage() { document.documentElement.classList.remove('eon-auth-away'); }
@@ -1046,7 +1047,7 @@
         if (leaving) return;
         leaving = true;
         hidePage();
-        try { window.location.reload(); } catch (e) { /* 다시 받지 못해도 가린 채로 둔다 */ }
+        try { if (reloadPage) reloadPage(); } catch (e) { /* 다시 받지 못해도 가린 채로 둔다 */ }
     }
     function guardCheck() {
         if (!guardOn || leaving) return;
@@ -1057,18 +1058,19 @@
         if (ownSignOut > 0) { leaveAfterSignOut = true; return; }
         leave();
     }
-    function watchPage() {
+    function watchPage(reload) {
         if (guardOn) return;
         guardOn = true;
+        reloadPage = typeof reload === 'function' ? reload : null;
         guardFor = displayUserRaw();
         listeners.push(guardCheck);
         drawers.push(guardCheck);
         window.addEventListener('pagehide', function () { hidePage(); });
         window.addEventListener('pageshow', function (ev) { if (ev && ev.persisted) leave(); });
     }
-    function memberPage(start) {
+    function memberPage(start, reload) {
         ready().then(function () {
-            watchPage();
+            watchPage(reload);
             if (typeof start === 'function') safeCall(start);
         });
     }

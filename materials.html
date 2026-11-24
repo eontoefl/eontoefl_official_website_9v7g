@@ -361,6 +361,9 @@
     // 켜진 화면인데 모듈이 없으면 "꺼짐"이 아니라 "닫음"이다 — 저장된 옛 값을 믿지 않는다.
     function on() { return PAGE_ON || !!mod(); }
 
+    // 화면을 다시 받는다(확인된 계정이 달라졌을 때 인증 모듈이 부른다)
+    function reload() { window.location.reload(); }
+
     // 화면 맨 위의 임시 안내(시험판 문구)
     function notice(text) {
         try {
@@ -410,13 +413,13 @@
         // 모듈이 없으면 시작하지 않는다(보호 표시·보호 요청 0).
         member: function (start) {
             var m = mod();
-            if (m) { m.memberPage(start); return; }
+            if (m) { m.memberPage(start, reload); return; }
             notice(MISSING_TEXT);
         },
         // 회원 갈래로 시작한 화면: 지금의 확인된 계정을 기준으로 지킨다
         watch: function () {
             var m = mod();
-            if (m) m.watchPage();
+            if (m) m.watchPage(reload);
         },
         // 이 사이트의 이 로그인만 끝낸다. 서버가 끝났다고 답했을 때만 done 을 부른다
         signOutThen: function (done) {
@@ -430,7 +433,7 @@
         // 로그인 뒤 돌아갈 주소: 허용 목록에 맞으면 그 주소, 아니면 null
         returnTarget: function (value) {
             var m = mod();
-            return m ? m.returnTarget(value) : null;
+            return m ? m.returnTarget(value, window.location.href) : null;
         },
         notice: notice
     });
@@ -754,10 +757,45 @@
             });
         }
 
+        // 켜진 화면 전용: 글 한 편(공개 본문)을 방문자 모양으로 먼저 그린 뒤, 확인된 관리자에게만 목록 이동·글쓰기·수정·삭제를 연다
+        let eonMaterialsDetailShown = false;   // 글 한 편(샘플 제외)이 화면에 그려졌는가
+        let eonMaterialsHeader = null;         // 머리글의 처음 글자
+        function eonMaterialsDrawAdmin() {
+            const u = JSON.parse(EonLogin.raw() || 'null');
+            const admin = !!(u && u.role === 'admin');
+            const backLink = document.querySelector('#detailView a[href="materials.html"]');
+            if (backLink) backLink.style.display = admin ? '' : 'none';
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) sidebar.style.display = admin ? '' : 'none';
+            const pageHeader = document.querySelector('.page-header h1');
+            if (pageHeader && eonMaterialsHeader !== null) pageHeader.textContent = admin ? eonMaterialsHeader : '학습 자료';
+            document.getElementById('writeBtn').style.display = admin ? 'block' : 'none';
+            if (eonMaterialsDetailShown) document.getElementById('adminActions').style.display = admin ? 'flex' : 'none';
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // 새 로그인 스위치가 켜진 화면:
+            //   목록(id 없음)은 관리자 갈래다 — 로그인 기록을 서버에 확인한 뒤 확인된 값으로만 정한다.
+            //   글 한 편(id 있음)은 공개 본문이다 — 기다리지 않고 그리고, 관리자 표시는 확인된 뒤에 맞춘다.
+            if (EonLogin.on()) {
+                const eonId = new URLSearchParams(window.location.search).get('id');
+                if (!eonId) {
+                    EonLogin.member(eonMaterialsStart);
+                    return;
+                }
+                const eonHeader = document.querySelector('.page-header h1');
+                eonMaterialsHeader = eonHeader ? eonHeader.textContent : null;
+                eonMaterialsStart();
+                EonLogin.display(eonMaterialsDrawAdmin);
+                return;
+            }
+            eonMaterialsStart();
+        });
+
+        function eonMaterialsStart() {
             const params = new URLSearchParams(window.location.search);
             const materialId = params.get('id');
-            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            const userData = JSON.parse(EonLogin.raw() || 'null');
             const isAdmin = userData && userData.role === 'admin';
 
             // 관리자가 아닌 경우: id 없이 목록 접근 시 홈으로 리다이렉트
@@ -793,7 +831,7 @@
             } else {
                 loadMaterials();
             }
-        });
+        }
 
         // ==================== 목록 ====================
 
@@ -945,7 +983,8 @@
 
                 // 관리자 수정/삭제 버튼 표시 (샘플 데이터 제외)
                 if (!String(materialId).startsWith('sample-')) {
-                    const userData2 = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+                    eonMaterialsDetailShown = true;
+                    const userData2 = JSON.parse(EonLogin.raw() || 'null');
                     if (userData2 && userData2.role === 'admin') {
                         document.getElementById('adminActions').style.display = 'flex';
                     }

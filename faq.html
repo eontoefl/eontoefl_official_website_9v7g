@@ -160,6 +160,9 @@
     // 켜진 화면인데 모듈이 없으면 "꺼짐"이 아니라 "닫음"이다 — 저장된 옛 값을 믿지 않는다.
     function on() { return PAGE_ON || !!mod(); }
 
+    // 화면을 다시 받는다(확인된 계정이 달라졌을 때 인증 모듈이 부른다)
+    function reload() { window.location.reload(); }
+
     // 화면 맨 위의 임시 안내(시험판 문구)
     function notice(text) {
         try {
@@ -209,13 +212,13 @@
         // 모듈이 없으면 시작하지 않는다(보호 표시·보호 요청 0).
         member: function (start) {
             var m = mod();
-            if (m) { m.memberPage(start); return; }
+            if (m) { m.memberPage(start, reload); return; }
             notice(MISSING_TEXT);
         },
         // 회원 갈래로 시작한 화면: 지금의 확인된 계정을 기준으로 지킨다
         watch: function () {
             var m = mod();
-            if (m) m.watchPage();
+            if (m) m.watchPage(reload);
         },
         // 이 사이트의 이 로그인만 끝낸다. 서버가 끝났다고 답했을 때만 done 을 부른다
         signOutThen: function (done) {
@@ -229,7 +232,7 @@
         // 로그인 뒤 돌아갈 주소: 허용 목록에 맞으면 그 주소, 아니면 null
         returnTarget: function (value) {
             var m = mod();
-            return m ? m.returnTarget(value) : null;
+            return m ? m.returnTarget(value, window.location.href) : null;
         },
         notice: notice
     });

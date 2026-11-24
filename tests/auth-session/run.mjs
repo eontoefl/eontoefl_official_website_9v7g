@@ -1,4 +1,4 @@
-// 공홈 인증 모듈 격리 회귀시험 (보안작업 묶음2 계약 3A)
+// 공홈 인증 모듈 격리 회귀시험 (보안작업 묶음2 계약 3A) + 화면의 로그인 상태 통일(계약 3C-1 — run-pages.mjs 를 이어서 돌린다)
 //
 // 실행:  node tests/auth-session/run.mjs        (저장소 폴더에서, Node v26, 설치할 것 없음)
 //
@@ -17,7 +17,9 @@ import { installNetworkGuard, verifyNetworkGuard, realNetworkAttempts, serialize
 import { targets, responses } from '../supabase-config-headers/cases.mjs';
 import { readFakeJwt, fakeJwt } from './fake-supabase.mjs';
 import { createCore, makeIgnore } from './serve-core.mjs';
-import { TEST_URL, CONFIG_FILE, AUTH_FILE, switchValue, findProdResidue } from './rewrite.mjs';
+import { TEST_URL, CONFIG_FILE, AUTH_FILE, switchValue, pageSwitchValue, findProdResidue } from './rewrite.mjs';
+import { TARGET_FILES, GATE_SOURCE, GATE_COMMENT, MODULE_TAG, extractGate } from './pages.mjs';
+import { sectionPages } from './run-pages.mjs';
 import {
     ROOT, BASE, FAKE_ANON, SDK_FILE, PROD, V, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, STATE_NAMES, hasOldValue,
     baseFile, workFile, provider, extractScripts, makeWorld, snapshot, diffSnapshot, checker,
@@ -170,7 +172,7 @@ function sectionOffStatic(mutate) {
     const problems = [];
     const files = provider(V.OFF, mutate);
     const info = { added: [], bytes: Buffer.byteLength(workFile(AUTH_FILE), 'utf8') };
-    for (const f of ['index.html', 'login.html']) {
+    for (const f of TARGET_FILES) {
         const base = staticRefs(baseFile(f));
         const now = staticRefs(files(f));
         const left = base.slice();
@@ -183,16 +185,18 @@ function sectionOffStatic(mutate) {
     }
     return { problems, info };
 }
-// 인증 모듈을 싣지 않는 화면(index·login 밖의 화면들이 이 경우다): js/common.js·js/main.js·js/login.js 가 기준과 같은가.
-// 화면의 script 태그에서 인증 모듈만 뺀 사본으로 본다 — 저장소의 파일 그대로(꺼짐)와 시험 서버가 켜짐으로 내주는 사본 둘 다.
+// 대상이 아닌 화면(게이트도 인증 모듈도 싣지 않는다 — js/common.js·js/main.js 를 싣는 admin-users.html 이 이 경우다):
+// js/common.js·js/main.js·js/login.js 가 기준과 같은가.
+// 화면에서 게이트와 인증 모듈 태그를 뺀 사본으로 본다 — 저장소의 파일 그대로(꺼짐)와 시험 서버가 켜짐으로 내주는 사본 둘 다.
 async function sectionNoModule() {
     const problems = [];
     let compared = 0;
     const strip = (p, text) => {
         if (!p.endsWith('.html')) return text;
-        const out = text.replace(/[ \t]*<script src="js\/auth-session\.js[^"]*"><\/script>\n/, '');
-        if (out === text) throw new Error('인증 모듈의 script 태그를 찾지 못함: ' + p);
-        return out;
+        const a = text.indexOf('    ' + GATE_COMMENT);
+        const b = text.indexOf(MODULE_TAG);
+        if (a < 0 || b < a) throw new Error('게이트와 인증 모듈의 태그를 찾지 못함: ' + p);
+        return text.slice(0, a) + text.slice(text.indexOf('\n', b) + 1);
     };
     for (const [name, baseVariant, nowVariant] of [['저장소 그대로', V.BASE, V.OFF], ['켜짐으로 내준 사본', V.BASE_T, V.ON]]) {
         for (const stateName of STATE_NAMES) {
@@ -202,7 +206,7 @@ async function sectionNoModule() {
                 compared++;
                 const label = `모듈 없는 화면(${name}) › ${stateName} › ${scenario.name}`;
                 for (const d of diffSnapshot(base.snap, now.snap)) problems.push(`${label} › 기준과 다름: ${d}`);
-                if (now.page.evaluate('typeof EonAuth') !== 'undefined') problems.push(`${label} › 시험이 인증 모듈을 빼지 못함`);
+                if (now.page.evaluate('typeof EonAuth') !== 'undefined' || now.page.evaluate('typeof EonLogin') !== 'undefined') problems.push(`${label} › 시험이 게이트·인증 모듈을 빼지 못함`);
                 if (now.snap.scripts.length || now.snap.channels || now.snap.sdk !== 'undefined') problems.push(`${label} › SDK·탭 사이 알림 통로의 흔적`);
                 if (now.w.outside.length) problems.push(`${label} › 가짜 서버 밖으로 나간 요청`);
             }
@@ -1536,11 +1540,11 @@ const MUTANTS = [
     },
     {
         name: '확인 전에 저장된 값으로 머리말을 그림(main.js)', tests: [testRestoreGating, testLegacyPresent], expect: /응답을 붙잡고 있는 동안|옛 값/,
-        edits: [['js/main.js', "    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();\n    return localStorage.getItem('iontoefl_user');\n}\n\n// 켜진 화면 전용: 확인된 표시", "    return localStorage.getItem('iontoefl_user');\n}\n\n// 켜진 화면 전용: 확인된 표시"]],
+        edits: [['js/main.js', "    if (window.EonLogin) return window.EonLogin.raw();\n", '']],
     },
     {
         name: '확인 전에 저장된 값으로 머리말을 그림(common.js)', tests: [testRestoreGating, testLegacyPresent], expect: /응답을 붙잡고 있는 동안|옛 값/,
-        edits: [['js/common.js', "    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();\n", '']],
+        edits: [['js/common.js', "    if (window.EonLogin) return window.EonLogin.raw();\n", '']],
     },
     {
         name: '확인 전에도 표시를 내줌(모듈)', tests: [testRestoreGating], expect: /응답을 붙잡고 있는 동안/,
@@ -1553,8 +1557,8 @@ const MUTANTS = [
     {
         name: '인증 모듈을 head 가 아니라 화면 끝에서 실음', tests: [testRestoreGating], expect: /첫 그리기 — 숨김 규칙이 head 에서/,
         edits: ['index.html', 'login.html'].flatMap((f) => [
-            [f, '    <script src="js/auth-session.js?v=20261125"></script>\n</head>', '</head>'],
-            [f, '    <script src="js/supabase-config.js?v=20261012"></script>\n', '    <script src="js/supabase-config.js?v=20261012"></script>\n    <script src="js/auth-session.js?v=20261125"></script>\n'],
+            [f, '    ' + MODULE_TAG + '\n</head>', '</head>'],
+            [f, '    <script src="js/supabase-config.js?v=20261012"></script>\n', '    <script src="js/supabase-config.js?v=20261012"></script>\n    ' + MODULE_TAG + '\n'],
         ]),
     },
     {
@@ -1563,11 +1567,11 @@ const MUTANTS = [
     },
     {
         name: '켜진 로그인이 주소의 redirect 값으로 이동', tests: [testLoginOk], expect: /이동이 index\.html 한 번이 아님/,
-        edits: [['js/login.js', "                if (window.EonAuth.isCurrent(attempt)) {\n                    window.location.href = 'index.html';", "                if (window.EonAuth.isCurrent(attempt)) {\n                    window.location.href = new URLSearchParams(window.location.search).get('redirect') || 'index.html';"]],
+        edits: [['js/login.js', "            const eonReturnTo = window.EonLogin.returnTarget(new URLSearchParams(window.location.search).get('redirect')) || 'index.html';", "            const eonReturnTo = new URLSearchParams(window.location.search).get('redirect') || 'index.html';"]],
     },
     {
         name: '켜진 화면이 옛 값만 보고 자동 이동', tests: [testLegacyPresent], expect: /자동 이동/,
-        edits: [['js/login.js', "    if (window.EonAuth && window.EonAuth.isOn()) return;\n", '']],
+        edits: [['js/login.js', "    if (window.EonLogin && window.EonLogin.on()) return;\n", '']],
     },
     {
         name: '로그아웃이 새 모듈의 것이 아닌 호환 값을 지움', tests: [testLogout], expect: /새 모듈의 것이 아닌 값/,
@@ -1728,7 +1732,10 @@ function sectionText() {
     if (!/client\.refreshSession\(\{ refresh_token: st\.refreshToken \}\)/.test(code) || /client\.refreshSession\(\)/.test(code)) problems.push('모듈이 시작하는 갱신이 그 기록의 갱신값을 지정하지 않음');
 
     // 기준에서 바뀐 파일
-    const allowed = new Set(['index.html', 'login.html', 'js/auth-session.js', 'js/common.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js']);
+    // 계약 3A 의 파일 + 계약 3C-1 의 파일(대상 화면 26개와 그 화면의 스크립트)
+    const allowed = new Set([...TARGET_FILES, 'js/auth-session.js', 'js/common.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js',
+        'js/admin-utils.js', 'js/analysis-view.js', 'js/application-detail.js', 'js/application-form.js', 'js/application.js', 'js/book-request.js',
+        'js/change-password.js', 'js/dashboard.js', 'js/find-id.js', 'js/find-password.js', 'js/my-profile.js', 'js/register.js', 'js/survey.js', 'js/withdraw.js']);
     const changed = git(['diff', '--name-only', BASE]).split('\n').filter(Boolean);
     const untracked = git(['ls-files', '--others', '--exclude-standard']).split('\n').filter(Boolean);
     const outside = changed.concat(untracked).filter((f) => !allowed.has(f) && !f.startsWith('tests/auth-session/') && !f.startsWith('tests/supabase-config-headers/'));
@@ -1738,12 +1745,31 @@ function sectionText() {
     // 인증 모듈을 싣는 화면
     const loaders = git(['grep', '-l', 'auth-session.js', '--', '*.html']).split('\n').filter(Boolean).sort();
     info.loaders = loaders;
-    if (JSON.stringify(loaders) !== JSON.stringify(['index.html', 'login.html'])) problems.push(`인증 모듈을 싣는 화면이 index.html·login.html 이 아님(${loaders.join(', ')})`);
+    if (JSON.stringify(loaders) !== JSON.stringify(TARGET_FILES.slice().sort())) problems.push(`인증 모듈을 싣는 화면이 대상 화면 ${TARGET_FILES.length}개와 같지 않음(${loaders.join(', ')})`);
+    // 게이트(화면의 스위치 + 로그인 값을 주는 한 길): 대상 화면마다 원본과 같은 글자로, 인증 모듈 태그 바로 앞에, 값은 꺼짐
+    const gateSource = workFile(GATE_SOURCE).trim();
+    info.gatePages = 0;
+    for (const f of TARGET_FILES) {
+        const html = workFile(f);
+        if (extractGate(html) !== gateSource) { problems.push(`${f}: 게이트의 글자가 원본(${GATE_SOURCE})과 다름`); continue; }
+        if (pageSwitchValue(html) !== 'off') problems.push(`${f}: 저장소의 화면 스위치 값이 꺼짐이 아님`);
+        const gateAt = html.indexOf(gateSource);
+        const tagAt = html.indexOf(MODULE_TAG);
+        const between = html.slice(gateAt + gateSource.length, tagAt);
+        if (tagAt < gateAt || between.replace(/\s/g, '') !== '</script>') problems.push(`${f}: 게이트가 인증 모듈 태그 바로 앞에 있지 않음`);
+        if (html.indexOf('</head>') < tagAt) problems.push(`${f}: 게이트·인증 모듈이 head 안에 있지 않음`);
+        info.gatePages++;
+    }
+    // 게이트가 다른 화면(대상이 아닌 화면)에 들어가 있지 않은가
+    const gated = git(['grep', '-l', 'eon-login-gate:begin', '--', '*.html']).split('\n').filter(Boolean).sort();
+    if (JSON.stringify(gated) !== JSON.stringify(TARGET_FILES.slice().sort())) problems.push(`게이트가 든 화면이 대상 화면과 같지 않음(${gated.length}개)`);
     for (const f of loaders) {
         const scripts = extractScripts(workFile(f)).filter((s) => s.src);
         const mine = scripts.filter((s) => s.src.split('?')[0] === AUTH_FILE);
         if (mine.length !== 1 || !mine[0].head) problems.push(`${f}: 인증 모듈이 head 에서 한 번 실리지 않음(첫 그리기 전에 숨김 규칙이 걸려야 한다)`);
-        if (scripts.filter((s) => s.head).length !== 1) problems.push(`${f}: head 에서 실리는 스크립트가 인증 모듈 하나가 아님`);
+        const headScripts = extractScripts(workFile(f)).filter((s) => s.head);
+        const at = headScripts.findIndex((s) => s.src && s.src.split('?')[0] === AUTH_FILE);
+        if (at < 1 || !headScripts[at - 1].inline || !headScripts[at - 1].inline.includes('eon-login-gate:begin')) problems.push(`${f}: head 에서 인증 모듈 바로 앞의 스크립트가 게이트가 아님`);
     }
     // 연결점: 등급을 넘기는 호출 0
     const config = workFile(CONFIG_FILE);
@@ -1754,8 +1780,21 @@ function sectionText() {
     if (info.gradedCalls !== 0) problems.push('등급을 넘기는 헤더 함수 호출이 있음');
     const users = git(['grep', '-l', '-E', 'EonAuth|eon_auth_v1', '--', '*.js', '*.html']).split('\n').filter(Boolean).filter((f) => !f.startsWith('tests/')).sort();
     info.users = users;
-    const allowedUsers = ['js/auth-session.js', 'js/common.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js'];
-    if (users.some((f) => !allowedUsers.includes(f))) problems.push(`인증 모듈을 쓰는 파일이 범위 밖에 있음: ${users.join(', ')}`);
+    // 인증 모듈(EonAuth)을 직접 부르는 곳: 모듈 자신, 게이트(대상 화면의 head), 로그인 화면, 머리말의 로그아웃, 연결점
+    const allowedUsers = [...TARGET_FILES, 'js/auth-session.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js'];
+    if (users.some((f) => !allowedUsers.includes(f))) problems.push(`인증 모듈을 쓰는 파일이 범위 밖에 있음: ${users.filter((f) => !allowedUsers.includes(f)).join(', ')}`);
+    // 한 길(EonLogin)을 쓰는 스크립트: 대상 화면만 싣거나, 대상이 아닌 화면도 싣는 파일이면 EonLogin 이 없을 때의 길을 둔다
+    const gateUsers = git(['grep', '-l', 'EonLogin', '--', 'js/*.js']).split('\n').filter(Boolean).sort();
+    info.gateUsers = gateUsers;
+    const allHtml = git(['ls-files', '--', '*.html']).split('\n').filter((x) => x && !x.includes('/'));
+    for (const js of gateUsers) {
+        const loadedBy = allHtml.filter((h) => extractScripts(workFile(h) || '').some((s) => s.src && s.src.split('?')[0] === js));
+        const outsiders = loadedBy.filter((h) => !TARGET_FILES.includes(h));
+        if (!outsiders.length) continue;
+        const text = workFile(js);
+        const bare = text.split('\n').filter((l) => !l.trim().startsWith('//') && /EonLogin\./.test(l) && !/window\.EonLogin/.test(l));
+        if (bare.length) problems.push(`${js}: 대상이 아닌 화면(${outsiders.join(', ')})도 싣는데 EonLogin 이 없을 때의 길 없이 부름`);
+    }
 
     // 시험 서버가 내줄 사본에 운영 흔적이 남지 않는가(두 화면과 그 스크립트)
     for (const variant of [V.OFF_T, V.ON]) {
@@ -2226,8 +2265,14 @@ async function main() {
     out(`    - 차단기(보내기 전에 가르기: 목적지 + 자격의 종류·용도, 기록은 정해 둔 이름만) 요청 ${rl.rows}가지: 어긋남 ${rl.problems.length}`);
     listSome(rl.problems);
 
+    const pg = await sectionPages();
+    fail('화면', pg.problems);
+    out(`[9] 화면의 로그인 상태 통일(계약 3C-1 — 대상 화면 ${pg.info.pages}개, 화면의 HTML 로 만든 가짜 DOM): ${pg.problems.length === 0 ? '통과' : `실패 ${pg.problems.length}`}`);
+    pg.lines.forEach((l) => out(l));
+    listSome(pg.problems, 40);
+
     if (realNetworkAttempts.length) fail('네트워크', `실제 네트워크 요청 시도 ${realNetworkAttempts.length}건`);
-    out(`[9] 실제 네트워크 요청 ${realNetworkAttempts.length}건`);
+    out(`[10] 실제 네트워크 요청 ${realNetworkAttempts.length}건`);
     out('');
     if (failures.length === 0) {
         out('결과: 통과  (가짜 화면·가짜 서버에서의 결과다 — 실제 화면 확인은 절차.md)');

@@ -8,10 +8,10 @@ import { execFileSync } from 'node:child_process';
 
 import { FakeBrowser } from './browser.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
-import { TEST_URL, CONFIG_FILE, AUTH_FILE, readProdConfig, rewriteConfig, rewriteSwitch } from './rewrite.mjs';
+import { TEST_URL, CONFIG_FILE, AUTH_FILE, readProdConfig, rewriteConfig, rewriteSwitch, rewritePageSwitch } from './rewrite.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const BASE = 'd39c0ee';
+export const BASE = '14455ae';       // 업무 동작의 기준(계약 3C-1: 3A 의 기준 d39c0ee 뒤에 main 이 움직였다)
 export const FAKE_ANON = 'zz-fake-anon-key-b3a';                  // 가짜 공개 키(실제 키가 아니다)
 export const SINK = 'http://127.0.0.1:8787/__b3a/sink/testroom';   // 로컬 시험 목적지(가짜 세계에서는 글자일 뿐)
 export const SDK_FILE = 'vendor/supabase-2.116.0.js';
@@ -59,6 +59,7 @@ export function provider(variant, mutate) {
         if (text === null) return null;
         if (variant.test && p === CONFIG_FILE) text = rewriteConfig(text, { testUrl: TEST_URL, testKey: FAKE_ANON, sinkUrl: SINK });
         if (!variant.base && p === AUTH_FILE) text = rewriteSwitch(text, variant.on ? 'on' : 'off');
+        if (!variant.base && p.endsWith('.html')) text = rewritePageSwitch(text, variant.on ? 'on' : 'off');
         if (mutate) text = mutate(p, text);
         return text;
     };
@@ -172,14 +173,14 @@ export function makeWorld(stateName, { variant, mutate } = {}) {
             if (u.origin === TEST_URL) return w.server.handle(req);
             if (u.origin === prodOrigin) {
                 if (variant.test) { w.outside.push('[운영 주소]'); throw new TypeError('Failed to fetch'); }
-                return legacyRest(req, u);
+                return (w.rest || legacyRest)(req, u);
             }
             w.outside.push(u.origin);
             throw new TypeError('Failed to fetch');
         },
     });
     w.server = new FakeSupabase({ origin: TEST_URL, anonKey: FAKE_ANON, now: () => w.browser.now });
-    w.server.business = (req, u) => legacyRest(req, u);
+    w.server.business = (req, u) => (w.rest || legacyRest)(req, u);     // w.rest: 시험이 업무 응답을 바꿔 끼우는 자리(계약 3C-1 의 화면 시험)
     for (const a of Object.values(ACCOUNTS)) w.server.addAccount(JSON.parse(JSON.stringify(a)));
     for (const [k, v] of Object.entries(STATES[stateName](w.browser.now))) w.browser.local.set(k, v);
     w.initial = new Map(w.browser.local);

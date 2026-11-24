@@ -312,7 +312,12 @@ function restoreBankSelection(app) {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    // 새 로그인 스위치가 켜진 화면: 로그인 상태가 정해진 뒤에 갈래를 고른다.
+    // 저장된 새 로그인이 없으면 기다릴 것이 없다 — 방문자 갈래는 로그인 확인을 기다리지 않는다(꺼짐이면 이 줄을 타지 않는다)
+    if (EonLogin.on()) await EonLogin.settle();
+    const userData = JSON.parse(EonLogin.raw() || 'null');
+    // 회원 갈래로 시작했으면 그 확인된 계정을 기준으로 화면을 지킨다(계정이 달라지면 가리고 다시 받는다)
+    if (EonLogin.on() && userData) EonLogin.watch();
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit');
 
@@ -440,6 +445,15 @@ function setupAccountFields(userData, editing) {
         }));
         clearAccountPasswordConfirmation();
         if (emailVerify) emailVerify.release();   // 계정 생성 직후 로그인 전환: 제출 버튼 잠금 해제
+    } else if (EonLogin.closed('signup_by_application')) {
+        // 켜진 길: 신청하면서 회원이 만들어지는 길은 닫아 둔다(계약 4에서 연다).
+        // 닉네임·이메일 조회와 인증번호 발송을 붙이지 않는다 — 이 갈래에서 나가는 계정 요청 0
+        signupOnly.forEach(el => { el.style.display = 'none'; });
+        signupOnly.forEach(el => el.querySelectorAll('input').forEach(input => {
+            input.required = false;
+            input.disabled = true;
+        }));
+        EonLogin.notice(EonLogin.closed('signup_by_application'));
     } else {
         signupOnly.forEach(el => { el.style.display = ''; });
         setupNicknameCheck();
@@ -869,7 +883,7 @@ async function initEditMode(appId) {
         }
 
         // 본인 신청서인지 확인 (관리자는 모든 신청서 수정 가능)
-        const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+        const userData = JSON.parse(EonLogin.raw() || 'null');
         if (!userData || (userData.role !== 'admin' && app.email !== userData.email)) {
             alert('본인의 신청서만 수정할 수 있습니다.');
             window.location.href = 'application.html';
@@ -1264,6 +1278,8 @@ function sessionFromUser(user) {
 }
 
 function saveUserSession(user) {
+    // 켜진 화면은 로그인 값을 직접 쓰지 않는다(인증 모듈만 쓴다)
+    if (EonLogin.on()) throw new Error('켜진 화면에서는 로그인 값을 직접 쓰지 않습니다.');
     const session = sessionFromUser(user);
     localStorage.setItem('iontoefl_user', JSON.stringify(session));
     localStorage.setItem('iontoefl_login_time', Date.now().toString());
@@ -1280,6 +1296,8 @@ function selectedIntroBookTrack() {
 }
 
 async function createOrRecoverAccount(snapshot) {
+    // 켜진 길에서는 닫혀 있다(제출 처리기가 먼저 막는다 — 여기는 그 뒤의 마지막 문)
+    if (EonLogin.closed('signup_by_application')) throw new Error('닫아 둔 기능입니다.');
     const { email, password } = snapshot;
     const payload = {
         name: snapshot.name,
@@ -1385,6 +1403,12 @@ function setupFormSubmission() {
     
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        // 켜진 길: 비회원 신청(신청하면서 회원이 만들어지는 길)은 닫혀 있다 — 계정 조회·인증·저장보다 앞에서 멈춘다
+        if (applicationState.isAnonymous && !isEditMode) {
+            const eonClosedText = EonLogin.closed('signup_by_application');
+            if (eonClosedText) { alert(eonClosedText); return; }
+        }
 
         // 긴 신청서 전체를 먼저 검증한다. 계정은 이 검증이 끝난 뒤에만 만든다.
         if (!validateForm()) {

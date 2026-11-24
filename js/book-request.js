@@ -61,10 +61,28 @@ let emailCheckTimer = null;
 let emailVerify = null;
 
 
+// 켜진 길에서 비회원 갈래(가입을 겸한 책 신청)가 닫혀 있을 때: 폼을 띄우지 않고 임시 안내만 낸다
+function eonBookRequestClosed(text) {
+    const box = document.getElementById('stateLoading');
+    if (box) {
+        box.textContent = text + ' ';
+        const link = document.createElement('a');
+        link.href = LOGIN_REDIRECT;
+        link.textContent = '로그인하기';
+        box.appendChild(link);
+    }
+    EonLogin.notice(text);
+}
+
 document.addEventListener('DOMContentLoaded', async function () {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    // 새 로그인 스위치가 켜진 화면: 로그인 상태가 정해진 뒤에 갈래를 고른다.
+    // 저장된 새 로그인이 없으면 기다릴 것이 없다(꺼짐이면 이 줄을 타지 않는다)
+    if (EonLogin.on()) await EonLogin.settle();
+    const userData = JSON.parse(EonLogin.raw() || 'null');
 
     if (userData && userData.email) {
+        // 회원 갈래로 시작했으면 그 확인된 계정을 기준으로 화면을 지킨다(계정이 달라지면 가리고 다시 받는다)
+        if (EonLogin.on()) EonLogin.watch();
         // ===== 로그인 상태: 차단 조건 확인 후 ② 모드 =====
         try {
             // 신청서 조회 기준을 사이트 전체(funnel/guard/dashboard)와 통일:
@@ -101,6 +119,12 @@ document.addEventListener('DOMContentLoaded', async function () {
             initForm('loggedIn', userData);
         }
     } else {
+        // 켜진 길: 가입을 겸한 책 신청은 닫아 둔다(계약 4에서 연다) — 닉네임·이메일 조회, 인증번호 발송, 저장을 시작하지 않는다
+        const eonClosedText = EonLogin.closed('signup_by_book_request');
+        if (eonClosedText) {
+            eonBookRequestClosed(eonClosedText);
+            return;
+        }
         // ===== 비로그인: ① 신규 모드 =====
         initForm('anonymous', null);
     }
@@ -139,6 +163,11 @@ function initForm(mode, userData) {
         if (logoutLink) {
             logoutLink.addEventListener('click', function (e) {
                 e.preventDefault();
+                if (EonLogin.on()) {
+                    // 켜진 화면("다른 계정으로"): 인증 모듈이 이 로그인만 끝낸 뒤 로그인 화면으로. 화면은 로그인 값을 직접 지우지 않는다
+                    EonLogin.signOutThen(function () { window.location.href = LOGIN_REDIRECT; });
+                    return;
+                }
                 localStorage.removeItem('iontoefl_user');
                 localStorage.removeItem('iontoefl_login_time');
                 window.location.href = LOGIN_REDIRECT;
@@ -582,6 +611,10 @@ function switchToLoggedInUI(user) {
 // ===== 계정 생성 (비로그인 신규) =====
 // 성공 시 사용자 객체 반환, 실패/중단 시 null
 async function createAccount() {
+    // 켜진 길에서는 닫혀 있다(화면을 띄울 때 먼저 막는다 — 여기는 그 뒤의 마지막 문): 계정 조회·저장 0
+    const eonClosedText = EonLogin.closed('signup_by_book_request');
+    if (eonClosedText) { showToast(eonClosedText, 'error'); return null; }
+
     const name = document.getElementById('name').value.trim();
     const nickname = document.getElementById('nickname').value.trim();
     const email = document.getElementById('email').value.trim();
@@ -676,6 +709,8 @@ async function createAccount() {
         level: result.level || 2,
         role: result.role || 'user'
     };
+    // 켜진 화면은 로그인 값을 직접 쓰지 않는다(인증 모듈만 쓴다)
+    if (EonLogin.on()) throw new Error('켜진 화면에서는 로그인 값을 직접 쓰지 않습니다.');
     localStorage.setItem('iontoefl_user', JSON.stringify(session));
     localStorage.setItem('iontoefl_login_time', Date.now().toString());
 

@@ -1,3 +1,8 @@
+// 켜진 길에서는 회원가입을 닫아 둔다(계약 4에서 연다): 닉네임 조회·인증번호 발송·저장을 시작하지 않는다.
+// 꺼짐이면 null 이고 아래는 지금 그대로 돈다.
+const eonRegisterClosedText = EonLogin.closed('signup');
+if (eonRegisterClosedText) EonLogin.notice(eonRegisterClosedText);
+
 // ==================== 닉네임 중복 체크 ====================
 let nicknameAvailable = false;
 let nicknameCheckTimer = null;
@@ -10,6 +15,7 @@ function sanitizeNickname(el) {
 }
 
 function checkNickname(val) {
+    if (eonRegisterClosedText) return;       // 닫힌 길: 닉네임 조회를 보내지 않는다
     const status = document.getElementById('nicknameStatus');
     nicknameAvailable = false;
 
@@ -64,7 +70,7 @@ nicknameInput.addEventListener('input', (e) => {
 });
 
 // ==================== 이메일 인증 (가입 전 필수) ====================
-const emailVerify = EmailVerify.mount({
+const emailVerify = eonRegisterClosedText ? null : EmailVerify.mount({
     form: document.getElementById('registerForm'),
     emailInput: document.getElementById('email'),
     container: document.getElementById('emailVerifyBox')
@@ -73,6 +79,9 @@ const emailVerify = EmailVerify.mount({
 // ==================== 회원가입 제출 ====================
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // 닫힌 길: 검증·조회·저장보다 앞에서 멈춘다(로그인 값을 쓰는 일도 없다)
+    if (eonRegisterClosedText) { showAlert(eonRegisterClosedText, 'error'); return; }
 
     if (!validateForm('registerForm')) return;
     if (!emailVerify.requireVerified()) return;
