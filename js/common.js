@@ -1,10 +1,15 @@
 // Common JavaScript for all pages
 
-// 화면이 그릴 로그인 표시 값.
-// 새 로그인 스위치가 켜진 화면에서는 인증 모듈이 확인한 값만 쓴다(꺼짐·인증 모듈을 싣지 않은 화면은 지금 그대로).
+// 화면이 그릴 로그인 표시 값 — 대상 화면의 head 에 있는 한 길(EonLogin.raw)로 받는다.
+// 켜진 화면에서는 인증 모듈이 확인한 값만(모듈이 없으면 null), 꺼진 화면에서는 지금 그대로 저장된 값.
+// EonLogin 이 없는 화면(대상이 아닌 화면)은 지금 그대로 저장된 값을 읽는다.
 function eonCommonUserRaw() {
-    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();
+    if (window.EonLogin) return window.EonLogin.raw();
     return localStorage.getItem('iontoefl_user');
+}
+// 켜진 화면인가(EonLogin 이 없는 화면은 언제나 꺼짐)
+function eonCommonOn() {
+    return !!(window.EonLogin && window.EonLogin.on());
 }
 
 // 로그인 상태 확인 및 네비게이션 업데이트
@@ -79,12 +84,13 @@ function initHamburgerMenu() {
 
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.EonAuth && window.EonAuth.isOn()) {
+    if (eonCommonOn()) {
         // 새 로그인 스위치가 켜진 화면: 로그인 기록을 다시 확인하기 전에는 로그인 전 모양으로 둔다
+        // (인증 모듈이 없는 켜진 화면은 로그인 전 모양 그대로다 — 저장된 옛 값을 읽지 않는다)
         initHamburgerMenu();
-        window.EonAuth.bindDisplay(eonAuthDrawCommon);
+        window.EonLogin.display(eonAuthDrawCommon);
         // 신청 링크는 확인이 끝난 뒤에 한 번만 바꾼다
-        window.EonAuth.ready().then(() => getFunnelSegment()).then(applyFunnelGating).catch(e => console.warn('퍼널 게이팅 실패:', e));
+        window.EonLogin.settle().then(() => getFunnelSegment()).then(applyFunnelGating).catch(e => console.warn('퍼널 게이팅 실패:', e));
         return;
     }
     updateAuthMenu();

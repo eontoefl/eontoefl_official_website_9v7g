@@ -1,6 +1,10 @@
 // Change Password Handler
 document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // 켜진 길에서는 비밀번호 변경을 닫아 둔다(계약 4에서 연다): 회원 조회·저장을 보내지 않는다
+    const eonClosedText = EonLogin.closed('change_password');
+    if (eonClosedText) { alert(eonClosedText); return; }
     
     const currentPassword = document.getElementById('currentPassword').value;
     const newPassword = document.getElementById('newPassword').value;
@@ -24,7 +28,7 @@ document.getElementById('changePasswordForm').addEventListener('submit', async (
     }
     
     // Get current user
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     
     if (!userData) {
         alert('❌ 로그인이 필요합니다.');
@@ -72,7 +76,20 @@ document.getElementById('changePasswordForm').addEventListener('submit', async (
 
 // Check if logged in
 document.addEventListener('DOMContentLoaded', () => {
-    const userData = localStorage.getItem('iontoefl_user');
+    // 새 로그인 스위치가 켜진 화면: 로그인 기록을 서버에 확인한 뒤에 본다(꺼짐이면 아래 그대로)
+    if (EonLogin.on()) {
+        EonLogin.member(function () {
+            if (!EonLogin.raw()) {
+                alert('❌ 로그인이 필요합니다.');
+                window.location.href = 'login.html';
+                return;
+            }
+            const eonClosedText = EonLogin.closed('change_password');
+            if (eonClosedText) EonLogin.notice(eonClosedText);
+        });
+        return;
+    }
+    const userData = EonLogin.raw();
     if (!userData) {
         alert('❌ 로그인이 필요합니다.');
         window.location.href = 'login.html';

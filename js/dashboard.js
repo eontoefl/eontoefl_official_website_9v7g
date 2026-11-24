@@ -4,6 +4,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', async function() {
+    // 새 로그인 스위치가 켜진 화면: 로그인 기록을 서버에 확인한 뒤에 한 번 시작한다(꺼짐이면 아래 그대로)
+    if (EonLogin.on()) {
+        EonLogin.member(eonDashboardStart);
+        return;
+    }
     await checkLogin();
     updateSidebarUserInfo();
     await loadDashboard();
@@ -11,23 +16,34 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadSurveyTeaser();   // 실전 리포트 유도 배너 (조건 맞을 때만 표시, 실패해도 무해)
 });
 
+// 켜진 화면의 시작: 확인된 회원이 아니면 로그인 화면으로 보내고 더 가지 않는다(회원 정보 표시 0·보호 요청 0)
+async function eonDashboardStart() {
+    if (!(await checkLogin())) return;
+    updateSidebarUserInfo();
+    await loadDashboard();
+    setupEventListeners();
+    loadSurveyTeaser();
+}
+
 /**
  * 로그인 체크 및 권한 확인
+ * (돌려주는 값: 이 화면을 이어 가도 되면 true — 꺼진 길은 이 값을 쓰지 않는다)
  */
 async function checkLogin() {
-    const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const currentUser = JSON.parse(EonLogin.raw() || '{}');
     
     if (!currentUser.email) {
         alert('로그인이 필요합니다.');
         window.location.href = 'login.html';
-        return;
+        return false;
     }
 
     // 관리자인 경우 관리자 대시보드로 리다이렉트
     if (currentUser.role === 'admin') {
         window.location.href = 'admin-dashboard.html';
-        return;
+        return false;
     }
+    return true;
 }
 
 /**
@@ -35,7 +51,7 @@ async function checkLogin() {
  */
 async function loadDashboard() {
     try {
-        const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+        const currentUser = JSON.parse(EonLogin.raw() || '{}');
 
         // 닉네임 미설정 체크
         await checkNicknameSetup(currentUser);
@@ -1758,7 +1774,7 @@ async function handleUnlockGuide() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 입문서 여는 중...';
 
     try {
-        const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+        const userData = JSON.parse(EonLogin.raw() || '{}');
         let user = userData;
         let userId = userData.id;
 
@@ -1885,6 +1901,14 @@ function setupEventListeners() {
         logoutBtn.addEventListener('click', function(e) {
             e.preventDefault();
             if (confirm('로그아웃 하시겠습니까?')) {
+                if (EonLogin.on()) {
+                    // 켜진 화면: 인증 모듈이 이 로그인만 끝낸다. 화면은 로그인 값을 직접 지우지 않는다
+                    EonLogin.signOutThen(function () {
+                        alert('로그아웃되었습니다.');
+                        window.location.href = 'index.html';
+                    });
+                    return;
+                }
                 localStorage.removeItem('iontoefl_user');
                 localStorage.removeItem('iontoefl_login_time');
                 alert('로그아웃되었습니다.');
@@ -1967,7 +1991,7 @@ function toggleIntroBookHelp() {
  */
 async function renderBookOnlyDashboard(app) {
     const dashboardContent = document.getElementById('dashboardContent');
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const userData = JSON.parse(EonLogin.raw() || '{}');
     const userId = app.user_id || userData.id;
 
     // 표시할 입문서 트랙 결정 (users.intro_book_track, 없으면 regular)
@@ -2138,7 +2162,7 @@ async function goToBookViewer(app, btnId, track) {
     }
 
     try {
-        const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+        const userData = JSON.parse(EonLogin.raw() || '{}');
 
         // 1. 일회용 토큰 생성
         const token = crypto.randomUUID();
@@ -2172,7 +2196,7 @@ async function renderBookOnlyMiniCard(bookApp) {
     const dashboardContent = document.getElementById('dashboardContent');
     if (!dashboardContent) return;
 
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const userData = JSON.parse(EonLogin.raw() || '{}');
     const userId = bookApp.user_id || userData.id;
 
     // 표시할 입문서 트랙 (무료 신청 때 고른 책 = 보던 책 이어보기)
@@ -2275,7 +2299,7 @@ async function checkNicknameSetup(currentUser) {
  * 사이드바에 사용자 이름/이메일 표시
  */
 function updateSidebarUserInfo() {
-    const currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const currentUser = JSON.parse(EonLogin.raw() || '{}');
     const nameEl = document.getElementById('sidebarUserName');
     const emailEl = document.getElementById('sidebarUserEmail');
     if (nameEl) nameEl.textContent = currentUser.name || '사용자';
@@ -2289,7 +2313,7 @@ function updateSidebarUserInfo() {
 // =====================================================================
 async function loadSurveyTeaser() {
     try {
-        const user = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+        const user = JSON.parse(EonLogin.raw() || 'null');
         if (!user || !user.id) return;
 
         // 1. 최근 응시한 시험

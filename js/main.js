@@ -9,9 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (window.EonAuth && window.EonAuth.isOn()) {
+    if (eonMainOn()) {
         // 새 로그인 스위치가 켜진 화면: 로그인 기록을 다시 확인한 뒤에만 이름·관리자 표시를 그린다
-        window.EonAuth.bindDisplay(eonAuthDrawNavigation);
+        window.EonLogin.display(eonAuthDrawNavigation);
     } else {
     // Update navigation based on login status
     updateNavigation();
@@ -215,11 +215,16 @@ function formatDate(timestamp) {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-// 화면이 그릴 로그인 표시 값.
-// 새 로그인 스위치가 켜진 화면에서는 인증 모듈이 확인한 값만 쓴다(꺼짐·인증 모듈을 싣지 않은 화면은 지금 그대로).
+// 화면이 그릴 로그인 표시 값 — 대상 화면의 head 에 있는 한 길(EonLogin.raw)로 받는다.
+// 켜진 화면에서는 인증 모듈이 확인한 값만(모듈이 없으면 null), 꺼진 화면에서는 지금 그대로 저장된 값.
+// EonLogin 이 없는 화면(대상이 아닌 화면)은 지금 그대로 저장된 값을 읽는다.
 function eonMainUserRaw() {
-    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();
+    if (window.EonLogin) return window.EonLogin.raw();
     return localStorage.getItem('iontoefl_user');
+}
+// 켜진 화면인가(EonLogin 이 없는 화면은 언제나 꺼짐)
+function eonMainOn() {
+    return !!(window.EonLogin && window.EonLogin.on());
 }
 
 // 켜진 화면 전용: 확인된 표시(없으면 로그인 전 모양)로 머리말과 대시보드 버튼을 다시 그린다
@@ -305,7 +310,7 @@ function updateNavigation() {
 
 // Logout function
 function logout() {
-    if (window.EonAuth && window.EonAuth.isOn()) {
+    if (eonMainOn()) {
         eonAuthLogout();
         return;
     }

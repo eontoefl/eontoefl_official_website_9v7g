@@ -11,9 +11,52 @@ const BLOCKING_CORRECTION_KEYS = ['pending', 'waiting', 'active', 'ext_waiting',
 
 let currentUser = null;
 
+// 켜진 화면의 시작(로그인 기록을 서버에 확인한 뒤에 한 번 불린다)
+async function eonWithdrawStart() {
+    // 1) 로그인 확인: 확인된 회원이 아니면 로그인 화면으로 보내고 더 가지 않는다
+    currentUser = JSON.parse(EonLogin.raw() || 'null');
+    if (!currentUser) {
+        alert('로그인이 필요합니다.');
+        window.location.href = 'login.html?redirect=withdraw.html';
+        return;
+    }
+
+    // 2) 관리자 차단
+    if (currentUser.role === 'admin') {
+        alert('관리자 계정은 탈퇴할 수 없습니다.');
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // 켜진 길에서는 탈퇴 신청을 닫아 둔다(계약 4에서 연다): 진행 중 판정 조회도 보내지 않는다
+    const eonClosedText = EonLogin.closed('withdraw');
+    if (eonClosedText) {
+        document.getElementById('loadingState').style.display = 'none';
+        EonLogin.notice(eonClosedText);
+        return;
+    }
+
+    // 3) 진행 중 차단 판정 (조회 실패 시에도 차단 = fail-safe)
+    const blocked = await isBlockedFromWithdrawal(currentUser);
+
+    document.getElementById('loadingState').style.display = 'none';
+    if (blocked) {
+        document.getElementById('blockedState').style.display = 'block';
+    } else {
+        document.getElementById('withdrawMain').style.display = 'block';
+        setupForm();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // 새 로그인 스위치가 켜진 화면: 로그인 기록을 서버에 확인한 뒤에 한 번 시작한다(꺼짐이면 아래 그대로)
+    if (EonLogin.on()) {
+        EonLogin.member(eonWithdrawStart);
+        return;
+    }
+
     // 1) 로그인 확인
-    currentUser = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    currentUser = JSON.parse(EonLogin.raw() || 'null');
     if (!currentUser) {
         alert('로그인이 필요합니다.');
         window.location.href = 'login.html?redirect=withdraw.html';

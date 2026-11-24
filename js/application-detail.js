@@ -92,13 +92,13 @@ function formatDate(timestamp) {
 
 // Check if user is admin
 function isAdmin() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     return userData && userData.role === 'admin';
 }
 
 // Check if user is the owner of the application
 function isOwner(app) {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     if (!userData) return false;
     
     // 이메일로 비교
@@ -111,7 +111,7 @@ function hasAccess(app) {
     if (isAdmin()) return true;
     
     // 비로그인 상태
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
     if (!userData) return false;
     
     // 본인 신청서인지 확인
@@ -119,11 +119,26 @@ function hasAccess(app) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 새 로그인 스위치가 켜진 화면: 로그인 기록을 서버에 확인한 뒤에 한 번 시작한다(꺼짐이면 아래 그대로)
+    if (EonLogin.on()) {
+        EonLogin.member(function () {
+            loadApplicationDetail();
+            window.addEventListener('hashchange', handleHashChange);
+        });
+        return;
+    }
     loadApplicationDetail();
     
     // 브라우저 뒤로가기/앞으로가기 지원
     window.addEventListener('hashchange', handleHashChange);
 });
+
+// 켜진 화면: 확인된 로그인이 없을 때 로그인 화면으로(안내·돌아올 주소는 꺼진 길과 같다)
+function eonDetailGoLogin() {
+    alert('⚠️ 로그인이 필요합니다.\n\n신청서를 확인하려면 로그인해주세요.');
+    const currentUrl = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+    window.location.href = `login.html?redirect=${currentUrl}`;
+}
 
 /**
  * URL hash 변경 시 탭 전환
@@ -177,6 +192,13 @@ async function loadApplicationDetail() {
         return;
     }
     
+    // 켜진 화면: 신청서를 받기 전에 확인된 로그인이 있는지 본다(없으면 조회를 보내지 않는다)
+    if (EonLogin.on() && !EonLogin.raw()) {
+        loading.style.display = 'none';
+        eonDetailGoLogin();
+        return;
+    }
+
     loading.style.display = 'block';
     
     try {
@@ -195,7 +217,7 @@ async function loadApplicationDetail() {
             }
             
             // 접근 권한 체크
-            const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+            const userData = JSON.parse(EonLogin.raw() || 'null');
             
             // 비로그인 상태
             if (!userData) {

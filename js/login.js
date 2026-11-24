@@ -3,7 +3,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     // 새 로그인 스위치가 켜진 화면은 인증 모듈로 로그인한다(꺼짐이면 아래 그대로)
-    if (window.EonAuth && window.EonAuth.isOn()) {
+    if (window.EonLogin && window.EonLogin.on()) {
         await eonAuthLoginSubmit();
         return;
     }
@@ -130,11 +130,18 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 });
 
 // 새 로그인 스위치가 켜진 화면의 로그인.
-// 회원 표를 읽지 않고, 비밀번호를 브라우저에서 비교하지 않는다. 주소의 redirect 값으로 이동하지 않는다.
+// 회원 표를 읽지 않고, 비밀번호를 브라우저에서 비교하지 않는다.
+// 주소의 redirect 값은 허용 목록(js/auth-session.js 의 RETURN_TARGETS)에 정확히 맞을 때만 쓰고, 아니면 index.html 로 간다.
 async function eonAuthLoginSubmit() {
     const loginBtn = document.getElementById('loginBtn');
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
+
+    // 켜진 화면인데 인증 모듈이 없다: 옛 방식으로 떨어지지 않고 닫는다(요청 0)
+    if (window.EonLogin.missing()) {
+        showAlert('로그인 상태를 확인할 수 없습니다. 잠시 뒤 새로 고침해 주세요.', 'error');
+        return;
+    }
 
     if (!email || !password) {
         showAlert('이메일과 비밀번호를 입력해주세요.', 'error');
@@ -152,10 +159,12 @@ async function eonAuthLoginSubmit() {
             // 같은 로그인 기록에서 본인 정보와 사이트 접근을 둘 다 확인한 뒤다
             showAlert('로그인 성공! 환영합니다.', 'success');
             const attempt = result.attempt;
+            // 돌아갈 주소: 해석한 뒤의 출처·경로·인자·# 이 허용 목록과 정확히 맞을 때만(아니면 index.html)
+            const eonReturnTo = window.EonLogin.returnTarget(new URLSearchParams(window.location.search).get('redirect')) || 'index.html';
             setTimeout(() => {
                 // 이동 직전에 다시 본다: 아직 이 시도의 그 로그인이 확인된 로그인인가(그 사이 다른 탭이 바꿨을 수 있다)
                 if (window.EonAuth.isCurrent(attempt)) {
-                    window.location.href = 'index.html';
+                    window.location.href = eonReturnTo;
                 } else {
                     showAlert('로그인 상태가 바뀌었습니다. 다시 로그인해 주세요.', 'error');
                 }
@@ -189,7 +198,7 @@ async function eonAuthLoginSubmit() {
 // Check if already logged in
 document.addEventListener('DOMContentLoaded', () => {
     // 새 로그인 스위치가 켜진 화면은 저장된 옛 값만 보고 이동하지 않는다
-    if (window.EonAuth && window.EonAuth.isOn()) return;
+    if (window.EonLogin && window.EonLogin.on()) return;
 
     const userData = localStorage.getItem('iontoefl_user');
     if (userData) {

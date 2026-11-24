@@ -136,6 +136,15 @@
         (document.head || document.documentElement).appendChild(style);
     })();
 
+    // (계약 3C-1) 회원 화면을 가리는 규칙: 확인된 계정이 달라졌거나, 다시 확인하는 중이거나, 화면을 떠났을 때
+    // (아래 hidePage 가 html 에 표시를 붙인다. 뒤로 가기로 되살아난 화면이 앞 계정의 내용을 보이지 않게 한다.)
+    (function () {
+        const style = document.createElement('style');
+        style.id = 'eon-auth-away';
+        style.textContent = 'html.eon-auth-away body{visibility:hidden !important}';
+        (document.head || document.documentElement).appendChild(style);
+    })();
+
     // 설정된 Supabase 출처와 공개 키(시작할 때 읽는다). HTTPS 이고 주소가 출처 그대로일 때만 쓴다.
     let ORIGIN = null;
     let ANON = '';
@@ -956,6 +965,128 @@
         return { apikey: ANON, authorization: 'Bearer ' + cur.session.access_token };
     }
 
+    // =================================================================
+    // (계약 3C-1) 화면의 로그인 상태 통일에 쓰는 것들. 요청의 자격은 바꾸지 않는다.
+    // =================================================================
+
+    // ---- 켜진 길에서 닫아 두는 기능의 목록(한 곳). 계약 4 에서 하나씩 연다 — 여는 것은 closed 를 false 로 바꾸는 것이다.
+    // 문구는 시험판의 임시 문구다(운영 시범 전에 다시 정한다).
+    const FEATURES = Object.freeze({
+        signup: { closed: true, text: '지금은 회원가입을 받을 수 없습니다. (새 로그인 시험판 — 준비 중인 기능입니다)' },
+        find_id: { closed: true, text: '지금은 아이디 찾기를 쓸 수 없습니다. (새 로그인 시험판 — 준비 중인 기능입니다)' },
+        find_password: { closed: true, text: '지금은 비밀번호 찾기를 쓸 수 없습니다. (새 로그인 시험판 — 준비 중인 기능입니다)' },
+        signup_by_application: { closed: true, text: '지금은 로그인한 회원만 신청서를 낼 수 있습니다. 로그인한 뒤 이용해 주세요. (새 로그인 시험판 — 비회원 신청은 준비 중입니다)' },
+        signup_by_book_request: { closed: true, text: '지금은 로그인한 회원만 입문서를 신청할 수 있습니다. 로그인한 뒤 이용해 주세요. (새 로그인 시험판 — 비회원 신청은 준비 중입니다)' },
+        change_password: { closed: true, text: '지금은 비밀번호를 바꿀 수 없습니다. (새 로그인 시험판 — 준비 중인 기능입니다)' },
+        withdraw: { closed: true, text: '지금은 탈퇴 신청을 받을 수 없습니다. (새 로그인 시험판 — 준비 중인 기능입니다)' },
+        edit_profile: { closed: true, text: '지금은 내 정보를 고칠 수 없습니다. (새 로그인 시험판 — 준비 중인 기능입니다)' }
+    });
+    const FEATURE_UNKNOWN_TEXT = '지금은 이 기능을 쓸 수 없습니다. (새 로그인 시험판)';
+    // 닫혀 있으면 임시 문구, 열려 있으면 null. 목록에 없는 이름은 닫힌 것으로 본다
+    function closedFeature(name) {
+        if (typeof name !== 'string' || !Object.prototype.hasOwnProperty.call(FEATURES, name)) return FEATURE_UNKNOWN_TEXT;
+        return FEATURES[name].closed ? FEATURES[name].text : null;
+    }
+
+    // ---- 로그인 뒤 돌아갈 주소의 허용 목록 ----
+    // 코드가 login.html?redirect= 로 보내는 화면 가운데, 로그인 뒤 실제로 돌아갈 일이 있는 화면과 그 화면이 쓰는 인자·# 만.
+    // 로그인 화면 자신·닫아 둔 기능의 화면(withdraw.html 등)·관리자 화면은 없다.
+    const RETURN_ID = /^[A-Za-z0-9_-]{1,80}$/;
+    const RETURN_TARGETS = Object.freeze([
+        { file: 'application-detail.html', params: { id: RETURN_ID }, required: ['id'], hashes: ['', '#step1', '#step2', '#step3', '#step4', '#step5'] },
+        { file: 'application-form.html', params: { edit: RETURN_ID }, required: [], hashes: [''] },
+        { file: 'analysis.html', params: { id: RETURN_ID }, required: ['id'], hashes: [''] },
+        { file: 'my-profile.html', params: {}, required: [], hashes: [''] },
+        { file: 'book-request.html', params: {}, required: [], hashes: [''] }
+    ]);
+    // 값을 해석한 뒤의 출처·경로·인자·# 이 목록과 정확히 맞을 때만, 해석한 조각으로 다시 만든 주소를 돌려준다(아니면 null).
+    // 글자의 앞부분을 견주지 않는다.
+    function returnTarget(value) {
+        if (typeof value !== 'string' || !value || value.length > 300) return null;
+        if (/[\u0000-\u0020\\]/.test(value)) return null;
+        let u;
+        let here;
+        try {
+            here = new URL(window.location.href);
+            u = new URL(value, here.href);
+        } catch (e) { return null; }
+        if (u.origin !== here.origin || u.username || u.password) return null;
+        const dir = here.pathname.replace(/[^/]*$/, '');
+        for (let i = 0; i < RETURN_TARGETS.length; i++) {
+            const t = RETURN_TARGETS[i];
+            if (u.pathname !== dir + t.file) continue;
+            if (t.hashes.indexOf(u.hash) < 0) return null;
+            const seen = {};
+            let query = '';
+            let bad = false;
+            u.searchParams.forEach(function (v, k) {
+                if (!Object.prototype.hasOwnProperty.call(t.params, k) || seen[k] || !t.params[k].test(v)) { bad = true; return; }
+                seen[k] = true;
+                query += (query ? '&' : '?') + k + '=' + encodeURIComponent(v);
+            });
+            if (bad) return null;
+            for (let j = 0; j < t.required.length; j++) if (!seen[t.required[j]]) return null;
+            return t.file + query + u.hash;
+        }
+        return null;
+    }
+
+    // ---- 회원 화면의 시작과 지킴 ----
+    // 확인이 끝난 뒤에 화면을 시작하고, 그 뒤 확인된 계정이 달라지면 화면을 가리고 다시 받는다
+    // (다시 받으면 앞 계정의 늦은 응답·작성 중이던 값이 새 계정의 화면에 남지 않는다).
+    let guardOn = false;
+    let guardFor = null;          // 화면을 시작할 때의 확인된 표시 값
+    let leaving = false;
+    let ownSignOut = 0;           // 이 탭이 시작한 로그아웃이 진행 중인가
+    let leaveAfterSignOut = false;
+
+    function hidePage() { document.documentElement.classList.add('eon-auth-away'); }
+    function showPage() { document.documentElement.classList.remove('eon-auth-away'); }
+    function leave() {
+        if (leaving) return;
+        leaving = true;
+        hidePage();
+        try { window.location.reload(); } catch (e) { /* 다시 받지 못해도 가린 채로 둔다 */ }
+    }
+    function guardCheck() {
+        if (!guardOn || leaving) return;
+        if (state === 'restoring') { hidePage(); return; }          // 다시 확인하는 동안은 가려 둔다
+        if (displayUserRaw() === guardFor) { showPage(); return; }
+        hidePage();
+        // 이 탭이 누른 로그아웃이면 그 화면의 코드가 안내·이동을 한다(끝났다고 확인되지 않은 경우만 아래에서 다시 받는다)
+        if (ownSignOut > 0) { leaveAfterSignOut = true; return; }
+        leave();
+    }
+    function watchPage() {
+        if (guardOn) return;
+        guardOn = true;
+        guardFor = displayUserRaw();
+        listeners.push(guardCheck);
+        drawers.push(guardCheck);
+        window.addEventListener('pagehide', function () { hidePage(); });
+        window.addEventListener('pageshow', function (ev) { if (ev && ev.persisted) leave(); });
+    }
+    function memberPage(start) {
+        ready().then(function () {
+            watchPage();
+            if (typeof start === 'function') safeCall(start);
+        });
+    }
+    function signOutTracked() {
+        ownSignOut++;
+        const run = signOut();
+        const done = function (r) {
+            setTimeout(function () {
+                ownSignOut--;
+                if (ownSignOut > 0 || !leaveAfterSignOut) return;
+                leaveAfterSignOut = false;
+                if (!(r && r.outcome === 'signed_out')) leave();     // 끝났다고 확인되지 않았다: 다시 받아 다시 확인한다
+            }, 0);
+        };
+        run.then(done, function () { done(null); });
+        return run;
+    }
+
     window.EonAuth = Object.freeze({
         GRADES: GRADES,
         isOn: function () { return true; },
@@ -971,8 +1102,12 @@
             };
         },
         signIn: signIn,
-        signOut: signOut,
+        signOut: signOutTracked,
         recheck: recheck,
+        closedFeature: closedFeature,
+        returnTarget: returnTarget,
+        memberPage: memberPage,
+        watchPage: watchPage,
         // 그 시도(attempt)의 로그인이 지금도 확인된 로그인이고 표시할 수 있는가(화면이 이동 직전에 본다)
         isCurrent: function (attempt) {
             return typeof attempt === 'string' && state === 'signed_in' && !!verified && verified.sid === attempt && displayUserRaw() !== null;

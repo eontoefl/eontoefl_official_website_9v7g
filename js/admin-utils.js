@@ -1,12 +1,21 @@
 // Admin Utility Functions
 // 관리자 인증 및 유틸리티 함수 모음
 
+// 화면이 쓸 로그인 값(글자).
+// 인증 모듈을 싣는 대상 화면(head 에 EonLogin 이 있는 화면)에서는 그 한 길로 받는다
+// — 켜진 화면이면 인증 모듈이 확인한 값만, 꺼진 화면이면 저장된 값 그대로.
+// 관리자 화면처럼 EonLogin 이 없는 화면에서는 지금과 같이 저장된 값을 읽는다.
+function eonAdminUtilsUserRaw() {
+    if (window.EonLogin) return window.EonLogin.raw();
+    return localStorage.getItem('iontoefl_user');
+}
+
 /**
  * 현재 로그인한 사용자가 관리자인지 확인
  * @returns {boolean} 관리자 여부
  */
 function isAdmin() {
-    const user = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const user = JSON.parse(eonAdminUtilsUserRaw() || '{}');
     return user.role === 'admin';
 }
 
@@ -47,7 +56,7 @@ function maskName(name, forceShow = false) {
  * @returns {Object} 관리자 정보
  */
 function getAdminInfo() {
-    const user = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+    const user = JSON.parse(eonAdminUtilsUserRaw() || '{}');
     return {
         name: user.name || '관리자',
         email: user.email || '',
@@ -60,7 +69,7 @@ function getAdminInfo() {
  * @returns {boolean} 로그인 여부
  */
 function isLoggedIn() {
-    const user = localStorage.getItem('iontoefl_user');
+    const user = eonAdminUtilsUserRaw();
     return !!user;
 }
 
@@ -69,7 +78,7 @@ function isLoggedIn() {
  * @returns {Object|null} 사용자 정보 또는 null
  */
 function getLoggedInUser() {
-    const userStr = localStorage.getItem('iontoefl_user');
+    const userStr = eonAdminUtilsUserRaw();
     if (!userStr) return null;
     try {
         return JSON.parse(userStr);

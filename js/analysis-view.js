@@ -1,7 +1,16 @@
 // Analysis View JavaScript
 document.addEventListener('DOMContentLoaded', () => {
+    // 새 로그인 스위치가 켜진 화면: 로그인 기록을 서버에 확인한 뒤에 한 번 시작한다 — 신청서 조회는 그 뒤에만 나간다
+    if (EonLogin.on()) {
+        EonLogin.member(eonAnalysisStart);
+        return;
+    }
+    eonAnalysisStart();
+});
+
+function eonAnalysisStart() {
     // 로그인 체크
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user'));
+    const userData = JSON.parse(EonLogin.raw());
     if (!userData) {
         // 미로그인 → 로그인 페이지로 (현재 URL을 redirect 파라미터로 전달)
         const currentUrl = encodeURIComponent(window.location.href);
@@ -9,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     loadAnalysis();
-});
+}
 
 // 개별분석지 로드
 async function loadAnalysis() {
@@ -30,7 +39,7 @@ async function loadAnalysis() {
         }
         
         // 권한 체크: 본인 신청서이거나 관리자만 열람 가능
-        const userData = JSON.parse(localStorage.getItem('iontoefl_user'));
+        const userData = JSON.parse(EonLogin.raw());
         if (userData.role !== 'admin' && userData.email !== application.email && userData.email !== application.user_email) {
             showError('이 분석지를 열람할 권한이 없습니다.');
             return;

@@ -14,20 +14,29 @@ let isComposing = false;
 
 // ==================== 초기화 ====================
 document.addEventListener('DOMContentLoaded', () => {
+    // 새 로그인 스위치가 켜진 화면: 로그인 기록을 서버에 확인한 뒤에 한 번 시작한다(꺼짐이면 아래 그대로)
+    if (EonLogin.on()) {
+        EonLogin.member(function () {
+            if (!checkLogin()) return;      // 확인된 회원이 아니면 로그인 화면으로 보내고 더 가지 않는다
+            setupLogout();
+        });
+        return;
+    }
     checkLogin();
     setupLogout();
 });
 
 /**
  * 로그인 체크
+ * (돌려주는 값: 이 화면을 이어 가도 되면 true — 꺼진 길은 이 값을 쓰지 않는다)
  */
 function checkLogin() {
-    const userData = JSON.parse(localStorage.getItem('iontoefl_user') || 'null');
+    const userData = JSON.parse(EonLogin.raw() || 'null');
 
     if (!userData || !userData.email) {
         alert('로그인이 필요합니다.');
         window.location.href = 'login.html?redirect=' + encodeURIComponent('my-profile.html');
-        return;
+        return false;
     }
 
     // 사이드바 사용자 정보 표시
@@ -40,8 +49,18 @@ function checkLogin() {
     const verifyEmailEl = document.getElementById('verifyEmail');
     if (verifyEmailEl) verifyEmailEl.value = userData.email;
 
+    // 켜진 길에서는 내 정보 고치기를 닫아 둔다(계약 4에서 연다): 비밀번호 확인·회원 조회·저장을 시작하지 않는다
+    const eonClosedText = EonLogin.closed('edit_profile');
+    if (eonClosedText) {
+        EonLogin.notice(eonClosedText);
+        const closedForm = document.getElementById('verifyForm');
+        if (closedForm) closedForm.addEventListener('submit', (e) => { e.preventDefault(); alert(eonClosedText); });
+        return true;
+    }
+
     // 비밀번호 확인 폼 이벤트
     setupVerifyForm(userData);
+    return true;
 }
 
 /**
@@ -53,6 +72,14 @@ function setupLogout() {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (confirm('로그아웃 하시겠습니까?')) {
+                if (EonLogin.on()) {
+                    // 켜진 화면: 인증 모듈이 이 로그인만 끝낸다. 화면은 로그인 값을 직접 지우지 않는다
+                    EonLogin.signOutThen(function () {
+                        alert('로그아웃되었습니다.');
+                        window.location.href = 'index.html';
+                    });
+                    return;
+                }
                 localStorage.removeItem('iontoefl_user');
                 localStorage.removeItem('iontoefl_login_time');
                 alert('로그아웃되었습니다.');
@@ -297,6 +324,10 @@ function setupEditForm() {
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        // 켜진 길에서는 내 정보 고치기가 닫혀 있다(저장도, 로그인 값을 고쳐 쓰는 일도 없다)
+        const eonClosedText = EonLogin.closed('edit_profile');
+        if (eonClosedText) { alert(eonClosedText); return; }
+
         // 시간 만료 체크
         if (Date.now() - verifiedAt > VERIFY_TIMEOUT) {
             alert('본인 확인 시간이 만료되었습니다. 다시 비밀번호를 입력해주세요.');
@@ -360,7 +391,7 @@ function setupEditForm() {
             await supabaseAPI.patch('users', currentUserData.id, updateData);
 
             // localStorage 업데이트
-            const localUser = JSON.parse(localStorage.getItem('iontoefl_user') || '{}');
+            const localUser = JSON.parse(EonLogin.raw() || '{}');
             localUser.name = name;
             localUser.nickname = nickname;
             localUser.phone = phone;
