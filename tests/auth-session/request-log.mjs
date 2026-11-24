@@ -1,34 +1,30 @@
-// 화면 시험에서 브라우저 자동화가 쓰는 "보내기 전에 가르기"와 "가려서 기록하기".
-// 이 파일은 요청을 보내지 않는다 — 자동화가 가로챈 요청 하나를 받아 "계속/중단"과 기록 한 줄을 돌려줄 뿐이다.
+// 화면 시험에서 요청을 "보내기 전에 가르는" 차단기와 "가려서 기록하기".
+// 이 파일은 요청을 보내지 않는다 — 가로챈 요청 하나를 받아 "계속/중단"과 기록 한 줄을 돌려줄 뿐이다.
+// 쓰는 곳: tests/auth-session/screen.mjs (화면 시험 실행기 — 모든 요청이 이 결정을 거친 뒤에만 나간다).
 //
-// 쓰는 법(Playwright 계열의 예 — 브레인방의 자동화에 맞게):
-//   import { makeDecider, summarize } from './request-log.mjs';
-//   const decide = makeDecider({ selfOrigin: 'http://127.0.0.1:8787', anonKey: process.env.B3A_TEST_ANON_KEY });
-//   const records = [];
-//   await context.route('**/*', async (route) => {
-//       const r = route.request();
-//       const d = decide({ url: r.url(), method: r.method(), headers: r.headers(), postData: r.postData(),
-//                          resourceType: r.resourceType(), isNavigation: r.isNavigationRequest() });
-//       records.push(d.record);
-//       if (d.action === 'abort') return route.abort('blockedbyclient');     // 전송 전에 중단
-//       return route.continue();
-//   });
-//   … 시험 …   console.log(summarize(records));
-//
-// 기록에는 비밀번호·JWT·갱신값을 남기지 않는다: 자격은 "있음/없음"과 종류만, 본문은 키 이름만.
+// 규칙
+//   * 허용 밖의 목적지는 전송 전에 중단한다(화면 이동·폼 제출·새 창 포함).
+//   * 자격의 종류와 용도가 맞아야 한다 — 맞지 않으면 목적지가 시험 프로젝트여도 전송 전에 중단한다:
+//       비밀번호 → 로그인 요청에만 / 갱신값 → 갱신 요청에만 / 회원 JWT → 로그아웃(scope=local)과 두 RPC 에만
+//       service_role·알 수 없는 자격 → 어디로도 보내지 않는다
+//   * 기록에는 자유 형식의 글자(주소·경로·키 이름·값)를 남기지 않는다. 정해 둔 이름과 참/거짓만 남긴다.
 
 import { TEST_URL } from './rewrite.mjs';
 import { STATIC_ALLOW } from './serve-core.mjs';
 
-export const MEMBER_TARGETS = [
-    'POST /auth/v1/token?grant_type=password',
-    'POST /auth/v1/token?grant_type=refresh_token',
-    'POST /auth/v1/logout?scope=local',
-    'POST /rest/v1/rpc/my_profile',
-    'POST /rest/v1/rpc/my_site_access',
-];
+// 시험 프로젝트로 가는 요청의 이름(이 밖은 무리 이름으로만 적는다)
+const NAMED = {
+    'POST /auth/v1/token?grant_type=password': 'login',
+    'POST /auth/v1/token?grant_type=refresh_token': 'refresh',
+    'POST /auth/v1/logout?scope=local': 'logout',
+    'POST /rest/v1/rpc/my_profile': 'my_profile',
+    'POST /rest/v1/rpc/my_site_access': 'my_site_access',
+};
+export const MEMBER_JWT_TARGETS = ['logout', 'my_profile', 'my_site_access'];
 
 const STATIC_TYPES = { stylesheet: STATIC_ALLOW.style, font: STATIC_ALLOW.font, image: STATIC_ALLOW.img };
+const TYPES = ['document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr', 'fetch', 'websocket', 'manifest', 'other'];
+const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 
 function claimsOf(token) {
     try {
@@ -58,88 +54,112 @@ export function credentialKind(headers, anonKey) {
     return 'other';
 }
 
-// 본문에서 값은 버리고 키 이름만(비밀번호·갱신값이 기록에 남지 않게)
-export function bodyKeys(postData) {
-    if (postData === null || postData === undefined || postData === '') return [];
+// 본문에 비밀번호·갱신값이 들어 있는가(값도 키 이름도 돌려주지 않는다)
+export function secretItems(postData) {
+    const out = { password: false, refreshToken: false };
+    if (postData === null || postData === undefined || postData === '') return out;
+    const text = String(postData);
+    let keys = [];
     try {
-        const parsed = JSON.parse(String(postData));
-        if (parsed && typeof parsed === 'object') return Object.keys(parsed).sort();
-        return ['(JSON 값)'];
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === 'object') keys = Object.keys(parsed);
     } catch (e) {
-        try { return [...new URLSearchParams(String(postData)).keys()].sort(); } catch (_) { return ['(읽지 못함)']; }
+        try { keys = [...new URLSearchParams(text).keys()]; } catch (_) { keys = []; }
     }
+    const lower = keys.map((k) => String(k).toLowerCase());
+    out.password = lower.includes('password') || /"password"\s*:/i.test(text);
+    out.refreshToken = lower.includes('refresh_token') || /"refresh_token"\s*:/i.test(text);
+    return out;
 }
 
-// 주소에서 꼬리표의 값은 버린다(grant_type·scope 만 남긴다 — 허용 목록 판정에 필요)
-export function safeUrl(rawUrl) {
-    try {
-        const u = new URL(rawUrl);
-        const keep = [];
-        for (const [k, v] of u.searchParams) keep.push(k === 'grant_type' || k === 'scope' ? `${k}=${v}` : `${k}=…`);
-        return u.origin + u.pathname + (keep.length ? '?' + keep.join('&') : '');
-    } catch (e) { return '(주소 아님)'; }
+// 시험 프로젝트로 가는 요청의 이름(정해 둔 다섯 또는 무리 이름)
+function targetName(method, u) {
+    const exact = NAMED[`${method} ${u.pathname}${u.search}`];
+    if (exact) return exact;
+    if (u.pathname.startsWith('/rest/v1/rpc/')) return 'rest-rpc-other';
+    if (u.pathname.startsWith('/rest/v1/')) return 'rest-table';
+    if (u.pathname.startsWith('/auth/v1/')) return 'auth-other';
+    if (u.pathname.startsWith('/storage/v1/')) return 'storage';
+    if (u.pathname.startsWith('/functions/v1/')) return 'functions';
+    return 'other';
 }
 
-export function makeDecider({ selfOrigin, anonKey }) {
-    if (!selfOrigin) throw new Error('selfOrigin 이 필요하다');
+export function makeDecider({ selfOrigins, anonKey }) {
+    const selves = new Set([].concat(selfOrigins || []));
+    if (!selves.size) throw new Error('selfOrigins 가 필요하다');
     return function decide(req) {
         let u = null;
         try { u = new URL(req.url); } catch (e) { u = null; }
-        const method = String(req.method || 'GET').toUpperCase();
-        const type = String(req.resourceType || 'other');
+        const rawMethod = String(req.method || 'GET').toUpperCase();
+        const method = METHODS.includes(rawMethod) ? rawMethod : 'OTHER';
+        const type = TYPES.includes(String(req.resourceType)) ? String(req.resourceType) : 'other';
         const nav = !!req.isNavigation;
         const local = !!u && (u.protocol === 'data:' || u.protocol === 'blob:' || u.protocol === 'about:');
         let where;
+        let target = 'other';
         if (!u) where = 'outside';
         else if (local) where = 'local';
-        else if (u.origin === selfOrigin) where = u.pathname.startsWith('/__b3a/sink') ? 'sink' : 'self';
-        else if (u.origin === TEST_URL) where = 'test-project';
-        else if (!nav && method === 'GET' && STATIC_TYPES[type] && STATIC_TYPES[type].includes(u.origin)) where = 'static-allowed';
+        else if (selves.has(u.origin)) {
+            where = 'self';
+            if (u.pathname.startsWith('/__b3a/sink')) { where = 'sink'; target = 'sink'; }
+            else if (u.pathname.startsWith('/__b3a/')) target = 'test-endpoint';
+            else target = 'file';
+        } else if (u.origin === TEST_URL) { where = 'test-project'; target = targetName(rawMethod, u); }
+        else if (!nav && method === 'GET' && STATIC_TYPES[type] && STATIC_TYPES[type].includes(u.origin)) { where = 'static-allowed'; target = 'static'; }
         else where = 'outside';
 
         const cred = credentialKind(req.headers, anonKey);
-        const keys = bodyKeys(req.postData);
-        const secretBody = keys.includes('password') || keys.includes('refresh_token');
-        const route = u ? `${method} ${u.pathname}${u.search && /^(\?grant_type=[a-z_]+|\?scope=[a-z]+)$/.test(u.search) ? u.search : (u.search ? '?…' : '')}` : '';
-        const memberTarget = where === 'test-project' && MEMBER_TARGETS.includes(route);
+        const items = secretItems(req.postData);
+        // 자격의 종류와 용도
+        const problems = [];
+        if (items.password && !(where === 'test-project' && target === 'login')) problems.push('password');
+        if (items.refreshToken && !(where === 'test-project' && target === 'refresh')) problems.push('refresh_token');
+        if (cred === 'member' && !(where === 'test-project' && MEMBER_JWT_TARGETS.includes(target))) problems.push('member_jwt');
+        if (cred === 'service_role') problems.push('service_role');
+        if (cred === 'other') problems.push('unknown_credential');
+        const leak = problems.length > 0;
+        const publicRetry = where === 'test-project' && (target === 'my_profile' || target === 'my_site_access') && cred !== 'member';
+
         // 시험 프로젝트로 가는 것이라도 화면 이동(최상위·폼)은 이 조각에 없다 → 중단
-        const allowed = where === 'self' || where === 'local' || where === 'static-allowed' || (where === 'test-project' && !nav);
+        const placeOk = where === 'self' || where === 'local' || where === 'static-allowed' || (where === 'test-project' && !nav);
+        const allowed = placeOk && !leak;
         return {
             action: allowed ? 'continue' : 'abort',
             record: {
-                where, nav, type, method,
-                // 바깥 주소는 출처만 남긴다(경로에 비밀이 들어갈 수 있다 — 봇 토큰·웹훅 번호)
-                url: local ? u.protocol : (where === 'outside' ? (u ? u.origin : '(주소 아님)') : safeUrl(req.url)),
-                apikey: headerOf(req.headers, 'apikey') === null ? '없음' : '있음',
+                where, target, nav, type, method,
+                apikey: headerOf(req.headers, 'apikey') !== null,
                 credential: cred,
-                bodyKeys: keys,
-                memberTarget,
-                // 회원 자격(또는 비밀번호·갱신값)이 허용 목록 밖으로 실렸는가
-                leak: (cred === 'member' || secretBody) && !memberTarget,
-                // 회원 자격이 필요한 주소에 공개 키로 나갔는가(거절 뒤 공개 키 재시도)
-                publicRetry: where === 'test-project' && /\/rest\/v1\/rpc\/my_(profile|site_access)$/.test(u.pathname) && cred !== 'member',
+                password: items.password,
+                refreshToken: items.refreshToken,
+                leak,
+                leakKinds: problems,
+                publicRetry,
                 aborted: !allowed,
             },
         };
     };
 }
 
-// 통과 기준의 숫자들. 전부 0 이어야 하는 것: leak, publicRetry, outsideSent, sink, serviceRole.
+// 통과 기준의 숫자들.
+//   leakSent·outsideSent 는 차단기의 결정을 센 것이다(차단기가 중단한 것은 "보내지 않은 것"으로 센다).
+//   실제로 나가지 않았다는 독립된 증거는 로컬 시험 목적지의 수신 수(서버 쪽 숫자)다.
 export function summarize(records) {
     const is = (fn) => records.filter(fn).length;
+    const byTarget = {};
+    for (const r of records) if (r.where === 'test-project' && !r.aborted) byTarget[r.target] = (byTarget[r.target] || 0) + 1;
     return {
         total: records.length,
-        self: is((r) => r.where === 'self'),
-        testProject: is((r) => r.where === 'test-project'),
-        memberTargets: is((r) => r.memberTarget),
+        self: is((r) => r.where === 'self' && !r.aborted),
+        testProject: is((r) => r.where === 'test-project' && !r.aborted),
+        testProjectByTarget: byTarget,
         staticAllowed: is((r) => r.where === 'static-allowed'),
-        leak: is((r) => r.leak),
-        publicRetry: is((r) => r.publicRetry),
+        leakBlocked: is((r) => r.leak && r.aborted),
+        leakSent: is((r) => r.leak && !r.aborted),
+        publicRetry: is((r) => r.publicRetry && !r.aborted),
         serviceRole: is((r) => r.credential === 'service_role'),
-        sink: is((r) => r.where === 'sink'),
-        // 허용 밖으로 가려던 것: 전부 전송 전에 중단돼야 한다(aborted). 중단되지 않은 것이 outsideSent.
-        outsideBlockedNavigation: is((r) => r.where === 'outside' && r.nav && r.aborted),
-        outsideBlockedRequest: is((r) => r.where === 'outside' && !r.nav && r.aborted),
-        outsideSent: is((r) => (r.where === 'outside' || (r.where === 'test-project' && r.nav)) && !r.aborted),
+        sinkAttempts: is((r) => r.where === 'sink'),
+        outsideBlockedNavigation: is((r) => (r.where === 'outside' || r.where === 'sink' || (r.where === 'test-project' && r.nav)) && r.nav && r.aborted),
+        outsideBlockedRequest: is((r) => (r.where === 'outside' || r.where === 'sink') && !r.nav && r.aborted),
+        outsideSent: is((r) => (r.where === 'outside' || r.where === 'sink' || (r.where === 'test-project' && r.nav)) && !r.aborted),
     };
 }

@@ -49,8 +49,8 @@ class FakeEl {
         this.style = style;
         this.classList = {
             _set: new Set(),
-            add: (c) => { this.classList._set.add(c); },
-            remove: (c) => { this.classList._set.delete(c); },
+            add: (c) => { if (!this.classList._set.has(c)) { this.classList._set.add(c); if (this._trackClass) page.rec({ t: 'class', el: el._label, op: 'add', name: c }); } },
+            remove: (c) => { if (this.classList._set.has(c)) { this.classList._set.delete(c); if (this._trackClass) page.rec({ t: 'class', el: el._label, op: 'remove', name: c }); } },
             toggle: (c) => { if (this.classList._set.has(c)) this.classList._set.delete(c); else this.classList._set.add(c); },
             contains: (c) => this.classList._set.has(c),
         };
@@ -117,6 +117,8 @@ export class FakePage {
     _buildDom(dom) {
         const page = this;
         this.head = this.el('head', 'head');
+        this.root = this.el('html', 'html');
+        this.root._trackClass = true;
         this.body = this.el('body', 'body');
         const singles = {};
         const lists = {};
@@ -148,6 +150,7 @@ export class FakePage {
             hidden: false,
             head: this.head,
             body: this.body,
+            documentElement: this.root,
             getElementById: (id) => page.byId[id] || null,
             querySelector: (sel) => singles[sel] || null,
             querySelectorAll: (sel) => (lists[sel] ? lists[sel]() : []),

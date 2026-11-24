@@ -55,6 +55,9 @@ export class FakeSupabase {
         return s;
     }
 
+    // 시험이 로그인 기록을 끝낸다(만료·삭제). code: 그 뒤 갱신에 돌려줄 오류 코드
+    endSession(s, code) { s.alive = false; s.endCode = code; }
+
     tokenBody(s) {
         const nowSec = Math.floor(this.now() / 1000);
         const exp = nowSec + s.expiresIn;
@@ -95,6 +98,7 @@ export class FakeSupabase {
         if (u.origin !== this.origin) { this.foreign.push(req); throw new TypeError('Failed to fetch (다른 출처)'); }
         const route = `${req.method.toUpperCase()} ${u.pathname}`;
         const entry = { route, search: u.search, cred: this.credentialKind(req), apikey: this.header(req, 'apikey') === this.anonKey, viaRedirect: !!req.viaRedirect, page: req.page };
+        if (u.pathname === '/auth/v1/logout') entry.scope = u.searchParams.get('scope');
         this.log.push(entry);
 
         const name = u.pathname.split('/').pop();
@@ -132,7 +136,9 @@ export class FakeSupabase {
         if (grant === 'refresh_token') {
             const rt = body.refresh_token;
             const s = [...this.sessions.values()].find((x) => x.refresh === rt || (x.prevRefresh === rt && this.now() - x.rotatedAt < 10000));
-            if (!s || !s.alive) return json(400, { code: 'refresh_token_not_found', message: 'Invalid Refresh Token: Refresh Token Not Found' }, v);
+            // 끝난 로그인 기록의 갱신: 로그아웃으로 끝났으면 갱신값이 없다는 답, 만료로 끝났으면 만료라는 답(실제 서버의 코드는 확인하지 못함)
+            if (!s) return json(400, { code: 'refresh_token_not_found', message: 'Invalid Refresh Token: Refresh Token Not Found' }, v);
+            if (!s.alive) return json(400, { code: s.endCode || 'refresh_token_not_found', message: 'Invalid Refresh Token' }, v);
             if (s.refresh === rt) {
                 s.prevRefresh = s.refresh;
                 s.refresh = `fake-refresh-${s.sid}-${++this.seq}`;

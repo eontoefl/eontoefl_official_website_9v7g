@@ -68,9 +68,11 @@ export function extractScripts(html) {
     const out = [];
     const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/g;
     let m;
+    const headEnd = html.indexOf('</head>');
     while ((m = re.exec(html))) {
         const src = /\bsrc="([^"]+)"/.exec(m[1]);
-        out.push(src ? { src: src[1] } : { inline: m[2] });
+        const head = headEnd >= 0 && m.index < headEnd;       // head 안의 script 인가(화면이 그려지기 전에 돈다)
+        out.push(src ? { src: src[1], head } : { inline: m[2], head });
     }
     return out;
 }
@@ -190,6 +192,7 @@ export function makeWorld(stateName, { variant, mutate } = {}) {
             if (s.src) {
                 const source = w.files(s.src.split('?')[0]);
                 if (source === null) throw new Error('없는 스크립트: ' + s.src);
+                page.rec({ t: 'run-script', src: s.src.split('?')[0], head: s.head });
                 page.run(source, s.src);
             } else if (s.inline.trim()) {
                 page.run(s.inline, pageFile + ':inline');
@@ -229,7 +232,7 @@ export function makeWorld(stateName, { variant, mutate } = {}) {
 
 export function snapshot(w, page) {
     return {
-        trace: w.browser.events.map(({ n, ...e }) => e),
+        trace: w.browser.events.filter((e) => e.t !== 'run-script').map(({ n, ...e }) => e),
         requests: w.browser.requests.map((r) => ({ page: r.page, url: r.url, method: r.method, headers: r.headers, body: r.bodyText, redirect: r.redirect, credentials: r.credentials })),
         storageLog: w.browser.storageLog.map(({ n, ...e }) => e),
         storage: [...w.browser.local.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)),

@@ -55,21 +55,30 @@ export function cspHeader() {
     ].join('; ');
 }
 
-// 막힌 주소는 출처만 남긴다(바깥 주소는 경로에도 비밀이 들어갈 수 있다 — 봇 토큰·웹훅 번호)
-const originOnly = (value) => {
-    try { const u = new URL(String(value)); return u.origin === 'null' ? u.protocol : u.origin; } catch (e) { return /^[a-z-]+$/.test(String(value)) ? String(value) : '(주소 아님)'; }
-};
-const pathOnly = (value) => {
-    try { return new URL(String(value)).pathname; } catch (e) { return ''; }
-};
+// 기록에는 자유 형식의 글자를 남기지 않는다: 막힌 주소는 "어느 무리인가"만, 지시어는 정해 둔 이름만.
+const DIRECTIVES = ['default-src', 'script-src', 'script-src-elem', 'script-src-attr', 'style-src', 'style-src-elem', 'style-src-attr',
+    'font-src', 'img-src', 'media-src', 'connect-src', 'form-action', 'frame-src', 'object-src', 'worker-src', 'base-uri'];
+const STATIC_ORIGINS = new Set([...STATIC_ALLOW.style, ...STATIC_ALLOW.font, ...STATIC_ALLOW.img]);
+function originClass(value, selfOrigin) {
+    const text = String(value || '');
+    if (/^(inline|eval|data|blob|about)$/.test(text)) return 'local';
+    let u;
+    try { u = new URL(text); } catch (e) { return 'unknown'; }
+    if (u.protocol === 'data:' || u.protocol === 'blob:' || u.protocol === 'about:') return 'local';
+    if (u.origin === selfOrigin) return 'self';
+    if (u.origin === TEST_URL) return 'test-project';
+    if (STATIC_ORIGINS.has(u.origin)) return 'static-allowed';
+    return 'outside';
+}
 
 // config: { files(Set 또는 배열 — 내줄 수 있는 상대 경로), readFile(rel) → Buffer|null, mode, testKey, port, prod: { url, key }, log(entry) }
 export function createCore(config) {
     const mode = config.mode;
     if (mode !== 'on' && mode !== 'off') throw new Error('mode 는 on 또는 off');
     const files = new Set(config.files);
-    const sinkUrl = `http://127.0.0.1:${config.port}/__b3a/sink/testroom`;
-    const counts = { served: 0, refused: 0, notFound: 0, sink: 0, csp: 0, bad: 0 };
+    const selfOrigin = `http://127.0.0.1:${config.port}`;
+    const sinkUrl = `${selfOrigin}/__b3a/sink/testroom`;
+    const counts = { served: 0, refused: 0, notFound: 0, sink: 0, probe: 0, csp: 0, bad: 0 };
     const refusedSeen = new Set();
     const log = (entry) => { if (config.log) config.log(Object.assign({ ts: new Date().toISOString(), mode }, entry)); };
     const opts = { mode, testUrl: TEST_URL, testKey: config.testKey, sinkUrl, prodKey: config.prod.key, prodUrl: config.prod.url };
@@ -105,58 +114,73 @@ export function createCore(config) {
     function respond(request) {
         let u;
         try { u = new URL(request.url, `http://127.0.0.1:${config.port}`); } catch (e) { counts.bad++; return text(400, '잘못된 요청'); }
-        const method = String(request.method || 'GET').toUpperCase();
-        const queryKeys = [...u.searchParams.keys()];
+        const rawMethod = String(request.method || 'GET').toUpperCase();
+        const method = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(rawMethod) ? rawMethod : 'OTHER';
 
         if (u.pathname.startsWith('/__b3a/sink')) {
+            // 로컬 시험 목적지: 여기로 온 요청은 "차단기를 지나 실제로 나간 것"이다(차단 시험에서는 0 이어야 한다)
             counts.sink++;
-            log({ t: 'sink', method, path: u.pathname, queryKeys });
-            return text(200, '로컬 시험 목적지입니다. 여기로 온 요청은 "바깥으로 나갈 뻔한 이동"으로 셉니다.');
+            log({ t: 'sink', method });
+            return text(200, '로컬 시험 목적지입니다. 여기로 온 요청은 "바깥으로 나갈 뻔한 것"으로 셉니다.');
+        }
+        if (u.pathname === '/__b3a/probe') {
+            // 수신기가 살아 있음을 보이는 정상 요청(차단하지 않는다)
+            counts.probe++;
+            log({ t: 'probe', method });
+            return text(200, 'ok');
+        }
+        if (u.pathname === '/__b3a/blank') {
+            return { status: 200, headers: Object.assign(baseHeaders(), { 'Content-Type': 'text/html; charset=utf-8' }), body: Buffer.from('<!doctype html><meta charset="utf-8"><title>b3a</title><body></body>', 'utf8') };
+        }
+        if (u.pathname === '/__b3a/redirect/sink' || u.pathname === '/__b3a/redirect/blank') {
+            // 리디렉션이 차단기를 거치는지 보는 데 쓴다
+            const to = u.pathname.endsWith('/sink') ? '/__b3a/sink/redirected' : '/__b3a/blank';
+            log({ t: 'redirect', to: u.pathname.endsWith('/sink') ? 'sink' : 'blank' });
+            return { status: 302, headers: Object.assign(baseHeaders(), { Location: to }), body: Buffer.alloc(0) };
         }
         if (u.pathname === '/__b3a/csp-report') {
             counts.csp++;
-            let directive = '';
-            let blocked = '';
-            let doc = '';
+            let directive = 'unknown';
+            let blocked = 'unknown';
             try {
                 const parsed = JSON.parse((request.body || Buffer.alloc(0)).toString('utf8').slice(0, 65536));
                 const r = Array.isArray(parsed) ? (parsed[0] && parsed[0].body) || {} : parsed['csp-report'] || {};
-                directive = String(r['effective-directive'] || r.effectiveDirective || r['violated-directive'] || '').split(' ')[0];
-                blocked = originOnly(r['blocked-uri'] || r.blockedURL || '');
-                doc = pathOnly(r['document-uri'] || r.documentURL || '');
-            } catch (e) { directive = '(읽지 못함)'; }
-            log({ t: 'csp', directive, blocked, document: doc });   // 막힌 것의 기록일 뿐 — 이 서버가 대신 보내지 않는다
+                const d = String(r['effective-directive'] || r.effectiveDirective || r['violated-directive'] || '').split(' ')[0];
+                directive = DIRECTIVES.includes(d) ? d : 'other';
+                blocked = originClass(r['blocked-uri'] || r.blockedURL || '', selfOrigin);
+            } catch (e) { directive = 'unreadable'; }
+            log({ t: 'csp', directive, blocked });   // 막힌 것의 기록일 뿐 — 이 서버가 대신 보내지 않는다
             return { status: 204, headers: baseHeaders(), body: Buffer.alloc(0) };
         }
         if (u.pathname === '/__b3a/status') {
             return { status: 200, headers: Object.assign(baseHeaders(), { 'Content-Type': 'application/json; charset=utf-8' }), body: Buffer.from(JSON.stringify({ mode, counts, refused: [...refusedSeen].sort(), testUrl: TEST_URL, sink: sinkUrl }), 'utf8') };
         }
-        if (method !== 'GET' && method !== 'HEAD') { counts.bad++; log({ t: 'bad', method, path: u.pathname }); return text(405, '이 서버는 파일을 읽어 주기만 합니다.'); }
+        if (method !== 'GET' && method !== 'HEAD') { counts.bad++; log({ t: 'bad', method }); return text(405, '이 서버는 파일을 읽어 주기만 합니다.'); }
 
         let rel;
         try { rel = decodeURIComponent(u.pathname).replace(/^\/+/, ''); } catch (e) { counts.bad++; return text(400, '잘못된 경로'); }
         if (rel === '') rel = 'index.html';
         if (rel.includes('..') || rel.includes('\\') || rel.includes('\0') || !files.has(rel)) {
             counts.notFound++;
-            log({ t: 'notfound', method, path: u.pathname });
+            log({ t: 'notfound', method });
             return text(404, '없는 파일');
         }
         let r;
         try { r = transform(rel); } catch (e) {
             counts.refused++;
             refusedSeen.add(rel);
-            log({ t: 'refused', method, path: u.pathname, why: '바꾸지 못함' });
+            log({ t: 'refused', method, file: rel, why: 'rewrite-failed' });
             return text(409, '이 파일은 시험 설정으로 바꾸지 못해 내주지 않습니다.');
         }
-        if (!r) { counts.notFound++; log({ t: 'notfound', method, path: u.pathname }); return text(404, '없는 파일'); }
+        if (!r) { counts.notFound++; log({ t: 'notfound', method }); return text(404, '없는 파일'); }
         if (r.residue.length) {
             counts.refused++;
             refusedSeen.add(rel);
-            log({ t: 'refused', method, path: u.pathname, why: r.residue.join(', ') });
+            log({ t: 'refused', method, file: rel, why: 'prod-residue', kinds: r.residue.length });
             return text(409, `이 파일은 내주지 않습니다: 응답에 ${r.residue.join(', ')}이(가) 남아 있습니다.`);
         }
         counts.served++;
-        log({ t: 'file', method, path: u.pathname, queryKeys, changed: r.changed });
+        log({ t: 'file', method, file: rel, rewritten: r.changed.length > 0 });   // file 은 저장소의 파일 목록에 있는 이름이다
         const ext = rel.slice(rel.lastIndexOf('.')).toLowerCase();
         return {
             status: 200,
@@ -165,5 +189,5 @@ export function createCore(config) {
         };
     }
 
-    return { respond, scan, counts, sinkUrl, csp: cspHeader() };
+    return { respond, scan, counts, sinkUrl, selfOrigin, csp: cspHeader() };
 }

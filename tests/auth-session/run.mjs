@@ -9,13 +9,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 import { installNetworkGuard, verifyNetworkGuard, realNetworkAttempts, serialize } from '../supabase-config-headers/harness.mjs';
 import { targets, responses } from '../supabase-config-headers/cases.mjs';
 import { readFakeJwt, fakeJwt } from './fake-supabase.mjs';
 import { createCore, makeIgnore } from './serve-core.mjs';
-import { makeDecider, summarize } from './request-log.mjs';
 import { TEST_URL, CONFIG_FILE, AUTH_FILE, switchValue, findProdResidue } from './rewrite.mjs';
 import {
     ROOT, BASE, FAKE_ANON, SDK_FILE, PROD, V, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, STATE_NAMES, hasOldValue,
@@ -59,6 +60,11 @@ const MSG = {
     legacy: '기존 방식의 로그인 상태가 있습니다. 기존 방식에서 로그아웃한 뒤 다시 로그인해 주세요.',
     success: '로그인 성공! 환영합니다.',
     error: '로그인 중 오류가 발생했습니다. 다시 시도해주세요.',
+    rate: '요청이 많습니다. 잠시 뒤 다시 시도해주세요.',
+    previous: '이전 로그인을 끝내지 못했습니다. 잠시 뒤 다시 시도해주세요.',
+    moved: '로그인 상태가 바뀌었습니다. 다시 로그인해 주세요.',
+    logoutUnknown: '로그아웃을 확인하지 못했습니다. 잠시 뒤 다시 시도해주세요.',
+    logoutDone: '로그아웃되었습니다.',
 };
 
 const navs = (page) => page.trace.filter((e) => e.t === 'nav' || e.t === 'reload').map((e) => (e.t === 'reload' ? '[새로 고침]' : e.to));
@@ -341,30 +347,200 @@ async function testNoUrlLogin(opt) {
     return c.problems;
 }
 
-// 새로 고침(복원): 확인이 끝나기 전에는 이름이 그려지지 않는다
+// 가짜 화면에서 "보이는가": 숨김 규칙(head 의 style)이 걸려 있으면 html 의 표시(class)가 있어야 보인다
+const hideRule = (page) => page.created.find((e) => e.tagName === 'STYLE' && e.id === 'eon-auth-hide' && page.head._children.includes(e) && /materials\.html/.test(e._text) && /#adminDashboardBtn/.test(e._text) && /#studentDashboardBtn/.test(e._text));
+function shown(page) {
+    const rule = !!hideRule(page);
+    const admin = page.root.classList.contains('eon-auth-admin');
+    const member = page.root.classList.contains('eon-auth-member');
+    const visible = (el) => !!el && el.style.display !== 'none';
+    return {
+        name: /합성/.test(lastMenu(page)),
+        adminLink: /admin-dashboard\.html/.test(lastMenu(page)),
+        adminBtn: visible(page.byId.adminDashboardBtn) && (!rule || admin),
+        studentBtn: visible(page.byId.studentDashboardBtn) && (!rule || member),
+        materials: page.materials.some((m) => visible(m)) && (!rule || admin),
+        adminMark: admin,
+        memberMark: member,
+    };
+}
+const anyShown = (s) => s.name || s.adminLink || s.adminBtn || s.studentBtn || s.materials || s.adminMark || s.memberMark;
+
+// 확인 전 표시 0: 응답을 붙잡고 있는 동안 이름·관리자 링크·버튼·학습 자료 링크가 보이지 않고,
+// 성공 응답을 풀어 준 뒤에만(그것도 확인된 사람의 것만) 보인다. 켜진 화면은 첫 그리기부터 숨김 규칙이 걸려 있다.
 async function testRestoreGating(opt) {
     const c = checker();
-    const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
-    const login = await loginAs(w, 'A');
-    login.close();
-    const before = w.server.log.length;
-    const page = await w.open('index', 'index.html');
-    c.ok(st(page) === 'signed_in', `복원: signed_in 이 아님(${st(page)}·${why(page)})`);
-    const rest = w.server.log.slice(before).map((e) => e.route);
-    c.ok(rest.filter((r) => r === R.profile).length === 1 && rest.filter((r) => r === R.access).length === 1, '복원: 본인 정보·사이트 접근을 한 번씩 다시 확인하지 않음');
-    c.ok(!rest.includes('POST /auth/v1/token'), '복원: 만료 전인데 로그인·갱신 요청을 보냄');
-    const accessReq = w.browser.requests.filter((r) => r.page === 'index' && r.url === ACCESS_URL)[0];
-    const named = page.trace.filter((e) => (e.t === 'html' || e.t === 'text') && /합성 회원 A/.test(e.html || e.text || ''));
-    c.ok(named.length > 0 && /합성 회원 A/.test(lastMenu(page)), '복원: 확인 뒤에 이름이 그려지지 않음');
-    c.ok(!!accessReq && named.every((e) => e.n > accessReq.n), '복원: 로그인 기록을 다시 확인하기 전에 이름이 그려짐');
-    const first = menuHistory(page)[0];
-    c.ok(!!first && /LOGIN/.test(first.html) && !/합성 회원 A/.test(first.html), '복원: 처음 그린 머리말이 로그인 전 모양이 아님');
-    c.ok(page.materials.every((m) => m.style.display === 'none'), '복원: 관리자가 아닌데 학습 자료 링크가 보임');
-    c.ok(!page.byId.adminDashboardBtn, '복원: 관리자가 아닌데 관리자 버튼이 생김');
-    audit(w, c, '복원');
+    const cases = [
+        { name: '회원 A(성공)', key: 'A', aal: 'aal1', after: { name: true, adminLink: false, adminBtn: false, studentBtn: true, materials: false, adminMark: false, memberMark: true }, state: 'signed_in' },
+        { name: '관리자 GM·aal2(성공)', key: 'GM', aal: 'aal2', after: { name: true, adminLink: true, adminBtn: true, studentBtn: false, materials: true, adminMark: true, memberMark: false }, state: 'signed_in' },
+        { name: '회원 A(allowed 거짓)', key: 'A', aal: 'aal1', prepare: (w) => { w.server.allowedOverride = false; }, after: null, state: 'rejected' },
+        { name: '관리자 GM·aal2(응답 실패)', key: 'GM', aal: 'aal2', fail: true, after: null, state: 'rejected' },
+        { name: '차단된 계정', key: 'BLK', aal: 'aal1', holdOn: 'my_profile', after: null, state: 'rejected' },
+        { name: '탈퇴 처리 중', key: 'WD', aal: 'aal1', holdOn: 'my_profile', after: null, state: 'rejected' },
+    ];
+    for (const k of cases) {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        w.seed(k.key, { aal: k.aal });
+        // 먼저 한 번 열어 둔다(앞 화면이 남긴 호환 값이 저장소에 있는 "새로 고침"의 상태를 만든다)
+        (await w.open('before', 'index.html')).close();
+        const primed = w.browser.local.has('iontoefl_user');
+        if (k.after) c.ok(primed, `확인 전 표시(${k.name}): 시험이 호환 값이 남아 있는 상태를 만들지 못함`);
+        if (k.prepare) k.prepare(w);
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const holdOn = k.holdOn || 'my_site_access';
+        w.server.faults[holdOn] = () => gate.then(() => (k.fail ? { status: 500, headers: {}, body: '{}' } : null));
+        let first = null;
+        const page = await w.open('index', 'index.html', {
+            noIdle: true,
+            beforeLoad: (p) => {
+                // 화면의 다른 스크립트(body 의 것)가 돌기 전에 숨김 규칙이 걸렸는가
+                const styleAt = p.trace.findIndex((e) => e.t === 'append' && e.to === 'head' && e.el === '#eon-auth-hide');
+                const bodyAt = p.trace.findIndex((e) => e.t === 'run-script' && !e.head);
+                first = { rule: !!hideRule(p), order: styleAt >= 0 && bodyAt >= 0 && styleAt < bodyAt, shown: shown(p) };
+            },
+        });
+        const label = `확인 전 표시(${k.name})`;
+        c.ok(first.rule && first.order, `${label}: 첫 그리기 — 숨김 규칙이 head 에서(다른 스크립트보다 먼저) 걸리지 않음`);
+        c.ok(!anyShown(first.shown), `${label}: 첫 그리기 — 이름·관리자 표시·버튼·학습 자료 링크가 보임`);
+        await w.browser.spin(60);
+        c.ok(st(page) === 'restoring' && w.browser.pending > 0, `${label}: 시험이 응답을 붙잡지 못함(${st(page)})`);
+        c.ok(!anyShown(shown(page)), `${label}: 응답을 붙잡고 있는 동안 표시가 보임(${JSON.stringify(shown(page))})`);
+        c.ok(!menuHistory(page).some((e) => /합성|dashboard\.html/.test(e.html)), `${label}: 응답을 붙잡고 있는 동안 이름이 그려진 적이 있음`);
+        c.ok(page.evaluate('EonAuth.displayUserRaw()') === null && page.evaluate('EonAuth.profile()') === null, `${label}: 응답을 붙잡고 있는 동안 표시·본인 정보를 내줌`);
+        release();
+        await w.browser.idle();
+        const after = shown(page);
+        c.ok(st(page) === k.state, `${label}: 풀어 준 뒤 상태가 ${k.state} 가 아님(${st(page)}·${why(page)})`);
+        if (k.after) c.ok(JSON.stringify(after) === JSON.stringify(k.after), `${label}: 풀어 준 뒤 표시가 기대와 다름(${JSON.stringify(after)})`);
+        else c.ok(!anyShown(after) && navs(page).length === 0, `${label}: 확인에 실패했는데 표시·이동이 있음(${JSON.stringify(after)})`);
+        audit(w, c, label);
+    }
+    // 복원에서 보내는 요청: 만료 전이면 로그인·갱신 없이 두 확인 요청을 한 번씩
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const before = w.server.log.length;
+        const page = await w.open('index', 'index.html');
+        const rest = w.server.log.slice(before).map((e) => e.route);
+        c.ok(st(page) === 'signed_in' && rest.filter((r) => r === R.profile).length === 1 && rest.filter((r) => r === R.access).length === 1, '복원: index 에서 본인 정보·사이트 접근을 한 번씩 다시 확인하지 않음');
+        c.ok(w.count(R.profile) === 2 && w.count(R.access) === 2, '복원: 로그인 화면 1회 + index 1회(각 요청 모두 2회)가 아님');
+        c.ok(!rest.includes('POST /auth/v1/token'), '복원: 만료 전인데 로그인·갱신 요청을 보냄');
+        audit(w, c, '복원');
+    }
     return c.problems;
 }
 
+// 로그인 뒤 1초 기다렸다 이동하기 직전에 다시 본다: 아직 그 시도의 그 로그인이 확인된 로그인인가
+async function testMoveRecheck(opt) {
+    const c = checker();
+    for (const [name, change] of [
+        ['다른 계정으로 바뀜', (w) => { w.seed('B'); }],
+        ['로그인이 없어짐', (w) => { w.browser.local.delete('eon_auth_v1'); }],
+        ['옛 방식의 값이 생김', (w) => { w.browser.local.set('iontoefl_user', OLD_STUDENT); }],
+    ]) {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const page = await w.open('login', 'login.html');
+        page.byId.email.value = A.email;
+        page.byId.password.value = A.password;
+        const done = page.byId.loginForm.fire('submit');
+        await w.browser.idle();
+        await done;
+        c.ok(st(page) === 'signed_in' && boxes(page).includes(MSG.success) && navs(page).length === 0, `이동 직전(${name}): 시험이 "확인됨·이동 전" 상태를 만들지 못함`);
+        change(w);                              // 1초를 기다리는 사이 다른 탭이 바꾼 것처럼
+        await w.browser.advance(1500);
+        c.ok(navs(page).length === 0, `이동 직전(${name}): 다시 보지 않고 이동함(${navs(page).join(', ')})`);
+        c.ok(boxes(page).includes(MSG.moved), `이동 직전(${name}): 안내가 없음`);
+        audit(w, c, `이동 직전(${name})`);
+    }
+    return c.problems;
+}
+
+// 한 시도(A)의 실패 처리가 다른 로그인(B)을 건드리지 않는다.
+//   A 를 확인하는 사이 저장된 로그인이 B 로 바뀐다 → A 의 시도는 표시 0·이동 0·B 에 대한 갱신·종료 요청 0.
+//   B 는 그 뒤 별도의 확인으로만 그린다.
+// weaken 이 참이면 모듈의 "직전 확인"을 뺀 사본으로 돌린다 — 요청이 지나는 한 곳만으로도 B 로 나가지 않아야 한다.
+const WEAKEN = [
+    [AUTH_FILE, "        if (!st || !same(st.claims, att) || typeof st.refreshToken !== 'string' || !st.refreshToken) return { kind: 'changed' };", "        if (!st) return { kind: 'changed' };"],
+    [AUTH_FILE, "        if (!st || !same(st.claims, att)) return 'changed';\n        const p = { kind: 'logout',", "        if (!st) return 'changed';\n        const p = { kind: 'logout',"],
+];
+async function testAttemptBinding(opt) {
+    const c = checker();
+    for (const weaken of [false, true]) {
+        const tag = weaken ? '(직전 확인을 뺀 사본 — 요청이 지나는 한 곳만으로)' : '';
+        const weakProblems = [];
+        const mutate = weaken
+            ? ((p, text) => { const t = applyEdits(WEAKEN, weakProblems)(p, text); return opt.mutate ? opt.mutate(p, t) : t; })
+            : opt.mutate;
+
+        // (1) 갱신: A 는 끝난 기록이라 확인에서 no_member → 복구(갱신)로 가려는 순간 저장된 로그인은 이미 B
+        {
+            const w = makeWorld('빈 브라우저', { variant: V.ON, mutate });
+            const sA = w.seed('A');
+            w.server.endSession(sA, 'session_expired');
+            let sB = null;
+            let rawB = null;
+            w.server.hooks['after:my_profile'] = () => { delete w.server.hooks['after:my_profile']; sB = w.seed('B'); rawB = w.browser.local.get('eon_auth_v1'); };
+            const page = await w.open('index', 'index.html');
+            await w.browser.advance(40 * 1000);     // 막힌 요청을 공식 클라이언트가 다시 보내려다 그만둘 때까지(가짜 시계)
+            const label = `묶기·갱신${tag}`;
+            c.ok(!!sB, `${label}: 시험이 로그인을 바꾸지 못함`);
+            c.ok(w.count(R.refresh) === 0, `${label}: B 에 대한 갱신 요청이 나감(${w.count(R.refresh)}번)`);
+            c.ok(w.count(R.logout) === 0, `${label}: B 에 대한 종료 요청이 나감`);
+            c.ok(!!sB && sB.alive && sB.prevRefresh === null && w.browser.local.get('eon_auth_v1') === rawB, `${label}: B 의 로그인 기록·저장값이 달라짐`);
+            c.ok(!page.trace.some((e) => /합성 회원 A/.test(e.html || e.text || '')) && !/m-A/.test(w.browser.local.get('iontoefl_user') || ''), `${label}: A 의 표시·호환 값이 생김`);
+            c.ok(navs(page).length === 0, `${label}: 화면 이동이 있음`);
+            const subs = w.browser.requests.filter((r) => r.url === PROFILE_URL || r.url === ACCESS_URL).map((r) => (readFakeJwt(bearerOf(r)) || {}).sub);
+            c.ok(JSON.stringify(subs) === JSON.stringify(['auth-A', 'auth-B', 'auth-B']), `${label}: B 를 별도의 확인(두 요청)으로만 그리지 않음(${subs.join(',')})`);
+            c.ok(st(page) === 'signed_in' && page.evaluate('EonAuth.profile().id') === 'm-B', `${label}: 그 뒤 B 의 확인 결과가 아님(${st(page)}·${why(page)})`);
+            if (weaken) c.ok(weakProblems.length === 0, `${label}: 사본을 만들지 못함`);
+            audit(w, c, label);
+        }
+        // (2) 종료: 회원 대응이 없는 N → 갱신은 되지만 여전히 no_member → 이 로그인을 끝내려는 순간 저장된 로그인은 이미 B
+        {
+            const w = makeWorld('빈 브라우저', { variant: V.ON, mutate });
+            w.seed('N');
+            let sB = null;
+            let rawB = null;
+            let asked = 0;
+            w.server.hooks['after:my_profile'] = () => {
+                if (++asked !== 2) return;
+                delete w.server.hooks['after:my_profile'];
+                sB = w.seed('B');
+                rawB = w.browser.local.get('eon_auth_v1');
+            };
+            const page = await w.open('index', 'index.html');
+            await w.browser.advance(40 * 1000);
+            const label = `묶기·종료${tag}`;
+            c.ok(!!sB, `${label}: 시험이 로그인을 바꾸지 못함`);
+            c.ok(w.count(R.logout) === 0, `${label}: B 에 대한 종료 요청이 나감`);
+            c.ok(w.count(R.refresh) === 1 && !!sB && sB.prevRefresh === null, `${label}: 갱신이 N 의 것 한 번이 아님(B 에 대한 갱신 요청이 나갔을 수 있음)`);
+            c.ok(!!sB && sB.alive && w.browser.local.get('eon_auth_v1') === rawB, `${label}: B 의 로그인 기록·저장값이 달라짐`);
+            c.ok(st(page) === 'signed_in' && page.evaluate('EonAuth.profile().id') === 'm-B', `${label}: 그 뒤 B 의 확인 결과가 아님(${st(page)}·${why(page)})`);
+            audit(w, c, label);
+        }
+    }
+    // (3) 표시 직전: 확인된 뒤라도 저장된 로그인이 바뀌었으면 그 자리에서 표시를 내주지 않는다
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const page = await w.open('index', 'index.html');
+        const attempt = page.evaluate('JSON.parse(localStorage.getItem("eon_auth_v1:compat")).sid');
+        c.ok(page.evaluate('EonAuth.displayUserRaw()') !== null && page.evaluate(`EonAuth.isCurrent(${JSON.stringify(attempt)})`) === true, '표시 직전: 시험이 확인된 상태를 만들지 못함');
+        w.seed('B');                            // 알림 없이 저장된 로그인만 바뀐 순간
+        c.ok(page.evaluate('EonAuth.displayUserRaw()') === null, '표시 직전: 저장된 로그인이 바뀌었는데 표시를 내줌');
+        c.ok(page.evaluate(`EonAuth.isCurrent(${JSON.stringify(attempt)})`) === false, '표시 직전: 저장된 로그인이 바뀌었는데 "아직 그 로그인"이라고 답함');
+        // 이 탭이 확인한 로그인이 아닌 것은 끝내지 않는다
+        const results = [];
+        page.sandbox.__probe = (v) => results.push(v);
+        page.evaluate('EonAuth.signOut().then((r) => __probe(r.outcome));');
+        await w.browser.spin(30);
+        c.ok(w.count(R.logout) === 0, '표시 직전: 이 탭이 확인하지 않은 로그인(B)에 대한 종료 요청이 나감');
+    }
+    return c.problems;
+}
 // signed_in 이 되지 않아야 하는 경우들: 표시·이동 0
 async function testNotSignedIn(opt) {
     const c = checker();
@@ -378,6 +554,7 @@ async function testNotSignedIn(opt) {
         { name: '점검(503)', key: 'A', prepare: (w) => { w.server.maintenance = true; }, msg: MSG.maintenance, state: 'rejected', reason: 'maintenance', session: true },
         { name: 'my_profile 응답 모양이 다름', key: 'A', prepare: (w) => { w.server.faults.my_profile = () => ({ status: 200, headers: {}, body: JSON.stringify({ state: 'ok' }) }); }, msg: MSG.error, state: 'rejected', reason: 'unexpected', session: true },
         { name: 'my_site_access 실패(500)', key: 'A', prepare: (w) => { w.server.faults.my_site_access = () => ({ status: 500, headers: {}, body: '{}' }); }, msg: MSG.error, state: 'rejected', reason: 'unexpected', session: true },
+        { name: 'my_profile 429', key: 'A', prepare: (w) => { w.server.faults.my_profile = () => ({ status: 429, headers: {}, body: '{}' }); }, msg: MSG.rate, state: 'rejected', reason: 'rate_limited', session: true, once: R.profile },
         { name: 'my_profile 응답 유실', key: 'A', prepare: (w) => { w.server.faults.my_profile = () => 'network'; }, msg: MSG.error, state: 'rejected', reason: 'network', session: true, once: R.profile },
         {
             name: '두 응답 사이 계정 변경', key: 'A', msg: MSG.error, other: true,
@@ -413,6 +590,7 @@ async function testNotSignedIn(opt) {
             const rpc = w.browser.requests.filter((r) => r.url === PROFILE_URL || r.url === ACCESS_URL);
             const subs = rpc.map((r) => (readFakeJwt(bearerOf(r)) || {}).sub);
             c.ok(JSON.stringify(subs) === JSON.stringify(['auth-A', 'auth-A', 'auth-B', 'auth-B']), `${label}: 확인 요청의 계정 순서가 A·A·B·B 가 아님(${subs.join(',')})`);
+            c.ok(w.count(R.refresh) === 0 && w.count(R.logout) === 0, `${label}: A 의 실패 처리가 갱신·종료 요청을 보냄(B 를 건드렸을 수 있음)`);
         } else {
             c.ok(st(page) === k.state && (k.reason === undefined || why(page) === k.reason), `${label}: 상태가 ${k.state}${k.reason ? '·' + k.reason : ''} 가 아님(${st(page)}·${why(page)})`);
             c.ok(!w.browser.local.has('iontoefl_user') && !w.browser.local.has('iontoefl_login_time') && !w.browser.local.has('eon_auth_v1:compat'), `${label}: 호환 값·표식이 남음`);
@@ -428,9 +606,10 @@ async function testNotSignedIn(opt) {
     return c.problems;
 }
 
-// 만료·종료된 로그인 기록
+// 만료·종료된 로그인 기록: "갱신 거절"과 "로그인이 끝났음"을 나눈다
 async function testExpiry(opt) {
     const c = checker();
+    const noStore = { 'x-supabase-api-version': '2024-01-01', 'Content-Type': 'application/json' };
     // (1) JWT 만 만료(401 PGRST303) → 한 번 갱신 → 다시 확인 → signed_in
     {
         const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
@@ -451,44 +630,67 @@ async function testExpiry(opt) {
         c.ok(st(page) === 'signed_in' && w.count(R.refresh) === 1, `만료(저장값): 갱신 한 번 뒤 signed_in 이 아님(${st(page)}·${why(page)}·갱신 ${w.count(R.refresh)})`);
         audit(w, c, '만료(저장값)');
     }
-    // (3) 로그인 기록이 끝났는데 JWT 는 유효(200 no_member) → 갱신 실패 → rejected, 새 모듈이 만든 호환 값 정리
-    {
+    // (3) 로그인 기록은 끝났는데 JWT 는 유효(200 no_member) → 갱신 한 번 → 서버의 답에 따라
+    //     끝났다는 코드: 이 브라우저의 그 로그인을 지움 / 그 밖(다른 4xx·429·5xx·응답 없음): 모름 — 지우지 않음
+    const refusals = [
+        { name: '만료 코드(session_expired)', end: 'session_expired', reason: 'expired', kept: false },
+        { name: '없음 코드(session_not_found)', end: 'session_not_found', reason: 'expired', kept: false },
+        { name: '갱신값 못 찾음(refresh_token_not_found)', end: 'refresh_token_not_found', reason: 'network', kept: true },
+        { name: '이미 쓴 갱신값(refresh_token_already_used)', end: 'refresh_token_already_used', reason: 'network', kept: true },
+        { name: '429', fault: () => ({ status: 429, headers: noStore, body: JSON.stringify({ code: 'over_request_rate_limit', message: 'rate limit' }) }), reason: 'rate_limited', kept: true },
+        { name: '그 밖의 4xx(코드 없음)', fault: () => ({ status: 400, headers: noStore, body: '{}' }), reason: 'network', kept: true },
+        { name: '5xx', fault: () => ({ status: 500, headers: noStore, body: '{}' }), reason: 'network', kept: true },
+        { name: '응답 없음', fault: () => 'network', reason: 'network', kept: true },
+    ];
+    for (const k of refusals) {
         const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
         const login = await loginAs(w, 'A');
         login.close();
-        for (const s of w.server.sessions.values()) s.alive = false;
-        const page = await w.open('index', 'index.html');
-        c.ok(st(page) === 'rejected' && why(page) === 'expired', `끝난 기록: rejected·expired 가 아님(${st(page)}·${why(page)})`);
-        c.ok(!menuHistory(page).some((e) => /합성/.test(e.html)) && /LOGIN/.test(lastMenu(page)), '끝난 기록: 이름이 그려짐');
-        c.ok(!w.browser.local.has('iontoefl_user') && !w.browser.local.has('iontoefl_login_time') && !w.browser.local.has('eon_auth_v1:compat'), '끝난 기록: 새 모듈이 만든 호환 값이 남음');
-        c.ok(!w.browser.local.has('eon_auth_v1'), '끝난 기록: 로그인 상태가 저장소에 남음');
-        c.ok(w.count(R.refresh) === 1 && w.count(R.profile) === 2 && w.count(R.access) === 1, '끝난 기록: 확인 한 번 → 갱신 한 번의 순서가 아님(로그인 때의 확인 포함 my_profile 2·my_site_access 1)');
+        for (const s of w.server.sessions.values()) w.server.endSession(s, k.end || 'session_expired');
+        if (k.fault) w.server.faults.token = (req, u) => (u.searchParams.get('grant_type') === 'refresh_token' ? k.fault() : null);
+        const page = await w.open('index', 'index.html', { noIdle: true });
+        await w.browser.advance(60 * 1000);
+        const label = `끝난 기록 › 갱신의 답: ${k.name}`;
+        c.ok(st(page) === 'rejected' && why(page) === k.reason, `${label}: rejected·${k.reason} 가 아님(${st(page)}·${why(page)})`);
+        c.ok(w.browser.local.has('eon_auth_v1') === k.kept, `${label}: 로그인 기록의 남김·지움이 기대(${k.kept ? '남김 — 끝났다는 증거가 아니다' : '지움'})와 다름`);
+        c.ok(w.count(R.refresh) === 1, `${label}: 갱신이 한 번이 아님(${w.count(R.refresh)}번)`);
+        c.ok(w.count(R.logout) === 0, `${label}: 종료 요청을 보냄`);
+        c.ok(!menuHistory(page).some((e) => /합성/.test(e.html)) && /LOGIN/.test(lastMenu(page)), `${label}: 이름이 그려짐`);
+        c.ok(!w.browser.local.has('iontoefl_user') && !w.browser.local.has('iontoefl_login_time') && !w.browser.local.has('eon_auth_v1:compat'), `${label}: 새 모듈이 만든 호환 값이 남음`);
         const results = [];
         page.sandbox.__probe = (v) => results.push(v);
         page.evaluate(`EonAuth.credentialFor('member', '${PROFILE_URL}', 'POST').then(() => __probe('자격을 줌'), (e) => __probe(e.code));`);
         await w.browser.idle();
-        c.ok(results[0] === 'rejected', `끝난 기록: 거절 뒤 회원 자격 요청이 오류가 아님(${results[0]})`);
-        audit(w, c, '끝난 기록');
+        c.ok(results[0] === 'rejected', `${label}: 거절 뒤 회원 자격 요청이 오류가 아님(${results[0]})`);
+        audit(w, c, label);
     }
-    // (4) 갱신 요청의 응답 유실 → rejected(모름). 같은 갱신을 다시 보내지 않고, 로그인 기록은 건드리지 않음
+    // (4) 복원 오류 길: 저장된 JWT 가 만료됐고 갱신의 답을 받지 못함 → rejected(모름).
+    //     같은 갱신을 다시 보내지 않고, 로그인 기록은 건드리지 않고, 새 모듈이 만든 호환 값은 남기지 않는다
     for (const [name, fault] of [['응답 유실', () => 'network'], ['서버 오류(503)', () => ({ status: 503, headers: {}, body: '{}' })]]) {
         const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
-        w.seed('A', { expiresIn: -60 });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const stored = JSON.parse(w.browser.local.get('eon_auth_v1'));
+        stored.expires_at = Math.floor(w.browser.now / 1000) - 60;         // 저장된 만료 시각이 지난 것으로
+        w.browser.local.set('eon_auth_v1', JSON.stringify(stored));
+        c.ok(w.browser.local.has('iontoefl_user'), `복원 오류(${name}): 시험이 호환 값이 있는 상태를 만들지 못함`);
         w.server.faults.token = fault;
         const page = await w.open('index', 'index.html', { noIdle: true });
         await w.browser.advance(90 * 1000);      // 공식 클라이언트가 스스로 다시 보내려 하는 동안(가짜 시계)
-        c.ok(st(page) === 'rejected' && why(page) === 'network', `갱신 ${name}: rejected·network 가 아님(${st(page)}·${why(page)})`);
-        c.ok(w.count(R.refresh) === 1, `갱신 ${name}: 결과를 모르는 갱신을 다시 보냄(${w.count(R.refresh)}번)`);
-        c.ok(w.browser.local.has('eon_auth_v1') && w.count(R.logout) === 0, `갱신 ${name}: 모르는 결과로 로그인 기록을 지움`);
-        c.ok(page.evaluate('EonAuth.displayUserRaw()') === null && !menuHistory(page).some((e) => /합성/.test(e.html)), `갱신 ${name}: 표시를 내줌`);
-        audit(w, c, `갱신 ${name}`);
+        c.ok(st(page) === 'rejected' && why(page) === 'network', `복원 오류(${name}): rejected·network 가 아님(${st(page)}·${why(page)})`);
+        c.ok(w.count(R.refresh) === 1, `복원 오류(${name}): 결과를 모르는 갱신을 다시 보냄(${w.count(R.refresh)}번)`);
+        c.ok(w.browser.local.has('eon_auth_v1') && w.count(R.logout) === 0, `복원 오류(${name}): 모르는 결과로 로그인 기록을 지움`);
+        c.ok(!w.browser.local.has('iontoefl_user') && !w.browser.local.has('iontoefl_login_time') && !w.browser.local.has('eon_auth_v1:compat'), `복원 오류(${name}): 새 모듈이 만든 호환 값이 남음`);
+        c.ok(page.evaluate('EonAuth.displayUserRaw()') === null && !menuHistory(page).some((e) => /합성/.test(e.html)), `복원 오류(${name}): 표시를 내줌`);
+        audit(w, c, `복원 오류(${name})`);
     }
     return c.problems;
 }
 
-// 로그아웃: 이 로그인만, 새 모듈이 만든 호환 값만. 그 뒤 다시 로그인.
+// 로그아웃: 이 로그인만, 새 모듈이 만든 호환 값만, 서버가 끝났다고 답했을 때만. 그 뒤 다시 로그인.
 async function testLogout(opt) {
     const c = checker();
+    const NEW_KEYS = ['iontoefl_user', 'iontoefl_login_time', 'eon_auth_v1:compat', 'eon_auth_v1'];
     {
         const w = makeWorld('교재 편집만', { variant: V.ON, mutate: opt.mutate });
         const login = await loginAs(w, 'A');
@@ -498,8 +700,8 @@ async function testLogout(opt) {
         await w.browser.idle();
         c.ok(st(page) === 'signed_out', `로그아웃: signed_out 이 아님(${st(page)})`);
         c.ok(w.count(R.logout) === 1, '로그아웃: 이 로그인만 끝내는 요청이 한 번이 아님');
-        c.ok(!['iontoefl_user', 'iontoefl_login_time', 'eon_auth_v1:compat', 'eon_auth_v1'].some((k) => w.browser.local.has(k)), '로그아웃: 새 모듈의 값이 남음');
-        c.ok(page.trace.some((e) => e.t === 'alert' && e.text === '로그아웃되었습니다.') && navs(page).join() === '[새로 고침]', '로그아웃: 안내·새로 고침이 기대와 다름');
+        c.ok(!NEW_KEYS.some((k) => w.browser.local.has(k)), '로그아웃: 새 모듈의 값이 남음');
+        c.ok(page.trace.some((e) => e.t === 'alert' && e.text === MSG.logoutDone) && navs(page).join() === '[새로 고침]', '로그아웃: 안내·새로 고침이 기대와 다름');
         c.ok([...w.server.sessions.values()].filter((s) => !s.alive).length === 1, '로그아웃: 서버에서 끝난 로그인 기록이 하나가 아님');
         page.close();
         const again = await loginAs(w, 'A', { name: 'login2' });
@@ -523,9 +725,59 @@ async function testLogout(opt) {
         c.ok(!w.browser.local.has('eon_auth_v1') && !w.browser.local.has('eon_auth_v1:compat'), '바뀐 호환 값: 새 모듈의 로그인·표식이 남음');
         audit(w, c, '바뀐 호환 값');
     }
+    // 로그아웃의 답이 실패·모름이면 "끝냈다"로 처리하지 않는다(안내·새로 고침·정리 없음, 다시 보내지도 않음)
+    const unknowns = [
+        ['응답 없음', () => 'network'],
+        ['5xx', () => ({ status: 500, headers: {}, body: '{}' })],
+        ['429', () => ({ status: 429, headers: {}, body: JSON.stringify({ code: 'over_request_rate_limit' }) })],
+        ['401', () => ({ status: 401, headers: {}, body: JSON.stringify({ code: 'bad_jwt' }) })],
+        ['403(코드 없음)', () => ({ status: 403, headers: {}, body: '{}' })],
+    ];
+    for (const [name, fault] of unknowns) {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const page = await w.open('index', 'index.html');
+        w.server.faults.logout = fault;
+        page.evaluate('logout()');
+        await w.browser.idle();
+        await w.browser.advance(20 * 1000);
+        const label = `로그아웃 모름(${name})`;
+        c.ok(st(page) === 'signed_in', `${label}: 끝내지 못했는데 상태가 바뀜(${st(page)})`);
+        c.ok(page.trace.some((e) => e.t === 'alert' && e.text === MSG.logoutUnknown) && !page.trace.some((e) => e.t === 'alert' && e.text === MSG.logoutDone), `${label}: 끝내지 못했는데 "로그아웃되었습니다"로 안내함`);
+        c.ok(navs(page).length === 0, `${label}: 끝내지 못했는데 새로 고침함`);
+        c.ok(NEW_KEYS.every((k) => w.browser.local.has(k)) && /합성 회원 A/.test(lastMenu(page)), `${label}: 끝내지 못했는데 로그인·호환 값·표시를 지움`);
+        c.ok(w.count(R.logout) === 1, `${label}: 종료 요청이 한 번이 아님(다시 보냈을 수 있음)`);
+        audit(w, c, label);
+    }
+    // 서버가 "그 로그인 기록은 없다"고 답한 것은 끝난 것이다
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const login = await loginAs(w, 'A');
+        login.close();
+        const page = await w.open('index', 'index.html');
+        for (const s of w.server.sessions.values()) s.alive = false;
+        page.evaluate('logout()');
+        await w.browser.idle();
+        c.ok(st(page) === 'signed_out' && !NEW_KEYS.some((k) => w.browser.local.has(k)), `로그아웃(이미 없는 기록): signed_out 이 아님(${st(page)})`);
+        audit(w, c, '로그아웃(이미 없는 기록)');
+    }
+    // 새 로그인 전에 앞의 로그인을 끝내지 못하면(모름) 새 로그인 요청을 보내지 않는다
+    {
+        const w = makeWorld('빈 브라우저', { variant: V.ON, mutate: opt.mutate });
+        const page = await loginAs(w, 'A');
+        const rawA = w.browser.local.get('eon_auth_v1');
+        w.server.faults.logout = () => 'network';
+        await w.submit(page, ACCOUNTS.B.email, ACCOUNTS.B.password);
+        await w.browser.advance(20 * 1000);
+        c.ok(boxes(page)[boxes(page).length - 1] === MSG.previous, '이전 로그인 모름: 안내가 기대와 다름');
+        c.ok(w.count(R.login) === 1, `이전 로그인 모름: 앞의 것을 끝내지 못했는데 새 로그인 요청을 보냄(${w.count(R.login)}번)`);
+        c.ok(w.browser.local.get('eon_auth_v1') === rawA && st(page) === 'signed_in' && page.evaluate('EonAuth.profile().id') === 'm-A', '이전 로그인 모름: 앞의 로그인을 지우거나 상태를 바꿈');
+        c.ok(JSON.stringify(navs(page)) === JSON.stringify(['index.html']), '이전 로그인 모름: 화면 이동이 더 있음');
+        audit(w, c, '이전 로그인 모름');
+    }
     return c.problems;
 }
-
 // 옛 방식의 로그인 상태가 있는 브라우저: 덮어쓰지 않고, 옛 값으로 그리지 않고, 자동 이동하지 않는다
 async function testLegacyPresent(opt) {
     const c = checker();
@@ -783,11 +1035,13 @@ async function testTabs(opt) {
 
 const ON_TESTS = [
     ['로그인 성공 하나', testLoginOk],
+    ['로그인 뒤 이동 직전의 재확인', testMoveRecheck],
     ['주소에 실린 로그인 정보를 읽지 않음', testNoUrlLogin],
-    ['새로 고침(복원)에서 확인 전 표시 없음', testRestoreGating],
-    ['signed_in 이 되지 않는 경우 12가지', testNotSignedIn],
-    ['만료·종료된 로그인 기록', testExpiry],
-    ['로그아웃과 재로그인', testLogout],
+    ['확인 전 표시 0(응답을 붙잡은 동안·첫 그리기부터)', testRestoreGating],
+    ['signed_in 이 되지 않는 경우 13가지', testNotSignedIn],
+    ['한 시도의 실패 처리가 다른 로그인을 건드리지 않음', testAttemptBinding],
+    ['만료·종료된 로그인 기록(갱신 거절과 끝남을 나눔)', testExpiry],
+    ['로그아웃(결과를 봄)과 재로그인', testLogout],
     ['옛 방식의 로그인 상태가 있는 브라우저', testLegacyPresent],
     ['저장소 상태 다섯 × 켜짐', testFiveStatesOn],
     ['자격을 싣는 조건·연결점·리디렉션', testCredentialRules],
@@ -795,153 +1049,229 @@ const ON_TESTS = [
     ['관리자 표시(G·GM × aal1·aal2)', testAdminDisplay],
     ['두 탭(동시 갱신·로그아웃·계정 변경·보관된 화면)', testTabs],
 ];
-
 // =====================================================================
-// 감도 점검: 일부러 바꾼 사본을 시험이 잡는가(메모리에서만 바꾼다)
-// =====================================================================
+// 감도 점검: 일부러 바꾼 사본을 시험이 잡는가(메모리에서만 바꾼다).
+// 변조마다 "겨냥한 판정"(expect)이 깨져야 검출이다 — 사본이 아무 예외로나 죽은 것은 검출로 세지 않는다.
 const MUTANTS = [
     {
-        name: '자격을 싣는 조건을 "시작 글자"로 느슨하게', tests: [testCredentialRules],
+        name: '자격을 싣는 조건을 "시작 글자"로 느슨하게', tests: [testCredentialRules], expect: /비슷한 주소/,
         edits: [[AUTH_FILE, "        if (u.href !== rawUrl) return null;                        // 정규 모양 그대로만\n        if (u.protocol !== 'https:' || u.origin !== ORIGIN) return null;\n        if (u.username || u.password) return null;\n", '        if (rawUrl.indexOf(ORIGIN) !== 0) return null;\n']],
     },
     {
-        name: '허용 경로를 "그 글자로 시작"으로 느슨하게', tests: [testCredentialRules],
+        name: '허용 경로를 "그 글자로 시작"으로 느슨하게', tests: [testCredentialRules], expect: /비슷한 주소/,
         edits: [[AUTH_FILE, 'if (t.method === m && u.pathname === t.path && u.search === t.search) return t;', 'if (t.method === m && u.pathname.indexOf(t.path) === 0) return t;']],
     },
     {
-        name: '교재 편집의 로그인 상태를 읽음', tests: [testFiveStatesOn],
-        edits: [[AUTH_FILE, "        let hasStored = true;\n", "        let hasStored = true;\n        try { window.localStorage.getItem('eon_book_auth_v1'); } catch (e) {}\n"]],
+        name: '교재 편집의 로그인 상태를 읽음', tests: [testFiveStatesOn], expect: /교재 편집·후속메일 로그인 상태/,
+        edits: [[AUTH_FILE, "    async function start() {\n        loadConfig();\n", "    async function start() {\n        loadConfig();\n        try { window.localStorage.getItem('eon_book_auth_v1'); } catch (e) {}\n"]],
     },
     {
-        name: '후속메일 화면의 로그인 상태를 지움', tests: [testLogout],
-        edits: [[AUTH_FILE, "            verified = null;\n            lastRejected = null;\n            clearCompat(sid);\n            setState('signed_out', null);\n            return { outcome: 'signed_out', serverConfirmed: serverConfirmed };", "            verified = null;\n            lastRejected = null;\n            clearCompat(sid);\n            window.localStorage.removeItem('sb-hmncdheiwqwekdbtijar-auth-token');\n            window.localStorage.removeItem('eon_book_auth_v1');\n            setState('signed_out', null);\n            return { outcome: 'signed_out', serverConfirmed: serverConfirmed };"]],
+        name: '후속메일 화면의 로그인 상태를 지움', tests: [testLogout], expect: /교재 편집·후속메일 로그인 상태|다른 로그인 상태의 값/,
+        edits: [[AUTH_FILE, "            clearCompat(st.claims.sid);\n            setState('signed_out', null);\n            return { outcome: 'signed_out' };", "            clearCompat(st.claims.sid);\n            window.localStorage.removeItem('sb-hmncdheiwqwekdbtijar-auth-token');\n            window.localStorage.removeItem('eon_book_auth_v1');\n            setState('signed_out', null);\n            return { outcome: 'signed_out' };"]],
     },
     {
-        name: '옛 iontoefl_user 를 덮어씀', tests: [testLegacyPresent],
+        name: '옛 iontoefl_user 를 덮어씀', tests: [testLegacyPresent], expect: /옛 값/,
         edits: [
             [AUTH_FILE, "            if (slot.kind === 'foreign') return { ok: false, why: 'legacy_present' };   // 덮어쓰지 않는다\n", ''],
             [AUTH_FILE, "            if (slot.kind === 'foreign') return { outcome: 'legacy_present' };\n", ''],
         ],
     },
     {
-        name: '쓰기 직전에 다시 확인하지 않음(로그인 전에만 봄)', tests: [testLegacyPresent],
+        name: '쓰기 직전에 다시 확인하지 않음(로그인 전에만 봄)', tests: [testLegacyPresent], expect: /도중에 생긴 옛 값/,
         edits: [[AUTH_FILE, "            if (slot.kind === 'foreign') return { ok: false, why: 'legacy_present' };   // 덮어쓰지 않는다\n", '']],
     },
     {
-        name: '꺼짐에서 SDK 를 불러옴', tests: [], section: 'off',
+        name: '꺼짐에서 SDK 를 불러옴', tests: [], section: 'off', expect: /SDK/,
         edits: [[AUTH_FILE, "    if (!ON) {\n        window.EonAuth = Object.freeze({", "    if (!ON) {\n        document.head.appendChild(Object.assign(document.createElement('script'), { src: SDK_SRC }));\n        window.EonAuth = Object.freeze({"]],
     },
     {
-        name: '꺼짐에서 저장소에 씀', tests: [], section: 'off',
+        name: '꺼짐에서 저장소에 씀', tests: [], section: 'off', expect: /기준과 다름: (storage|trace)/,
         edits: [[AUTH_FILE, "    if (!ON) {\n        window.EonAuth = Object.freeze({", "    if (!ON) {\n        window.localStorage.setItem(MARK_KEY, '{}');\n        window.EonAuth = Object.freeze({"]],
     },
     {
-        name: '주소의 꼬리표로 스위치가 켜짐', tests: [testOffCannotBeTurnedOn],
+        name: '꺼짐에서 숨김 규칙을 넣음(꺼진 화면이 기준과 달라짐)', tests: [], section: 'off', expect: /기준과 다름: trace/,
+        edits: [[AUTH_FILE, "    if (!ON) {\n        window.EonAuth = Object.freeze({", "    if (!ON) {\n        document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'a{display:none}' }));\n        window.EonAuth = Object.freeze({"]],
+    },
+    {
+        name: '주소의 꼬리표로 스위치가 켜짐', tests: [testOffCannotBeTurnedOn], expect: /스위치가 켜짐/,
         edits: [[AUTH_FILE, "    const ON = EON_AUTH_SWITCH === 'on';", "    const ON = EON_AUTH_SWITCH === 'on' || /[?&]eon_auth=on/.test(window.location.search);"]],
     },
     {
-        name: '저장소의 값으로 스위치가 켜짐', tests: [testOffCannotBeTurnedOn],
+        name: '저장소의 값으로 스위치가 켜짐', tests: [testOffCannotBeTurnedOn], expect: /스위치가 켜짐/,
         edits: [[AUTH_FILE, "    const ON = EON_AUTH_SWITCH === 'on';", "    const ON = EON_AUTH_SWITCH === 'on' || window.localStorage.getItem('eon_auth') === 'on';"]],
     },
     {
-        name: 'my_profile 만 보고 signed_in(allowed 를 보지 않음)', tests: [testNotSignedIn],
+        name: 'my_profile 만 보고 signed_in(allowed 를 보지 않음)', tests: [testNotSignedIn], expect: /allowed 거짓/,
         edits: [[AUTH_FILE, "        if (a.allowed !== true) return { ok: false, reason: 'not_allowed' };\n", '']],
     },
     {
-        name: 'my_profile 만 보고 signed_in(my_site_access 를 부르지 않음)', tests: [testNotSignedIn, testLoginOk],
+        name: 'my_profile 만 보고 signed_in(my_site_access 를 부르지 않음)', tests: [testNotSignedIn, testLoginOk], expect: /allowed 거짓|my_site_access/,
         edits: [[AUTH_FILE, "        const a = await askAccess(token);               // 같은 JWT(같은 로그인 기록)로 묻는다\n", "        const a = { kind: 'ok', allowed: true, isAdmin: false };\n"]],
     },
     {
-        name: 'SDK 로그인 성공만으로 signed_in(차단·탈퇴·대응 없음을 보지 않음)', tests: [testNotSignedIn],
+        name: 'SDK 로그인 성공만으로 signed_in(차단·탈퇴·대응 없음을 보지 않음)', tests: [testNotSignedIn], expect: /거절 › (차단|탈퇴 처리 중|회원 대응 없음)/,
         edits: [[AUTH_FILE, "        if (b.state === 'no_member' || b.state === 'blocked' || b.state === 'withdrawal_pending') return { kind: b.state };\n", "        if (b.state === 'no_member' || b.state === 'blocked' || b.state === 'withdrawal_pending') return { kind: 'ok', profile: { id: 'x', name: 'x', nickname: null, email: null, phone: null, timezone: null } };\n"]],
     },
     {
-        name: '두 응답 사이의 계정·로그인 기록 변경을 보지 않음', tests: [testNotSignedIn],
+        name: '두 응답 사이의 계정·로그인 기록 변경을 보지 않음', tests: [testNotSignedIn], expect: /두 응답 사이/,
         edits: [
-            [AUTH_FILE, "        if (cur.error || !c2 || c2.sub !== c.sub || c2.sid !== c.sid) return { ok: false, reason: 'session_changed' };\n", ''],
+            [AUTH_FILE, "        if (!storedIs(att)) return { ok: false, reason: 'session_changed' };\n", ''],
             [AUTH_FILE, "            if (slot.storedSid !== v.sid) return { ok: false, why: 'session_changed' };  // 확인한 그 로그인 기록이 아니다\n", ''],
         ],
     },
     {
-        name: '거절 뒤 공개 키로 떨어짐', tests: [testNoPublicFallback, testExpiry],
+        name: '거절 뒤 공개 키로 떨어짐', tests: [testNoPublicFallback, testExpiry], expect: /오류가 아님/,
         edits: [[AUTH_FILE, "        if (state !== 'signed_in' || !verified) throw EonAuthError(state === 'rejected' ? 'rejected' : 'signed_out');", "        if (state !== 'signed_in' || !verified) return publicCredential();"]],
     },
     {
-        name: '복원 중에 기다리지 않고 공개 키를 줌', tests: [testNoPublicFallback],
+        name: '복원 중에 기다리지 않고 공개 키를 줌', tests: [testNoPublicFallback], expect: /복원 중: 기다리지 않고 답함/,
         edits: [[AUTH_FILE, "        await ready();\n        if (state !== 'signed_in' || !verified) throw", "        if (state === 'restoring') return publicCredential();\n        if (state !== 'signed_in' || !verified) throw"]],
     },
     {
-        name: '확인 요청이 거절되면 공개 키로 다시 보냄', tests: [testNotSignedIn],
+        name: '확인 요청이 거절되면 공개 키로 다시 보냄', tests: [testNotSignedIn], expect: /자격으로 나감/,
         edits: [[AUTH_FILE, "        if (r.status !== 200) return { kind: statusKind(r.status) };\n        const b = r.body;\n        if (!b || typeof b !== 'object') return { kind: 'unexpected' };", "        if (r.status !== 200) { await callRpc('/rest/v1/rpc/my_profile', ANON); return { kind: statusKind(r.status) }; }\n        const b = r.body;\n        if (!b || typeof b !== 'object') return { kind: 'unexpected' };"]],
     },
     {
-        name: '결과를 모르는 확인 요청을 다시 보냄', tests: [testNotSignedIn],
+        name: '결과를 모르는 확인 요청을 다시 보냄', tests: [testNotSignedIn], expect: /결과를 모르는 요청을 다시 보냄/,
         edits: [[AUTH_FILE, "        const r = await callRpc('/rest/v1/rpc/my_profile', token);\n", "        let r = await callRpc('/rest/v1/rpc/my_profile', token);\n        if (r.status === 0) r = await callRpc('/rest/v1/rpc/my_profile', token);\n"]],
     },
     {
-        name: '결과를 모르는 갱신을 다시 보냄(공식 클라이언트의 재시도를 그대로 둠)', tests: [testExpiry],
+        name: '결과를 모르는 갱신을 다시 보냄(공식 클라이언트의 재시도를 그대로 둠)', tests: [testExpiry], expect: /갱신을 다시 보냄|갱신이 한 번이 아님/,
         edits: [[AUTH_FILE, "            if (unknownRefresh.indexOf(refreshToken) >= 0) return Promise.reject(EonAuthError('refresh_unknown'));\n", '']],
     },
     {
-        name: '끝난 로그인 기록을 브라우저에 남겨 둠', tests: [testExpiry],
-        edits: [[AUTH_FILE, "        if (r.ended) await endLocal();       // 끝난 로그인 기록을 이 브라우저에 남겨 두지 않는다\n", '']],
+        name: '끝났다는 답을 받고도 그 로그인을 브라우저에 남겨 둠', tests: [testExpiry], expect: /만료 코드\(session_expired\): 로그인 기록의 남김·지움/,
+        edits: [[AUTH_FILE, "        if (r.ended) removeStoredIf(att);      // 서버가 끝났다고 답한 그 기록만 이 브라우저에서 지운다\n", '']],
     },
     {
-        name: '전역 로그아웃', tests: [testLogout],
+        name: '429 를 "로그인이 끝났음"으로 처리', tests: [testExpiry], expect: /갱신의 답: 429: (rejected·rate_limited 가 아님|로그인 기록의 남김·지움)/,
+        edits: [[AUTH_FILE, "        if (res.status === 429) return { kind: 'rate_limited' };\n        if (res.status >= 400", "        if (res.status === 429) return { kind: 'ended' };\n        if (res.status >= 400"]],
+    },
+    {
+        name: '모든 4xx 를 "로그인이 끝났음"으로 처리', tests: [testExpiry], expect: /갱신의 답: (그 밖의 4xx|갱신값 못 찾음)[^:]*: 로그인 기록의 남김·지움/,
+        edits: [[AUTH_FILE, "        if (res.status >= 400 && res.status < 500 && ENDED_CODES.indexOf(res.code) >= 0) return { kind: 'ended' };\n        return { kind: 'unknown' };\n    }", "        if (res.status >= 400 && res.status < 500) return { kind: 'ended' };\n        return { kind: 'unknown' };\n    }"]],
+    },
+    {
+        name: '이미 쓴 갱신값의 거절을 "로그인이 끝났음"으로 처리', tests: [testExpiry], expect: /이미 쓴 갱신값[^:]*: (rejected·network 가 아님|로그인 기록의 남김·지움)/,
+        edits: [[AUTH_FILE, "    const ENDED_CODES = ['session_not_found', 'session_expired'];", "    const ENDED_CODES = ['session_not_found', 'session_expired', 'refresh_token_already_used'];"]],
+    },
+    {
+        name: '로그아웃의 결과를 보지 않음(실패·모름도 끝낸 것으로)', tests: [testLogout], expect: /로그아웃 모름\([^)]*\): 끝내지 못했는데/,
+        edits: [[AUTH_FILE, "        if (!ended) return 'unknown';             // 실패·모름: 끝냈다고 하지 않는다. 다시 보내지도 않는다\n", '']],
+    },
+    {
+        name: '앞의 로그인을 끝냈는지 모르는데 새 로그인을 보냄', tests: [testLogout], expect: /이전 로그인 모름: 앞의 것을 끝내지 못했는데 새 로그인 요청을 보냄/,
+        edits: [[AUTH_FILE, "                if ((await boundEnd(st.claims)) !== 'ended') return { outcome: 'previous_unknown' };\n", "                await boundEnd(st.claims);\n"]],
+    },
+    {
+        name: '갱신이 그 시도의 로그인 기록에 묶이지 않음(직전 확인도, 나가는 곳의 확인도 없음)', tests: [testAttemptBinding], expect: /묶기·갱신[^:]*: B 에 대한 갱신 요청이 나감/,
         edits: [
-            [AUTH_FILE, "                const r = await client.signOut({ scope: 'local' });", "                const r = await client.signOut({ scope: 'global' });"],
+            WEAKEN[0],
+            [AUTH_FILE, "                if (bound.kind !== 'refresh' || refreshToken !== bound.token || !same(st.claims, bound)) {", "                if (bound.kind !== 'refresh' || refreshToken !== bound.token) {"],
+        ],
+    },
+    {
+        name: '종료가 그 시도의 로그인 기록에 묶이지 않음(직전 확인도, 나가는 곳의 확인도 없음)', tests: [testAttemptBinding], expect: /묶기·종료[^:]*: B 에 대한 종료 요청이 나감/,
+        edits: [
+            WEAKEN[1],
+            [AUTH_FILE, "            if (!bound || bound.kind !== 'logout' || !c || c.sub !== bound.sub || c.sid !== bound.sid) {", "            if (!bound || bound.kind !== 'logout' || !c) {"],
+        ],
+    },
+    {
+        name: '표시 직전에 저장된 로그인 기록을 견주지 않음', tests: [testAttemptBinding], expect: /표시 직전: 저장된 로그인이 바뀌었는데 표시를 내줌/,
+        edits: [[AUTH_FILE, "            if (slot.mark.sid !== verified.sid || slot.storedSid !== verified.sid) return null;", "            if (slot.mark.sid !== verified.sid) return null;"]],
+    },
+    {
+        name: '이 탭이 확인하지 않은 로그인도 끝냄', tests: [testAttemptBinding], expect: /표시 직전: 이 탭이 확인하지 않은 로그인\(B\)에 대한 종료 요청이 나감/,
+        edits: [[AUTH_FILE, "            if (!st || !st.claims || !same(st.claims, mine)) return { outcome: 'changed' };", "            if (!st || !st.claims) return { outcome: 'changed' };"]],
+    },
+    {
+        name: '이동 직전에 다시 보지 않음', tests: [testMoveRecheck], expect: /이동 직전\([^)]*\): 다시 보지 않고 이동함/,
+        edits: [['js/login.js', "                if (window.EonAuth.isCurrent(attempt)) {", "                if (true) {"]],
+    },
+    {
+        name: '복원이 오류로 끝난 길에 호환 값을 남김', tests: [testExpiry], expect: /복원 오류\([^)]*\): 새 모듈이 만든 호환 값이 남음/,
+        edits: [[AUTH_FILE, "            // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다\n            clearCompat(null, true);\n", '']],
+    },
+    {
+        name: '전역 로그아웃', tests: [testLogout], expect: /이 로그인만 끝내는 것이 아님/,
+        edits: [
+            [AUTH_FILE, "client.admin.signOut(st.accessToken, 'local')", "client.admin.signOut(st.accessToken, 'global')"],
             [AUTH_FILE, "search: '?scope=local'", "search: '?scope=global'"],
         ],
     },
     {
-        name: '리디렉션을 따라감', tests: [testCredentialRules],
+        name: '리디렉션을 따라감', tests: [testCredentialRules], expect: /리디렉션/,
         edits: [[AUTH_FILE, "            redirect: 'error',            // 리디렉션을 따라가지 않는다\n", '']],
     },
     {
-        name: '추가 머리글로 자격을 덮어쓸 수 있음', tests: [testCredentialRules],
+        name: '추가 머리글로 자격을 덮어쓸 수 있음', tests: [testCredentialRules], expect: /덮어쓸 수 있음/,
         edits: [[AUTH_FILE, "        const g = normalizeGrade(grade);\n        assertNoCredentialOverride(extra);\n", "        const g = normalizeGrade(grade);\n"]],
     },
     {
-        name: '연결점이 회원 등급을 공개 키로 돌려줌', tests: [testCredentialRules],
-        edits: [[AUTH_FILE, "        throw EonAuthError(g === GRADES.LEGACY_OWN ? 'legacy_own' : 'grade_closed');\n    }\n\n    // ---", "        return Object.assign({ 'apikey': ANON, 'Authorization': 'Bearer ' + ANON, 'Content-Type': 'application/json' }, extra);\n    }\n\n    // ---"]],
+        name: '연결점이 회원 등급을 공개 키로 돌려줌', tests: [testCredentialRules], expect: /연결점: 회원·관리자 등급이 오류가 아님/,
+        edits: [[AUTH_FILE, "        throw EonAuthError(g === GRADES.LEGACY_OWN ? 'legacy_own' : 'grade_closed');\n    }\n\n    // ---", "        return Object.assign({ 'apikey': anonKey(), 'Authorization': 'Bearer ' + anonKey(), 'Content-Type': 'application/json' }, extra);\n    }\n\n    // ---"]],
     },
     {
-        name: '확인 전에 저장된 값으로 머리말을 그림(main.js)', tests: [testRestoreGating, testLegacyPresent],
+        name: '확인 전에 저장된 값으로 머리말을 그림(main.js)', tests: [testRestoreGating, testLegacyPresent], expect: /응답을 붙잡고 있는 동안|옛 값/,
         edits: [['js/main.js', "    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();\n    return localStorage.getItem('iontoefl_user');\n}\n\n// 켜진 화면 전용: 확인된 표시", "    return localStorage.getItem('iontoefl_user');\n}\n\n// 켜진 화면 전용: 확인된 표시"]],
     },
     {
-        name: '확인 전에 저장된 값으로 머리말을 그림(common.js)', tests: [testRestoreGating, testLegacyPresent],
+        name: '확인 전에 저장된 값으로 머리말을 그림(common.js)', tests: [testRestoreGating, testLegacyPresent], expect: /응답을 붙잡고 있는 동안|옛 값/,
         edits: [['js/common.js', "    if (window.EonAuth && window.EonAuth.isOn()) return window.EonAuth.displayUserRaw();\n", '']],
     },
     {
-        name: '확인 전에도 표시를 내줌(모듈)', tests: [testRestoreGating, testNoPublicFallback],
-        edits: [[AUTH_FILE, "        if (displayHold || state !== 'signed_in' || !verified) return null;\n        try {\n            const slot = readSlot();\n            if (slot.kind !== 'ours' || slot.mark.sid !== verified.sid || slot.user === null) return null;", "        if (displayHold) return null;\n        try {\n            const slot = readSlot();\n            if (slot.kind !== 'ours' || slot.user === null) return null;"]],
+        name: '확인 전에도 표시를 내줌(모듈)', tests: [testRestoreGating], expect: /응답을 붙잡고 있는 동안/,
+        edits: [[AUTH_FILE, "        if (displayHold || state !== 'signed_in' || !verified) return null;\n        try {\n            const slot = readSlot();\n            if (slot.kind !== 'ours' || slot.user === null) return null;\n            if (slot.mark.sid !== verified.sid || slot.storedSid !== verified.sid) return null;", "        if (displayHold) return null;\n        try {\n            const slot = readSlot();\n            if (slot.kind !== 'ours' || slot.user === null) return null;"]],
     },
     {
-        name: '켜진 로그인이 주소의 redirect 값으로 이동', tests: [testLoginOk],
-        edits: [['js/login.js', "            setTimeout(() => {\n                window.location.href = 'index.html';\n            }, 1000);\n        } else if (outcome === 'legacy_present') {", "            setTimeout(() => {\n                window.location.href = new URLSearchParams(window.location.search).get('redirect') || 'index.html';\n            }, 1000);\n        } else if (outcome === 'legacy_present') {"]],
+        name: '첫 그리기에 숨김 규칙이 없음(학습 자료 링크가 먼저 보임)', tests: [testRestoreGating], expect: /첫 그리기/,
+        edits: [[AUTH_FILE, "        style.textContent = HIDE_CSS;", "        style.textContent = '';"]],
     },
     {
-        name: '켜진 화면이 옛 값만 보고 자동 이동', tests: [testLegacyPresent],
+        name: '인증 모듈을 head 가 아니라 화면 끝에서 실음', tests: [testRestoreGating], expect: /첫 그리기 — 숨김 규칙이 head 에서/,
+        edits: ['index.html', 'login.html'].flatMap((f) => [
+            [f, '    <script src="js/auth-session.js?v=20261125"></script>\n</head>', '</head>'],
+            [f, '    <script src="js/supabase-config.js?v=20261012"></script>\n', '    <script src="js/supabase-config.js?v=20261012"></script>\n    <script src="js/auth-session.js?v=20261125"></script>\n'],
+        ]),
+    },
+    {
+        name: '확인되기 전에 관리자 표시(class)를 붙임', tests: [testRestoreGating], expect: /응답을 붙잡고 있는 동안 표시가 보임|첫 그리기 — 이름·관리자 표시/,
+        edits: [[AUTH_FILE, "        if (role === 'admin') list.add('eon-auth-admin'); else list.remove('eon-auth-admin');", "        list.add('eon-auth-admin');"]],
+    },
+    {
+        name: '켜진 로그인이 주소의 redirect 값으로 이동', tests: [testLoginOk], expect: /이동이 index\.html 한 번이 아님/,
+        edits: [['js/login.js', "                if (window.EonAuth.isCurrent(attempt)) {\n                    window.location.href = 'index.html';", "                if (window.EonAuth.isCurrent(attempt)) {\n                    window.location.href = new URLSearchParams(window.location.search).get('redirect') || 'index.html';"]],
+    },
+    {
+        name: '켜진 화면이 옛 값만 보고 자동 이동', tests: [testLegacyPresent], expect: /자동 이동/,
         edits: [['js/login.js', "    if (window.EonAuth && window.EonAuth.isOn()) return;\n", '']],
     },
     {
-        name: '로그아웃이 새 모듈의 것이 아닌 호환 값을 지움', tests: [testLogout],
+        name: '로그아웃이 새 모듈의 것이 아닌 호환 값을 지움', tests: [testLogout], expect: /새 모듈의 것이 아닌 값/,
         edits: [
             [AUTH_FILE, "            if (slot.kind === 'ours') {\n                if (slot.user === slot.mark.user) store.removeItem(COMPAT_USER);\n                if (slot.time === slot.mark.time) store.removeItem(COMPAT_TIME);\n            }", '            store.removeItem(COMPAT_USER);\n            store.removeItem(COMPAT_TIME);'],
         ],
     },
     {
-        name: '관리자 표시를 본인 정보의 값으로 채움(is_admin 을 쓰지 않음)', tests: [testAdminDisplay],
+        name: '관리자 표시를 본인 정보의 값으로 채움(is_admin 을 쓰지 않음)', tests: [testAdminDisplay], expect: /GM·aal1/,
         edits: [[AUTH_FILE, "                role: v.isAdmin ? 'admin' : 'user'      // 표시에만 쓴다(서버 권한이 아니다)", "                role: /관리자/.test(String(p.name)) ? 'admin' : 'user'"]],
     },
     {
-        name: '다른 탭의 로그아웃을 따라가지 않음', tests: [testTabs],
-        edits: [[AUTH_FILE, "            client.onAuthStateChange(function () { scheduleReconcile(); });", '            client.onAuthStateChange(function () {});']],
+        name: '다른 탭의 로그아웃을 따라가지 않음', tests: [testTabs], expect: /두 탭: (한 탭 로그아웃 뒤 상태|다른 탭에 이름이 남음)/,
+        edits: [[AUTH_FILE, "        if (ev.key === STORAGE_KEY || ev.key === null) { redraw(false); scheduleReconcile(); }", '']],
     },
     {
-        name: '공식 클라이언트가 별도 저장 이름을 쓰지 않음(기본 이름·저장소 전체)', tests: [testLoginOk],
+        name: '공식 클라이언트가 별도 저장 이름을 쓰지 않음(기본 이름·저장소 전체)', tests: [testLoginOk], expect: /저장소의 이름|통로의 이름/,
         edits: [[AUTH_FILE, "                storageKey: STORAGE_KEY,\n                storage: scopedStorage,\n", '                storage: window.localStorage,\n']],
+    },
+    {
+        name: '차단기가 자격의 용도가 맞지 않는 요청(leak)을 보내 줌', tests: [], section: 'request-log', expect: /가르기: .*중단하지 않음/,
+        edits: [['tests/auth-session/request-log.mjs', '        const allowed = placeOk && !leak;', '        const allowed = placeOk;']],
+    },
+    {
+        name: '차단기가 기록에 주소를 남김', tests: [], section: 'request-log', expect: /가르기: 기록에/,
+        edits: [['tests/auth-session/request-log.mjs', '                where, target, nav, type, method,', '                where, target, nav, type, method, url: req.url,']],
     },
 ];
 
@@ -962,22 +1292,25 @@ async function sectionMutants() {
     const lines = [];
     for (const m of MUTANTS) {
         const editProblems = [];
-        const mutate = applyEdits(m.edits, editProblems);
-        for (const [file] of m.edits) mutate(file, workFile(file));     // 바꿀 자리가 있는지 먼저 본다
+        const check = applyEdits(m.edits, editProblems);
+        for (const file of new Set(m.edits.map((e) => e[0]))) check(file, workFile(file));     // 바꿀 자리가 있는지 먼저 본다
         if (editProblems.length) { problems.push(`감도 "${m.name}": ${editProblems[0]}`); continue; }
-        let caught = 0;
-        try {
-            if (m.section === 'off') caught += (await sectionOff(applyEdits(m.edits, []))).problems.length;
-            for (const test of m.tests) caught += (await test({ mutate: applyEdits(m.edits, []) })).length;
-        } catch (e) {
-            caught += 1;        // 바꾼 사본이 시험 도중 예외를 냄 — 잡힌 것으로 센다
+        const found = [];
+        const crashes = [];
+        const run = async (fn) => { try { found.push(...(await fn())); } catch (e) { crashes.push(String(e && e.message)); } };
+        if (m.section === 'off') await run(async () => (await sectionOff(applyEdits(m.edits, []))).problems);
+        if (m.section === 'request-log') await run(async () => (await sectionRequestLog(applyEdits(m.edits, []))).problems);
+        for (const test of m.tests) await run(() => test({ mutate: applyEdits(m.edits, []) }));
+        const hit = found.filter((p) => m.expect.test(p));
+        if (hit.length === 0) {
+            problems.push(`감도 "${m.name}": 겨냥한 판정이 깨지지 않음(다른 어긋남 ${found.length}건, 예외 ${crashes.length}건)`);
+            lines.push(`    - ${m.name}: 잡지 못함`);
+        } else {
+            lines.push(`    - ${m.name}: 겨냥한 판정 ${hit.length}건이 깨짐${crashes.length ? ` (그 밖에 예외 ${crashes.length}건 — 검출로 세지 않음)` : ''}`);
         }
-        if (caught === 0) problems.push(`감도 "${m.name}": 시험이 잡지 못함`);
-        lines.push(`    - ${m.name}: ${caught === 0 ? '잡지 못함' : `어긋남 ${caught}건으로 검출`}`);
     }
     return { problems, lines };
 }
-
 // =====================================================================
 // 글자 점검
 // =====================================================================
@@ -1000,7 +1333,8 @@ function sectionText() {
     }
     if (/\bfetch\s*=/.test(code) || /XMLHttpRequest/.test(code)) problems.push('전역 fetch 를 바꾸거나 XHR 을 씀');
     if ((code.match(/detectSessionInUrl: false/g) || []).length !== 1 || /detectSessionInUrl: true/.test(code)) problems.push('주소에서 로그인 정보를 읽는 기능이 꺼져 있지 않음');
-    if ((code.match(/scope: 'local'/g) || []).length !== 2 || /scope: 'global'|scope: 'others'/.test(code)) problems.push('로그아웃의 범위가 이 로그인만(local)이 아님');
+    if ((code.match(/client\.admin\.signOut\(st\.accessToken, 'local'\)/g) || []).length !== 1 || /client\.signOut\(|'global'|'others'/.test(code)) problems.push('로그아웃이 "그 기록의 JWT 로, 이 로그인만(local)" 한 곳이 아님');
+    if (!/client\.refreshSession\(\{ refresh_token: st\.refreshToken \}\)/.test(code) || /client\.refreshSession\(\)/.test(code)) problems.push('모듈이 시작하는 갱신이 그 기록의 갱신값을 지정하지 않음');
 
     // 기준에서 바뀐 파일
     const allowed = new Set(['index.html', 'login.html', 'js/auth-session.js', 'js/common.js', 'js/login.js', 'js/main.js', 'js/supabase-config.js']);
@@ -1015,9 +1349,10 @@ function sectionText() {
     info.loaders = loaders;
     if (JSON.stringify(loaders) !== JSON.stringify(['index.html', 'login.html'])) problems.push(`인증 모듈을 싣는 화면이 index.html·login.html 이 아님(${loaders.join(', ')})`);
     for (const f of loaders) {
-        const scripts = extractScripts(workFile(f)).filter((s) => s.src).map((s) => s.src.split('?')[0]);
-        const i = scripts.indexOf(AUTH_FILE);
-        if (i < 1 || scripts[i - 1] !== CONFIG_FILE) problems.push(`${f}: 인증 모듈이 설정 파일 바로 다음에 실리지 않음`);
+        const scripts = extractScripts(workFile(f)).filter((s) => s.src);
+        const mine = scripts.filter((s) => s.src.split('?')[0] === AUTH_FILE);
+        if (mine.length !== 1 || !mine[0].head) problems.push(`${f}: 인증 모듈이 head 에서 한 번 실리지 않음(첫 그리기 전에 숨김 규칙이 걸려야 한다)`);
+        if (scripts.filter((s) => s.head).length !== 1) problems.push(`${f}: head 에서 실리는 스크립트가 인증 모듈 하나가 아님`);
     }
     // 연결점: 등급을 넘기는 호출 0
     const config = workFile(CONFIG_FILE);
@@ -1094,51 +1429,112 @@ function sectionServer() {
         if (status.mode !== mode || status.counts.sink !== 1 || status.counts.refused !== refused) problems.push(`서버(${mode}): 상태 응답이 맞지 않음`);
         const logText = JSON.stringify(logs);
         if (logText.includes('zzsecret') || logText.includes(FAKE_ANON) || logText.includes(PROD.key)) problems.push(`서버(${mode}): 기록에 꼬리표의 값·키가 남음`);
-        if (!logs.some((e) => e.t === 'csp' && e.directive === 'connect-src' && e.blocked === 'https://api.telegram.org' && e.document === '/index.html')) problems.push(`서버(${mode}): 막힌 요청이 기록되지 않음`);
+        if (get('/__b3a/probe').status !== 200 || core.counts.probe !== 1) problems.push(`서버(${mode}): 수신 확인용 끝점이 세지 못함`);
+        const red = get('/__b3a/redirect/sink');
+        if (red.status !== 302 || red.headers.Location !== '/__b3a/sink/redirected' || get('/__b3a/blank').status !== 200) problems.push(`서버(${mode}): 리디렉션 대조용 끝점이 맞지 않음`);
+        const freeText = logs.filter((e) => Object.entries(e).some(([k, v]) => !['ts', 'file'].includes(k) && typeof v === 'string' && !/^[a-zA-Z0-9_.:-]{1,40}$/.test(v)));
+        if (freeText.length) problems.push(`서버(${mode}): 기록에 자유 형식의 글자가 있음(${freeText.length}줄)`);
+        if (logs.some((e) => e.file !== undefined && !files.includes(e.file))) problems.push(`서버(${mode}): 기록의 파일 이름이 저장소의 파일 목록에 없는 것`);
+        if (!logs.some((e) => e.t === 'csp' && e.directive === 'connect-src' && e.blocked === 'outside')) problems.push(`서버(${mode}): 막힌 요청이 기록되지 않음`);
         info['ok' + mode] = ok200;
     }
     return { problems, info };
 }
 
-// 자동화가 쓰는 "보내기 전에 가르기": 허용 밖은 중단, 기록에는 비밀값이 남지 않는다
-function sectionRequestLog() {
-    const problems = [];
-    const anon = fakeJwt({ role: 'anon', ref: 'hmncdheiwqwekdbtijar' });
-    const member = fakeJwt({ role: 'authenticated', sub: 'auth-A', session_id: 'sess-1' });
-    const decide = makeDecider({ selfOrigin: 'http://127.0.0.1:8787', anonKey: anon });
-    const rows = [
-        // [설명, 요청, 기대 action, 기대 where, 기대 속성]
-        ['자기 화면', { url: 'http://127.0.0.1:8787/login.html?redirect=x', method: 'GET', resourceType: 'document', isNavigation: true }, 'continue', 'self', {}],
-        ['로그인', { url: TEST_URL + '/auth/v1/token?grant_type=password', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, Authorization: 'Bearer ' + anon }, postData: JSON.stringify({ email: 'a@zz.invalid', password: 'zzsecretpw' }) }, 'continue', 'test-project', { memberTarget: true, leak: false }],
-        ['my_profile', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + member }, postData: '{}' }, 'continue', 'test-project', { memberTarget: true, leak: false, credential: 'member', publicRetry: false }],
-        ['my_profile 을 공개 키로', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + anon }, postData: '{}' }, 'continue', 'test-project', { publicRetry: true }],
-        ['업무 요청에 회원 자격', { url: TEST_URL + '/rest/v1/applications?email=eq.a%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + member } }, 'continue', 'test-project', { leak: true }],
-        ['업무 요청(공개 키)', { url: TEST_URL + '/rest/v1/applications?email=eq.a%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + anon } }, 'continue', 'test-project', { leak: false, credential: 'anon' }],
-        ['전역 로그아웃', { url: TEST_URL + '/auth/v1/logout?scope=global', method: 'POST', resourceType: 'fetch', headers: { apikey: anon, authorization: 'Bearer ' + member } }, 'continue', 'test-project', { leak: true, memberTarget: false }],
-        ['허용 목록의 글꼴', { url: 'https://fonts.gstatic.com/s/x.woff2', method: 'GET', resourceType: 'font' }, 'continue', 'static-allowed', {}],
-        ['허용 목록 호스트의 스크립트(목록 밖 종류)', { url: 'https://cdn.jsdelivr.net/npm/x.js', method: 'GET', resourceType: 'script' }, 'abort', 'outside', {}],
-        ['텔레그램 fetch', { url: 'https://api.telegram.org/botzzsecret/sendMessage', method: 'POST', resourceType: 'fetch', postData: '{"text":"x"}' }, 'abort', 'outside', {}],
-        ['운영 주소 fetch', { url: 'https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/users', method: 'GET', resourceType: 'fetch', headers: { apikey: 'x' } }, 'abort', 'outside', {}],
-        ['바깥으로 화면 이동', { url: 'https://testroom.eonfl.com/?t=zzsecret', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'outside', {}],
-        ['카카오 링크 이동', { url: 'http://pf.kakao.com/_FWxcZC', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'outside', {}],
-        ['시험 프로젝트로 화면 이동', { url: TEST_URL + '/auth/v1/authorize?provider=x', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'test-project', {}],
-        ['로컬 시험 목적지', { url: 'http://127.0.0.1:8787/__b3a/sink/testroom', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'sink', {}],
-        ['data 그림', { url: 'data:image/png;base64,AAAA', method: 'GET', resourceType: 'image' }, 'continue', 'local', {}],
-    ];
-    const records = [];
-    for (const [name, req, action, where, props] of rows) {
-        const d = decide(req);
-        records.push(d.record);
-        if (d.action !== action || d.record.where !== where) problems.push(`가르기: ${name} — ${d.action}/${d.record.where} (기대 ${action}/${where})`);
-        for (const [k, v] of Object.entries(props)) if (d.record[k] !== v) problems.push(`가르기: ${name} — ${k} 가 ${v} 가 아님`);
-    }
-    const text = JSON.stringify(records);
-    if (text.includes(anon) || text.includes(member) || text.includes('zzsecret') || /eyJ[A-Za-z0-9_-]{8,}/.test(text)) problems.push('가르기: 기록에 JWT·비밀번호·꼬리표의 값이 남음');
-    const s = summarize(records);
-    if (s.leak !== 2 || s.publicRetry !== 1 || s.sink !== 1 || s.outsideBlockedNavigation !== 2 || s.outsideBlockedRequest !== 3 || s.outsideSent !== 0 || s.staticAllowed !== 1) problems.push(`가르기: 요약 숫자가 기대와 다름(${JSON.stringify(s)})`);
-    return { problems, rows: rows.length };
+// 차단기("보내기 전에 가르기"): 허용 밖·자격의 용도가 맞지 않는 요청은 전송 전에 중단하고, 기록에는 정해 둔 이름과 참/거짓만 남는다.
+// mutate 를 주면 차단기의 사본을 바꿔서 본다(감도 점검).
+async function loadRequestLog(mutate) {
+    if (!mutate) return import('./request-log.mjs');
+    const here = path.join(ROOT, 'tests', 'auth-session');
+    let text = mutate('tests/auth-session/request-log.mjs', workFile('tests/auth-session/request-log.mjs'));
+    text = text.replace(/from '\.\/([a-z-]+\.mjs)'/g, (m, name) => `from ${JSON.stringify(pathToFileURL(path.join(here, name)).href)}`);
+    const file = path.join(os.tmpdir(), `b3a-request-log-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
+    fs.writeFileSync(file, text);
+    try { return await import(pathToFileURL(file).href); } finally { fs.unlinkSync(file); }
 }
 
+async function sectionRequestLog(mutate) {
+    const problems = [];
+    const { makeDecider, summarize } = await loadRequestLog(mutate);
+    const anon = fakeJwt({ role: 'anon', ref: 'hmncdheiwqwekdbtijar' });
+    const member = fakeJwt({ role: 'authenticated', sub: 'auth-A', session_id: 'sess-1' });
+    const service = fakeJwt({ role: 'service_role', ref: 'hmncdheiwqwekdbtijar' });
+    const SELF = 'http://127.0.0.1:8787';
+    const decide = makeDecider({ selfOrigins: [SELF, 'http://127.0.0.1:8788'], anonKey: anon });
+    const H = (bearer) => ({ apikey: anon, Authorization: 'Bearer ' + bearer });
+    const pw = JSON.stringify({ email: 'a@zz.invalid', password: 'zzsecretpw' });
+    const rt = JSON.stringify({ refresh_token: 'zzsecretrefresh' });
+    const rows = [
+        // [설명, 요청, 기대 action, 기대 where, 기대 target, leak]
+        ['자기 화면', { url: SELF + '/login.html?redirect=zzsecret', method: 'GET', resourceType: 'document', isNavigation: true }, 'continue', 'self', 'file', false],
+        ['꺼짐 서버의 화면', { url: 'http://127.0.0.1:8788/index.html', method: 'GET', resourceType: 'document', isNavigation: true }, 'continue', 'self', 'file', false],
+        ['수신 확인용 끝점', { url: SELF + '/__b3a/probe', method: 'GET', resourceType: 'fetch' }, 'continue', 'self', 'test-endpoint', false],
+        ['로그인', { url: TEST_URL + '/auth/v1/token?grant_type=password', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: pw }, 'continue', 'test-project', 'login', false],
+        ['갱신', { url: TEST_URL + '/auth/v1/token?grant_type=refresh_token', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: rt }, 'continue', 'test-project', 'refresh', false],
+        ['로그아웃(이 로그인만)', { url: TEST_URL + '/auth/v1/logout?scope=local', method: 'POST', resourceType: 'fetch', headers: H(member) }, 'continue', 'test-project', 'logout', false],
+        ['my_profile', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'continue', 'test-project', 'my_profile', false],
+        ['my_site_access', { url: TEST_URL + '/rest/v1/rpc/my_site_access', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'continue', 'test-project', 'my_site_access', false],
+        ['업무 요청(공개 키)', { url: TEST_URL + '/rest/v1/applications?email=eq.zzsecret%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: H(anon) }, 'continue', 'test-project', 'rest-table', false],
+        ['my_profile 을 공개 키로(기록만 — 자격이 새는 것은 아니다)', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: '{}' }, 'continue', 'test-project', 'my_profile', false],
+        ['허용 목록의 글꼴', { url: 'https://fonts.gstatic.com/s/x.woff2', method: 'GET', resourceType: 'font' }, 'continue', 'static-allowed', 'static', false],
+        ['data 그림', { url: 'data:image/png;base64,AAAA', method: 'GET', resourceType: 'image' }, 'continue', 'local', 'other', false],
+        // 자격의 종류·용도가 맞지 않는 것: 시험 프로젝트로 가는 것이라도 중단
+        ['업무 요청에 회원 JWT', { url: TEST_URL + '/rest/v1/applications?email=eq.a%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: H(member) }, 'abort', 'test-project', 'rest-table', true],
+        ['회원 표에 회원 JWT', { url: TEST_URL + '/rest/v1/users?select=*', method: 'GET', resourceType: 'fetch', headers: H(member) }, 'abort', 'test-project', 'rest-table', true],
+        ['전역 로그아웃', { url: TEST_URL + '/auth/v1/logout?scope=global', method: 'POST', resourceType: 'fetch', headers: H(member) }, 'abort', 'test-project', 'auth-other', true],
+        ['로그인 주소에 회원 JWT', { url: TEST_URL + '/auth/v1/token?grant_type=password', method: 'POST', resourceType: 'fetch', headers: H(member), postData: pw }, 'abort', 'test-project', 'login', true],
+        ['갱신 주소에 비밀번호', { url: TEST_URL + '/auth/v1/token?grant_type=refresh_token', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: pw }, 'abort', 'test-project', 'refresh', true],
+        ['로그인 주소에 갱신값', { url: TEST_URL + '/auth/v1/token?grant_type=password', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: rt }, 'abort', 'test-project', 'login', true],
+        ['RPC 에 갱신값', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(member), postData: rt }, 'abort', 'test-project', 'my_profile', true],
+        ['다른 RPC 에 회원 JWT', { url: TEST_URL + '/rest/v1/rpc/other_function', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'abort', 'test-project', 'rest-rpc-other', true],
+        ['Edge 함수에 회원 JWT', { url: TEST_URL + '/functions/v1/telegram-notify', method: 'POST', resourceType: 'fetch', headers: H(member), postData: '{}' }, 'abort', 'test-project', 'functions', true],
+        ['service_role 자격', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(service), postData: '{}' }, 'abort', 'test-project', 'my_profile', true],
+        ['알 수 없는 자격', { url: TEST_URL + '/rest/v1/reviews', method: 'GET', resourceType: 'fetch', headers: { apikey: anon, Authorization: 'Bearer zzsecretopaque' } }, 'abort', 'test-project', 'rest-table', true],
+        ['자기 서버에 회원 JWT', { url: SELF + '/index.html', method: 'GET', resourceType: 'fetch', headers: H(member) }, 'abort', 'self', 'file', true],
+        ['자기 서버에 비밀번호(폼)', { url: SELF + '/login.html', method: 'POST', resourceType: 'document', isNavigation: true, postData: 'email=a%40zz.invalid&password=zzsecretpw' }, 'abort', 'self', 'file', true],
+        // 허용 밖의 목적지
+        ['허용 목록 호스트의 스크립트(목록 밖 종류)', { url: 'https://cdn.jsdelivr.net/npm/x.js', method: 'GET', resourceType: 'script' }, 'abort', 'outside', 'other', false],
+        ['텔레그램 fetch', { url: 'https://api.telegram.org/botzzsecret/sendMessage', method: 'POST', resourceType: 'fetch', postData: '{"text":"x"}' }, 'abort', 'outside', 'other', false],
+        ['운영 주소 fetch', { url: 'https://qpqjevecjejvbeuogtbx.supabase.co/rest/v1/users', method: 'GET', resourceType: 'fetch', headers: { apikey: 'x' } }, 'abort', 'outside', 'other', false],
+        ['바깥으로 화면 이동', { url: 'https://testroom.eonfl.com/?t=zzsecret', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'outside', 'other', false],
+        ['카카오 링크 이동', { url: 'http://pf.kakao.com/_FWxcZC', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'outside', 'other', false],
+        ['제어 포트(다른 로컬 포트)', { url: 'http://127.0.0.1:8899/continue?step=1', method: 'POST', resourceType: 'fetch' }, 'abort', 'outside', 'other', false],
+        ['시험 프로젝트로 화면 이동', { url: TEST_URL + '/auth/v1/authorize?provider=x', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'test-project', 'auth-other', false],
+        ['로컬 시험 목적지(fetch)', { url: SELF + '/__b3a/sink/testroom', method: 'GET', resourceType: 'fetch' }, 'abort', 'sink', 'sink', false],
+        ['로컬 시험 목적지(이동)', { url: SELF + '/__b3a/sink/testroom', method: 'GET', resourceType: 'document', isNavigation: true }, 'abort', 'sink', 'sink', false],
+    ];
+    const records = [];
+    for (const [name, req, action, where, target, leak] of rows) {
+        const d = decide(req);
+        records.push(d.record);
+        if (action === 'abort' && d.action !== 'abort') problems.push(`가르기: ${name} — 전송 전에 중단하지 않음`);
+        if (action === 'continue' && d.action !== 'continue') problems.push(`가르기: ${name} — 보내야 하는 요청을 중단함`);
+        if (d.record.where !== where || d.record.target !== target) problems.push(`가르기: ${name} — 무리·이름이 ${d.record.where}/${d.record.target} (기대 ${where}/${target})`);
+        if (d.record.leak !== leak) problems.push(`가르기: ${name} — 자격의 용도 판정이 ${d.record.leak} (기대 ${leak})`);
+        if (d.record.aborted !== (d.action === 'abort')) problems.push(`가르기: ${name} — 기록의 중단 표시가 결정과 다름`);
+    }
+    // 기록에는 자유 형식의 글자가 없다: 정해 둔 이름·참/거짓만
+    const allowedValues = new Set(['self', 'sink', 'test-project', 'static-allowed', 'outside', 'local',
+        'file', 'test-endpoint', 'static', 'other', 'login', 'refresh', 'logout', 'my_profile', 'my_site_access', 'rest-rpc-other', 'rest-table', 'auth-other', 'storage', 'functions',
+        'document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr', 'fetch', 'websocket', 'manifest',
+        'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'OTHER',
+        'none', 'anon', 'member', 'service_role',
+        'password', 'refresh_token', 'member_jwt', 'unknown_credential']);
+    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted']);
+    for (const r of records) {
+        for (const [k, v] of Object.entries(r)) {
+            const values = Array.isArray(v) ? v : [v];
+            if (!allowedKeys.has(k) || values.some((x) => typeof x !== 'boolean' && !allowedValues.has(x))) { problems.push('가르기: 기록에 정해 두지 않은 항목·글자가 있음'); break; }
+        }
+    }
+    const text = JSON.stringify(records);
+    if (text.includes('zzsecret') || /eyJ[A-Za-z0-9_-]{8,}/.test(text) || /https?:/.test(text)) problems.push('가르기: 기록에 JWT·비밀번호·갱신값·주소가 남음');
+    const s = summarize(records);
+    const want = { leakBlocked: 13, leakSent: 0, publicRetry: 1, serviceRole: 1, sinkAttempts: 2, outsideSent: 0, staticAllowed: 1 };
+    for (const [k, v] of Object.entries(want)) if (s[k] !== v) problems.push(`가르기: 요약의 ${k} 가 ${s[k]} (기대 ${v})`);
+    if (s.testProjectByTarget.login !== 1 || s.testProjectByTarget.my_profile !== 2 || s.testProjectByTarget['rest-table'] !== 1) problems.push('가르기: 요약의 이름별 수가 기대와 다름');
+    return { problems, rows: rows.length };
+}
 function sectionContract1() {
     const problems = [];
     let text = '';
@@ -1212,7 +1608,7 @@ async function main() {
 
     const mut = await sectionMutants();
     fail('감도', mut.problems);
-    out(`[7] 감도 점검(일부러 바꾼 사본 ${MUTANTS.length}개): ${mut.problems.length === 0 ? '모두 검출' : `실패 ${mut.problems.length}`}`);
+    out(`[7] 감도 점검(일부러 바꾼 사본 ${MUTANTS.length}개 — 변조마다 겨냥한 판정이 깨져야 검출): ${mut.problems.length === 0 ? '모두 검출' : `실패 ${mut.problems.length}`}`);
     mut.lines.forEach((l) => out(l));
     listSome(mut.problems);
 
@@ -1220,9 +1616,9 @@ async function main() {
     fail('서버', srv.problems);
     out(`[8] 화면 시험용 로컬 서버의 몸통(소켓 없이): 내줄 수 있는 파일 ${srv.info.servable}개를 꺼짐·켜짐으로 한 번씩 — 운영 흔적이 남은 채 내준 것 0, 내주지 않는 파일 ${srv.info.refused.length}개. 어긋남 ${srv.problems.length}`);
     listSome(srv.problems);
-    const rl = sectionRequestLog();
+    const rl = await sectionRequestLog();
     fail('가르기', rl.problems);
-    out(`    - 자동화용 "보내기 전에 가르기"·가린 기록(요청 ${rl.rows}가지): 어긋남 ${rl.problems.length}`);
+    out(`    - 차단기(보내기 전에 가르기: 목적지 + 자격의 종류·용도, 기록은 정해 둔 이름만) 요청 ${rl.rows}가지: 어긋남 ${rl.problems.length}`);
     listSome(rl.problems);
 
     if (realNetworkAttempts.length) fail('네트워크', `실제 네트워크 요청 시도 ${realNetworkAttempts.length}건`);
