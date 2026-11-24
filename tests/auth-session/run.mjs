@@ -954,7 +954,8 @@ async function sectionMutants() {
 // 글자 점검
 // =====================================================================
 function git(args) {
-    return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+    // 한글 파일 이름을 따옴표·8진수로 바꾸지 않게 한다
+    return execFileSync('git', ['-c', 'core.quotepath=false', ...args], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 }
 
 function sectionText() {
@@ -1018,7 +1019,7 @@ function sectionText() {
 function sectionServer() {
     const problems = [];
     const info = {};
-    const tracked = git(['-c', 'core.quotepath=false', 'ls-files']).split('\n').filter(Boolean);
+    const tracked = git(['ls-files']).split('\n').filter(Boolean);
     const ignored = makeIgnore(fs.readFileSync(path.join(ROOT, '.vercelignore'), 'utf8'));
     const files = tracked.filter((f) => !ignored(f) && !f.startsWith('.'));
     const readFile = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel)); } catch (e) { return null; } };
