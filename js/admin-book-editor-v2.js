@@ -15,7 +15,7 @@
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const DEV = params.get('dev') === '1' && ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-  const MARK_CSS = '[data-be2-mark]{pointer-events:none}';
+  const MARK_CSS = '[data-be2-mark]{pointer-events:none}[data-be2-mark]::before{content:attr(data-be2-mark)}';
   const KEEP = ['white-space', 'overflow-wrap', 'word-break', 'line-break', '-webkit-line-break'];
 
   function checkAuth() {
@@ -96,14 +96,16 @@
     r.querySelectorAll('img').forEach((im) => { im.setAttribute('contenteditable', 'false'); im.setAttribute('draggable', 'false'); });
     // 위치가 고정된 요소는 생김새로 나눈다 (2026-11-24 정리. 예전: 위치 고정이면 전부 잠금)
     //  - 글 줄 안의 표식(그 줄에 다른 글자가 있음: → ① 2-1 EX): 장식. 잠그고 클릭은 그 줄 글자로 넘긴다(잠긴 칸에 커서가 빠지지 않게).
-    //    클릭 넘기기는 에디터 전용 표시(data-be2-mark) + 아래 MARK_CSS. inert는 그림을 눌렀을 때 커서를 쪽 맨 앞으로 보내서 쓰지 않는다
+    //    표식 글자는 편집하는 동안 글자가 아니라 그림으로 보인다(data-be2-mark에 옮겨 MARK_CSS의 ::before로 그림, 저장할 때 htmlOf가 되돌림).
+    //    줄 안에 잠긴 글자가 남아 있으면, 그 바로 뒤에서 한글을 조합할 때 크롬이 커서를 잠긴 글자 안으로 옮겨 두 번째 글자부터 사라진다(2026-11-24 재현).
+    //    inert는 그림을 눌렀을 때 커서를 쪽 맨 앞으로 보내서 쓰지 않는다
     //  - 글자 없는 모양(분홍 테두리·띠): 잠근다
     //  - 글자가 있는 따로 선 상자(사진 손글씨·머리글·쪽 번호): 다른 글처럼 고친다. 늘어나 종이 아래로 나가면 넘침 검사가 잡는다
     const ownText = (el) => !!el && [...el.childNodes].some((n) => n.nodeType === 3 && n.data.trim());
     r.querySelectorAll('*').forEach((el) => {
       const pos = getComputedStyle(el).position;
       if ((pos !== 'absolute' && pos !== 'fixed') || el.closest('[contenteditable="false"]')) return;
-      if (ownText(el.parentElement)) { el.setAttribute('contenteditable', 'false'); el.setAttribute('data-be2-mark', ''); }
+      if (ownText(el.parentElement)) { el.setAttribute('contenteditable', 'false'); const t = el.children.length ? '' : el.textContent; el.setAttribute('data-be2-mark', t); if (t) el.textContent = ''; }
       else if (!el.textContent.trim()) el.setAttribute('contenteditable', 'false');
     });
     const remember = () => { S.pre = caretOffset(root, r); };
@@ -189,7 +191,7 @@
     const c = twp.cloneNode(true);
     [...c.querySelectorAll(':scope > .page')].forEach((r, i) => { const o = S.orig.get(live[i]); if (o == null) r.removeAttribute('style'); else r.setAttribute('style', o); });
     c.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
-    c.querySelectorAll('[data-be2-mark]').forEach((el) => el.removeAttribute('data-be2-mark'));
+    c.querySelectorAll('[data-be2-mark]').forEach((el) => { const t = el.getAttribute('data-be2-mark'); if (t && !el.children.length) el.textContent = t; el.removeAttribute('data-be2-mark'); });
     c.querySelectorAll('[spellcheck]').forEach((el) => el.removeAttribute('spellcheck'));
     c.querySelectorAll('img[draggable]').forEach((el) => el.removeAttribute('draggable'));
     // 입력 중 브라우저가 넣는 줄바꿈 없는 빈칸(nbsp)을 보통 빈칸으로 (원래 쪽에 nbsp가 없을 때만)
@@ -335,8 +337,9 @@
   function buildOutline() {
     const list = $('outlineList'); list.innerHTML = ''; let n = 0;
     S.pages.forEach((p, i) => {
-      const root = S.roots.get(p.id); if (!root) return;
-      root.querySelectorAll('h1, h2').forEach((h) => {
+      if (!S.roots.get(p.id)) return;
+      const tpl = document.createElement('template'); tpl.innerHTML = p.html;   // 저장된 쪽 기준(편집 화면은 표식 글자를 그림으로 바꿔 두어 제목 번호가 빠짐)
+      tpl.content.querySelectorAll('h1, h2').forEach((h) => {
         const t = (h.textContent || '').trim(); if (!t) return;
         const b = document.createElement('button'); b.className = 'be2-oi' + (h.tagName === 'H2' ? ' lv2' : ''); b.dataset.page = p.id;
         b.innerHTML = '<span class="pn">' + (i + 1) + '</span>' + esc(t);
