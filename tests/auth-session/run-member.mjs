@@ -16,6 +16,7 @@ import { openPage, fire } from './pages-dom.mjs';
 import { memberWorld, memberOf, memberScoresUrl, wrapperScoresPath, scoreRequests, credOf, SCORE_COLUMNS, SCORE_TABLE } from './member-world.mjs';
 import { fakeJwt } from './fake-supabase.mjs';
 import { makePeople } from './business-fake.mjs';
+import { SCORE_FIXTURE, SCORE_MARK, countRows } from './scores-fixture.mjs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -695,6 +696,59 @@ async function testRunnerGate(opt) {
     return c.problems;
 }
 
+// =====================================================================
+// 8. 합성 성적 행의 SQL(넣기·지우기·상태 읽기)의 글자 점검 — **실행해 본 것이 아니다**(작업방은 SQL 을 실행하지 못한다)
+// =====================================================================
+const SQL_UP = 'tests/auth-session/b3c2a_scores_up.sql';
+const SQL_DOWN = 'tests/auth-session/b3c2a_scores_down.sql';
+const SQL_STATE = 'tests/auth-session/b3c2a_scores_state.sql';
+const SCREEN_FILE = 'tests/auth-session/screen.mjs';
+async function testSqlText(opt) {
+    const c = checker();
+    const read = (f) => (opt.mutate ? opt.mutate(f, workFile(f)) : workFile(f));
+    const code = (f) => read(f).split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
+    const up = code(SQL_UP);
+    const down = code(SQL_DOWN);
+    const state = code(SQL_STATE);
+    const count = (text, re) => (text.match(re) || []).length;
+    // 넣는 값이 합성 성적 행의 한 곳(scores-fixture.mjs)과 같다
+    const one = (n) => Number(n).toFixed(1);
+    for (const [owner, rows] of Object.entries(SCORE_FIXTURE)) {
+        for (const r of rows) {
+            const line = `('${owner.toLowerCase()}', '${r.tag}', date '${r.test_date}', ${one(r.reading)}, ${one(r.listening)}, ${one(r.speaking)}, ${one(r.writing)}, ${one(r.overall)}, ${r.legacy_total === null ? 'null::integer' : r.legacy_total})`;
+            c.ok(up.includes(line), `SQL(넣기): 합성 행 ${r.tag} 의 값이 scores-fixture.mjs 와 다름`);
+            c.ok(r.reading >= 1 && r.reading <= 6 && r.listening >= 1 && r.listening <= 6 && r.speaking >= 1 && r.speaking <= 6 && r.writing >= 1 && r.writing <= 6 && r.overall >= 1 && r.overall <= 6 && (r.legacy_total === null || (r.legacy_total >= 0 && r.legacy_total <= 120)), `SQL(넣기): 합성 행 ${r.tag} 의 값이 표의 제약(1.0~6.0, 0~120) 밖`);
+        }
+    }
+    c.ok(count(up, /\(\s*'[a-z]+', '[AB]\d', date /g) === 3 && SCORE_MARK === 'zzb3c2a' && up.includes("'zzb3c2a ' || v.tag"), 'SQL(넣기): 넣는 행이 셋이 아니거나 표식이 다름');
+    // 실행기가 응답의 행을 가리는 지문이 그 값으로 만들어진다
+    c.ok(JSON.stringify(countRows([{ test_date: '1999-03-13', reading: 4.5, listening: 3.5, speaking: 2.5, writing: 5.5, overall: 4, legacy_total: 81 }, { test_date: '1999-02-12', reading: 2, listening: 2.5, speaking: 1.5, writing: 2, overall: 2, legacy_total: 45 }, { test_date: '2024-05-05', reading: 4.5, listening: 3.5, speaking: 2.5, writing: 5.5, overall: 4, legacy_total: 81 }])) === '{"A":1,"B":1,"other":1}', '합성 행의 지문: 응답의 행을 A·B·그 밖으로 가리지 못함');
+    // 세 파일 공통: 대상 확인, 쓰는 문장의 범위
+    for (const [name, text] of [['넣기', up], ['지우기', down]]) {
+        c.ok(text.includes("current_setting('b3c2a.test_project_ref', true), '') <> 'hmncdheiwqwekdbtijar'"), `SQL(${name}): 대상 확인이 없음`);
+        c.ok(count(text, /^begin;$/gm) === 1 && count(text, /^commit;$/gm) === 1, `SQL(${name}): begin·commit 이 한 번씩이 아님`);
+        c.ok(!/\b(drop|truncate|alter|grant|revoke|create)\b/i.test(text) && !/\bupdate\s+public\./i.test(text), `SQL(${name}): 넣기·지우기 말고 다른 것을 바꾸는 문장이 있음`);
+        c.ok(!text.includes('qpqjevecjejvbeuogtbx'), `SQL(${name}): 운영 ref 가 문장 안에 있음`);
+    }
+    c.ok(count(up, /insert into/gi) === 1 && /insert into public\.toefl_actual_scores\s/i.test(up) && !/delete from/i.test(up), 'SQL(넣기): 성적 표에 한 번 넣는 것 말고 다른 쓰기가 있음');
+    c.ok(up.indexOf('insert into') > up.indexOf("'zzb3c2a 넣기 중단: 합성 표식"), 'SQL(넣기): 겹침·모양 확인이 넣기보다 뒤에 있음');
+    c.ok(/v_columns\s+constant text := 'created_at:timestamptz:YES,id:uuid:NO,legacy_total:int4:YES,listening:numeric:YES,memo:text:YES,overall:numeric:YES,reading:numeric:YES,score_image:text:YES,speaking:numeric:YES,test_date:date:NO,updated_at:timestamptz:YES,user_email:text:YES,user_id:uuid:NO,user_name:text:YES,writing:numeric:YES'/.test(up), 'SQL(넣기): 열의 기대가 발주 때 읽은 15개와 다름');
+    c.ok(up.includes("'Allow all access for anon,b2n1_admin_delete,b2n1_admin_insert,b2n1_admin_update,b2n1_own_or_admin_select'"), 'SQL(넣기): 규칙의 기대가 발주 때 읽은 다섯과 다름');
+    // 지우기: 번호와 주인이 둘 다 같은 행만, 지문을 먼저 본 뒤에, 정확히 3
+    c.ok(count(down, /delete from/gi) === 1 && /delete from public\.toefl_actual_scores s\s+using [^;]*where s\.id = \(e\.x ->> 'id'\)::pg_catalog\.uuid and s\.user_id = \(e\.x ->> 'user_id'\)::pg_catalog\.uuid;/.test(down), 'SQL(지우기): 지우는 문장이 "넘겨받은 번호와 주인이 둘 다 같은 행" 하나가 아님');
+    c.ok(!/delete from[^;]*like/i.test(down) && !/insert into/i.test(down), 'SQL(지우기): 표식으로 찾아 지우거나 넣는 문장이 있음');
+    c.ok(down.indexOf("= (e.x ->> 'print')") > 0 && down.indexOf("= (e.x ->> 'print')") < down.indexOf('delete from'), 'SQL(지우기): 지문 대조가 지우기보다 앞에 있지 않음');
+    c.ok(/if v_del <> 3 then\s+raise exception/.test(down), 'SQL(지우기): 지워진 수가 3 이 아닐 때 되돌리지 않음');
+    // 상태 읽기: 쓰는 문장 없음
+    c.ok(!/\b(insert|update|delete|drop|truncate|alter|grant|revoke|create|set)\b/i.test(state) && /^with given as/m.test(state), 'SQL(상태 읽기): 읽기 말고 다른 문장이 있음');
+    // 지문의 식이 세 파일에서 같다
+    const printOf = (text) => { const m = /pg_catalog\.md5\(pg_catalog\.concat_ws\('\|', s\.id::text[^;]*?coalesce\(s\.memo, ''\)\)\)/.exec(text.replace(/\s+/g, ' ')); return m ? m[0] : null; };
+    c.ok(!!printOf(up) && printOf(up) === printOf(down) && printOf(up) === printOf(state), 'SQL: 행의 지문을 만드는 식이 세 파일에서 같지 않음');
+    // 실행기의 --fake 가짜 서버가 같은 합성 행을 쓴다
+    c.ok(/fake\.scoreRows = Object\.entries\(SCORE_FIXTURE\)/.test(read(SCREEN_FILE)), '실행기(--fake): 가짜 서버의 성적 행이 scores-fixture.mjs 의 것이 아님');
+    return c.problems;
+}
+
 const TESTS = [
     ['열림: 확인 뒤에만·회원 자격으로·규약의 모양 그대로, 그 밖의 요청은 3C-1 의 켜짐과 같음, 화면 결과는 같은 합성 자료의 꺼짐과 같음(A·B·성적 0건 회원)', testOpenRead],
     ['스위치의 조합 넷(꺼짐 = 기준·3C-1 의 꺼짐 / 켜짐 + 닫힘 = 3C-1 의 켜짐 / 켜짐 + 열림 / 확인할 수 없음 + 열림 = 성적 요청 0)과 저장소의 값(닫힘)', testSwitchMatrix],
@@ -703,6 +757,7 @@ const TESTS = [
     ['만료(401·PGRST303)의 다섯 갈래: 갱신 한 번 뒤 한 번만 — 갈래마다 정해진 횟수에서 끝남', testExpiry],
     ['시작할 때의 사람을 붙든다: 사람이 달라지면 보내지 않거나 응답을 버림, A 가 시작한 흐름은 B 의 JWT 로 이어 보내지 않음', testPersonChange],
     ['실행기: 내보내는 업무 요청은 "그 경우의 합성 회원 한 명의 성적 읽기"뿐 — 차단기와 전송 지점이 따로 본다(제품의 규약표를 읽지 않음)', testRunnerGate],
+    ['합성 성적 행의 SQL(넣기·지우기·상태 읽기)의 글자 점검 — 실행해 본 것이 아니다', testSqlText],
 ];
 
 // =====================================================================
@@ -788,6 +843,12 @@ const MUTANTS = [
         edits: [[CORE_FILE, "        if (permit.credential === 'member' && u.search === search && auth", "        if (permit.credential === 'member' && u.search.startsWith(search) && auth"]] },
     { name: '실행기의 전송 지점이 허락한 자격의 종류를 보지 않는 사본(공개 키 허락에 회원 자격을 내보냄)', tests: [testRunnerGate], expect: /실행기의 전송 지점\(허락은 공개 키인데 회원 자격으로/,
         edits: [[CORE_FILE, "        if (permit.credential === 'member' && u.search === search && auth", "        if (u.search === search && auth"], [CORE_FILE, "        const c = permit.credential === 'member' ? jwtClaims(auth) : null;", '        const c = jwtClaims(auth);']] },
+    { name: '합성 성적 행을 지울 때 주인을 보지 않는 사본(번호만으로 지움)', tests: [testSqlText], expect: /SQL\(지우기\): 지우는 문장이/,
+        edits: [[SQL_DOWN, "   where s.id = (e.x ->> 'id')::pg_catalog.uuid and s.user_id = (e.x ->> 'user_id')::pg_catalog.uuid;\n  get diagnostics", "   where s.id = (e.x ->> 'id')::pg_catalog.uuid;\n  get diagnostics"]] },
+    { name: '합성 성적 행을 표식으로 찾아 지우는 사본', tests: [testSqlText], expect: /SQL\(지우기\): (지우는 문장이|표식으로 찾아)/,
+        edits: [[SQL_DOWN, "   where s.id = (e.x ->> 'id')::pg_catalog.uuid and s.user_id = (e.x ->> 'user_id')::pg_catalog.uuid;\n  get diagnostics", "   where s.memo like 'zzb3c2a%';\n  get diagnostics"]] },
+    { name: '넣는 SQL 의 값이 합성 성적 행의 한 곳과 다른 사본', tests: [testSqlText], expect: /SQL\(넣기\): 합성 행 A2 의 값이 scores-fixture\.mjs 와 다름/,
+        edits: [[SQL_UP, "    ('a', 'A2', date '1999-03-13', 4.5, 3.5, 2.5, 5.5, 4.0, 81),", "    ('a', 'A2', date '1999-03-13', 4.5, 3.5, 2.5, 5.5, 4.5, 81),"]] },
     { name: '꺼진 화면의 성적 요청이 달라진 사본(열을 줄임)', tests: [testSwitchMatrix], expect: /꺼짐\(A\): 기준\(14455ae\)과 다름|꺼짐\(A\): 성적 요청이/,
         edits: [[FORM_FILE, "                'select': 'test_date,reading,listening,speaking,writing,overall,legacy_total',", "                'select': 'test_date,overall',"]] },
     { name: '꺼진 화면이 전송 담당 함수를 타는 사본(꺼짐인데 켜진 길)', tests: [testSwitchMatrix], expect: /꺼짐\(A\): 기준\(14455ae\)과 다름|꺼짐\(A\): 성적 요청이/,
