@@ -2,12 +2,16 @@
 // =====================================================================
 // 보안작업 묶음 2 — 계약 2-나-3 (나) 합성 PDF 올리기·지우기 (시험 프로젝트 hmncdheiwqwekdbtijar 의 books 버킷만)
 //
-// 이 파일은 작업방이 실제 Storage 에 돌려 본 적이 없다(가짜 응답으로만 돌려 봤다 — 가짜 응답은 실제 동작을 대신하지 않는다).
+// 1차 판(0fd11de)의 올리기는 브레인방이 시험 프로젝트에서 한 번 돌렸다(세 객체 올림·구간 대조 일치). 지우기(--remove)와
+// 2차에서 바꾼 부분(아래 ★)은 실제 Storage 에서 돈 적이 없다 — 작업방은 가짜 응답으로만 돌려 봤다.
 // 이어 올리기(TUS)의 요청 모양은 Supabase 문서의 것이다: POST /storage/v1/upload/resumable (Upload-Metadata 에
-// bucketName·objectName·contentType·cacheControl), 받은 Location 에 6MiB 씩 PATCH. 틀리면 응답을 그대로 적고 멈춘다.
+// bucketName·objectName·contentType·cacheControl), 받은 Location 에 6MiB 씩 PATCH.
+// ★ 실패한 응답의 원문은 결과·로그에 남기지 않는다. HTTP 상태와 본문의 코드 필드(statusCode·code·error)만 적는다.
+// ★ "객체 없음"으로 세는 응답은 관측된 모양 하나뿐이다: HTTP 400 · 본문 statusCode 404 · NoSuchKey. 그 밖(일반 404 포함)은 미확인.
+// ★ 객체 ID 를 기록하지 못한 객체는 이 도구의 것으로 받아들이지 않는다(받아들이는 선택 --adopt 는 없앴다).
 //
 // 쓰는 법
-//   올리기:  node upload.mjs --manifest <make_pdf 의 manifest.json> --out <결과 json> [--docs 160,68,34] [--adopt]
+//   올리기:  node upload.mjs --manifest <make_pdf 의 manifest.json> --out <결과 json> [--docs 160,68,34]
 //   지우기:  node upload.mjs --remove <올리기 결과 json> --out <지우기 결과 json>
 //   계획만:  node upload.mjs --manifest <…> --plan            (요청 0)
 // 환경 변수: B2N3_URL (정확히 https://hmncdheiwqwekdbtijar.supabase.co), B2N3_SERVICE_KEY (시험 프로젝트의 service_role 키)
@@ -16,11 +20,14 @@
 //   0. 요청 전: 주소·열쇠 확인, 로컬 원본의 크기·sha256 이 manifest 와 같은지
 //   1. 버킷 조회: books 가 있고 비공개인지(아니면 "기준선 불일치"로 멈춤), 버킷 크기 제한
 //   2. 이름마다 정보 조회: 같은 이름이 이미 있으면 덮어쓰지 않고 멈춤(올리기 요청에도 x-upsert 를 보내지 않는다)
-//   3. 이어 올리기(TUS). 끊기면 받은 위치(HEAD 의 Upload-Offset)부터 이어 보낸다(이 실행 안에서만)
+//   3. 이어 올리기(TUS). 끊기면 받은 위치(HEAD 의 Upload-Offset)부터 이어 보낸다(이 실행 안에서만).
+//      프로세스가 죽어 결과 파일에 객체 ID 가 없는 객체가 남으면 도구는 그것을 받아들이지도 지우지도 않는다 —
+//      브레인방이 서비스 열쇠로 이름·크기·만든 시각을 확인해 판단한다(절차.md)
 //   4. 정보 조회로 크기·형식·캐시 설정 확인, 객체 ID 기록
 //   5. 내용 대조: eTag 를 md5 로 가정하지 않는다. 앞·중간·끝 구간을 범위 요청으로 받아 로컬 원본의 같은 구간과 바이트로 견준다
 // 지우기: 결과 파일의 객체마다 "이름과 객체 ID 가 둘 다 지금의 객체와 같을 때만" 지운다.
-//   하나라도 ID 가 다르거나 읽지 못하면 아무것도 지우지 않고 멈춘다(종료 값 4). 지운 뒤 이름마다 "없음"을 확인한다.
+//   하나라도 ID 가 다르거나, 읽지 못하거나, ID 가 기록되지 않은 객체가 지금 있으면 아무것도 지우지 않고 멈춘다(종료 값 4).
+//   지운 뒤 이름마다 "없음"을 확인한다.
 //
 // 종료 값: 0 = 끝까지 맞음 / 1 = 어긋남·실패 / 2 = 요청 전에 멈춤(주소·열쇠·인자·로컬 파일) /
 //          3 = 기준선 불일치(버킷) / 4 = 같은 이름이 이미 있음(올리기) 또는 ID 불일치(지우기) — 아무것도 덮어쓰거나 지우지 않음
@@ -70,21 +77,22 @@ async function http(method, pathOrUrl, { headers = {}, body, raw = false } = {})
   requestCount++;
   const res = await fetch(url, { method, headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, ...headers }, body, redirect: 'manual' });
   const buf = raw ? Buffer.from(await res.arrayBuffer()) : null;
-  const text = raw ? null : await res.text();
   let json = null;
-  if (text) { try { json = JSON.parse(text); } catch { /* 본문이 JSON 이 아님 */ } }
-  return { status: res.status, h: (n) => res.headers.get(n), text, json, buf };
+  if (!raw) { const text = await res.text(); if (text) { try { json = JSON.parse(text); } catch { /* 본문이 JSON 이 아님 */ } } }
+  return { status: res.status, h: (n) => res.headers.get(n), json, buf };
 }
-const show = (r) => `HTTP ${r.status} ${String(r.text ?? '').slice(0, 600)}`;
+// 실패한 응답은 원문을 남기지 않는다: 상태와 본문의 코드 필드만(값이 짧은 글자·숫자일 때만. message 는 적지 않는다)
+const codeField = (v) => (v != null && /^[A-Za-z0-9_ .-]{1,48}$/.test(String(v)) ? String(v) : v == null ? '-' : '(적지 않음)');
+const show = (r) => `HTTP ${r.status} statusCode=${codeField(r.json?.statusCode)} code=${codeField(r.json?.code)} error=${codeField(r.json?.error)}`;
 const encName = (n) => n.split('/').map(encodeURIComponent).join('/');
 
-// 정보 조회: 있음(200) / 없음(관측된 모양 하나 — HTTP 400 · statusCode 404 · NoSuchKey, 또는 HTTP 404) / 그 밖은 모름
+// 정보 조회: 있음(200) / 없음(관측된 모양 하나 — HTTP 400 · statusCode 404 · NoSuchKey) / 그 밖은 모름(일반 404 포함)
 async function info(name) {
   const r = await http('GET', `/storage/v1/object/info/authenticated/${BUCKET}/${encName(name)}`);
   if (r.status === 200 && r.json && r.json.id) return { state: 'present', meta: r.json, r };
   const sc = r.json?.statusCode != null ? String(r.json.statusCode) : null;
   const code = String(r.json?.code ?? r.json?.error ?? '');
-  if ((r.status === 400 && sc === '404' && code === 'NoSuchKey') || (r.status === 404 && (sc === '404' || sc === null))) return { state: 'absent', r };
+  if (r.status === 400 && sc === '404' && (code === 'NoSuchKey' || String(r.json?.error ?? '') === 'NoSuchKey')) return { state: 'absent', r };
   return { state: 'unknown', r };
 }
 
@@ -132,7 +140,7 @@ async function tusUpload(name, path, size, onProgress) {
         r = await http('PATCH', loc.href, { headers: { 'Tus-Resumable': '1.0.0', 'Upload-Offset': String(offset), 'Content-Type': 'application/offset+octet-stream' }, body: buf });
       } catch (e) {
         // 네트워크가 끊김: 서버가 받은 위치를 물어 거기서 잇는다
-        if (netFails >= RETRY_DELAYS.length) return { ok: false, step: 'patch', detail: `네트워크 오류가 ${netFails + 1}번 — ${String(e?.message ?? e).slice(0, 200)}`, offset };
+        if (netFails >= RETRY_DELAYS.length) return { ok: false, step: 'patch', detail: `네트워크 오류가 ${netFails + 1}번(${codeField(e?.name)} ${codeField(e?.cause?.code)})`, offset };
         await sleep(RETRY_DELAYS[netFails++]);
         let head;
         try { head = await http('HEAD', loc.href, { headers: { 'Tus-Resumable': '1.0.0' } }); } catch { continue; }
@@ -199,8 +207,8 @@ async function doUpload() {
   }
   const outPath = arg('--out');
   if (!outPath) stop(2, '--out <결과 json> 이 필요하다');
-  const prior = existsSync(outPath) ? JSON.parse(readFileSync(outPath, 'utf8')) : null;
-  if (prior && !has('--adopt')) stop(2, `${outPath} 가 이미 있다. 덮어쓰지 않는다(끊긴 올리기를 이어 확인하려면 --adopt)`);
+  if (has('--adopt')) stop(2, '--adopt 는 없앴다. 객체 ID 를 기록하지 못한 객체는 이 도구의 것으로 받아들이지 않는다(절차.md 의 "끊긴 올리기")');
+  if (existsSync(outPath)) stop(2, `${outPath} 가 이미 있다. 덮어쓰지 않는다`);
   checkTarget();
   for (const d of docs) { if ((await sha256File(d.path)) !== d.sha256) stop(2, `로컬 원본의 sha256 이 manifest 와 다르다: ${d.file}`); }
 
@@ -217,31 +225,26 @@ async function doUpload() {
   if (limit != null && docs.some((d) => d.bytes > Number(limit))) fail(3, `기준선 불일치: books 버킷의 크기 제한(${limit})이 올릴 파일보다 작다`);
 
   // 2. 같은 이름이 이미 있는가 — 전부 본 뒤에 올리기를 시작한다
-  const adopt = {};
   for (const d of docs) {
     const i = await info(d.object_name);
-    const was = prior?.objects?.find((o) => o.name === d.object_name);
     if (i.state === 'absent') continue;
-    if (i.state === 'present' && has('--adopt') && was && (was.state === 'started' || was.state === 'verified' || was.state === 'uploaded')) { adopt[d.doc] = i.meta; continue; }
-    if (i.state === 'present') fail(4, `같은 이름이 이미 있다: ${d.object_name} (id ${i.meta.id}, 크기 ${i.meta.size}). 덮어쓰지 않는다`);
+    if (i.state === 'present') fail(4, `같은 이름이 이미 있다: ${d.object_name} (id ${i.meta.id}, 크기 ${i.meta.size}). 덮어쓰지도 받아들이지도 않는다 — 누가 올린 것인지 브레인방이 확인할 것`);
     fail(1, `${d.object_name} 이 있는지 읽지 못했다(${show(i.r)})`);
   }
 
   // 3~5
   for (const d of docs) {
-    const rec = { doc: d.doc, bucket: BUCKET, name: d.object_name, bytes_local: d.bytes, sha256_local: d.sha256, state: 'started', adopted: !!adopt[d.doc] };
+    const rec = { doc: d.doc, bucket: BUCKET, name: d.object_name, bytes_local: d.bytes, sha256_local: d.sha256, state: 'started' };
     result.objects.push(rec);
     save();
-    if (!adopt[d.doc]) {
-      log(`doc ${d.doc}: ${d.object_name} 올리기 시작(${d.bytes.toLocaleString('en-US')} 바이트, ${Math.ceil(d.bytes / CHUNK)}조각)`);
-      const t0 = Date.now();
-      let lastShown = 0;
-      const up = await tusUpload(d.object_name, d.path, d.bytes, (off) => { if (off - lastShown >= 30 * 1024 * 1024 || off === d.bytes) { lastShown = off; log(`  ${Math.floor((off / d.bytes) * 100)}%`); } });
-      rec.upload = { ...up, ms: Date.now() - t0 };
-      if (!up.ok) fail(1, `doc ${d.doc} 올리기 실패(${up.step}): ${up.detail}`);
-      rec.state = 'uploaded';
-      save();
-    } else log(`doc ${d.doc}: 끊긴 올리기가 남긴 객체를 확인해 받아들인다(--adopt)`);
+    log(`doc ${d.doc}: ${d.object_name} 올리기 시작(${d.bytes.toLocaleString('en-US')} 바이트, ${Math.ceil(d.bytes / CHUNK)}조각)`);
+    const t0 = Date.now();
+    let lastShown = 0;
+    const up = await tusUpload(d.object_name, d.path, d.bytes, (off) => { if (off - lastShown >= 30 * 1024 * 1024 || off === d.bytes) { lastShown = off; log(`  ${Math.floor((off / d.bytes) * 100)}%`); } });
+    rec.upload = { ...up, ms: Date.now() - t0 };
+    if (!up.ok) fail(1, `doc ${d.doc} 올리기 실패(${up.step}): ${up.detail}`);
+    rec.state = 'uploaded';
+    save();
     const i = await info(d.object_name);
     if (i.state !== 'present') fail(1, `doc ${d.doc}: 올린 뒤 정보 조회가 객체를 돌려주지 않는다(${show(i.r)})`);
     const m = i.meta;
@@ -280,6 +283,8 @@ async function doRemove() {
   if (existsSync(outPath)) stop(2, `${outPath} 가 이미 있다. 덮어쓰지 않는다`);
   const prior = JSON.parse(readFileSync(src, 'utf8'));
   if (prior.target !== TEST_URL || prior.bucket !== BUCKET) stop(2, '결과 파일의 대상이 시험 프로젝트의 books 가 아니다');
+  // 객체 ID 가 기록된 것만 지우기 대상이다. ID 가 없는 객체(끊긴 올리기)는 대상이 아니다 — 지금 그 이름에 객체가 있으면
+  // 아무것도 지우지 않고 멈춰 사람에게 넘긴다.
   const targets = (prior.objects ?? []).filter((o) => o.id);
   const noId = (prior.objects ?? []).filter((o) => !o.id);
   for (const o of prior.objects ?? []) if (o.bucket !== BUCKET || !NAME_RE.test(o.name)) stop(2, `결과 파일에 이 도구의 이름 모양이 아닌 객체가 있다: ${o.name}`);
@@ -290,13 +295,14 @@ async function doRemove() {
   for (const o of [...targets, ...noId]) {
     const i = await info(o.name);
     const rec = { doc: o.doc, name: o.name, id_recorded: o.id ?? null, now: i.state, id_now: i.state === 'present' ? i.meta.id : null };
-    rec.decision = i.state === 'absent' ? 'already_absent' : i.state !== 'present' ? 'unknown' : !o.id ? 'no_id_recorded' : i.meta.id === o.id ? 'delete' : 'id_differs';
+    rec.decision = i.state === 'absent' ? (o.id ? 'already_absent' : 'no_id_recorded_and_absent') : i.state !== 'present' ? 'unknown' : !o.id ? 'no_id_recorded' : i.meta.id === o.id ? 'delete' : 'id_differs';
+    if (rec.decision === 'no_id_recorded') Object.assign(rec, { size_now: i.meta.size ?? null, created_at_now: i.meta.created_at ?? null, hand_over: '객체 ID 를 기록하지 못한 객체다. 이 도구는 지우지 않는다 — 브레인방이 서비스 열쇠로 이름·크기·만든 시각을 확인해 판단한다' });
     if (rec.decision === 'unknown') rec.response = show(i.r);
     result.objects.push(rec);
   }
   const blocked = result.objects.filter((r) => ['unknown', 'no_id_recorded', 'id_differs'].includes(r.decision));
   if (blocked.length) {
-    result.problems.push(`이름과 객체 ID 가 둘 다 같다고 확인하지 못한 객체가 ${blocked.length}개다. 아무것도 지우지 않았다`);
+    result.problems.push(`이름과 객체 ID 가 둘 다 같다고 확인하지 못한 객체가 ${blocked.length}개다(ID 가 기록되지 않은 객체 포함). 아무것도 지우지 않았다`);
     result.request_count = requestCount;
     writeOut(outPath, result);
     for (const r of blocked) log(`  ${r.name}: ${r.decision} (기록 ${r.id_recorded} / 지금 ${r.id_now})`);
@@ -313,7 +319,7 @@ async function doRemove() {
     if (i.state === 'present') rec.id_after = i.meta.id;
   }
   result.deleted = result.objects.filter((r) => r.decision === 'delete' && r.after === 'absent').length;
-  result.already_absent = result.objects.filter((r) => r.decision === 'already_absent').length;
+  result.already_absent = result.objects.filter((r) => r.decision === 'already_absent' || r.decision === 'no_id_recorded_and_absent').length;
   result.not_gone = result.objects.filter((r) => r.decision === 'delete' && r.after !== 'absent').map((r) => r.name);
   result.finished_at = new Date().toISOString();
   result.request_count = requestCount;
@@ -323,5 +329,5 @@ async function doRemove() {
   return result.not_gone.length ? 1 : 0;
 }
 
-const code = await (has('--remove') ? doRemove() : doUpload()).catch((e) => { log(`예외: ${String(e?.stack ?? e).slice(0, 800)}`); return 1; });
+const code = await (has('--remove') ? doRemove() : doUpload()).catch((e) => { log(`예외: ${codeField(e?.name)} ${String(e?.message ?? '').replace(/[^\x20-\x7e가-힣]/g, ' ').slice(0, 160)}`); return 1; });
 process.exit(code);
