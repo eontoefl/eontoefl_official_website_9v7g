@@ -54,6 +54,8 @@ export function makePeople({ loginEmails, fixturesFromLoginEmail = false } = {})
         memberEmailOf: (k) => (known(k) ? seen.emails[k] : ''),
         // 로그인 이메일과 회원 이메일이 다른가(같으면 "화면이 로그인 이메일을 조건에 쓰는가"를 잴 수 없다). 모르면 null
         differs: (k) => (known(k) && login()[k] ? !same(seen.emails[k], login()[k]) : null),
+        // 결과에 적히면 안 되는 값들(끝에서 흔적을 찾아보는 데만 쓴다): my_profile 에서 본 회원 이메일과, 짧지 않은 회원번호
+        privateValues: () => Object.values(seen.emails).concat(Object.values(seen.ids).filter((x) => x.length >= 16)),
         // 기록의 이름표에 쓰는 값들: { 이름표: { emails: [회원 이메일], ids: [회원번호], loginEmails: [로그인 이메일] } }
         labels() {
             const out = {};

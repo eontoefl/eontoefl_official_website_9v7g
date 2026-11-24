@@ -1268,7 +1268,8 @@ async function main() {
     };
     const text = JSON.stringify(output, null, 1);
     // 덧붙이는 점검: 결과에 비밀값·JWT 모양이 없는가(주된 보호는 "정해 둔 값만 적는다"이다)
-    const leaks = SCAN.filter((s) => s && text.includes(s)).length + (/eyJ[A-Za-z0-9_-]{8,}/.test(text) ? 1 : 0);
+    // (3차) my_profile 에서 본 회원 이메일·회원번호도 결과에 원문으로 쓰지 않는다(이름표로만 적는다) — 함께 찾아본다
+    const leaks = SCAN.concat(people.privateValues()).filter((s) => s && text.includes(s)).length + (/eyJ[A-Za-z0-9_-]{8,}/.test(text) ? 1 : 0);
     if (leaks) { console.error('중단: 결과에 비밀값의 흔적이 있어 파일을 쓰지 않는다'); process.exitCode = 5; }
     else { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, text); }
 

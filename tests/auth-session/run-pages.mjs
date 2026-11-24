@@ -951,6 +951,7 @@ async function testPeople(opt) {
     c.ok(people.note(null, GM.profile) === false && people.note('GM', { id: 'm-GM', name: 'x' }) === false && people.known('GM') === false, '사람의 값: 누구의 것인지 모르는 응답·이메일이 없는 응답을 적음');
     // 판정의 기대(화면에 보여야 하는 값)
     c.ok(people.known('A') && people.nameOf('A') === A.profile.name && people.memberEmailOf('A') === MA && people.differs('A') === true && people.nameOf('B') === B.profile.name, '사람의 값: 판정의 기대(이름·회원 이메일)가 my_profile 의 값이 아님');
+    c.ok(JSON.stringify(people.privateValues().sort()) === JSON.stringify([MA, MB].sort()), '사람의 값: 결과에서 흔적을 찾아볼 값(회원 이메일, 짧지 않은 회원번호)이 기대와 다름');
     // 가짜 자료: 주인은 my_profile 에서 본 A(회원 이메일·회원번호·이름)
     const app = people.fake('GET', rest + 'applications?id=eq.' + bf.FAKE_APP + '&limit=1')[0];
     c.ok(!!app && app.email === MA && app.user_email === MA && app.user_id === 'm-A' && app.name === A.profile.name, '가짜 자료: 가짜 신청서의 주인이 my_profile 에서 본 A(회원 이메일·회원번호·이름)가 아님');
