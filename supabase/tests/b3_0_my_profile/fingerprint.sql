@@ -9,7 +9,8 @@
 --   my_profile           public.my_profile 이라는 이름의 함수
 --       named_count      그 이름의 함수 수(인자가 다른 것 포함). 적용 전·되돌린 뒤 0, 적용 뒤 1
 --       exists           인자 없는 public.my_profile() 이 있는가
---       oid · def_md5    함수 번호 · md5(pg_get_functiondef)
+--       oid · def_md5    함수 번호 · md5(pg_get_functiondef) — **적용 직후에 적어 둔다. 되돌리기 SQL 이 이 두 값을 받는다**
+--                        (set b3_0.applied_oid / set b3_0.applied_def_md5)
 --       body_md5         본문(prosrc)에서 줄 끝의 CR 을 뺀 글자의 md5 — 되돌리기 SQL 이 견주는 값과 같은 계산
 --       language · returns · volatility(v = volatile) · security_definer · config · owner · acl
 --       execute          실행 권한(역할 넷): public · anon · authenticated · service_role
@@ -22,7 +23,7 @@
 --   maintenance_exception  예외 명단: n, rows
 --   users_table          public.users: rls · force_rls · policies(수) · grants_fp(표 권한 목록의 지문)
 --   counts               auth_users · sessions · public_users · member_identity · admin_principal
---   synthetic            이 시험의 합성 행 수: public_users(이메일이 zzb3p0_ 로 시작) · auth_users(같은 표식)
+--   synthetic            이 시험의 합성 회원 행 수: public_users(정확한 일곱 이메일 중 있는 것)
 -- =====================================================================
 with fn as (
   select p.oid, p.prosrc, p.proconfig, p.proacl, p.prosecdef, p.provolatile, p.prorettype, p.prolang, p.proowner
@@ -124,7 +125,9 @@ select pg_catalog.jsonb_build_object(
     'admin_principal', (select pg_catalog.count(*) from security_private.admin_principal)
   ),
   'synthetic', pg_catalog.jsonb_build_object(
-    'public_users', (select pg_catalog.count(*) from public.users u where u.email like 'zzb3p0\_%'),
-    'auth_users', (select pg_catalog.count(*) from auth.users au where au.email like 'zzb3p0\_%')
+    'public_users', (select pg_catalog.count(*) from public.users u
+                      where u.email in ('zzb3p0_a@member.zzb3p0.invalid', 'zzb3p0_b@member.zzb3p0.invalid', 'zzb3p0_gm@member.zzb3p0.invalid',
+                                        'zzb3p0_blk@member.zzb3p0.invalid', 'zzb3p0_wd@member.zzb3p0.invalid', 'zzb3p0_bw@member.zzb3p0.invalid',
+                                        'zzb3p0_trap@member.zzb3p0.invalid'))
   )
 ) as result;
