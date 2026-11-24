@@ -151,6 +151,34 @@ async function sectionOff(mutate) {
     return { problems, compared };
 }
 
+// 인증 모듈을 싣지 않는 화면(index·login 밖의 화면들이 이 경우다): js/common.js·js/main.js·js/login.js 가 기준과 같은가.
+// 화면의 script 태그에서 인증 모듈만 뺀 사본으로 본다 — 저장소의 파일 그대로(꺼짐)와 시험 서버가 켜짐으로 내주는 사본 둘 다.
+async function sectionNoModule() {
+    const problems = [];
+    let compared = 0;
+    const strip = (p, text) => {
+        if (!p.endsWith('.html')) return text;
+        const out = text.replace(/[ \t]*<script src="js\/auth-session\.js[^"]*"><\/script>\n/, '');
+        if (out === text) throw new Error('인증 모듈의 script 태그를 찾지 못함: ' + p);
+        return out;
+    };
+    for (const [name, baseVariant, nowVariant] of [['저장소 그대로', V.BASE, V.OFF], ['켜짐으로 내준 사본', V.BASE_T, V.ON]]) {
+        for (const stateName of STATE_NAMES) {
+            for (const scenario of LEGACY_SCENARIOS) {
+                const base = await runLegacy(scenario, stateName, baseVariant);
+                const now = await runLegacy(scenario, stateName, nowVariant, strip);
+                compared++;
+                const label = `모듈 없는 화면(${name}) › ${stateName} › ${scenario.name}`;
+                for (const d of diffSnapshot(base.snap, now.snap)) problems.push(`${label} › 기준과 다름: ${d}`);
+                if (now.page.evaluate('typeof EonAuth') !== 'undefined') problems.push(`${label} › 시험이 인증 모듈을 빼지 못함`);
+                if (now.snap.scripts.length || now.snap.channels || now.snap.sdk !== 'undefined') problems.push(`${label} › SDK·탭 사이 알림 통로의 흔적`);
+                if (now.w.outside.length) problems.push(`${label} › 가짜 서버 밖으로 나간 요청`);
+            }
+        }
+    }
+    return { problems, compared };
+}
+
 // 꺼짐: 주소의 꼬리표·저장소의 값으로는 켜지지 않는다 + 꺼진 모듈의 제공 함수
 async function testOffCannotBeTurnedOn(opt) {
     const c = checker();
@@ -1161,6 +1189,11 @@ async function main() {
     fail('꺼짐', offSwitch);
     out(`    - 주소의 꼬리표·저장소의 값으로는 켜지지 않음, 꺼진 모듈의 제공 함수: 어긋남 ${offSwitch.length}`);
     listSome(offSwitch);
+
+    const noModule = await sectionNoModule();
+    fail('모듈 없는 화면', noModule.problems);
+    out(`    - 인증 모듈을 싣지 않는 화면의 js/common.js·main.js·login.js(저장소 그대로 / 켜짐으로 내준 사본) × 같은 ${STATE_NAMES.length}×${LEGACY_SCENARIOS.length} = ${noModule.compared}건: 어긋남 ${noModule.problems.length}`);
+    listSome(noModule.problems);
 
     const wr = await sectionWrappers();
     fail('래퍼', wr.problems);
