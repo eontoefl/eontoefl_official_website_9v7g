@@ -23,7 +23,8 @@
 --   0. 대상 확인 값, 계정 번호의 모양
 --   1. 넘겨받은 두 행이 JSON 이고, 키가 지금 site_state 의 열 여덟 개와 정확히 같다
 --      시작 행: id 1 · phase 'normal' / 켠 직후의 행: id 1 · phase 'maintenance' · maintenance_id 301 · message 'zzb3p0 시험 점검'
---   2. 점검 번호 301 의 예외 행이 **정확히 하나이고 그 계정이 A** 다(그대로 한 행)
+--   2. 점검 번호 301 의 예외 행이 **정확히 하나이고 켤 때 넣은 값 그대로**다: 계정이 A, expires_at 이 NULL
+--      (켠 뒤 누가 그 행의 expires_at 만 바꿨어도 지우지 않고 멈춘다. 지우는 문장의 조건에도 같은 세 값을 넣는다)
 -- 되돌린 뒤 확인: 지운 예외 행 1, 바뀐 site_state 행 1, 지금의 행이 시작 행과 열마다 같다. 아니면 전체가 되돌아간다.
 -- 마지막 결과(한 칸 jsonb): 지금의 site_state 행·남은 301 예외 수(0)
 -- =====================================================================
@@ -100,10 +101,12 @@ begin
   if v_n <> 1 then
     raise exception 'zzb3p0 점검 원복 중단: 점검 번호 301 의 예외 행이 %개다(이 시험이 넣은 한 행이어야 한다). 아무것도 바꾸지 않았다 — 사람이 확인할 것', v_n;
   end if;
+  -- 켤 때 넣은 값 그대로인가: (301, A 의 계정 번호, expires_at NULL). 이 표의 열은 이 셋뿐이다(2-가 마이그레이션 131~138줄)
   select pg_catalog.count(*) into v_n
-    from security_private.maintenance_exception me where me.maintenance_id = 301 and me.auth_user_id = v_acct;
+    from security_private.maintenance_exception me
+   where me.maintenance_id = 301 and me.auth_user_id = v_acct and me.expires_at is null;
   if v_n <> 1 then
-    raise exception 'zzb3p0 점검 원복 중단: 점검 번호 301 의 예외 행이 회원 A 의 것이 아니다. 아무것도 바꾸지 않았다 — 사람이 확인할 것';
+    raise exception 'zzb3p0 점검 원복 중단: 점검 번호 301 의 예외 행이 켤 때 넣은 값(회원 A · expires_at NULL) 그대로가 아니다. 아무것도 바꾸지 않았다 — 사람이 확인할 것';
   end if;
 
   -- 비교와 쓰기를 한 문장으로: 지금 행의 모든 열이 "켠 직후의 행"과 같을 때만 시작 값으로 되돌린다
@@ -128,7 +131,8 @@ begin
     raise exception 'zzb3p0 점검 원복 중단: 지금의 site_state 행이 켠 직후의 행과 다르다(바뀐 행 %) — 켠 뒤에 누가 그 행을 바꿨다. 아무것도 바꾸지 않았다 — 사람이 확인할 것', v_n;
   end if;
 
-  delete from security_private.maintenance_exception me where me.maintenance_id = 301 and me.auth_user_id = v_acct;
+  delete from security_private.maintenance_exception me
+   where me.maintenance_id = 301 and me.auth_user_id = v_acct and me.expires_at is null;
   get diagnostics v_n = row_count;
   if v_n <> 1 then
     raise exception 'zzb3p0 점검 원복 실패: 예외 행이 %행 지워졌다(1이어야 한다). 전부 되돌린다', v_n;
