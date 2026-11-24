@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>b2n3 책 PDF 전달 방식 실측</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 지금 두 뷰어(테스트룸 book.html·commentary.html)와 같은 PDF.js: 3.11.174, 같은 CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  body { font: 14px/1.5 system-ui, "Malgun Gothic", sans-serif; margin: 16px; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 22px 0 6px; border-top: 1px solid #ddd; padding-top: 12px; }
+  .note { color: #666; font-size: 13px; } .warn { color: #a40000; font-weight: 600; }
+  button { font: inherit; padding: 4px 10px; margin: 2px 4px 2px 0; } input[type=password], input[type=text] { font: 12px monospace; width: 420px; }
+  table { border-collapse: collapse; margin: 6px 0; font-size: 13px; } th, td { border: 1px solid #ccc; padding: 2px 7px; text-align: right; } th { background: #f3f3f3; } td.l, th.l { text-align: left; }
+  .ok { color: #0a6b0a; } .bad { color: #a40000; font-weight: 600; } .unk { color: #9a6700; }
+  #status { position: sticky; top: 0; background: #fffbe6; border: 1px solid #e6d38a; padding: 6px 10px; z-index: 5; font-weight: 600; }
+  #log { font: 12px/1.4 monospace; white-space: pre-wrap; background: #f7f7f7; border: 1px solid #ddd; padding: 6px; max-height: 240px; overflow: auto; }
+  /* 뷰어 영역: D·R 모두 같은 크기·같은 배율(맞춤 배율 × 1.0). 테스트룸 뷰어와 같은 식으로 맞춘다 */
+  #viewer { width: 1000px; height: 760px; background: #525659; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  label { display: block; margin: 3px 0; }
+</style>
+</head>
+<body>
+<h1>b2n3 책 PDF 전달 방식 실측 <span class="note">(계약 2-나-3 나 · 시험 프로젝트 hmncdheiwqwekdbtijar · 합성 파일만)</span></h1>
+<div id="status">준비 중…</div>
+<p class="note">D = 직접 Storage(<code>/storage/v1/object/authenticated/books/…</code>, apikey·Authorization 둘 다 공개 키 — 지금 학생 화면의 방식) / R = 임시 중계 함수(<code>/functions/v1/zz-b2n3-relay</code>, apikey 공개 키 + Authorization 회원 자격). 순서와 기대 결과는 절차.md 를 따른다.</p>
+
+<h2>0. 준비 <span class="note">(요청 0)</span></h2>
+<div id="manifest" class="note">manifest 읽는 중…</div>
+<label>공개 키(anon) <input type="password" id="in-anon" autocomplete="off"></label>
+<label>회원 자격 — 끝내지 않는 로그인(측정·대조군) <input type="password" id="in-keep" autocomplete="off"></label>
+<label>회원 자격 — 끝낼 로그인(종료 뒤 시험) <input type="password" id="in-end" autocomplete="off"></label>
+<button id="btn-creds">자격 확인</button> <span id="creds" class="note"></span>
+<div>재는 크기:
+  <label style="display:inline"><input type="checkbox" class="doc" value="160" checked> 160MB(필수)</label>
+  <label style="display:inline"><input type="checkbox" class="doc" value="68" checked> 68MB(필수)</label>
+  <label style="display:inline"><input type="checkbox" class="doc" value="34" checked> 34MB(참고)</label>
+</div>
+
+<h2>1. 로컬 원본 열기 확인 <span class="note">(Supabase 요청 0 — 합성 PDF 를 이 PDF.js 가 여는가, 쪽 글자가 맞는가)</span></h2>
+<button id="btn-local">로컬 원본 확인</button> <div id="out-local"></div>
+
+<h2>2. 범위 응답 대조 <span class="note">(D·R 각각: 앞·중간·끝 구간, HEAD, 범위 없는 GET. 받은 바이트를 로컬 원본과 견준다)</span></h2>
+<label><input type="checkbox" id="opt-full" checked> 범위 없는 GET 을 끝까지 받아 길이·sha256 을 견준다(크기별·경로별 한 번씩 — 파일 전체만큼 전송된다)</label>
+<button id="btn-range">범위 응답 대조 시작</button> <div id="out-range"></div>
+
+<h2>3. 표시 시간 측정 <span class="note">(크기별·열기 유형별로 D·R 각각 5회, D와 R 번갈아. 첫 쪽 = 열기 시작→1쪽 렌더 완료 / 중간·끝 쪽 = 이동 시작→렌더 완료)</span></h2>
+<button id="btn-timing">표시 시간 측정 시작</button> <button id="btn-stop">멈추기(지금 재는 것까지)</button> <button id="btn-resume" disabled>새 자격을 넣었다 — 이어 하기</button>
+<div id="out-timing"></div>
+<div id="viewer"><canvas id="pdf-canvas"></canvas></div>
+
+<h2>4. 종료 뒤 시험 <span class="note">(끝낼 로그인의 자격으로. 로그아웃은 측정자가 한다 — 절차.md)</span></h2>
+<button id="btn-pre">(1) 종료 전 대조군</button>
+<div id="logout-box" class="note"></div>
+<label><input type="checkbox" id="chk-ended"> (2) 그 로그인 기록만 끝냈고, DB 에서 그 기록이 없어졌으며 끝내지 않는 로그인의 기록은 남아 있음을 확인했다</label>
+<button id="btn-post">(3) 종료 뒤 요청 + 같은 때의 대조군</button>
+<div id="out-logout"></div>
+
+<h2>5. 캐시 머리글 확인 <span class="note">(측정이 다 끝난 뒤에. "같은 주소로 다시 요청"에 쓴 주소에 1바이트 범위 요청을 보내 캐시 관련 머리글을 적는다)</span></h2>
+<button id="btn-probe">캐시 머리글 확인</button> <div id="out-probe"></div>
+
+<h2>6. 결과와 판정</h2>
+<button id="btn-save">결과 저장(로컬 서버의 results 폴더)</button> <button id="btn-download">JSON 내려받기</button> <span id="saved" class="note"></span>
+<div id="out-verdict"></div>
+
+<h2>기록</h2>
+<div id="log"></div>
+<script src="measure.js"></script>
+</body>
+</html>
