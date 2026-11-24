@@ -23,6 +23,13 @@
 //                   (대조표 전체를 사이에 둔 앞뒤 불변이다 — 호출 하나하나의 불변을 보이는 것이 아니다)
 //   compare         지문 결과 둘을 견준다(--a --b, read_at 은 빼고. --ignore 로 더 뺄 키를 적는다)      0
 //   body-md5        마이그레이션 파일의 함수 본문 md5 를 계산한다(되돌리기 SQL·지문의 body_md5 와 견줄 값)   0
+//   set-lines       SQL 파일 앞에 둘 set 줄을 저장해 둔 파일에서 글자 그대로 만들어 적는다(손으로 옮겨 적다 틀리지 않게)   0
+//                   --for fixtures-up --accounts <계정 번호 json: {"a":"…","b":"…",… 여덟}>
+//                   --for maint-on|maint-off --expect <json> --snapshot <state_snapshot 결과>
+//                   --for fixtures-down --expect <json>
+//                   --for rollback --fingerprint <적용 직후의 지문>
+//                   --for session-expire --expect <json> --sessions-sql <sessions-sql 결과> --not-after-before <값|null>
+//                   --for session-restore --expect <json> --expired <session_expire.sql 결과>
 //
 // 공통 인자
 //   --expect <json>          fixtures_up.sql 의 마지막 결과(합성 계정별 회원 값·기대 상태)
@@ -613,7 +620,58 @@ function phaseBodyMd5() {
   return 0;
 }
 
-const PHASES = { plan: phasePlan, 'sessions-sql': phaseSessionsSql, absent: phaseAbsent, matrix: phaseMatrix, revoked: phaseRevoked, 'rows-compare': () => phaseCompare('rows'), compare: () => phaseCompare('json'), 'body-md5': phaseBodyMd5 };
+// SQL 파일 앞에 둘 set 줄. 값은 저장해 둔 파일에서 글자 그대로 옮기고, 작은따옴표는 두 번 쓴다.
+function phaseSetLines() {
+  const what = arg('--for');
+  const q = (v) => `'${String(v).replace(/'/g, "''")}'`;
+  const lines = [`set b3_0.test_project_ref = '${REF}';`];
+  const uuid = (v, name) => { if (!UUID_RE.test(String(v ?? ''))) stop(2, `${name} 이 번호 모양이 아니다`); return String(v); };
+  const acctA = () => uuid(loadResult(arg('--expect'), '--expect').accounts?.a?.auth_user_id, '--expect 의 accounts.a.auth_user_id');
+  if (what === 'fixtures-up') {
+    const acc = loadResult(arg('--accounts'), '--accounts');
+    for (const l of ['a', 'b', 'n', 'g', 'gm', 'blk', 'wd', 'bw']) lines.push(`set b3_0.acct_${l} = ${q(uuid(acc[l], `--accounts 의 ${l}`))};`);
+    if (new Set(['a', 'b', 'n', 'g', 'gm', 'blk', 'wd', 'bw'].map((l) => String(acc[l]).toLowerCase())).size !== 8) stop(2, '--accounts 의 계정 번호 여덟 개가 서로 다르지 않다');
+  } else if (what === 'maint-on' || what === 'maint-off') {
+    const snap = loadResult(arg('--snapshot'), '--snapshot');
+    if (!snap.site_state_row || !/^[0-9a-f]{32}$/.test(String(snap.site_state_row_md5 ?? ''))) stop(2, '--snapshot 이 state_snapshot.sql 의 결과가 아니다');
+    if (snap.site_state_row.phase !== 'normal') stop(2, `--snapshot 의 phase 가 normal 이 아니다(${snap.site_state_row.phase}) — 켜기 전에 뜬 것이어야 한다`);
+    lines.push(`set b3_0.acct_a = ${q(acctA())};`);
+    if (what === 'maint-on') lines.push(`set b3_0.saved_row_md5 = ${q(snap.site_state_row_md5)};`);
+    else lines.push(`set b3_0.saved_site_state = ${q(JSON.stringify(snap.site_state_row))};`);
+  } else if (what === 'fixtures-down') {
+    const e = loadResult(arg('--expect'), '--expect');
+    const c = e.created;
+    if (!c || !Array.isArray(c.users) || c.users.length !== 7 || !Array.isArray(c.mappings) || c.mappings.length !== 6 || !Array.isArray(c.admins) || c.admins.length !== 2) stop(2, '--expect 에 created(users 7 · mappings 6 · admins 2)가 없다(fixtures_up.sql 2차 판의 결과여야 한다)');
+    lines.push(`set b3_0.created = ${q(JSON.stringify(c))};`);
+  } else if (what === 'rollback') {
+    const f = loadResult(arg('--fingerprint'), '--fingerprint').my_profile ?? {};
+    if (f.exists !== true || !/^[0-9]{1,10}$/.test(String(f.oid ?? '')) || !/^[0-9a-f]{32}$/.test(String(f.def_md5 ?? ''))) stop(2, '--fingerprint 에 my_profile 의 oid·def_md5 가 없다(적용 직후에 뜬 지문이어야 한다)');
+    lines.shift(); // 되돌리기 SQL 은 대상 확인 값을 쓰지 않는다(운영으로도 갈 수 있는 파일이다)
+    lines.push(`set b3_0.applied_oid = ${q(f.oid)};`, `set b3_0.applied_def_md5 = ${q(f.def_md5)};`);
+    const expected = bodyMd5OfMigration(arg('--migration') ?? join(HERE, '..', '..', 'migrations', '20261124033800_b3_0_my_profile.sql'));
+    if (f.body_md5 && expected && f.body_md5 !== expected) lines.push(`set b3_0.applied_body_md5 = ${q(f.body_md5)};   -- 지문의 body_md5 가 파일에서 계산한 값(${expected})과 달라서 넘긴다`);
+  } else if (what === 'session-expire' || what === 'session-restore') {
+    lines.push(`set b3_0.account_id = ${q(acctA())};`);
+    if (what === 'session-expire') {
+      const s = loadResult(arg('--sessions-sql'), '--sessions-sql');
+      const c = (s.credentials ?? []).find((x) => x.credential === 'a_expire');
+      if (!c) stop(2, '--sessions-sql 에 a_expire 가 없다(sessions-sql 단계의 결과여야 한다)');
+      const before = arg('--not-after-before');
+      if (before === undefined) stop(2, '--not-after-before <직전에 읽은 not_after 글자 그대로 | null> 이 필요하다');
+      lines.push(`set b3_0.session_id = ${q(uuid(c.session_id, 'a_expire 의 session_id'))};`, `set b3_0.not_after_before = ${q(before)};`);
+    } else {
+      const x = loadResult(arg('--expired'), '--expired');
+      if (!x.session_id || !x.not_after_expired) stop(2, '--expired 가 session_expire.sql 의 결과가 아니다');
+      lines.push(`set b3_0.session_id = ${q(uuid(x.session_id, '--expired 의 session_id'))};`, `set b3_0.not_after_expired = ${q(x.not_after_expired)};`, `set b3_0.not_after_before = ${q(x.not_after_before === null || x.not_after_before === undefined ? 'null' : x.not_after_before)};`);
+    }
+  } else stop(2, '--for 는 fixtures-up | maint-on | maint-off | fixtures-down | rollback | session-expire | session-restore');
+  console.log(lines.join('\n'));
+  writeOut({ tool: 'b3p0 profile_matrix.mjs', phase: 'set-lines', for: what, request_count: 0, lines, note: '이 줄들을 같은 요청의 맨 앞에 두고 그 뒤에 SQL 파일 전체를 붙인다. 값은 식별값이다(열쇠·자격이 아니다)' });
+  log(`phase=set-lines for=${what} 요청 0건 — ${lines.length}줄`);
+  return 0;
+}
+
+const PHASES = { 'set-lines': phaseSetLines, plan: phasePlan, 'sessions-sql': phaseSessionsSql, absent: phaseAbsent, matrix: phaseMatrix, revoked: phaseRevoked, 'rows-compare': () => phaseCompare('rows'), compare: () => phaseCompare('json'), 'body-md5': phaseBodyMd5 };
 if (!PHASES[phase]) stop(2, `--phase 는 ${Object.keys(PHASES).join(' | ')}`);
 const code = await Promise.resolve(PHASES[phase]()).catch((e) => { log(`예외: ${String(e?.name ?? 'Error')} ${String(e?.message ?? '').slice(0, 200)}`); return 1; });
 process.exit(code);
