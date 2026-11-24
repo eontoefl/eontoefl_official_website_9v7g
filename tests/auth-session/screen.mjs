@@ -36,6 +36,7 @@ import { TEST_URL, TEST_REF, CONFIG_FILE, readProdConfig } from './rewrite.mjs';
 import { createCore, makeIgnore } from './serve-core.mjs';
 import { makeDecider, summarize } from './request-log.mjs';
 import { buildPageCases, PAGE_CASE_IDS, NOT_RUN_MATRIX } from './screen-pages.mjs';
+import { FAKE_APP, FAKE_POST, makePeople } from './business-fake.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
 import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv, controlPassOk } from './screen-core.mjs';
 
@@ -56,9 +57,11 @@ const PAUSE_TIMEOUT = Number(arg('--pause-timeout-ms', '600000'));
 //   --selftest bad-session          가짜 조작자가 출처가 맞지 않는 로그인 상태(다른 계정·다른 aal·다른 발급자)를 준다 → 넣지 않아야 한다
 //   --selftest bad-control-pass     예행의 대조용 요청을 자격·본문이 실린 POST 로 보낸다 → 예외로 내보내지 않아야 한다(수신 0, 종료 코드 4)
 //   --selftest leaky-business       차단기가 업무 요청을 "보냄"으로 가르게 한다 → 전송 지점이 따로 막아야 한다(가짜 서버가 받은 업무 요청 0, 전체 판정은 통과 아님, 종료 코드 1)
+//   --selftest login-email-fixtures 가짜 자료와 이름표의 "사람의 이메일"을 로그인 이메일로 만든다(3차 보완 전의 결함) → 본인 것이어야 하는 화면이 남의 것으로 처리돼
+//                                   C2·C6·C7·C13·C15 가 "기대와 다름"이어야 한다(시험 프로젝트 상대의 1차 실제 실행에서 난 것과 같은 다섯)
 const SELFTEST = arg('--selftest', null);
 if (SELFTEST && !FAKE) stop('--selftest 는 --fake 에서만 쓴다');
-if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session', 'bad-control-pass', 'leaky-business'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
+if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session', 'bad-control-pass', 'leaky-business', 'login-email-fixtures'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
 const OUT = path.resolve(arg('--out', path.join(ROOT, 'tests', 'auth-session', '.run', `screen-${FAKE ? 'fake' : 'real'}.json`)));
 
 // ---------------------------------------------------------------------------
@@ -98,14 +101,23 @@ if (FAKE) {
     vault = makeVault(values);
     SCAN.push(PW, ANON, CONTROL_SECRET, ...Object.values(EMAIL));
 }
-const fakeEmail = (k) => `zzb3a_${String(k).toLowerCase()}@member.zz.invalid`;      // --fake 의 합성 이메일(비밀이 아니다)
+const fakeEmail = (k) => `zzb3a_${String(k).toLowerCase()}@member.zz.invalid`;      // --fake 의 합성 로그인 이메일(비밀이 아니다)
+// --fake 의 합성 회원 이메일(회원 표의 이메일 — my_profile 이 주는 값). 실제 시험 자료처럼 로그인 이메일과 **다르다**
+const fakeMemberEmail = (k) => `zzb3c1_${String(k).toLowerCase()}@members-table.zz.invalid`;
 
 // (계약 3C-1) 업무 요청은 --fake 든 --real 이든 **하나도 내보내지 않는다**. 시험 프로젝트(또는 가짜 서버)로 나가는 것은
 // 3A 에서 승인된 인증 요청 다섯뿐이다. 막은 업무 요청에는 실행기가 가짜 응답을 준다 — 그 자료는 이번 실행의 합성 계정 값으로 만든다.
 // (가짜 응답으로 그려진 화면은 실제 업무 성공이 아니다. 판정은 "시도"로 한다.)
-const FAKE_APP = '00000000-0000-4000-8000-0000b3c1a001';      // 가짜 응답에만 있는 신청서 번호(시험 프로젝트의 DB 에는 없다)
-const FAKE_POST = 'zz-b3c1-post';                              // 가짜 응답에만 있는 글 번호
-const SEEN = { ids: {}, names: {} };                           // my_profile 의 응답에서 본 합성 회원의 번호·이름(가짜 응답과 기록의 이름표에만 쓴다)
+// **사람의 값(가짜 응답·이름표·판정의 기대)은 my_profile 의 응답에서 본 회원 표의 값만 쓴다** — business-fake.mjs 한 곳.
+// 로그인 이메일(환경 변수의 값)은 로그인 화면에 적는 값이고 JWT 에 든 값일 뿐, 화면에 보일 값도 업무 조건의 값도 아니다
+// (시험 자료의 합성 회원은 로그인 이메일과 회원 이메일이 일부러 다르다).
+const people = makePeople({
+    loginEmails: () => (vault && vault.armed() ? Object.fromEntries(ACCOUNT_KEYS.map((k) => [k, vault.get('EMAIL_' + k)])) : {}),
+    fixturesFromLoginEmail: SELFTEST === 'login-email-fixtures',       // 대조 실험: 3차 보완 전의 결함을 다시 만든다
+});
+// 이름표의 대조(경우 CL)가 이번 실행에서 보인 것: 로그인 이메일이 조건인 시도에 'login-email' 이름표가 붙는가.
+// 보이지 못했으면 "로그인 이메일을 조건에 쓴 시도 0"은 통과가 아니라 미확인이다
+const labelControl = { loginEmail: null };
 // 전송 지점이 따로 보는 목록(차단기의 결정과 독립): 이 다섯이 아니면 전송 지점에서 내보내지 않는다
 const AUTH_FIVE = {
     'POST /auth/v1/token?grant_type=password': 'login',
@@ -115,40 +127,6 @@ const AUTH_FIVE = {
     'POST /rest/v1/rpc/my_site_access': 'my_site_access',
 };
 const wire = { sent: { login: 0, refresh: 0, logout: 0, my_profile: 0, my_site_access: 0 }, refusedAtSendPoint: 0 };
-
-// 막은 업무 요청에 주는 가짜 응답(--fake·--real 같은 모양). 조회에만 자료를 주고, 쓰기에는 빈 목록을 준다.
-const CONTENT_TABLES = ['notices', 'reviews', 'reviews_book', 'study_certifications', 'materials', 'application_notices'];
-function businessFake(method, rawUrl) {
-    let u;
-    try { u = new URL(rawUrl); } catch (e) { return []; }
-    if (String(method).toUpperCase() !== 'GET' || !vault.armed()) return [];
-    const m = /^\/rest\/v1\/([A-Za-z0-9_]+)$/.exec(u.pathname);
-    if (!m) return [];
-    const table = m[1];
-    const q = u.searchParams;
-    const eq = (k) => { const v = q.get(k) || ''; return v.startsWith('eq.') ? v.slice(3) : ''; };
-    const emailOf = (k) => vault.get('EMAIL_' + k);
-    const person = (k) => ({ id: SEEN.ids[k] || 'zz-member-' + k, name: SEEN.names[k] || '합성 회원 ' + k, email: emailOf(k) });
-    const byValue = (v) => ACCOUNT_KEYS.find((k) => v && (emailOf(k).toLowerCase() === v.toLowerCase() || SEEN.ids[k] === v));
-    const a = person('A');
-    const appA = { id: FAKE_APP, email: a.email, user_email: a.email, user_id: a.id, name: a.name, phone: '010-0000-0000', application_type: 'challenge', program: '합성 과정', deleted: false, withdrawn_at: null, analysis_status: '승인', analysis_content: '합성 분석', created_at: '2026-11-01T00:00:00Z' };
-    if (table === 'users') {
-        const k = byValue(eq('email')) || byValue(eq('id'));
-        if (!k) return [];
-        const p = person(k);
-        return [{ id: p.id, name: p.name, nickname: '합성닉', email: p.email, phone: '010-0000-0000', role: 'user', intro_book_track: 'regular', blocked: false, withdrawal_requested_at: null }];
-    }
-    if (table === 'applications') {
-        if (eq('id')) return eq('id') === FAKE_APP ? [appA] : [];
-        if (q.has('email') || q.has('user_id') || q.has('user_email')) return [];       // 합성 회원은 "신청서가 없는 회원"이다(번호로 열 때만 A 의 가짜 신청서 한 건)
-        return [appA];                                                                  // 신청 게시판의 목록
-    }
-    if (table === 'toefl_survey_questions') return [{ id: 'zz-b3c1-q1', question: '합성 질문', question_type: 'text', options: null, status: 'active', hidden: false, target_count: null, sort_order: 1, created_at: '2026-11-01T00:00:00Z' }];
-    if (CONTENT_TABLES.includes(table)) {
-        return [{ id: eq('id') || FAKE_POST, subject: '합성 글', content: '<p>합성 본문</p>', author: '합성 글쓴이', author_name: '합성 글쓴이', author_email: a.email, published_at: '2026-11-01T00:00:00Z', created_at: '2026-11-01T00:00:00Z', hit: 1, is_private: false, attachments: [] }];
-    }
-    return [];
-}
 
 const pwPath = process.env.B3A_PLAYWRIGHT;
 const chromePath = process.env.B3A_CHROMIUM;
@@ -277,7 +255,7 @@ function setupFake() {
         const a = FAKE_ACCOUNTS[k];
         fake.addAccount({
             email: fakeEmail(k), password: SCAN[0], authId: 'auth-' + k, member: a.member, admin: !!a.admin,
-            profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: fakeEmail(k), phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
+            profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: fakeMemberEmail(k), phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
         });
     }
     // 가짜 서버까지 오는 것은 인증 요청 다섯뿐이다(업무 요청은 실행기가 전송 지점 앞에서 막는다). 왔다면 세어 둔다
@@ -461,10 +439,9 @@ function observe(cx, rec, out) {
             !keys.some((k) => /pass|pw|secret|hash/i.test(k));
         cx.seen.profileKeysOk = cx.seen.profileKeysOk === false ? false : ok;
         if (state === 'ok' && body.profile && typeof body.profile.name === 'string') cx.seen.names[cx.account || '?'] = body.profile.name;
-        if (state === 'ok' && body.profile && cx.account) {       // 가짜 응답과 기록의 이름표에 쓴다(결과에는 적지 않는다)
-            if (typeof body.profile.id === 'string') SEEN.ids[cx.account] = body.profile.id;
-            if (typeof body.profile.name === 'string') SEEN.names[cx.account] = body.profile.name;
-        }
+        // 가짜 응답·이름표·판정의 기대에 쓴다(결과에는 적지 않는다). 누구의 응답인가는 그 요청의 JWT 로 가린다
+        // (지금 치고 있는 계정 cx.account 로 가리면, 다른 계정이 저장된 채 열린 화면의 응답이 잘못 붙는다)
+        if (state === 'ok' && body.profile && out.jwtAccount) people.note(out.jwtAccount, body.profile);
     }
     if (rec.target === 'my_site_access' && out.status === 200) { rec.allowed = body.allowed === true; rec.isAdmin = body.is_admin === true; }
 }
@@ -512,7 +489,8 @@ async function handleRoute(route, cx) {
         rec.how = 'business-blocked-fake-response';
         const hold = cx.hooks.business;
         if (hold && hold.before) await hold.before(rec);          // 시험이 이 가짜 응답을 붙잡아 둘 수 있다(늦게 도착하는 응답)
-        const rows = businessFake(r.method(), r.url());
+        if (cx.probing) rec.probe = true;                          // 시험이 일부러 시킨 대조용 시도(이름표의 대조) — 화면이 스스로 보낸 것이 아니다
+        const rows = vault.armed() ? people.fake(r.method(), r.url()) : [];
         return route.fulfill({ status: 200, headers: Object.assign({ 'content-type': 'application/json', 'content-range': rows.length ? `0-${rows.length - 1}/${rows.length}` : '*/0' }, CORS), body: JSON.stringify(rows) });
     }
     if (rec.where === 'self' && cx.dropAuthModule && rec.target === 'file' && new URL(r.url()).pathname === '/js/auth-session.js') {
@@ -572,6 +550,7 @@ async function handleRoute(route, cx) {
         if (resp.status() >= 300 && resp.status() < 400) { rec.how = 'redirect-blocked'; return route.abort('blockedbyclient'); }
         out = { status: resp.status(), headers: resp.headers(), body: await resp.body() };
     }
+    out.jwtAccount = rec.target === 'my_profile' ? people.accountOfJwt(headers.authorization || headers.Authorization) : null;
     observe(cx, rec, out);
     if (hook && hook.after) {
         const act = await hook.after(rec, out);
@@ -673,6 +652,10 @@ const baseline = (cx, ck) => {
     // (계약 3C-1) 업무 요청: 내보낸 것 0(전부 전송 전에 막고 가짜 응답), 차단기를 지나 전송 지점까지 온 업무 요청 0
     ck('내보낸 업무 요청 0(차단기의 결정)', s.businessSent === 0);
     ck('차단기를 지나 전송 지점까지 온 업무 요청 0(전송 지점이 따로 본 것)', cx.records.filter((x) => x.how === 'refused-at-send-point' || x.selftestLeak).length === 0);
+    // (3차) 화면은 확인된 회원의 이메일을 쓴다 — 로그인 이메일을 업무 조건에 쓰면 결함. 3C-1 의 경우(C…)의 판정에 넣는다
+    // (3A 의 경우들의 판정 목록은 그대로 둔다 — 그 경우들에서 잡힌 것은 전체 판정과 결과의 loginEmailConditions 로 본다).
+    // 양성 대조: 이번 실행의 CL 이 "로그인 이메일이 조건인 시도에 그 이름표가 붙는다"를 보였어야 한다. 아니면 미확인
+    if (/^C/.test(cx.id) && cx.id !== 'CL') ck('화면이 로그인 이메일을 업무 조건에 쓴 시도 0(쓰면 결함 — 이름표의 대조는 CL)', s.businessByLoginEmail > 0 ? false : (labelControl.loginEmail === true ? true : null));
     return s;
 };
 async function execCase(id, title, fn, { required = true } = {}) {
@@ -1153,7 +1136,7 @@ async function buildCases() {
     await buildPageCases({
         runCase, pause, doLogin, until, settled, stateOf, sleep, pathOf, count, vault, seedStore, SEEDS, newCx,
         synth: () => ({ appA: FAKE_APP, post: FAKE_POST }),
-        seenNames: () => SEEN.names,
+        people, labelControl, restUrl: () => TEST_URL + '/rest/v1',
         hidden: (page) => page.evaluate(() => document.documentElement.classList.contains('eon-auth-away')).catch(() => null),
         checkProvidedSession, keyBuckets,
         sites: () => ({ on: ON, off: OFF }),
@@ -1193,7 +1176,8 @@ async function main() {
         selfOrigins: [ON, OFF], anonKey: ANON, issuer: ISSUER,
         memberEmails: () => (vault.armed() ? ACCOUNT_KEYS.map((k) => vault.get('EMAIL_' + k)) : []),
         // (계약 3C-1) 업무 요청은 전부 막는다(인자와 무관). 여기서 주는 것은 기록의 이름표뿐이다: 조건의 값이 어느 합성 계정의 것인가
-        accountLabels: () => Object.fromEntries(ACCOUNT_KEYS.map((k) => [k, [vault.armed() ? vault.get('EMAIL_' + k) : '', SEEN.ids[k] || '']])),
+        // 회원 이메일·회원번호는 my_profile 에서 본 것, 로그인 이메일은 따로(화면이 로그인 이메일을 업무 조건에 쓰면 결함 — 따로 센다)
+        accountLabels: () => people.labels(),
     });
     if (FAKE) fakeOperator();
     console.log(`  켜짐 ${ON}   꺼짐 ${OFF}   제어 포트 ${control.port}`);
@@ -1212,7 +1196,8 @@ async function main() {
     try {
         const plan = await buildCases();
         const first = plan.find((c) => c.id === 'P');
-        const rest = plan.filter((c) => c.id !== 'P' && (!ONLY || ONLY.has(c.id)));
+        const wantsPageCase = !!ONLY && [...ONLY].some((id) => PAGE_CASE_IDS.includes(id));
+        const rest = plan.filter((c) => c.id !== 'P' && (!ONLY || ONLY.has(c.id) || (c.id === 'CL' && wantsPageCase)));
         // 예행(P)은 언제나 먼저 돈다. P 의 판정이 전부 참이 아니면 뒤의 경우를 하나도 시작하지 않는다(보관함도 열리지 않는다)
         seq = await runSequence({
             preflight: async () => { await first.run(); return results.find((r) => r.id === 'P'); },
@@ -1238,7 +1223,8 @@ async function main() {
     const controlPass = all.filter((r) => r.how === 'control-pass').length;         // 예행에서 일부러 보낸 대조용 정상 요청(1건)
     const sinkUnexpected = sinkTotal - controlPass;
     const businessLeaks = all.filter((r) => r.business && (r.sent || !r.aborted)).length + wire.refusedAtSendPoint + (fake ? fake.businessArrivals : 0);
-    const overall = businessLeaks === 0 && !stopped && notRun.length === 0 && required.every((r) => r.verdict === 'pass') && sinkUnexpected === 0 && controlPass === 1 && egress.blocked === 0 && (!FAKE || egress.testProject === 0);
+    const loginEmailConditions = all.filter((r) => r.business && !r.probe && r.accountBy === 'login-email').length;       // 어느 경우에서든 0 이어야 한다
+    const overall = businessLeaks === 0 && loginEmailConditions === 0 && !stopped && notRun.length === 0 && required.every((r) => r.verdict === 'pass') && sinkUnexpected === 0 && controlPass === 1 && egress.blocked === 0 && (!FAKE || egress.testProject === 0);
     const output = {
         tool: 'tests/auth-session/screen.mjs',
         mode: FAKE ? 'fake-server' : 'test-project',
@@ -1267,6 +1253,9 @@ async function main() {
             businessArrivedAtFakeServer: fake ? fake.businessArrivals : null,   // --fake: 가짜 서버가 받은 업무 요청(0 이어야 한다)
             requestsAnsweredByFakeServer: all.filter((r) => r.how && r.how.startsWith('fake-server')).length,
             staticAllowedFulfilledLocally: all.filter((r) => r.where === 'static-allowed').length,
+            // (3차) 화면이 로그인 이메일을 업무 조건에 쓴 시도(0 이어야 한다)와, 그 이름표가 붙는다는 대조(CL)를 이번 실행이 보였는가
+            loginEmailConditions,
+            loginEmailLabelControl: labelControl.loginEmail,
         },
         summary: summarize(all),
         // (계약 3C-1) 이 실행기가 돌리지 않는 조합 — 통과로 세지 않는다
@@ -1289,6 +1278,7 @@ async function main() {
     console.log(`  시험 프로젝트로 실제 보낸 요청 ${output.independentEvidence.requestsSentToTestProject}건, 가짜 서버가 답한 요청 ${output.independentEvidence.requestsAnsweredByFakeServer}건`);
     console.log(`  업무 요청: 실제로 나간 것 ${output.independentEvidence.businessSentToTestProject}건(전송 지점을 지난 요청 ${output.independentEvidence.wireSentTotal}건은 전부 인증 요청 다섯 — ${Object.entries(wire.sent).map(([k, n]) => k + ' ' + n).join(', ')}) / 전송 지점까지 온 업무 요청 ${wire.refusedAtSendPoint}건`);
     console.log(`  업무 요청의 시도(전부 전송 전에 막고 가짜 응답 — 업무 성공으로 세지 않는다): ${Object.entries(output.summary.businessAttempts).map(([k, n]) => k + ' ' + n).join(', ')}`);
+    console.log(`  시도의 이름표(조건의 값이 합성 계정의 어느 열의 값인가): ${Object.entries(output.summary.businessLabeled).map(([k, n]) => k + ' ' + n).join(', ')} — 로그인 이메일이 조건인 시도 ${loginEmailConditions}건(0 이어야 한다, 대조 ${labelControl.loginEmail === true ? '보임' : '보이지 못함'})`);
     if (!leaks) console.log(`  결과: ${OUT}`);
     if (SELFTEST) console.log(`  대조 실험(${SELFTEST}): 일부러 고장을 냈다 — 통과가 아닌 것이 기대다`);
     console.log(`전체 판정: ${overall ? '통과' : '통과 아님'}${FAKE ? '  (가짜 서버 — 실제 서버의 증거가 아니다)' : ''}${stopped ? '  [' + stopped + ']' : ''}`);

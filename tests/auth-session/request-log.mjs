@@ -113,22 +113,36 @@ export function businessKind(method, u, target) {
     }
     return conditions === 0 ? 'unconditioned' : 'read';
 }
-// 조건(eq)의 값이 이번 실행의 어느 합성 계정의 것인가 — 이름표(예: 'A')만 돌려준다. 없으면 'none'
-// labels: { 이름표: [그 계정의 값들(이메일·회원번호)] }
+// 조건(eq)의 값이 이번 실행의 어느 합성 계정의 것인가 — 이름표(예: 'A')와, 어느 열의 값으로 맞았는가만 돌려준다.
+// labels: { 이름표: { emails: [회원 표의 이메일], ids: [회원번호], loginEmails: [로그인 이메일] } }
+//   by: 'email'        회원 표의 이메일(my_profile 이 준 것)이 조건
+//       'id'           회원번호가 조건
+//       'login-email'  로그인 이메일이 조건 — 화면은 확인된 회원의 이메일을 써야 한다. 이것이 잡히면 결함이다(따로 센다)
+// 회원번호 조회에 이름표가 붙는다고 이메일 쪽의 "0건"이 유효해지지 않는다 — 판정은 열마다 따로 본다.
+export const ACCOUNT_BY = ['email', 'id', 'login-email', 'none'];
 export function businessAccount(u, labels) {
-    if (!u || !labels) return 'none';
-    for (const [, v] of u.searchParams) {
-        if (!v.startsWith('eq.')) continue;
-        const value = v.slice(3).trim().toLowerCase();
-        for (const [label, values] of Object.entries(labels)) {
-            if ((values || []).some((x) => typeof x === 'string' && x.length > 0 && x.trim().toLowerCase() === value)) return label;
-        }
-    }
-    return 'none';
+    const none = { account: 'none', by: 'none' };
+    if (!u || !labels) return none;
+    const conditions = [];
+    for (const [, v] of u.searchParams) if (v.startsWith('eq.')) conditions.push(v.slice(3).trim().toLowerCase());
+    const hit = (list, value) => (Array.isArray(list) ? list : []).some((x) => typeof x === 'string' && x.length > 0 && x.trim().toLowerCase() === value);
+    const find = (test) => {
+        for (const value of conditions) for (const [label, own] of Object.entries(labels)) if (own && test(own, value)) return label;
+        return null;
+    };
+    // 차례: 로그인 이메일이 먼저다 — 한 요청에 회원번호와 로그인 이메일이 함께 조건이어도 결함(로그인 이메일)이 다른 이름표에 가려지지 않게.
+    // 로그인 이메일과 회원 이메일이 같은 글자인 계정이면 둘을 가를 수 없다 — 그때는 회원 이메일로 적는다(결함으로 세지 않는다)
+    const byLogin = find((own, value) => hit(own.loginEmails, value) && !hit(own.emails, value));
+    if (byLogin) return { account: byLogin, by: 'login-email' };
+    const byEmail = find((own, value) => hit(own.emails, value));
+    if (byEmail) return { account: byEmail, by: 'email' };
+    const byId = find((own, value) => hit(own.ids, value));
+    if (byId) return { account: byId, by: 'id' };
+    return none;
 }
 
 // issuer·memberEmails(배열 또는 배열을 돌려주는 함수)를 주면 회원 JWT 의 출처도 본다
-// accountLabels({ 이름표: [값들] } 또는 그것을 돌려주는 함수)를 주면 업무 요청의 기록에 "어느 합성 계정의 값이 조건인가"를 적는다
+// accountLabels({ 이름표: { emails, ids, loginEmails } } 또는 그것을 돌려주는 함수)를 주면 업무 요청의 기록에 "어느 합성 계정의 어느 열의 값이 조건인가"를 적는다
 // (적는 것뿐이다 — 주든 안 주든 업무 요청은 전부 막는다)
 export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accountLabels }) {
     const selves = new Set([].concat(selfOrigins || []));
@@ -179,10 +193,11 @@ export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accoun
         const businessOf = isBusiness ? (u ? businessKind(rawMethod, u, target) : 'other') : null;
         const labels = typeof accountLabels === 'function' ? accountLabels() : accountLabels;
         const businessBlocked = allowed && isBusiness;
+        const whose = isBusiness ? businessAccount(u, labels) : null;
         return {
             // fake: 전송 전에 막고, 실행기가 가짜 응답을 준다(보내지 않는다). 자격 위반·허용 밖은 가짜 응답 없이 중단(abort)
             action: !allowed ? 'abort' : (businessBlocked ? 'fake' : 'continue'),
-            record: Object.assign(!isBusiness ? {} : { business: businessOf, account: businessAccount(u, labels) }, {
+            record: Object.assign(!isBusiness ? {} : { business: businessOf, account: whose.account, accountBy: whose.by }, {
                 where, target, nav, type, method,
                 apikey: headerOf(req.headers, 'apikey') !== null,
                 credential: cred,
@@ -221,5 +236,9 @@ export function summarize(records) {
         // (계약 3C-1) 업무 요청: 내보낸 것은 0 이어야 한다. 시도는 갈래마다 센다(가짜 응답을 받은 화면은 업무 성공이 아니다)
         businessSent: is((r) => r.business && !r.aborted),
         businessAttempts: Object.fromEntries(BUSINESS_KINDS.map((k) => [k, is((r) => r.business === k)])),
+        // 시도의 이름표: 어느 열의 값으로 맞았는가(회원 이메일 / 회원번호 / 로그인 이메일 / 없음). 시험이 일부러 시킨 대조용 시도(probe)는 빼고 센다
+        businessLabeled: Object.fromEntries(ACCOUNT_BY.map((k) => [k, is((r) => r.business && !r.probe && r.accountBy === k)])),
+        // 화면이 로그인 이메일을 업무 조건에 쓴 시도 — 0 이어야 한다(쓰면 결함)
+        businessByLoginEmail: is((r) => r.business && !r.probe && r.accountBy === 'login-email'),
     };
 }

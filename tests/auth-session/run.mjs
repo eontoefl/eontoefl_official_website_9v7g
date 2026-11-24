@@ -53,7 +53,8 @@ const ALLOWED_EXACT = new Set([
     PROFILE_URL,
     ACCESS_URL,
 ]);
-const EXPECT_A = JSON.stringify({ id: 'm-A', name: '합성 회원 A', nickname: '에이', email: A.email, phone: '010-0000-0001', role: 'user' });
+// 호환 값의 이메일은 my_profile 이 준 회원 표의 이메일이다(로그인 이메일 A.email 이 아니다 — 가짜 세계에서도 둘은 다르다)
+const EXPECT_A = JSON.stringify({ id: 'm-A', name: '합성 회원 A', nickname: '에이', email: A.profile.email, phone: '010-0000-0001', role: 'user' });
 const MSG = {
     wrong: '이메일 또는 비밀번호가 일치하지 않습니다.',
     blocked: '🚫 차단된 계정입니다.\n\n관리자에게 문의해주세요.',
@@ -1108,7 +1109,7 @@ async function testWithdrawKeepsOthers(opt) {
     const c = checker();
     const plantB = (w) => {
         const sB = w.server.createSession(ACCOUNTS.B.email);
-        const user = JSON.stringify({ id: 'm-B', name: '합성 회원 B', nickname: '', email: ACCOUNTS.B.email, phone: null, role: 'user' });
+        const user = JSON.stringify({ id: 'm-B', name: '합성 회원 B', nickname: '', email: ACCOUNTS.B.profile.email, phone: null, role: 'user' });
         const values = { 'eon_auth_v1:compat': JSON.stringify({ v: 1, sid: sB.sid, sub: 'auth-B', user, time: '1795500000001' }), iontoefl_user: user, iontoefl_login_time: '1795500000001' };
         for (const [k, v] of Object.entries(values)) w.browser.local.set(k, v);
         return values;
@@ -1177,7 +1178,7 @@ async function testFailedWaitKeepsOthers(opt) {
     // 다른 탭이 B 로 로그인해 확인까지 끝낸 것처럼: 저장된 로그인·호환 값·표식을 B 의 것으로(이 탭에는 알림이 오지 않는다)
     const switchToB = (w) => {
         const sB = w.seed('B');
-        const user = JSON.stringify({ id: 'm-B', name: '다른 탭이 쓴 B', nickname: '', email: ACCOUNTS.B.email, phone: null, role: 'user' });
+        const user = JSON.stringify({ id: 'm-B', name: '다른 탭이 쓴 B', nickname: '', email: ACCOUNTS.B.profile.email, phone: null, role: 'user' });
         const values = { 'eon_auth_v1:compat': JSON.stringify({ v: 1, sid: sB.sid, sub: 'auth-B', user, time: '1795500000001' }), iontoefl_user: user, iontoefl_login_time: '1795500000001' };
         for (const [k, v] of Object.entries(values)) w.browser.local.set(k, v);
         return { sB, values, raw: w.browser.local.get('eon_auth_v1') };
@@ -2136,9 +2137,9 @@ async function sectionRequestLog(mutate) {
         'document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr', 'fetch', 'websocket', 'manifest',
         'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'OTHER',
         'none', 'anon', 'member', 'service_role',
-        'write', 'partial-search', 'unconditioned', 'read',
+        'write', 'partial-search', 'unconditioned', 'read', 'email', 'id', 'login-email',
         'password', 'refresh_token', 'member_jwt', 'unknown_credential', 'foreign_member_jwt']);
-    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted', 'business', 'account']);
+    const allowedKeys = new Set(['where', 'target', 'nav', 'type', 'method', 'apikey', 'credential', 'password', 'refreshToken', 'leak', 'leakKinds', 'publicRetry', 'aborted', 'business', 'account', 'accountBy']);
     for (const r of records) {
         for (const [k, v] of Object.entries(r)) {
             const values = Array.isArray(v) ? v : [v];

@@ -14,6 +14,7 @@ import { installNetworkGuard, realNetworkAttempts } from '../supabase-config-hea
 import { TEST_URL, AUTH_FILE } from './rewrite.mjs';
 import { ROOT, V, STATE_NAMES, ACCOUNTS, OLD_STUDENT, BOOK_KEY, FOLLOWUP_KEYS, makeWorld, snapshot, diffSnapshot, checker, workFile } from './world.mjs';
 import { openPage, fire } from './pages-dom.mjs';
+import { fakeJwt } from './fake-supabase.mjs';
 import { TARGET_PAGES, MERGE_BASE } from './pages.mjs';
 
 const A = ACCOUNTS.A;
@@ -21,7 +22,15 @@ const B = ACCOUNTS.B;
 const GM = ACCOUNTS.GM;
 const OLD_ADMIN = JSON.stringify({ id: 'm-old-adm', name: '옛관리자', nickname: '', email: 'oldadm@zz.invalid', phone: '010-0000-0099', level: 2, role: 'admin' });
 const OLD_NAMES = /옛학생|옛관리자|old@zz\.invalid|oldadm@zz\.invalid|m-old-1/;
-const idOf = (acc) => new RegExp([acc.profile.name, acc.email.replace(/[.]/g, '\\.'), acc.profile.id].join('|'));
+// (3차) 가짜 세계에서도 회원 이메일(my_profile 이 주는 값 — acc.profile.email)과 로그인 이메일(acc.email)은 다르다. 화면이 쓰는 것은 회원 이메일이다.
+const MA = A.profile.email;
+const MB = B.profile.email;
+const esc = (s) => String(s).replace(/[.]/g, '\\.');
+// 그 사람의 값이 "없어야 한다"를 볼 때: 이름·회원 이메일·로그인 이메일·회원번호 어느 것이든
+const idOf = (acc) => new RegExp([acc.profile.name, esc(acc.profile.email), esc(acc.email), acc.profile.id].join('|'));
+// 그 사람의 값이 "조건이어야 한다"를 볼 때: 회원 이메일·회원번호(로그인 이메일은 아니다)
+const memberOf = (acc) => new RegExp([esc(acc.profile.email), acc.profile.id].join('|'));
+const LOGIN_EMAILS = Object.values(ACCOUNTS).map((a) => a.email);
 const TEXT = {
     missing: '로그인 상태를 확인할 수 없습니다. 잠시 뒤 새로 고침해 주세요.',
     closed: /새 로그인 시험판/,
@@ -71,6 +80,7 @@ function pagesRest(w) {
 }
 
 const NOBODY = 'nobody@zz.invalid';
+const KNOWN = { lateFollowUpByNewUser: null };       // 판정이 그대로 적어 둔 "알려진 것"의 수(출력에 적는다)
 const PAGE_STATES = [...STATE_NAMES, '옛 관리자'];
 function world(stateName, variant, mutate, ownerEmail) {
     const w = makeWorld(stateName === '옛 관리자' ? '빈 브라우저' : stateName, { variant, mutate });
@@ -105,6 +115,9 @@ function auditOn(w, c, label) {
         if (member) c.ok(isAuthUrl(r.url), `${label}: 회원 자격이 인증 모듈의 요청 밖(업무 요청)에 실림`);
     }
     c.ok(w.outside.length === 0 && w.server.foreign.length === 0, `${label}: 시험 출처 밖으로 나간 요청이 있음`);
+    // 화면은 확인된 회원의 이메일(my_profile)을 쓴다 — 로그인 이메일을 업무 요청에 쓰면 결함이다
+    const usesLogin = (r) => LOGIN_EMAILS.some((e) => decodeURIComponent(r.url).includes(e) || String(r.bodyText || '').includes(e));
+    c.ok(!w.browser.requests.some((r) => !isAuthUrl(r.url) && usesLogin(r)), `${label}: 로그인 이메일을 업무 요청에 씀(화면은 확인된 회원의 이메일을 써야 한다)`);
     const touched = w.browser.storageLog.filter((e) => e.key === BOOK_KEY || FOLLOWUP_KEYS.includes(e.key) || e.op === 'clear' || e.op === 'key' || e.op === 'length');
     c.ok(touched.length === 0, `${label}: 교재 편집·후속메일 로그인 상태(또는 저장소 전체)를 읽거나 씀 ${touched.length}건`);
 }
@@ -220,7 +233,7 @@ async function sectionOffActions(mutate) {
 // 새 방식의 로그인이 저장돼 있고(호환 값도 앞 화면이 남겨 둔 상태), 확인 응답을 붙잡은 채로 화면을 연다
 async function heldOpen(s, key, mutate, ownerEmail, opts = {}) {
     const acc = ACCOUNTS[key];
-    const w = world('빈 브라우저', opts.variant || V.ON, mutate, ownerEmail !== undefined ? ownerEmail : acc.email);
+    const w = world('빈 브라우저', opts.variant || V.ON, mutate, ownerEmail !== undefined ? ownerEmail : (acc.profile ? acc.profile.email : acc.email));      // 자료의 주인은 그 회원(회원 이메일)이다
     const sess = w.seed(key, { aal: key === 'GM' ? 'aal2' : 'aal1' });
     (await w.open('before', 'index.html')).close();       // 앞 화면(3A 의 가짜 화면)이 호환 값을 남긴다
     const primed = w.browser.local.has('iontoefl_user');
@@ -285,7 +298,7 @@ async function testBeforeConfirm(opt) {
         if (s.file === 'my-dashboard.html' || s.file === 'my-profile.html') c.ok(drawnMatch(h.page, who), `${label}: 확인된 뒤 회원 정보가 그려지지 않음`);
         // 갈래 화면: 회원에게만 붙는 것은 확인 뒤에 붙는다
         if (s.file === 'survey.html') c.ok(!!h.page.byId.svName && h.page.byId.svName.value === h.acc.profile.name, `${label}: 확인된 뒤 이름 칸이 채워지지 않음`);
-        if (s.file === 'application-form.html' && !s.memberOnly) c.ok(h.page.byId.applicantName.value === h.acc.profile.name && business(h.w, h.page).some((r) => who.test(decodeURIComponent(r.url))), `${label}: 확인된 뒤 회원 갈래(계정 칸·기존 신청 확인)가 붙지 않음`);
+        if (s.file === 'application-form.html' && !s.memberOnly) c.ok(h.page.byId.applicantName.value === h.acc.profile.name && business(h.w, h.page).some((r) => memberOf(h.acc).test(decodeURIComponent(r.url))), `${label}: 확인된 뒤 회원 갈래(계정 칸·기존 신청 확인)가 붙지 않음`);
         auditOn(h.w, c, label);
     }
     // 비회원 설문: 확인 전에 이미 적은 칸은 자동 채움이 덮지 않는다(비어 있고 손대지 않은 칸만 채운다)
@@ -546,7 +559,8 @@ async function testClosedFeatures(opt) {
         for (const file of ['application-form.html', 'book-request.html']) {
             const x = await member(file);
             c.ok(!noticeShown(x.page, TEXT.closed), `열림(${file}): 로그인한 회원에게 닫힘 안내가 뜸`);
-            c.ok(business(x.w, x.page).some((r) => decodeURIComponent(r.url).includes(A.email)), `열림(${file}): 로그인한 회원의 신청 조회가 나가지 않음`);
+            c.ok(business(x.w, x.page).some((r) => decodeURIComponent(r.url).includes(MA)), `열림(${file}): 로그인한 회원의 신청 조회(회원 이메일이 조건)가 나가지 않음`);
+            auditOn(x.w, c, `열림(${file})`);
             c.ok(!toLogin(x.page), `열림(${file}): 로그인한 회원을 로그인 화면으로 보냄`);
         }
     }
@@ -557,8 +571,8 @@ async function testClosedFeatures(opt) {
 async function testLogoutOn(opt) {
     const c = checker();
     const cases = [
-        { file: 'my-dashboard.html', el: 'logoutBtn', to: 'index.html', owner: A.email },
-        { file: 'my-profile.html', el: 'logoutBtn', to: 'index.html', owner: A.email },
+        { file: 'my-dashboard.html', el: 'logoutBtn', to: 'index.html', owner: MA },
+        { file: 'my-profile.html', el: 'logoutBtn', to: 'index.html', owner: MA },
         { file: 'book-request.html', el: 'logoutLink', to: 'login.html?redirect=book-request.html', owner: NOBODY },
     ];
     for (const k of cases) {
@@ -664,7 +678,7 @@ async function testAccountChange(opt) {
         { file: 'survey.html', search: '' },
     ];
     for (const k of pages) {
-        const w = world('빈 브라우저', V.ON, opt.mutate, k.owner || A.email);
+        const w = world('빈 브라우저', V.ON, opt.mutate, k.owner || MA);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
         const page = await openPage(w, 't1', k.file, { search: k.search });
@@ -682,7 +696,7 @@ async function testAccountChange(opt) {
         auditOn(w, c, label);
     }
     {   // 늦게 도착한 A 의 응답
-        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        const w = world('빈 브라우저', V.ON, opt.mutate, MA);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
         let release;
@@ -702,10 +716,19 @@ async function testAccountChange(opt) {
         release();
         await w.browser.idle();
         c.ok(hidden(page), '늦은 응답: A 의 응답이 도착한 뒤 화면이 다시 보임');
-        c.ok(!page.trace.slice(mark).some((e) => e.t === 'fetch' && !isAuthUrl(e.url) && decodeURIComponent(e.url).includes(B.email)), '늦은 응답: A 의 화면이 B 의 값으로 조회를 이어 감');
+        // (3차) 2차의 판정 "A 의 화면이 B 의 값으로 조회를 이어 가지 않음"은 B 의 로그인 이메일만 찾았다 — 화면이 쓰지 않는 값이라 헛통과였다.
+        // 회원 이메일·회원번호로 보면: 가려진 옛 화면(다시 받기를 부른 뒤, 가짜 DOM 에서는 그 화면의 스크립트가 멈추지 않는다)이
+        // 붙잡혀 있던 응답을 받은 뒤 로그인 값을 다시 읽어(이제 B), **B 의 회원번호가 조건인 조회 1건을 이어 간다.**
+        // 제품 코드는 이번에 바꾸지 않는다(3차 발주) — 지금의 동작을 그대로 적어 두고(달라지면 이 판정이 깨진다), 보고서의 "판단 필요"에 올린다.
+        const lateUrls = page.trace.slice(mark).filter((e) => e.t === 'fetch' && !isAuthUrl(e.url)).map((e) => decodeURIComponent(e.url));
+        const ofWho = (acc) => lateUrls.filter((x) => x.includes(acc.profile.email) || x.includes(acc.email) || x.includes('eq.' + acc.profile.id));
+        c.ok(ofWho(A).length === 0, '늦은 응답: 가려진 옛 화면이 A 의 값(앞 사람)으로 조회를 이어 감');
+        c.ok(!lateUrls.some((x) => LOGIN_EMAILS.some((e) => x.includes(e))), '늦은 응답: 가려진 옛 화면이 로그인 이메일을 조건에 씀');
+        KNOWN.lateFollowUpByNewUser = ofWho(B).length;
+        c.ok(ofWho(B).length === 1 && /\/toefl_exam_schedules\?user_id=eq\.m-B&/.test(ofWho(B)[0]), `늦은 응답(알려진 것 — 판단 필요): 가려진 옛 화면이 지금 로그인한 사람(B)의 값으로 이어 가는 조회가 "시험 일정 1건(회원번호)"이 아님(${ofWho(B).length}건) — 달라졌으면 보고서의 그 항목을 고칠 것`);
     }
     {   // 같은 사람: 표시 값만 달라짐(이름) / 같은 사람을 다시 확인 — 다시 받지 않고, 적던 값이 그대로다
-        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        const w = world('빈 브라우저', V.ON, opt.mutate, MA);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
         const page = await openPage(w, 't1', 'write.html', { search: '?board=reviews' });
@@ -725,7 +748,7 @@ async function testAccountChange(opt) {
         c.ok(state(page) === 'signed_in' && !hidden(page) && navsOf(page).length === 0 && page.byId.writeSubject.value === typed, `같은 사람의 표시 값이 달라짐: 다시 받거나 가린 채이거나 적던 값이 달라짐(${navsOf(page).join(', ')})`);
     }
     {   // 뒤로 가기로 되살아난 화면: 확인된 사람이 같으면 그대로(다시 받지 않는다)
-        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        const w = world('빈 브라우저', V.ON, opt.mutate, MA);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
         const page = await openPage(w, 't1', 'my-dashboard.html', {});
@@ -744,7 +767,7 @@ async function testAccountChange(opt) {
         c.ok(state(page) === 'signed_in' && !hidden(page) && navsOf(page).length === 0, `되살아난 화면(같은 사람): 확인된 뒤에도 가린 채이거나 다시 받음(${state(page)}, ${navsOf(page).join(', ')})`);
     }
     {   // 뒤로 가기로 되살아난 화면: 그 사이 다른 사람이 됨 → 가린 채 다시 받는다
-        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        const w = world('빈 브라우저', V.ON, opt.mutate, MA);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
         const page = await openPage(w, 't1', 'my-dashboard.html', {});
@@ -756,7 +779,7 @@ async function testAccountChange(opt) {
         c.ok(hidden(page) && navsOf(page).includes('[새로 고침]'), '되살아난 화면(다른 사람): 가린 채로 다시 받지 않음');
     }
     {   // 뒤로 가기로 되살아난 화면: 다시 확인하지 못함(모름) → 가린 채 다시 받는다
-        const w = world('빈 브라우저', V.ON, opt.mutate, A.email);
+        const w = world('빈 브라우저', V.ON, opt.mutate, MA);
         w.seed('A');
         (await w.open('before', 'index.html')).close();
         const page = await openPage(w, 't1', 'my-dashboard.html', {});
@@ -806,12 +829,14 @@ async function testPublicButtons(opt) {
 
 // 실행기의 차단기(request-log.mjs): 업무 요청 가운데 내보내는 것은 합성 자료가 조건인 정확한 조회뿐
 const LOG_FILE = 'tests/auth-session/request-log.mjs';
-async function loadRequestLog(mutate) {
-    if (!mutate) return import('./request-log.mjs');
+const BF_FILE = 'tests/auth-session/business-fake.mjs';
+const loadRequestLog = (mutate) => loadModule(LOG_FILE, mutate);
+async function loadModule(FILE, mutate) {
+    if (!mutate) return import('./' + path.basename(FILE));
     const here = path.join(ROOT, 'tests', 'auth-session');
-    let text = mutate(LOG_FILE, workFile(LOG_FILE));
+    let text = mutate(FILE, workFile(FILE));
     text = text.replace(/from '\.\/([a-z-]+\.mjs)'/g, (m, name) => `from ${JSON.stringify(pathToFileURL(path.join(here, name)).href)}`);
-    const file = path.join(os.tmpdir(), `b3c1-request-log-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
+    const file = path.join(os.tmpdir(), `b3c1-${path.basename(FILE, '.mjs')}-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
     fs.writeFileSync(file, text);
     try { return await import(pathToFileURL(file).href); } finally { fs.unlinkSync(file); }
 }
@@ -819,39 +844,49 @@ async function testBusinessGate(opt) {
     const c = checker();
     const log = await loadRequestLog(opt.mutate);
     const anon = 'zz-fake-anon';
-    const labels = { A: [A.email, 'm-A'], B: [B.email, 'm-B'] };
+    // 이름표의 값: 회원 이메일·회원번호(my_profile 에서 본 것)와 로그인 이메일을 따로
+    const labels = { A: { emails: [MA], ids: ['m-A'], loginEmails: [A.email] }, B: { emails: [MB], ids: ['m-B'], loginEmails: [B.email] }, GM: { emails: [], ids: [], loginEmails: [GM.email] } };
     const decide = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, accountLabels: () => labels });
     const headers = { apikey: anon, Authorization: 'Bearer ' + anon };
     const rest = TEST_URL + '/rest/v1/';
     const rows = [
-        // [이름, 메서드, 주소, 본문, 기대 갈래, 기대 이름표] — 전부 "전송 전에 막고 가짜 응답"이어야 한다
-        ['본인 신청서(이메일이 A 의 값)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email) + '&deleted=neq.true&withdrawn_at=is.null&limit=100', null, 'read', 'A'],
-        ['신청서 한 건(번호)', 'GET', rest + 'applications?id=eq.00000000-0000-4000-8000-0000b3c1a001&limit=1', null, 'read', 'none'],
-        ['A 의 시험 일정(회원번호)', 'GET', rest + 'toefl_exam_schedules?user_id=eq.m-A&status=neq.cancelled&order=exam_datetime.desc&limit=1', null, 'read', 'A'],
-        ['B 의 신청서(이메일)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(B.email), null, 'read', 'B'],
-        ['대소문자만 다른 A 의 이메일', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email.toUpperCase()), null, 'read', 'A'],
-        ['A 의 값으로 시작하는 다른 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email + '.evil'), null, 'read', 'none'],
-        ['A 의 값이 들어 있지만 eq 가 아님(neq)', 'GET', rest + 'applications?email=neq.' + encodeURIComponent(A.email), null, 'read', 'none'],
-        ['신청서 전체 목록(조건 없음)', 'GET', rest + 'applications?limit=1000&order=created_at.desc', null, 'unconditioned', 'none'],
-        ['공지 전체 목록', 'GET', rest + 'notices?order=published_at.desc&limit=1000', null, 'unconditioned', 'none'],
-        ['회원 표 전체', 'GET', rest + 'users?limit=1000', null, 'unconditioned', 'none'],
-        ['이름의 부분 검색', 'GET', rest + 'applications?name=ilike.*' + encodeURIComponent('합성') + '*&limit=20', null, 'partial-search', 'none'],
-        ['or 조건(이메일·전화)', 'GET', rest + 'withdrawal_records?or=' + encodeURIComponent('(email.ilike.' + A.email + ',phone.eq.010)') + '&limit=1', null, 'partial-search', 'none'],
-        ['상태만 조건(설문 질문)', 'GET', rest + 'toefl_survey_questions?status=eq.active&order=created_at.asc', null, 'read', 'none'],
-        ['쓰기(POST)', 'POST', rest + 'applications', '{"name":"x"}', 'write', 'none'],
-        ['쓰기(PATCH — A 의 회원번호가 조건)', 'PATCH', rest + 'users?id=eq.m-A', '{"name":"x"}', 'write', 'A'],
-        ['쓰기(DELETE)', 'DELETE', rest + 'reviews?id=eq.zz-1', null, 'write', 'none'],
-        ['다른 RPC', 'POST', rest + 'rpc/some_function', '{}', 'write', 'none'],
-        ['다른 RPC(GET)', 'GET', rest + 'rpc/some_function?x=eq.m-B', null, 'other', 'B'],
-        ['파일', 'GET', TEST_URL + '/storage/v1/object/public/x/y.png', null, 'other', 'none'],
-        ['함수', 'POST', TEST_URL + '/functions/v1/send', '{}', 'write', 'none'],
+        // [이름, 메서드, 주소, 본문, 기대 갈래, 기대 이름표, 기대 열] — 전부 "전송 전에 막고 가짜 응답"이어야 한다
+        ['본인 신청서(회원 이메일이 A 의 값)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(MA) + '&deleted=neq.true&withdrawn_at=is.null&limit=100', null, 'read', 'A', 'email'],
+        ['신청서 한 건(번호)', 'GET', rest + 'applications?id=eq.00000000-0000-4000-8000-0000b3c1a001&limit=1', null, 'read', 'none', 'none'],
+        ['A 의 시험 일정(회원번호)', 'GET', rest + 'toefl_exam_schedules?user_id=eq.m-A&status=neq.cancelled&order=exam_datetime.desc&limit=1', null, 'read', 'A', 'id'],
+        ['B 의 신청서(회원 이메일)', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(MB), null, 'read', 'B', 'email'],
+        ['대소문자만 다른 A 의 이메일', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(MA.toUpperCase()), null, 'read', 'A', 'email'],
+        ['A 의 값으로 시작하는 다른 값', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(MA + '.evil'), null, 'read', 'none', 'none'],
+        ['A 의 값이 들어 있지만 eq 가 아님(neq)', 'GET', rest + 'applications?email=neq.' + encodeURIComponent(MA), null, 'read', 'none', 'none'],
+        ['로그인 이메일이 조건(A) — 화면의 결함으로 따로 센다', 'GET', rest + 'applications?email=eq.' + encodeURIComponent(A.email), null, 'read', 'A', 'login-email'],
+        ['회원번호와 로그인 이메일이 함께 조건(A) — 로그인 이메일이 가려지지 않는다', 'GET', rest + 'applications?user_id=eq.m-A&email=eq.' + encodeURIComponent(A.email), null, 'read', 'A', 'login-email'],
+        ['회원 값을 아직 모르는 계정(GM)의 로그인 이메일이 조건', 'GET', rest + 'users?email=eq.' + encodeURIComponent(GM.email), null, 'read', 'GM', 'login-email'],
+        ['신청서 전체 목록(조건 없음)', 'GET', rest + 'applications?limit=1000&order=created_at.desc', null, 'unconditioned', 'none', 'none'],
+        ['공지 전체 목록', 'GET', rest + 'notices?order=published_at.desc&limit=1000', null, 'unconditioned', 'none', 'none'],
+        ['회원 표 전체', 'GET', rest + 'users?limit=1000', null, 'unconditioned', 'none', 'none'],
+        ['이름의 부분 검색', 'GET', rest + 'applications?name=ilike.*' + encodeURIComponent('합성') + '*&limit=20', null, 'partial-search', 'none', 'none'],
+        ['or 조건(이메일·전화)', 'GET', rest + 'withdrawal_records?or=' + encodeURIComponent('(email.ilike.' + MA + ',phone.eq.010)') + '&limit=1', null, 'partial-search', 'none', 'none'],
+        ['상태만 조건(설문 질문)', 'GET', rest + 'toefl_survey_questions?status=eq.active&order=created_at.asc', null, 'read', 'none', 'none'],
+        ['쓰기(POST)', 'POST', rest + 'applications', '{"name":"x"}', 'write', 'none', 'none'],
+        ['쓰기(PATCH — A 의 회원번호가 조건)', 'PATCH', rest + 'users?id=eq.m-A', '{"name":"x"}', 'write', 'A', 'id'],
+        ['쓰기(DELETE)', 'DELETE', rest + 'reviews?id=eq.zz-1', null, 'write', 'none', 'none'],
+        ['다른 RPC', 'POST', rest + 'rpc/some_function', '{}', 'write', 'none', 'none'],
+        ['다른 RPC(GET)', 'GET', rest + 'rpc/some_function?x=eq.m-B', null, 'other', 'B', 'id'],
+        ['파일', 'GET', TEST_URL + '/storage/v1/object/public/x/y.png', null, 'other', 'none', 'none'],
+        ['함수', 'POST', TEST_URL + '/functions/v1/send', '{}', 'write', 'none', 'none'],
     ];
     const recs = [];
-    for (const [name, method, url, postData, kind, account] of rows) {
+    for (const [name, method, url, postData, kind, account, by] of rows) {
         const d = decide({ url, method, headers, postData, resourceType: 'fetch', isNavigation: false });
         recs.push(d.record);
         c.ok(d.action === 'fake' && d.record.aborted === true, `차단기(${name}): 업무 요청을 전송 전에 막지 않음(${d.action})`);
         c.ok(d.record.business === kind && d.record.account === account, `차단기(${name}): 기록의 갈래·이름표가 기대와 다름(${d.record.business}·${d.record.account})`);
+        c.ok(d.record.accountBy === by, `차단기(${name}): 이름표의 열이 기대와 다름(${d.record.accountBy} — 기대 ${by})`);
+    }
+    // 로그인 이메일과 회원 이메일이 같은 글자인 계정이면 둘을 가를 수 없다 — 회원 이메일로 적는다(결함으로 세지 않는다)
+    {
+        const same = log.businessAccount(new URL(rest + 'applications?email=eq.' + encodeURIComponent(A.email)), { A: { emails: [A.email], ids: ['m-A'], loginEmails: [A.email] } });
+        c.ok(same.account === 'A' && same.by === 'email', `차단기(로그인 이메일 = 회원 이메일인 계정): 열이 기대와 다름(${same.by})`);
     }
     // 인증 모듈의 다섯 요청만 나간다(업무 요청으로 세지 않는다). 자격 위반은 가짜 응답이 아니라 중단이다
     const member = 'a.b.c';
@@ -871,7 +906,7 @@ async function testBusinessGate(opt) {
     // 끌 수 없다: 이름표를 주지 않아도, 끄려는 인자를 줘도 업무 요청은 나가지 않는다
     for (const [what, extra] of [['이름표 없음', {}], ['business: false', { business: false }], ['business: { values }', { business: { values: () => [A.email] } }], ['real: false', { real: false, allowBusiness: true }]]) {
         const dx = log.makeDecider(Object.assign({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon }, extra));
-        for (const i of [0, 7, 13]) {
+        for (const i of [0, 10, 16]) {
             const d = dx({ url: rows[i][2], method: rows[i][1], headers, postData: rows[i][3], resourceType: 'fetch', isNavigation: false });
             c.ok(d.action === 'fake' && d.record.aborted === true, `차단기(${what}): 업무 요청을 내보냄(${rows[i][0]})`);
         }
@@ -879,10 +914,98 @@ async function testBusinessGate(opt) {
     // 셈: 내보낸 업무 요청 0, 시도는 갈래마다
     const sum = log.summarize(recs);
     c.ok(sum.businessSent === 0 && sum.testProject === 0, `차단기: 업무 요청을 내보낸 것으로 셈(${sum.businessSent})`);
-    c.ok(sum.businessAttempts.read === 8 && sum.businessAttempts.unconditioned === 3 && sum.businessAttempts['partial-search'] === 2 && sum.businessAttempts.write === 5 && sum.businessAttempts.other === 2, `차단기: 시도의 셈이 기대와 다름(${JSON.stringify(sum.businessAttempts)})`);
+    c.ok(sum.businessAttempts.read === 11 && sum.businessAttempts.unconditioned === 3 && sum.businessAttempts['partial-search'] === 2 && sum.businessAttempts.write === 5 && sum.businessAttempts.other === 2, `차단기: 시도의 셈이 기대와 다름(${JSON.stringify(sum.businessAttempts)})`);
+    // 이름표의 셈: 열마다 따로, 로그인 이메일이 조건인 시도는 따로. 시험이 일부러 시킨 대조용 시도(probe)는 빼고 센다
+    c.ok(sum.businessLabeled.email === 3 && sum.businessLabeled.id === 3 && sum.businessLabeled['login-email'] === 3 && sum.businessByLoginEmail === 3, `차단기: 이름표의 셈이 기대와 다름(${JSON.stringify(sum.businessLabeled)}·${sum.businessByLoginEmail})`);
+    {
+        const probed = log.summarize(recs.map((r) => (r.accountBy === 'login-email' ? Object.assign({}, r, { probe: true }) : r)));
+        c.ok(probed.businessByLoginEmail === 0 && probed.businessLabeled['login-email'] === 0 && probed.businessLabeled.email === 3, '차단기: 대조용 시도(probe)를 화면이 보낸 시도로 셈');
+    }
     // 기록에는 정해 둔 이름만
     const kinds = new Set(log.BUSINESS_KINDS);
-    c.ok(recs.every((r) => kinds.has(r.business) && ['A', 'B', 'none'].includes(r.account) && !JSON.stringify(r).includes('zz.invalid') && !JSON.stringify(r).includes('/rest/')), '차단기: 기록에 주소·값이 남음');
+    c.ok(recs.every((r) => kinds.has(r.business) && ['A', 'B', 'GM', 'none'].includes(r.account) && log.ACCOUNT_BY.includes(r.accountBy) && !JSON.stringify(r).includes('zz.invalid') && !JSON.stringify(r).includes('/rest/')), '차단기: 기록에 주소·값이 남음');
+    return c.problems;
+}
+
+// 실행기가 쓰는 "사람의 값"(business-fake.mjs): 가짜 응답·이름표·판정의 기대는 my_profile 에서 본 회원 표의 값으로.
+// 가짜 세계도 실제 시험 자료처럼 로그인 이메일 ≠ 회원 이메일이다 — 로그인 이메일로 만든 가짜 자료는 화면이 "남의 것"으로 처리한다.
+async function testPeople(opt) {
+    const c = checker();
+    const bf = await loadModule(BF_FILE, opt.mutate);
+    const log = await loadRequestLog(opt.mutate);
+    const rest = TEST_URL + '/rest/v1/';
+    const enc = encodeURIComponent;
+    const logins = { A: A.email, B: B.email, BLK: ACCOUNTS.BLK.email, GM: GM.email };
+    for (const k of ['A', 'B', 'GM']) c.ok(ACCOUNTS[k].email.toLowerCase() !== ACCOUNTS[k].profile.email.toLowerCase(), `가짜 세계(${k}): 로그인 이메일과 회원 이메일이 같음(실제 시험 자료와 다른 모양 — 이 결함을 가짜 시험이 잡지 못한다)`);
+    const people = bf.makePeople({ loginEmails: () => logins });
+    const bearer = (email) => 'Bearer ' + fakeJwt({ iss: 'x', sub: 'auth', email, role: 'authenticated' });
+    // my_profile 을 보기 전: 회원 자료를 주지 않고, 가짜 신청서·가짜 글은 주인 없는 자료다
+    c.ok(people.known('A') === false && people.nameOf('A') === '' && people.memberEmailOf('A') === '' && people.differs('A') === null, '사람의 값: my_profile 을 보기 전인데 값을 앎');
+    c.ok(people.fake('GET', rest + 'users?email=eq.' + enc(MA)).length === 0 && people.fake('GET', rest + 'users?email=eq.' + enc(A.email)).length === 0, '사람의 값: my_profile 을 보기 전인데 회원 자료를 줌');
+    const ownerless = people.fake('GET', rest + 'applications?id=eq.' + bf.FAKE_APP)[0];
+    c.ok(!!ownerless && ![MA, A.email, MB, B.email].includes(ownerless.email) && !['m-A', 'm-B'].includes(ownerless.user_id), '사람의 값: A 를 모르는데 가짜 신청서의 주인이 합성 계정');
+    // 누구의 my_profile 응답인가는 요청의 JWT(로그인 이메일)로 가린다
+    c.ok(people.accountOfJwt(bearer(A.email)) === 'A' && people.accountOfJwt(bearer(B.email.toUpperCase())) === 'B' && people.accountOfJwt(bearer('zz-nobody@zz.invalid')) === null && people.accountOfJwt('Bearer zz-anon') === null && people.accountOfJwt(bearer(MA)) === null,
+        '사람의 값: 요청의 JWT 로 계정을 가리지 못함(또는 회원 이메일을 로그인 이메일로 봄)');
+    c.ok(people.note(people.accountOfJwt(bearer(A.email)), A.profile) === true && people.note(people.accountOfJwt(bearer(B.email)), B.profile) === true, '사람의 값: my_profile 의 응답을 적지 못함');
+    c.ok(people.note(null, GM.profile) === false && people.note('GM', { id: 'm-GM', name: 'x' }) === false && people.known('GM') === false, '사람의 값: 누구의 것인지 모르는 응답·이메일이 없는 응답을 적음');
+    // 판정의 기대(화면에 보여야 하는 값)
+    c.ok(people.known('A') && people.nameOf('A') === A.profile.name && people.memberEmailOf('A') === MA && people.differs('A') === true && people.nameOf('B') === B.profile.name, '사람의 값: 판정의 기대(이름·회원 이메일)가 my_profile 의 값이 아님');
+    // 가짜 자료: 주인은 my_profile 에서 본 A(회원 이메일·회원번호·이름)
+    const app = people.fake('GET', rest + 'applications?id=eq.' + bf.FAKE_APP + '&limit=1')[0];
+    c.ok(!!app && app.email === MA && app.user_email === MA && app.user_id === 'm-A' && app.name === A.profile.name, '가짜 자료: 가짜 신청서의 주인이 my_profile 에서 본 A(회원 이메일·회원번호·이름)가 아님');
+    for (const table of ['reviews', 'reviews_book', 'study_certifications']) {
+        const post = people.fake('GET', rest + table + '?id=eq.' + bf.FAKE_POST)[0];
+        c.ok(!!post && post.author_email === MA, `가짜 자료(${table}): 가짜 글의 글쓴이가 A 의 회원 이메일이 아님`);
+    }
+    const list = people.fake('GET', rest + 'applications?order=created_at.desc&limit=1000');
+    c.ok(list.length === 1 && list[0].email === MA, '가짜 자료: 신청 게시판의 목록에 A 의 가짜 신청서 한 건(회원 이메일)이 없음');
+    const userB = people.fake('GET', rest + 'users?email=eq.' + enc(MB) + '&limit=1');
+    c.ok(userB.length === 1 && userB[0].email === MB && userB[0].id === 'm-B' && userB[0].name === B.profile.name, '가짜 자료: 회원 이메일이 조건인 회원 조회에 그 회원(my_profile 의 값)을 주지 않음');
+    c.ok(people.fake('GET', rest + 'users?id=eq.m-B&limit=1').length === 1, '가짜 자료: 회원번호가 조건인 회원 조회에 그 회원을 주지 않음');
+    c.ok(people.fake('GET', rest + 'users?email=eq.' + enc(B.email)).length === 0, '가짜 자료: 로그인 이메일이 조건인 회원 조회에 회원을 줌(화면이 로그인 이메일을 쓰는 결함을 가린다)');
+    c.ok(people.fake('GET', rest + 'applications?email=eq.' + enc(MA)).length === 0 && people.fake('PATCH', rest + 'reviews?id=eq.' + bf.FAKE_POST).length === 0 && people.fake('GET', TEST_URL + '/storage/v1/object/x').length === 0, '가짜 자료: 합성 회원의 신청서 목록·쓰기·다른 주소에 자료를 줌');
+    // 이름표: 회원 이메일·회원번호(my_profile)와 로그인 이메일을 따로
+    const labels = people.labels();
+    c.ok(JSON.stringify(labels.A) === JSON.stringify({ emails: [MA], ids: ['m-A'], loginEmails: [A.email] }), '이름표: A 의 값이 { 회원 이메일, 회원번호, 로그인 이메일 }이 아님');
+    c.ok(!!labels.GM && labels.GM.emails.length === 0 && labels.GM.ids.length === 0 && labels.GM.loginEmails[0] === GM.email, '이름표: my_profile 을 보지 못한 계정의 로그인 이메일을 두지 않음(또는 회원 값을 지어냄)');
+    const by = (s) => { const r = log.businessAccount(new URL(rest + s), labels); return r.account + ':' + r.by; };
+    c.ok(by('applications?email=eq.' + enc(MA)) === 'A:email', `이름표: 화면이 쓰는 값(A 의 회원 이메일)이 조건인 조회에 이름표가 붙지 않음(${by('applications?email=eq.' + enc(MA))})`);
+    c.ok(by('applications?email=eq.' + enc(A.email)) === 'A:login-email', '이름표: 로그인 이메일이 조건인 조회를 따로 가르지 않음');
+    c.ok(by('users?id=eq.m-B') === 'B:id' && by('users?email=eq.' + enc(GM.email)) === 'GM:login-email', '이름표: 회원번호·아직 모르는 계정의 로그인 이메일의 이름표가 기대와 다름');
+
+    // 가짜 DOM 의 화면에 이 가짜 자료를 준다: 확인된 A 에게 "본인 것"이어야 하는 화면이 본인 것으로 그려지는가
+    // (시험 프로젝트 상대의 1차 실제 실행에서 "기대와 다름"이 된 것들 — 로그인 이메일로 만든 자료였다)
+    const asA = async (file, search) => {
+        const w = world('빈 브라우저', V.ON, null, MA);
+        w.rest = (req, u) => json(people.fake(req.method, u.href));
+        w.seed('A');
+        (await w.open('before', 'index.html')).close();
+        const page = await openPage(w, 't1', file, { search });
+        await w.browser.advance(2500);
+        return { w, page };
+    };
+    {
+        const x = await asA('application-detail.html', '?id=' + bf.FAKE_APP);
+        c.ok(state(x.page) === 'signed_in' && navsOf(x.page).length === 0, `가짜 자료를 받은 화면(신청서 상세): 확인된 A 의 가짜 신청서가 "남의 것"으로 처리됨(${navsOf(x.page).join(', ')})`);
+        auditOn(x.w, c, '가짜 자료를 받은 화면(신청서 상세)');
+    }
+    for (const file of ['reviews.html', 'reviews-book.html', 'study-certify.html']) {
+        const x = await asA(file, '?id=' + bf.FAKE_POST);
+        const el = x.page.byId.postActions;
+        c.ok(!!el && el.style.display === 'flex', `가짜 자료를 받은 화면(${file} 글 한 편): 확인된 A 의 가짜 글에 본인 글 버튼이 보이지 않음`);
+    }
+    {
+        const x = await asA('application.html', '');
+        c.ok(!!x.page.byId['menu-' + bf.FAKE_APP] || drawnMatch(x.page, new RegExp('menu-' + bf.FAKE_APP)), '가짜 자료를 받은 화면(신청 게시판): 확인된 A 의 가짜 신청서에 "내 신청서" 표시가 붙지 않음');
+    }
+
+    // 대조 실험(--selftest login-email-fixtures)의 모양: 3차 보완 전의 결함을 그대로 다시 만든다(기대 값은 그대로 my_profile 의 것)
+    const old = bf.makePeople({ loginEmails: () => logins, fixturesFromLoginEmail: true });
+    old.note('A', A.profile);
+    const oldApp = old.fake('GET', rest + 'applications?id=eq.' + bf.FAKE_APP)[0];
+    const oldBy = log.businessAccount(new URL(rest + 'applications?email=eq.' + enc(MA)), old.labels());
+    c.ok(!!oldApp && oldApp.email === A.email && oldBy.account === 'none' && old.memberEmailOf('A') === MA && old.nameOf('A') === A.profile.name, '대조 실험(login-email-fixtures): 3차 보완 전의 결함(로그인 이메일로 만든 자료·이름표, 기대는 그대로)을 다시 만들지 못함');
     return c.problems;
 }
 
@@ -931,7 +1054,8 @@ async function testSameAsMergeBase(opt) {
 
 const ON_PAGE_TESTS = [
     ['3A 가 다룬 두 화면(index·login)이 3A 를 합친 기준과 같음(꺼짐은 기록 전체, 켜짐은 요청·저장소·이동·안내·머리말)', testSameAsMergeBase],
-    ['실행기의 차단기: 업무 요청은 하나도 내보내지 않는다(나가는 것은 인증 요청 다섯뿐 — 끄는 인자가 없다), 시도는 갈래·이름표로 적는다', testBusinessGate],
+    ['실행기의 차단기: 업무 요청은 하나도 내보내지 않는다(나가는 것은 인증 요청 다섯뿐 — 끄는 인자가 없다), 시도는 갈래·이름표(조건의 열마다: 회원 이메일·회원번호·로그인 이메일)로 적는다', testBusinessGate],
+    ['실행기의 "사람의 값": 가짜 자료·이름표·판정의 기대는 my_profile 에서 본 회원 표의 값으로(로그인 이메일 ≠ 회원 이메일인 세계) — 그 자료를 받은 화면이 본인 것으로 그림', testPeople],
     ['확인 전 보호 표시 0·자동 보호 요청 0, 공개 본문은 기다리지 않음, 확인 뒤에만 회원 표시·조회', testBeforeConfirm],
     ['확인되지 않으면 회원 전용 갈래만 로그인 화면으로·그 뒤 보호 업무 요청 0, 공개 본문·방문자 갈래는 방문자 기준과 같음', testNotConfirmed],
     ['만료된 값이 남은 방문자: 공개·갈래 화면의 공개 부분은 그 확인을 기다리지 않고, 끝난 뒤에도 방문자 그대로', testStaleVisitor],
@@ -1029,7 +1153,7 @@ const PAGE_MUTANTS = [
     },
     {
         name: '차단기가 조건의 값을 "그 글자로 시작"으로 견줘 이름표를 붙이는 사본', tests: [testBusinessGate], expect: /A 의 값으로 시작하는 다른 값/,
-        edits: [[LOG_FILE, "x.trim().toLowerCase() === value)) return label;", "value.startsWith(x.trim().toLowerCase()))) return label;"]],
+        edits: [[LOG_FILE, "x.trim().toLowerCase() === value);", "value.startsWith(x.trim().toLowerCase()));"]],
     },
     {
         name: '확인된 계정이 달라져도 화면을 그대로 두는 사본', tests: [testAccountChange], expect: /가리지 않음|다시 받지 않음/,
@@ -1080,6 +1204,35 @@ const PAGE_MUTANTS = [
     {
         name: '함께 싣는 스크립트가 게이트 없는 화면에서 저장된 값을 읽지 않는 사본(main.js)', section: 'non-target', tests: [], expect: /대상이 아닌 화면\(admin-users\.html.*기준과 다름/,
         edits: [['js/main.js', "    if (window.EonLogin) return window.EonLogin.raw();\n    return localStorage.getItem('iontoefl_user');", '    return window.EonLogin ? window.EonLogin.raw() : null;']],
+    },
+    {
+        name: '실행기가 가짜 자료와 이름표를 로그인 이메일로 만드는 사본(3차 보완 전의 실행기 — 시험 프로젝트 상대의 1차 실제 실행에서 다섯 경우를 틀리게 한 것)', tests: [testPeople],
+        expect: /가짜 신청서의 주인이 my_profile 에서 본 A|가짜 글의 글쓴이가 A 의 회원 이메일이 아님|화면이 쓰는 값\(A 의 회원 이메일\)이 조건인 조회에 이름표가 붙지 않음|"남의 것"으로 처리됨|본인 글 버튼이 보이지 않음|"내 신청서" 표시가 붙지 않음/,
+        edits: [[BF_FILE, "    const emailOf = (k) => (fixturesFromLoginEmail ? login()[k] : seen.emails[k]) || '';", "    const emailOf = (k) => login()[k] || '';"]],
+    },
+    {
+        name: '실행기가 my_profile 의 응답을 JWT 를 보지 않고 아무 계정에나 적는 사본', tests: [testPeople], expect: /요청의 JWT 로 계정을 가리지 못함/,
+        edits: [[BF_FILE, '                for (const [key, value] of Object.entries(login())) if (same(value, c.email)) return key;', '                for (const [key] of Object.entries(login())) return key;']],
+    },
+    {
+        name: '실행기가 로그인 이메일이 조건인 회원 조회에도 회원 자료를 주는 사본(화면의 결함을 가린다)', tests: [testPeople], expect: /로그인 이메일이 조건인 회원 조회에 회원을 줌/,
+        edits: [[BF_FILE, '    const byValue = (v) => Object.keys(seen.ids).find((k) => known(k) && (same(emailOf(k), v) || seen.ids[k] === v));', '    const byValue = (v) => Object.keys(seen.ids).find((k) => known(k) && (same(emailOf(k), v) || same(login()[k], v) || seen.ids[k] === v));']],
+    },
+    {
+        name: '차단기가 로그인 이메일이 조건인 시도를 따로 가르지 않는 사본(회원 이메일의 것으로 적음)', tests: [testBusinessGate, testPeople], expect: /이름표의 열이 기대와 다름\(email — 기대 login-email\)|로그인 이메일이 조건인 조회를 따로 가르지 않음/,
+        edits: [[LOG_FILE, "    if (byLogin) return { account: byLogin, by: 'login-email' };", "    if (byLogin) return { account: byLogin, by: 'email' };"]],
+    },
+    {
+        name: '차단기가 이름표의 열을 가르지 않는 사본(회원번호가 조건인 시도를 이메일 열로 적음)', tests: [testBusinessGate], expect: /이름표의 열이 기대와 다름\(email — 기대 id\)/,
+        edits: [[LOG_FILE, "    if (byId) return { account: byId, by: 'id' };", "    if (byId) return { account: byId, by: 'email' };"]],
+    },
+    {
+        name: '차단기가 대조용 시도(probe)를 화면이 보낸 시도로 세는 사본', tests: [testBusinessGate], expect: /대조용 시도\(probe\)를 화면이 보낸 시도로 셈/,
+        edits: [[LOG_FILE, "        businessByLoginEmail: is((r) => r.business && !r.probe && r.accountBy === 'login-email'),", "        businessByLoginEmail: is((r) => r.business && r.accountBy === 'login-email'),"]],
+    },
+    {
+        name: '표시 값의 이메일이 로그인 이메일이 되는 사본(인증 모듈이 회원 이메일 대신 로그인 이메일을 화면에 내줌)', tests: [testBeforeConfirm, testClosedFeatures], expect: /로그인 이메일을 업무 요청에 씀|로그인한 회원의 신청 조회\(회원 이메일이 조건\)가 나가지 않음|확인된 뒤 회원 갈래/,
+        edits: [[AUTH_FILE, "                email: p.email,\n", "                email: String(p.email).replace('zzb3c1_', 'zzb3a_').replace('@members-table.', '@member.'),\n"]],
     },
     {
         name: '꺼짐인데 저장된 값을 읽지 않는 사본(한 길이 꺼짐에서 null)', section: 'off', tests: [], expect: /기준과 다름/,
@@ -1151,6 +1304,8 @@ export async function sectionPages() {
         add(name, list);
         lines.push(`    - 켜짐 — ${name}: ${list.length === 0 ? '통과' : `어긋남 ${list.length}`}`);
     }
+    // 알려진 것(통과·실패가 아니다 — 보고서의 "판단 필요"): 판정이 지금의 동작을 그대로 적어 둔 것
+    lines.push(`    - 알려진 것(판단 필요): 사람이 달라진 뒤 가려진 옛 화면이, 붙잡혀 있던 응답을 받고 나서 지금 로그인한 사람(B)의 회원번호가 조건인 조회를 이어 감 ${KNOWN.lateFollowUpByNewUser}건(가짜 DOM — 다시 받기를 부른 뒤에도 그 화면의 스크립트가 도는 동안). 제품 코드는 바꾸지 않았다`);
     const mut = await sectionPageMutants();
     add('감도', mut.problems);
     lines.push(`    - 감도(일부러 바꾼 사본 ${PAGE_MUTANTS.length}개 — 변조마다 겨냥한 판정이 깨져야 검출): ${mut.problems.length === 0 ? '모두 검출' : `실패 ${mut.problems.length}`}`);

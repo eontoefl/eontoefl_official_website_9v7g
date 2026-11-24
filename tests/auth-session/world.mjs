@@ -125,13 +125,13 @@ function legacyRest(req, u) {
 
 // 합성 계정(가짜 서버)
 export const ACCOUNTS = {
-    A: { email: 'zzb3a_a@member.zz.invalid', password: 'zz-pw-A', authId: 'auth-A', member: 'ok', profile: { id: 'm-A', name: '합성 회원 A', nickname: '에이', email: 'zzb3a_a@member.zz.invalid', phone: '010-0000-0001', timezone: 'Asia/Seoul' } },
-    B: { email: 'zzb3a_b@member.zz.invalid', password: 'zz-pw-B', authId: 'auth-B', member: 'ok', profile: { id: 'm-B', name: '합성 회원 B', nickname: null, email: 'zzb3a_b@member.zz.invalid', phone: null, timezone: 'Asia/Seoul' } },
+    A: { email: 'zzb3a_a@member.zz.invalid', password: 'zz-pw-A', authId: 'auth-A', member: 'ok', profile: { id: 'm-A', name: '합성 회원 A', nickname: '에이', email: 'zzb3c1_a@members-table.zz.invalid', phone: '010-0000-0001', timezone: 'Asia/Seoul' } },
+    B: { email: 'zzb3a_b@member.zz.invalid', password: 'zz-pw-B', authId: 'auth-B', member: 'ok', profile: { id: 'm-B', name: '합성 회원 B', nickname: null, email: 'zzb3c1_b@members-table.zz.invalid', phone: null, timezone: 'Asia/Seoul' } },
     BLK: { email: 'zzb3a_blk@member.zz.invalid', password: 'zz-pw-K', authId: 'auth-K', member: 'blocked' },
     WD: { email: 'zzb3a_wd@member.zz.invalid', password: 'zz-pw-W', authId: 'auth-W', member: 'withdrawal' },
     N: { email: 'zzb3a_n@member.zz.invalid', password: 'zz-pw-N', authId: 'auth-N', member: 'none' },
     G: { email: 'zzb3a_g@member.zz.invalid', password: 'zz-pw-G', authId: 'auth-G', member: 'none', admin: true },
-    GM: { email: 'zzb3a_gm@member.zz.invalid', password: 'zz-pw-M', authId: 'auth-M', member: 'ok', admin: true, profile: { id: 'm-GM', name: '합성 관리자 GM', nickname: '지엠', email: 'zzb3a_gm@member.zz.invalid', phone: '010-0000-0009', timezone: 'Asia/Seoul' } },
+    GM: { email: 'zzb3a_gm@member.zz.invalid', password: 'zz-pw-M', authId: 'auth-M', member: 'ok', admin: true, profile: { id: 'm-GM', name: '합성 관리자 GM', nickname: '지엠', email: 'zzb3c1_gm@members-table.zz.invalid', phone: '010-0000-0009', timezone: 'Asia/Seoul' } },
 };
 
 export const OLD_STUDENT = JSON.stringify({ id: 'm-old-1', name: '옛학생', nickname: '', email: 'old@zz.invalid', phone: '010-0000-0000', level: 2, role: 'user' });
