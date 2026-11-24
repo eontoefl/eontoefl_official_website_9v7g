@@ -16,8 +16,11 @@
 //                     normal      점검 꺼짐, 공통 확인 설정 없음        normal-hook  점검 꺼짐, 공통 확인 설정 걸림
 //                     maint       점검 중,  공통 확인 설정 없음        maint-hook   점검 중,  공통 확인 설정 걸림
 //   revoked         --kind expired|loggedout  --step pre|post|restored   JWT 는 유효한데 로그인 기록이 끝난 경우   있음
-//                   --kind jwt-expired                                    JWT 자체가 만료된 경우(함수에 들어오기 전 거절)
-//   rows-compare    함수 호출 앞뒤의 rows_md5.sql 결과 둘을 견준다(--before --after)                  0
+//                   --kind jwt-expired  --step pre|post [--pre <pre 결과>]  JWT 자체가 만료된 경우.
+//                     **같은 JWT** 로 만료 전 성공(pre: ok)과 만료 뒤 오류의 사유(post)를 한 쌍으로 대조한다.
+//                     post 는 pre 의 결과 파일을 받아 같은 JWT 인지(sha256 앞 12자·만료 시각) 본다
+//   rows-compare    대조표 전체의 앞뒤에 뜬 rows_md5.sql 결과 둘을 견준다(--before --after)             0
+//                   (대조표 전체를 사이에 둔 앞뒤 불변이다 — 호출 하나하나의 불변을 보이는 것이 아니다)
 //   compare         지문 결과 둘을 견준다(--a --b, read_at 은 빼고. --ignore 로 더 뺄 키를 적는다)      0
 //   body-md5        마이그레이션 파일의 함수 본문 md5 를 계산한다(되돌리기 SQL·지문의 body_md5 와 견줄 값)   0
 //
@@ -43,6 +46,10 @@
 //   금지 값 = 합성 회원 전원의 회원번호·이름·별명·이메일·전화, 옛 비밀번호 열의 합성 표식, 탈퇴 사유 표식, 로그인 계정 번호.
 //             ok 칸에서는 그 회원 본인의 여섯 값만 허용한다. 응답 본문의 글자 전체에서 찾는다.
 //   HEAD 는 본문이 비어 있다는 것으로 판정하지 않는다 — 상태 코드로 판정한다.
+//   인자를 붙인 요청: 공통 확인이 걸려 있어도 함수를 찾지 못해 먼저 거절될 수 있다. 그래서 그 칸은 상태와 무관하게
+//     "회원 정보가 오지 않음(state·profile 없음, 금지 값 없음, 2xx 아님)"으로 판정하고 관측한 상태·코드를 적는다.
+//     공통 확인이 실제로 도는지는 유효한 POST 로 본다(일반 회원 → 503, 예외 회원 → 본인 것만) — 결과의 hook_evidence.
+//   JWT 만료: 401 이고 오류 문구가 만료를 뜻할 때만 통과. 다른 인증 오류는 미확인.
 // 종료 값: 0 = 전부 통과 / 1 = 기대와 다름 또는 미확인이 있음 / 2 = 요청 전에 멈춤(주소·열쇠·자격·인자·로그인 기록) /
 //          3 = 기준선 불일치(지문이 --state 와 맞지 않음)
 // =====================================================================
@@ -266,14 +273,16 @@ const normCache = (v) => (v == null ? null : String(v).toLowerCase().split(',').
 const sameKeys = (obj, want) => obj && typeof obj === 'object' && !Array.isArray(obj) && JSON.stringify(Object.keys(obj).sort()) === JSON.stringify([...want].sort());
 
 // 기대값: { kind, … }
-//   ok(account) · state_only(state) · maintenance · no_execute · method · no_execute_or_method · not_found_fn · jwt_expired
+//   ok(account) · state_only(state) · maintenance · no_execute · method · no_execute_or_method · not_found_fn(absent 단계) ·
+//   args_no_profile(인자를 붙인 요청) · jwt_expired
 function expectFor(stateName, actor, method, withArgs) {
   const s = STATES[stateName];
   const outside = actor === 'anon' || actor === 'service';
   const exempt = MAINT_EXEMPT.includes(actor);
+  // 인자를 붙인 요청은 점검·공통 확인의 상태와 떼어 판정한다(함수를 찾지 못해 먼저 거절될 수도, 공통 확인이 먼저 거절할 수도 있다)
+  if (withArgs) return { kind: 'args_no_profile', why: '인자 없는 함수다 — 인자를 붙이면 어느 쪽이 먼저 거절하든 회원 정보가 오지 않아야 한다' };
   if (s.maint && s.hook && !exempt) return { kind: 'maintenance', why: '공통 확인이 먼저 거절한다(점검 중, 예외가 아님)' };
   if (method !== 'POST') return outside ? { kind: 'no_execute_or_method', why: '실행 권한이 없거나 POST 가 아니라서 거절' } : { kind: 'method', why: 'POST 가 아니면 거절(405)' };
-  if (withArgs) return { kind: 'not_found_fn', why: '인자 없는 함수라 인자를 붙이면 함수를 찾지 못한다' };
   if (outside) return { kind: 'no_execute', why: '실행 권한이 없다' };
   if (s.maint && !exempt) return { kind: 'maintenance', why: '함수가 회원 행을 읽기 전에 점검을 확인해 거절한다' };
   switch (actor) {
@@ -295,7 +304,8 @@ function describeExpect(e) {
     case 'method': return '405 (거절 상태)';
     case 'no_execute_or_method': return '401·403(42501) 또는 405 (거절 상태)';
     case 'not_found_fn': return '404 (code PGRST202 — 등록되지 않은 함수)';
-    case 'jwt_expired': return '401 (code PGRST3xx — 함수에 들어오기 전 거절), 함수의 응답 아님';
+    case 'args_no_profile': return '거절이고 회원 정보 없음(state·profile 없음) — 관측한 상태·코드를 적는다(404·PGRST202 또는 503·PT503 등)';
+    case 'jwt_expired': return '401 이고 오류의 사유가 만료(함수에 들어오기 전 거절 — 함수의 응답 아님). 다른 인증 오류는 미확인';
     default: return '?';
   }
 }
@@ -310,7 +320,8 @@ function judge(expected, res, method, expect, forbidden) {
   const hasProfile = isObj && ('state' in j || 'profile' in j);
   const expectsBody = expected.kind === 'ok' || expected.kind === 'state_only';
   if (!expectsBody && res.status === 429) { out.verdict = 'unverified'; bad('429 — 요청 한도'); }
-  if (!expectsBody && res.status >= 500 && !(expected.kind === 'maintenance' && res.status === 503)) { out.verdict = 'unverified'; bad(`기대하지 않은 ${res.status}`); }
+  const maintenanceShape = res.status === 503 && (method === 'HEAD' || out.code === 'PT503');
+  if (!expectsBody && res.status >= 500 && !((expected.kind === 'maintenance' && res.status === 503) || (expected.kind === 'args_no_profile' && maintenanceShape))) { out.verdict = 'unverified'; bad(`기대하지 않은 ${res.status}`); }
   switch (expected.kind) {
     case 'ok': {
       const want = expect.accounts[expected.account].member;
@@ -353,11 +364,23 @@ function judge(expected, res, method, expect, forbidden) {
       else if (out.code !== 'PGRST202') bad(`code 가 PGRST202 가 아니다(${out.code}) — 일반 404 는 "등록되지 않은 함수"의 증거가 아니다`);
       if (hasProfile) bad('함수를 찾지 못해야 하는데 state·profile 이 응답에 있다');
       break;
-    case 'jwt_expired':
-      if (res.status !== 401) bad(`상태 ${res.status} (기대 401)`);
-      else if (!/^PGRST3\d\d$/.test(out.code ?? '')) bad(`code 가 PGRST3xx 가 아니다(${out.code})`);
-      if (hasProfile) bad('함수에 들어오기 전에 거절돼야 하는데 state·profile 이 응답에 있다');
+    case 'args_no_profile':
+      // 어느 쪽이 먼저 거절했는지는 기대값이 아니라 관측이다
+      out.observed = res.status === 404 && out.code === 'PGRST202' ? '함수를 찾지 못함(404·PGRST202)' : maintenanceShape ? '점검 거절(503·PT503)' : `그 밖(${res.status}·${out.code})`;
+      if (hasProfile) bad('인자를 붙였는데 state·profile 이 응답에 있다(함수가 실행됐다)');
+      else if (res.status >= 200 && res.status < 400) { out.verdict = 'unverified'; bad(`거절이 아니라 ${res.status} — 무엇이 실행됐는지 확인할 것`); }
       break;
+    case 'jwt_expired': {
+      // 만료를 뜻하는 사유일 때만 통과. 오류 문구는 고정된 안내문이라 앞 80자를 적는다(자격·회원 값이 아니다)
+      const msg = isObj && typeof j.message === 'string' ? j.message : '';
+      out.observed_message = msg.slice(0, 80);
+      out.reason_is_expiry = /expired/i.test(msg);
+      if (hasProfile) bad('함수에 들어오기 전에 거절돼야 하는데 state·profile 이 응답에 있다');
+      else if (res.status === 200) bad('만료된 JWT 인데 200 이다');
+      else if (res.status !== 401) { out.verdict = 'unverified'; bad(`상태 ${res.status} (기대 401) — 만료로 거절된 것인지 확인하지 못했다`); }
+      else if (!out.reason_is_expiry) { out.verdict = 'unverified'; bad(`401 이지만 오류의 사유가 만료가 아니다(code ${out.code}) — 다른 인증 오류는 미확인이다`); }
+      break;
+    }
     default: bad('기대값을 정하지 못했다');
   }
   const leaks = leakProblems(res, forbidden, allowed);
@@ -482,6 +505,19 @@ async function phaseMatrix() {
     const res = await call(row.actor, row.method, row.args ? row.args() : {});
     cells.push({ no: row.no, actor: row.actor, method: row.method, request: row.request, expect_kind: row.expected.kind, expect_text: describeExpect(row.expected), why: row.expected.why ?? null, ...judge(row.expected, res, row.method, expect, forbidden) });
   }
+  // 공통 확인이 실제로 도는가는 유효한 POST 로 본다(인자를 붙인 요청으로 보지 않는다)
+  const post = (actor) => cells.find((c) => c.actor === actor && c.request === 'POST {}');
+  const is503 = (c) => !!c && c.verdict === 'pass' && c.http_status === 503;
+  const s = STATES[state];
+  result.hook_evidence = !s.hook ? null : !s.maint
+    ? { note: '점검이 꺼진 상태에서는 공통 확인이 전부 통과시킨다 — 도는지의 입증은 maint-hook 에서 한다' }
+    : {
+      rule: '유효한 POST {} 로 본다: 일반 회원 → 503, 예외 회원 → 본인 것만',
+      general_member_post_is_503: actors.includes('member_b') ? is503(post('member_b')) : null,
+      exempt_member_gets_own_profile_only: actors.includes('member_a') ? (() => { const c = post('member_a'); return !!c && c.verdict === 'pass' && c.body_state === 'ok'; })() : null,
+      // 함수 안의 점검 확인만으로는 공개 키·서비스 열쇠가 401·403 이다(maint). 여기서 503 이면 공통 확인이 함수보다 먼저 돈 것이다
+      outside_roles_post_is_503: ['anon', 'service'].filter((a) => actors.includes(a)).every((a) => is503(post(a))),
+    };
   return finish(result, cells);
 }
 async function phaseRevoked() {
@@ -489,23 +525,40 @@ async function phaseRevoked() {
   const step = arg('--step');
   if (!['expired', 'loggedout', 'jwt-expired'].includes(kind)) stop(2, '--kind 는 expired | loggedout | jwt-expired');
   if (kind !== 'jwt-expired' && !['pre', 'post', 'restored'].includes(step)) stop(2, '--step 은 pre | post | restored');
+  if (kind === 'jwt-expired' && !['pre', 'post'].includes(step)) stop(2, '--kind jwt-expired 의 --step 은 pre(만료 전) | post(만료 뒤)');
   if (kind === 'loggedout' && step === 'restored') stop(2, '로그아웃은 되돌릴 수 없다(--step restored 는 expired 에만)');
   const expect = loadResult(arg('--expect'), '--expect');
   checkTarget(false);
   const subject = kind === 'expired' ? 'a_expire' : kind === 'loggedout' ? 'a_logout' : 'a_old';
+  const jwtPost = kind === 'jwt-expired' && step === 'post';
   loadLogin('member_a', expect);
-  // JWT 는 유효해야 한다(로그인 기록이 끝난 것과 JWT 만료를 가르려면). jwt-expired 는 반대로 만료돼 있어야 한다.
-  loadLogin(subject, expect, kind === 'jwt-expired' ? { mustBeExpired: true } : { minSeconds: 120 });
+  // JWT 는 유효해야 한다(로그인 기록이 끝난 것과 JWT 만료를 가르려면). jwt-expired 의 post 는 반대로 만료돼 있어야 한다.
+  loadLogin(subject, expect, jwtPost ? { mustBeExpired: true } : { minSeconds: kind === 'jwt-expired' ? 20 : 120 });
   checkDistinctSessions(['member_a', subject]);
+  // 같은 JWT 인지 가르는 지문: 글자의 sha256 앞 12자와 만료 시각(자격 글자는 적지 않는다)
+  const subjectFingerprint = { sha256_12: createHash('sha256').update(jwts[subject], 'utf8').digest('hex').slice(0, 12), exp: decodeJwtPayload(jwts[subject]).exp ?? null, session_id: jwtInfo[subject].session_id };
+  let pairCheck = null;
+  if (jwtPost) {
+    // 한 쌍의 앞쪽: 같은 JWT 로 만료 전에 성공했다는 결과 파일
+    const pre = loadResult(arg('--pre'), '--pre(만료 전에 같은 JWT 로 쟰 jwt-expired pre 의 결과)');
+    const preCell = (pre.cells ?? []).find((c) => c.actor === 'a_old');
+    if (pre.phase !== 'revoked' || pre.kind !== 'jwt-expired' || pre.step !== 'pre') stop(2, '--pre 파일이 jwt-expired pre 의 결과가 아니다');
+    if (!preCell || preCell.verdict !== 'pass' || preCell.body_state !== 'ok') stop(2, '--pre 의 그 자격 칸이 통과(ok)가 아니다 — 만료 전 성공이 없으면 한 쌍이 되지 않는다');
+    const f = pre.subject_jwt ?? {};
+    if (f.sha256_12 !== subjectFingerprint.sha256_12 || f.exp !== subjectFingerprint.exp || f.session_id !== subjectFingerprint.session_id) stop(2, '지금의 B3P0_JWT_A_OLD 가 --pre 때의 JWT 와 같은 글자가 아니다. 같은 JWT 로 만료 전·후를 재야 한다');
+    pairCheck = { same_jwt_as_pre: true, pre_finished_at: pre.finished_at ?? null, pre_state: preCell.body_state, pre_http_status: preCell.http_status };
+  }
   const fpCheck = checkFingerprint(loadResult(arg('--fingerprint'), '--fingerprint'), { wantFunction: true, state: 'normal', expect });
   if (fpCheck.problems.length) stop(3, `기준선 불일치 — ${fpCheck.problems.join(' / ')}`);
   const want = { member_a: 'alive' };
+  // jwt-expired 는 앞뒤 모두 로그인 기록이 살아 있어야 한다(거절이 기록 종료가 아니라 JWT 만료 때문임을 가르려면)
   want[subject] = kind === 'jwt-expired' ? 'alive' : step === 'post' ? (kind === 'expired' ? 'expired' : 'gone') : 'alive';
   const sessionCheck = checkSessions(arg('--sessions-alive'), want);
-  const subjectExpect = kind === 'jwt-expired' ? { kind: 'jwt_expired' } : step === 'post' ? { kind: 'state_only', state: 'no_member' } : { kind: 'ok', account: 'a' };
+  const subjectExpect = jwtPost ? { kind: 'jwt_expired' } : kind !== 'jwt-expired' && step === 'post' ? { kind: 'state_only', state: 'no_member' } : { kind: 'ok', account: 'a' };
   const result = baseResult({
     phase: 'revoked', kind, step: step ?? null, fingerprint_check: fpCheck, session_check: sessionCheck, credentials: credentialsOut(),
-    meaning: kind === 'jwt-expired' ? 'JWT 자체가 만료됐다(로그인 기록은 살아 있다) — 함수에 들어오기 전에 거절된다' : step === 'post' ? `JWT 는 유효한데 로그인 기록이 ${kind === 'expired' ? 'not_after 만료로' : '로그아웃으로'} 끝났다 — 함수가 no_member 를 돌려준다` : '로그인 기록이 살아 있다 — 본인 정보가 온다',
+    subject_jwt: subjectFingerprint, pair_check: pairCheck,
+    meaning: jwtPost ? 'JWT 자체가 만료됐다(로그인 기록은 살아 있다) — 같은 JWT 가 만료 전에는 ok 였고(pre), 만료 뒤에는 만료를 사유로 함수에 들어오기 전에 거절된다' : kind === 'jwt-expired' ? '한 쌍의 앞쪽: 이 JWT 로 만료 전에 본인 정보가 온다. 같은 JWT 를 만료 시각이 지난 뒤 --step post --pre <이 결과> 로 다시 잰다' : step === 'post' ? `JWT 는 유효한데 로그인 기록이 ${kind === 'expired' ? 'not_after 만료로' : '로그아웃으로'} 끝났다 — 함수가 no_member 를 돌려준다` : '로그인 기록이 살아 있다 — 본인 정보가 온다',
   });
   const forbidden = forbiddenValues(expect);
   const cells = [];
@@ -533,7 +586,7 @@ function phaseCompare(kindOfCompare) {
   const result = { tool: 'b3p0 profile_matrix.mjs', phase: kindOfCompare === 'rows' ? 'rows-compare' : 'compare', request_count: 0, ignored_keys: ignore, same: differences.length === 0, differences };
   if (kindOfCompare === 'rows') {
     result.synthetic_user_rows = Array.isArray(a.users) ? a.users.length : null;
-    result.note = '합성 회원 행·대응 행·명부 행의 md5 와 회원 표·대응표 전체의 md5 가 앞뒤로 같은가(함수가 아무것도 고치지 않았는가)';
+    result.note = '대조표 전체의 앞뒤 불변: 대조표를 재기 전과 다 잰 뒤에 뜬 합성 회원 행·대응 행의 md5 와 회원 표·대응표·명부 전체의 md5 가 같은가. 호출 하나하나가 아무것도 고치지 않았다는 증거는 아니다(사이에 고쳐졌다가 되돌려진 것은 이 비교로 보이지 않는다)';
     if (!Array.isArray(a.users) || a.users.length === 0) { result.same = false; result.differences.push('앞 결과에 합성 회원 행이 없다(견줄 것이 없다)'); }
   }
   writeOut(result);
