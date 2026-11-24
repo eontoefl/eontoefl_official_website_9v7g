@@ -671,11 +671,24 @@
     // 공식 클라이언트의 알림·저장소의 변화(이 탭·다른 탭의 로그인·로그아웃·갱신) 뒤에 상태를 맞춘다
     // 여기서는 공식 클라이언트에 묻지 않고 저장된 로그인을 직접 본다 — 공식 클라이언트에 물으면 갱신이 일어날 수 있고,
     // 갱신의 알림이 다시 이 함수를 부르므로(기기의 시계가 틀린 경우 등) 갱신이 되풀이될 수 있다.
+    // 이 탭이 확인해 둔 것을 거둔다: 본인 정보·사이트 접근·표시를 더는 내주지 않는다.
+    // 서버의 로그인 기록·저장된 로그인 값·다른 로그인의 호환 값은 건드리지 않는다
+    // (새 모듈이 만든 호환 값은 그 로그인 기록의 것일 때만 정리한다 — clearCompat 의 규칙 그대로).
+    function withdraw(why, sid) {
+        verified = null;
+        clearCompat(sid === undefined ? null : sid);
+        setState('rejected', why);
+    }
+
     async function reconcile() {
         let present = true;
-        try { present = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { return; }
+        try { present = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) {
+            // 저장소를 읽지 못한다 → 무엇이 저장돼 있는지 모른다. 앞서 확인한 것을 그대로 믿지 않는다
+            if (state === 'signed_in') withdraw('unreadable', verified ? verified.sid : null);
+            return;
+        }
         const st = present ? storedSession() : null;
-        const s = st && typeof st.accessToken === 'string' ? { access_token: st.accessToken } : null;
+        const s = st && st.claims && typeof st.accessToken === 'string' ? { access_token: st.accessToken } : null;
         if (!present) {
             if (state === 'signed_in') {
                 const sid = verified ? verified.sid : null;
@@ -685,7 +698,11 @@
             }
             return;
         }
-        if (!s) return;                                            // 읽을 수 없는 값: 건드리지 않는다
+        if (!s) {
+            // 풀이할 수 없는 값이 저장돼 있다: 그 값은 건드리지 않는다. 다만 앞서 확인한 로그인이 지금도 그것이라고 볼 수 없다
+            if (state === 'signed_in') withdraw('unreadable', verified ? verified.sid : null);
+            return;
+        }
         const c = st.claims;
         if (verified && same(c, verified)) return;                 // 같은 로그인 기록(갱신 포함)
         if (!verified && same(c, lastRejected)) return;
@@ -787,8 +804,15 @@
             try { hasStored = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { hasStored = true; }
             if (hasStored) {
                 const st = storedSession();
-                if (!st || !st.claims) return { outcome: 'previous_unknown' };
-                if ((await boundEnd(st.claims)) !== 'ended') return { outcome: 'previous_unknown' };
+                if (!st || !st.claims) {
+                    if (state === 'signed_in') withdraw('unreadable', verified ? verified.sid : null);
+                    return { outcome: 'previous_unknown' };
+                }
+                if ((await boundEnd(st.claims)) !== 'ended') {
+                    // 끝났는지 모른다: 새 로그인을 보내지 않고, 이 탭이 그 로그인에 대해 확인해 둔 것도 거둔다
+                    if (same(verified, st.claims) || state === 'signed_in') { lastRejected = st.claims; withdraw('logout_unknown', st.claims.sid); }
+                    return { outcome: 'previous_unknown' };
+                }
                 if (same(verified, st.claims)) verified = null;
                 clearCompat(st.claims.sid);
             }
@@ -831,9 +855,23 @@
             // 이 탭이 알고 있는 로그인(확인했거나 방금 거절된 것)만 끝낸다
             const st = storedSession();
             const mine = verified || lastRejected;
-            if (!st || !st.claims || !same(st.claims, mine)) return { outcome: 'changed' };
+            if (!st || !st.claims || !same(st.claims, mine)) {
+                // 저장된 로그인이 이 탭이 확인한 것이 아니다(바뀌었거나 읽을 수 없다): 끝내지 않는다. 이 탭이 확인해 둔 것은 거둔다
+                const was = verified ? verified.sid : null;
+                lastRejected = null;
+                withdraw(st && st.claims ? 'session_changed' : 'unreadable', was);
+                if (st && st.claims) scheduleReconcile();         // 바뀐 로그인은 별도의 확인으로만
+                return { outcome: 'changed' };
+            }
             const e = await boundEnd(st.claims);
-            if (e !== 'ended') return { outcome: e === 'changed' ? 'changed' : 'unknown' };
+            if (e !== 'ended') {
+                // 실패·모름: 끝냈다고 하지 않는다. 그렇다고 "확인된 로그인"으로 남겨 두지도 않는다
+                // (서버의 로그인 기록과 저장된 로그인 값은 그대로 둔다)
+                lastRejected = e === 'changed' ? null : st.claims;
+                withdraw(e === 'changed' ? 'session_changed' : 'logout_unknown', st.claims.sid);
+                if (e === 'changed') scheduleReconcile();
+                return { outcome: e === 'changed' ? 'changed' : 'unknown' };
+            }
             verified = null;
             lastRejected = null;
             clearCompat(st.claims.sid);
@@ -908,8 +946,9 @@
             return typeof attempt === 'string' && state === 'signed_in' && !!verified && verified.sid === attempt && displayUserRaw() !== null;
         },
         // 확인된 본인 정보(my_profile 의 여섯 열)와 사이트 접근(my_site_access). 확인 전이면 null.
-        profile: function () { return state === 'signed_in' && verified ? Object.assign({}, verified.profile) : null; },
-        siteAccess: function () { return state === 'signed_in' && verified ? { allowed: true, is_admin: verified.isAdmin } : null; },
+        // (확인된 로그인이 지금도 저장된 그 로그인일 때만 — 저장값이 바뀌었거나 읽을 수 없으면 알림을 기다리지 않고 null)
+        profile: function () { return state === 'signed_in' && verified && storedIs(verified) ? Object.assign({}, verified.profile) : null; },
+        siteAccess: function () { return state === 'signed_in' && verified && storedIs(verified) ? { allowed: true, is_admin: verified.isAdmin } : null; },
         displayUserRaw: displayUserRaw,
         bindDisplay: bindDisplay,
         headersForGrade: headersForGrade,
