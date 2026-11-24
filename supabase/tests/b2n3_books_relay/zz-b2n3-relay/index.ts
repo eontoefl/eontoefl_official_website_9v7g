@@ -22,7 +22,10 @@
 //     판정 장애         → 503 과 고정 문구(RPC 오류·시간 초과·예상 밖 응답). 장애를 자격 거절로 바꿔 내지 않는다
 //   허용이면 서비스 열쇠로 그 객체를 가져오되 들어온 Range 를 그대로 전달하고, 응답을 모으지 않고 흘려보낸다.
 // 응답 머리글 X-B2n3-Judge 에 판정 결과를 적는다(측정 화면이 "이 함수가 낸 응답"임을 확인하는 데 쓴다).
+// 열쇠·자격이 실린 두 요청(판정 RPC, Storage)은 리디렉션을 따라가지 않는다(redirect: "manual"). 3xx 가 오면
+//   판정 장애(503) / 상류 오류(502)로 끝내고 로그에 사유를 적는다. 보호 본문은 나가지 않는다.
 // 로그: 요청마다 한 줄  b2n3 marker=… run=… doc=… m=… range=… judge=… status=… bytes=… ms=… end=…
+//   사전 요청(OPTIONS)도 한 줄 남긴다(m=OPTIONS judge=not_judged:preflight) — 브라우저에서는 사전 요청 수를 볼 수 없다.
 //   자격·열쇠는 적지 않는다.
 // =====================================================================
 
@@ -84,6 +87,9 @@ function loginTokenOf(req: Request): string | null {
 
 type Judge = { result: "allow" | "not_member" | "other_member" | "judge_error"; detail: string };
 
+// 리디렉션 응답인가(redirect: "manual" 로 받은 3xx. 실행 환경에 따라 상태가 가려진 opaqueredirect 로 올 수도 있다)
+const isRedirect = (r: Response) => r.type === "opaqueredirect" || (r.status >= 300 && r.status < 400);
+
 async function judge(cfg: Config, token: string): Promise<Judge> {
   let res: Response;
   try {
@@ -91,10 +97,15 @@ async function judge(cfg: Config, token: string): Promise<Judge> {
       method: "POST",
       headers: { "apikey": cfg.anonKey, "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "Accept": "application/json" },
       body: "{}",
+      redirect: "manual", // 자격이 실린 요청이다 — 다른 곳으로 따라가지 않는다
       signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS),
     });
   } catch (e) {
     return { result: "judge_error", detail: (e as Error)?.name === "TimeoutError" ? "rpc_timeout" : "rpc_network" };
+  }
+  if (isRedirect(res)) {
+    await res.body?.cancel().catch(() => {});
+    return { result: "judge_error", detail: `rpc_redirect_${res.status}` };
   }
   let text = "";
   try {
@@ -169,8 +180,6 @@ async function handler(req: Request): Promise<Response> {
     console.log("b2n3 bad_config status=500");
     return new Response("b2n3: bad config", { status: 500, headers: base });
   }
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-
   const url = new URL(req.url);
   const doc = url.searchParams.get("doc") ?? "";
   const run = url.searchParams.get("run") ?? "";
@@ -182,6 +191,10 @@ async function handler(req: Request): Promise<Response> {
     return new Response(body, { status, headers: { ...base, "X-B2n3-Judge": judgeText.split(":")[0] } });
   };
 
+  if (req.method === "OPTIONS") {
+    line("not_judged:preflight", 204, 0, "none"); // 사전 요청 수를 로그에서 세도록
+    return new Response(null, { status: 204, headers: cors });
+  }
   if (req.method !== "GET" && req.method !== "HEAD") return plain(405, "not_judged:method", null);
   const keys = [...url.searchParams.keys()];
   if (keys.length !== 2 || !DOCS.includes(doc) || !RUN_RE.test(run)) return plain(400, "not_judged:bad_request", null);
@@ -199,9 +212,14 @@ async function handler(req: Request): Promise<Response> {
   if (range !== null) upHeaders["Range"] = range;
   let up: Response;
   try {
-    up = await fetch(`${TEST_URL}/storage/v1/object/authenticated/${BUCKET}/${cfg.objects[doc]}`, { method: req.method, headers: upHeaders });
+    // 서비스 열쇠가 실린 요청이다 — 다른 곳으로 따라가지 않는다
+    up = await fetch(`${TEST_URL}/storage/v1/object/authenticated/${BUCKET}/${cfg.objects[doc]}`, { method: req.method, headers: upHeaders, redirect: "manual" });
   } catch {
     return plain(502, "allow:upstream_network", "b2n3: upstream error");
+  }
+  if (isRedirect(up)) {
+    await up.body?.cancel().catch(() => {});
+    return plain(502, `allow:upstream_redirect_${up.status}`, "b2n3: upstream error");
   }
   const out: Record<string, string> = { ...base, "X-B2n3-Judge": "allow" };
   for (const [from, to] of [["content-type", "Content-Type"], ["content-length", "Content-Length"], ["content-range", "Content-Range"], ["accept-ranges", "Accept-Ranges"]]) {
