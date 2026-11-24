@@ -72,8 +72,11 @@
 //   인자를 붙여 남을 고치려는 요청: 통과로 세는 거절은 둘뿐이다 — 함수를 찾지 못함(404·PGRST202) 또는 점검 거절(503·PT503).
 //     값이 왔으면(state·settings·answers) 기대와 다름, 2xx 거나 **예상한 거절 코드가 아닌 4xx 면 미확인**이다.
 //     남의 행이 고쳐지지 않았음은 rows-effect 가 본다.
-//   effect --step coercion: JSON true 가 아닌 값(글자 "true" · 숫자 1 등)이 동의로 받아들여져 동의 시각을 바꾸면 그 칸은 기대와 다름이다
-//     (결과의 json_true_only.holds 가 false — 인자의 형을 바꾸는 보완이 필요하다는 뜻).
+//   effect --step coercion: p_consent 에 JSON true 가 아닌 값 여덟(글자 "true" · 숫자 1 · "yes" · "t" · "false" · 0 · 배열 · 객체).
+//     3차부터 인자의 형이 jsonb 다 — **여덟 전부 400·PT400·invalid_consent 가 기대값이다.** 하나라도 동의로 받아들여지면
+//     그 칸은 기대와 다름이고 결과의 json_true_only.holds 가 false 다.
+//   JSON 의 형이 다른 값을 넣은 칸(종류에 참거짓·배열·객체, 답변에 "객체를 글자로 쓴 것"): 기대는 400·PT400 의 그 사유다.
+//     다른 거절(4xx)이면 미확인, 받아들여지면 기대와 다름.
 // 종료 값: 0 = 전부 통과 / 1 = 기대와 다름 또는 미확인이 있음 / 2 = 요청 전에 멈춤(주소·열쇠·자격·인자·로그인 기록) /
 //          3 = 기준선 불일치(지문·저장된 값이 그 단계의 전제와 맞지 않음)
 // =====================================================================
@@ -99,7 +102,7 @@ const FUNCS = {
   my_settings: { args: '', tag: 'b3c_settings', kind: 'read' },
   my_book_answers: { args: '', tag: 'b3c_answers', kind: 'read' },
   my_intro_track_set: { args: 'text', tag: 'b3c_track', kind: 'write' },
-  my_marketing_consent_set: { args: 'boolean', tag: 'b3c_consent', kind: 'write' },
+  my_marketing_consent_set: { args: 'jsonb', tag: 'b3c_consent', kind: 'write' }, // 3차: boolean → jsonb(JSON 의 형을 그대로 본다)
   my_book_answers_hold: { args: 'jsonb', tag: 'b3c_hold', kind: 'write' },
 };
 const FN_ORDER = ['my_settings', 'my_book_answers', 'my_intro_track_set', 'my_marketing_consent_set', 'my_book_answers_hold'];
@@ -594,7 +597,9 @@ function judge(expected, res, method, ctx) {
     }
     case 'invalid':
       out.observed_details = isObj && typeof j.details === 'string' ? j.details.slice(0, 40) : null; // 고정된 사유 이름이다(받은 값이 아니다)
-      if (res.status !== 400) bad(`상태 ${res.status} (기대 400)`);
+      // 형을 달리한 값의 칸(other_reject_is_unverified): 다른 거절(4xx)은 "누가 거절했는지 모른다" — 미확인으로 남긴다
+      if (expected.other_reject_is_unverified && !hasData && res.status >= 400 && res.status < 500 && !(res.status === 400 && out.code === 'PT400')) { out.verdict = 'unverified'; bad(`예상한 거절(400·PT400·${expected.message})이 아니다(${res.status}·${out.code}) — 무엇이 거절했는지 확인할 것`); }
+      else if (res.status !== 400) bad(`상태 ${res.status} (기대 400)`);
       else {
         if (out.code !== 'PT400') bad(`code 가 PT400 이 아니다(${out.code})`);
         if (!(isObj && j.message === expected.message)) bad(`message 가 ${expected.message} 가 아니다`);
@@ -1061,31 +1066,37 @@ async function phaseEffect() {
     result.meaning = '잘못된 값은 전부 거절되고(400·PT400 또는 404·PGRST202) 아무 열도 바뀌지 않는다(이 단계의 앞뒤 스냅숏이 같아야 한다)';
     const inv = (message, details) => ({ kind: 'invalid', message, details });
     for (const [label, v] of [['null', null], ['대문자', 'Regular'], ['빈 글자', ''], ['그 밖의 값', 'canada'], ['앞뒤 공백', ' regular'], ['숫자', 123]]) await run('member_a', 'my_intro_track_set', { p_track: v }, inv('invalid_track'), `POST {"p_track": ${label}}`);
+    // JSON 글자가 아닌 값: PostgREST 가 글자로 바꿔 넘겨도(참 → 'true', 배열 → '["regular"]') 허용 값 둘이 될 수 없다 — 전부 거절이어야 한다
+    for (const [label, v] of [['참', true], ['거짓', false], ['배열 ["regular"]', ['regular']], ['객체 {"p_track":"regular"}', { p_track: 'regular' }]]) await run('member_a', 'my_intro_track_set', { p_track: v }, { ...inv('invalid_track'), other_reject_is_unverified: true }, `POST {"p_track": ${label}} (JSON 글자가 아닌 값)`);
     await run('member_a', 'my_intro_track_set', {}, { kind: 'missing_arg' }, 'POST {} (인자 없음)');
     for (const [label, v] of [['false', false], ['null', null]]) await run('member_a', 'my_marketing_consent_set', { p_consent: v }, inv('invalid_consent'), `POST {"p_consent": ${label}}`);
     await run('member_a', 'my_marketing_consent_set', {}, { kind: 'missing_arg' }, 'POST {} (인자 없음)');
     await run('member_a', 'my_book_answers_hold', {}, { kind: 'missing_arg' }, 'POST {} (인자 없음)');
     for (const c of invalidHoldCases('a')) await run('member_a', 'my_book_answers_hold', c.body, c.expected, `POST {p_answers: ${c.label}}`);
+    // 올바른 열두 항목의 객체를 "글자로 쓴 것"(JSON 글자): 객체로 풀어 받으면 안 된다 — 객체가 아니므로 거절
+    await run('member_a', 'my_book_answers_hold', { p_answers: JSON.stringify(holdPayload('a', 'rejstr')) }, { ...inv('invalid_answers', 'not_object'), other_reject_is_unverified: true }, 'POST {p_answers: 올바른 한 벌을 글자로 쓴 것(JSON 글자)}');
     // 남을 겨냥한 것: B 의 번호를 답변 안에 넣음(위의 member_id 경우와 같은 규칙), B 가 A 를 겨냥
     await run('member_b', 'my_book_answers_hold', { p_answers: { ...holdPayload('b', 'rej'), id: expect.accounts.a.member.id } }, inv('invalid_answers', 'unknown_key'), 'POST {p_answers: 열두 항목 + "id": <A 의 회원번호>}');
     await run('member_b', 'my_marketing_consent_set', { p_consent: false }, inv('invalid_consent'), 'POST {"p_consent": false} (B — 철회는 없다)');
   } else if (step === 'coercion') {
     // PostgREST 가 JSON 값을 boolean 으로 어떻게 바꾸는지 모른다(글자 "true", 숫자 1 등). 관측해서 적는다.
-    // 계약은 "참만"이다. JSON 의 true 가 아닌 값(글자 "true" · 숫자 1 등)이 동의로 받아들여져 동의 시각을 바꾸면 **통과가 아니다**.
-    result.meaning = 'p_consent 에 JSON true 가 아닌 값(글자·숫자)을 넣는다. 하나라도 동의로 받아들여지면(200 ok — 동의 시각이 새로 쓰인다) "JSON 참만"은 통과가 아니다(그 칸은 기대와 다름). 그 경우 인자의 형을 바꾸는 보완이 필요하다. 받아들여진 효과(A 의 동의 시각)는 expected_effects 에 반영된다 — rows-effect 는 그 효과가 A 의 그 열에만 있는지를 본다';
-    for (const [label, v] of [['글자 "true"', 'true'], ['숫자 1', 1], ['글자 "yes"', 'yes'], ['글자 "t"', 't'], ['글자 "false"', 'false'], ['숫자 0', 0]]) {
+    // 계약은 "참만"이다. 3차부터 인자의 형이 jsonb 라 함수가 JSON 의 형을 그대로 본다 — JSON 의 true 가 아닌 값은
+    // **전부 400·PT400·invalid_consent 로 거절되는 것이 기대값**이다. 하나라도 동의로 받아들여져 동의 시각을 바꾸면 통과가 아니다.
+    result.meaning = 'p_consent 에 JSON true 가 아닌 값 여덟(글자 · 숫자 · 배열 · 객체)을 넣는다. 여덟 전부 400·PT400·invalid_consent 로 거절돼야 한다(인자의 형이 jsonb — 함수가 JSON 의 형을 그대로 본다). 하나라도 동의로 받아들여지면(200 ok — 동의 시각이 새로 쓰인다) "JSON 참만"은 통과가 아니다. 받아들여진 효과가 있으면 expected_effects 에 반영된다 — rows-effect 는 그 효과가 A 의 그 열에만 있는지를 본다';
+    const wantReject = { kind: 'invalid', message: 'invalid_consent' };
+    for (const [label, v] of [['글자 "true"', 'true'], ['숫자 1', 1], ['글자 "yes"', 'yes'], ['글자 "t"', 't'], ['글자 "false"', 'false'], ['숫자 0', 0], ['배열 [true]', [true]], ['객체 {"value":true}', { value: true }]]) {
       const res = await call('member_a', 'my_marketing_consent_set', 'POST', { p_consent: v });
       const accepted = res.status === 200 && res.json && res.json.state === 'ok';
-      const exp = accepted ? { ...okConsent(), kind: 'ok' } : { kind: 'observe' };
-      const cell = cellOf(++no, 'member_a', 'my_marketing_consent_set', 'POST', `POST {"p_consent": ${label}}`, { kind: 'observe' }, judge(exp, res, 'POST', { forbidden, owner: 'a' }));
-      cell.expect_text = 'JSON true 가 아닌 값이다 — 거절(4xx)이어야 한다. 동의로 받아들여지면 기대와 다름';
+      // 받아들여졌으면 실제로 쓰인 것이다 — 응답의 시각을 장부에 적으려고 ok 의 모양으로 읽고, 판정은 아래에서 기대와 다름으로 바꾼다
+      const exp = accepted ? { ...okConsent(), kind: 'ok' } : wantReject;
+      const cell = cellOf(++no, 'member_a', 'my_marketing_consent_set', 'POST', `POST {"p_consent": ${label}}`, wantReject, judge(exp, res, 'POST', { forbidden, owner: 'a' }));
       cell.observed = accepted ? '받아들여짐(200 ok — 참으로 바뀌어 넘어갔고 동의 시각이 새로 쓰였다)' : `거절(${res.status}·${cell.code})`;
       applyReturned(ledger, 'a', 'my_marketing_consent_set', cell); // 효과는 판정을 바꾸기 전에 장부에 적는다(실제로 쓰였으므로)
       if (accepted) { cell.verdict = 'mismatch'; cell.problems.push('JSON true 가 아닌 값이 동의로 받아들여져 동의 시각을 바꿨다 — "JSON 참만"이 아니다'); }
       cells.push(cell);
     }
     result.accepted_non_boolean = cells.filter((c) => c.observed.startsWith('받아들여짐')).map((c) => c.request);
-    result.json_true_only = { holds: result.accepted_non_boolean.length === 0, accepted: result.accepted_non_boolean, meaning: result.accepted_non_boolean.length === 0 ? 'JSON true 가 아닌 값은 하나도 동의로 받아들여지지 않았다' : '"JSON 참만"이 아니다 — 인자의 형(boolean)을 바꾸는 보완이 필요하다(브레인방 판단)' };
+    result.json_true_only = { holds: result.accepted_non_boolean.length === 0, accepted: result.accepted_non_boolean, all_rejected_with_invalid_consent: cells.every((c) => c.verdict === 'pass' && c.http_status === 400 && c.code === 'PT400'), meaning: result.accepted_non_boolean.length === 0 ? 'JSON true 가 아닌 값은 하나도 동의로 받아들여지지 않았다' : '"JSON 참만"이 아니다 — JSON true 가 아닌 값이 동의로 받아들여졌다(인자의 형이 jsonb 인데도 — 함수의 본문이나 적용된 판을 확인할 것)' };
   } else if (step === 'race') {
     // 두 창: A 가 서로 다른 두 벌을 동시에 보낸다. 남은 것이 둘 중 한 벌 "전체"인가(항목이 섞이지 않았는가)
     const rounds = 5; const winners = [];
