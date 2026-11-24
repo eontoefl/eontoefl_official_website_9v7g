@@ -1,0 +1,1083 @@
+// 화면 시험 실행기 (보안작업 묶음2 계약 3A) — 실제 브라우저(Chromium)로 절차를 돌린다.
+//
+//   node tests/auth-session/screen.mjs --fake            가짜 서버(fake-supabase.mjs)를 상대로 — 작업방이 돌리는 것
+//   node tests/auth-session/screen.mjs --real            시험 프로젝트(hmncdheiwqwekdbtijar)를 상대로 — 브레인방만
+//   [--out 결과.json] [--only P,1,9] [--pause-timeout-ms 600000] [--headed]
+//
+// 환경 변수
+//   B3A_PLAYWRIGHT   playwright-core 폴더의 경로            B3A_CHROMIUM   chrome.exe 의 경로      (둘 다 필수. 설치·내려받기를 하지 않는다)
+//   --real 일 때: B3A_TEST_URL(정확히 시험 프로젝트의 주소), B3A_TEST_ANON_KEY(시험 프로젝트의 anon 키),
+//                B3A_PW(합성 계정 공통 비밀번호), B3A_EMAIL_A·_B·_BLK·_WD·_N·_G·_GM, B3A_CONTROL_SECRET(16자 이상), [B3A_CONTROL_PORT]
+//
+// 지키는 것
+//   * 모든 요청(새 창·화면 이동·폼·리디렉션 포함)이 차단기(request-log.mjs)의 결정을 거친 뒤에만 나간다.
+//     브라우저는 127.0.0.1 말고는 이름을 풀지 못하게 띄운다 — 시험 프로젝트로 가는 요청은 차단기를 지난 뒤 이 실행기가 대신 내보낸다.
+//     리디렉션 응답은 브라우저에 넘기지 않고 다음 주소를 차단기로 다시 가른다. 서비스 워커는 끈다.
+//   * 차단기를 붙이지 못하면 아무 화면도 열지 않는다. playwright-core·Chromium 을 쓸 수 없으면 종료한다(다른 방식으로 넘어가지 않는다).
+//   * 경우마다 디스크에 남지 않는 새 브라우저 상태(context). 추적·HAR·상태 내보내기·화면 캡처를 하지 않는다.
+//   * 비밀번호·이메일·JWT·갱신값을 출력·파일에 쓰지 않는다. 결과에는 정해 둔 판정값·이름·수만 적는다.
+//   * --fake 에서는 시험 프로젝트·바깥으로 나가는 연결이 0 이어야 한다(실행기가 연 연결도 센다).
+
+import fs from 'node:fs';
+import net from 'node:net';
+import dns from 'node:dns';
+import http from 'node:http';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+
+import { TEST_URL, TEST_REF, CONFIG_FILE, readProdConfig } from './rewrite.mjs';
+import { createCore, makeIgnore } from './serve-core.mjs';
+import { makeDecider, summarize } from './request-log.mjs';
+import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback; };
+const flag = (name) => process.argv.includes(name);
+function stop(message) { console.error('중단: ' + message); process.exit(2); }
+
+const FAKE = flag('--fake');
+const REAL = flag('--real');
+if (FAKE === REAL) stop('--fake 또는 --real 중 하나를 주세요');
+const ONLY = arg('--only') ? new Set(arg('--only').split(',')) : null;
+const PAUSE_TIMEOUT = Number(arg('--pause-timeout-ms', '600000'));
+const OUT = path.resolve(arg('--out', path.join(ROOT, 'tests', 'auth-session', '.run', `screen-${FAKE ? 'fake' : 'real'}.json`)));
+
+// ---------------------------------------------------------------------------
+// 환경
+// ---------------------------------------------------------------------------
+const ACCOUNT_KEYS = ['A', 'B', 'BLK', 'WD', 'N', 'G', 'GM'];
+const FAKE_ACCOUNTS = {
+    A: { member: 'ok', name: '합성 회원 A' }, B: { member: 'ok', name: '합성 회원 B' }, BLK: { member: 'blocked' }, WD: { member: 'withdrawal' },
+    N: { member: 'none' }, G: { member: 'none', admin: true }, GM: { member: 'ok', admin: true, name: '합성 관리자 GM' },
+};
+let ANON;
+let PW;
+const EMAIL = {};
+let CONTROL_SECRET;
+if (FAKE) {
+    ANON = fakeJwt({ role: 'anon', ref: TEST_REF, fake: true });      // 가짜 공개 키(서명 자리는 고정 글자)
+    PW = 'zz-' + crypto.randomBytes(9).toString('hex');
+    for (const k of ACCOUNT_KEYS) EMAIL[k] = `zzb3a_${k.toLowerCase()}@member.zz.invalid`;
+    CONTROL_SECRET = crypto.randomBytes(24).toString('hex');
+} else {
+    if (process.env.B3A_TEST_URL !== TEST_URL) stop(`B3A_TEST_URL 이 시험 프로젝트의 주소(${TEST_URL})와 정확히 같지 않음`);
+    ANON = process.env.B3A_TEST_ANON_KEY || '';
+    let claims = null;
+    try { claims = JSON.parse(Buffer.from(ANON.split('.')[1], 'base64url').toString('utf8')); } catch (e) { claims = null; }
+    if (!claims || claims.ref !== TEST_REF || claims.role !== 'anon') stop('B3A_TEST_ANON_KEY 가 시험 프로젝트의 anon 키가 아님');
+    PW = process.env.B3A_PW || '';
+    if (PW.length < 8) stop('B3A_PW 가 없거나 너무 짧음');
+    for (const k of ACCOUNT_KEYS) { EMAIL[k] = process.env['B3A_EMAIL_' + k] || ''; if (!/^[^@\s]+@[^@\s]+$/.test(EMAIL[k])) stop('B3A_EMAIL_' + k + ' 가 없음'); }
+    CONTROL_SECRET = process.env.B3A_CONTROL_SECRET || '';
+    if (CONTROL_SECRET.length < 16) stop('B3A_CONTROL_SECRET 이 없거나 16자보다 짧음(실행마다 새로 만든 값)');
+}
+const SECRETS = [PW, ANON, CONTROL_SECRET, ...Object.values(EMAIL)];
+
+const pwPath = process.env.B3A_PLAYWRIGHT;
+const chromePath = process.env.B3A_CHROMIUM;
+if (!pwPath || !fs.existsSync(pwPath)) stop('B3A_PLAYWRIGHT(playwright-core 폴더)가 없음 — 이 실행기는 설치·내려받기를 하지 않는다');
+if (!chromePath || !fs.existsSync(chromePath)) stop('B3A_CHROMIUM(chrome.exe)이 없음 — 이 실행기는 설치·내려받기를 하지 않는다');
+let chromium;
+try { chromium = createRequire(import.meta.url)(pwPath).chromium; } catch (e) { chromium = null; }
+if (!chromium || typeof chromium.launch !== 'function') stop('playwright-core 를 쓸 수 없음 — 같은 보호를 입증하지 못한 다른 방식으로 넘어가지 않고 종료한다');
+
+// ---------------------------------------------------------------------------
+// 실행기가 여는 연결도 막고 센다: 127.0.0.1 과(--real 일 때만) 시험 프로젝트
+// ---------------------------------------------------------------------------
+const egress = { local: 0, testProject: 0, blocked: 0 };
+{
+    const LOCAL = new Set(['127.0.0.1', 'localhost', '::1']);
+    const testHost = new URL(TEST_URL).hostname;
+    const classify = (host) => (LOCAL.has(host) ? 'local' : (REAL && host === testHost ? 'testProject' : 'blocked'));
+    const origConnect = net.Socket.prototype.connect;
+    net.Socket.prototype.connect = function (...args) {
+        let host = 'localhost';
+        let pipe = false;
+        const first = Array.isArray(args[0]) ? args[0][0] : args[0];
+        if (first && typeof first === 'object') { if (first.path) pipe = true; host = first.host || first.hostname || 'localhost'; }
+        else if (typeof first === 'string') pipe = true;
+        else if (typeof args[1] === 'string') host = args[1];
+        const kind = pipe ? 'local' : classify(String(host));
+        egress[kind]++;
+        if (kind === 'blocked') { process.nextTick(() => this.destroy(new Error('b3a: 허용 밖 연결을 막음'))); return this; }
+        return origConnect.apply(this, args);
+    };
+    const origLookup = dns.lookup;
+    dns.lookup = function (hostname, ...rest) {
+        if (classify(String(hostname)) === 'blocked') {
+            egress.blocked++;
+            const cb = rest[rest.length - 1];
+            if (typeof cb === 'function') process.nextTick(() => cb(Object.assign(new Error('b3a: 허용 밖 이름 풀이를 막음'), { code: 'ENOTFOUND' })));
+            return {};
+        }
+        return origLookup.call(this, hostname, ...rest);
+    };
+}
+
+// ---------------------------------------------------------------------------
+// 로컬 서버 둘(켜짐·꺼짐)과 제어 포트 — 전부 127.0.0.1
+// ---------------------------------------------------------------------------
+const tracked = execFileSync('git', ['-c', 'core.quotepath=false', 'ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(Boolean);
+let ignoreText = '';
+try { ignoreText = fs.readFileSync(path.join(ROOT, '.vercelignore'), 'utf8'); } catch (e) { ignoreText = ''; }
+const ignored = makeIgnore(ignoreText);
+const files = tracked.filter((f) => !ignored(f) && !f.startsWith('.'));
+const prod = readProdConfig(fs.readFileSync(path.join(ROOT, CONFIG_FILE), 'utf8'));
+const readFile = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel)); } catch (e) { return null; } };
+
+async function startSite(mode) {
+    const server = http.createServer();
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = server.address().port;
+    const core = createCore({ files, readFile, mode, testKey: ANON, port, prod, log: null });
+    server.on('request', (req, res) => {
+        const chunks = [];
+        req.on('data', (c) => { if (chunks.length < 64) chunks.push(c); });
+        req.on('end', () => {
+            let out;
+            try { out = core.respond({ method: req.method, url: req.url, body: Buffer.concat(chunks) }); } catch (e) { out = { status: 500, headers: {}, body: Buffer.alloc(0) }; }
+            res.writeHead(out.status, out.headers);
+            res.end(out.body);
+        });
+    });
+    return { server, core, origin: `http://127.0.0.1:${port}` };
+}
+
+// 제어 포트: 브레인방이 사이에 끼어야 하는 단계에서 멈춰 기다린다.
+// 127.0.0.1 이라는 것은 권한 확인이 아니다 — 실행마다의 비밀과 그 멈춤의 일회용 단계 번호가 둘 다 맞는 명령만 받는다.
+const control = { server: null, port: 0, waiting: null, arrivals: 0, rejected: 0 };
+function secretOk(value) {
+    const a = Buffer.from(String(value || ''));
+    const b = Buffer.from(CONTROL_SECRET);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+async function startControl() {
+    control.server = http.createServer((req, res) => {
+        control.arrivals++;
+        const chunks = [];
+        let size = 0;
+        req.on('data', (c) => { size += c.length; if (size <= 262144) chunks.push(c); });
+        req.on('end', () => {
+            const reply = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
+            if (!secretOk(req.headers['x-b3a-secret'])) { control.rejected++; return reply(403, { error: 'forbidden' }); }
+            const u = new URL(req.url, 'http://127.0.0.1');
+            if (req.method === 'GET' && u.pathname === '/wait') {
+                const w = control.waiting;
+                return reply(200, { waiting: w ? { step: w.step, kind: w.kind, info: w.info, needsRevert: w.needsRevert } : null });
+            }
+            if (req.method === 'POST' && u.pathname === '/continue') {
+                const w = control.waiting;
+                if (!w || String(w.step) !== u.searchParams.get('step')) { control.rejected++; return reply(409, { error: 'no-such-step' }); }
+                let body = null;
+                if (size > 262144) return reply(413, { error: 'too-large' });
+                try { body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null; } catch (e) { return reply(400, { error: 'bad-json' }); }
+                control.waiting = null;
+                w.resolve(body);
+                return reply(200, { ok: true });
+            }
+            control.rejected++;
+            return reply(404, { error: 'not-found' });
+        });
+    });
+    const wanted = Number(process.env.B3A_CONTROL_PORT || 0);
+    await new Promise((resolve) => control.server.listen(wanted, '127.0.0.1', resolve));
+    control.port = control.server.address().port;
+}
+
+class PauseTimeout extends Error {}
+let pendingRevert = null;       // 브레인방이 건 DB 변경이 남아 있을 수 있는 멈춤의 이름
+// kind: 정해 둔 이름. info: 비밀이 아닌 식별값(로그인 기록 번호·계정 이름표). 돌려주는 값: 브레인방이 보낸 본문(없으면 null)
+function pause(kind, info, { needsRevert = false, revertOf = null } = {}) {
+    return new Promise((resolve, reject) => {
+        const step = crypto.randomInt(100000, 999999999);
+        const timer = setTimeout(() => {
+            if (control.waiting && control.waiting.step === step) control.waiting = null;
+            reject(new PauseTimeout(kind));
+        }, PAUSE_TIMEOUT);
+        control.waiting = { step, kind, info: info || {}, needsRevert, resolve: (body) => {
+            clearTimeout(timer);
+            if (needsRevert) pendingRevert = kind;
+            if (revertOf && pendingRevert === revertOf) pendingRevert = null;
+            resolve(body);
+        } };
+        console.log(`  [멈춤] ${kind} — 제어 포트 ${control.port} 에서 기다림(단계 번호는 GET /wait 로)`);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// --fake: 가짜 서버와, 브레인방 구실을 하는 가짜 조작자(제어 포트로 답한다)
+// ---------------------------------------------------------------------------
+let fake = null;
+const fakeNotes = { otherSession: null };
+function setupFake() {
+    fake = new FakeSupabase({ origin: TEST_URL, anonKey: ANON, now: () => Date.now() });
+    for (const k of ACCOUNT_KEYS) {
+        const a = FAKE_ACCOUNTS[k];
+        fake.addAccount({
+            email: EMAIL[k], password: PW, authId: 'auth-' + k, member: a.member, admin: !!a.admin,
+            profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: EMAIL[k], phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
+        });
+    }
+    fake.business = () => ({ status: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' });
+}
+function controlCall(method, pathAndQuery, body) {
+    return new Promise((resolve) => {
+        const req = http.request({ host: '127.0.0.1', port: control.port, method, path: pathAndQuery, headers: { 'x-b3a-secret': CONTROL_SECRET, 'Content-Type': 'application/json' } }, (res) => {
+            const chunks = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch (e) { resolve(null); } });
+        });
+        req.on('error', () => resolve(null));
+        if (body !== undefined) req.write(JSON.stringify(body));
+        req.end();
+    });
+}
+async function fakeOperator() {
+    for (;;) {
+        await sleep(150);
+        if (!control.server) return;
+        const r = await controlCall('GET', '/wait');
+        const w = r && r.waiting;
+        if (!w) continue;
+        let body = null;
+        const bySid = (sid) => fake.sessions.get(sid);
+        if (w.kind === 'other-session-create') fakeNotes.otherSession = fake.createSession(EMAIL[w.info.account]);
+        else if (w.kind === 'check-logout-scope') {
+            const ended = bySid(w.info.ended);
+            body = { result: ended && !ended.alive && fakeNotes.otherSession && fakeNotes.otherSession.alive ? 'ok' : 'differs' };
+        } else if (w.kind === 'check-records-intact') {
+            body = { result: (w.info.sids || []).every((sid) => bySid(sid) && bySid(sid).alive) ? 'ok' : 'differs' };
+        } else if (w.kind === 'expire-session') fake.endSession(bySid(w.info.sid), 'session_expired');
+        else if (w.kind === 'restore-session') { const s = bySid(w.info.sid); if (s) { s.alive = true; s.endCode = null; } }
+        else if (w.kind === 'maintenance-on') { fake.maintenance = true; fake.maintenanceExcept = new Set(['auth-A']); }
+        else if (w.kind === 'maintenance-off') { fake.maintenance = false; fake.maintenanceExcept = new Set(); }
+        else if (w.kind === 'provide-session') body = { session: fake.tokenBody(fake.createSession(EMAIL[w.info.account], { aal: w.info.aal })) };
+        await controlCall('POST', '/continue?step=' + w.step, body === null ? undefined : body);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 브라우저 안에 넣는 관찰 장치(화면이 뜨기 전에): 표시의 시각, 저장소 접근 횟수(키의 무리 이름만), 되살아난 화면
+// ---------------------------------------------------------------------------
+const INIT_SCRIPT = `(() => {
+  if (window.__b3a) return;
+  const b = window.__b3a = { last: { name: -1, adminLink: -1, adminBtn: -1, studentBtn: -1, materials: -1 }, persistedAt: -1, shows: 0 };
+  const shown = (el) => !!el && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
+  b.sample = () => {
+    const out = { name: false, adminLink: false, adminBtn: false, studentBtn: false, materials: false };
+    try {
+      const menu = document.getElementById('authMenu');
+      out.name = !!(menu && menu.querySelector('a[href="my-dashboard.html"], a[href="admin-dashboard.html"]'));
+      out.adminLink = !!(menu && menu.querySelector('a[href="admin-dashboard.html"]'));
+      out.adminBtn = shown(document.getElementById('adminDashboardBtn'));
+      out.studentBtn = shown(document.getElementById('studentDashboardBtn'));
+      out.materials = [...document.querySelectorAll('a[href="materials.html"], a[href="materials.html?id"]')].some(shown);
+    } catch (e) {}
+    const now = performance.now();
+    for (const k of Object.keys(out)) if (out[k]) b.last[k] = now;
+    return out;
+  };
+  const tickFrame = () => { b.sample(); requestAnimationFrame(tickFrame); };
+  requestAnimationFrame(tickFrame);
+  setInterval(b.sample, 100);
+  const watch = () => { try { new MutationObserver(b.sample).observe(document.documentElement, { subtree: true, childList: true, attributes: true }); } catch (e) {} b.sample(); };
+  if (document.documentElement) watch(); else document.addEventListener('readystatechange', watch, { once: true });
+  window.addEventListener('pageshow', (ev) => { b.shows++; if (ev.persisted) { b.persistedAt = performance.now(); } try { window.__b3aEvent(ev.persisted ? 'pageshow-persisted' : 'pageshow-normal'); } catch (e) {} }, true);
+  // 저장소 접근 횟수: 키는 정해 둔 무리 이름으로만 센다(값은 보지 않는다)
+  const bucket = (k) => { k = String(k);
+    if (k === 'iontoefl_user' || k === 'iontoefl_login_time' || k === 'eon_book_auth_v1' || k === 'eon_auth_v1' || k === 'eon_auth_v1:compat') return k;
+    if (/^sb-.*-auth-token$/.test(k)) return 'followup';
+    if (k.indexOf('eon_auth_v1') === 0) return 'eon_auth_other';
+    return 'other'; };
+  const P = Storage.prototype;
+  b.rawGet = P.getItem;
+  for (const op of ['getItem', 'setItem', 'removeItem']) {
+    const orig = P[op];
+    P[op] = function (k) { if (this === window.localStorage) { try { window.__b3aCount(bucket(k), op); } catch (e) {} } return orig.apply(this, arguments); };
+  }
+  const origClear = P.clear;
+  P.clear = function () { if (this === window.localStorage) { try { window.__b3aCount('all', 'clear'); } catch (e) {} } return origClear.apply(this, arguments); };
+})();`;
+
+const MESSAGES = {
+    success: '로그인 성공! 환영합니다.',
+    wrong: '이메일 또는 비밀번호가 일치하지 않습니다.',
+    blocked: '🚫 차단된 계정입니다.\n\n관리자에게 문의해주세요.',
+    withdrawal: '탈퇴 처리 중인 계정입니다.',
+    maintenance: '지금은 점검 중입니다. 잠시 뒤 다시 시도해주세요.',
+    legacy: '기존 방식의 로그인 상태가 있습니다. 기존 방식에서 로그아웃한 뒤 다시 로그인해 주세요.',
+    error: '로그인 중 오류가 발생했습니다. 다시 시도해주세요.',
+    rate: '요청이 많습니다. 잠시 뒤 다시 시도해주세요.',
+    previous: '이전 로그인을 끝내지 못했습니다. 잠시 뒤 다시 시도해주세요.',
+    moved: '로그인 상태가 바뀌었습니다. 다시 로그인해 주세요.',
+    logoutConfirm: '로그아웃 하시겠습니까?',
+    logoutDone: '로그아웃되었습니다.',
+    logoutUnknown: '로그아웃을 확인하지 못했습니다. 잠시 뒤 다시 시도해주세요.',
+};
+const messageId = (text) => { for (const [id, t] of Object.entries(MESSAGES)) if (t === text) return id; return 'other'; };
+const STATES = ['off', 'signed_out', 'restoring', 'signed_in', 'rejected'];
+const REASONS = [null, 'blocked', 'withdrawal_pending', 'no_member', 'not_allowed', 'maintenance', 'network', 'rate_limited', 'expired', 'ended',
+    'session_changed', 'legacy_present', 'unexpected', 'token_shape', 'unavailable', 'storage', 'error'];
+const PROFILE_KEYS = ['id', 'name', 'nickname', 'email', 'phone', 'timezone'];
+const KEY_BUCKETS = ['iontoefl_user', 'iontoefl_login_time', 'eon_book_auth_v1', 'eon_auth_v1', 'eon_auth_v1:compat', 'followup', 'eon_auth_other', 'other'];
+const bucketOf = (k) => (KEY_BUCKETS.includes(k) ? k : (/^sb-.*-auth-token$/.test(k) ? 'followup' : (k.startsWith('eon_auth_v1') ? 'eon_auth_other' : 'other')));
+
+// ---------------------------------------------------------------------------
+// 브라우저와 경우 하나의 환경
+// ---------------------------------------------------------------------------
+let browser = null;
+let ON = '';
+let OFF = '';
+let siteOn = null;
+let siteOff = null;
+let decide = null;
+const STATIC_BODY = { stylesheet: 'text/css', font: 'font/woff2', image: 'image/png' };
+
+async function newCx(id) {
+    const context = await browser.newContext({ serviceWorkers: 'block' });      // 디스크에 남지 않는 새 상태
+    const cx = { id, context, records: [], hooks: {}, dialogs: [], store: {}, events: [], seen: { profileKeysOk: null, sids: {}, names: {}, lastLoginSid: null, states: [] }, account: null };
+    await context.exposeBinding('__b3aCount', (src, bucket, op) => {
+        if (!KEY_BUCKETS.includes(bucket) && bucket !== 'all') return;
+        if (!['getItem', 'setItem', 'removeItem', 'clear'].includes(op)) return;
+        cx.store[bucket] = cx.store[bucket] || { getItem: 0, setItem: 0, removeItem: 0, clear: 0 };
+        cx.store[bucket][op]++;
+    });
+    await context.exposeBinding('__b3aEvent', (src, name) => { if (name === 'pageshow-persisted' || name === 'pageshow-normal') cx.events.push(name); });
+    await context.addInitScript(INIT_SCRIPT);
+    // 차단기: context 단위로, 첫 화면을 열기 전에. 붙이지 못하면(예외) 이 경우는 아무 화면도 열지 않는다.
+    await context.route('**/*', (route) => handleRoute(route, cx).catch(() => route.abort('blockedbyclient').catch(() => {})));
+    context.on('page', (page) => page.on('dialog', (d) => { cx.dialogs.push(messageId(d.message())); d.accept().catch(() => {}); }));
+    cx.page = () => context.newPage();
+    return cx;
+}
+
+// 응답에서 정해 둔 것만 본다(본문을 기록하지 않는다)
+function observe(cx, rec, out) {
+    let body = null;
+    try { body = JSON.parse(Buffer.isBuffer(out.body) ? out.body.toString('utf8') : String(out.body || '')); } catch (e) { body = null; }
+    rec.status = [200, 204, 400, 401, 403, 404, 405, 409, 429, 500, 503].includes(out.status) ? out.status : (out.status >= 500 ? 500 : (out.status >= 400 ? 400 : 200));
+    if (!body || typeof body !== 'object') return;
+    if ((rec.target === 'login' || rec.target === 'refresh') && out.status === 200 && typeof body.access_token === 'string') {
+        try {
+            const c = JSON.parse(Buffer.from(body.access_token.split('.')[1], 'base64url').toString('utf8'));
+            if (typeof c.session_id === 'string') { cx.seen.lastLoginSid = c.session_id; cx.seen.sids[cx.account || '?'] = c.session_id; rec.hasSessionId = true; } else rec.hasSessionId = false;
+        } catch (e) { rec.hasSessionId = false; }
+    }
+    if (rec.target === 'my_profile' && out.status === 200) {
+        const state = ['ok', 'no_member', 'blocked', 'withdrawal_pending'].includes(body.state) ? body.state : 'other';
+        rec.profileState = state;
+        cx.seen.states.push(state);
+        const keys = Object.keys(body).concat(body.profile && typeof body.profile === 'object' ? Object.keys(body.profile) : []);
+        const ok = Object.keys(body).every((k) => k === 'state' || k === 'profile') &&
+            (state !== 'ok' ? Object.keys(body).length === 1 : Object.keys(body.profile || {}).every((k) => PROFILE_KEYS.includes(k))) &&
+            !keys.some((k) => /pass|pw|secret|hash/i.test(k));
+        cx.seen.profileKeysOk = cx.seen.profileKeysOk === false ? false : ok;
+        if (state === 'ok' && body.profile && typeof body.profile.name === 'string') cx.seen.names[cx.account || '?'] = body.profile.name;
+    }
+    if (rec.target === 'my_site_access' && out.status === 200) { rec.allowed = body.allowed === true; rec.isAdmin = body.is_admin === true; }
+}
+
+const CORS = { 'access-control-allow-origin': '*', 'access-control-expose-headers': '*' };
+async function handleRoute(route, cx) {
+    const r = route.request();
+    let headers;
+    try { headers = await r.allHeaders(); } catch (e) { headers = r.headers(); }
+    const d = decide({ url: r.url(), method: r.method(), headers, postData: r.postData(), resourceType: r.resourceType(), isNavigation: r.isNavigationRequest() });
+    const rec = d.record;
+    rec.sent = false;
+    cx.records.push(rec);
+    if (d.action === 'abort') return route.abort('blockedbyclient');
+    if (rec.where === 'local') return route.continue();                        // data:·blob:·about: — 네트워크로 나가지 않는다
+    if (rec.where === 'static-allowed') {                                       // 허용 목록의 정적 자원: 보내지 않고 빈 응답(화면 시험에 필요 없다)
+        rec.how = 'fulfilled-empty';
+        return route.fulfill({ status: 200, contentType: STATIC_BODY[rec.type] || 'text/plain', body: '' });
+    }
+    if (rec.where === 'self') {
+        const resp = await route.fetch({ maxRedirects: 0 });
+        rec.sent = true;
+        if (resp.status() >= 300 && resp.status() < 400) {
+            // 리디렉션은 브라우저에 넘기지 않는다: 다음 주소를 차단기로 다시 가른다
+            let next = '';
+            try { next = new URL(resp.headers().location || '', r.url()).href; } catch (e) { next = ''; }
+            const d2 = decide({ url: next, method: 'GET', headers: {}, postData: null, resourceType: r.resourceType(), isNavigation: r.isNavigationRequest() });
+            d2.record.redirectHop = true;
+            d2.record.sent = false;
+            d2.record.aborted = true;           // 허용되는 다음 주소라도 이 실행기는 리디렉션을 따라가지 않는다(이 조각에 필요한 리디렉션이 없다)
+            cx.records.push(d2.record);
+            return route.abort('blockedbyclient');
+        }
+        return route.fulfill({ response: resp });
+    }
+    // 시험 프로젝트
+    const hook = cx.hooks[rec.target];
+    if (hook && hook.before) {
+        const act = await hook.before(rec);
+        if (act === 'abort') { rec.how = 'aborted-before-send'; return route.abort('failed'); }
+        if (act && act.fulfill) { rec.how = 'fake-response'; rec.status = act.fulfill.status; return route.fulfill({ status: act.fulfill.status, headers: Object.assign({ 'content-type': 'application/json' }, CORS), body: act.fulfill.body }); }
+    }
+    let out;
+    if (FAKE) {
+        rec.how = 'fake-server';
+        const res = await fake.handle({ url: r.url(), method: r.method(), headers: Object.entries(headers), bodyText: r.postData(), page: cx.id });
+        out = { status: res.status, headers: Object.assign({}, res.headers, CORS), body: res.body === null || res.body === undefined ? '' : res.body };
+    } else {
+        const resp = await route.fetch({ maxRedirects: 0 });
+        rec.sent = true;
+        rec.how = 'sent';
+        if (resp.status() >= 300 && resp.status() < 400) { rec.how = 'redirect-blocked'; return route.abort('blockedbyclient'); }
+        out = { status: resp.status(), headers: resp.headers(), body: await resp.body() };
+    }
+    observe(cx, rec, out);
+    if (hook && hook.after) {
+        const act = await hook.after(rec, out);
+        if (act === 'drop') { rec.how = rec.how + '+response-dropped'; return route.abort('failed'); }
+        if (act && act.replace) { rec.how = rec.how + '+response-replaced'; out = Object.assign({}, out, act.replace); }
+    }
+    return route.fulfill({ status: out.status, headers: out.headers, body: out.body });
+}
+
+// ---------------------------------------------------------------------------
+// 화면을 다루는 작은 도구
+// ---------------------------------------------------------------------------
+async function until(page, expr, ms = 12000) {
+    const end = Date.now() + ms;
+    for (;;) {
+        try { if (await page.evaluate(expr)) return true; } catch (e) { /* 이동 중 */ }
+        if (Date.now() > end) return false;
+        await sleep(120);
+    }
+}
+const settled = (page, ms) => until(page, "!!window.EonAuth && window.EonAuth.state() !== 'restoring'", ms);
+async function stateOf(page) {
+    try {
+        const [s, r] = await page.evaluate(() => [window.EonAuth.state(), window.EonAuth.reason()]);
+        return { state: STATES.includes(s) ? s : 'other', reason: REASONS.includes(r) ? r : 'other' };
+    } catch (e) { return { state: 'other', reason: 'other' }; }
+}
+const marks = (page) => page.evaluate(() => ({ cur: window.__b3a.sample(), last: window.__b3a.last, now: performance.now(), persistedAt: window.__b3a.persistedAt })).catch(() => null);
+const anyNow = (m) => !!m && Object.values(m.cur).some(Boolean);
+const anySince = (m, since) => !!m && (Object.values(m.cur).some(Boolean) || Object.values(m.last).some((t) => t >= since));
+const keyBuckets = async (page) => [...new Set((await page.evaluate(() => Object.keys(window.localStorage)).catch(() => [])).map(bucketOf))].sort();
+const pathOf = (page) => { try { return new URL(page.url()).pathname; } catch (e) { return ''; } };
+const nameShown = (page, expected) => page.evaluate((n) => { const m = document.getElementById('authMenu'); return !!m && typeof n === 'string' && n.length > 0 && m.textContent.includes(n); }, expected).catch(() => false);
+const count = (cx, target, pred) => cx.records.filter((r) => r.where === 'test-project' && r.target === target && !r.aborted && (!pred || pred(r))).length;
+const alertId = (page) => page.evaluate((table) => {
+    const el = document.querySelector('.alert');
+    if (!el) return null;
+    for (const [id, t] of Object.entries(table)) if (t === el.textContent) return id;
+    return 'other';
+}, MESSAGES).catch(() => null);
+
+// 로그인 화면에서 제출. 돌려주는 값: { message(정해 둔 이름), moved(index.html 로 갔는가), path }
+async function doLogin(cx, page, acct, { query = '?redirect=my-dashboard.html', wrongPassword = false, site = ON } = {}) {
+    cx.account = acct;
+    await page.goto(site + '/login.html' + query, { waitUntil: 'domcontentloaded' });
+    await settled(page);
+    await page.fill('#email', EMAIL[acct]);
+    await page.fill('#password', wrongPassword ? PW + 'x' : PW);
+    await page.click('#loginBtn');
+    await until(page, "!!document.querySelector('.alert') || !location.pathname.endsWith('/login.html')", 25000);
+    const message = pathOf(page).endsWith('/login.html') ? await alertId(page) : 'success';
+    let moved = false;
+    if (message === 'success') moved = await until(page, "location.pathname.endsWith('/index.html')", 4000);
+    else await sleep(1600);                                   // 실패 안내 뒤에도 이동하지 않는지 본다
+    if (moved) { await settled(page); await sleep(500); }
+    return { message, moved, path: pathOf(page) };
+}
+
+// 응답을 붙잡아 둔 동안 표시가 0 인지, 풀어 준 뒤에는 어떤지
+async function heldLoad(cx, page, target, go, { sinceBfcache = false } = {}) {
+    let reached;
+    let release;
+    const reachedP = new Promise((r) => { reached = r; });
+    const releasedP = new Promise((r) => { release = r; });
+    cx.hooks[target] = { after: async () => { reached(true); await releasedP; return null; } };
+    const nav = go().catch(() => null);
+    const got = await Promise.race([reachedP, sleep(15000).then(() => false)]);
+    await sleep(1300);
+    const during = await marks(page);
+    const since = sinceBfcache && during ? during.persistedAt : 0;
+    const shownDuring = got ? anySince(during, since) : null;
+    const st = await stateOf(page);
+    release();
+    delete cx.hooks[target];
+    await nav;
+    await settled(page, 30000);
+    await sleep(600);
+    return { reached: !!got, shownDuring, stateDuring: st.state, after: await marks(page), stateAfter: await stateOf(page) };
+}
+
+// ---------------------------------------------------------------------------
+// 경우들. 판정: ok 가 전부 참이면 통과 / 거짓이 있으면 기대와 다름 / null(재지 못함)이 있으면 미확인
+// ---------------------------------------------------------------------------
+const results = [];
+function makeChecks() {
+    const list = [];
+    return { list, ck: (name, ok) => { list.push({ name, ok: ok === null || ok === undefined ? null : !!ok }); } };
+}
+const baseline = (cx, ck) => {
+    const s = summarize(cx.records);
+    ck('자격이 용도 밖으로 나간 것 0(차단기의 결정)', s.leakSent === 0);
+    // 대조 단계(P)는 일부러 용도가 맞지 않는 요청을 시켜 본다. 그 밖의 경우에는 그런 시도 자체가 없어야 한다
+    if (cx.id !== 'P') ck('자격의 용도가 맞지 않는 요청을 시도한 것 0', s.leakBlocked === 0);
+    else ck('대조: 자격의 용도가 맞지 않는 요청을 전송 전에 막음', s.leakBlocked >= 1);
+    ck('회원 자격이 필요한 주소에 공개 키로 나간 것 0', s.publicRetry === 0);
+    ck('허용 밖으로 보낸 것 0(차단기의 결정)', s.outsideSent === 0);
+    ck('service_role 자격 0', s.serviceRole === 0);
+    return s;
+};
+async function runCase(id, title, fn, { required = true } = {}) {
+    if (ONLY && !ONLY.has(id)) return;
+    const entry = { id, title, required, verdict: 'unknown', checks: [], summary: null, storage: null, records: [] };
+    results.push(entry);
+    let cx = null;
+    const t0 = Date.now();
+    try {
+        cx = await newCx(id);
+        const { list, ck } = makeChecks();
+        entry.checks = list;
+        const sink0 = siteOn.core.counts.sink + siteOff.core.counts.sink;
+        await fn(cx, ck);
+        entry.summary = baseline(cx, ck);
+        ck('로컬 시험 목적지 수신 0(차단기와 독립된 증거)', siteOn.core.counts.sink + siteOff.core.counts.sink === sink0);
+    } catch (e) {
+        if (e instanceof PauseTimeout) entry.checks.push({ name: '멈춤의 기다림이 상한을 넘김', ok: null });
+        else entry.checks.push({ name: '실행 도중 예외(경우를 끝까지 돌리지 못함)', ok: null });
+        if (e instanceof PauseTimeout && pendingRevert) throw e;
+    } finally {
+        if (cx) {
+            entry.storage = cx.store;
+            entry.records = cx.records;
+            entry.pageshow = cx.events;
+            await cx.context.close().catch(() => {});
+        }
+        entry.verdict = entry.checks.some((c) => c.ok === false) ? 'differs' : (entry.checks.some((c) => c.ok === null) || entry.checks.length === 0 ? 'unknown' : 'pass');
+        console.log(`  ${id.padEnd(4)} ${entry.verdict === 'pass' ? '통과' : (entry.verdict === 'differs' ? '기대와 다름' : '미확인')}  ${title}  (${Math.round((Date.now() - t0) / 100) / 10}초)`);
+        for (const c of entry.checks.filter((x) => x.ok !== true)) console.log(`         · ${c.ok === false ? '다름' : '미확인'}: ${c.name}`);
+    }
+}
+
+const NEW_KEYS = ['eon_auth_v1', 'eon_auth_v1:compat', 'iontoefl_login_time', 'iontoefl_user'];
+const sameSet = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+async function allCases() {
+    // ---- P. 로컬 대조: 차단이 실제로 듣는가(수신기가 살아 있음을 먼저 보인 뒤) ----
+    await runCase('P', '차단기의 로컬 대조(첫 화면·새 창·리디렉션·폼·제어 포트)', async (cx, ck) => {
+        const core = siteOn.core;
+        const page = await cx.page();
+        await page.goto(ON + '/__b3a/blank');
+        const probe0 = core.counts.probe;
+        await page.evaluate(() => fetch('/__b3a/probe').then((r) => r.status, () => 0));
+        ck('수신기가 살아 있음: 차단하지 않은 정상 요청 1건을 실제로 받음', core.counts.probe === probe0 + 1);
+        const sink0 = core.counts.sink;
+        const csp0 = core.counts.csp;
+        const rejected0 = control.rejected;
+        const blockedBefore = cx.records.filter((r) => r.aborted).length;
+        const tryFetch = (url, init) => page.evaluate(([u, i]) => fetch(u, i).then(() => 'sent', () => 'blocked'), [url, init || {}]);
+        let attempts = 0;
+        ck('fetch → 시험 목적지: 막힘', (await tryFetch('/__b3a/sink/fetch')) === 'blocked'); attempts++;
+        ck('fetch(POST) → 시험 목적지: 막힘', (await tryFetch('/__b3a/sink/post', { method: 'POST', body: 'x=1' })) === 'blocked'); attempts++;
+        ck('fetch → 리디렉션 → 시험 목적지: 막힘', (await tryFetch('/__b3a/redirect/sink')) === 'blocked'); attempts++;
+        ck('fetch → 제어 포트: 막힘', (await tryFetch(`http://127.0.0.1:${control.port}/wait`)) === 'blocked'); attempts++;
+        ck('fetch → 바깥 주소: 막힘', (await tryFetch('https://example.invalid/x')) === 'blocked'); attempts++;
+        ck('fetch → 시험 프로젝트에 회원 표 읽기(공개 키 없이 알 수 없는 자격): 막힘', (await tryFetch(TEST_URL + '/rest/v1/users', { headers: { Authorization: 'Bearer zz-not-a-real-credential' } })) === 'blocked'); attempts++;
+        const navTry = async (how) => {                   // 화면 이동은 새 탭에서(중단된 이동은 그 탭을 오류 화면으로 만든다)
+            const p = await cx.page();
+            await p.goto(ON + '/__b3a/blank');
+            await how(p).catch(() => {});
+            await sleep(500);
+            await p.close().catch(() => {});
+        };
+        await navTry((p) => p.evaluate(() => { location.href = '/__b3a/sink/nav'; })); attempts++;
+        await navTry((p) => p.evaluate(() => { const f = document.createElement('form'); f.method = 'POST'; f.action = '/__b3a/sink/form'; document.body.appendChild(f); f.submit(); })); attempts++;
+        await navTry((p) => p.goto(ON + '/__b3a/redirect/sink')); attempts++;
+        await navTry((p) => p.evaluate(() => { window.open('/__b3a/sink/popup'); })); attempts++;
+        await navTry((p) => p.evaluate(() => { location.href = 'https://example.invalid/nav'; })); attempts++;
+        await navTry((p) => p.evaluate((port) => { location.href = 'http://127.0.0.1:' + port + '/wait'; }, control.port)); attempts++;
+        await navTry((p) => p.evaluate((u) => { location.href = u + '/auth/v1/authorize?provider=x'; }, TEST_URL)); attempts++;
+        {   // 첫 화면이 곧 시험 목적지인 새 브라우저 상태
+            const cx2 = await newCx('P2');
+            const p = await cx2.page();
+            await p.goto(ON + '/__b3a/sink/first').catch(() => {});
+            await sleep(300);
+            cx.records.push(...cx2.records);
+            await cx2.context.close();
+            attempts++;
+        }
+        const blocked = cx.records.filter((r) => r.aborted).length - blockedBefore;
+        // 화면 안의 fetch 중 일부(바깥 주소·제어 포트)는 내용 보안 정책이 차단기보다 먼저 막는다 — 따로 센다
+        const cspBlocked = core.counts.csp - csp0;
+        ck('시킨 시도가 전부 전송 전에 막힘(차단기가 센 수 + 내용 보안 정책이 먼저 막은 수 ≥ 시킨 수)', blocked + cspBlocked >= attempts);
+        ck('차단기가 직접 막은 것: fetch·리디렉션·폼·화면 이동·새 창·첫 화면(11건 이상)', blocked >= 11);
+        ck('시험 목적지가 실제로 받은 수 0', core.counts.sink === sink0);
+        ck('제어 포트가 화면에서 받은 요청 0(비밀 없이 온 요청 0)', control.rejected === rejected0);
+    });
+
+    // ---- 1~8. 로그인 ----
+    const loginOk = (acct, id) => runCase(id, `${acct} 로그인 → index.html 에 이름`, async (cx, ck) => {
+        const page = await cx.page();
+        const r = await doLogin(cx, page, acct);
+        const st = await stateOf(page);
+        ck('안내: 로그인 성공', r.message === 'success');
+        ck('index.html 로만 이동(redirect 값으로 가지 않음)', r.moved && r.path.endsWith('/index.html'));
+        ck('상태 signed_in', st.state === 'signed_in');
+        ck('머리말에 그 계정의 이름', await nameShown(page, cx.seen.names[acct]));
+        ck('두 확인 요청: login.html 에서 각 1회 + index.html 에서 각 1회', count(cx, 'my_profile') === 2 && count(cx, 'my_site_access') === 2);
+        ck('로그인 요청 1회, 갱신·로그아웃 0', count(cx, 'login') === 1 && count(cx, 'refresh') === 0 && count(cx, 'logout') === 0);
+        ck('회원 표를 읽는 요청 0(업무 요청은 공개 키)', cx.records.filter((x) => x.where === 'test-project' && x.target === 'rest-table' && x.credential !== 'anon').length === 0);
+        ck('저장소의 키 이름: 새 모듈의 넷뿐', sameSet(await keyBuckets(page), NEW_KEYS));
+        const compatKeys = await page.evaluate(() => { try { return Object.keys(JSON.parse(window.__b3a.rawGet.call(localStorage, 'iontoefl_user'))).sort().join(','); } catch (e) { return ''; } });
+        ck('호환 값의 키: id·name·nickname·email·phone·role (password·level 없음)', compatKeys === 'email,id,name,nickname,phone,role');
+        ck('my_profile 응답의 키: state + 여섯 열뿐(비밀번호 열 없음)', cx.seen.profileKeysOk);
+        ck('JWT 에 로그인 기록 번호(session_id)가 있음', cx.records.some((x) => x.target === 'login' && x.hasSessionId === true));
+        const m = await marks(page);
+        ck('일반 회원에게 관리자 링크·버튼·학습 자료 링크 0', !!m && !m.cur.adminLink && !m.cur.adminBtn && !m.cur.materials);
+    });
+    await loginOk('A', '1');
+    await loginOk('B', '2');
+
+    const loginRefused = (id, title, acct, want, extra) => runCase(id, title, async (cx, ck) => {
+        const page = await cx.page();
+        const r = await doLogin(cx, page, acct, want.opts || {});
+        const st = await stateOf(page);
+        ck('안내 문구', r.message === want.message);
+        ck('화면 이동 0', !r.moved && r.path.endsWith('/login.html'));
+        ck('상태', st.state === want.state && (want.reason === undefined || st.reason === want.reason));
+        ck('호환 값 없음', !(await keyBuckets(page)).some((k) => k === 'iontoefl_user' || k === 'iontoefl_login_time' || k === 'eon_auth_v1:compat'));
+        ck('이름·관리자 표시 0', !anyNow(await marks(page)));
+        if (extra) await extra(cx, ck, page);
+    });
+    await loginRefused('3', '틀린 비밀번호', 'A', { message: 'wrong', state: 'signed_out', opts: { wrongPassword: true } },
+        (cx, ck) => ck('확인 요청 0', count(cx, 'my_profile') === 0 && count(cx, 'my_site_access') === 0));
+    await loginRefused('4', '차단된 계정', 'BLK', { message: 'blocked', state: 'rejected', reason: 'blocked' });
+    await loginRefused('5', '탈퇴 처리 중', 'WD', { message: 'withdrawal', state: 'rejected', reason: 'withdrawal_pending' },
+        (cx, ck) => ck('회원 표를 고치는 요청 0', cx.records.filter((x) => x.target === 'rest-table' && x.method !== 'GET').length === 0));
+    const noMember = async (cx, ck, page) => {
+        ck('순서: 로그인 → my_profile → 갱신 1 → my_profile → 로그아웃(이 로그인만)', count(cx, 'my_profile') === 2 && count(cx, 'refresh') === 1 && count(cx, 'logout') === 1 && count(cx, 'my_site_access') === 0);
+        ck('이 브라우저의 로그인도 지워짐', !(await keyBuckets(page)).includes('eon_auth_v1'));
+    };
+    await loginRefused('6', '회원 대응이 없는 계정', 'N', { message: 'wrong', state: 'signed_out', reason: 'no_member' }, noMember);
+    await loginRefused('7', '회원 대응 없는 관리자(aal1)', 'G', { message: 'wrong', state: 'signed_out', reason: 'no_member' }, noMember);
+    await runCase('8', '회원 대응 있는 관리자(aal1): 관리자 표시 없음', async (cx, ck) => {
+        const page = await cx.page();
+        const r = await doLogin(cx, page, 'GM');
+        ck('로그인되고 index.html 로', r.message === 'success' && r.moved);
+        const role = await page.evaluate(() => { try { return JSON.parse(window.__b3a.rawGet.call(localStorage, 'iontoefl_user')).role; } catch (e) { return ''; } });
+        ck('role 은 user(6자리 확인 전)', role === 'user');
+        const m = await marks(page);
+        ck('관리자 링크·버튼·학습 자료 링크 0', !!m && !m.cur.adminLink && !m.cur.adminBtn && !m.cur.materials);
+    });
+
+    // ---- 9. 확인 전 표시 0: 깨끗한 첫 방문·새로 고침·뒤로 가기(다시 불러옴 / 보관된 화면) ----
+    await runCase('9', '확인 전 표시 0(응답을 붙잡은 동안) — 회원 A', async (cx, ck) => {
+        const page = await cx.page();
+        await doLogin(cx, page, 'A');
+        const expectName = cx.seen.names.A;
+        const judge = async (label, h, since) => {
+            ck(`${label}: 응답을 붙잡음`, h.reached ? true : null);
+            ck(`${label}: 붙잡은 동안 이름·관리자 링크·버튼·학습 자료 링크 0`, h.reached ? h.shownDuring === false : null);
+            ck(`${label}: 풀어 준 뒤 signed_in·이름`, h.stateAfter.state === 'signed_in' && !!h.after && h.after.cur.name && (await nameShown(page, expectName)));
+            ck(`${label}: 일반 회원에게는 풀어 준 뒤에도 관리자 링크·버튼·학습 자료 링크 0`, !!h.after && !h.after.cur.adminLink && !h.after.cur.adminBtn && !h.after.cur.materials);
+        };
+        await judge('새로 고침', await heldLoad(cx, page, 'my_site_access', () => page.reload({ waitUntil: 'domcontentloaded' })));
+        // 깨끗한 첫 방문(새 탭에서 index.html 을 처음 엶)
+        const fresh = await cx.page();
+        const h2 = await heldLoad(cx, fresh, 'my_site_access', () => fresh.goto(ON + '/index.html', { waitUntil: 'domcontentloaded' }));
+        ck('첫 방문: 응답을 붙잡음', h2.reached ? true : null);
+        ck('첫 방문: 붙잡은 동안 표시 0', h2.reached ? h2.shownDuring === false : null);
+        ck('첫 방문: 풀어 준 뒤 이름', !!h2.after && h2.after.cur.name);
+        await fresh.close();
+        // 뒤로 가기(다시 불러오게 만든 경우): unload 처리기가 있으면 브라우저가 화면을 보관하지 않는다
+        await page.evaluate(() => window.addEventListener('unload', () => {}));
+        await page.goto(ON + '/__b3a/blank');
+        cx.events.length = 0;
+        await judge('뒤로 가기(다시 불러옴)', await heldLoad(cx, page, 'my_site_access', () => page.goBack({ waitUntil: 'domcontentloaded' })));
+        ck('뒤로 가기(다시 불러옴): 보관된 화면이 아니었음', !cx.events.includes('pageshow-persisted'));
+    });
+    // 뒤로 가기(브라우저가 보관해 둔 화면을 되살린 경우). 브라우저가 되살리지 않으면 재지 못한다 → 미확인으로 남고, 필수 경우로 세지 않는다
+    await runCase('9b', '확인 전 표시 0 — 뒤로 가기로 되살아난(보관된) 화면', async (cx, ck) => {
+        const page = await cx.page();
+        await doLogin(cx, page, 'A');
+        await page.goto(ON + '/__b3a/blank');
+        cx.events.length = 0;
+        const h = await heldLoad(cx, page, 'my_site_access', () => page.goBack({ waitUntil: 'commit' }), { sinceBfcache: true });
+        const persisted = cx.events.includes('pageshow-persisted');
+        ck('브라우저가 화면을 되살림(아니면 다시 불러온 것 — 재지 못함)', persisted ? true : null);
+        ck('되살아난 뒤 붙잡은 동안 표시 0', persisted && h.reached ? h.shownDuring === false : null);
+        ck('풀어 준 뒤 이름', persisted ? (!!h.after && h.after.cur.name) : null);
+    }, { required: false });
+
+    // ---- 10·11. 로그아웃과 재로그인 ----
+    await runCase('10', '로그아웃: 이 로그인만 + 재로그인', async (cx, ck) => {
+        await pause('other-session-create', { account: 'A' });
+        const page = await cx.page();
+        await doLogin(cx, page, 'A');
+        const sid = cx.seen.lastLoginSid;
+        await page.locator('#authMenu a', { hasText: 'LOGOUT' }).click();
+        await until(page, "window.EonAuth && window.EonAuth.state() === 'signed_out'", 15000);
+        await sleep(800);
+        ck('확인 창과 "로그아웃되었습니다" 안내', cx.dialogs.includes('logoutConfirm') && cx.dialogs.includes('logoutDone') && !cx.dialogs.includes('logoutUnknown'));
+        ck('로그아웃 요청 1회(이 로그인만)', count(cx, 'logout') === 1);
+        ck('새 모듈의 값이 저장소에 없음', !(await keyBuckets(page)).some((k) => NEW_KEYS.includes(k)));
+        ck('머리말이 로그인 전 모양', !anyNow(await marks(page)));
+        const db = await pause('check-logout-scope', { account: 'A', ended: sid });
+        ck('DB: 그 로그인 기록만 끝나고 다른 기록은 그대로(브레인방 확인)', db && db.result === 'ok' ? true : (db && db.result === 'differs' ? false : null));
+        const again = await doLogin(cx, page, 'A');                          // 11. 재로그인
+        ck('재로그인: 성공하고 index.html 에 이름', again.message === 'success' && again.moved && (await nameShown(page, cx.seen.names.A)));
+    });
+
+    // ---- 12·13. 두 탭 ----
+    await runCase('12', '두 탭: 갱신 뒤에도 상태 유지 → 한 탭 로그아웃', async (cx, ck) => {
+        let clock = true;
+        try { await cx.context.clock.install(); } catch (e) { clock = false; }
+        const p1 = await cx.page();
+        await doLogin(cx, p1, 'A');
+        const p2 = await cx.page();
+        await p2.goto(ON + '/index.html', { waitUntil: 'domcontentloaded' });
+        await settled(p2);
+        ck('두 탭 모두 signed_in', (await stateOf(p1)).state === 'signed_in' && (await stateOf(p2)).state === 'signed_in');
+        if (clock) {
+            // JWT 수명은 바꾸지 않는다 — 브라우저의 시계만 앞으로 돌려 갱신 시각을 지나게 한다
+            try { await cx.context.clock.fastForward(3530 * 1000); } catch (e) { clock = false; }
+            for (let i = 0; clock && i < 40 && count(cx, 'refresh') === 0; i++) { await sleep(250); try { await cx.context.clock.runFor(1000); } catch (e) { /* 계속 */ } }
+        }
+        const refreshed = count(cx, 'refresh') >= 1;
+        ck('갱신이 일어남(브라우저의 시계를 앞으로)', clock ? (refreshed ? true : null) : null);
+        await sleep(600);
+        ck('갱신 뒤에도 두 탭 모두 signed_in·이름', refreshed ? ((await stateOf(p1)).state === 'signed_in' && (await stateOf(p2)).state === 'signed_in' && (await nameShown(p1, cx.seen.names.A)) && (await nameShown(p2, cx.seen.names.A))) : null);
+        ck('로그인 요청은 1회뿐', count(cx, 'login') === 1);
+        // 13. 한 탭만 로그아웃
+        await p1.evaluate(() => window.EonAuth.signOut());
+        await until(p1, "window.EonAuth.state() === 'signed_out'", 15000);
+        for (let i = 0; i < 20; i++) { try { await cx.context.clock.runFor(500); } catch (e) { /* 시계 없음 */ } await sleep(150); if ((await stateOf(p2)).state !== 'signed_in') break; }
+        const s2 = await stateOf(p2);
+        ck('다른 탭: rejected·ended', s2.state === 'rejected' && s2.reason === 'ended');
+        ck('다른 탭: 이름 없음, 호환 값 없음', !anyNow(await marks(p2)) && !(await keyBuckets(p2)).some((k) => NEW_KEYS.includes(k)));
+        ck('로그아웃 요청 1회', count(cx, 'logout') === 1);
+    });
+
+    // ---- T. A → B 전환: 한 탭이 A 를 확인하는 사이 다른 탭이 B 로 로그인 ----
+    await runCase('T', '두 탭: A 를 확인하는 사이 다른 탭이 B 로 로그인', async (cx, ck) => {
+        const p0 = await cx.page();
+        await doLogin(cx, p0, 'A');
+        const sidA = cx.seen.sids.A;
+        await p0.close();
+        const p1 = await cx.page();
+        let reached;
+        let release;
+        const reachedP = new Promise((r) => { reached = r; });
+        const releasedP = new Promise((r) => { release = r; });
+        let first = true;
+        cx.hooks.my_site_access = { after: async () => { if (!first) return null; first = false; reached(true); await releasedP; return null; } };
+        const nav = p1.goto(ON + '/index.html', { waitUntil: 'domcontentloaded' }).catch(() => null);
+        const got = await Promise.race([reachedP, sleep(15000).then(() => false)]);
+        ck('탭 1: A 의 확인 응답을 붙잡음', got ? true : null);
+        const refresh0 = count(cx, 'refresh');
+        const p2 = await cx.page();
+        const r2 = await doLogin(cx, p2, 'B');
+        const sidB = cx.seen.sids.B;
+        ck('탭 2: B 로그인 성공', r2.message === 'success' && r2.moved);
+        ck('B 로그인 전에 A 의 로그인을 끝내는 요청 1회', count(cx, 'logout') === 1);
+        release();
+        await nav;
+        await settled(p1, 30000);
+        await sleep(1500);
+        const m1 = await marks(p1);
+        ck('탭 1: A 의 이름이 그려진 적 없음', !(await nameShown(p1, cx.seen.names.A)));
+        ck('탭 1: 끝난 뒤 B 를 별도로 확인해 B 의 이름', (await stateOf(p1)).state === 'signed_in' && (await nameShown(p1, cx.seen.names.B)));
+        ck('A 의 실패 처리가 낸 갱신·종료 요청 0(B 를 건드리지 않음)', count(cx, 'refresh') === refresh0 && count(cx, 'logout') === 1);
+        ck('탭 1: 화면 이동 0', pathOf(p1).endsWith('/index.html') && !!m1);
+        const db = await pause('check-records-intact', { sids: [sidB].filter(Boolean), ended: sidA });
+        ck('DB: B 의 로그인 기록이 그대로(브레인방 확인)', db && db.result === 'ok' ? true : (db && db.result === 'differs' ? false : null));
+    });
+
+    // ---- 14. 확정된 만료(실제 — 브레인방이 DB 에서 기록을 끝냄) ----
+    await runCase('14', '끝난 로그인 기록(서버에서 끝냄) → 새로 고침', async (cx, ck) => {
+        const page = await cx.page();
+        await doLogin(cx, page, 'A');
+        const sid = cx.seen.lastLoginSid;
+        await pause('expire-session', { sid }, { needsRevert: true });
+        try {
+            const before = cx.seen.states.length;
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await settled(page, 40000);
+            await sleep(600);
+            const st = await stateOf(page);
+            cx.observed = { state: st.state, reason: st.reason };
+            ck('my_profile 이 200 no_member', cx.seen.states.slice(before).includes('no_member'));
+            ck('signed_in 이 아님', st.state === 'rejected' || st.state === 'signed_out');
+            ck('갱신 1회, 공개 키 재시도 0', count(cx, 'refresh') === 1);
+            ck('이름·관리자 표시 0', !anyNow(await marks(page)));
+            ck('새 모듈이 만든 호환 값 없음', !(await keyBuckets(page)).some((k) => k === 'iontoefl_user' || k === 'iontoefl_login_time' || k === 'eon_auth_v1:compat'));
+            ck('서버가 "끝남"으로 답했으면(expired) 이 브라우저의 로그인도 지워짐 / 아니면 남음', st.reason === 'expired' ? !(await keyBuckets(page)).includes('eon_auth_v1') : (st.reason === 'no_member' ? true : (await keyBuckets(page)).includes('eon_auth_v1') || st.state === 'signed_out'));
+        } finally {
+            await pause('restore-session', { sid }, { revertOf: 'expire-session' });
+        }
+    });
+
+    // ---- 15·16. 점검(실제 503) ----
+    await runCase('15', '점검 켠 상태: B 는 점검 안내, 예외 명단의 A 는 로그인', async (cx, ck) => {
+        await pause('maintenance-on', { exception: 'A' }, { needsRevert: true });
+        try {
+            const page = await cx.page();
+            const r = await doLogin(cx, page, 'B');
+            const st = await stateOf(page);
+            ck('B: 점검 안내', r.message === 'maintenance');
+            ck('B: rejected·maintenance(실제 503)', st.state === 'rejected' && st.reason === 'maintenance' && cx.records.some((x) => x.target === 'my_profile' && x.status === 503));
+            ck('B: 이동 0·호환 값 없음·표시 0', !r.moved && !(await keyBuckets(page)).includes('iontoefl_user') && !anyNow(await marks(page)));
+            const cx2 = await newCx('16');
+            try {
+                const p2 = await cx2.page();
+                const r2 = await doLogin(cx2, p2, 'A');
+                ck('A(예외 명단): 로그인되고 index.html 에 이름', r2.message === 'success' && r2.moved && (await nameShown(p2, cx2.seen.names.A)));
+                cx.records.push(...cx2.records);
+            } finally { await cx2.context.close(); }
+        } finally {
+            await pause('maintenance-off', {}, { revertOf: 'maintenance-on' });
+        }
+    });
+
+    // ---- allowed 거짓(실행기가 만든 가짜 응답 — 실제 503 과 따로 센다) ----
+    await runCase('AF', 'allowed 거짓(가짜 응답): 표시·이동 0', async (cx, ck) => {
+        cx.hooks.my_site_access = { after: async (rec, out) => ({ replace: { status: 200, body: JSON.stringify({ allowed: false, is_admin: false }) } }) };
+        const page = await cx.page();
+        const r = await doLogin(cx, page, 'A');
+        const st = await stateOf(page);
+        ck('점검 안내(임시 문구)', r.message === 'maintenance');
+        ck('rejected·not_allowed', st.state === 'rejected' && st.reason === 'not_allowed');
+        ck('이동 0·호환 값 없음·표시 0', !r.moved && !(await keyBuckets(page)).includes('iontoefl_user') && !anyNow(await marks(page)));
+    });
+
+    // ---- 17~19. 저장된 로그인으로 시작(aal2 는 화면으로 만들 수 없다) ----
+    const seeded = (id, title, acct, aal, judge) => runCase(id, title, async (cx, ck) => {
+        const got = await pause('provide-session', { account: acct, aal });
+        const session = got && got.session;
+        if (!session || typeof session !== 'object' || typeof session.access_token !== 'string') { ck('브레인방이 로그인 상태를 줌', null); return; }
+        cx.account = acct;
+        const page = await cx.page();
+        await page.goto(ON + '/__b3a/blank');
+        await page.evaluate((s) => { localStorage.setItem('eon_auth_v1', JSON.stringify(s)); }, session);     // 메모리에서 브라우저로만(디스크에 쓰지 않는다)
+        const h = await heldLoad(cx, page, 'my_profile', () => page.goto(ON + '/index.html', { waitUntil: 'domcontentloaded' }));
+        ck('확인 응답을 붙잡음', h.reached ? true : null);
+        ck('붙잡은 동안 이름·관리자 링크·버튼·학습 자료 링크 0', h.reached ? h.shownDuring === false : null);
+        await judge(cx, ck, page, h);
+    });
+    await seeded('17', 'GM·aal2(저장된 로그인): 확인 뒤에만 관리자 표시', 'GM', 'aal2', async (cx, ck, page, h) => {
+        const role = await page.evaluate(() => { try { return JSON.parse(window.__b3a.rawGet.call(localStorage, 'iontoefl_user')).role; } catch (e) { return ''; } });
+        ck('signed_in, role 은 admin', h.stateAfter.state === 'signed_in' && role === 'admin');
+        ck('풀어 준 뒤 관리자 링크·버튼·학습 자료 링크가 보임', !!h.after && h.after.cur.adminLink && h.after.cur.adminBtn && h.after.cur.materials);
+        ck('my_site_access 의 is_admin 이 참', cx.records.some((x) => x.target === 'my_site_access' && x.isAdmin === true));
+    });
+    const seededNoMember = async (cx, ck, page, h) => {
+        ck('signed_in 이 아님(no_member)', h.stateAfter.state !== 'signed_in' && h.stateAfter.reason === 'no_member');
+        ck('관리자 표시 0', !!h.after && !anyNow(h.after));
+        ck('호환 값 없음', !(await keyBuckets(page)).includes('iontoefl_user'));
+    };
+    await seeded('18', 'G·aal2(저장된 로그인): 대응 없음 → 표시 0', 'G', 'aal2', seededNoMember);
+    await seeded('19a', 'G·aal1(저장된 로그인): 대응 없음 → 표시 0', 'G', 'aal1', seededNoMember);
+    await seeded('19b', 'GM·aal1(저장된 로그인): 회원 표시만', 'GM', 'aal1', async (cx, ck, page, h) => {
+        ck('signed_in', h.stateAfter.state === 'signed_in');
+        ck('관리자 링크·버튼·학습 자료 링크 0', !!h.after && !h.after.cur.adminLink && !h.after.cur.adminBtn && !h.after.cur.materials);
+    });
+
+    // ---- R. 갱신의 경우들(구분해서) ----
+    //   my_profile 에 가짜 401(JWT 만료) 하나를 돌려줘 모듈이 갱신을 한 번 하게 만든 뒤, 그 갱신을 경우마다 다르게 다룬다.
+    const refreshCase = (id, title, hook, want) => runCase(id, title, async (cx, ck) => {
+        const page = await cx.page();
+        await doLogin(cx, page, 'A');
+        let once = true;
+        cx.hooks.my_profile = { before: async () => (once ? ((once = false), { fulfill: { status: 401, body: JSON.stringify({ code: 'PGRST303', message: 'JWT expired' }) } }) : null) };
+        cx.hooks.refresh = hook;
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await settled(page, 45000);
+        await sleep(600);
+        const st = await stateOf(page);
+        const attempts = cx.records.filter((x) => x.target === 'refresh' && !x.aborted);
+        ck('갱신 시도는 한 번뿐(결과를 모르는 갱신을 다시 보내지 않음)', attempts.length === 1);
+        ck(`상태 rejected·${want.reason}`, st.state === 'rejected' && st.reason === want.reason);
+        ck('로그인 기록을 지우지 않음(끝났다는 증거가 아니다)', (await keyBuckets(page)).includes('eon_auth_v1'));
+        ck('종료 요청 0', count(cx, 'logout') === 0);
+        ck('이름·관리자 표시 0, 새 모듈이 만든 호환 값 없음', !anyNow(await marks(page)) && !(await keyBuckets(page)).includes('iontoefl_user'));
+        ck(want.sentLabel, want.sent(attempts[0] || {}));
+    });
+    await refreshCase('R1', '갱신: 전송 전 중단(서버가 받지 못함)', { before: async () => 'abort' }, { reason: 'network', sentLabel: '그 갱신은 서버로 나가지 않음', sent: (r) => r.how === 'aborted-before-send' && r.sent === false });
+    await refreshCase('R2', '갱신: 서버가 처리한 뒤 응답 유실', { after: async () => 'drop' }, { reason: 'network', sentLabel: '그 갱신은 서버가 받았고 응답만 버림', sent: (r) => /response-dropped$/.test(r.how || '') });
+    await refreshCase('R3', '갱신: 429(가짜 응답)', { before: async () => ({ fulfill: { status: 429, body: JSON.stringify({ code: 'over_request_rate_limit', message: 'rate limit' }) } }) }, { reason: 'rate_limited', sentLabel: '429 는 실행기가 만든 가짜 응답', sent: (r) => r.how === 'fake-response' });
+
+    // ---- I. 기존 로그인 상태와의 격리 ----
+    const SEEDS = {
+        old: { iontoefl_user: JSON.stringify({ id: 'm-old', name: '옛학생', nickname: '', email: 'old@zz.invalid', phone: '010-0000-0000', level: 2, role: 'user' }), iontoefl_login_time: '1790000000000' },
+        book: { eon_book_auth_v1: JSON.stringify({ access_token: 'zz-other-book', refresh_token: 'zz-other-book-r', expires_at: 4102444800, user: { id: 'other-book', email: 'book@other.zz.invalid' } }) },
+        followup: { [`sb-${TEST_REF}-auth-token`]: JSON.stringify({ access_token: 'zz-other-followup', refresh_token: 'zz-other-followup-r', expires_at: 4102444800 }) },
+    };
+    SEEDS.mixed = Object.assign({}, SEEDS.old, { eon_book_auth_v1: SEEDS.book.eon_book_auth_v1.replace('4102444800', '1700000000') }, { [`sb-${TEST_REF}-auth-token`]: SEEDS.followup[`sb-${TEST_REF}-auth-token`].replace('4102444800', '1700000000') });
+    const seedStore = async (cx, page, site, seed) => {
+        await page.goto(site + '/__b3a/blank');
+        await page.evaluate((s) => { for (const [k, v] of Object.entries(s)) localStorage.setItem(k, v); }, seed);
+        for (const k of Object.keys(cx.store)) delete cx.store[k];            // 넣는 동안 센 것은 버린다
+    };
+    const unchanged = (page, seed) => page.evaluate((s) => Object.entries(s).every(([k, v]) => window.__b3a.rawGet.call(localStorage, k) === v), seed);
+    const touched = (cx, bucket, ops) => ops.reduce((n, op) => n + ((cx.store[bucket] || {})[op] || 0), 0);
+    for (const [id, name] of [['I1', 'old'], ['I4', 'mixed']]) {
+        await runCase(id, `격리: 옛 방식의 로그인 상태가 있는 브라우저(${name === 'old' ? '옛 학생' : '섞임+만료'})`, async (cx, ck) => {
+            const page = await cx.page();
+            await seedStore(cx, page, ON, SEEDS[name]);
+            await page.goto(ON + '/login.html?redirect=my-dashboard.html', { waitUntil: 'domcontentloaded' });
+            await settled(page);
+            await sleep(1500);
+            ck('옛 값만 보고 자동 이동하지 않음', pathOf(page).endsWith('/login.html'));
+            await page.fill('#email', EMAIL.A);
+            await page.fill('#password', PW);
+            await page.click('#loginBtn');
+            await until(page, "!!document.querySelector('.alert')", 15000);
+            await sleep(1500);
+            ck('안내: 기존 방식의 로그인 상태가 있습니다', (await alertId(page)) === 'legacy');
+            ck('인증 요청 0', cx.records.filter((x) => ['login', 'refresh', 'logout', 'my_profile', 'my_site_access', 'auth-other'].includes(x.target)).length === 0);
+            ck('옛 값이 글자 그대로', await unchanged(page, SEEDS[name]));
+            ck('옛 값의 자리에 쓰기·지우기 0', touched(cx, 'iontoefl_user', ['setItem', 'removeItem']) === 0 && touched(cx, 'iontoefl_login_time', ['setItem', 'removeItem']) === 0 && touched(cx, 'all', ['clear']) === 0);
+            ck('교재 편집·후속메일 상태의 읽기·쓰기·지우기 0', touched(cx, 'eon_book_auth_v1', ['getItem', 'setItem', 'removeItem']) === 0 && touched(cx, 'followup', ['getItem', 'setItem', 'removeItem']) === 0);
+            await page.goto(ON + '/index.html', { waitUntil: 'domcontentloaded' });
+            await settled(page);
+            await sleep(500);
+            ck('index.html 이 옛 값으로 이름을 그리지 않음', !anyNow(await marks(page)));
+        });
+    }
+    for (const [id, name, bucket] of [['I2', 'book', 'eon_book_auth_v1'], ['I3', 'followup', 'followup']]) {
+        await runCase(id, `격리: ${name === 'book' ? '교재 편집' : '후속메일'} 상태만 있는 브라우저에서 로그인 → 로그아웃`, async (cx, ck) => {
+            const page = await cx.page();
+            await seedStore(cx, page, ON, SEEDS[name]);
+            const r = await doLogin(cx, page, 'A');
+            ck('로그인되고 index.html 에 이름', r.message === 'success' && r.moved && (await nameShown(page, cx.seen.names.A)));
+            await page.locator('#authMenu a', { hasText: 'LOGOUT' }).click();
+            await until(page, "window.EonAuth && window.EonAuth.state() === 'signed_out'", 15000);
+            await sleep(600);
+            ck('넣어 둔 값이 글자 그대로', await unchanged(page, SEEDS[name]));
+            ck('그 키의 읽기·쓰기·지우기 0', touched(cx, bucket, ['getItem', 'setItem', 'removeItem']) === 0 && touched(cx, 'all', ['clear']) === 0);
+            ck('업무 요청의 자격은 공개 키', cx.records.filter((x) => x.where === 'test-project' && (x.target === 'rest-table' || x.target === 'rest-rpc-other')).every((x) => x.credential === 'anon'));
+        });
+    }
+
+    // ---- O. 꺼짐 대조 ----
+    const offStates = { O1: {}, O2: SEEDS.old, O3: SEEDS.book, O4: SEEDS.followup, O5: SEEDS.mixed };
+    for (const [id, seed] of Object.entries(offStates)) {
+        await runCase(id, `꺼짐 대조(${{ O1: '빈 브라우저', O2: '옛 학생', O3: '교재 편집만', O4: '후속메일만', O5: '섞임+만료' }[id]})`, async (cx, ck) => {
+            const page = await cx.page();
+            await seedStore(cx, page, OFF, seed);
+            await page.goto(OFF + '/index.html?eon_auth=on&EON_AUTH_SWITCH=on', { waitUntil: 'domcontentloaded' });
+            await sleep(1200);
+            ck('EonAuth.state() 가 off(주소의 꼬리표로 켜지지 않음)', (await stateOf(page)).state === 'off');
+            const hasOld = Object.prototype.hasOwnProperty.call(seed, 'iontoefl_user');
+            const m = await marks(page);
+            ck(hasOld ? '옛 값으로 이름을 그림(지금 그대로)' : '로그인 전 모양', !!m && m.cur.name === hasOld);
+            await page.goto(OFF + '/login.html?redirect=my-dashboard.html', { waitUntil: 'commit' }).catch(() => {});
+            await sleep(1500);
+            ck(hasOld ? '옛 값이 있으면 redirect 주소로 자동 이동(지금 그대로)' : '자동 이동 없음', pathOf(page).endsWith(hasOld ? '/my-dashboard.html' : '/login.html'));
+            ck('인증 모듈의 요청 0', cx.records.filter((x) => ['login', 'refresh', 'logout', 'my_profile', 'my_site_access', 'auth-other'].includes(x.target)).length === 0);
+            ck('SDK 파일을 받는 요청 0(꺼짐 서버가 그 파일을 내준 횟수)', siteOff.core.counts.sdk === 0);
+            ck('새 모듈의 저장소 키 0', !(await keyBuckets(page)).some((k) => k.startsWith('eon_auth')));
+            ck('새 모듈의 키·교재 편집·후속메일 키의 읽기·쓰기·지우기 0', ['eon_auth_v1', 'eon_auth_v1:compat', 'eon_auth_other', 'eon_book_auth_v1', 'followup'].every((b) => touched(cx, b, ['getItem', 'setItem', 'removeItem']) === 0));
+            ck('넣어 둔 값이 글자 그대로', await unchanged(page, seed));
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+async function main() {
+    console.log(`화면 시험 실행기 — ${FAKE ? '가짜 서버를 상대로(실제 서버의 증거가 아니다)' : '시험 프로젝트를 상대로'}`);
+    if (FAKE) setupFake();
+    siteOn = await startSite('on');
+    siteOff = await startSite('off');
+    ON = siteOn.origin;
+    OFF = siteOff.origin;
+    for (const site of [siteOn, siteOff]) {
+        const scan = site.core.scan();
+        if (scan.repoSwitch !== 'off') stop('저장소의 스위치 값이 꺼짐이 아니다');
+        site.core.counts.sdk = 0;
+    }
+    // SDK 파일을 내준 횟수(꺼짐 서버에서는 0 이어야 한다)
+    for (const site of [siteOn, siteOff]) {
+        const respond = site.core.respond;
+        site.core.respond = (req) => { if (String(req.url).split('?')[0] === '/vendor/supabase-2.116.0.js') site.core.counts.sdk++; return respond(req); };
+    }
+    await startControl();
+    decide = makeDecider({ selfOrigins: [ON, OFF], anonKey: ANON });
+    if (FAKE) fakeOperator();
+    console.log(`  켜짐 ${ON}   꺼짐 ${OFF}   제어 포트 ${control.port}`);
+
+    browser = await chromium.launch({
+        executablePath: chromePath,
+        headless: !flag('--headed'),
+        // 브라우저는 127.0.0.1 말고는 이름을 풀지 못한다(차단기를 거치지 않고 바깥으로 나가는 길을 막는다)
+        args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'],
+        ignoreDefaultArgs: ['--disable-back-forward-cache'],      // 보관된 화면이 되살아나는 경우도 재려고
+    });
+
+    let stopped = null;
+    try {
+        await allCases();
+    } catch (e) {
+        stopped = e instanceof PauseTimeout ? `멈춤(${e.message})의 기다림이 상한을 넘김` : '실행 도중 예외';
+    } finally {
+        await browser.close().catch(() => {});
+    }
+    if (pendingRevert) {
+        // 브레인방이 건 DB 변경이 남아 있을 수 있다 → "원복 확인"을 받기 전에는 끝내지 않는다
+        console.log(`  원복 확인을 기다림: ${pendingRevert}`);
+        const kind = pendingRevert === 'maintenance-on' ? 'maintenance-off' : 'restore-session';
+        try { await pause(kind + '-confirm', { of: pendingRevert }, { revertOf: pendingRevert }); } catch (e) { stopped = `원복 확인(${pendingRevert})을 받지 못함`; }
+    }
+
+    const sinkTotal = siteOn.core.counts.sink + siteOff.core.counts.sink;
+    const required = results.filter((r) => r.required);
+    const totals = { pass: results.filter((r) => r.verdict === 'pass').length, differs: results.filter((r) => r.verdict === 'differs').length, unknown: results.filter((r) => r.verdict === 'unknown').length };
+    const expectedIds = ['P', '1', '2', '3', '4', '5', '6', '7', '8', '9', '9b', '10', '12', 'T', '14', '15', 'AF', '17', '18', '19a', '19b', 'R1', 'R2', 'R3', 'I1', 'I4', 'I2', 'I3', 'O1', 'O2', 'O3', 'O4', 'O5'];
+    const notRun = expectedIds.filter((id) => !results.some((r) => r.id === id));
+    const all = results.flatMap((r) => r.records);
+    const overall = !stopped && notRun.length === 0 && required.every((r) => r.verdict === 'pass') && sinkTotal === 0 && egress.blocked === 0 && (!FAKE || egress.testProject === 0);
+    const output = {
+        tool: 'tests/auth-session/screen.mjs',
+        mode: FAKE ? 'fake-server' : 'test-project',
+        note: FAKE ? '가짜 서버를 상대로 돌린 결과다 — 실제 서버·실제 응답의 증거가 아니다' : '시험 프로젝트를 상대로 돌린 결과',
+        overall: overall ? 'pass' : 'not-pass',
+        stopped,
+        notRun,
+        totals,
+        independentEvidence: {
+            // 차단기의 결정과 독립된 숫자들
+            sinkReceived: sinkTotal,
+            probeReceived: siteOn.core.counts.probe + siteOff.core.counts.probe,
+            controlArrivals: control.arrivals,
+            controlRejected: control.rejected,
+            runnerConnections: egress,                      // 실행기가 연 연결: local / testProject / blocked(막은 시도)
+            requestsSentToTestProject: all.filter((r) => r.where === 'test-project' && r.sent).length,
+            requestsAnsweredByFakeServer: all.filter((r) => r.how && r.how.startsWith('fake-server')).length,
+            staticAllowedFulfilledLocally: all.filter((r) => r.where === 'static-allowed').length,
+        },
+        summary: summarize(all),
+        cases: results,
+    };
+    const text = JSON.stringify(output, null, 1);
+    // 덧붙이는 점검: 결과에 비밀값·JWT 모양이 없는가(주된 보호는 "정해 둔 값만 적는다"이다)
+    const leaks = SECRETS.filter((s) => s && text.includes(s)).length + (/eyJ[A-Za-z0-9_-]{8,}/.test(text) ? 1 : 0);
+    if (leaks) { console.error('중단: 결과에 비밀값의 흔적이 있어 파일을 쓰지 않는다'); process.exitCode = 3; }
+    else { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, text); }
+
+    console.log('');
+    console.log(`  경우: 통과 ${totals.pass} / 기대와 다름 ${totals.differs} / 미확인 ${totals.unknown}${notRun.length ? ` / 돌리지 않음 ${notRun.length}` : ''}`);
+    console.log(`  독립된 증거: 시험 목적지 수신 ${sinkTotal}, 실행기가 연 연결 — 로컬 ${egress.local}·시험 프로젝트 ${egress.testProject}·막은 시도 ${egress.blocked}`);
+    console.log(`  시험 프로젝트로 실제 보낸 요청 ${output.independentEvidence.requestsSentToTestProject}건, 가짜 서버가 답한 요청 ${output.independentEvidence.requestsAnsweredByFakeServer}건`);
+    if (!leaks) console.log(`  결과: ${OUT}`);
+    console.log(`전체 판정: ${overall ? '통과' : '통과 아님'}${FAKE ? '  (가짜 서버 — 실제 서버의 증거가 아니다)' : ''}${stopped ? '  [' + stopped + ']' : ''}`);
+    control.server.close();
+    control.server = null;
+    siteOn.server.close();
+    siteOff.server.close();
+    if (!process.exitCode) process.exitCode = stopped ? 3 : (overall ? 0 : 1);
+    setTimeout(() => process.exit(process.exitCode), 300);
+}
+
+main().catch((e) => { console.error('중단: 실행기 오류 — ' + String(e && e.message).split('\n')[0]); process.exit(3); });

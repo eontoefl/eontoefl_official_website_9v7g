@@ -31,6 +31,7 @@ export class FakeSupabase {
         this.accounts = new Map();      // 이메일 → 계정
         this.sessions = new Map();      // 로그인 기록 번호 → 기록
         this.maintenance = false;
+        this.maintenanceExcept = new Set();   // 점검 중에도 통과하는 계정 번호(예외 명단 흉내)
         this.allowedOverride = null;    // my_site_access.allowed 를 강제로
         this.seq = 0;
         this.log = [];                  // 받은 요청
@@ -179,7 +180,7 @@ export class FakeSupabase {
         if (u.search || (req.bodyText && req.bodyText !== '{}')) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
         const who = this.caller(req);
         if (who.error) return who.error;
-        if (this.maintenance) return json(503, { code: 'PT503', message: 'maintenance' });
+        if (this.maintenance && !(who.session && this.maintenanceExcept.has(who.session.authId))) return json(503, { code: 'PT503', message: 'maintenance' });
         const noStore = { 'Cache-Control': 'private, no-store' };
         const a = who.account;
         if (!a || a.member === 'none') return json(200, { state: 'no_member' }, noStore);
@@ -192,7 +193,8 @@ export class FakeSupabase {
         if (req.method !== 'POST') return json(405, { code: 'PGRST', message: 'method not allowed' });
         const who = this.caller(req);
         if (who.error) return who.error;
-        const allowed = this.allowedOverride === null ? !this.maintenance : this.allowedOverride;
+        const excepted = !!(who.session && this.maintenanceExcept.has(who.session.authId));
+        const allowed = this.allowedOverride === null ? (!this.maintenance || excepted) : this.allowedOverride;
         const isAdmin = !!(who.session && who.account && who.account.admin && who.session.aal === 'aal2');
         return json(200, { allowed, is_admin: isAdmin }, { 'Cache-Control': 'private, no-store' });
     }
