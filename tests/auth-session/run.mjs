@@ -1504,6 +1504,8 @@ async function sectionRequestLog(mutate) {
         ['업무 요청(공개 키)', { url: TEST_URL + '/rest/v1/applications?email=eq.zzsecret%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: H(anon) }, 'continue', 'test-project', 'rest-table', false],
         ['my_profile 을 공개 키로(기록만 — 자격이 새는 것은 아니다)', { url: TEST_URL + '/rest/v1/rpc/my_profile', method: 'POST', resourceType: 'fetch', headers: H(anon), postData: '{}' }, 'continue', 'test-project', 'my_profile', false],
         ['허용 목록의 글꼴', { url: 'https://fonts.gstatic.com/s/x.woff2', method: 'GET', resourceType: 'font' }, 'continue', 'static-allowed', 'static', false],
+        ['허용 목록 호스트의 파비콘', { url: 'https://eontoefl.github.io/eontoefl_official_website_9v7g/logo/purple2.png', method: 'GET', resourceType: 'other' }, 'continue', 'static-allowed', 'static', false],
+        ['허용 목록 호스트로 POST(정적 요청이 아님)', { url: 'https://eontoefl.github.io/x', method: 'POST', resourceType: 'other', postData: 'a=1' }, 'abort', 'outside', 'other', false],
         ['data 그림', { url: 'data:image/png;base64,AAAA', method: 'GET', resourceType: 'image' }, 'continue', 'local', 'other', false],
         // 자격의 종류·용도가 맞지 않는 것: 시험 프로젝트로 가는 것이라도 중단
         ['업무 요청에 회원 JWT', { url: TEST_URL + '/rest/v1/applications?email=eq.a%40zz.invalid', method: 'GET', resourceType: 'fetch', headers: H(member) }, 'abort', 'test-project', 'rest-table', true],
@@ -1557,7 +1559,7 @@ async function sectionRequestLog(mutate) {
     const text = JSON.stringify(records);
     if (text.includes('zzsecret') || /eyJ[A-Za-z0-9_-]{8,}/.test(text) || /https?:/.test(text)) problems.push('가르기: 기록에 JWT·비밀번호·갱신값·주소가 남음');
     const s = summarize(records);
-    const want = { leakBlocked: 13, leakSent: 0, publicRetry: 1, serviceRole: 1, sinkAttempts: 2, outsideSent: 0, staticAllowed: 1 };
+    const want = { leakBlocked: 13, leakSent: 0, publicRetry: 1, serviceRole: 1, sinkAttempts: 2, outsideSent: 0, staticAllowed: 2 };
     for (const [k, v] of Object.entries(want)) if (s[k] !== v) problems.push(`가르기: 요약의 ${k} 가 ${s[k]} (기대 ${v})`);
     if (s.testProjectByTarget.login !== 1 || s.testProjectByTarget.my_profile !== 2 || s.testProjectByTarget['rest-table'] !== 1) problems.push('가르기: 요약의 이름별 수가 기대와 다름');
     return { problems, rows: rows.length };

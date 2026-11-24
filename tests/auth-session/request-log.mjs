@@ -22,7 +22,8 @@ const NAMED = {
 };
 export const MEMBER_JWT_TARGETS = ['logout', 'my_profile', 'my_site_access'];
 
-const STATIC_TYPES = { stylesheet: STATIC_ALLOW.style, font: STATIC_ALLOW.font, image: STATIC_ALLOW.img };
+// 종류 other 는 파비콘(<link rel="icon">)이다 — 그림의 허용 호스트에만
+const STATIC_TYPES = { stylesheet: STATIC_ALLOW.style, font: STATIC_ALLOW.font, image: STATIC_ALLOW.img, other: STATIC_ALLOW.img };
 const TYPES = ['document', 'stylesheet', 'image', 'media', 'font', 'script', 'xhr', 'fetch', 'websocket', 'manifest', 'other'];
 const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 

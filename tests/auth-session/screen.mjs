@@ -561,11 +561,15 @@ async function runCase(id, title, fn, { required = true } = {}) {
             entry.records = cx.records;
             entry.pageshow = cx.events;
             entry.notes = cx.notes || null;
+            // 바깥으로 가려던 시도(전송 전에 막힌 것)의 수 — 대조 단계(P) 말고는 0 이 기대다. 판정에는 넣지 않고 적어 둔다
+            const s = summarize(cx.records);
+            entry.outsideAttempts = s.outsideBlockedRequest + s.outsideBlockedNavigation;
             await cx.context.close().catch(() => {});
         }
         entry.verdict = entry.checks.some((c) => c.ok === false) ? 'differs' : (entry.checks.some((c) => c.ok === null) || entry.checks.length === 0 ? 'unknown' : 'pass');
         console.log(`  ${id.padEnd(4)} ${entry.verdict === 'pass' ? '통과' : (entry.verdict === 'differs' ? '기대와 다름' : '미확인')}  ${title}  (${Math.round((Date.now() - t0) / 100) / 10}초)`);
         for (const c of entry.checks.filter((x) => x.ok !== true)) console.log(`         · ${c.ok === false ? '다름' : '미확인'}: ${c.name}`);
+        if (id !== 'P' && entry.outsideAttempts) console.log(`         · 참고: 바깥으로 가려던 시도 ${entry.outsideAttempts}건(전송 전에 막힘)`);
     }
 }
 
