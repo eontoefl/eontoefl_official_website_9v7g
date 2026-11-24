@@ -396,7 +396,8 @@ function setupEditForm() {
             localUser.nickname = nickname;
             localUser.phone = phone;
             localUser.timezone = timezone;
-            localStorage.setItem('iontoefl_user', JSON.stringify(localUser));
+            // 켜진 화면은 로그인 값을 직접 쓰지 않는다(인증 모듈만 쓴다 — 지금은 내 정보 고치기가 닫혀 있어 여기까지 오지 않는다)
+            if (!EonLogin.on()) localStorage.setItem('iontoefl_user', JSON.stringify(localUser));
 
             // 현재 데이터도 갱신
             currentUserData.name = name;

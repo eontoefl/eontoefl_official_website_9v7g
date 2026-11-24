@@ -143,8 +143,11 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                 level: result.level || 2,
                 role: result.role || 'user'
             };
+            // 켜진 화면은 로그인 값을 직접 쓰지 않는다(인증 모듈만 쓴다 — 지금은 가입이 닫혀 있어 여기까지 오지 않는다)
+            if (!EonLogin.on()) {
             localStorage.setItem('iontoefl_user', JSON.stringify(loginData));
             localStorage.setItem('iontoefl_login_time', Date.now().toString());
+            }
 
             showAlert('회원가입이 완료되었습니다!', 'success');
             document.getElementById('registerForm').reset();
