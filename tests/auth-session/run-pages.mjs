@@ -6,6 +6,7 @@
 // 가짜 DOM 은 그리기·이벤트 전파를 흉내 내지 않는다 — 기준과 작업본을 같은 가짜 DOM 에서 돌려 견준다.
 
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -141,6 +142,42 @@ async function sectionOffPages(mutate) {
         }
     }
     return { problems, compared };
+}
+
+// 대상이 아닌 화면 가운데 대상 화면과 스크립트를 함께 싣는 화면(js/admin-utils.js·js/common.js·js/main.js 를 싣는 관리자 화면들):
+// 글자가 아니라 그 화면에서의 동작이 기준과 같은가 — 저장소의 파일 그대로(꺼짐)와 시험 서버가 켜짐으로 내주는 사본 둘 다.
+// (이 화면들은 게이트도 인증 모듈도 싣지 않는다. 켜진 브라우저에서도 지금처럼 저장된 값을 읽는다.)
+const SHARED_SCRIPTS = ['js/admin-utils.js', 'js/common.js', 'js/main.js'];
+function nonTargetPages() {
+    const all = execFileSync('git', ['-c', 'core.quotepath=false', 'ls-files', '--', '*.html'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter((f) => f && !f.includes('/'));
+    const targets = new Set(TARGET_PAGES.map((p) => p.file));
+    return all.filter((f) => !targets.has(f) && SHARED_SCRIPTS.some((js) => (workFile(f) || '').includes('src="' + js)));
+}
+async function sectionNonTarget(mutate) {
+    const problems = [];
+    let compared = 0;
+    const pages = nonTargetPages();
+    for (const file of pages) {
+        for (const stateName of ['빈 브라우저', '옛 학생', '옛 관리자']) {
+            for (const [name, baseVariant, nowVariant] of [['저장소 그대로', V.BASE, V.OFF], ['켜짐으로 내준 사본', V.BASE_T, V.ON]]) {
+                const run = async (variant, m) => {
+                    const w = world(stateName, variant, m);
+                    const page = await openPage(w, 't1', file, {});
+                    await w.browser.advance(6000);
+                    return { w, page, snap: snapshot(w, page) };
+                };
+                const base = await run(baseVariant);
+                const now = await run(nowVariant, mutate);
+                compared++;
+                const label = `대상이 아닌 화면(${file} · ${stateName} · ${name})`;
+                for (const d of diffSnapshot(base.snap, now.snap)) problems.push(`${label} › 기준과 다름: ${d}`);
+                if (now.page.evaluate('typeof EonAuth') !== 'undefined' || now.page.evaluate('typeof EonLogin') !== 'undefined') problems.push(`${label} › 게이트·인증 모듈이 실려 있음`);
+                // 그 화면이 스스로 끼워 넣는 스크립트(예: admin-settings 의 공지 편집기)는 기준에도 있다 — 기준과 같은지를 본다
+                if (JSON.stringify(now.snap.scripts) !== JSON.stringify(base.snap.scripts) || now.snap.channels !== base.snap.channels || now.snap.sdk !== base.snap.sdk) problems.push(`${label} › 끼워 넣는 스크립트·탭 사이 알림 통로·SDK 가 기준과 다름`);
+            }
+        }
+    }
+    return { problems, compared, pages };
 }
 
 // 꺼짐에서 사람이 누르는 동작(로그아웃·제출): 기준과 같은가
@@ -846,6 +883,14 @@ const PAGE_MUTANTS = [
         edits: [['js/dashboard.js', '    if (EonLogin.on()) {\n        EonLogin.member(eonDashboardStart);\n        return;\n    }\n    await checkLogin();', '    if (true) {\n        EonLogin.member(eonDashboardStart);\n        return;\n    }\n    await checkLogin();']],
     },
     {
+        name: '함께 싣는 스크립트가 게이트 없는 화면(관리자 화면)에서 한 길을 그대로 부르는 사본(admin-utils)', section: 'non-target', tests: [], expect: /대상이 아닌 화면\(admin-.*기준과 다름/,
+        edits: [['js/admin-utils.js', "    if (window.EonLogin) return window.EonLogin.raw();\n    return localStorage.getItem('iontoefl_user');", '    return window.EonLogin.raw();']],
+    },
+    {
+        name: '함께 싣는 스크립트가 게이트 없는 화면에서 저장된 값을 읽지 않는 사본(main.js)', section: 'non-target', tests: [], expect: /대상이 아닌 화면\(admin-users\.html.*기준과 다름/,
+        edits: [['js/main.js', "    if (window.EonLogin) return window.EonLogin.raw();\n    return localStorage.getItem('iontoefl_user');", '    return window.EonLogin ? window.EonLogin.raw() : null;']],
+    },
+    {
         name: '꺼짐인데 저장된 값을 읽지 않는 사본(한 길이 꺼짐에서 null)', section: 'off', tests: [], expect: /기준과 다름/,
         edits: [[GATE, '            if (!on()) return window.localStorage.getItem(KEY);', '            if (!on()) return null;']],
     },
@@ -877,6 +922,9 @@ async function sectionPageMutants() {
         if (m.section === 'off') {
             await run(async () => (await sectionOffPages(applyPageEdits(m.edits, []))).problems);
         }
+        if (m.section === 'non-target') {
+            await run(async () => (await sectionNonTarget(applyPageEdits(m.edits, []))).problems);
+        }
         for (const test of m.tests) await run(() => test({ mutate: applyPageEdits(m.edits, []) }));
         const hit = found.filter((p) => m.expect.test(p));
         if (hit.length === 0) {
@@ -903,6 +951,9 @@ export async function sectionPages() {
     const act = await sectionOffActions();
     add('꺼짐의 동작', act.problems);
     lines.push(`    - 꺼짐의 동작(로그아웃·제출 ${act.compared}가지)을 기준과 대조: 어긋남 ${act.problems.length}`);
+    const nt = await sectionNonTarget();
+    add('대상이 아닌 화면', nt.problems);
+    lines.push(`    - 대상이 아닌 화면 가운데 스크립트를 함께 싣는 화면 ${nt.pages.length}개(관리자 화면 — js/admin-utils.js·common.js·main.js) × 저장소 상태 3 × (저장소 그대로 / 켜짐으로 내준 사본) = ${nt.compared}건을 기준과 대조: 어긋남 ${nt.problems.length}`);
     for (const [name, test] of ON_PAGE_TESTS) {
         let list;
         try { list = await test({}); } catch (e) { list = [`시험 도중 예외: ${e && e.stack ? e.stack.split('\n').slice(0, 3).join(' / ') : e}`]; }
