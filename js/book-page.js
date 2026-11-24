@@ -34,16 +34,18 @@
 
   // 쪽이 종이(280mm)나 글 칸을 넘친 정도(px). 0 = 안 넘침.
   // ① 쪽 자체나 쪽 안 어떤 요소든 1058px 아래로 나간 만큼 ② overflow:hidden 상자 안에서 넘친 만큼 중 큰 값
+  // 모두 종이 px로 잰다: 화면 위치는 바깥 배율(place)만큼 커지거나 작으니 그 배율(k)로 나눈다 (2026-11-24, 125%에서 모든 쪽이 넘친다고 나오던 것)
   function overflowOf(root) {
     var r = root && root.querySelector('.bp-root'); if (!r) return 0;
     var pg = r.querySelector('.twp > .page') || r.firstElementChild; if (!pg) return 0;
-    var top = r.getBoundingClientRect().top;
-    var over = Math.max(0, pg.getBoundingClientRect().bottom - top - H);
+    var box = r.getBoundingClientRect(), top = box.top, k = box.width / W || 1;
+    var below = function (rect) { return (rect.bottom - top) / k - H; };
+    var over = Math.max(0, below(pg.getBoundingClientRect()));
     var els = pg.querySelectorAll('*');
     for (var i = 0; i < els.length; i++) {
       var el = els[i], cs = getComputedStyle(el);
       var rb = el.getBoundingClientRect();
-      if (rb.height > 0 && rb.bottom - top - H > over) over = rb.bottom - top - H;
+      if (rb.height > 0 && below(rb) > over) over = below(rb);
       if ((cs.overflowY === 'hidden' || cs.overflow === 'hidden') && el.clientHeight > 0 && !(el.classList && el.classList.contains('book-score-gauge'))) {   // 점수판 반원은 아래 반을 일부러 가린 것 (2026-11-17)
         var d = el.scrollHeight - el.clientHeight; if (d > over) over = d;
       }

@@ -15,6 +15,7 @@
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const DEV = params.get('dev') === '1' && ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  const MARK_CSS = '[data-be2-mark]{pointer-events:none}';
   const KEEP = ['white-space', 'overflow-wrap', 'word-break', 'line-break', '-webkit-line-break'];
 
   function checkAuth() {
@@ -75,6 +76,7 @@
     sec.innerHTML = '<div class="be2-label"><span>' + (i + 1) + '쪽</span><span class="ov"></span></div><div class="be2-paper"><div class="be2-host"></div></div>';
     const host = sec.querySelector('.be2-host');
     const root = BP.render(host, p.html, { edit: true });
+    const mk = document.createElement('style'); mk.textContent = MARK_CSS; root.appendChild(mk);   // 저장되는 .bp-root 밖이라 쪽 html에는 안 들어감
     S.secs.set(p.id, sec); S.roots.set(p.id, root);
     $('stack').appendChild(sec);
     root.querySelectorAll('.twp > .page').forEach((r) => makeEditable(r, p, root));
@@ -92,8 +94,18 @@
     r.setAttribute('spellcheck', 'false');
     r.style.setProperty('outline', 'none');
     r.querySelectorAll('img').forEach((im) => { im.setAttribute('contenteditable', 'false'); im.setAttribute('draggable', 'false'); });
-    // 위치가 고정된 장식(쪽 번호·머리글 띠 등)은 고치지 않는다: 글이 늘어도 쪽 높이가 안 변해 넘침을 못 잡고, 본문 위로 겹침
-    r.querySelectorAll('*').forEach((el) => { const pos = getComputedStyle(el).position; if ((pos === 'absolute' || pos === 'fixed') && !el.closest('[contenteditable="false"]')) el.setAttribute('contenteditable', 'false'); });
+    // 위치가 고정된 요소는 생김새로 나눈다 (2026-11-24 정리. 예전: 위치 고정이면 전부 잠금)
+    //  - 글 줄 안의 표식(그 줄에 다른 글자가 있음: → ① 2-1 EX): 장식. 잠그고 클릭은 그 줄 글자로 넘긴다(잠긴 칸에 커서가 빠지지 않게).
+    //    클릭 넘기기는 에디터 전용 표시(data-be2-mark) + 아래 MARK_CSS. inert는 그림을 눌렀을 때 커서를 쪽 맨 앞으로 보내서 쓰지 않는다
+    //  - 글자 없는 모양(분홍 테두리·띠): 잠근다
+    //  - 글자가 있는 따로 선 상자(사진 손글씨·머리글·쪽 번호): 다른 글처럼 고친다. 늘어나 종이 아래로 나가면 넘침 검사가 잡는다
+    const ownText = (el) => !!el && [...el.childNodes].some((n) => n.nodeType === 3 && n.data.trim());
+    r.querySelectorAll('*').forEach((el) => {
+      const pos = getComputedStyle(el).position;
+      if ((pos !== 'absolute' && pos !== 'fixed') || el.closest('[contenteditable="false"]')) return;
+      if (ownText(el.parentElement)) { el.setAttribute('contenteditable', 'false'); el.setAttribute('data-be2-mark', ''); }
+      else if (!el.textContent.trim()) el.setAttribute('contenteditable', 'false');
+    });
     const remember = () => { S.pre = caretOffset(root, r); };
     r.addEventListener('compositionstart', () => { S.composing = true; remember(); });
     r.addEventListener('compositionend', () => { S.composing = false; setTimeout(() => check(p, root, r), 0); });
@@ -177,6 +189,7 @@
     const c = twp.cloneNode(true);
     [...c.querySelectorAll(':scope > .page')].forEach((r, i) => { const o = S.orig.get(live[i]); if (o == null) r.removeAttribute('style'); else r.setAttribute('style', o); });
     c.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
+    c.querySelectorAll('[data-be2-mark]').forEach((el) => el.removeAttribute('data-be2-mark'));
     c.querySelectorAll('[spellcheck]').forEach((el) => el.removeAttribute('spellcheck'));
     c.querySelectorAll('img[draggable]').forEach((el) => el.removeAttribute('draggable'));
     // 입력 중 브라우저가 넣는 줄바꿈 없는 빈칸(nbsp)을 보통 빈칸으로 (원래 쪽에 nbsp가 없을 때만)
