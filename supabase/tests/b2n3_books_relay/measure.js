@@ -191,9 +191,12 @@ async function frameProbe() {
   return { gaps, ok: !!gaps && median(gaps) <= FRAME_SLOW_MEDIAN_MS && !document.hidden };
 }
 async function waitForFrames() {
+  const before = $('status').textContent;
+  let paused = false;
   for (;;) {
     const p = await frameProbe();
-    if (p.ok || ALLOW_SLOW_FRAMES || S.stop) return p;
+    if (p.ok || ALLOW_SLOW_FRAMES || S.stop) { if (paused) status(before); return p; } // 멈춤 문구를 남겨 두지 않는다
+    paused = true;
     status('멈춤: 화면 갱신이 느리거나 탭이 숨겨져 있다 — 이 창을 실제로 맨 앞에 보이게 두면 이어서 잰다');
     await sleep(1000);
   }
@@ -230,7 +233,8 @@ function resourceSummary(url) {
   const statuses = [...new Set(entries.map((e) => e.responseStatus).filter((x) => x))];
   const delivery = [...new Set(entries.map((e) => e.deliveryType).filter((x) => x !== undefined))];
   return {
-    requests_seen: entries.length, // 사전 요청(OPTIONS)은 여기 보이지 않는다
+    requests_seen: entries.length, // 측정 구간 안에 끝난 요청만 보인다(뒤에서 아직 받는 중이던 요청과 사전 요청은 빠진다) — 요청 수의 정본이 아니다
+    requests_seen_note: '아래쪽 어림이다. 가짜 응답 점검에서 함수 로그의 줄 수가 이 값보다 훨씬 많았다',
     preflight_options: '브라우저에서 관측 불가',
     transfer_bytes: sizesVisible ? entries.reduce((a, e) => a + (e.transferSize || 0), 0) : null,
     body_bytes: sizesVisible ? entries.reduce((a, e) => a + (e.encodedBodySize || 0), 0) : null,
@@ -569,10 +573,11 @@ function renderTiming() {
 function classifyAfterEnd(rec) {
   if (rec.error || rec.status === 0) return { class: 'unverified', what: `요청 오류(네트워크·CORS·시간 초과): ${rec.error}` };
   const j = rec.headers ? rec.headers.judge : null;
+  const n = rec.received_bytes || 0;
   if (rec.status === 200 || rec.status === 206) return { class: 'delivered', what: `HTTP ${rec.status}` };
-  if ((rec.received_bytes || 0) > 0 && rec.status !== 503) return { class: 'delivered', what: `HTTP ${rec.status} 인데 본문 ${rec.received_bytes}바이트가 왔다` };
-  if ((rec.status === 401 || rec.status === 403) && j === 'not_member') return { class: 'denied', what: `HTTP ${rec.status} · X-B2n3-Judge not_member` };
-  return { class: 'unverified', what: `HTTP ${rec.status} · X-B2n3-Judge ${j == null ? '없음(또는 관측 불가)' : j}` };
+  if (rec.body_matches_original) return { class: 'delivered', what: `HTTP ${rec.status} 인데 원본과 같은 본문 ${n}바이트가 왔다` };
+  if ((rec.status === 401 || rec.status === 403) && j === 'not_member' && n === 0) return { class: 'denied', what: `HTTP ${rec.status} · X-B2n3-Judge not_member · 본문 0` };
+  return { class: 'unverified', what: `HTTP ${rec.status} · X-B2n3-Judge ${j == null ? '없음(또는 관측 불가)' : j}${n ? ` · 본문 ${n}바이트(원본과 다름)` : ''}` };
 }
 async function requestSet(doc, url, headers, expectAllow) {
   const d = S.docs[doc];
@@ -581,11 +586,16 @@ async function requestSet(doc, url, headers, expectAllow) {
   const add = async (kind, opt, compare) => {
     const { rec, bytes } = await request(url, { headers, ...opt, cap: opt.cap ?? M1 });
     rec.kind = kind;
+    const want = compare ? await localBytes(doc, compare[0], compare[0] + Math.max(bytes.length, 1) - 1).catch(() => new Uint8Array(0)) : null;
     if (expectAllow) {
-      const want = compare ? await localBytes(doc, compare[0], compare[0] + Math.max(bytes.length, 1) - 1).catch(() => new Uint8Array(0)) : null;
       rec.bytes_equal = compare ? bytes.length > 0 && sameBytes(bytes, want.slice(0, bytes.length)) : null;
       rec.ok = kind === 'HEAD' ? rec.status === 200 : (rec.status === 200 || rec.status === 206) && rec.bytes_equal === true && (kind === 'GET' ? rec.status === 200 : rec.status === 206 && bytes.length === compare[1] - compare[0] + 1);
-    } else { Object.assign(rec, classifyAfterEnd(rec)); rec.protected_bytes = rec.status === 503 ? 0 : rec.received_bytes || 0; }
+    } else {
+      // 보호 본문이 왔는가: 받은 바이트가 원본의 같은 구간과 같은가(함수의 고정 문구 같은 다른 본문은 보호 본문이 아니다)
+      rec.body_matches_original = !!compare && bytes.length > 0 && sameBytes(bytes, want.slice(0, bytes.length));
+      Object.assign(rec, classifyAfterEnd(rec));
+      rec.protected_bytes = rec.class === 'delivered' ? rec.received_bytes || 0 : 0;
+    }
     out.push(rec);
   };
   await add('GET', {}, [0, M1 - 1]); // 범위 없는 GET: 앞 1MiB 만 받고 끊는다(전송량을 아끼려는 것)
@@ -671,7 +681,7 @@ function postLogoutVerdict(docs) {
   const counts = { total: sum('total'), denied: sum('denied'), delivered: sum('delivered'), unverified: sum('unverified'), protected_bytes: sum('protected_bytes') };
   const controlOk = by.every((x) => x.control_ok === true);
   const reasons = [];
-  if (counts.delivered > 0 || counts.protected_bytes > 0) reasons.push(`종료 뒤 요청 ${counts.delivered}건에 응답 본문이 전달됐다(보호 본문 ${counts.protected_bytes}바이트)`);
+  if (counts.delivered > 0 || counts.protected_bytes > 0) reasons.push(`종료 뒤 요청 ${counts.delivered}건이 열렸다(200·206 또는 원본과 같은 본문 — 보호 본문 ${counts.protected_bytes}바이트)`);
   if (counts.unverified > 0) reasons.push(`종료 뒤 요청 ${counts.unverified}건이 미확인: ${[...new Set(by.flatMap((x) => x.unverified_what || []))].join(' / ')}`);
   if (!controlOk) reasons.push('같은 때의 대조군(끝내지 않은 로그인)이 열리지 않았다 — 거절이 "그 로그인이 끝나서"임을 보일 수 없다');
   return { result: counts.delivered > 0 || counts.protected_bytes > 0 ? 'fail' : counts.unverified > 0 || !controlOk || counts.denied !== counts.total ? 'unverified' : 'pass', counts, control_ok: controlOk, reasons };
