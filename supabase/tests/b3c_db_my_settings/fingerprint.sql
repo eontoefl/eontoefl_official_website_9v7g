@@ -38,7 +38,7 @@ with want(fn_name, fn_args) as (
     ('my_settings'::pg_catalog.text, ''::pg_catalog.text),
     ('my_book_answers', ''),
     ('my_intro_track_set', 'text'),
-    ('my_marketing_consent_set', 'boolean'),
+    ('my_marketing_consent_set', 'jsonb'),
     ('my_book_answers_hold', 'jsonb')
 ),
 fn as (

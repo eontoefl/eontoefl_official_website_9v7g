@@ -2,7 +2,7 @@
 -- 보안작업 묶음 2 — 계약 3C-DB 되돌리기
 -- 대상: supabase/migrations/20261124091000_b3c_db_my_settings.sql 이 만든 것만 지운다 — 공개 함수 다섯.
 --     public.my_settings()                       public.my_book_answers()
---     public.my_intro_track_set(text)            public.my_marketing_consent_set(boolean)
+--     public.my_intro_track_set(text)            public.my_marketing_consent_set(jsonb)
 --     public.my_book_answers_hold(jsonb)
 --   * 다른 것은 건드리지 않는다(public.my_profile(), 2-가의 객체, 회원 표). cascade 를 쓰지 않는다(restrict) —
 --     이 함수들에 기대는 것이 있으면 그 자리에서 실패하고, 한 트랜잭션이므로 아무것도 지워지지 않는다.
@@ -31,7 +31,7 @@
 --          my_settings                1b860ef5b7f7ff1a78492f1206b7a113
 --          my_book_answers            da4a5694b1a0e37c9f95524e1f9cb04a
 --          my_intro_track_set         9d28cb0a39eaca18e65c517b587802c4
---          my_marketing_consent_set   4a63406377aa6ec78a9e235d84486c47
+--          my_marketing_consent_set   ec578f66f7a166e3195add7e0af8178f
 --          my_book_answers_hold       8db28a1bcf35981ccc44ec27078baf58
 --      이 값이 지금의 함수와 다르면 이 파일은 멈춘다. **도구(set-lines --for rollback)도 지문의 body_md5 가 파일에서 계산한
 --      값과 다르면 멈추고, 견줄 값을 스스로 바꿔 넘기지 않는다.** 원인을 사람이 확인해야 한다(누가 함수를 바꿨는가,
@@ -47,12 +47,12 @@ do $b3c_rb$
 declare
   v_names  constant text[] := array[
     'my_settings', 'my_book_answers', 'my_intro_track_set', 'my_marketing_consent_set', 'my_book_answers_hold'];
-  v_args   constant text[] := array['', '', 'text', 'boolean', 'jsonb'];   -- pg_get_function_identity_arguments 에서 인자 이름을 뺀 것
+  v_args   constant text[] := array['', '', 'text', 'jsonb', 'jsonb'];   -- pg_get_function_identity_arguments 에서 인자 이름을 뺀 것
   v_bodies constant text[] := array[
     '1b860ef5b7f7ff1a78492f1206b7a113',
     'da4a5694b1a0e37c9f95524e1f9cb04a',
     '9d28cb0a39eaca18e65c517b587802c4',
-    '4a63406377aa6ec78a9e235d84486c47',
+    'ec578f66f7a166e3195add7e0af8178f',
     '8db28a1bcf35981ccc44ec27078baf58'];
   v_raw_applied text := coalesce(pg_catalog.current_setting('b3c.applied', true), '');
   v_raw_bodies  text := coalesce(pg_catalog.current_setting('b3c.applied_body_md5', true), '');
@@ -157,7 +157,7 @@ begin
 
   -- 다섯 모두 확인됐다. 다섯을 지운다(이름을 적은 정적 문장)
   drop function public.my_book_answers_hold(jsonb) restrict;
-  drop function public.my_marketing_consent_set(boolean) restrict;
+  drop function public.my_marketing_consent_set(jsonb) restrict;
   drop function public.my_intro_track_set(text) restrict;
   drop function public.my_book_answers() restrict;
   drop function public.my_settings() restrict;

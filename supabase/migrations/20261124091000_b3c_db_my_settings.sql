@@ -9,7 +9,7 @@
 --   public.my_settings()                          returns jsonb   읽기: 입문서 종류 · 마케팅 동의
 --   public.my_book_answers()                      returns jsonb   읽기: 보관해 둔 입문서 신청 답변
 --   public.my_intro_track_set(p_track text)       returns jsonb   쓰기: intro_book_track 한 열
---   public.my_marketing_consent_set(p_consent boolean) returns jsonb   쓰기: marketing_consent · marketing_consent_at 두 열
+--   public.my_marketing_consent_set(p_consent jsonb) returns jsonb    쓰기: marketing_consent · marketing_consent_at 두 열
 --   public.my_book_answers_hold(p_answers jsonb)  returns jsonb   쓰기: pending_book_request 한 열
 -- 만들지 않는 것(빈 함수·권한도 두지 않는다): 내 정보 네 열 고치기, 별명 중복 확인, 보관 답변 지우기.
 --
@@ -50,7 +50,9 @@
 --   my_intro_track_set(p_track)   {"state":"ok","intro_book_track":<저장된 값>}
 --       p_track 은 'regular' 또는 'australia'. 널·그 밖의 값은 400 · message 'invalid_track'.
 --   my_marketing_consent_set(p_consent)   {"state":"ok","marketing_consent":true,"marketing_consent_at":<DB 의 시각>}
---       p_consent 는 참만. 거짓·널은 400 · message 'invalid_consent'. 시각은 인자로 받지 않는다 —
+--       p_consent 는 **JSON 의 true 만**. 인자의 형을 jsonb 로 둔 것은 JSON 의 형을 그대로 보려는 것이다(3차):
+--       boolean 인자였을 때는 PostgREST 가 JSON 글자 "true" · "yes" · "t" 와 숫자 1 을 참으로 바꿔 넘겼다(시험 프로젝트에서 확인됨).
+--       그 밖(글자 · 숫자 · 널 · 거짓 · 배열 · 객체)은 400 · message 'invalid_consent'. 시각은 인자로 받지 않는다 —
 --       행을 잠근 뒤의 DB 시각(clock_timestamp)을 쓴다. 부를 때마다 시각을 새로 쓴다(지금 화면의 동작과 같다).
 --   my_book_answers_hold(p_answers)   {"state":"ok","answers":<저장된 것: 열두 항목 + answered_at>}
 --       p_answers 는 정확히 열두 항목의 객체. 맞지 않으면 400 · message 'invalid_answers' · details 에 고정된 사유 이름
@@ -494,7 +496,7 @@ grant execute on function public.my_intro_track_set(text) to authenticated;
 -- ---------------------------------------------------------------------
 -- 4. 쓰기: 마케팅 동의(참만. 철회는 만들지 않는다)
 -- ---------------------------------------------------------------------
-create function public.my_marketing_consent_set(p_consent boolean)
+create function public.my_marketing_consent_set(p_consent jsonb)
 returns jsonb
 language plpgsql
 volatile
@@ -545,8 +547,11 @@ begin
     return pg_catalog.jsonb_build_object('state', 'withdrawal_pending');
   end if;
 
-  -- 받은 값: 참만(거짓 · 널은 거절 — 철회는 이 함수의 일이 아니다)
-  if p_consent is not true then
+  -- 받은 값: JSON 의 true 만. 형이 boolean 이고 값이 참일 때만 받는다.
+  -- 그 밖(SQL NULL · JSON null · false · 글자 "true" · 숫자 1 · 배열 · 객체)은 거절 — 철회는 이 함수의 일이 아니다. 받은 값은 오류에 싣지 않는다
+  if p_consent is null
+     or pg_catalog.jsonb_typeof(p_consent) is distinct from 'boolean'
+     or p_consent is distinct from 'true'::pg_catalog.jsonb then
     raise exception using errcode = 'PT400', message = 'invalid_consent';
   end if;
 
@@ -568,8 +573,8 @@ begin
 end;
 $b3c_consent$;
 
-revoke all on function public.my_marketing_consent_set(boolean) from public, anon, authenticated, service_role;
-grant execute on function public.my_marketing_consent_set(boolean) to authenticated;
+revoke all on function public.my_marketing_consent_set(jsonb) from public, anon, authenticated, service_role;
+grant execute on function public.my_marketing_consent_set(jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 5. 쓰기: 입문서 신청 답변 보관(통째로 덮어쓴다)
@@ -829,7 +834,7 @@ declare
     'public.my_settings()',
     'public.my_book_answers()',
     'public.my_intro_track_set(text)',
-    'public.my_marketing_consent_set(boolean)',
+    'public.my_marketing_consent_set(jsonb)',
     'public.my_book_answers_hold(jsonb)'];
   v_names  constant text[] := array[
     'my_settings', 'my_book_answers', 'my_intro_track_set', 'my_marketing_consent_set', 'my_book_answers_hold'];
