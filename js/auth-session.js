@@ -376,14 +376,19 @@
             if (m && m.v === 1 && typeof m.sid === 'string' && typeof m.sub === 'string' &&
                 typeof m.user === 'string' && typeof m.time === 'string') mark = m;
         } catch (e) { mark = null; }
-        const st = storedSession();
-        const storedSid = st && st.claims ? st.claims.sid : null;
+        // 저장된 새 방식의 로그인: 없음(absent) / 읽어서 기록 번호를 앎(ok) / 있지만 읽을 수 없음(unreadable)
+        let stored = 'absent';
+        let storedSid = null;
+        if (store.getItem(STORAGE_KEY) !== null) {
+            const st = storedSession();
+            if (st && st.claims) { stored = 'ok'; storedSid = st.claims.sid; } else stored = 'unreadable';
+        }
         let kind;
         if (user === null && time === null) kind = 'empty';
         else if (mark && user === mark.user && (time === mark.time || time === null)) kind = 'ours';
         else if (mark && user === null && time === mark.time) kind = 'ours';
         else kind = 'foreign';
-        return { kind: kind, user: user, time: time, mark: mark, storedSid: storedSid };
+        return { kind: kind, user: user, time: time, mark: mark, stored: stored, storedSid: storedSid };
     }
 
     function writeCompat(v) {
@@ -412,17 +417,19 @@
         }
     }
 
-    // 새 모듈이 만든 값(표식)만 지운다.
-    //   sid 를 주면: 그 로그인 기록의 것이거나 이미 주인 없는 값일 때만(다른 로그인의 값은 건드리지 않는다)
-    //   every 가 참이면: 새 모듈이 만든 값이면 전부(저장된 로그인을 읽지 못해 아무것도 확인할 수 없을 때)
-    function clearCompat(sid, every) {
+    // 새 모듈이 만든 값(표식)만 지운다. 지우는 것은 다음 둘뿐이다.
+    //   mine : 표식의 로그인 기록 번호가 sid(이 탭이 다루던 그 기록)와 정확히 같다
+    //   stale: 주인 없는 값 — 저장된 로그인을 실제로 읽어서(또는 저장된 것이 없음을 확인해서)
+    //          표식의 기록이 지금 저장된 기록이 아님이 확인됐다. 읽지 못한 것은 "다르다"로 치지 않는다
+    //   onlyMine 이 참이면(확인을 거두는 길) stale 로는 지우지 않는다 — 다른 계정의 값이거나 주인을 알 수 없으면 그대로 둔다
+    function clearCompat(sid, onlyMine) {
         try {
             const store = window.localStorage;
             const slot = readSlot();
             if (!slot.mark) return;
             const mine = sid !== null && sid !== undefined && slot.mark.sid === sid;
-            const stale = slot.mark.sid !== slot.storedSid;
-            if (!every && !mine && !stale) return;
+            const stale = slot.stored === 'absent' || (slot.stored === 'ok' && slot.mark.sid !== slot.storedSid);
+            if (!mine && (onlyMine || !stale)) return;
             if (slot.kind === 'ours') {
                 if (slot.user === slot.mark.user) store.removeItem(COMPAT_USER);
                 if (slot.time === slot.mark.time) store.removeItem(COMPAT_TIME);
@@ -672,11 +679,12 @@
     // 여기서는 공식 클라이언트에 묻지 않고 저장된 로그인을 직접 본다 — 공식 클라이언트에 물으면 갱신이 일어날 수 있고,
     // 갱신의 알림이 다시 이 함수를 부르므로(기기의 시계가 틀린 경우 등) 갱신이 되풀이될 수 있다.
     // 이 탭이 확인해 둔 것을 거둔다: 본인 정보·사이트 접근·표시를 더는 내주지 않는다.
-    // 서버의 로그인 기록·저장된 로그인 값·다른 로그인의 호환 값은 건드리지 않는다
-    // (새 모듈이 만든 호환 값은 그 로그인 기록의 것일 때만 정리한다 — clearCompat 의 규칙 그대로).
+    // 서버의 로그인 기록·저장된 로그인 값·다른 로그인의 호환 값은 건드리지 않는다.
+    // 새 모듈이 만든 호환 값은 표식의 로그인 기록 번호가 sid(이 탭이 확인했던 그 기록)와 정확히 같을 때만 정리한다.
+    // 다르거나 주인을 알 수 없으면 지우지 않고 이 탭의 표시만 거둔다.
     function withdraw(why, sid) {
         verified = null;
-        clearCompat(sid === undefined ? null : sid);
+        clearCompat(sid === undefined ? null : sid, true);
         setState('rejected', why);
     }
 
@@ -766,15 +774,16 @@
             client.onAuthStateChange(function () { scheduleReconcile(); });
         } catch (e) {
             client = null;
-            clearCompat(null, true);
+            const kept = storedSession();
+            clearCompat(kept && kept.claims ? kept.claims.sid : null, true);     // 확인할 수 없다: 지금 저장된 그 기록으로 만든 값만
             setState('signed_out', 'unavailable');
             return;
         }
         const cur = await readSession();
         if (cur.error) {
             // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다
-            clearCompat(null, true);
             const held = storedSession();
+            clearCompat(held && held.claims ? held.claims.sid : null, true);     // 이 탭이 복원하려던 그 기록으로 만든 값만
             lastRejected = held ? held.claims : null;      // 같은 기록을 알림마다 다시 묻지 않는다
             setState('rejected', 'network');
             return;
@@ -888,8 +897,8 @@
             const cur = await readSession();
             if (cur.error) {
                 verified = null;
-                clearCompat(null, true);
                 const held = storedSession();
+                clearCompat(held && held.claims ? held.claims.sid : null, true);
                 lastRejected = held ? held.claims : null;
                 setState('rejected', 'network');
                 return state;
