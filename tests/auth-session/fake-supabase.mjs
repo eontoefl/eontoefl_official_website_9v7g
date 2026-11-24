@@ -39,6 +39,44 @@ export class FakeSupabase {
         this.hooks = {};                // 'after:my_profile' 등
         this.faults = {};               // 'my_profile' → (요청) => 응답 | 'network' | null
         this.business = () => json(200, []);
+        this.scoreRows = [];            // (계약 3C-2a) 성적 표의 합성 행(시험이 넣는다)
+    }
+
+    // (계약 3C-2a) 성적 표(toefl_actual_scores)의 흉내 — 실제 서버가 이렇게 답한다는 증거가 아니다.
+    // 시험 프로젝트에서 읽은 규칙을 흉내 낸다: 익명 역할(공개 키)은 전부 보인다(익명 역할의 전체 허용 규칙이 남아 있다),
+    // 로그인 역할(회원 JWT)은 그 계정의 회원번호가 주인인 행만(관리자·aal2 는 전부). 만료된 JWT 는 401·PGRST303, 점검 중이면 503·PT503.
+    scoresTable(req, u) {
+        if (req.method !== 'GET') return json(405, { code: 'PT405', message: 'fake: 이 가짜 표는 읽기만' });
+        const kind = this.credentialKind(req);
+        let visible = [];
+        if (kind === 'anon') {
+            visible = this.scoreRows;
+        } else if (kind === 'member') {
+            const who = this.caller(req);
+            if (who.error) return who.error;
+            const c = readFakeJwt(this.bearer(req));
+            if (this.maintenance && !this.maintenanceExcept.has(c.sub)) return json(503, { code: 'PT503', message: 'maintenance' });
+            const account = [...this.accounts.values()].find((a) => a.authId === c.sub) || null;
+            const memberId = account && account.member === 'ok' && account.profile ? account.profile.id : null;
+            const admin = !!(account && account.admin && c.aal === 'aal2');
+            visible = this.scoreRows.filter((r) => admin || (memberId !== null && r.user_id === memberId));
+        } else {
+            return json(401, { code: 'PGRST301', message: 'fake: 자격 없음' });
+        }
+        const q = u.searchParams;
+        let rows = visible.slice();
+        for (const [k, v] of q) {
+            if (['select', 'order', 'limit'].includes(k)) continue;
+            if (v.startsWith('eq.')) rows = rows.filter((r) => String(r[k]) === v.slice(3));
+            else if (v.startsWith('in.(') && v.endsWith(')')) { const list = v.slice(4, -1).split(','); rows = rows.filter((r) => list.includes(String(r[k]))); }
+            else return json(400, { code: 'PGRST100', message: 'fake: 모르는 조건' });
+        }
+        if (q.get('order') === 'test_date.asc') rows.sort((a, b) => (a.test_date < b.test_date ? -1 : (a.test_date > b.test_date ? 1 : 0)));
+        rows = rows.slice(0, Number(q.get('limit') || '1000'));
+        const cols = (q.get('select') || '*') === '*' ? null : q.get('select').split(',');
+        const known = ['id', 'user_id', 'user_email', 'user_name', 'reading', 'listening', 'speaking', 'writing', 'overall', 'legacy_total', 'test_date', 'score_image', 'memo', 'created_at', 'updated_at'];
+        if (cols && cols.some((c) => !known.includes(c))) return json(400, { code: 'PGRST200', message: 'fake: 모르는 열·관계' });
+        return json(200, rows.map((r) => (cols ? Object.fromEntries(cols.map((c) => [c, r[c] === undefined ? null : r[c]])) : r)));
     }
 
     addAccount(a) {

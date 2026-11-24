@@ -42,36 +42,8 @@ function scoresResponse(w, req, u) {
     const bearer = w.server.bearer(req);
     if (entry.cred === 'member') { const c = readFakeJwt(bearer); entry.authId = c.sub; entry.sid = c.session_id; }
     w.scoreLog.push(entry);
-    if (req.method !== 'GET') return json(405, { code: 'PT405', message: 'fake: 이 가짜 표는 읽기만' });
-    let visible = [];
-    if (entry.cred === 'anon') {
-        visible = w.scores;
-    } else if (entry.cred === 'member') {
-        const who = w.server.caller(req);
-        if (who.error) return who.error;
-        const c = readFakeJwt(bearer);
-        const account = [...w.server.accounts.values()].find((a) => a.authId === c.sub) || null;
-        if (w.server.maintenance && !w.server.maintenanceExcept.has(c.sub)) return json(503, { code: 'PT503', message: 'maintenance' });
-        const memberId = account && account.member === 'ok' && account.profile ? account.profile.id : null;
-        const admin = !!(account && account.admin && c.aal === 'aal2');
-        visible = w.scores.filter((r) => admin || (memberId !== null && r.user_id === memberId));
-    } else {
-        return json(401, { code: 'PGRST301', message: 'fake: 자격 없음' });
-    }
-    const q = u.searchParams;
-    let rows = visible.slice();
-    for (const [k, v] of q) {
-        if (['select', 'order', 'limit'].includes(k)) continue;
-        if (v.startsWith('eq.')) rows = rows.filter((r) => String(r[k]) === v.slice(3));
-        else if (v.startsWith('in.(')) { const list = v.slice(4, -1).split(','); rows = rows.filter((r) => list.includes(String(r[k]))); }
-        else return json(400, { code: 'PGRST100', message: 'fake: 모르는 조건' });
-    }
-    if (q.get('order') === 'test_date.asc') rows.sort((a, b) => (a.test_date < b.test_date ? -1 : 1));
-    const limit = Number(q.get('limit') || '1000');
-    rows = rows.slice(0, limit);
-    const cols = (q.get('select') || '*') === '*' ? null : q.get('select').split(',');
-    if (cols && cols.some((c) => /[()]/.test(c) || !(c in SCORE_ROWS[0]))) return json(400, { code: 'PGRST200', message: 'fake: 모르는 열·관계' });
-    return json(200, rows.map((r) => (cols ? Object.fromEntries(cols.map((c) => [c, r[c]])) : r)));
+    w.server.scoreRows = w.scores;
+    return w.server.scoresTable(req, u);        // 규칙의 흉내는 가짜 서버(fake-supabase.mjs)의 것이다
 }
 
 // 가짜 업무 응답: 성적 표 + 재시작 신청 화면이 읽는 것(지난 신청서·회원 한 줄). 그 밖은 빈 목록

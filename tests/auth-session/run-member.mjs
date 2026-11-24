@@ -8,12 +8,16 @@
 // 시험이 기대하는 "나가야 하는 요청"의 글자는 여기(member-world.mjs)에 따로 적어 둔 것이다 — 제품의 규약표를 읽지 않는다.
 
 import fs from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { installNetworkGuard, realNetworkAttempts } from '../supabase-config-headers/harness.mjs';
 import { TEST_URL, AUTH_FILE, switchValue, memberTaskValue } from './rewrite.mjs';
 import { V, ACCOUNTS, FAKE_ANON, snapshot, diffSnapshot, checker, workFile } from './world.mjs';
 import { openPage, fire } from './pages-dom.mjs';
 import { memberWorld, memberOf, memberScoresUrl, wrapperScoresPath, scoreRequests, credOf, SCORE_COLUMNS, SCORE_TABLE } from './member-world.mjs';
+import { fakeJwt } from './fake-supabase.mjs';
+import { makePeople } from './business-fake.mjs';
+import os from 'node:os';
+import path from 'node:path';
 
 const A = ACCOUNTS.A;
 const B = ACCOUNTS.B;
@@ -600,6 +604,97 @@ async function testPersonChange(opt) {
     return c.problems;
 }
 
+// =====================================================================
+// 7. 실행기: 실제로 내보내는 업무 요청은 "그 경우의 합성 회원 한 명의 성적 읽기"뿐 — 차단기와 전송 지점이 따로 본다
+//    (둘 다 제품의 규약표를 읽지 않는다. 여기서는 그 둘이 제품이 실제로 만드는 요청과 같은 글자를 기대하는지도 본다)
+// =====================================================================
+const LOG_FILE = 'tests/auth-session/request-log.mjs';
+const CORE_FILE = 'tests/auth-session/screen-core.mjs';
+async function loadModule(FILE, mutate) {
+    if (!mutate) return import('./' + path.basename(FILE));
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    let text = mutate(FILE, workFile(FILE));
+    text = text.replace(/from '\.\/([a-z-]+\.mjs)'/g, (m, name) => `from ${JSON.stringify(pathToFileURL(path.join(here, name)).href)}`);
+    const file = path.join(os.tmpdir(), `b3c2a-${path.basename(FILE, '.mjs')}-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.mjs`);
+    fs.writeFileSync(file, text);
+    try { return await import(pathToFileURL(file).href); } finally { fs.unlinkSync(file); }
+}
+async function testRunnerGate(opt) {
+    const c = checker();
+    const log = await loadModule(LOG_FILE, opt.mutate);
+    const core = await loadModule(CORE_FILE, opt.mutate);
+    const anon = 'zz-fake-anon';
+    const ISS = TEST_URL + '/auth/v1';
+    const logins = { A: A.email, B: B.email, GM: ACCOUNTS.GM.email };
+    const people = makePeople({ loginEmails: () => logins });
+    people.note('A', A.profile);
+    people.note('B', B.profile);
+    const labels = people.labels();
+    const jwt = (acc, iss = ISS) => fakeJwt({ iss, role: 'authenticated', sub: acc.authId, email: acc.email, session_id: 'sess-x' });
+    const decide = log.makeDecider({ selfOrigins: ['http://127.0.0.1:8787'], anonKey: anon, issuer: ISS, memberEmails: () => Object.values(logins), accountLabels: () => labels });
+    const member = (acc) => ({ apikey: anon, authorization: 'Bearer ' + jwt(acc), 'content-type': 'application/json' });
+    const pub = { apikey: anon, authorization: 'Bearer ' + anon, 'content-type': 'application/json' };
+    const mUrl = (id) => memberScoresUrl(id);
+    const wUrl = (id) => TEST_URL + wrapperScoresPath(id);
+    const P = (credential, accounts) => ({ credential, accounts });
+    // 세 곳이 따로 적어 둔 글자가 서로 같은가(같아야 제품이 실제로 만드는 요청 — 위 1번 시험이 본 것 — 과 맞는다)
+    c.ok(new URL(mUrl('m-A')).search === log.scoresSearch('m-A', 'member') && new URL(wUrl('m-A')).search === log.scoresSearch('m-A', 'wrapper'), '실행기: 차단기가 따로 적어 둔 모양이 회귀시험이 따로 적어 둔 모양(제품이 실제로 보낸 것)과 다름');
+    const rows = [
+        // [이름, 메서드, 주소, 머리글, 허락, 기대 결정, 기대 까닭, 전송 지점의 기대]
+        ['회원 자격·A 의 것·허락(회원, A)', 'GET', mUrl('m-A'), member(A), P('member', ['A']), 'continue', 'none', true],
+        ['회원 자격·B 의 것·허락(회원, A·B)', 'GET', mUrl('m-B'), member(B), P('member', ['A', 'B']), 'continue', 'none', true],
+        ['공개 키·래퍼의 모양·허락(공개 키, A)', 'GET', wUrl('m-A'), pub, P('anon', ['A']), 'continue', 'none', true],
+        ['허락이 없음(회원 자격)', 'GET', mUrl('m-A'), member(A), null, 'abort', 'no-permit', false],
+        ['허락이 없음(공개 키)', 'GET', wUrl('m-A'), pub, null, 'fake', 'no-permit', false],
+        ['조건의 사람이 허락 밖(B 의 회원번호, 허락은 A)', 'GET', mUrl('m-B'), member(B), P('member', ['A']), 'abort', 'owner', false],
+        ['A 의 JWT 로 B 의 회원번호를 조건으로(허락은 A·B)', 'GET', mUrl('m-B'), member(A), P('member', ['A', 'B']), 'abort', 'jwt-owner-mismatch', false],
+        ['B 의 JWT 로 A 의 회원번호를 조건으로(허락은 A·B)', 'GET', mUrl('m-A'), member(B), P('member', ['A', 'B']), 'abort', 'jwt-owner-mismatch', false],
+        ['허락은 회원 자격인데 공개 키로', 'GET', wUrl('m-A'), pub, P('member', ['A']), 'fake', 'credential', false],
+        ['허락은 공개 키인데 회원 자격으로', 'GET', mUrl('m-A'), member(A), P('anon', ['A']), 'abort', 'credential', false],
+        ['회원 자격인데 래퍼의 모양(끝에 &)', 'GET', wUrl('m-A'), member(A), P('member', ['A']), 'abort', 'shape', false],
+        ['공개 키인데 전송 담당 함수의 모양', 'GET', mUrl('m-A'), pub, P('anon', ['A']), 'fake', 'shape', false],
+        ['조건을 더함', 'GET', mUrl('m-A') + '&memo=not.is.null', member(A), P('member', ['A']), 'abort', 'shape', false],
+        ['열을 더함(select=*)', 'GET', `${TEST_URL}/rest/v1/${SCORE_TABLE}?user_id=eq.m-A&select=*&order=test_date.asc&limit=50`, member(A), P('member', ['A']), 'abort', 'shape', false],
+        ['개수를 바꿈', 'GET', mUrl('m-A').replace('limit=50', 'limit=500'), member(A), P('member', ['A']), 'abort', 'shape', false],
+        ['조건 없는 조회', 'GET', `${TEST_URL}/rest/v1/${SCORE_TABLE}?select=*`, member(A), P('member', ['A']), 'abort', 'owner', false],
+        ['조건 없는 조회(공개 키)', 'GET', `${TEST_URL}/rest/v1/${SCORE_TABLE}?select=*`, pub, P('anon', ['A']), 'fake', 'owner', false],
+        ['번호 목록으로 묶은 조회(in)', 'GET', `${TEST_URL}/rest/v1/${SCORE_TABLE}?id=in.(x,y)&select=id`, member(A), P('member', ['A']), 'abort', 'owner', false],
+        ['로그인 계정 번호가 조건', 'GET', mUrl(A.authId), member(A), P('member', ['A']), 'abort', 'owner', false],
+        ['쓰기(POST)', 'POST', mUrl('m-A'), member(A), P('member', ['A']), 'abort', 'method', false],
+        ['다른 발급자의 JWT', 'GET', mUrl('m-A'), { apikey: anon, authorization: 'Bearer ' + jwt(A, 'https://qpqjevecjejvbeuogtbx.supabase.co/auth/v1') }, P('member', ['A']), 'abort', 'jwt-owner-mismatch', false],
+    ];
+    const recs = [];
+    for (const [name, method, url, headers, permit, want, why, wire] of rows) {
+        const d = decide({ url, method, headers, postData: method === 'POST' ? '{}' : null, resourceType: 'fetch', isNavigation: false, scoresPermit: permit });
+        recs.push(d.record);
+        c.ok(d.action === want, `실행기의 차단기(${name}): 결정이 ${want} 가 아님(${d.action})`);
+        c.ok(d.record.target === 'scores' && d.record.scores === (want === 'continue' ? 'permitted' : 'refused') && d.record.scoresWhy === why, `실행기의 차단기(${name}): 기록이 기대와 다름(${d.record.scores}·${d.record.scoresWhy})`);
+        c.ok(d.record.aborted === (want !== 'continue') && (want !== 'continue' || d.record.leak === false), `실행기의 차단기(${name}): "보내지 않음"·자격의 용도 판정이 결정과 다름`);
+        const sent = core.wireScoresOk({ method, rawUrl: url, headers, permit, anonKey: anon, testUrl: TEST_URL, issuer: ISS, memberIdOf: (k) => people.memberIdOf(k), accountOfJwt: (auth) => people.accountOfJwt(auth) });
+        c.ok(sent === wire, `실행기의 전송 지점(${name}): 내보내는가가 기대(${wire})와 다름(${sent})`);
+    }
+    // 회원번호를 아직 모르는 계정(my_profile 을 보지 못함)의 성적 읽기는 허락이 있어도 내보내지 않는다
+    {
+        const d = decide({ url: mUrl('m-GM'), method: 'GET', headers: member(ACCOUNTS.GM), postData: null, resourceType: 'fetch', isNavigation: false, scoresPermit: P('member', ['GM']) });
+        const sent = core.wireScoresOk({ method: 'GET', rawUrl: mUrl('m-GM'), headers: member(ACCOUNTS.GM), permit: P('member', ['GM']), anonKey: anon, testUrl: TEST_URL, issuer: ISS, memberIdOf: (k) => people.memberIdOf(k), accountOfJwt: (auth) => people.accountOfJwt(auth) });
+        c.ok(d.action !== 'continue' && sent === false, '실행기(회원번호를 모르는 계정): 성적 읽기를 내보냄');
+    }
+    // 성적 표가 아닌 업무 요청은 허락이 있어도 그대로 막는다. 인증 모듈의 요청은 그대로 나간다
+    {
+        const other = decide({ url: `${TEST_URL}/rest/v1/applications?user_id=eq.m-A`, method: 'GET', headers: pub, postData: null, resourceType: 'fetch', isNavigation: false, scoresPermit: P('anon', ['A']) });
+        const otherMember = decide({ url: `${TEST_URL}/rest/v1/users?id=eq.m-A`, method: 'GET', headers: member(A), postData: null, resourceType: 'fetch', isNavigation: false, scoresPermit: P('member', ['A']) });
+        const profile = decide({ url: `${TEST_URL}/rest/v1/rpc/my_profile`, method: 'POST', headers: member(A), postData: '{}', resourceType: 'fetch', isNavigation: false, scoresPermit: P('member', ['A']) });
+        c.ok(other.action === 'fake' && otherMember.action === 'abort' && otherMember.record.leak === true && profile.action === 'continue' && !('scores' in profile.record), '실행기의 차단기: 성적 표가 아닌 업무 요청을 내보내거나(허락이 다른 표로 번짐) 인증 모듈의 요청을 막음');
+    }
+    // 셈과 기록
+    const sum = log.summarize(recs);
+    c.ok(sum.scoresPermitted === 3 && sum.scoresRefused === rows.length - 3 && sum.scoresAttempts === rows.length && sum.businessSent === 0, `실행기의 차단기: 성적 요청의 셈이 기대와 다름(${sum.scoresPermitted}·${sum.scoresRefused}·${sum.businessSent})`);
+    c.ok(sum.scoresJwtOwnerMismatch >= 3, '실행기의 차단기: "JWT 의 사람 ≠ 조건의 사람"을 세지 않음');
+    c.ok(recs.every((r) => !/zz\.invalid|eyJ|\/rest\/|m-A|m-B/.test(JSON.stringify(r))), '실행기의 차단기: 기록에 주소·값이 남음');
+    c.ok(recs.every((r) => log.SCORES_WHY.includes(r.scoresWhy) && ['A', 'B', 'GM', 'none'].includes(r.scoresOwner) && ['A', 'B', 'GM', 'none'].includes(r.scoresJwt)), '실행기의 차단기: 기록의 이름이 정해 둔 것이 아님');
+    return c.problems;
+}
+
 const TESTS = [
     ['열림: 확인 뒤에만·회원 자격으로·규약의 모양 그대로, 그 밖의 요청은 3C-1 의 켜짐과 같음, 화면 결과는 같은 합성 자료의 꺼짐과 같음(A·B·성적 0건 회원)', testOpenRead],
     ['스위치의 조합 넷(꺼짐 = 기준·3C-1 의 꺼짐 / 켜짐 + 닫힘 = 3C-1 의 켜짐 / 켜짐 + 열림 / 확인할 수 없음 + 열림 = 성적 요청 0)과 저장소의 값(닫힘)', testSwitchMatrix],
@@ -607,6 +702,7 @@ const TESTS = [
     ['실패·거절·점검·시간 초과: 상태가 맞음, 다시 보내지 않음, 공개 키 재시도 0, 화면은 지금 실패했을 때와 같음, 적던 값 불변', testFailures],
     ['만료(401·PGRST303)의 다섯 갈래: 갱신 한 번 뒤 한 번만 — 갈래마다 정해진 횟수에서 끝남', testExpiry],
     ['시작할 때의 사람을 붙든다: 사람이 달라지면 보내지 않거나 응답을 버림, A 가 시작한 흐름은 B 의 JWT 로 이어 보내지 않음', testPersonChange],
+    ['실행기: 내보내는 업무 요청은 "그 경우의 합성 회원 한 명의 성적 읽기"뿐 — 차단기와 전송 지점이 따로 본다(제품의 규약표를 읽지 않음)', testRunnerGate],
 ];
 
 // =====================================================================
@@ -672,6 +768,26 @@ const MUTANTS = [
         edits: [[AUTH_FILE, "        'my-scores': Object.freeze({ open: false,", "        'my-scores': Object.freeze({ open: true,"]] },
     { name: '모듈을 받지 못한 켜진 화면에서 공개 키로 읽는 사본', tests: [testSwitchMatrix], expect: /성적 이력의 코드를 직접 부름\): 성적 요청이 나감/,
         edits: [[FORM_FILE, '        if (EonLogin.on() && (EonLogin.missing() || !eonReads)) {', '        if (false) {']] },
+    { name: '실행기의 차단기가 허락 없이도 성적 요청을 내보내는 사본', tests: [testRunnerGate], expect: /실행기의 차단기\(허락이 없음/,
+        edits: [[LOG_FILE, "    else if (!permit || !Array.isArray(permit.accounts)) why = 'no-permit';\n", "    else if (!permit || !Array.isArray(permit.accounts)) permit = { credential: cred === 'member' ? 'member' : 'anon', accounts: [owner] };\n"]] },
+    { name: '실행기의 차단기가 JWT 의 사람과 조건의 사람을 견주지 않는 사본', tests: [testRunnerGate], expect: /실행기의 차단기\([AB] 의 JWT 로/,
+        edits: [[LOG_FILE, "    else if (permit.credential === 'member' && jwt !== owner) why = 'jwt-owner-mismatch';\n", '']] },
+    { name: '실행기의 차단기가 요청의 모양을 보지 않는 사본', tests: [testRunnerGate], expect: /실행기의 차단기\((조건을 더함|개수를 바꿈|열을 더함)/,
+        edits: [[LOG_FILE, "    else if (shape !== (permit.credential === 'member' ? 'member' : 'wrapper')) why = 'shape';\n", ''], [LOG_FILE, "            else if (owner === 'none' && u.searchParams.get('user_id') === 'eq.' + id) owner = label;", "            else if (owner === 'none' && u.searchParams.get('user_id') === 'eq.' + id) { owner = label; shape = 'member'; }"]] },
+    { name: '실행기의 차단기가 허락의 계정을 보지 않는 사본', tests: [testRunnerGate], expect: /실행기의 차단기\(조건의 사람이 허락 밖/,
+        edits: [[LOG_FILE, "    else if (owner === 'none' || !permit.accounts.includes(owner)) why = 'owner';", "    else if (owner === 'none') why = 'owner';"]] },
+    { name: '실행기의 차단기가 허락한 자격의 종류를 보지 않는 사본', tests: [testRunnerGate], expect: /실행기의 차단기\(허락은 (회원 자격인데 공개 키로|공개 키인데 회원 자격으로)/,
+        edits: [[LOG_FILE, "    else if (permit.credential === 'member' ? cred !== 'member' : !(permit.credential === 'anon' && exactAnon)) why = 'credential';\n", '']] },
+    { name: '실행기의 전송 지점이 허락의 계정을 보지 않는 사본(아는 회원번호면 내보냄)', tests: [testRunnerGate], expect: /실행기의 전송 지점\((조건의 사람이 허락 밖|허락이 없음)/,
+        edits: [[CORE_FILE, '    for (const k of permit.accounts) {\n        const id = memberIdOf(k);', "    for (const k of ['A', 'B', 'GM']) {\n        const id = memberIdOf(k);"], [CORE_FILE, "    if (!permit || !Array.isArray(permit.accounts) || !anonKey || method !== 'GET') return false;", "    if (!anonKey || method !== 'GET') return false;\n    if (!permit) permit = { credential: 'member', accounts: [] };"]] },
+    { name: '실행기의 전송 지점이 JWT 의 사람을 보지 않는 사본', tests: [testRunnerGate], expect: /실행기의 전송 지점\([AB] 의 JWT 로/,
+        edits: [[CORE_FILE, "auth !== 'Bearer ' + anonKey && ours && accountOfJwt(auth) === k) return true;", "auth !== 'Bearer ' + anonKey && ours) return true;"]] },
+    { name: '실행기의 전송 지점이 JWT 의 발급자를 보지 않는 사본', tests: [testRunnerGate], expect: /실행기의 전송 지점\(다른 발급자의 JWT/,
+        edits: [[CORE_FILE, "        const ours = !!c && c.role === 'authenticated' && c.iss === issuer;", "        const ours = !!c && c.role === 'authenticated';"]] },
+    { name: '실행기의 전송 지점이 요청의 글자를 보지 않는 사본(시작만 같으면 내보냄)', tests: [testRunnerGate], expect: /실행기의 전송 지점\((조건을 더함|회원 자격인데 래퍼의 모양)/,
+        edits: [[CORE_FILE, "        if (permit.credential === 'member' && u.search === search && auth", "        if (permit.credential === 'member' && u.search.startsWith(search) && auth"]] },
+    { name: '실행기의 전송 지점이 허락한 자격의 종류를 보지 않는 사본(공개 키 허락에 회원 자격을 내보냄)', tests: [testRunnerGate], expect: /실행기의 전송 지점\(허락은 공개 키인데 회원 자격으로/,
+        edits: [[CORE_FILE, "        if (permit.credential === 'member' && u.search === search && auth", "        if (u.search === search && auth"], [CORE_FILE, "        const c = permit.credential === 'member' ? jwtClaims(auth) : null;", '        const c = jwtClaims(auth);']] },
     { name: '꺼진 화면의 성적 요청이 달라진 사본(열을 줄임)', tests: [testSwitchMatrix], expect: /꺼짐\(A\): 기준\(14455ae\)과 다름|꺼짐\(A\): 성적 요청이/,
         edits: [[FORM_FILE, "                'select': 'test_date,reading,listening,speaking,writing,overall,legacy_total',", "                'select': 'test_date,overall',"]] },
     { name: '꺼진 화면이 전송 담당 함수를 타는 사본(꺼짐인데 켜진 길)', tests: [testSwitchMatrix], expect: /꺼짐\(A\): 기준\(14455ae\)과 다름|꺼짐\(A\): 성적 요청이/,

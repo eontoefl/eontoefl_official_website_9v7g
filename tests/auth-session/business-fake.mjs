@@ -10,6 +10,7 @@
 
 export const FAKE_APP = '00000000-0000-4000-8000-0000b3c1a001';      // 가짜 응답에만 있는 신청서 번호(시험 프로젝트의 DB 에는 없다)
 export const FAKE_POST = 'zz-b3c1-post';                              // 가짜 응답에만 있는 글 번호
+export const FAKE_PREV_APP = '00000000-0000-4000-8000-0000b3c2a0';    // (계약 3C-2a) 가짜 응답에만 있는 "지난 신청서(수강 1)" 번호의 앞부분 — 뒤에 이름표가 붙는다
 const CONTENT_TABLES = ['notices', 'reviews', 'reviews_book', 'study_certifications', 'materials', 'application_notices'];
 // A 의 my_profile 을 아직 보지 못했을 때의 가짜 자료의 주인(어느 합성 계정도 아니다)
 const NOBODY = { id: 'zz-fake-nobody', name: '합성 신청자', email: 'nobody@fake-rows.zz.invalid' };
@@ -25,6 +26,18 @@ export function makePeople({ loginEmails, fixturesFromLoginEmail = false } = {})
     // **가짜 자료와 이름표가 쓰는 "그 사람의 이메일"** — my_profile 이 준 회원 표의 이메일
     const emailOf = (k) => (fixturesFromLoginEmail ? login()[k] : seen.emails[k]) || '';
     const person = (k) => (known(k) ? { id: seen.ids[k], name: seen.names[k], email: emailOf(k) } : null);
+    // (계약 3C-2a) 재시작이 허용된 회원의 이름표들: 그 회원의 "기존 신청 확인"(회원 이메일이 조건)에 지난 신청서 한 건을 준다
+    // → 신청서 화면이 재시작 신청 화면이 되고 성적 이력을 읽는다. 그 신청서는 가짜 응답에만 있다
+    let restart = [];
+    const restartApp = (k) => {
+        const p = person(k);
+        return {
+            id: FAKE_PREV_APP + String(Object.keys(seen.ids).indexOf(k) + 10), email: p.email, user_email: p.email, user_id: p.id, name: p.name, phone: '010-0000-0000', application_type: 'challenge',
+            deleted: false, withdrawn_at: null, enrollment_no: 1, restart_allowed_at: '2026-11-01T00:00:00Z', superseded_by: null, restart_materials: [],
+            has_toefl_score: 'no', address: '합성 주소', bank_name: '합성은행', account_number: '000-00-000000', account_holder: p.name,
+            preferred_program: '', preferred_correction: '', submitted_date: '2026-06-01', created_at: '2026-06-01T00:00:00Z',
+        };
+    };
     const byValue = (v) => Object.keys(seen.ids).find((k) => known(k) && (same(emailOf(k), v) || seen.ids[k] === v));
 
     return {
@@ -52,6 +65,8 @@ export function makePeople({ loginEmails, fixturesFromLoginEmail = false } = {})
         // 판정의 기대에 쓰는 값(화면에 보여야 하는 것) — 언제나 my_profile 에서 본 것
         nameOf: (k) => (known(k) ? seen.names[k] : ''),
         memberEmailOf: (k) => (known(k) ? seen.emails[k] : ''),
+        memberIdOf: (k) => (known(k) ? seen.ids[k] : ''),
+        setRestart: (keys) => { restart = Array.isArray(keys) ? keys.slice() : []; },
         // 로그인 이메일과 회원 이메일이 다른가(같으면 "화면이 로그인 이메일을 조건에 쓰는가"를 잴 수 없다). 모르면 null
         differs: (k) => (known(k) && login()[k] ? !same(seen.emails[k], login()[k]) : null),
         // 결과에 적히면 안 되는 값들(끝에서 흔적을 찾아보는 데만 쓴다): my_profile 에서 본 회원 이메일과, 짧지 않은 회원번호
@@ -83,6 +98,7 @@ export function makePeople({ loginEmails, fixturesFromLoginEmail = false } = {})
             }
             if (table === 'applications') {
                 if (eq('id')) return eq('id') === FAKE_APP ? [appA] : [];
+                if (eq('email')) { const k = restart.find((x) => known(x) && same(emailOf(x), eq('email'))); if (k) return [restartApp(k)]; }
                 if (q.has('email') || q.has('user_id') || q.has('user_email')) return [];       // 합성 회원은 "신청서가 없는 회원"이다(번호로 열 때만 A 의 가짜 신청서 한 건)
                 return [appA];                                                                  // 신청 게시판의 목록
             }

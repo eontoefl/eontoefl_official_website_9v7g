@@ -14,6 +14,10 @@
 //       막은 업무 요청에는 실행기가 가짜 응답을 준다(화면의 동작을 보려는 것이다 — 실제 업무 성공으로 세지 않는다).
 //       판정은 "시도"로 한다: 시도한 요청의 갈래(쓰기·부분 검색·조건 없는 조회·조건 있는 조회·그 밖)와,
 //       조건의 값이 이번 실행의 어느 합성 계정의 것인지(이름표만)를 기록한다.
+//   * (계약 3C-2a) 업무 요청 가운데 내보내는 것이 하나 생겼다: **그 경우의 합성 회원 한 명의 성적 읽기**.
+//       경우가 허락(scoresPermit — 자격의 종류와 계정의 이름표)을 걸어 둔 동안에만, 아래에 따로 적어 둔 모양과 글자까지 같고,
+//       조건의 값이 그 계정의 회원번호이며, 자격이 허락한 종류(회원 JWT 면 그 계정의 것, 공개 키면 공개 키 그대로)일 때만 내보낸다.
+//       이 모양은 제품의 규약표를 읽지 않고 여기에 따로 적는다 — 제품의 검사와 같은 가정을 나눠 갖지 않게.
 
 import { TEST_URL } from './rewrite.mjs';
 import { STATIC_ALLOW } from './serve-core.mjs';
@@ -97,6 +101,51 @@ function targetName(method, u) {
 //   unconditioned   조건 없는 조회(전체 목록)
 //   read            조건 있는 조회
 //   other           그 밖(GET 인 RPC·파일 등)
+// (계약 3C-2a) 실행기가 따로 적어 둔 "내보내도 되는 성적 읽기"의 모양
+export const SCORES_PATH = '/rest/v1/toefl_actual_scores';
+const SCORES_TAIL = '&select=test_date%2Creading%2Clistening%2Cspeaking%2Cwriting%2Coverall%2Clegacy_total&order=test_date.asc&limit=50';
+// 회원번호 하나에 대한 두 모양: 전송 담당 함수(회원 자격)가 보내는 것 / 공개 래퍼(공개 키)가 보내는 것(끝에 & 가 붙는다)
+export const scoresSearch = (memberId, form) => `?user_id=eq.${memberId}${SCORES_TAIL}${form === 'wrapper' ? '&' : ''}`;
+export const SCORES_WHY = ['none', 'method', 'no-permit', 'owner', 'credential', 'jwt-owner-mismatch', 'shape'];
+
+// 성적 표로 가는 요청 하나를 본다. 돌려주는 값: null(성적 표로 가는 요청이 아님) 또는
+//   { ok, why(정해 둔 이름), owner(조건의 회원번호가 누구의 것인가 — 이름표), jwt(실린 회원 JWT 가 누구의 것인가 — 이름표), shape }
+// permit: { credential: 'member' | 'anon', accounts: [이름표…] } 또는 null(허락 없음 — 어느 성적 요청도 내보내지 않는다)
+export function scoresLook({ u, method, headers, anonKey, issuer, labels, permit }) {
+    if (!u || u.origin !== TEST_URL || u.pathname !== SCORES_PATH) return null;
+    const all = labels || {};
+    const lower = (s) => String(s).trim().toLowerCase();
+    let owner = 'none';
+    let shape = 'other';
+    for (const [label, own] of Object.entries(all)) {
+        for (const id of (own && Array.isArray(own.ids) ? own.ids : [])) {
+            if (typeof id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(id)) continue;
+            if (u.search === scoresSearch(id, 'member')) { owner = label; shape = 'member'; }
+            else if (u.search === scoresSearch(id, 'wrapper')) { owner = label; shape = 'wrapper'; }
+            else if (owner === 'none' && u.searchParams.get('user_id') === 'eq.' + id) owner = label;
+        }
+    }
+    const auth = headerOf(headers, 'authorization') || '';
+    const cred = credentialKind(headers, anonKey);
+    let jwt = 'none';
+    if (cred === 'member') {
+        const c = claimsOf(auth.slice(7)) || {};
+        if (typeof c.email === 'string' && (!issuer || c.iss === issuer)) {
+            for (const [label, own] of Object.entries(all)) if ((own && Array.isArray(own.loginEmails) ? own.loginEmails : []).some((e) => typeof e === 'string' && e && lower(e) === lower(c.email))) jwt = label;
+        }
+    }
+    const exactAnon = !!anonKey && auth === 'Bearer ' + anonKey && headerOf(headers, 'apikey') === anonKey;
+    let why = 'none';
+    if (String(method).toUpperCase() !== 'GET') why = 'method';
+    else if (!permit || !Array.isArray(permit.accounts)) why = 'no-permit';
+    else if (owner === 'none' || !permit.accounts.includes(owner)) why = 'owner';
+    else if (permit.credential === 'member' ? cred !== 'member' : !(permit.credential === 'anon' && exactAnon)) why = 'credential';
+    else if (permit.credential === 'member' && jwt !== owner) why = 'jwt-owner-mismatch';
+    else if (shape !== (permit.credential === 'member' ? 'member' : 'wrapper')) why = 'shape';
+    else if (headerOf(headers, 'apikey') !== anonKey) why = 'credential';
+    return { ok: why === 'none', why, owner, jwt, shape, cred };
+}
+
 const CONTROL_PARAMS = ['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'];
 const PARTIAL_OPS = /^(not\.)?(ilike|like|imatch|match|fts|plfts|phfts|wfts)(\(|\.)/;
 export const BUSINESS_KINDS = ['write', 'partial-search', 'unconditioned', 'read', 'other'];
@@ -171,11 +220,16 @@ export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accoun
 
         const cred = credentialKind(req.headers, anonKey);
         const items = secretItems(req.postData);
+        const labels = typeof accountLabels === 'function' ? accountLabels() : accountLabels;
+        // (계약 3C-2a) 성적 표로 가는 요청인가, 그 경우가 허락한 그 한 가지인가
+        const sc = where === 'test-project' ? scoresLook({ u, method: rawMethod, headers: req.headers, anonKey, issuer, labels, permit: req.scoresPermit || null }) : null;
+        if (sc) target = 'scores';
         // 자격의 종류와 용도
         const problems = [];
         if (items.password && !(where === 'test-project' && target === 'login')) problems.push('password');
         if (items.refreshToken && !(where === 'test-project' && target === 'refresh')) problems.push('refresh_token');
-        if (cred === 'member' && !(where === 'test-project' && MEMBER_JWT_TARGETS.includes(target))) problems.push('member_jwt');
+        // 회원 JWT 가 실려도 되는 곳: 로그아웃·두 RPC, 그리고 허락된 그 성적 읽기 하나
+        if (cred === 'member' && !(where === 'test-project' && (MEMBER_JWT_TARGETS.includes(target) || (sc && sc.ok)))) problems.push('member_jwt');
         if (cred === 'member' && issuer) {
             const c = claimsOf((headerOf(req.headers, 'authorization') || '').slice(7)) || {};
             if (c.iss !== issuer || typeof c.email !== 'string' || !emailsNow().includes(c.email.trim().toLowerCase())) problems.push('foreign_member_jwt');
@@ -190,14 +244,15 @@ export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accoun
         const allowed = placeOk && !leak;
         // (계약 3C-1) 업무 요청: 인증 모듈의 다섯 요청이 아닌, 시험 프로젝트로 가는 요청 — 전부 전송 전에 막는다
         const isBusiness = where === 'test-project' && !Object.values(NAMED).includes(target);
-        const businessOf = isBusiness ? (u ? businessKind(rawMethod, u, target) : 'other') : null;
-        const labels = typeof accountLabels === 'function' ? accountLabels() : accountLabels;
+        const businessOf = isBusiness ? (u ? businessKind(rawMethod, u, sc ? 'rest-table' : target) : 'other') : null;
         const businessBlocked = allowed && isBusiness;
+        const passScores = businessBlocked && !!sc && sc.ok;                    // (계약 3C-2a) 허락된 성적 읽기 하나만 막지 않는다
         const whose = isBusiness ? businessAccount(u, labels) : null;
-        return {
+        const scoresRecord = !sc ? {} : { scores: sc.ok ? 'permitted' : 'refused', scoresWhy: sc.why, scoresOwner: sc.owner, scoresJwt: sc.jwt, scoresShape: sc.shape };
+        const decided = {
             // fake: 전송 전에 막고, 실행기가 가짜 응답을 준다(보내지 않는다). 자격 위반·허용 밖은 가짜 응답 없이 중단(abort)
             action: !allowed ? 'abort' : (businessBlocked ? 'fake' : 'continue'),
-            record: Object.assign(!isBusiness ? {} : { business: businessOf, account: whose.account, accountBy: whose.by }, {
+            record: Object.assign(!isBusiness ? {} : { business: businessOf, account: whose.account, accountBy: whose.by }, scoresRecord, {
                 where, target, nav, type, method,
                 apikey: headerOf(req.headers, 'apikey') !== null,
                 credential: cred,
@@ -209,6 +264,8 @@ export function makeDecider({ selfOrigins, anonKey, issuer, memberEmails, accoun
                 aborted: !allowed || businessBlocked,
             }),
         };
+        if (passScores) { decided.action = 'continue'; decided.record.aborted = false; }
+        return decided;
     };
 }
 
@@ -234,7 +291,12 @@ export function summarize(records) {
         outsideBlockedRequest: is((r) => (r.where === 'outside' || r.where === 'sink') && !r.nav && r.aborted),
         outsideSent: is((r) => (r.where === 'outside' || r.where === 'sink' || (r.where === 'test-project' && r.nav)) && !r.aborted),
         // (계약 3C-1) 업무 요청: 내보낸 것은 0 이어야 한다. 시도는 갈래마다 센다(가짜 응답을 받은 화면은 업무 성공이 아니다)
-        businessSent: is((r) => r.business && !r.aborted),
+        // (계약 3C-2a) 허락된 성적 읽기는 따로 센다 — 그 밖의 업무 요청이 나간 것은 여전히 0 이어야 한다
+        businessSent: is((r) => r.business && !r.aborted && r.scores !== 'permitted'),
+        scoresPermitted: is((r) => r.scores === 'permitted' && !r.aborted),
+        scoresRefused: is((r) => r.scores === 'refused'),
+        scoresAttempts: is((r) => r.target === 'scores'),
+        scoresJwtOwnerMismatch: is((r) => r.target === 'scores' && r.credential === 'member' && r.scoresJwt !== r.scoresOwner),
         businessAttempts: Object.fromEntries(BUSINESS_KINDS.map((k) => [k, is((r) => r.business === k)])),
         // 시도의 이름표: 어느 열의 값으로 맞았는가(회원 이메일 / 회원번호 / 로그인 이메일 / 없음). 시험이 일부러 시킨 대조용 시도(probe)는 빼고 센다
         businessLabeled: Object.fromEntries(ACCOUNT_BY.map((k) => [k, is((r) => r.business && !r.probe && r.accountBy === k)])),

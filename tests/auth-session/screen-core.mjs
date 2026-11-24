@@ -184,3 +184,37 @@ export function browserEnv(env) {
     }
     return out;
 }
+
+// ---------------------------------------------------------------------------
+// (계약 3C-2a) 전송 지점이 따로 보는 "내보내도 되는 성적 읽기".
+// 차단기(request-log.mjs)의 결정과 독립이다 — 차단기의 것을 들여오지 않고 모양을 여기 다시 적는다. 제품의 규약표도 읽지 않는다.
+// 그 경우가 허락(permit — 자격의 종류와 계정의 이름표)을 걸어 둔 동안에만, 아래의 글자와 같고, 조건의 값이 그 계정의 회원번호
+// (my_profile 에서 본 것)이며, 자격이 허락한 종류일 때만 참이다: 회원이면 그 계정의 JWT, 공개 키면 공개 키 그대로.
+// ---------------------------------------------------------------------------
+export const WIRE_SCORES_PATH = '/rest/v1/toefl_actual_scores';
+const WIRE_SCORES_TAIL = '&select=test_date%2Creading%2Clistening%2Cspeaking%2Cwriting%2Coverall%2Clegacy_total&order=test_date.asc&limit=50';
+const jwtClaims = (auth) => {
+    try {
+        const parts = String(auth).replace(/^Bearer /, '').split('.');
+        return parts.length === 3 ? JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) : null;
+    } catch (e) { return null; }
+};
+export function wireScoresOk({ method, rawUrl, headers, permit, anonKey, testUrl, issuer, memberIdOf, accountOfJwt }) {
+    if (!permit || !Array.isArray(permit.accounts) || !anonKey || method !== 'GET') return false;
+    let u;
+    try { u = new URL(rawUrl); } catch (e) { return false; }
+    if (u.origin !== testUrl || u.pathname !== WIRE_SCORES_PATH || u.hash) return false;
+    const h = headers || {};
+    const auth = String(h.authorization || h.Authorization || '');
+    if (String(h.apikey || '') !== anonKey) return false;
+    for (const k of permit.accounts) {
+        const id = memberIdOf(k);
+        if (typeof id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(id)) continue;
+        const search = '?user_id=eq.' + id + WIRE_SCORES_TAIL;
+        const c = permit.credential === 'member' ? jwtClaims(auth) : null;
+        const ours = !!c && c.role === 'authenticated' && c.iss === issuer;          // 발급자가 시험 프로젝트인 회원 JWT 인가
+        if (permit.credential === 'member' && u.search === search && auth !== 'Bearer ' + anonKey && ours && accountOfJwt(auth) === k) return true;
+        if (permit.credential === 'anon' && u.search === search + '&' && auth === 'Bearer ' + anonKey) return true;
+    }
+    return false;
+}

@@ -37,8 +37,10 @@ import { createCore, makeIgnore } from './serve-core.mjs';
 import { makeDecider, summarize } from './request-log.mjs';
 import { buildPageCases, PAGE_CASE_IDS, NOT_RUN_MATRIX } from './screen-pages.mjs';
 import { FAKE_APP, FAKE_POST, makePeople } from './business-fake.mjs';
+import { buildMemberCases, MEMBER_CASE_IDS, MEMBER_NOT_RUN } from './screen-member.mjs';
+import { SCORE_FIXTURE, countRows } from './scores-fixture.mjs';
 import { FakeSupabase, fakeJwt } from './fake-supabase.mjs';
-import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv, controlPassOk } from './screen-core.mjs';
+import { ISSUER, PauseTimeout, PauseBoard, makeVault, runSequence, confirmRevert, checkProvidedSession, browserEnv, controlPassOk, wireScoresOk, WIRE_SCORES_PATH } from './screen-core.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -57,11 +59,13 @@ const PAUSE_TIMEOUT = Number(arg('--pause-timeout-ms', '600000'));
 //   --selftest bad-session          가짜 조작자가 출처가 맞지 않는 로그인 상태(다른 계정·다른 aal·다른 발급자)를 준다 → 넣지 않아야 한다
 //   --selftest bad-control-pass     예행의 대조용 요청을 자격·본문이 실린 POST 로 보낸다 → 예외로 내보내지 않아야 한다(수신 0, 종료 코드 4)
 //   --selftest leaky-business       차단기가 업무 요청을 "보냄"으로 가르게 한다 → 전송 지점이 따로 막아야 한다(가짜 서버가 받은 업무 요청 0, 전체 판정은 통과 아님, 종료 코드 1)
+//   --selftest leaky-scores         (계약 3C-2a) 경우가 허락을 엉뚱한 계정에 걸고, 차단기는 고장 나 성적 요청을 전부 "보냄"으로 가른다
+//                                   → 전송 지점이 따로 막아야 한다(내보낸 성적 요청 0, 그 경우는 "기대와 다름", 종료 코드 1)
 //   --selftest login-email-fixtures 가짜 자료와 이름표의 "사람의 이메일"을 로그인 이메일로 만든다(3차 보완 전의 결함) → 본인 것이어야 하는 화면이 남의 것으로 처리돼
 //                                   C2·C6·C7·C13·C15 가 "기대와 다름"이어야 한다(시험 프로젝트 상대의 1차 실제 실행에서 난 것과 같은 다섯)
 const SELFTEST = arg('--selftest', null);
 if (SELFTEST && !FAKE) stop('--selftest 는 --fake 에서만 쓴다');
-if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session', 'bad-control-pass', 'leaky-business', 'login-email-fixtures'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
+if (SELFTEST && !['leaky-blocker', 'silent-operator', 'bad-session', 'bad-control-pass', 'leaky-business', 'login-email-fixtures', 'leaky-scores'].includes(SELFTEST)) stop('--selftest 의 값이 맞지 않음');
 const OUT = path.resolve(arg('--out', path.join(ROOT, 'tests', 'auth-session', '.run', `screen-${FAKE ? 'fake' : 'real'}.json`)));
 
 // ---------------------------------------------------------------------------
@@ -126,7 +130,15 @@ const AUTH_FIVE = {
     'POST /rest/v1/rpc/my_profile': 'my_profile',
     'POST /rest/v1/rpc/my_site_access': 'my_site_access',
 };
-const wire = { sent: { login: 0, refresh: 0, logout: 0, my_profile: 0, my_site_access: 0 }, refusedAtSendPoint: 0 };
+const wire = { sent: { login: 0, refresh: 0, logout: 0, my_profile: 0, my_site_access: 0, scores: 0 }, refusedAtSendPoint: 0 };
+
+// (계약 3C-2a) 전송 지점이 따로 보는 "내보내도 되는 성적 읽기"(차단기의 결정과 독립 — 차단기의 것을 들여오지 않고 여기 다시 적는다).
+// 그 경우가 허락(cx.scores — 자격의 종류와 계정의 이름표)을 걸어 둔 동안에만, 아래의 글자와 같고, 조건의 값이 그 계정의 회원번호
+// (my_profile 에서 본 것)이며, 자격이 허락한 종류일 때만 참이다: 회원이면 그 계정의 JWT, 공개 키면 공개 키 그대로.
+const wireScores = (method, rawUrl, headers, permit) => wireScoresOk({
+    method, rawUrl, headers, permit: vault.armed() ? permit : null, anonKey: ANON, testUrl: TEST_URL, issuer: ISSUER,
+    memberIdOf: (k) => people.memberIdOf(k), accountOfJwt: (auth) => people.accountOfJwt(auth),
+});
 
 const pwPath = process.env.B3A_PLAYWRIGHT;
 const chromePath = process.env.B3A_CHROMIUM;
@@ -258,9 +270,16 @@ function setupFake() {
             profile: a.member === 'ok' ? { id: 'm-' + k, name: a.name, nickname: null, email: fakeMemberEmail(k), phone: '010-0000-0000', timezone: 'Asia/Seoul' } : undefined,
         });
     }
-    // 가짜 서버까지 오는 것은 인증 요청 다섯뿐이다(업무 요청은 실행기가 전송 지점 앞에서 막는다). 왔다면 세어 둔다
+    // 가짜 서버까지 오는 것은 인증 요청 다섯과, (계약 3C-2a) 허락된 성적 읽기뿐이다. 그 밖의 업무 요청이 왔다면 세어 둔다
     fake.businessArrivals = 0;
-    fake.business = () => { fake.businessArrivals++; return { status: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' }; };
+    fake.scoresArrivals = 0;
+    // 합성 성적 행(scores-fixture.mjs — 넣는 SQL 과 같은 값). 주인은 가짜 세계의 회원번호(m-A·m-B)다. GM 은 행이 없다
+    fake.scoreRows = Object.entries(SCORE_FIXTURE).flatMap(([k, rows]) => rows.map((r, i) => Object.assign({ id: `fake-score-${k}-${i + 1}`, user_id: 'm-' + k, user_email: fakeMemberEmail(k), user_name: 'zzb3c2a', score_image: null, memo: 'zzb3c2a ' + r.tag }, r)));
+    fake.business = (req, u) => {
+        if (u.pathname === WIRE_SCORES_PATH) { fake.scoresArrivals++; return fake.scoresTable(req, u); }
+        fake.businessArrivals++;
+        return { status: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' };
+    };
 }
 function controlCall(method, pathAndQuery, body) {
     return new Promise((resolve) => {
@@ -392,6 +411,8 @@ let ON = '';
 let OFF = '';
 let siteOn = null;
 let siteOff = null;
+let siteOpen = null;        // (계약 3C-2a) 새 로그인 켜짐 + 업무 규약의 my-scores 열림
+let OPEN = '';
 let decide = null;
 const STATIC_BODY = { stylesheet: 'text/css', font: 'font/woff2', image: 'image/png' };
 
@@ -445,16 +466,30 @@ function observe(cx, rec, out) {
     }
     if (rec.target === 'my_site_access' && out.status === 200) { rec.allowed = body.allowed === true; rec.isAdmin = body.is_admin === true; }
 }
+// (계약 3C-2a) 성적 읽기의 응답: 상태 코드·오류 코드(정해 둔 이름)·행의 수(누구의 합성 행인가 — 이름표로만). 본문은 기록하지 않는다
+function lookScores(status, bodyBytes) {
+    let body = null;
+    try { body = JSON.parse(Buffer.isBuffer(bodyBytes) ? bodyBytes.toString('utf8') : String(bodyBytes || '')); } catch (e) { body = null; }
+    const st = [200, 204, 400, 401, 403, 404, 405, 409, 429, 500, 503].includes(status) ? status : (status >= 500 ? 500 : (status >= 400 ? 400 : 200));
+    const raw = body && !Array.isArray(body) && typeof body === 'object' && typeof body.code === 'string' ? body.code : null;
+    return { status: st, code: st >= 400 ? (raw === null ? 'none' : (KNOWN_CODES.includes(raw) ? raw : 'other')) : 'none', rows: st === 200 && Array.isArray(body) ? countRows(body) : null };
+}
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-expose-headers': '*' };
 async function handleRoute(route, cx) {
     const r = route.request();
     let headers;
     try { headers = await r.allHeaders(); } catch (e) { headers = r.headers(); }
-    const d = decide({ url: r.url(), method: r.method(), headers, postData: r.postData(), resourceType: r.resourceType(), isNavigation: r.isNavigationRequest() });
+    const d = decide({ url: r.url(), method: r.method(), headers, postData: r.postData(), resourceType: r.resourceType(), isNavigation: r.isNavigationRequest(), scoresPermit: cx.scores || null });
     const rec = d.record;
     rec.sent = false;
     cx.records.push(rec);
+    if (SELFTEST === 'leaky-scores' && rec.target === 'scores' && d.action !== 'continue') {
+        // 대조 실험(--fake 에서만): 차단기가 고장 나 허락되지 않은 성적 요청을 "보냄"으로 가른다 → 아래의 전송 지점이 따로 막아야 한다
+        d.action = 'continue';
+        rec.aborted = false;
+        rec.selftestLeak = true;
+    }
     if (SELFTEST === 'leaky-business' && d.action === 'fake') {
         // 대조 실험(--fake 에서만): 차단기가 고장 나 업무 요청을 "보냄"으로 가른다 → 아래의 전송 지점이 따로 막아야 한다
         d.action = 'continue';
@@ -524,6 +559,8 @@ async function handleRoute(route, cx) {
     // 차단기의 결정과 따로, 주소를 직접 다시 본다: 다섯이 아니면 차단기가 무엇이라 했든 내보내지 않는다(끌 수 없다).
     let wireName = null;
     try { const wu = new URL(r.url()); wireName = AUTH_FIVE[`${r.method()} ${wu.pathname}${wu.search}`] || null; } catch (e) { wireName = null; }
+    // (계약 3C-2a) 여섯째: 그 경우의 합성 회원 한 명의 성적 읽기(전송 지점이 따로 본다)
+    if (!wireName && wireScores(r.method(), r.url(), headers, cx.scores || null)) wireName = 'scores';
     if (!wireName) {
         wire.refusedAtSendPoint++;
         rec.how = 'refused-at-send-point';
@@ -535,7 +572,12 @@ async function handleRoute(route, cx) {
     if (hook && hook.before) {
         const act = await hook.before(rec);
         if (act === 'abort') { rec.how = 'aborted-before-send'; return route.abort('failed'); }
-        if (act && act.fulfill) { rec.how = 'fake-response'; rec.status = act.fulfill.status; return route.fulfill({ status: act.fulfill.status, headers: Object.assign({ 'content-type': 'application/json' }, CORS), body: act.fulfill.body }); }
+        if (act && act.fulfill) {
+            rec.how = 'fake-response';
+            rec.status = act.fulfill.status;
+            if (wireName === 'scores') { rec.server = null; rec.given = lookScores(act.fulfill.status, act.fulfill.body); rec.substituted = true; }      // 보내지 않고 실행기가 준 응답
+            return route.fulfill({ status: act.fulfill.status, headers: Object.assign({ 'content-type': 'application/json' }, CORS), body: act.fulfill.body });
+        }
     }
     let out;
     wire.sent[wireName]++;
@@ -552,10 +594,17 @@ async function handleRoute(route, cx) {
     }
     out.jwtAccount = rec.target === 'my_profile' ? people.accountOfJwt(headers.authorization || headers.Authorization) : null;
     observe(cx, rec, out);
+    // (계약 3C-2a) 성적 읽기: "서버가 실제로 준 응답"을 적는다(--fake 면 가짜 서버가 준 것). 아래에서 바꿔 주면 "실행기가 바꿔 준 응답"을 따로 적는다
+    if (wireName === 'scores') { rec.server = lookScores(out.status, out.body); rec.given = null; rec.substituted = false; }
     if (hook && hook.after) {
         const act = await hook.after(rec, out);
         if (act === 'drop') { rec.how = rec.how + '+response-dropped'; return route.abort('failed'); }
-        if (act && act.replace) { rec.how = rec.how + '+response-replaced'; out = Object.assign({}, out, act.replace); }
+        if (act && act.replace) {
+            rec.how = rec.how + '+response-replaced';
+            out = Object.assign({}, out, act.replace);
+            // 성적 읽기의 응답을 바꿔 줄 때는 머리글도 새로 쓴다(서버가 준 본문의 길이·압축 표시가 바꾼 본문과 맞지 않는다)
+            if (wireName === 'scores') { out.headers = Object.assign({ 'content-type': 'application/json' }, CORS); rec.given = lookScores(out.status, out.body); rec.substituted = true; }
+        }
     }
     return route.fulfill({ status: out.status, headers: out.headers, body: out.body });
 }
@@ -635,6 +684,8 @@ async function heldLoad(cx, page, target, go, { sinceBfcache = false } = {}) {
 // 경우들. 판정: ok 가 전부 참이면 통과 / 거짓이 있으면 기대와 다름 / null(재지 못함)이 있으면 미확인
 // ---------------------------------------------------------------------------
 const results = [];
+// 로컬 시험 목적지가 받은 수(사이트 셋의 합)
+const sinkNow = () => siteOn.core.counts.sink + siteOff.core.counts.sink + (siteOpen ? siteOpen.core.counts.sink : 0);
 function makeChecks() {
     const list = [];
     return { list, ck: (name, ok) => { list.push({ name, ok: ok === null || ok === undefined ? null : !!ok }); } };
@@ -655,7 +706,10 @@ const baseline = (cx, ck) => {
     // (3차) 화면은 확인된 회원의 이메일을 쓴다 — 로그인 이메일을 업무 조건에 쓰면 결함. 3C-1 의 경우(C…)의 판정에 넣는다
     // (3A 의 경우들의 판정 목록은 그대로 둔다 — 그 경우들에서 잡힌 것은 전체 판정과 결과의 loginEmailConditions 로 본다).
     // 양성 대조: 이번 실행의 CL 이 "로그인 이메일이 조건인 시도에 그 이름표가 붙는다"를 보였어야 한다. 아니면 미확인
-    if (/^C/.test(cx.id) && cx.id !== 'CL') ck('화면이 로그인 이메일을 업무 조건에 쓴 시도 0(쓰면 결함 — 이름표의 대조는 CL)', s.businessByLoginEmail > 0 ? false : (labelControl.loginEmail === true ? true : null));
+    // (계약 3C-2a) 성적 읽기: 허락되지 않은 것은 하나도 나가지 않고, 회원 자격의 성적 요청은 "JWT 의 사람 = 조건의 사람"이다
+    ck('허락되지 않은 성적 요청을 내보낸 것 0', cx.records.filter((x) => x.target === 'scores' && x.scores !== 'permitted' && (x.sent || !x.aborted) && !x.selftestLeak).length === 0);
+    ck('회원 자격의 성적 요청 가운데 "JWT 의 사람 ≠ 조건의 사람"인 것 0', s.scoresJwtOwnerMismatch === 0);
+    if (/^[CS]/.test(cx.id) && cx.id !== 'CL') ck('화면이 로그인 이메일을 업무 조건에 쓴 시도 0(쓰면 결함 — 이름표의 대조는 CL)', s.businessByLoginEmail > 0 ? false : (labelControl.loginEmail === true ? true : null));
     return s;
 };
 async function execCase(id, title, fn, { required = true } = {}) {
@@ -667,10 +721,10 @@ async function execCase(id, title, fn, { required = true } = {}) {
         cx = await newCx(id);
         const { list, ck } = makeChecks();
         entry.checks = list;
-        const sink0 = siteOn.core.counts.sink + siteOff.core.counts.sink;
+        const sink0 = sinkNow();
         await fn(cx, ck);
         entry.summary = baseline(cx, ck);
-        ck(id === 'P' ? '로컬 시험 목적지 수신은 대조용 1건뿐(차단기와 독립된 증거)' : '로컬 시험 목적지 수신 0(차단기와 독립된 증거)', siteOn.core.counts.sink + siteOff.core.counts.sink === sink0 + (id === 'P' ? 1 : 0));
+        ck(id === 'P' ? '로컬 시험 목적지 수신은 대조용 1건뿐(차단기와 독립된 증거)' : '로컬 시험 목적지 수신 0(차단기와 독립된 증거)', sinkNow() === sink0 + (id === 'P' ? 1 : 0));
     } catch (e) {
         if (e instanceof PauseTimeout) entry.checks.push({ name: '멈춤의 기다림이 상한을 넘김', ok: null });
         else entry.checks.push({ name: '실행 도중 예외(경우를 끝까지 돌리지 못함)', ok: null });
@@ -1143,6 +1197,15 @@ async function buildCases() {
         authModuleCount: () => siteOff.core.counts.authModule,
         sdkCountOff: () => siteOff.core.counts.sdk,
     });
+    // ---- S. 계약 3C-2a: 회원 자격으로 읽는 구조 + 성적 이력 읽기 하나 ----
+    await buildMemberCases({
+        runCase, pause, doLogin, until, settled, stateOf, sleep, pathOf, count, vault, newCx, people, labelControl,
+        hidden: (page) => page.evaluate(() => document.documentElement.classList.contains('eon-auth-away')).catch(() => null),
+        sites: () => ({ on: ON, off: OFF, open: OPEN }),
+        // 그 경우의 허락: 자격의 종류('member'·'anon')와 계정의 이름표들. 대조 실험(leaky-scores)에서는 엉뚱한 계정에 건다
+        arm: (cx, credential, accounts) => { cx.scores = { credential, accounts: SELFTEST === 'leaky-scores' ? accounts.map((k) => (k === 'B' ? 'A' : 'B')) : accounts.slice() }; },
+        disarm: (cx) => { cx.scores = null; },
+    });
     return plan;
 }
 
@@ -1152,16 +1215,19 @@ async function main() {
     if (FAKE) setupFake();
     siteOn = await startSite('on');
     siteOff = await startSite('off');
+    siteOpen = await startSite('on-open');
     ON = siteOn.origin;
     OFF = siteOff.origin;
-    for (const site of [siteOn, siteOff]) {
+    OPEN = siteOpen.origin;
+    for (const site of [siteOn, siteOff, siteOpen]) {
         const scan = site.core.scan();
         if (scan.repoSwitch !== 'off') stop('저장소의 스위치 값이 꺼짐이 아니다');
+        if (scan.repoMemberTask !== 'false') stop('저장소의 업무 규약에서 my-scores 가 닫힘이 아니다');
         site.core.counts.sdk = 0;
         site.core.counts.authModule = 0;
     }
     // SDK 파일을 내준 횟수(꺼짐 서버에서는 0 이어야 한다)
-    for (const site of [siteOn, siteOff]) {
+    for (const site of [siteOn, siteOff, siteOpen]) {
         const respond = site.core.respond;
         site.core.respond = (req) => {
             const p = String(req.url).split('?')[0];
@@ -1173,14 +1239,14 @@ async function main() {
     await startControl();
     // 회원 JWT 는 발급자가 시험 프로젝트이고 계정이 이번 실행의 합성 계정일 때만 내보낸다(보관함이 열리기 전에는 어떤 회원 JWT 도 내보내지 않는다)
     decide = makeDecider({
-        selfOrigins: [ON, OFF], anonKey: ANON, issuer: ISSUER,
+        selfOrigins: [ON, OFF, OPEN], anonKey: ANON, issuer: ISSUER,
         memberEmails: () => (vault.armed() ? ACCOUNT_KEYS.map((k) => vault.get('EMAIL_' + k)) : []),
         // (계약 3C-1) 업무 요청은 전부 막는다(인자와 무관). 여기서 주는 것은 기록의 이름표뿐이다: 조건의 값이 어느 합성 계정의 것인가
         // 회원 이메일·회원번호는 my_profile 에서 본 것, 로그인 이메일은 따로(화면이 로그인 이메일을 업무 조건에 쓰면 결함 — 따로 센다)
         accountLabels: () => people.labels(),
     });
     if (FAKE) fakeOperator();
-    console.log(`  켜짐 ${ON}   꺼짐 ${OFF}   제어 포트 ${control.port}`);
+    console.log(`  켜짐 ${ON}   꺼짐 ${OFF}   켜짐+성적 읽기 열림 ${OPEN}   제어 포트 ${control.port}`);
 
     browser = await chromium.launch({
         executablePath: chromePath,
@@ -1196,7 +1262,7 @@ async function main() {
     try {
         const plan = await buildCases();
         const first = plan.find((c) => c.id === 'P');
-        const wantsPageCase = !!ONLY && [...ONLY].some((id) => PAGE_CASE_IDS.includes(id));
+        const wantsPageCase = !!ONLY && [...ONLY].some((id) => PAGE_CASE_IDS.includes(id) || MEMBER_CASE_IDS.includes(id));
         const rest = plan.filter((c) => c.id !== 'P' && (!ONLY || ONLY.has(c.id) || (c.id === 'CL' && wantsPageCase)));
         // 예행(P)은 언제나 먼저 돈다. P 의 판정이 전부 참이 아니면 뒤의 경우를 하나도 시작하지 않는다(보관함도 열리지 않는다)
         seq = await runSequence({
@@ -1213,16 +1279,21 @@ async function main() {
     if (board.pendingRevert && seq.stopped !== 'revert') await confirmRevert(board);
     if (board.pendingRevert) stopped = '원복 확인을 받지 못함 — 시험 프로젝트의 점검·로그인 기록을 직접 확인해 되돌릴 것';
 
-    const sinkTotal = siteOn.core.counts.sink + siteOff.core.counts.sink;
+    const sinkTotal = sinkNow();
     const required = results.filter((r) => r.required);
     const totals = { pass: results.filter((r) => r.verdict === 'pass').length, differs: results.filter((r) => r.verdict === 'differs').length, unknown: results.filter((r) => r.verdict === 'unknown').length };
     const expectedIds = ['P', '1', '2', '3', '4', '5', '6', '7', '8', '9', '9b', '10', '12', 'T', '14', '15', 'AF', '17', '18', '19a', '19b', 'R1', 'R2', 'R3', 'I1', 'I4', 'I2', 'I3', 'O1', 'O2', 'O3', 'O4', 'O5'];
     expectedIds.push(...PAGE_CASE_IDS);
+    expectedIds.push(...MEMBER_CASE_IDS);
     const notRun = expectedIds.filter((id) => !results.some((r) => r.id === id));
     const all = results.flatMap((r) => r.records);
     const controlPass = all.filter((r) => r.how === 'control-pass').length;         // 예행에서 일부러 보낸 대조용 정상 요청(1건)
     const sinkUnexpected = sinkTotal - controlPass;
-    const businessLeaks = all.filter((r) => r.business && (r.sent || !r.aborted)).length + wire.refusedAtSendPoint + (fake ? fake.businessArrivals : 0);
+    // (계약 3C-2a) 허락된 성적 읽기는 업무 요청이지만 나가도 되는 하나다 — 그 밖의 업무 요청이 나간 것만 센다
+    const scoresRecords = results.flatMap((c) => c.records.filter((r) => r.target === 'scores').map((r) => ({ case: c.id, r })));
+    const scoresBad = scoresRecords.filter((x) => x.r.scores !== 'permitted' && (x.r.sent || !x.r.aborted) && !x.r.selftestLeak).length
+        + scoresRecords.filter((x) => x.r.credential === 'member' && x.r.scoresJwt !== x.r.scoresOwner).length;
+    const businessLeaks = scoresBad + all.filter((r) => r.business && r.scores !== 'permitted' && (r.sent || !r.aborted)).length + wire.refusedAtSendPoint + (fake ? fake.businessArrivals : 0);
     const loginEmailConditions = all.filter((r) => r.business && !r.probe && r.accountBy === 'login-email').length;       // 어느 경우에서든 0 이어야 한다
     const overall = businessLeaks === 0 && loginEmailConditions === 0 && !stopped && notRun.length === 0 && required.every((r) => r.verdict === 'pass') && sinkUnexpected === 0 && controlPass === 1 && egress.blocked === 0 && (!FAKE || egress.testProject === 0);
     const output = {
@@ -1246,7 +1317,12 @@ async function main() {
             runnerConnections: egress,                      // 실행기가 연 연결: local / testProject / blocked(막은 시도)
             requestsSentToTestProject: all.filter((r) => r.where === 'test-project' && r.sent).length,
             // (계약 3C-1) 업무 요청: 실제로 나간 것 0 이어야 한다. 전송 지점이 따로 센 것 — 그 지점을 지난 요청은 인증 요청 다섯뿐
-            businessSentToTestProject: all.filter((r) => r.business && r.sent).length,
+            businessSentToTestProject: all.filter((r) => r.business && r.scores !== 'permitted' && r.sent).length,
+            // (계약 3C-2a) 허락된 성적 읽기: 전송 지점을 지난 수(wireSentByName.scores)와 같아야 한다. --fake 면 가짜 서버가 받은 수와도
+            scoresPermittedByDecider: all.filter((r) => r.scores === 'permitted' && !r.aborted).length,
+            scoresSentToTestProject: all.filter((r) => r.target === 'scores' && r.sent).length,
+            scoresArrivedAtFakeServer: fake ? fake.scoresArrivals : null,
+            scoresRefusedOrBlocked: all.filter((r) => r.target === 'scores' && r.scores !== 'permitted').length,
             wireSentByName: wire.sent,                      // 전송 지점을 지난 요청(--real 이면 시험 프로젝트로, --fake 면 가짜 서버로)
             wireSentTotal: Object.values(wire.sent).reduce((a, b) => a + b, 0),
             businessRefusedAtSendPoint: wire.refusedAtSendPoint,       // 차단기를 지나 전송 지점까지 온 업무 요청(0 이어야 한다 — 왔어도 내보내지 않는다)
@@ -1259,8 +1335,16 @@ async function main() {
         },
         summary: summarize(all),
         // (계약 3C-1) 이 실행기가 돌리지 않는 조합 — 통과로 세지 않는다
-        notRunMatrix: NOT_RUN_MATRIX,
-        businessNote: '업무 요청은 하나도 내보내지 않았다. 막은 업무 요청에는 가짜 응답을 줬다 — 그 응답으로 그려진 화면은 실제 업무 성공이 아니다',
+        notRunMatrix: NOT_RUN_MATRIX.concat(MEMBER_NOT_RUN),
+        // (계약 3C-2a) 성적 요청의 표: 경우·자격의 종류·조건의 사람·JWT 의 사람(이름표)·허락·보냈는가,
+        // **서버가 실제로 준 응답(server)** 과 **실행기가 바꿔 준 응답(given)** 을 칸을 나눠 적는다. given 이 null 이면 화면은 서버의 응답을 그대로 받았다.
+        // server 가 null 이면 그 요청은 보내지 않았다(막았거나, 실행기가 보내기 전에 응답을 줬다). 행의 수는 누구의 합성 행인가(이름표)로만 센다
+        scoresTable: scoresRecords.map(({ case: id, r }) => ({
+            case: id, credential: r.credential, owner: r.scoresOwner, jwt: r.scoresJwt, shape: r.scoresShape, permitted: r.scores === 'permitted', why: r.scoresWhy,
+            sent: r.sent === true || /^fake-server/.test(r.how || ''), server: r.server === undefined ? null : r.server, given: r.given === undefined ? null : r.given,
+            held: r.held === true, heldPastTimeout: r.heldPastTimeout === true,       // 실행기가 응답을 붙잡아 뒀는가 / 화면이 기다리기를 그만둔 뒤에야 넘겼는가
+        })),
+        businessNote: '내보낸 업무 요청은 허락된 성적 읽기(그 경우의 합성 회원 한 명의 것)뿐이다. 그 밖의 업무 요청은 전송 전에 막고 가짜 응답을 줬다 — 그 응답으로 그려진 화면은 실제 업무 성공이 아니다',
         pendingRevert: board.pendingRevert,                 // null 이 아니면 브레인방이 건 DB 변경이 남아 있을 수 있다
         operatorLeftovers: board.leftovers,                 // 브레인방이 만든 것이 남아 있을 수 있음(로그인 기록 — 정리는 브레인방이 DB 로)
         pauses: board.history,
@@ -1277,8 +1361,9 @@ async function main() {
     console.log(`  경우: 통과 ${totals.pass} / 기대와 다름 ${totals.differs} / 미확인 ${totals.unknown}${notRun.length ? ` / 돌리지 않음 ${notRun.length}` : ''}`);
     console.log(`  독립된 증거: 시험 목적지 수신 ${sinkTotal}(대조용 ${controlPass} + 그 밖 ${sinkUnexpected}), 실행기가 연 연결 — 로컬 ${egress.local}·시험 프로젝트 ${egress.testProject}·막은 시도 ${egress.blocked}`);
     console.log(`  시험 프로젝트로 실제 보낸 요청 ${output.independentEvidence.requestsSentToTestProject}건, 가짜 서버가 답한 요청 ${output.independentEvidence.requestsAnsweredByFakeServer}건`);
-    console.log(`  업무 요청: 실제로 나간 것 ${output.independentEvidence.businessSentToTestProject}건(전송 지점을 지난 요청 ${output.independentEvidence.wireSentTotal}건은 전부 인증 요청 다섯 — ${Object.entries(wire.sent).map(([k, n]) => k + ' ' + n).join(', ')}) / 전송 지점까지 온 업무 요청 ${wire.refusedAtSendPoint}건`);
-    console.log(`  업무 요청의 시도(전부 전송 전에 막고 가짜 응답 — 업무 성공으로 세지 않는다): ${Object.entries(output.summary.businessAttempts).map(([k, n]) => k + ' ' + n).join(', ')}`);
+    console.log(`  업무 요청: 실제로 나간 것 ${output.independentEvidence.businessSentToTestProject}건(전송 지점을 지난 요청 ${output.independentEvidence.wireSentTotal}건은 인증 요청 다섯과 허락된 성적 읽기뿐 — ${Object.entries(wire.sent).map(([k, n]) => k + ' ' + n).join(', ')}) / 전송 지점까지 온 업무 요청 ${wire.refusedAtSendPoint}건`);
+    console.log(`  성적 읽기(계약 3C-2a — 그 경우의 합성 회원 한 명의 것만 내보낸다): 전송 지점을 지난 것 ${wire.sent.scores}건, 막거나 허락하지 않은 것 ${output.independentEvidence.scoresRefusedOrBlocked}건, 실행기가 응답을 바꿔 준 것 ${scoresRecords.filter((x) => x.r.substituted).length}건`);
+    console.log(`  업무 요청의 시도(허락된 성적 읽기 ${wire.sent.scores}건 말고는 전부 전송 전에 막고 가짜 응답 — 업무 성공으로 세지 않는다): ${Object.entries(output.summary.businessAttempts).map(([k, n]) => k + ' ' + n).join(', ')}`);
     console.log(`  시도의 이름표(조건의 값이 합성 계정의 어느 열의 값인가): ${Object.entries(output.summary.businessLabeled).map(([k, n]) => k + ' ' + n).join(', ')} — 로그인 이메일이 조건인 시도 ${loginEmailConditions}건(0 이어야 한다, 대조 ${labelControl.loginEmail === true ? '보임' : '보이지 못함'})`);
     if (!leaks) console.log(`  결과: ${OUT}`);
     if (SELFTEST) console.log(`  대조 실험(${SELFTEST}): 일부러 고장을 냈다 — 통과가 아닌 것이 기대다`);
@@ -1287,6 +1372,7 @@ async function main() {
     control.server = null;
     siteOn.server.close();
     siteOff.server.close();
+    siteOpen.server.close();
     if (board.leftovers.length) console.log(`  브레인방이 만든 것이 남아 있을 수 있음: ${board.leftovers.map((x) => x.kind + '(' + x.account + ')').join(', ')}`);
     if (!process.exitCode) process.exitCode = seq.stopped === 'preflight' ? 4 : (stopped ? 3 : (overall ? 0 : 1));
     setTimeout(() => process.exit(process.exitCode), 300);
