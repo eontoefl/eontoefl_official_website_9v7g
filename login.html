@@ -30,6 +30,8 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/page-layout.css">
+    <!-- 인증 모듈: 켜진 화면이 처음 그려질 때부터 관리자·회원 표시를 숨기려고 head 에서 싣는다(스위치가 꺼져 있으면 아무것도 하지 않는다) -->
+    <script src="js/auth-session.js?v=20261125"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -196,7 +198,6 @@
 
     <!-- JavaScript -->
     <script src="js/supabase-config.js?v=20261012"></script>
-    <script src="js/auth-session.js?v=20261124"></script>
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script src="js/login.js"></script>

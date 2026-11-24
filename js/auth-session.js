@@ -7,12 +7,14 @@
 // * 이 모듈이 회원 자격을 싣는 요청은 자기 자신의 요청뿐이다:
 //   로그인·갱신·로그아웃, rpc/my_profile, rpc/my_site_access. 그 밖의 업무 요청은 지금 쓰는 자격 그대로다.
 // * 교재 편집(eon_book_auth_v1)과 후속메일 화면(sb-…-auth-token)의 로그인 상태는 읽지도 쓰지도 지우지도 않는다.
+// * 이 파일은 화면의 head 에서 실린다(켜진 화면이 처음 그려질 때부터 관리자·회원 표시를 숨기기 위해).
+//   설정 파일(js/supabase-config.js)은 뒤에 실리므로 주소·공개 키는 쓸 때 읽는다.
 // =====================================================================
 (function () {
     'use strict';
 
     // 새 로그인 스위치. 저장소의 값은 꺼짐('off')이다.
-    // 이 줄의 값은 시험용 로컬 서버(tests/auth-session/serve.mjs)가 파일을 내줄 때만 바꾼다.
+    // 이 줄의 값은 시험용 로컬 서버(tests/auth-session/serve-core.mjs)가 파일을 내줄 때만 바꾼다.
     // 주소의 꼬리표·저장소의 값·쿠키로 켜는 길은 없다.
     const EON_AUTH_SWITCH = 'off';
 
@@ -23,8 +25,12 @@
     const COMPAT_USER = 'iontoefl_user';        // 아직 전환하지 않은 화면이 읽는 호환 값
     const COMPAT_TIME = 'iontoefl_login_time';
     const SDK_SRC = 'vendor/supabase-2.116.0.js';
-    const RPC_TIMEOUT_MS = 15000;
-    const SESSION_WAIT_MS = 20000;              // 공식 클라이언트의 복원·갱신을 기다리는 상한
+    const RPC_TIMEOUT_MS = 15000;               // 기다림의 상한일 뿐이다 — 넘겨도 서버의 작업이 취소되는 것은 아니다
+    const SESSION_WAIT_MS = 20000;              // 공식 클라이언트의 복원·갱신을 기다리는 상한(위와 같음)
+
+    // 서버가 "이 로그인 기록은 없다·끝났다"고 답한 것으로 보는 오류 코드.
+    // 이 밖의 거절(쓴 갱신값 refresh_token_already_used, 못 찾음, 429 등)은 끝났다는 증거가 아니다 — "모름"이다.
+    const ENDED_CODES = ['session_not_found', 'session_expired'];
 
     // 요청 등급
     const GRADES = Object.freeze({
@@ -43,11 +49,12 @@
         return e;
     }
 
-    const BASE = typeof SUPABASE_URL === 'string' ? SUPABASE_URL : '';
-    const ANON = typeof SUPABASE_ANON_KEY === 'string' ? SUPABASE_ANON_KEY : '';
+    // 설정 파일의 값(이 파일보다 뒤에 실린다 — 쓸 때 읽는다)
+    function anonKey() { return typeof SUPABASE_ANON_KEY === 'string' ? SUPABASE_ANON_KEY : ''; }
+    function baseUrl() { return typeof SUPABASE_URL === 'string' ? SUPABASE_URL : ''; }
 
     function publicCredential() {
-        return { apikey: ANON, authorization: 'Bearer ' + ANON };
+        return { apikey: anonKey(), authorization: 'Bearer ' + anonKey() };
     }
 
     // 호출자가 넘긴 추가 머리글이 Authorization·apikey 를 덮어쓰지 못한다
@@ -72,8 +79,8 @@
         assertNoCredentialOverride(extra);
         if (g === GRADES.ANON || g === GRADES.HOLD) {
             return Object.assign({
-                'apikey': ANON,
-                'Authorization': 'Bearer ' + ANON,
+                'apikey': anonKey(),
+                'Authorization': 'Bearer ' + anonKey(),
                 'Content-Type': 'application/json'
             }, extra);
         }
@@ -94,6 +101,7 @@
             signIn: function () { return Promise.resolve({ outcome: 'off' }); },
             signOut: function () { return Promise.resolve({ outcome: 'off' }); },
             recheck: function () { return Promise.resolve('off'); },
+            isCurrent: function () { return false; },
             profile: function () { return null; },
             siteAccess: function () { return null; },
             displayUserRaw: function () { return null; },
@@ -113,12 +121,33 @@
     // 켜짐
     // -----------------------------------------------------------------
 
-    // 설정된 Supabase 출처. HTTPS 이고 주소가 출처 그대로일 때만 쓴다.
+    // 화면이 처음 그려질 때부터: 확인된 관리자·회원이 아니면 학습 자료 링크와 대시보드 버튼이 보이지 않는다.
+    // (확인이 끝나면 아래 applyClasses 가 html 에 표시를 붙여 푼다.)
+    const HIDE_CSS =
+        'html:not(.eon-auth-admin) a[href="materials.html"],' +
+        'html:not(.eon-auth-admin) a[href="materials.html?id"],' +
+        'html:not(.eon-auth-admin) #adminDashboardBtn,' +
+        'html:not(.eon-auth-member) #studentDashboardBtn' +
+        '{display:none !important}';
+    (function () {
+        const style = document.createElement('style');
+        style.id = 'eon-auth-hide';
+        style.textContent = HIDE_CSS;
+        (document.head || document.documentElement).appendChild(style);
+    })();
+
+    // 설정된 Supabase 출처와 공개 키(시작할 때 읽는다). HTTPS 이고 주소가 출처 그대로일 때만 쓴다.
     let ORIGIN = null;
-    try {
-        const cfg = new URL(BASE);
-        if (cfg.protocol === 'https:' && cfg.origin === BASE && !cfg.username && !cfg.password) ORIGIN = cfg.origin;
-    } catch (e) { ORIGIN = null; }
+    let ANON = '';
+    function loadConfig() {
+        ANON = anonKey();
+        ORIGIN = null;
+        try {
+            const base = baseUrl();
+            const cfg = new URL(base);
+            if (cfg.protocol === 'https:' && cfg.origin === base && !cfg.username && !cfg.password) ORIGIN = cfg.origin;
+        } catch (e) { ORIGIN = null; }
+    }
 
     // 인증 모듈이 쓰는 주소의 목록. 이 목록 밖으로는 요청을 보내지 않는다.
     const TARGETS = [
@@ -171,73 +200,6 @@
         return undefined;
     }
 
-    // 결과를 모르는 갱신 요청에 쓴 갱신값(이 화면의 메모리에만). 같은 값으로는 다시 보내지 않는다.
-    const unknownRefresh = [];
-
-    // 인증 모듈과 공식 클라이언트가 내는 모든 요청이 지나는 한 곳.
-    // (전역 fetch 를 바꾸지 않는다 — 이 함수를 받은 호출만 지난다.)
-    function guardedFetch(input, init) {
-        const opt = init || {};
-        const target = matchTarget(input, opt.method);
-        if (!target) return Promise.reject(EonAuthError('target_not_allowed'));
-        const headers = plainHeaders(opt.headers);
-        if (!headers) return Promise.reject(EonAuthError('bad_headers'));
-        const auth = headerValue(headers, 'authorization');
-        if (headerValue(headers, 'apikey') !== ANON || typeof auth !== 'string' || auth.indexOf('Bearer ') !== 0) {
-            return Promise.reject(EonAuthError('bad_headers'));
-        }
-        let refreshToken = null;
-        if (target.key === 'refresh') {
-            try { refreshToken = JSON.parse(opt.body).refresh_token; } catch (e) { refreshToken = null; }
-            if (typeof refreshToken !== 'string' || !refreshToken) return Promise.reject(EonAuthError('bad_body'));
-            // 공식 클라이언트는 응답을 못 받은 갱신을 스스로 다시 보내려 한다 — 결과를 모르는 요청은 다시 보내지 않는다
-            if (unknownRefresh.indexOf(refreshToken) >= 0) return Promise.reject(EonAuthError('refresh_unknown'));
-        }
-        const sent = window.fetch(input, {
-            method: target.method,
-            headers: headers,
-            body: opt.body,
-            redirect: 'error',            // 리디렉션을 따라가지 않는다
-            credentials: 'omit',
-            cache: 'no-store',
-            referrerPolicy: 'no-referrer',
-            signal: opt.signal
-        });
-        if (refreshToken === null) return sent;
-        return sent.then(function (res) {
-            if (res.status >= 500) unknownRefresh.push(refreshToken);
-            return res;
-        }, function (err) {
-            unknownRefresh.push(refreshToken);
-            throw err;
-        });
-    }
-
-    function withTimeout(promise, ms) {
-        return new Promise(function (resolve, reject) {
-            const timer = setTimeout(function () { reject(EonAuthError('timeout')); }, ms);
-            promise.then(function (v) { clearTimeout(timer); resolve(v); }, function (e) { clearTimeout(timer); reject(e); });
-        });
-    }
-
-    // 서버가 분명히 거절한 갱신인가(응답을 못 받은 것과 구분한다)
-    function isDefiniteAuthFailure(err) {
-        if (!err) return false;
-        if (err.name === 'AuthSessionMissingError') return true;
-        return err.name === 'AuthApiError' && typeof err.status === 'number' && err.status >= 400 && err.status < 500;
-    }
-
-    // 공식 클라이언트에 주는 저장 어댑터: 자기 이름(eon_auth_v1…)만 읽고 쓴다.
-    function ownKey(key) {
-        if (key === STORAGE_KEY || (typeof key === 'string' && key.indexOf(STORAGE_KEY + '-') === 0)) return key;
-        throw EonAuthError('storage_key_not_allowed');
-    }
-    const scopedStorage = {
-        getItem: function (key) { return window.localStorage.getItem(ownKey(key)); },
-        setItem: function (key, value) { window.localStorage.setItem(ownKey(key), value); },
-        removeItem: function (key) { window.localStorage.removeItem(ownKey(key)); }
-    };
-
     // JWT 의 계정 번호와 로그인 기록 번호(서명은 서버가 본다 — 여기서는 "같은 로그인 기록인가"를 가리는 데만 쓴다)
     function decodeClaims(token) {
         try {
@@ -251,6 +213,119 @@
             return { sub: c.sub, sid: c.session_id };
         } catch (e) { return null; }
     }
+    function same(a, b) { return !!a && !!b && a.sub === b.sub && a.sid === b.sid; }
+
+    // 지금 이 브라우저에 저장된 새 방식의 로그인(동기 — 한 구간에서 보고 판단하는 데 쓴다)
+    function storedSession() {
+        try {
+            const st = JSON.parse(window.localStorage.getItem(STORAGE_KEY));
+            if (!st || typeof st !== 'object') return null;
+            return { claims: decodeClaims(st.access_token), accessToken: st.access_token, refreshToken: st.refresh_token };
+        } catch (e) { return null; }
+    }
+    function storedIs(att) {
+        const st = storedSession();
+        return !!st && same(st.claims, att);
+    }
+    // 저장된 로그인이 아직 그 기록일 때만 이 브라우저에서 지운다(다른 로그인으로 바뀌었으면 건드리지 않는다)
+    function removeStoredIf(att) {
+        try {
+            if (!storedIs(att)) return false;
+            window.localStorage.removeItem(STORAGE_KEY);
+            window.localStorage.removeItem(STORAGE_KEY + '-user');
+            window.localStorage.removeItem(STORAGE_KEY + '-code-verifier');
+            return true;
+        } catch (e) { return false; }
+    }
+
+    // 모듈이 시작한 갱신·종료 하나(그 시도의 로그인 기록에 묶는다). 맞지 않는 갱신·종료 요청은 보내지 않는다.
+    //   { kind: 'refresh', token }  또는  { kind: 'logout', sub, sid }   + 보낸 뒤의 결과(result)
+    let permit = null;
+
+    // 결과를 모르는 갱신 요청에 쓴 갱신값(이 화면의 메모리에만 — 새로 고침·다른 탭까지 막는 것이 아니다)
+    const unknownRefresh = [];
+
+    function resultOf(res) {
+        return res.clone().json().then(function (b) {
+            const code = b && typeof b.code === 'string' ? b.code : (b && typeof b.error_code === 'string' ? b.error_code : null);
+            return { status: res.status, code: code };
+        }, function () { return { status: res.status, code: null }; });
+    }
+
+    // 인증 모듈과 공식 클라이언트가 내는 모든 요청이 지나는 한 곳.
+    // (전역 fetch 를 바꾸지 않는다 — 이 함수를 받은 호출만 지난다.)
+    function guardedFetch(input, init) {
+        const opt = init || {};
+        const target = matchTarget(input, opt.method);
+        if (!target) return Promise.reject(EonAuthError('target_not_allowed'));
+        const headers = plainHeaders(opt.headers);
+        if (!headers) return Promise.reject(EonAuthError('bad_headers'));
+        const auth = headerValue(headers, 'authorization');
+        if (headerValue(headers, 'apikey') !== ANON || typeof auth !== 'string' || auth.indexOf('Bearer ') !== 0) {
+            return Promise.reject(EonAuthError('bad_headers'));
+        }
+        const bound = permit;
+        let refreshToken = null;
+        if (target.key === 'logout') {
+            // 종료 요청은 모듈이 시작한 것만, 그 시도의 로그인 기록의 JWT 일 때만 나간다
+            const c = decodeClaims(auth.slice(7));
+            if (!bound || bound.kind !== 'logout' || !c || c.sub !== bound.sub || c.sid !== bound.sid) {
+                return Promise.reject(EonAuthError('not_bound'));
+            }
+        } else if (target.key === 'refresh') {
+            try { refreshToken = JSON.parse(opt.body).refresh_token; } catch (e) { refreshToken = null; }
+            if (typeof refreshToken !== 'string' || !refreshToken) return Promise.reject(EonAuthError('bad_body'));
+            // 나가는 갱신은 "지금 저장된 로그인"의 갱신값이어야 한다(공식 클라이언트가 스스로 하는 갱신도 같다)
+            const st = storedSession();
+            if (!st || st.refreshToken !== refreshToken) return Promise.reject(EonAuthError('not_bound'));
+            if (bound) {
+                // 모듈이 시작한 갱신·종료가 진행 중이면: 그 시도의 로그인 기록·갱신값일 때만
+                if (bound.kind !== 'refresh' || refreshToken !== bound.token || !same(st.claims, bound)) {
+                    return Promise.reject(EonAuthError('not_bound'));
+                }
+            }
+            // 공식 클라이언트는 응답을 못 받은 갱신을 스스로 다시 보내려 한다 — 결과를 모르는 요청은 다시 보내지 않는다
+            if (unknownRefresh.indexOf(refreshToken) >= 0) return Promise.reject(EonAuthError('refresh_unknown'));
+        }
+        const sent = window.fetch(input, {
+            method: target.method,
+            headers: headers,
+            body: opt.body,
+            redirect: 'error',            // 리디렉션을 따라가지 않는다
+            credentials: 'omit',
+            cache: 'no-store',
+            referrerPolicy: 'no-referrer',
+            signal: opt.signal
+        });
+        if (target.key !== 'refresh' && target.key !== 'logout') return sent;
+        return sent.then(function (res) {
+            if (refreshToken !== null && res.status >= 500) unknownRefresh.push(refreshToken);
+            if (bound) bound.result = resultOf(res);
+            return res;
+        }, function (err) {
+            if (refreshToken !== null) unknownRefresh.push(refreshToken);
+            if (bound) bound.result = Promise.resolve({ status: 0, code: null });
+            throw err;
+        });
+    }
+
+    function withTimeout(promise, ms) {
+        return new Promise(function (resolve, reject) {
+            const timer = setTimeout(function () { reject(EonAuthError('timeout')); }, ms);
+            promise.then(function (v) { clearTimeout(timer); resolve(v); }, function (e) { clearTimeout(timer); reject(e); });
+        });
+    }
+
+    // 공식 클라이언트에 주는 저장 어댑터: 자기 이름(eon_auth_v1…)만 읽고 쓴다.
+    function ownKey(key) {
+        if (key === STORAGE_KEY || (typeof key === 'string' && key.indexOf(STORAGE_KEY + '-') === 0)) return key;
+        throw EonAuthError('storage_key_not_allowed');
+    }
+    const scopedStorage = {
+        getItem: function (key) { return window.localStorage.getItem(ownKey(key)); },
+        setItem: function (key, value) { window.localStorage.setItem(ownKey(key), value); },
+        removeItem: function (key) { window.localStorage.removeItem(ownKey(key)); }
+    };
 
     // ---- 상태 ----
     let state = 'restoring';       // signed_out / restoring / signed_in / rejected
@@ -275,13 +350,6 @@
         redraw(false);
     }
 
-    // 작업을 하나씩 차례로(로그인·로그아웃·복원·다시 확인이 서로 끼어들지 않게)
-    let tail = Promise.resolve();
-    function enqueue(fn) {
-        const run = tail.then(fn);
-        tail = run.then(function () {}, function () {});
-        return run;
-    }
     // 복원·갱신·확인이 끝날 때까지 기다린다(상태가 restoring 이 아니게 될 때까지)
     function ready() {
         if (state !== 'restoring') return Promise.resolve(state);
@@ -308,12 +376,8 @@
             if (m && m.v === 1 && typeof m.sid === 'string' && typeof m.sub === 'string' &&
                 typeof m.user === 'string' && typeof m.time === 'string') mark = m;
         } catch (e) { mark = null; }
-        let storedSid = null;
-        try {
-            const st = JSON.parse(store.getItem(STORAGE_KEY));
-            const c = st && decodeClaims(st.access_token);
-            storedSid = c ? c.sid : null;
-        } catch (e) { storedSid = null; }
+        const st = storedSession();
+        const storedSid = st && st.claims ? st.claims.sid : null;
         let kind;
         if (user === null && time === null) kind = 'empty';
         else if (mark && user === mark.user && (time === mark.time || time === null)) kind = 'ours';
@@ -348,15 +412,17 @@
         }
     }
 
-    // 새 모듈이 만든 값이고(표식), 끝내려는 그 로그인 기록의 것이거나 이미 주인 없는 값일 때만 지운다.
-    function clearCompat(sid) {
+    // 새 모듈이 만든 값(표식)만 지운다.
+    //   sid 를 주면: 그 로그인 기록의 것이거나 이미 주인 없는 값일 때만(다른 로그인의 값은 건드리지 않는다)
+    //   every 가 참이면: 새 모듈이 만든 값이면 전부(저장된 로그인을 읽지 못해 아무것도 확인할 수 없을 때)
+    function clearCompat(sid, every) {
         try {
             const store = window.localStorage;
             const slot = readSlot();
             if (!slot.mark) return;
             const mine = sid !== null && sid !== undefined && slot.mark.sid === sid;
             const stale = slot.mark.sid !== slot.storedSid;
-            if (!mine && !stale) return;
+            if (!every && !mine && !stale) return;
             if (slot.kind === 'ours') {
                 if (slot.user === slot.mark.user) store.removeItem(COMPAT_USER);
                 if (slot.time === slot.mark.time) store.removeItem(COMPAT_TIME);
@@ -365,18 +431,30 @@
         } catch (e) { /* 저장소를 쓸 수 없으면 아무것도 지우지 않는다 */ }
     }
 
-    // 화면이 그려도 되는 본인 표시: 로그인 기록을 확인했고(signed_in), 그 자리의 값이 그 기록으로 만든 값일 때만
+    // 화면이 그려도 되는 본인 표시: 로그인 기록을 확인했고(signed_in), 지금 저장된 로그인이 그 기록이고,
+    // 그 자리의 값이 그 기록으로 만든 값일 때만
     function displayUserRaw() {
         if (displayHold || state !== 'signed_in' || !verified) return null;
         try {
             const slot = readSlot();
-            if (slot.kind !== 'ours' || slot.mark.sid !== verified.sid || slot.user === null) return null;
+            if (slot.kind !== 'ours' || slot.user === null) return null;
+            if (slot.mark.sid !== verified.sid || slot.storedSid !== verified.sid) return null;
             return slot.user;
         } catch (e) { return null; }
     }
 
+    // html 에 붙이는 표시(숨김 규칙을 푸는 열쇠): 확인된 관리자 / 확인된 회원
+    function applyClasses(raw) {
+        let role = null;
+        try { role = raw ? (JSON.parse(raw).role === 'admin' ? 'admin' : 'member') : null; } catch (e) { role = null; }
+        const list = document.documentElement.classList;
+        if (role === 'admin') list.add('eon-auth-admin'); else list.remove('eon-auth-admin');
+        if (role === 'member') list.add('eon-auth-member'); else list.remove('eon-auth-member');
+    }
+
     function redraw(force) {
         const now = displayUserRaw();
+        applyClasses(now);
         if (!force && now === lastDrawn) return;
         lastDrawn = now;
         drawers.slice().forEach(function (fn) { safeCall(fn); });
@@ -386,6 +464,7 @@
         if (typeof fn !== 'function') return;
         drawers.push(fn);
         lastDrawn = displayUserRaw();
+        applyClasses(lastDrawn);
         safeCall(fn);
     }
 
@@ -424,6 +503,7 @@
     function statusKind(status) {
         if (status === 0) return 'network';
         if (status === 401) return 'jwt_rejected';
+        if (status === 429) return 'rate_limited';
         if (status === 503) return 'maintenance';
         return 'unexpected';
     }
@@ -460,52 +540,98 @@
         return { kind: 'ok', allowed: b.allowed, isAdmin: b.is_admin };
     }
 
-    // 같은 현재 로그인 기록에서 my_profile 이 ok 이고 my_site_access.allowed 가 참인가
-    async function verifyOnce(session) {
-        const token = session && session.access_token;
-        const c = decodeClaims(token);
-        if (!c) return { ok: false, reason: 'token_shape' };
-        if (session.user && session.user.id && session.user.id !== c.sub) return { ok: false, reason: 'token_shape' };
+    // 그 시도의 로그인 기록(att)에서 my_profile 이 ok 이고 my_site_access.allowed 가 참인가
+    async function verifyOnce(att, token) {
+        if (!same(decodeClaims(token), att)) return { ok: false, reason: 'session_changed' };
         const p = await askProfile(token);
         if (p.kind !== 'ok') return { ok: false, reason: p.kind };
         const a = await askAccess(token);               // 같은 JWT(같은 로그인 기록)로 묻는다
         if (a.kind !== 'ok') return { ok: false, reason: a.kind };
         if (a.allowed !== true) return { ok: false, reason: 'not_allowed' };
         // 두 응답 사이에 이 브라우저의 계정·로그인 기록이 바뀌지 않았는가
-        const cur = await readSession();
-        const c2 = cur.session ? decodeClaims(cur.session.access_token) : null;
-        if (cur.error || !c2 || c2.sub !== c.sub || c2.sid !== c.sid) return { ok: false, reason: 'session_changed' };
-        return { ok: true, sub: c.sub, sid: c.sid, profile: p.profile, isAdmin: a.isAdmin === true };
+        if (!storedIs(att)) return { ok: false, reason: 'session_changed' };
+        return { ok: true, sub: att.sub, sid: att.sid, profile: p.profile, isAdmin: a.isAdmin === true };
     }
 
-    async function verifyWithRecovery(session) {
-        const first = await verifyOnce(session);
-        if (first.ok || (first.reason !== 'jwt_rejected' && first.reason !== 'no_member')) return first;
-        // JWT 가 만료됐거나 로그인 기록이 끝났을 수 있다 → 공식 클라이언트로 한 번만 갱신해 본다
-        let refreshed = null;
-        let definite = false;
+    // 그 시도의 로그인 기록만 갱신한다. 돌려주는 값: ok(session) / changed / ended / rate_limited / unknown
+    async function boundRefresh(att) {
+        const st = storedSession();
+        if (!st || !same(st.claims, att) || typeof st.refreshToken !== 'string' || !st.refreshToken) return { kind: 'changed' };
+        const p = { kind: 'refresh', sub: att.sub, sid: att.sid, token: st.refreshToken, result: null };
+        permit = p;
+        const release = function () { if (permit === p) permit = null; };
+        let r = null;
         try {
-            const r = await withTimeout(client.refreshSession(), SESSION_WAIT_MS);
-            if (r && !r.error && r.data && r.data.session) refreshed = r.data.session;
-            else definite = isDefiniteAuthFailure(r && r.error);
-        } catch (e) { refreshed = null; }
-        // 서버가 갱신을 거절했으면 이 로그인 기록은 끝났다. 응답을 못 받았으면 모른다(다시 보내지 않는다).
-        if (!refreshed) return { ok: false, reason: definite ? 'expired' : 'network', ended: definite };
-        const second = await verifyOnce(refreshed);
+            // 공식 클라이언트가 이 갱신을 끝낼 때까지 묶어 둔다(아래에서 기다리기를 그만둔 뒤에도 — 뒤늦은 재시도가 다른 로그인으로 나가지 않게)
+            const call = client.refreshSession({ refresh_token: st.refreshToken });
+            call.then(release, release);
+            r = await withTimeout(call, SESSION_WAIT_MS);
+        } catch (e) { r = null; }
+        const res = p.result ? await p.result : null;
+        if (r && !r.error && r.data && r.data.session) {
+            if (!same(decodeClaims(r.data.session.access_token), att)) return { kind: 'changed' };
+            return { kind: 'ok', session: r.data.session };
+        }
+        if (!res) return { kind: storedIs(att) ? 'unknown' : 'changed' };     // 보내지 않았거나 답을 기다리다 그만둠
+        if (res.status === 200) {
+            // 서버는 갱신해 줬는데 공식 클라이언트가 결과를 돌려주지 않은 경우: 저장된 것이 그 기록이면 그것으로 잇는다
+            const now = storedSession();
+            return now && same(now.claims, att) ? { kind: 'ok', session: { access_token: now.accessToken } } : { kind: 'changed' };
+        }
+        if (res.status === 429) return { kind: 'rate_limited' };
+        if (res.status >= 400 && res.status < 500 && ENDED_CODES.indexOf(res.code) >= 0) return { kind: 'ended' };
+        return { kind: 'unknown' };
+    }
+
+    // 그 시도의 로그인 기록만 끝낸다(이 사이트의 이 로그인만). 돌려주는 값: ended / changed / unknown
+    // 서버가 끝났다고 답했을 때만 이 브라우저의 로그인도 지운다 — 그것도 저장된 것이 아직 그 기록일 때만.
+    async function boundEnd(att) {
+        const st = storedSession();
+        if (!st || !same(st.claims, att)) return 'changed';
+        const p = { kind: 'logout', sub: att.sub, sid: att.sid, result: null };
+        permit = p;
+        const release = function () { if (permit === p) permit = null; };
+        try {
+            const call = client.admin.signOut(st.accessToken, 'local');
+            call.then(release, release);
+            await withTimeout(call, RPC_TIMEOUT_MS);
+        } catch (e) { /* 결과는 아래에서 본다 */ }
+        const res = p.result ? await p.result : null;
+        const ended = !!res && ((res.status >= 200 && res.status < 300) ||
+            ((res.status === 403 || res.status === 404) && res.code === 'session_not_found'));
+        if (!ended) return 'unknown';             // 실패·모름: 끝냈다고 하지 않는다. 다시 보내지도 않는다
+        removeStoredIf(att);
+        return 'ended';
+    }
+
+    async function verifyWithRecovery(att, token) {
+        const first = await verifyOnce(att, token);
+        if (first.ok || (first.reason !== 'jwt_rejected' && first.reason !== 'no_member')) return first;
+        // JWT 가 만료됐거나 로그인 기록이 끝났을 수 있다 → 그 기록의 갱신값으로 한 번만 갱신해 본다
+        const rf = await boundRefresh(att);
+        if (rf.kind === 'changed') return { ok: false, reason: 'session_changed' };
+        if (rf.kind === 'ended') return { ok: false, reason: 'expired', ended: true };
+        if (rf.kind === 'rate_limited') return { ok: false, reason: 'rate_limited' };
+        if (rf.kind !== 'ok') return { ok: false, reason: 'network' };
+        const second = await verifyOnce(att, rf.session.access_token);
         if (!second.ok && second.reason === 'no_member') return { ok: false, reason: 'no_member', definitive: true };
-        if (!second.ok && second.reason === 'jwt_rejected') return { ok: false, reason: 'expired' };
+        if (!second.ok && second.reason === 'jwt_rejected') return { ok: false, reason: 'unexpected' };
         return second;
     }
 
-    async function endLocal() {
-        try { await client.signOut({ scope: 'local' }); } catch (e) { /* 결과를 몰라도 다시 보내지 않는다 */ }
-    }
-
     // 로그인 기록 하나를 확인해 상태를 정한다. 돌려주는 값: 결과 이름.
+    // 실패 처리(갱신·종료·정리)는 전부 그 시도의 로그인 기록(att)에만 한다.
     async function settle(session, origin) {
         setState('restoring', null);
+        const att = decodeClaims(session && session.access_token);
+        if (!att) {
+            verified = null;
+            clearCompat(null);
+            setState('rejected', 'token_shape');
+            return 'token_shape';
+        }
         let r;
-        try { r = await verifyWithRecovery(session); } catch (e) { r = { ok: false, reason: 'error' }; }
+        try { r = await verifyWithRecovery(att, session.access_token); } catch (e) { r = { ok: false, reason: 'error' }; }
 
         if (r.ok) {
             const w = writeCompat(r);
@@ -515,33 +641,34 @@
                 setState('signed_in', w.ok ? null : w.why);
                 return 'signed_in';
             }
-            if (origin === 'login' && w.why !== 'session_changed') {
+            if (w.why !== 'session_changed') {
                 // 로그인하는 사이에 옛 방식의 값이 생겼거나 저장할 수 없다 → 덮어쓰지 않고 이 로그인을 끝낸다
                 verified = null;
-                await endLocal();
-                setState('signed_out', w.why);
+                const e = await boundEnd(att);
+                lastRejected = e === 'ended' ? null : att;
+                setState(e === 'ended' ? 'signed_out' : 'rejected', w.why);
                 return w.why === 'legacy_present' ? 'legacy_present' : 'error';
             }
             r = { ok: false, reason: 'session_changed' };
         }
 
         verified = null;
-        const c = decodeClaims(session && session.access_token);
         if (r.reason === 'no_member' && r.definitive) {
-            // 회원 대응이 없는 계정: 이 로그인을 끝낸다
-            await endLocal();
-            clearCompat(c ? c.sid : null);
-            setState('signed_out', 'no_member');
+            // 회원 대응이 없는 계정: 이 로그인을 끝낸다(끝났다고 확인됐을 때만 "로그인 전")
+            const e = await boundEnd(att);
+            clearCompat(att.sid);
+            lastRejected = e === 'ended' ? null : att;
+            setState(e === 'ended' ? 'signed_out' : 'rejected', 'no_member');
             return 'no_member';
         }
-        if (r.ended) await endLocal();       // 끝난 로그인 기록을 이 브라우저에 남겨 두지 않는다
-        clearCompat(c ? c.sid : null);
-        lastRejected = c;
+        if (r.ended) removeStoredIf(att);      // 서버가 끝났다고 답한 그 기록만 이 브라우저에서 지운다
+        clearCompat(att.sid);
+        lastRejected = att;
         setState('rejected', r.reason);
         return r.reason;
     }
 
-    // 공식 클라이언트의 알림(이 탭·다른 탭의 로그인·로그아웃·갱신) 뒤에 상태를 맞춘다
+    // 공식 클라이언트의 알림·저장소의 변화(이 탭·다른 탭의 로그인·로그아웃·갱신) 뒤에 상태를 맞춘다
     async function reconcile() {
         const cur = await readSession();
         if (cur.error) return;
@@ -556,9 +683,20 @@
             return;
         }
         const c = decodeClaims(s.access_token);
-        if (verified && c && c.sub === verified.sub && c.sid === verified.sid) return;     // 같은 로그인 기록(갱신 포함)
-        if (!verified && c && lastRejected && c.sub === lastRejected.sub && c.sid === lastRejected.sid) return;
+        if (verified && same(c, verified)) return;                 // 같은 로그인 기록(갱신 포함)
+        if (!verified && same(c, lastRejected)) return;
         await settle(s, 'event');
+    }
+
+    // 작업을 하나씩 차례로(시작·로그인·로그아웃·복원·다시 확인이 서로 끼어들지 않게). 시작은 화면이 다 읽힌 뒤.
+    let tail = new Promise(function (resolve) {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { resolve(); });
+        else resolve();
+    });
+    function enqueue(fn) {
+        const run = tail.then(fn);
+        tail = run.then(function () {}, function () {});
+        return run;
     }
 
     let reconcileQueued = false;
@@ -586,6 +724,7 @@
     }
 
     async function start() {
+        loadConfig();
         // 저장된 새 방식의 로그인이 없으면 기다릴 것이 없다 → 바로 "로그인 전"
         let hasStored = true;
         try { hasStored = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { hasStored = true; }
@@ -606,11 +745,17 @@
             client.onAuthStateChange(function () { scheduleReconcile(); });
         } catch (e) {
             client = null;
+            clearCompat(null, true);
             setState('signed_out', 'unavailable');
             return;
         }
         const cur = await readSession();
-        if (cur.error) { setState('rejected', 'network'); return; }
+        if (cur.error) {
+            // 저장된 로그인을 읽지 못했다(갱신 실패 등) → 아무것도 확인할 수 없다. 새 모듈이 만든 호환 값은 남기지 않는다
+            clearCompat(null, true);
+            setState('rejected', 'network');
+            return;
+        }
         if (!cur.session) { clearCompat(null); setState('signed_out', null); return; }
         await settle(cur.session, 'restore');
     }
@@ -618,7 +763,8 @@
     function outcomeOf(result) {
         if (result === 'signed_in' || result === 'legacy_present' || result === 'blocked' ||
             result === 'withdrawal_pending' || result === 'no_member' || result === 'maintenance' ||
-            result === 'not_allowed' || result === 'session_changed' || result === 'expired') return result;
+            result === 'not_allowed' || result === 'session_changed' || result === 'expired' ||
+            result === 'rate_limited') return result;
         return 'error';
     }
 
@@ -629,13 +775,16 @@
             let slot;
             try { slot = readSlot(); } catch (e) { return { outcome: 'error' }; }
             if (slot.kind === 'foreign') return { outcome: 'legacy_present' };
-            // 이 브라우저에 새 방식의 로그인이 이미 있으면 그것부터 끝낸다(이 로그인만)
-            const prev = await readSession();
-            if (prev.session) {
-                const pc = decodeClaims(prev.session.access_token);
-                verified = null;
-                await endLocal();
-                clearCompat(pc ? pc.sid : null);
+            // 이 브라우저에 새 방식의 로그인이 이미 있으면 그것부터 끝낸다(이 로그인만).
+            // 끝났는지 모르면 새 로그인 요청을 보내지 않는다.
+            let hasStored = true;
+            try { hasStored = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { hasStored = true; }
+            if (hasStored) {
+                const st = storedSession();
+                if (!st || !st.claims) return { outcome: 'previous_unknown' };
+                if ((await boundEnd(st.claims)) !== 'ended') return { outcome: 'previous_unknown' };
+                if (same(verified, st.claims)) verified = null;
+                clearCompat(st.claims.sid);
             }
             lastRejected = null;
             setState('restoring', null);
@@ -650,31 +799,40 @@
                 setState('signed_out', null);
                 const err = r && r.error;
                 const wrong = !!err && err.status === 400 && err.code === 'invalid_credentials';
-                return { outcome: wrong ? 'invalid_credentials' : 'error' };
+                return { outcome: wrong ? 'invalid_credentials' : (err && err.status === 429 ? 'rate_limited' : 'error') };
             }
-            return { outcome: outcomeOf(await settle(r.data.session, 'login')) };
+            const att = decodeClaims(r.data.session.access_token);
+            const result = await settle(r.data.session, 'login');
+            // attempt: 이 시도의 로그인 기록 번호(비밀이 아니다). 화면은 이동 직전에 isCurrent 로 다시 본다
+            return { outcome: outcomeOf(result), attempt: att ? att.sid : null };
         });
     }
 
-    // 이 사이트의 이 로그인만 끝낸다(전역 종료 아님)
+    // 이 사이트의 이 로그인만 끝낸다(전역 종료 아님). 서버가 끝났다고 답했을 때만 signed_out 이다.
     function signOut() {
         return enqueue(async function () {
             if (!client) return { outcome: 'error' };
-            const before = await readSession();
-            const c = before.session ? decodeClaims(before.session.access_token) : null;
-            let serverConfirmed = false;
-            try {
-                const r = await client.signOut({ scope: 'local' });
-                serverConfirmed = !!r && !r.error;
-            } catch (e) { serverConfirmed = false; }
-            const after = await readSession();
-            if (after.error || after.session) return { outcome: 'error' };     // 이 브라우저의 로그인이 남아 있다
-            const sid = c ? c.sid : (verified ? verified.sid : null);
+            let hasStored = true;
+            try { hasStored = window.localStorage.getItem(STORAGE_KEY) !== null; } catch (e) { hasStored = true; }
+            if (!hasStored) {
+                const sid = verified ? verified.sid : null;
+                verified = null;
+                lastRejected = null;
+                clearCompat(sid);
+                setState('signed_out', null);
+                return { outcome: 'signed_out' };
+            }
+            // 이 탭이 알고 있는 로그인(확인했거나 방금 거절된 것)만 끝낸다
+            const st = storedSession();
+            const mine = verified || lastRejected;
+            if (!st || !st.claims || !same(st.claims, mine)) return { outcome: 'changed' };
+            const e = await boundEnd(st.claims);
+            if (e !== 'ended') return { outcome: e === 'changed' ? 'changed' : 'unknown' };
             verified = null;
             lastRejected = null;
-            clearCompat(sid);
+            clearCompat(st.claims.sid);
             setState('signed_out', null);
-            return { outcome: 'signed_out', serverConfirmed: serverConfirmed };
+            return { outcome: 'signed_out' };
         });
     }
 
@@ -684,7 +842,12 @@
             if (!client) return state;
             lastRejected = null;
             const cur = await readSession();
-            if (cur.error) { verified = null; setState('rejected', 'network'); return state; }
+            if (cur.error) {
+                verified = null;
+                clearCompat(null, true);
+                setState('rejected', 'network');
+                return state;
+            }
             if (!cur.session) {
                 const sid = verified ? verified.sid : null;
                 const was = state;
@@ -711,7 +874,7 @@
         if (state !== 'signed_in' || !verified) throw EonAuthError(state === 'rejected' ? 'rejected' : 'signed_out');
         const cur = await readSession();
         const c = cur.session ? decodeClaims(cur.session.access_token) : null;
-        if (cur.error || !c || c.sub !== verified.sub || c.sid !== verified.sid) throw EonAuthError('session_changed');
+        if (cur.error || !same(c, verified)) throw EonAuthError('session_changed');
         return { apikey: ANON, authorization: 'Bearer ' + cur.session.access_token };
     }
 
@@ -732,6 +895,10 @@
         signIn: signIn,
         signOut: signOut,
         recheck: recheck,
+        // 그 시도(attempt)의 로그인이 지금도 확인된 로그인이고 표시할 수 있는가(화면이 이동 직전에 본다)
+        isCurrent: function (attempt) {
+            return typeof attempt === 'string' && state === 'signed_in' && !!verified && verified.sid === attempt && displayUserRaw() !== null;
+        },
         // 확인된 본인 정보(my_profile 의 여섯 열)와 사이트 접근(my_site_access). 확인 전이면 null.
         profile: function () { return state === 'signed_in' && verified ? Object.assign({}, verified.profile) : null; },
         siteAccess: function () { return state === 'signed_in' && verified ? { allowed: true, is_admin: verified.isAdmin } : null; },
@@ -741,9 +908,12 @@
         credentialFor: credentialFor
     });
 
-    // 다른 탭이 호환 값을 바꾸면 표시를 다시 본다(이름만 본다 — 다른 로그인 상태의 값은 읽지 않는다)
+    // 다른 탭이 호환 값이나 새 방식의 로그인을 바꾸면 표시를 다시 보고 상태를 맞춘다
+    // (키 이름만 본다 — 다른 로그인 상태의 값은 읽지 않는다)
     window.addEventListener('storage', function (ev) {
-        if (ev && (ev.key === COMPAT_USER || ev.key === COMPAT_TIME || ev.key === MARK_KEY || ev.key === null)) redraw(false);
+        if (!ev) return;
+        if (ev.key === COMPAT_USER || ev.key === COMPAT_TIME || ev.key === MARK_KEY || ev.key === null) redraw(false);
+        if (ev.key === STORAGE_KEY || ev.key === null) { redraw(false); scheduleReconcile(); }
     });
 
     // 뒤로 가기로 보관된 화면이 되살아나면: 먼저 로그인 전 모양으로 돌리고, 다시 확인한 뒤에 그린다

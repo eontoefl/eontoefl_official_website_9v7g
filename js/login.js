@@ -151,9 +151,19 @@ async function eonAuthLoginSubmit() {
         if (outcome === 'signed_in') {
             // 같은 로그인 기록에서 본인 정보와 사이트 접근을 둘 다 확인한 뒤다
             showAlert('로그인 성공! 환영합니다.', 'success');
+            const attempt = result.attempt;
             setTimeout(() => {
-                window.location.href = 'index.html';
+                // 이동 직전에 다시 본다: 아직 이 시도의 그 로그인이 확인된 로그인인가(그 사이 다른 탭이 바꿨을 수 있다)
+                if (window.EonAuth.isCurrent(attempt)) {
+                    window.location.href = 'index.html';
+                } else {
+                    showAlert('로그인 상태가 바뀌었습니다. 다시 로그인해 주세요.', 'error');
+                }
             }, 1000);
+        } else if (outcome === 'previous_unknown') {
+            showAlert('이전 로그인을 끝내지 못했습니다. 잠시 뒤 다시 시도해주세요.', 'error');
+        } else if (outcome === 'rate_limited') {
+            showAlert('요청이 많습니다. 잠시 뒤 다시 시도해주세요.', 'error');
         } else if (outcome === 'legacy_present') {
             showAlert('기존 방식의 로그인 상태가 있습니다. 기존 방식에서 로그아웃한 뒤 다시 로그인해 주세요.', 'error');
         } else if (outcome === 'invalid_credentials' || outcome === 'no_member') {

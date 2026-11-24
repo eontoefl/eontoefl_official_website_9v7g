@@ -249,7 +249,8 @@ async function eonAuthLogout() {
         result = null;
     }
     if (!result || result.outcome !== 'signed_out') {
-        alert('로그아웃하지 못했습니다. 다시 시도해주세요.');
+        // 서버가 끝났다고 답하지 않았다(실패·모름) — 로그아웃됐다고 안내하지 않는다
+        alert('로그아웃을 확인하지 못했습니다. 잠시 뒤 다시 시도해주세요.');
         return;
     }
     alert('로그아웃되었습니다.');
