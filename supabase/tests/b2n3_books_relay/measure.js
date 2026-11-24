@@ -22,6 +22,8 @@ const LIMIT_MS = { first: 1000, mid: 500, last: 500 };
 const REQUIRED_DOCS = ['160', '68'];
 const OPEN_TIMEOUT_MS = 300000;
 const MIN_SECONDS_LEFT = 120;
+const FRAME_GAP_LIMIT_MS = 200; // 화면 갱신(requestAnimationFrame) 간격이 이보다 길면 탭이 뒤에 있거나 가려진 것으로 본다
+const ALLOW_SLOW_FRAMES = new URLSearchParams(location.search).get('allow_slow_frames') === '1'; // 도구 점검용: 느려도 재되 결과에 표시한다(판정에 못 쓴다)
 const K64 = 65536;
 const M1 = 1048576;
 
@@ -191,11 +193,38 @@ function resourceSummary(url) {
     from_browser_cache: delivery.includes('cache') ? true : sizesVisible ? entries.every((e) => e.transferSize > 0) ? false : null : null,
   };
 }
+// 화면 갱신 간격. PDF.js 는 그릴 때 requestAnimationFrame 을 쓴다 — 탭이 뒤에 있으면 그 간격이 초 단위로 늘어
+// 표시 시간이 뭉개진다(작업방의 점검에서, 자동화 도구가 뒤에서 연 탭은 "보임"으로 보고하면서도 간격이 1초였다).
+// 그래서 visibilityState 를 믿지 않고 간격을 직접 잰다.
+async function frameGaps(n = 3) {
+  const gaps = [];
+  let last = now();
+  for (let i = 0; i < n; i++) { await new Promise((r) => requestAnimationFrame(r)); const t = now(); gaps.push(round(t - last)); last = t; }
+  return gaps;
+}
+async function frameProbe() {
+  const gaps = await Promise.race([frameGaps(), sleep(4000).then(() => null)]);
+  return { gaps, ok: !!gaps && Math.max(...gaps) <= FRAME_GAP_LIMIT_MS };
+}
+async function waitForFrames() {
+  for (;;) {
+    const p = await frameProbe();
+    if (p.ok || ALLOW_SLOW_FRAMES || S.stop) return p;
+    status('멈춤: 화면 갱신이 느리다 — 이 탭이 뒤에 있거나 가려져 있다. 탭을 맨 앞에 두면 이어서 잰다');
+    await sleep(1000);
+  }
+}
 // 한 번의 측정: 첫 쪽 = 문서 열기 시작 → 1쪽 렌더 완료 / 중간·끝 쪽 = 이미 열린 그 문서에서 이동 시작 → 렌더 완료
 async function measureOpen(doc, url, httpHeaders) {
   const d = S.docs[doc];
   const mid = Math.ceil(d.pages / 2);
   const rec = { url_run: new URL(url, location.href).searchParams.get('run'), started_at: new Date().toISOString(), ok: false, ms: { open: null, first: null, mid: null, last: null }, pages_measured: { first: 1, mid, last: d.pages } };
+  const probeBefore = await waitForFrames();
+  const frames = { before: probeBefore.gaps, max_gap_during_ms: 0, count_during: 0, after: null };
+  let frameOn = true;
+  let frameLast = now();
+  const frameLoop = () => { const t = now(); frames.max_gap_during_ms = Math.max(frames.max_gap_during_ms, round(t - frameLast)); frames.count_during++; frameLast = t; if (frameOn) requestAnimationFrame(frameLoop); };
+  requestAnimationFrame(frameLoop);
   performance.clearResourceTimings();
   let task = null;
   let progress = { loaded: null, total: null };
@@ -227,6 +256,12 @@ async function measureOpen(doc, url, httpHeaders) {
     if (e && e.status !== undefined) rec.error_status = e.status;
   } finally {
     clearTimeout(timer);
+    frameOn = false;
+    const probeAfter = await frameProbe();
+    frames.after = probeAfter.gaps;
+    rec.frames = frames;
+    rec.frames_slow = !probeBefore.ok || !probeAfter.ok; // 참이면 이 측정의 표시 시간은 판정에 쓰지 않는다(다시 잰다)
+    rec.visibility = document.visibilityState;
     rec.pdfjs_progress = progress; // PDF.js 가 센 받은 바이트(전송량의 어림 — 로그가 정본이다)
     rec.resource = resourceSummary(url);
     try { if (task) await task.destroy(); } catch (e) { /* 닫기 실패는 측정값에 넣지 않는다 */ }
@@ -340,6 +375,10 @@ async function runTiming() {
   if (pdfjsLib.version !== PDFJS_VERSION) { status(`멈춤: PDF.js 가 ${pdfjsLib.version} — ${PDFJS_VERSION} 이 아니다`); return; }
   S.stop = false;
   const T = RESULT.timing = RESULT.timing || { note: '조건(크기 × 열기 유형 × 경로)마다 5회. 순서는 D, R 번갈아. "first" = 주소에 매번 새 run 값 / "again" = 같은 주소로 다시 요청(그 조건의 first 1회차 주소). 두 열기 유형은 합치지 않는다.', runs: [] };
+  if (!ALLOW_SLOW_FRAMES) {
+    const slow = T.runs.filter((r) => r.frames_slow);
+    if (slow.length) { T.discarded_slow_frame_runs = (T.discarded_slow_frame_runs || []).concat(slow); T.runs = T.runs.filter((r) => !r.frames_slow); log(`화면 갱신이 느린 채 잰 ${slow.length}건을 버리고 다시 잰다`); }
+  }
   const order = [];
   for (const doc of selectedDocs()) for (const type of ['first', 'again']) for (let i = 1; i <= RUNS; i++) for (const path of ['D', 'R']) order.push({ doc, type, i, path });
   const firstUrl = {};
@@ -356,7 +395,7 @@ async function runTiming() {
     status(`표시 시간 측정 ${n}/${order.length}: doc ${o.doc} · ${o.type === 'first' ? '첫 요청' : '같은 주소 다시'} · ${o.i}/${RUNS}회 · ${o.path}`);
     const rec = await measureOpen(o.doc, url, o.path === 'D' ? hD() : hR(S.creds.keep));
     T.runs.push({ doc: o.doc, open_type: o.type, iteration: o.i, path: o.path, url, ...rec });
-    log(`doc ${o.doc} ${o.type} #${o.i} ${o.path}: ${rec.ok ? `첫 쪽 ${rec.ms.first}ms · 중간 ${rec.ms.mid}ms · 끝 ${rec.ms.last}ms · 요청 ${rec.resource.requests_seen}건` : '실패 — ' + rec.error}`);
+    log(`doc ${o.doc} ${o.type} #${o.i} ${o.path}${rec.frames_slow ? ' [화면 갱신 느림]' : ''}: ${rec.ok ? `첫 쪽 ${rec.ms.first}ms · 중간 ${rec.ms.mid}ms · 끝 ${rec.ms.last}ms · 요청 ${rec.resource.requests_seen}건` : '실패 — ' + rec.error}`);
     renderTiming();
     await sleep(400);
   }
@@ -383,6 +422,7 @@ function timingSummary() {
       r: { n_ok: r.length, n_fail: pick('R').length - r.length, values: r, median: rm, max: r.length ? Math.max(...r) : null },
       diff_median_ms: dm != null && rm != null ? rm - dm : null, limit_ms: LIMIT_MS[page], complete,
       ok: complete ? rm - dm <= LIMIT_MS[page] : null,
+      pdfjs_loaded_bytes: { D: pick('D').reduce((a, x) => a + ((x.pdfjs_progress && x.pdfjs_progress.loaded) || 0), 0), R: pick('R').reduce((a, x) => a + ((x.pdfjs_progress && x.pdfjs_progress.loaded) || 0), 0), note: 'PDF.js 가 센 받은 바이트의 합(어림). 전송량의 정본은 로그다' },
       from_browser_cache: { D: [...new Set(pick('D').map((x) => String(x.resource.from_browser_cache)))], R: [...new Set(pick('R').map((x) => String(x.resource.from_browser_cache)))] },
     });
   }
@@ -449,6 +489,7 @@ async function runPost() {
   const endNow = jwtPayload($('in-end').value.trim());
   if (!endNow || endNow.session_id !== P.end_session_id) { status('멈춤: 끝낼 로그인의 자격 칸이 종료 전과 다르다 — 이미 받아 둔 같은 자격이어야 한다'); return; }
   if (secondsLeft(S.creds.end) < 60) { status('멈춤: 끝낼 로그인의 자격이 만료됐거나 곧 만료된다 — 만료로 거절된 것과 종료로 거절된 것을 가를 수 없다. 처음부터 다시'); return; }
+  if (P.post) (P.post_earlier_attempts = P.post_earlier_attempts || []).push({ ...P.post, verdict_then: P.verdict });
   P.post = { at: new Date().toISOString(), measurer_confirmed_session_ended_in_db: true, end_credential_seconds_left: secondsLeft(S.creds.end), same_url: {}, new_url: {}, control_keep: {}, diagnostic_d_with_member: {} };
   for (const doc of selectedDocs()) {
     status(`종료 뒤 요청: doc ${doc}`);
@@ -513,6 +554,8 @@ function computeVerdict() {
   const timingComplete = req.length === expectedCells && req.every((x) => x.complete);
   if (!timingComplete) reasons.push('필수 크기(160·68)의 표시 시간 측정이 조건마다 5회씩 다 차지 않았다');
   if (displayFailures > 0) reasons.push(`표시 실패 ${displayFailures}건`);
+  const slowFrames = runs.filter((r) => r.frames_slow).length;
+  if (slowFrames > 0) reasons.push(`화면 갱신이 느린 채(탭이 뒤에 있거나 가려진 채) 잰 측정 ${slowFrames}건 — 그 표시 시간은 판정에 쓸 수 없다. 탭을 맨 앞에 두고 "표시 시간 측정 시작"을 다시 누르면 그것만 다시 잰다`);
   const slow = req.filter((x) => x.ok === false);
   for (const x of slow) reasons.push(`doc ${x.doc} · ${x.open_type} · ${x.page}: R 중앙값이 D 보다 ${x.diff_median_ms}ms 느리다(기준 +${x.limit_ms}ms)`);
   let rangeErrors = null;
@@ -526,7 +569,7 @@ function computeVerdict() {
   const failed = displayFailures > 0 || slow.length > 0 || (rangeErrors || 0) > 0 || lo === 'fail';
   return {
     rule: '필수 판정 대상 160·68. 크기별·열기 유형별로 D·R 각각 5회의 중앙값을 견준다(두 열기 유형 모두). 표시 실패 0, 잘못된 범위·바이트 0, 종료 뒤 같은 주소·새 주소·범위·HEAD 전부 401/403 이고 본문 0(미확인이 있으면 통과 아님). R 중앙값 − D 중앙값: 첫 쪽 +1000ms 이내, 중간·끝 쪽 +500ms 이내. 34 는 표에만 적고 판정에 넣지 않는다.',
-    result: pass ? 'pass' : failed ? 'fail' : 'not_decided', pass, display_failures: displayFailures, range_byte_errors: rangeErrors, post_logout: lo, timing: summary, reasons,
+    result: pass ? 'pass' : failed ? 'fail' : 'not_decided', pass, display_failures: displayFailures, slow_frame_runs: slowFrames, range_byte_errors: rangeErrors, post_logout: lo, timing: summary, reasons,
     caveat: '후보 선정 기준이지 운영 보장이 아니다. 한 기기·한 회선·합성 PDF·회원 판정 1회의 값이다(절차.md 의 한계).',
   };
 }
@@ -568,7 +611,8 @@ async function init() {
   RESULT.marker = S.manifest.marker;
   const box = viewerBox();
   const conn = navigator.connection || {};
-  RESULT.environment = { user_agent: navigator.userAgent, origin: location.origin, device_pixel_ratio: window.devicePixelRatio || 1, viewer_box_css_px: box, zoom: '맞춤 배율 × 1.0(뷰어의 기본)', pdfjs_version: pdfjsLib.version, connection: { effective_type: conn.effectiveType ?? null, downlink_mbps: conn.downlink ?? null, rtt_ms: conn.rtt ?? null, note: '브라우저가 어림한 값이다' } };
+  if (ALLOW_SLOW_FRAMES) { RESULT.notes.push('도구 점검용 선택(allow_slow_frames=1)으로 열었다 — 화면 갱신이 느려도 쟀다. 판정에 쓸 수 없다.'); log('주의: allow_slow_frames=1 — 화면 갱신이 느려도 잰다(판정에 쓸 수 없다)'); }
+  RESULT.environment = { user_agent: navigator.userAgent, frame_probe_at_start: (await frameProbe()), origin: location.origin, device_pixel_ratio: window.devicePixelRatio || 1, viewer_box_css_px: box, zoom: '맞춤 배율 × 1.0(뷰어의 기본)', pdfjs_version: pdfjsLib.version, connection: { effective_type: conn.effectiveType ?? null, downlink_mbps: conn.downlink ?? null, rtt_ms: conn.rtt ?? null, note: '브라우저가 어림한 값이다' } };
   $('manifest').innerHTML = `표식 <b>${esc(S.manifest.marker)}</b> · ` + S.manifest.docs.map((d) => `doc ${d.doc}: ${d.bytes.toLocaleString('en-US')}바이트·${d.pages}쪽(${esc(d.object_name)})`).join(' / ') + ` · PDF.js ${esc(pdfjsLib.version)} · 화면 ${box.w}×${box.h}px, dpr ${RESULT.environment.device_pixel_ratio}`;
   try {
     const c = await (await fetch('/local/credentials', { headers: { 'X-B2n3-Local': '1' } })).json();
