@@ -92,6 +92,8 @@ function _restartAgreeClock(updateData, nowMs) {
 // 아직 고르지 않은 것(A3). 무료 분석의 동의 기한은 결과가 조건부승인·거부면 필요 없다.
 function _missingTypeWindow() {
     if (!document.getElementById('typeOptionsBox')) return [];
+    // 잠긴 학생(동의 완료·기한 지남)은 유형·기한을 바꾸지 않으므로 고를 것도 없다(저장값이 비어 있어도 막지 않음)
+    if (_promoToggleCtx && _promoToggleCtx.lockReason) return [];
     const type = _formStudentType();
     if (!type) return ['학생 유형'];
     const st = _currentAnalysisStatus();
@@ -420,7 +422,14 @@ function _splitRecommendReason(text) {
     let m, last = null;
     while ((m = re.exec(s)) !== null) last = m[1];
     if (last === null) return { body: s, reason: null };
-    const body = s.replace(re, '').replace(/\n{3,}/g, '\n\n').trim();
+    // 블록 자리만 지운다. 본문의 섹션 사이 빈 줄(n8n이 넣는 여러 줄)은 건드리지 않는다.
+    let body = s;
+    let m2;
+    while ((m2 = /\[\[추천이유\]\][\s\S]*?\[\[\/추천이유\]\]/.exec(body)) !== null) {
+        const before = body.slice(0, m2.index).replace(/\s+$/, '');
+        const after = body.slice(m2.index + m2[0].length).replace(/^\s+/, '');
+        body = before && after ? before + '\n\n' + after : (before || after);
+    }
     return { body, reason: last.trim() };
 }
 
@@ -2536,8 +2545,11 @@ async function saveModalAnalysis(event) {
             schedule_end: blankProgramFields ? null : formData.get('schedule_end'),
             self_paced: blankProgramFields ? false : selfPacedEnabled,
             self_paced_end_date: (blankProgramFields || !selfPacedEnabled) ? null : selfPacedEndDate,
-            // 학생 유형은 늘 넣는다(공개 SQL이 첫 도착 알림톡 종류를 고름). 기간은 '처음'일 때만, 추천 이유는 무료 분석만.
-            is_incentive_applicant: isIncentive,
+            // 학생 유형은 넣는다(공개 SQL이 첫 도착 알림톡 종류를 고름). 잠긴 학생은 저장된 확정값만(비어 있으면 키를 빼서 공개 SQL이 원래 값을 유지).
+            // 기간은 '처음'일 때만, 추천 이유는 무료 분석만.
+            ...((typeLocked && !isRestartSave)
+                ? ((currentManageApp.is_incentive_applicant === true || currentManageApp.is_incentive_applicant === false) ? { is_incentive_applicant: currentManageApp.is_incentive_applicant } : {})
+                : { is_incentive_applicant: isIncentive }),
             ...(saveWindow !== undefined ? { analysis_agree_window_hours: saveWindow } : {}),
             ...(isIncentive ? { analysis_recommend_reason: reasonText || null } : {}),
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
