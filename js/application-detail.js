@@ -130,9 +130,15 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function handleHashChange() {
     const urlHash = window.location.hash;
+    // 무료 분석 흐름의 STEP 2 두 상태(#step2 분석 / #step2-plan 과정·비용): 같은 탭 안에서 한 번에 한 상태만 그린다.
+    // 주소가 바뀔 때마다 다시 그린다(뒤로 가기로 해시 없는 처음 주소로 돌아온 경우도 분석 상태로).
+    if (currentApplication && isFreeAnalysisFlow(currentApplication)) {
+        renderStudentStep2(currentApplication);
+    }
     const hashToTab = {
         '#step1': 'tabInfo',
         '#step2': 'tabStudentAnalysis',
+        '#step2-plan': 'tabStudentAnalysis',
         '#step3': 'tabContract',
         '#step4': 'tabPayment',
         '#step5': 'tabUsage'
@@ -337,6 +343,14 @@ function displayApplicationDetail(app) {
         }
     }
 
+    // 무료 분석 흐름: 판정 값(statusText)은 그대로 두고 보이는 글자만 바꾼다. 동의 전(기한이 지나도) '분석 도착', 동의 뒤 '승인'.
+    let statusLabel = statusText;
+    if (isFreeAnalysisFlow(app) && !app.student_agreed_at) {
+        statusLabel = '분석 도착';
+        statusIcon = 'fa-file-lines';
+        statusHint = '이온쌤이 쓴 개별분석이 도착했어요. 천천히 읽어보세요.';
+    }
+
     // 상태 배지 + 수정/삭제 버튼 표시 (신청서 상세 제목 오른쪽)
     // 관리자는 개별분석 등록·삭제 여부와 무관하게 항상 수정/삭제 가능
     const hasAnalysisRegistered = app.analysis_status && app.analysis_content;
@@ -364,7 +378,7 @@ function displayApplicationDetail(app) {
     document.getElementById('detailStatus').innerHTML = `
         <span class="status-badge ${statusClass}">
             <i class="fas ${statusIcon}" style="margin-right: 6px; font-size: 11px;"></i>
-            ${statusText}
+            ${statusLabel}
         </span>
         ${statusHint ? `<span class="detail-header-hint">${statusHint}</span>` : ''}
     `;
@@ -1079,6 +1093,19 @@ function getAnalysisSection(app) {
     // 조건부승인은 아직 협의 단계 → 동의 폼 대신 카톡 문의 안내를 표시
     const showConditionalContact = isConditional && !app.student_program_agreed;
 
+    // 무료 분석 흐름(2026-11-26): STEP 2 안의 두 상태. #step2 = 분석(+분석 끝 카드), #step2-plan = 과정·비용(+동의 카드).
+    // 동의 뒤에는 지금 동의 완료 화면 그대로, 제목만 '{이름}님의 개별분석'(K24).
+    const freeFlow = isFreeAnalysisFlow(app);
+    const freeOpen = freeFlow && !app.student_program_agreed;
+    const freeExpired = freeOpen && _agreeExpired(app);
+    const planState = freeOpen && !freeExpired && window.location.hash === '#step2-plan';
+    const showDetailBlocks = !freeFlow || planState || !!app.student_program_agreed;
+    const callName = escapeHtml(_studentCallName(app.name));
+    const head = freeFlow
+        ? { title: planState ? `${callName}님께 추천하는 과정` : `${callName}님의 개별분석`, icon: planState ? 'fa-route' : 'fa-file-lines', accent: '#7c68a8', tile: '#efeaf7' }
+        : status;
+    const reasonText = (app.analysis_recommend_reason || '').trim();
+
     return `
         <style>
             /* STEP 1과 같은 카드/여백 언어. 선·2px 컬러 테두리·hr 없음. */
@@ -1174,26 +1201,49 @@ function getAnalysisSection(app) {
             }
         </style>
 
-        <!-- 표제: 큰 배너 대신 아이콘 타일 + 한 줄 -->
+        <!-- 표제: 큰 배너 대신 아이콘 타일 + 한 줄 (무료 분석 흐름은 '{이름}님의 개별분석' / 과정·비용 상태는 '{이름}님께 추천하는 과정') -->
         <div class="s2-card">
             <div class="s2-verdict">
-                <div class="s2-verdict-tile" style="background: ${status.tile};">
-                    <i class="fas ${status.icon}" style="color: ${status.accent};"></i>
+                <div class="s2-verdict-tile" style="background: ${head.tile};">
+                    <i class="fas ${head.icon}" style="color: ${head.accent};"></i>
                 </div>
-                <div class="s2-verdict-title">${status.title}</div>
+                <div>
+                    <div class="s2-verdict-title">${head.title}</div>
+                    ${planState ? `<div style="font-size: 14px; color: #64748b; margin-top: 4px; line-height: 1.6;">과정과 비용을 먼저 살펴보세요. 아직 수강에 동의한 건 아니에요.</div>` : ''}
+                </div>
             </div>
         </div>
 
-        <!-- 1. 개별 분석 내용 -->
-        ${app.analysis_content ? `
+        <!-- 과정·비용 상태: 추천 이유 (비어 있으면 숨김) -->
+        ${planState && reasonText ? `
+        <div class="s2-card" style="background: #f6f4fb;">
+            <div style="font-size: 12px; font-weight: 700; color: #7c68a8; margin-bottom: 8px;">이 과정을 추천하는 이유</div>
+            <div class="s2-analysis" style="font-size: 14px;">${escapeHtml(reasonText)}</div>
+        </div>
+        ` : ''}
+
+        <!-- 1. 개별 분석 내용 (과정·비용 상태에서는 그리지 않음) -->
+        ${app.analysis_content && !planState ? `
         <div class="s2-card">
             <div class="s2-card-title"><i class="fas fa-file-lines"></i> 개별 분석 내용</div>
             <div class="s2-analysis">${escapeHtml(app.analysis_content)}</div>
         </div>
         ` : ''}
 
+        <!-- 무료 분석 · 분석 상태: 분석 끝 카드(대표 확정 5). 기한이 지났으면 같은 자리에 재개 요청 블록 -->
+        ${freeOpen && !planState ? `
+        <div class="s2-card" style="background: #f6f4fb;">
+            <div style="font-size: 12px; font-weight: 700; color: #7c68a8; margin-bottom: 6px;">함께 준비한다면</div>
+            ${freeExpired ? renderResumeBlock('동의', !!app.resume_requested_at) : `
+            <div style="font-size: 17px; font-weight: 700; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 6px;">저랑 준비하면 이렇게 공부해요</div>
+            <div style="font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 16px;">분석에서 말씀드린 부분을 매일 어떻게 연습하는지 보여드릴게요.</div>
+            <button type="button" onclick="goStep2Plan()" style="padding: 12px 20px; background: #5b4a7d; color: #ffffff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;">과정과 비용 보기 <i class="fas fa-chevron-right" style="font-size: 11px; margin-left: 4px;"></i></button>
+            `}
+        </div>
+        ` : ''}
+
         <!-- 2. 배정 프로그램 정보 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
-        ${showProgramAndPrice && app.assigned_program ? `
+        ${showProgramAndPrice && showDetailBlocks && app.assigned_program ? `
         <div class="s2-card">
             <div class="s2-card-title"><i class="fas fa-graduation-cap"></i> 배정 프로그램 정보</div>
             <div class="s2-row">
@@ -1245,10 +1295,10 @@ function getAnalysisSection(app) {
         ` : ''}
 
         <!-- 3. 이용가 및 할인 내역 (조건부승인 동안엔 숨김 — 아직 협의 전) -->
-        ${showProgramAndPrice ? getPricingBox(app) : ''}
+        ${showProgramAndPrice && showDetailBlocks ? getPricingBox(app) : ''}
 
-        <!-- 동의 섹션 (승인일 때만) — 경고·타이머·동의폼이 여기서 한 덩어리가 된다 -->
-        ${needsAgreement ? getAgreementSection(app) : ''}
+        <!-- 동의 섹션 (승인일 때만) — 경고·타이머·동의폼이 여기서 한 덩어리가 된다. 무료 분석은 과정·비용 상태에서만 -->
+        ${needsAgreement && (!freeFlow || planState) ? getAgreementSection(app) : ''}
 
         <!-- 불합격: 격려 카드 (다음 도전을 위한 마무리) -->
         ${isRejected ? `
@@ -1308,60 +1358,52 @@ function getAnalysisSection(app) {
 // (동의 기한 초시계 제거) 매초 갱신 카운트다운(formatCountdown/startAnalysisCountdown)은
 // 절대 일시 고정 표기로 대체되어 삭제됨. 마감 표기는 getAgreementSection에서 formatKstDateTimeKo로 처리.
 
+// ===== 무료 분석 흐름 STEP 2 (2026-11-26) =====
+// 동의 기한이 지났는지(다시 열기 반영). 기준 시각이 없으면 지나지 않은 것으로 본다.
+function _agreeExpired(app) {
+    const dl = agreeDeadline(app);
+    return !isNaN(dl) && dl <= Date.now();
+}
+
+// 학생을 부르는 이름: 세 글자 한국 이름은 성을 뺀다(홍길동 → 길동). 그 밖에는 그대로.
+function _studentCallName(name) {
+    const n = String(name || '').trim();
+    return /^[가-힣]{3}$/.test(n) ? n.slice(1) : n;
+}
+
+// #step2-plan(과정·비용)을 볼 수 있는 학생: 무료 분석 흐름 + 동의 전 + 기한 안
+function canSeeStep2Plan(app) {
+    return isFreeAnalysisFlow(app) && !app.student_program_agreed && !_agreeExpired(app);
+}
+
+// STEP 2 탭을 지금 주소 상태로 다시 그린다. 볼 수 없는 학생이 #step2-plan이면 #step2로 바꾸고 바로 다시 그린다
+// (replaceState는 hashchange를 일으키지 않으므로 직접 그린다).
+function renderStudentStep2(app) {
+    if (window.location.hash === '#step2-plan' && !canSeeStep2Plan(app)) {
+        history.replaceState(null, '', window.location.pathname + window.location.search + '#step2');
+    }
+    const tab = document.getElementById('tabStudentAnalysis');
+    if (tab && app.analysis_status && app.analysis_content) tab.innerHTML = getAnalysisSection(app);
+}
+
+// 분석 끝 카드의 [과정과 비용 보기]
+function goStep2Plan() {
+    window.location.hash = '#step2-plan';
+    const main = document.querySelector('.main-content') || document.body;
+    window.scrollTo({ top: Math.max(0, main.getBoundingClientRect().top + window.scrollY - 90), behavior: 'smooth' });
+}
+
 // 동의 섹션 HTML
 function getAgreementSection(app) {
-    const isIncentive = app.is_incentive_applicant === true;
-    const deadlineMs = isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    const deadlineLabel = isIncentive ? '5일' : '24시간';
-    
-    // 데드라인 기준: 최초 저장 시각(analysis_first_saved_at) 우선, 구 데이터는 폴백
-    const analysisTimestamp = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-    const elapsedMs = analysisTimestamp 
-        ? (Date.now() - new Date(analysisTimestamp).getTime())
-        : 0;
-    const remainingMs = deadlineMs - elapsedMs;
+    // 동의 기한: 계산·표기는 restart-shared.js 한 곳(agreeDeadline / agreeWindowHours / agreeWindowLabel).
+    // 다시 열었으면 24시간, 아니면 저장 기간(없으면 옛 규칙: 무료 분석 5일 / 수강 희망 24시간).
+    const freeFlow = isFreeAnalysisFlow(app);
+    const windowLabel = agreeWindowLabel(agreeWindowHours(app));
+    const analysisTimestamp = app.analysis_first_saved_at || app.analysis_saved_at;
 
-    // 긴급 기준: 유도학생은 남은 1일 미만, 일반은 6시간 미만
-    const urgentThresholdMs = isIncentive ? (24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
-    const isExpired = remainingMs <= 0;
-    const isUrgent = !isExpired && remainingMs <= urgentThresholdMs;
-    
-    // 타이머 상태별 색상 (안내 컨테이너 내부 타이머에 사용)
-    let timerColor, timerBorderColor;
-    if (isExpired) {
-        timerColor = '#dc2626'; timerBorderColor = '#ef4444';
-    } else if (isUrgent) {
-        timerColor = '#dc2626'; timerBorderColor = '#fca5a5';
-    } else {
-        timerColor = '#92400e'; timerBorderColor = '#f59e0b';
-    }
-    
-    // 안내 영역 배경색: 만료/긴급 시 빨간색, 그 외 노란색
-    let infoBg, infoBorder, infoIconColor, infoTextColor;
-    if (isExpired) {
-        infoBg = '#fee2e2'; infoBorder = '#ef4444'; infoIconColor = '#dc2626'; infoTextColor = '#991b1b';
-    } else if (isUrgent) {
-        infoBg = '#fef3c7'; infoBorder = '#f59e0b'; infoIconColor = '#d97706'; infoTextColor = '#92400e';
-    } else {
-        infoBg = '#fef3c7'; infoBorder = '#f59e0b'; infoIconColor = '#d97706'; infoTextColor = '#92400e';
-    }
-    
-    // 프로모션 기간 표기: 유효한 관리자 리셋(analysis_deadline_override)이 있으면 리셋 정책인 24시간, 기본이면 5일.
-    // (일반은 아래 문자열/기한 그대로. 잘못된 날짜 문자열은 유효한 리셋으로 보지 않는다.)
-    const promoOverrideValid = isIncentive && !!app.analysis_deadline_override
-        && !isNaN(new Date(app.analysis_deadline_override).getTime());
-    const promoWindowLabel = promoOverrideValid ? '24시간' : '5일';
+    // 안내 문구(⑫, 두 유형 공통): 기간만 다르다
+    const guideText = `개별분석 결과를 확인하신 후, <strong>${windowLabel} 이내</strong>에 동의해주세요.`;
 
-    // 안내 문구: 프로모션은 기간만 다르고 일반과 같은 안내, 일반학생은 기본 문구
-    const guideText = isIncentive
-        ? `개별분석 결과를 확인하신 후, <strong>${promoWindowLabel} 이내</strong>에 동의해주세요.`
-        : '개별분석 결과를 확인하신 후, <strong>24시간 이내</strong>에 동의해주세요.';
-    
-    // 만료 시 경고 문구
-    const expiredMsg = isExpired
-        ? `<div style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> 시간이 초과되었습니다. 관리자에게 문의해주세요.</div>`
-        : (isUrgent ? `<div id="analysisCountdownMsg" style="font-size: 12px; color: #dc2626; margin-top: 6px; font-weight: 600;"><i class="fas fa-exclamation-circle"></i> 동의 기한이 얼마 남지 않았습니다!</div>` : '');
-    
     // 동의 대상 요약: 학생이 "무엇에 동의하는지"를 폼 바로 위에서 다시 보여준다.
     // (프로그램·가격 카드가 한참 위에 있어 스크롤 없이 확인하도록)
     const priceStr = app.final_price ? `${app.final_price.toLocaleString()}원` : '';
@@ -1398,17 +1440,15 @@ function getAgreementSection(app) {
     // 겁주는 빨간 경고 대신, 조건이 그대로 보장된다는 차분한 라벤더 안내.
     // 마감 절대시각 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 기본 창(일반 24h / 프로모션 5일).
     //   (admin-applications.js getAnalysisAgreeDeadlineMs와 동일 기준)
-    const assuranceDeadlineMs = app.analysis_deadline_override
-        ? new Date(app.analysis_deadline_override).getTime()
-        : (analysisTimestamp ? new Date(analysisTimestamp).getTime() + deadlineMs : NaN);
-    const assuranceWindowLabel = isIncentive ? promoWindowLabel : '24시간';
+    const assuranceDeadlineMs = agreeDeadline(app);
+    const assuranceWindowLabel = windowLabel;
     const assuranceDeadlineLabel = !isNaN(assuranceDeadlineMs) ? formatKstDateTimeKo(assuranceDeadlineMs) : '';
     const assuranceStartLabel = app.schedule_start ? formatKstDateKo(app.schedule_start) : '';
     // 마지막 줄(시작일 확정)은 자기주도(self_paced)이거나 시작일이 없으면 표시하지 않는다.
     const assuranceShowStartLine = app.self_paced !== true && !!app.schedule_start;
     const autoRejectWarning = `
         <div style="background: #efeaf7; border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;">
-            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;">이 조건은 ${assuranceWindowLabel} 동안 보장돼요</div>
+            <div style="font-size: 14px; font-weight: 700; color: #5b4a7d; margin-bottom: 8px;">안내드린 일정은 ${assuranceWindowLabel} 동안 유지돼요</div>
             <div style="font-size: 13px; color: #5b4a7d; line-height: 1.8;">
                 지금 보신 프로그램·가격·시작일은 ${assuranceDeadlineLabel ? `<strong>${assuranceDeadlineLabel}</strong>까지` : '안내드린 기한까지'} 그대로 확정할 수 있어요.<br>
                 안내드린 시작일과 일정은 지금 상황을 기준으로 짜드린 것이라,<br>
@@ -1469,7 +1509,7 @@ function getAgreementSection(app) {
     return `
         <div id="analysisCountdownContainer" class="s2-card">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px;">
-                <div class="s2-card-title" style="margin: 0;"><i class="fas fa-clipboard-check"></i> 프로그램 동의 (필수)</div>
+                <div class="s2-card-title" style="margin: 0;"><i class="fas fa-clipboard-check"></i> ${freeFlow ? '이 일정으로 시작해볼까요?' : '프로그램 동의 (필수)'}</div>
                 ${timerChip}
             </div>
             <div style="font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 4px;">
@@ -1503,7 +1543,7 @@ function getAgreementSection(app) {
                 </div>
 
                 <button id="submitAgreementBtn" onclick="submitStudentAgreement()" disabled class="s2-agree-btn">
-                    <i class="fas fa-circle-check" style="margin-right: 7px;"></i> 동의하고 다음 단계로
+                    <i class="fas fa-circle-check" style="margin-right: 7px;"></i> ${freeFlow ? '이 일정으로 시작하기' : '동의하고 다음 단계로'}
                 </button>
             </div>
         </div>
@@ -1631,7 +1671,8 @@ function updateAgreementButton() {
 
 // 학생 동의 제출
 async function submitStudentAgreement() {
-    if (!confirm('프로그램에 동의하시겠습니까?')) {
+    const freeFlow = isFreeAnalysisFlow(currentApplication);
+    if (!confirm(freeFlow ? '이 일정으로 진행할까요?\n계약서를 확인한 후에 결제하시면 돼요' : '프로그램에 동의하시겠습니까?')) {
         return;
     }
     
@@ -1707,7 +1748,9 @@ async function submitStudentAgreement() {
         alert('❌ 동의 처리에 실패했습니다.\n\n다시 시도해주세요.');
         
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> 동의하고 다음 단계로';
+        submitBtn.innerHTML = freeFlow
+            ? '<i class="fas fa-circle-check" style="margin-right: 7px;"></i> 이 일정으로 시작하기'
+            : '<i class="fas fa-check-circle"></i> 동의하고 다음 단계로';
     }
 }
 
@@ -2080,11 +2123,13 @@ function loadStudentTabs(app) {
     
     // 개별분석이 있으면 해당 탭에 내용 로드
     if (hasAnalysis) {
-        const analysisTab = document.getElementById('tabStudentAnalysis');
-        if (analysisTab) {
-            analysisTab.innerHTML = getAnalysisSection(app);
-            // 동의 기한은 getAnalysisSection에서 절대 일시로 고정 표기(초시계 없음).
+        // 무료 분석 흐름: 사이드바 STEP 2 이름은 '개별분석'(대표 확정 3). #step2-plan을 볼 수 없으면 #step2로 바꾼 뒤 그린다.
+        if (isFreeAnalysisFlow(app)) {
+            const stepName = document.querySelector('.step-nav-link[data-tab="tabStudentAnalysis"] .step-name');
+            if (stepName) stepName.textContent = '개별분석';
         }
+        renderStudentStep2(app);
+        // 동의 기한은 getAnalysisSection에서 절대 일시로 고정 표기(초시계 없음).
     } else {
         const analysisTab = document.getElementById('tabStudentAnalysis');
         if (analysisTab) {
@@ -2125,6 +2170,7 @@ function loadStudentTabs(app) {
         const hashToTab = {
             '#step1': 'tabInfo',
             '#step2': 'tabStudentAnalysis',
+            '#step2-plan': 'tabStudentAnalysis',
             '#step3': 'tabContract',
             '#step4': 'tabPayment',
             '#step5': 'tabUsage'

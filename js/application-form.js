@@ -1450,10 +1450,10 @@ function setupFormSubmission() {
                 formData.book_access_enabled = true;
                 if (applicationState.restartOf) {
                     // 재시작(수강 2): 수강 번호·원 신청서·교재 체크를 함께 저장. n8n 웹훅은 formData를 통째로 보내므로 enrollment_no가 같이 간다(→ 일반 판정·재시작 문단).
+                    // 학생 유형은 넣지 않는다: 다시 신청 여부는 isRestartApp(enrollment_no)로 판정하고, 유형은 관리자가 정한다(2026-11-26).
                     formData.enrollment_no = 2;
                     formData.restart_of = applicationState.restartOf.id;
                     formData.restart_materials = Array.isArray(applicationState.restartOf.restart_materials) ? applicationState.restartOf.restart_materials : [];
-                    formData.is_incentive_applicant = false;
                 }
 
                 let existingDifferentApplication = null;

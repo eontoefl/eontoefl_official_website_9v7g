@@ -3,37 +3,30 @@
 
 let currentManageApp = null;
 
-// ===== 학생 유형(프로모션/일반) 직접 전환 =====
-// 유형 칸(is_incentive_applicant) 하나로 동의 기한(프로모션 5일/일반 24시간)·5만 원 할인·첫 도착 알림톡이 갈린다.
-// 개별분석 탭 스위치로 관리자가 직접 바꾼다. 분석을 이미 보낸 학생을 바꾸면 저장 순간부터 기한을 새로 시작한다.
+// ===== 학생 유형·동의 기한 (개별분석 프로모션 분기, 2026-11-26) =====
+// 개별분석 탭 맨 위 0번 질문 "이 학생은 어떻게 신청했나요?"(무료 분석 / 수강 희망)와 동의 기한(24·72·120시간)을 관리자가 고른다.
+//  - 학생 유형(is_incentive_applicant): 5만 원 할인 · 첫 도착 알림톡 · 학생 화면(무료 분석 흐름)을 정한다. 미정이면 아래 칸을 잠그고 저장을 막는다.
+//  - 동의 기한(analysis_agree_window_hours): 무료 분석만 고른다. 수강 희망은 24시간 고정. 다시 신청한 학생은 수강 희망 고정.
+//  - 기한 계산·표기 규칙은 restart-shared.js(agreeBaseHours/agreeWindowHours/agreeDeadline/agreeWindowLabel) 한 곳.
+//  - 보낸 뒤 유형이나 기간을 바꾸면(또는 승인→조건부→다시 승인) 저장 순간부터 기한을 새로 시작한다(_agreeClockAction '다시').
 const PROMO_DISCOUNT = 50000;
 const PROMO_DISCOUNT_REASON = '금액 조정';
-let _promoToggleCtx = null; // { published, savedIncentive, lockReason, auto }
-
-function _agreeWindowMs(isIncentive) {
-    return isIncentive ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-}
-
-// 동의 마감(절대 ms): 리셋 기한(override) 우선, 없으면 기준 시각 + 유형별 기간. (admin-applications.js getAnalysisAgreeDeadlineMs와 같은 계산)
-function _analysisAgreeDeadlineMs(app) {
-    const o = app.analysis_deadline_override ? new Date(app.analysis_deadline_override).getTime() : NaN;
-    if (!isNaN(o)) return o;
-    const base = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-    return base ? new Date(base).getTime() + _agreeWindowMs(!!app.is_incentive_applicant) : NaN;
-}
+const AGREE_WINDOW_CHOICES = [24, 72, 120];
+// { hasAnalysis, published, savedType, savedWindow, freeWindowDefault, lockReason, restart, auto }
+let _promoToggleCtx = null;
 
 function _formatKstShort(ms) {
     return new Date(ms).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// 스위치를 잠가야 하는 이유(없으면 null). 보낸 분석에만 해당.
+// 학생 유형·기한을 잠가야 하는 이유(없으면 null). 보낸 분석에만 해당(K9).
 //  - 동의 완료: 계약 단계라 유형 차이가 없음
-//  - 기한 지남(승인·미동의): 스위치가 '다시 열기' 경로가 되지 않게 먼저 기존 방법으로 기한을 다시 열도록
+//  - 기한 지남(승인·미동의): 유형 변경이 '다시 열기' 경로가 되지 않게 먼저 기존 방법으로 기한을 다시 열도록
 function _incentiveLockReason(app, hasAnalysis) {
     if (!hasAnalysis) return null;
     if (app.student_agreed_at) return '동의한 학생은 바꿀 수 없어요';
     if (app.analysis_status === '승인') {
-        const dl = _analysisAgreeDeadlineMs(app);
+        const dl = agreeDeadline(app);
         if (!isNaN(dl) && dl <= Date.now()) return '기한이 지난 학생이에요. 먼저 기한을 다시 열어 주세요';
     }
     return null;
@@ -43,48 +36,102 @@ function _currentAnalysisStatus() {
     return document.querySelector('#statusOptionsContainer input[name="analysis_status"]:checked')?.value || '';
 }
 
-// 보낸 분석에서 스위치가 저장된 값과 달라졌는지
-function _isIncentiveTypeChanged() {
-    const el = document.getElementById('incentiveToggle');
-    return !!(_promoToggleCtx && _promoToggleCtx.published && el && el.checked !== _promoToggleCtx.savedIncentive);
+// 화면의 학생 유형: 'free' | 'enroll' | null. 다시 신청은 수강 희망, 잠겼으면 저장된 값(화면 값이 아님).
+function _formStudentType() {
+    const ctx = _promoToggleCtx || {};
+    if (ctx.restart) return 'enroll';
+    if (ctx.lockReason) return ctx.savedType;
+    return document.querySelector('#typeOptionsContainer input[name="student_type"]:checked')?.value || null;
 }
 
-// 유형을 바꿔 저장할 때 확인창·안내에 쓰는 한 줄
-function _incentiveChangeNotice(toIncentive, statusValue) {
-    const typeLine = `학생 유형: ${toIncentive ? '일반 → 프로모션' : '프로모션 → 일반'}`;
-    if (statusValue !== '승인') return typeLine;
-    const deadlineStr = _formatKstShort(Date.now() + _agreeWindowMs(toIncentive));
-    return `${typeLine}\n동의 기한이 지금부터 ${toIncentive ? '5일' : '24시간'}(${deadlineStr}까지)로 다시 시작돼요.`;
+// 화면의 동의 기간(시간). 수강 희망은 24 고정, 잠겼으면 저장된 값. 무료 분석인데 아직 안 골랐으면 null.
+function _formAgreeWindow() {
+    const ctx = _promoToggleCtx || {};
+    if (ctx.lockReason) return ctx.savedWindow;
+    const type = _formStudentType();
+    if (type !== 'free') return type ? 24 : null;
+    const v = document.querySelector('#windowOptionsContainer input[name="agree_window"]:checked')?.value;
+    return v ? Number(v) : null;
 }
 
-// 스위치 변경 처리 (최초 저장 전·수정 모드 공통)
-function onIncentiveToggleChange(el) {
-    const on = el.checked;
-    const slider = el.parentElement.querySelectorAll('span');
-    slider[0].style.background = on ? '#7c68a8' : '#cbd5e1';
-    slider[1].style.left = on ? '25px' : '3px';
-    const typeLabel = document.getElementById('incentiveTypeLabel');
-    if (typeLabel) typeLabel.textContent = '학생 유형: ' + (on ? '프로모션' : '일반');
+// 이번 저장의 '합친 행' = DB 공개 행(currentManageApp) + 이번 폼 값(유형·기간·결과). 예약 대기 값은 폼에 이미 채워져 있다.
+function _mergedAnalysisApp() {
+    const type = _formStudentType();
+    return Object.assign({}, currentManageApp || {}, {
+        is_incentive_applicant: type === 'free' ? true : (type === 'enroll' ? false : null),
+        analysis_agree_window_hours: _formAgreeWindow(),
+        analysis_status: _currentAnalysisStatus()
+    });
+}
 
-    // 프로모션 ON → 입문서도 자동 ON (dispatchEvent로 즉시 DB 저장 트리거, 기존 동작)
-    if (on) {
-        const bookAccessToggle = document.getElementById('bookAccessToggle');
-        if (bookAccessToggle && !bookAccessToggle.checked) {
-            bookAccessToggle.checked = true;
-            bookAccessToggle.dispatchEvent(new Event('change'));
-        }
-    }
+// 기한 시계 판단(구현안 2-2). before = DB 공개 행, merged = 이번에 저장될 값. 이번 결과가 승인일 때만 판단한다.
+//  'first' 승인 공개 이력(analysis_first_saved_at)이 없음
+//  'again' 이력이 있고 학생 유형 · 저장 기간 · 지금 상태(승인 아님) 중 하나라도 바뀜
+//  'none'  그 밖
+function _agreeClockAction(merged, before) {
+    if (!merged || merged.analysis_status !== '승인') return 'none';
+    if (!before || !before.analysis_first_saved_at) return 'first';
+    if ((merged.is_incentive_applicant === true) !== (before.is_incentive_applicant === true)) return 'again';
+    if (agreeBaseHours(merged) !== agreeBaseHours(before)) return 'again';
+    if (before.analysis_status !== '승인') return 'again';
+    return 'none';
+}
 
-    // 할인: 거부·조건부승인은 저장 시 어차피 비우므로 건드리지 않는다.
+function _currentClockAction() {
+    return _agreeClockAction(_mergedAnalysisApp(), currentManageApp);
+}
+
+// 처음·다시 공통: 기준 시각을 지금으로 옮기고, 다시 열기 시각과 두 마감 알림 발송 기록을 비운다.
+function _restartAgreeClock(updateData, nowMs) {
+    updateData.analysis_first_saved_at = nowMs;
+    updateData.analysis_deadline_override = null;
+    updateData.analysis_agree_reminder_sent_at = null;
+    updateData.incentive_warning_sent_at = null;
+}
+
+// 아직 고르지 않은 것(A3). 무료 분석의 동의 기한은 결과가 조건부승인·거부면 필요 없다.
+function _missingTypeWindow() {
+    if (!document.getElementById('typeOptionsBox')) return [];
+    const type = _formStudentType();
+    if (!type) return ['학생 유형'];
+    const st = _currentAnalysisStatus();
+    if (type === 'free' && !_formAgreeWindow() && st !== '조건부승인' && st !== '거부') return ['동의 기한'];
+    return [];
+}
+
+// 저장 진입 세 곳(즉시발송·예약발송·조용히수정) 맨 앞. 미정이면 안내만 하고 멈춘다(잠긴 칸이 빠진 채 저장돼 AI 초안이 지워지는 일 방지).
+function _requireStudentType() {
+    const missing = _missingTypeWindow();
+    if (!missing.length) return true;
+    alert('아직 고르지 않은 것: ' + missing.join(' · '));
+    return false;
+}
+
+// '다시'일 때 확인창·안내 문구(A4 + 새 기한)
+function _agreeRestartNotice(merged) {
+    const before = currentManageApp || {};
+    const lines = [];
+    const fromT = before.is_incentive_applicant === true ? '무료 분석' : '수강 희망';
+    const toT = merged.is_incentive_applicant === true ? '무료 분석' : '수강 희망';
+    if (fromT !== toT) lines.push(`학생 유형: ${fromT} → ${toT}`);
+    const h = agreeBaseHours(merged);
+    lines.push('보낸 뒤 기한을 바꾸면 지금부터 다시 계산돼요.');
+    lines.push(`새 동의 기한: ${agreeWindowLabel(h)} (${_formatKstShort(Date.now() + h * 60 * 60 * 1000)}까지)`);
+    return lines.join('\n');
+}
+
+// 0번 선택을 바꿀 때: 5만 원 할인 자동 채움(옛 토글 동작 그대로) → 기간 칸 처음 값 → 상태 다시 그리기
+function _onStudentTypeChange() {
+    const type = _formStudentType();
+    const ctx = _promoToggleCtx || {};
     const status = _currentAnalysisStatus();
     const discountEl = document.getElementById('additional_discount');
     const reasonEl = document.querySelector('[name="discount_reason"]');
     if (discountEl && reasonEl && status !== '거부' && status !== '조건부승인') {
         const cur = parseInt(discountEl.value) || 0;
-        const ctx = _promoToggleCtx || {};
         const isAutoValue = cur === PROMO_DISCOUNT && reasonEl.value === PROMO_DISCOUNT_REASON;
-        if (on) {
-            // 5만 원보다 적으면 5만 원으로 올림(겹쳐 더하지 않음). 끌 때 되돌릴 수 있게 원래 값을 기억.
+        if (type === 'free') {
+            // 5만 원보다 적으면 5만 원으로 올림(겹쳐 더하지 않음). 되돌릴 수 있게 원래 값을 기억.
             if (cur < PROMO_DISCOUNT) {
                 ctx.auto = { prevAmount: cur, prevReason: reasonEl.value };
                 discountEl.value = PROMO_DISCOUNT;
@@ -93,45 +140,137 @@ function onIncentiveToggleChange(el) {
                 ctx.auto = null;
             }
         } else if (ctx.auto && isAutoValue) {
-            // 이번 화면에서 켜며 올린 할인은 원래 값으로 되돌림(학생이 아직 못 본 금액)
+            // 이번 화면에서 무료 분석을 고르며 올린 할인은 원래 값으로 되돌림(학생이 아직 못 본 금액)
             discountEl.value = ctx.auto.prevAmount;
             reasonEl.value = ctx.auto.prevReason;
             ctx.auto = null;
         } else if (!ctx.published && isAutoValue) {
-            // 보내기 전: 프로모션이라 자동으로 채워져 있던 5만 원만 뺀다(다른 할인은 유지)
+            // 보내기 전: 무료 분석이라 자동으로 채워져 있던 5만 원만 뺀다(다른 할인은 유지)
             discountEl.value = 0;
             reasonEl.value = '';
         }
-        // 보낸 학생을 일반으로: 학생이 본 할인은 유지
+        // 보낸 학생을 수강 희망으로: 학생이 본 할인은 유지
         calculateModalPrice();
     }
-
-    // 보낸 분석: 유형이 바뀌면 예약발송을 막고, 새 기한을 안내
-    if (_promoToggleCtx && _promoToggleCtx.published) {
-        const changed = _isIncentiveTypeChanged();
-        const scheduleBtn = document.getElementById('scheduleAnalysisBtn');
-        if (scheduleBtn) {
-            if (changed) scheduleBtn.setAttribute('disabled', '');
-            else scheduleBtn.removeAttribute('disabled');
-            scheduleBtn.style.opacity = changed ? '0.5' : '1';
-            scheduleBtn.style.cursor = changed ? 'not-allowed' : 'pointer';
-            scheduleBtn.title = changed ? '유형을 바꾼 경우에는 즉시발송이나 조용히수정만 쓸 수 있어요' : '';
-        }
-        const hint = document.getElementById('incentiveChangeHint');
-        if (hint) {
-            hint.style.display = changed ? 'block' : 'none';
-            hint.textContent = changed
-                ? _incentiveChangeNotice(on, status).replace(/\n/g, ' · ') + ' · 예약발송은 쓸 수 없어요.'
-                : '';
-        }
-    }
+    // 기간 칸: 무료 분석으로 바꾸면 처음 값(처음 보내는 무료 분석은 기본값 없음), 수강 희망은 24
+    document.querySelectorAll('#windowOptionsContainer input[name="agree_window"]').forEach(r => {
+        r.checked = type === 'free'
+            ? (ctx.freeWindowDefault != null && Number(r.value) === ctx.freeWindowDefault)
+            : Number(r.value) === 24;
+    });
+    _applyTypeWindowState();
 }
 
-function bindIncentiveToggle() {
-    const el = document.getElementById('incentiveToggle');
-    if (!el || el.dataset.bound) return;
-    el.dataset.bound = '1';
-    el.addEventListener('change', function() { onIncentiveToggleChange(this); });
+// 0번 질문·기간 칸·추천 이유 칸·잠금·예약 버튼·안내를 한 번에 맞춘다.
+// 부르는 곳: 처음 그릴 때, 0번·기간 변경, 결과 변경(selectStatus 끝), 시작일 변경, 수정 모드(editAnalysis 맨 끝).
+function _applyTypeWindowState() {
+    const box = document.getElementById('typeOptionsBox');
+    if (!box) return;
+    const ctx = _promoToggleCtx || {};
+    const readOnlyNow = !!ctx.hasAnalysis && !_analysisEditing;   // 보낸 분석은 수정 모드에서만 바꾼다
+    const locked = !!ctx.lockReason;
+    const type = _formStudentType();
+    const status = _currentAnalysisStatus();
+
+    // 0번 선택
+    box.querySelectorAll('input[name="student_type"]').forEach(r => {
+        r.disabled = readOnlyNow || locked || !!ctx.restart;
+        if (locked) r.checked = (r.value === ctx.savedType);
+    });
+    box.querySelectorAll('.type-option').forEach(o => {
+        const on = o.dataset.value === type;
+        o.style.background = on ? '#efeaf7' : '#ffffff';
+        o.style.boxShadow = on ? 'inset 0 0 0 2px #7c68a8' : 'none';
+        const t = o.querySelector('.type-option-title');
+        if (t) t.style.color = on ? '#4c1d95' : '#475569';
+    });
+    const typeWrap = document.getElementById('typeOptionsContainer');
+    if (typeWrap) {
+        const off = readOnlyNow || locked || !!ctx.restart;
+        typeWrap.style.pointerEvents = off ? 'none' : 'auto';
+        typeWrap.style.opacity = (readOnlyNow || locked) ? '0.7' : '1';
+    }
+
+    // 동의 기한: 조건부승인·거부면 숨기고 disabled(필수 검사에 걸리지 않게). 수강 희망은 24 고정. 잠겼으면 저장값.
+    const hideWindow = status === '조건부승인' || status === '거부';
+    const wWrap = document.getElementById('windowOptionsWrap');
+    if (wWrap) wWrap.style.display = hideWindow ? 'none' : '';
+    const fixed = type !== 'free';
+    document.querySelectorAll('#windowOptionsContainer input[name="agree_window"]').forEach(r => {
+        if (locked) r.checked = Number(r.value) === Number(ctx.savedWindow);
+        else if (type === 'enroll') r.checked = Number(r.value) === 24;
+        r.disabled = hideWindow || readOnlyNow || locked || fixed;
+        if (!hideWindow && !readOnlyNow && !locked && type === 'free') r.setAttribute('required', '');
+        else r.removeAttribute('required');
+    });
+    const win = _formAgreeWindow();
+    document.querySelectorAll('#windowOptionsContainer .window-option').forEach(o => {
+        const on = !!win && Number(o.dataset.value) === Number(win);
+        const dim = fixed && !on;
+        o.style.background = on ? '#efeaf7' : '#ffffff';
+        o.style.boxShadow = on ? 'inset 0 0 0 2px #7c68a8' : 'none';
+        o.style.opacity = dim ? '0.45' : '1';
+        const t = o.querySelector('.window-option-title');
+        if (t) t.style.color = on ? '#4c1d95' : '#475569';
+    });
+    const winWrapInner = document.getElementById('windowOptionsContainer');
+    if (winWrapInner) winWrapInner.style.pointerEvents = (readOnlyNow || locked || fixed) ? 'none' : 'auto';
+
+    // 미정이면 아래 칸 잠금(K4). inert는 칸을 비활성으로 만들지 않아 저장 값에서 빠지지 않는다.
+    const lockArea = document.getElementById('typeLockArea');
+    if (lockArea) {
+        const lockBelow = !type && !readOnlyNow;
+        if (lockBelow) lockArea.setAttribute('inert', ''); else lockArea.removeAttribute('inert');
+        lockArea.style.opacity = lockBelow ? '0.45' : '';
+    }
+    const missing = readOnlyNow ? [] : _missingTypeWindow();
+    ['typeMissingNote', 'typeMissingBtnNote'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = missing.length ? '' : 'none';
+        const txt = el.querySelector('.txt');
+        if (txt) txt.textContent = '아직 고르지 않은 것: ' + missing.join(' · ');
+    });
+
+    // 6번 추천 이유: 무료 분석일 때만 보인다(필수 아님)
+    const reasonGroup = document.getElementById('formGroup-reason');
+    if (reasonGroup) reasonGroup.style.display = type === 'free' ? '' : 'none';
+    const reasonEl = document.getElementById('analysis_recommend_reason');
+    if (reasonEl) reasonEl.disabled = readOnlyNow;
+
+    // 시계 판단: '다시'면 예약발송을 막고 새 기한을 안내한다
+    const action = readOnlyNow ? 'none' : _currentClockAction();
+    const scheduleBtn = document.getElementById('scheduleAnalysisBtn');
+    if (scheduleBtn && !readOnlyNow) {
+        const block = action === 'again';
+        if (block) scheduleBtn.setAttribute('disabled', ''); else scheduleBtn.removeAttribute('disabled');
+        scheduleBtn.style.opacity = block ? '0.5' : '1';
+        scheduleBtn.style.cursor = block ? 'not-allowed' : 'pointer';
+        scheduleBtn.title = block ? '유형이나 기한을 바꾼 경우에는 즉시발송이나 조용히수정만 쓸 수 있어요' : '';
+    }
+    const hint = document.getElementById('incentiveChangeHint');
+    if (hint) {
+        const show = action === 'again';
+        hint.style.display = show ? 'block' : 'none';
+        hint.textContent = show ? _agreeRestartNotice(_mergedAnalysisApp()).replace(/\n/g, ' · ') + ' · 예약발송은 쓸 수 없어요.' : '';
+    }
+
+    // K17: 고른 기한이 제안 시작일을 넘기면 경고
+    const warn = document.getElementById('agreeStartWarn');
+    if (warn) {
+        let msg = '';
+        const startYmd = document.getElementById('schedule_start')?.value || '';
+        if (!readOnlyNow && status === '승인' && type && startYmd) {
+            const h = agreeBaseHours(_mergedAnalysisApp());
+            const dl = (action === 'first' || action === 'again') ? Date.now() + h * 60 * 60 * 1000 : agreeDeadline(currentManageApp || {});
+            const startMs = new Date(startYmd + 'T00:00:00+09:00').getTime();
+            if (!isNaN(dl) && !isNaN(startMs) && dl > startMs) {
+                msg = `동의 기한(${_formatKstShort(dl)}까지)이 시작일(${startYmd})을 넘겨요. 기한을 줄이거나 시작일을 확인해 주세요.`;
+            }
+        }
+        warn.style.display = msg ? 'block' : 'none';
+        warn.textContent = msg;
+    }
 }
 
 // ===== AI 피드백 재생성 (개별분석 다시 제작) =====
@@ -241,7 +380,8 @@ async function regenerateAnalysis() {
         const requestedAt = new Date().toISOString();
         fetch(N8N_REGEN_WEBHOOK, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...currentManageApp, mode: 'regenerate', feedback: fb, prev_analysis: prev, schedule_overrides: scheduleOverrides })
+            // prev_reason: 저장된 값이 아니라 지금 화면의 6번 칸 값(아직 저장 안 한 수정 포함)
+            body: JSON.stringify({ ...currentManageApp, mode: 'regenerate', feedback: fb, prev_analysis: prev, prev_reason: (document.getElementById('analysis_recommend_reason')?.value || ''), schedule_overrides: scheduleOverrides })
         }).catch(() => {});
         // 3) 서랍 폴링 (최대 8분)
         const started = Date.now();
@@ -253,8 +393,13 @@ async function regenerateAnalysis() {
             if (r && r.analysis_regen_result) { result = r.analysis_regen_result; resultRow = r; break; }
         }
         if (!result) throw new Error('시간 초과. 잠시 후 다시 시도해주세요.');
-        // 4) 분석칸에 채우고 서랍 정리
-        if (box) box.value = result;
+        // 4) 분석칸에 채우고 서랍 정리. 결과 끝의 [[추천이유]] 블록은 떼어 6번 칸에 넣는다(블록이 없으면 6번은 그대로).
+        const split = _splitRecommendReason(result);
+        if (box) box.value = split.body;
+        if (split.reason !== null) {
+            const rEl = document.getElementById('analysis_recommend_reason');
+            if (rEl) rEl.value = split.reason;
+        }
         // 일정 칸도 이번 다시 만들기의 추천 일정으로 갱신(저장 전이라 되돌릴 수 있음)
         const newSug = _parseScheduleSuggest(resultRow && resultRow.analysis_schedule_suggest);
         if (newSug && (!newSug.computed_at || newSug.computed_at >= requestedAt)) applyScheduleSuggestToForm(newSug, true);
@@ -266,6 +411,17 @@ async function regenerateAnalysis() {
         showRegenOverlay(false);
         alert('❌ 다시 제작 실패: ' + (e.message || e));
     }
+}
+
+// 다시 만들기 결과에서 [[추천이유]]…[[/추천이유]] 블록을 떼어낸다. 블록이 여러 개면 마지막 것. 없으면 reason=null.
+function _splitRecommendReason(text) {
+    const s = String(text || '');
+    const re = /\[\[추천이유\]\]([\s\S]*?)\[\[\/추천이유\]\]/g;
+    let m, last = null;
+    while ((m = re.exec(s)) !== null) last = m[1];
+    if (last === null) return { body: s, reason: null };
+    const body = s.replace(re, '').replace(/\n{3,}/g, '\n\n').trim();
+    return { body, reason: last.trim() };
 }
 
 function showRegenOverlay(on) {
@@ -962,14 +1118,35 @@ function loadModalAnalysisTab(app) {
         ? (pendingPayload.additional_discount || 0)
         : (app.additional_discount || 0);
     let fillDiscountReason = hasPendingDraft ? (pendingPayload.discount_reason || '') : (app.discount_reason || '');
-    const fillIsIncentive = hasPendingDraft
-        ? (pendingPayload.is_incentive_applicant === true)
-        : !!app.is_incentive_applicant;
+    // 학생 유형·동의 기한: DB 공개 행 + 예약 대기 값을 합쳐 판정(공통 함수 studentType/agreeBaseHours).
+    const typeSource = hasPendingDraft
+        ? Object.assign({}, app, {
+            is_incentive_applicant: ('is_incentive_applicant' in pendingPayload) ? pendingPayload.is_incentive_applicant : app.is_incentive_applicant,
+            analysis_agree_window_hours: ('analysis_agree_window_hours' in pendingPayload) ? pendingPayload.analysis_agree_window_hours : app.analysis_agree_window_hours
+        })
+        : app;
+    const isRestartStudent = typeof isRestartApp === 'function' && isRestartApp(app);
+    const fillType = studentType(typeSource);                       // 'free' | 'enroll' | null
+    const fillIsIncentive = fillType === 'free';
+    const typeConfirmed = typeSource.is_incentive_applicant === true || typeSource.is_incentive_applicant === false;
+    const typeAutoRecommended = !typeConfirmed && !isRestartStudent && app.auto_analysis_type === 'promotion';
+    const hasStoredWindow = AGREE_WINDOW_CHOICES.includes(Number(typeSource.analysis_agree_window_hours));
+    const typePublished = !!app.analysis_first_saved_at;            // 승인 공개 이력
+    // 무료 분석 기간 칸의 처음 값: 저장 기간이 없고 처음 보내는 무료 분석이면 '기본값 없음'(K6), 아니면 저장 기간(없으면 옛 규칙).
+    const freeWindowDefault = (!hasStoredWindow && !typePublished) ? null : agreeBaseHours(Object.assign({}, typeSource, { is_incentive_applicant: true }));
+    const fillWindow = fillType === 'free' ? freeWindowDefault : (fillType === 'enroll' ? 24 : null);
     const incentiveLockReason = _incentiveLockReason(app, hasAnalysis);
+    const fillReason = hasPendingDraft && ('analysis_recommend_reason' in pendingPayload)
+        ? (pendingPayload.analysis_recommend_reason || '')
+        : (app.analysis_recommend_reason || '');
     _promoToggleCtx = {
-        published: !!hasAnalysis,
-        savedIncentive: fillIsIncentive,
+        hasAnalysis: !!hasAnalysis,
+        published: typePublished,
+        savedType: fillType,
+        savedWindow: agreeBaseHours(typeSource),
+        freeWindowDefault: freeWindowDefault,
         lockReason: incentiveLockReason,
+        restart: isRestartStudent,
         auto: null
     };
     // 프로모션 승인 제안의 빈 추가 할인 칸에만 50,000원 / 사유 '금액 조정'을 미리 채운다.
@@ -984,9 +1161,8 @@ function loadModalAnalysisTab(app) {
         fillAdditionalDiscount = 50000;
         fillDiscountReason = '금액 조정';
     }
-    const fillBookAccess = hasPendingDraft
-        ? (pendingPayload.book_access_enabled === true)
-        : !!app.book_access_enabled;
+    // 입문서 스위치는 즉시 저장되는 칸이라 예약 정보에 키가 없다 → 실제 값만 본다.
+    const fillBookAccess = !!app.book_access_enabled;
 
     // 예약 발송 대기 배너 (예약 중일 때만)
     const scheduledAtKstStr = isScheduled ? formatScheduledAtKst(app.analysis_alimtalk_scheduled_at) : '';
@@ -1000,7 +1176,7 @@ function loadModalAnalysisTab(app) {
                     <div>
                         <div style="font-weight: 700; font-size: 15px; color: #1e293b; letter-spacing: -0.01em; margin-bottom: 5px;">예약 발송 대기 중</div>
                         <div style="font-size: 13px; color: #64748b; line-height: 1.7;">
-                            <strong style="color: #1e293b;">${scheduledAtKstStr}</strong>에 학생에게 공개되며<br>알림톡(${fillIsIncentive ? '프로모션 학생 전용 템플릿' : '일반 학생 템플릿'})이 발송됩니다.
+                            <strong style="color: #1e293b;">${scheduledAtKstStr}</strong>에 학생에게 공개되며<br>알림톡(${fillIsIncentive ? '무료 분석 알림톡' : '수강 희망 알림톡'})이 발송됩니다.
                         </div>
                         <div style="font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
                             발송 전까지 분석 내용을 자유롭게 수정할 수 있습니다. 수정해도 예약 시각은 유지됩니다.
@@ -1050,7 +1226,7 @@ function loadModalAnalysisTab(app) {
         </span>
     ` : '';
 
-    // 프로모션 폐지로 숨겨둔 AI 판단/확신도 뱃지 (되살리려면 display:flex)
+    // (옛 'AI 판단' 배지는 0번 질문 아래 '자동 추천' 표시로 옮겼다. 확신도 배지는 계속 숨김)
     const aiHiddenBadges = (hasAIAnalysis && !hasPendingDraft) ? `
         <div style="display: none; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
             ${app.auto_analysis_type ? `
@@ -1068,7 +1244,7 @@ function loadModalAnalysisTab(app) {
     const canResetDeadline = app.analysis_status === '승인' && !!app.analysis_content && !app.student_agreed_at;
     let deadlineResetStrip = '';
     if (canResetDeadline) {
-        const _dlMs = _analysisAgreeDeadlineMs(app);
+        const _dlMs = agreeDeadline(app);
         const _dlStr = isNaN(_dlMs) ? '-' : _formatKstShort(_dlMs);
         const _expired = !isNaN(_dlMs) && _dlMs <= Date.now();
         deadlineResetStrip = `
@@ -1122,31 +1298,70 @@ function loadModalAnalysisTab(app) {
         <div id="pauseBlockWrap_correction"></div>
 
         <form id="modalAnalysisForm" onsubmit="saveModalAnalysis(event)">
-            <!-- 0. 학생 유형(프로모션/일반) 스위치: 켜짐=프로모션. 보낸 분석은 수정 모드에서만, 동의·기한 지난 학생은 잠금 -->
-            <div class="form-group" id="incentiveToggleBox" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 24px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05); ${pointerEvents}">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="width: 38px; height: 38px; border-radius: 10px; background: #ede9f5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="fas fa-tag" style="font-size: 14px; color: #7c68a8;"></i>
+            <!-- 0. 학생 유형 · 동의 기한 (2026-11-26). 결과 선택 칸과 클래스·컨테이너·name을 나눠 결과 선택 코드가 건드리지 않게 한다 -->
+            <div class="form-group" id="typeOptionsBox" style="background: #ffffff; padding: 18px 20px; border-radius: 14px; margin-bottom: 12px; box-shadow: 0 2px 20px rgba(25, 28, 29, 0.05);">
+                <label class="form-label" style="margin-bottom: 10px;">0. 이 학생은 어떻게 신청했나요? <span class="required">*</span></label>
+                ${isRestartStudent ? `
+                <div id="typeOptionsContainer" style="padding: 12px 14px; border-radius: 12px; background: #f6f4fb; font-size: 14px; font-weight: 700; color: #4c1d95;">수강 희망 (다시 신청)</div>
+                ` : `
+                <div id="typeOptionsContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f4f2f8; padding: 6px; border-radius: 16px;">
+                    <label style="cursor: pointer; display: block;">
+                        <input type="radio" name="student_type" value="free" ${fillType === 'free' ? 'checked' : ''} ${readOnly} style="display: none;" onchange="_onStudentTypeChange()">
+                        <div class="type-option" data-value="free" style="padding: 16px 12px; border-radius: 14px; text-align: center; background: #ffffff; transition: 0.15s;">
+                            <i class="fas fa-gift" style="font-size: 20px; color: #a99bc6; margin-bottom: 6px;"></i>
+                            <div class="type-option-title" style="font-weight: 700; font-size: 14px; color: #475569;">무료 분석으로 신청</div>
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 3px;">프로모션 · 무료 분석 화면 · 5만 원 할인</div>
                         </div>
-                        <div>
-                            <div id="incentiveTypeLabel" style="font-weight: 600; font-size: 14px; color: #1e293b;">학생 유형: ${fillIsIncentive ? '프로모션' : '일반'}</div>
-                            <div style="font-size: 12px; color: #94a3b8; margin-top: 2px; line-height: 1.6;">켜짐: 동의 기한 5일 · 5만 원 할인 / 꺼짐: 24시간 · 할인 없음<br>(보낸 뒤 바꾸면 기한이 지금부터 다시 시작돼요)</div>
-                            ${incentiveLockReason ? `<div style="font-size: 12px; color: #a53b22; margin-top: 4px; font-weight: 600;">${incentiveLockReason}</div>` : ''}
-                        </div>
-                    </div>
-                    <label style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer; flex-shrink: 0;">
-                        <input type="checkbox" id="incentiveToggle" name="is_incentive_applicant"
-                               ${fillIsIncentive ? 'checked' : ''}
-                               ${(hasAnalysis || incentiveLockReason) ? 'disabled' : ''}
-                               style="opacity: 0; width: 0; height: 0;">
-                        <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${fillIsIncentive ? '#7c68a8' : '#cbd5e1'}; border-radius: 26px; transition: 0.3s;"></span>
-                        <span style="position: absolute; top: 3px; left: ${fillIsIncentive ? '25px' : '3px'}; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
                     </label>
+                    <label style="cursor: pointer; display: block;">
+                        <input type="radio" name="student_type" value="enroll" ${fillType === 'enroll' ? 'checked' : ''} ${readOnly} style="display: none;" onchange="_onStudentTypeChange()">
+                        <div class="type-option" data-value="enroll" style="padding: 16px 12px; border-radius: 14px; text-align: center; background: #ffffff; transition: 0.15s;">
+                            <i class="fas fa-graduation-cap" style="font-size: 20px; color: #a99bc6; margin-bottom: 6px;"></i>
+                            <div class="type-option-title" style="font-weight: 700; font-size: 14px; color: #475569;">수강 희망으로 신청</div>
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 3px;">일반 · 지금 화면 · 할인 없음</div>
+                        </div>
+                    </label>
+                </div>
+                ${typeAutoRecommended ? `<div style="display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; background: #ede9f5; padding: 5px 11px; border-radius: 999px; font-size: 12px; color: #5b21b6; font-weight: 600;"><i class="fas fa-tag" style="font-size: 10px;"></i> 자동 추천: 무료 분석 (후속메일 받은 학생)</div>` : ''}
+                `}
+                ${incentiveLockReason ? `<div style="font-size: 12px; color: #a53b22; margin-top: 8px; font-weight: 600;">${incentiveLockReason}</div>` : ''}
+
+                <div id="windowOptionsWrap" style="margin-top: 16px;">
+                    <label class="form-label" style="margin-bottom: 10px;">동의 기한 <span class="required">*</span></label>
+                    <div id="windowOptionsContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: #f4f2f8; padding: 6px; border-radius: 14px;">
+                    <label style="cursor: pointer; display: block;">
+                        <input type="radio" name="agree_window" value="24" ${Number(fillWindow) === 24 ? 'checked' : ''} ${readOnly} style="display: none;" onchange="_applyTypeWindowState()">
+                        <div class="window-option" data-value="24" style="padding: 12px 10px; border-radius: 12px; text-align: center; background: #ffffff; transition: 0.15s;">
+                            <i class="fas fa-clock" style="font-size: 14px; color: #a99bc6; margin-bottom: 4px;"></i>
+                            <div class="window-option-title" style="font-weight: 700; font-size: 14px; color: #475569;">24시간</div>
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">1일</div>
+                        </div>
+                    </label>
+                    <label style="cursor: pointer; display: block;">
+                        <input type="radio" name="agree_window" value="72" ${Number(fillWindow) === 72 ? 'checked' : ''} ${readOnly} style="display: none;" onchange="_applyTypeWindowState()">
+                        <div class="window-option" data-value="72" style="padding: 12px 10px; border-radius: 12px; text-align: center; background: #ffffff; transition: 0.15s;">
+                            <i class="fas fa-clock" style="font-size: 14px; color: #a99bc6; margin-bottom: 4px;"></i>
+                            <div class="window-option-title" style="font-weight: 700; font-size: 14px; color: #475569;">72시간</div>
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">3일</div>
+                        </div>
+                    </label>
+                    <label style="cursor: pointer; display: block;">
+                        <input type="radio" name="agree_window" value="120" ${Number(fillWindow) === 120 ? 'checked' : ''} ${readOnly} style="display: none;" onchange="_applyTypeWindowState()">
+                        <div class="window-option" data-value="120" style="padding: 12px 10px; border-radius: 12px; text-align: center; background: #ffffff; transition: 0.15s;">
+                            <i class="fas fa-clock" style="font-size: 14px; color: #a99bc6; margin-bottom: 4px;"></i>
+                            <div class="window-option-title" style="font-weight: 700; font-size: 14px; color: #475569;">120시간</div>
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">5일</div>
+                        </div>
+                    </label>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">학생이 분석을 받은 뒤 수강에 동의할 수 있는 시간이에요.</div>
+                    <div id="agreeStartWarn" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 10px; background: #fbecd2; color: #b45309; font-size: 12px; font-weight: 600; line-height: 1.6;"></div>
                 </div>
                 <div id="incentiveChangeHint" style="display: none; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #fbecd2; color: #b45309; font-size: 12px; font-weight: 600; line-height: 1.6;"></div>
             </div>
+            <div id="typeMissingNote" style="display: none; margin-bottom: 20px; padding: 10px 14px; border-radius: 10px; background: #fdf6e3; color: #92400e; font-size: 13px; font-weight: 600;"><i class="fas fa-lock" style="margin-right: 6px;"></i><span class="txt"></span></div>
 
+            <div id="typeLockArea">
             <!-- 1. 결과 선택 -->
             <div class="form-group">
                 <label class="form-label">1. 결과 선택 <span class="required">*</span></label>
@@ -1421,7 +1636,17 @@ function loadModalAnalysisTab(app) {
                 </div>
             </div>
             
+            <!-- 6. 추천 이유 (무료 분석만 보임, 필수 아님) -->
+            <div class="form-group" id="formGroup-reason" style="${fillIsIncentive ? '' : 'display: none;'}">
+                <label class="form-label">6. 추천 이유 <span style="font-size: 12px; color: #94a3b8; font-weight: 500;">(학생의 과정·비용 화면 맨 위에 보여요)</span></label>
+                <textarea id="analysis_recommend_reason" rows="4" ${readOnly}
+                          style="width: 100%; box-sizing: border-box; padding: 14px; border: none; border-radius: 12px; background: #ffffff; outline: none; font-family: inherit; line-height: 1.7;"
+                          placeholder="비워 두면 학생 화면에 추천 이유 카드가 나오지 않아요.">${escapeHtml(fillReason)}</textarea>
+            </div>
+            </div><!-- /typeLockArea -->
+
             <!-- 하단 버튼 -->
+            <div id="typeMissingBtnNote" style="display: none; margin-top: 28px; font-size: 12px; color: #a53b22; font-weight: 600; text-align: right;"><i class="fas fa-lock" style="margin-right: 5px;"></i><span class="txt"></span></div>
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 36px;">
                 <div style="display: flex; gap: 8px;">
                     ${hasAnalysis ? `
@@ -1458,7 +1683,7 @@ function loadModalAnalysisTab(app) {
                         <button type="submit" class="btn-primary" id="saveAnalysisBtn" data-mode="immediate" style="padding: 12px 24px;">
                             <i class="fas fa-paper-plane"></i> 즉시발송
                         </button>
-                        <button type="button" class="btn-primary" onclick="openScheduleModal()"
+                        <button type="button" class="btn-primary" id="scheduleAnalysisBtn" onclick="openScheduleModal()"
                                 style="padding: 12px 24px; background: #ebe6f4; border: none; color: #4c1d95; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit;">
                             <i class="fas fa-clock"></i> 예약발송
                         </button>
@@ -1519,9 +1744,17 @@ function loadModalAnalysisTab(app) {
         correctionStartDate.addEventListener('change', validateCorrectionStartDate);
     }
     
-    // 학생 유형 스위치: 최초 저장 전(초안·예약 대기)은 바로 조작. 보낸 분석은 수정 모드(editAnalysis)에서 연결.
+    // 학생 유형·동의 기한 칸 상태(잠금·고정·추천 이유·예약 버튼). 시작일이 바뀌면 K17 경고를 다시 계산.
     const bookAccessToggle = document.getElementById('bookAccessToggle');
-    if (!hasAnalysis) bindIncentiveToggle();
+    _applyTypeWindowState();
+    if (scheduleStart) scheduleStart.addEventListener('change', _applyTypeWindowState);
+    // 결과 라디오가 어떤 경로로 바뀌든(칸 클릭·라벨 클릭) 기한 칸·시계 판단을 다시 맞춘다
+    document.querySelectorAll('#statusOptionsContainer input[name="analysis_status"]').forEach(r => r.addEventListener('change', _applyTypeWindowState));
+    // 즉시발송(submit 버튼)은 브라우저 필수 칸 검사가 먼저 돌아 잠긴 칸에 걸리므로, 누르는 순간 학생 유형·기한부터 확인한다
+    const _submitBtn = document.getElementById('saveAnalysisBtn');
+    if (_submitBtn) _submitBtn.addEventListener('click', function(e) {
+        if (!_requireStudentType()) { e.preventDefault(); e.stopPropagation(); }
+    });
 
     // 입문서 제공 토글 인터랙션 (즉시 DB 저장)
     if (bookAccessToggle) {
@@ -2004,6 +2237,8 @@ function selectStatus(value, event) {
 
     // 거부·조건부승인 시 프로그램/일정/가격 섹션 비활성화 (조건부승인은 아직 협의 전이라 미정)
     setRejectionUIState(value === '거부' || value === '조건부승인');
+    // 결과가 바뀌면 동의 기한 칸(조건부·거부면 숨김)·시계 판단·예약 버튼을 다시 맞춘다
+    _applyTypeWindowState();
 }
 
 // 거부·조건부승인 선택 시 프로그램 배정/일정/가격 정보 섹션 비활성화 처리
@@ -2117,6 +2352,7 @@ async function upsertCorrectionSchedule(userId, startDate, endDate) {
 function silentSaveAnalysis() {
     const form = document.getElementById('modalAnalysisForm');
     if (!form) return;
+    if (!_requireStudentType()) return;
     if (!form.reportValidity()) return;
 
     window._scheduledMode = 'silent';
@@ -2134,6 +2370,8 @@ async function saveModalAnalysis(event) {
 
     const form = event.target;
     const saveBtn = document.getElementById('saveAnalysisBtn');
+    // 학생 유형·동의 기한을 고르지 않았으면 저장하지 않는다(A3)
+    if (!_requireStudentType()) { window._scheduledMode = null; window._scheduledAtIso = null; return; }
     // openScheduleModal()이 _scheduledMode='scheduled'와 _scheduledAtIso를 세팅하고 폼을 submit함.
     let mode = window._scheduledMode || (saveBtn?.dataset?.mode || 'immediate');
     const scheduledAtIso = window._scheduledAtIso || null;
@@ -2141,18 +2379,17 @@ async function saveModalAnalysis(event) {
     window._scheduledMode = null;
     window._scheduledAtIso = null;
 
-    // 보낸 분석의 학생 유형을 바꾼 저장인지 (바꾸면 저장 순간부터 동의 기한 새로 시작)
-    const typeChanged = _isIncentiveTypeChanged();
-    const toIncentive = document.getElementById('incentiveToggle')?.checked || false;
-    if (typeChanged && _promoToggleCtx.lockReason) {
-        alert(`학생 유형을 바꿀 수 없어요.\n\n${_promoToggleCtx.lockReason}`);
+    // 기한 시계 판단(구현안 2-2): 처음 / 다시 / 없음. 잠긴 칸은 저장된 값으로 판단한다.
+    const mergedApp = _mergedAnalysisApp();
+    const clockAction = _agreeClockAction(mergedApp, currentManageApp);
+    const typeVal = _formStudentType();                       // 'free' | 'enroll'
+    const windowVal = _formAgreeWindow();                     // 24 | 72 | 120
+    const typeLocked = !!(_promoToggleCtx && (_promoToggleCtx.lockReason || _promoToggleCtx.restart));
+    if (clockAction === 'again' && (mode === 'scheduled' || mode === 'update-scheduled')) {
+        alert('유형이나 기한을 바꾼 경우에는 예약발송을 쓸 수 없어요.\n즉시발송이나 조용히수정으로 저장해주세요.');
         return;
     }
-    if (typeChanged && mode === 'scheduled') {
-        alert('유형을 바꾼 경우에는 예약발송을 쓸 수 없어요.\n즉시발송이나 조용히수정으로 저장해주세요.');
-        return;
-    }
-    const typeChangeLine = typeChanged ? '\n\n' + _incentiveChangeNotice(toIncentive, _currentAnalysisStatus()) : '';
+    const typeChangeLine = clockAction === 'again' ? '\n\n' + _agreeRestartNotice(mergedApp) : '';
 
     // 모드별 confirm 메시지
     let confirmMsg;
@@ -2268,7 +2505,15 @@ async function saveModalAnalysis(event) {
         }
     }
 
-    const isIncentive = isRestartSave ? false : (document.getElementById('incentiveToggle')?.checked || false);   // 수강 2는 항상 일반
+    const isIncentive = isRestartSave ? false : (typeVal === 'free');   // 수강 2는 항상 수강 희망
+    // 기간은 처음·다시일 때만 저장(배포 전에 보낸 학생을 그대로 고치면 옛 기한 유지, K16). 추천 이유는 무료 분석만.
+    const saveWindow = (clockAction === 'first' || clockAction === 'again') ? (isIncentive ? windowVal : 24) : undefined;
+    const reasonText = (document.getElementById('analysis_recommend_reason')?.value || '').trim();
+    const typeFields = {
+        ...(typeLocked && !isRestartSave ? {} : { is_incentive_applicant: isIncentive }),
+        ...(saveWindow !== undefined ? { analysis_agree_window_hours: saveWindow } : {}),
+        ...(isIncentive ? { analysis_recommend_reason: reasonText || null } : {})
+    };
     const nowMs = Date.now();
 
     // === 분기: 예약 발송 ===
@@ -2291,7 +2536,10 @@ async function saveModalAnalysis(event) {
             schedule_end: blankProgramFields ? null : formData.get('schedule_end'),
             self_paced: blankProgramFields ? false : selfPacedEnabled,
             self_paced_end_date: (blankProgramFields || !selfPacedEnabled) ? null : selfPacedEndDate,
+            // 학생 유형은 늘 넣는다(공개 SQL이 첫 도착 알림톡 종류를 고름). 기간은 '처음'일 때만, 추천 이유는 무료 분석만.
             is_incentive_applicant: isIncentive,
+            ...(saveWindow !== undefined ? { analysis_agree_window_hours: saveWindow } : {}),
+            ...(isIncentive ? { analysis_recommend_reason: reasonText || null } : {}),
             // 수정 여부: analysis_first_saved_at가 이미 있으면 = 이전에 공개한 적 있음 = 수정
             is_analysis_update: !!currentManageApp.analysis_first_saved_at
         };
@@ -2360,7 +2608,7 @@ async function saveModalAnalysis(event) {
         analysis_saved_at: nowMs,
         current_step: 2,
         status: '개별분석완료',
-        is_incentive_applicant: isIncentive,
+        ...typeFields,
         ...(isRestartSave ? { correction_mode: blankProgramFields ? null : correctionMode } : {}),
         // 즉시 저장 시 예약 데이터가 남아있으면 정리 (이론상 이 분기는 isScheduled=false 상태에서만 도달하지만 안전장치)
         analysis_alimtalk_scheduled_at: null,
@@ -2369,22 +2617,13 @@ async function saveModalAnalysis(event) {
         analysis_pending_payload: null
     };
 
-    // 동의 데드라인 계산 기준: '승인'이 되는 순간부터 시작한다.
-    // 조건부승인/거부 동안에는 타이머를 시작하지 않고, '승인'으로 (전)환되는 시점에 새로 기록한다.
-    // (이미 승인 상태에서 수정 저장하는 경우엔 기존 시각을 유지 → 수정해도 리셋되지 않음)
-    if (formData.get('analysis_status') === '승인' && currentManageApp.analysis_status !== '승인') {
-        updateData.analysis_first_saved_at = nowMs;
-    }
-    // 보낸 분석의 학생 유형을 바꾸면 지금부터 기한을 새로 시작한다(프로모션 5일 / 일반 24시간).
-    // 기준 시각을 옮기고 리셋 기한을 지워 학생 화면·목록·리마인드·후속메일 계산이 모두 같은 새 기한을 쓰게 하고,
-    // 마감 리마인드(일반·프로모션)를 다시 준비한다.
-    const deadlineRestarted = typeChanged && formData.get('analysis_status') === '승인';
-    if (deadlineRestarted) {
-        updateData.analysis_first_saved_at = nowMs;
-        updateData.analysis_deadline_override = null;
-        updateData.analysis_agree_reminder_sent_at = null;
-        updateData.incentive_warning_sent_at = null;
-    }
+    // 동의 기한 시계: '처음'(승인 공개 이력 없음)·'다시'(보낸 뒤 유형·기간이 바뀌었거나 승인이 아니었다가 다시 승인)면
+    // 저장 순간부터 새로 시작한다. 기준 시각을 옮기고 다시 열기 시각·두 마감 알림 기록을 비워
+    // 학생 화면·목록·리마인드가 모두 같은 새 기한을 쓰게 한다. '없음'(승인 상태에서 내용만 수정)은 기존 기한 유지.
+    const deadlineRestarted = clockAction === 'first' || clockAction === 'again';
+    if (deadlineRestarted) _restartAgreeClock(updateData, nowMs);
+    // 무료 분석을 처음·다시 보낼 때 입문서를 켠다(끄지는 않음, K12)
+    if (deadlineRestarted && isIncentive) updateData.book_access_enabled = true;
 
     // 재시작 첨삭 '다시'·'새로'(수강 1 첨삭 기록이 있을 때): 일정표를 새로 쓰기 전에 옛 기록을 보관함으로. 거부되면 저장 중단.
     if (isRestartSave && !blankProgramFields && correctionEnabled) {
@@ -2457,11 +2696,13 @@ async function saveModalAnalysis(event) {
                     ? '\n\n📢 개별분석 수정 알림톡이 발송되었습니다.'
                     : isConditionalOrReject
                         ? '\n\n📢 개별분석 등록 안내 알림톡(확인 필요 안내)이 발송되었습니다.'
-                        : (isIncentive ? '\n\n📢 프로모션 학생 전용 알림톡(개별분석 완료 안내 · 5일 보장)이 발송되었습니다.' : '');
+                        : (isIncentive ? `\n\n📢 무료 분석 알림톡을 보냈어요. 동의 기한 ${agreeWindowLabel(agreeBaseHours(Object.assign({}, currentManageApp, updateData)))} (${_formatKstShort(agreeDeadline(Object.assign({}, currentManageApp, updateData)))}까지)` : '');
             }
-            const typeChangeNotice = typeChanged
-                ? '\n\n🔁 학생 유형: ' + (isIncentive ? '프로모션' : '일반')
-                    + (deadlineRestarted ? ` · 동의 기한 ${_formatKstShort(nowMs + _agreeWindowMs(isIncentive))}까지로 다시 시작` : '')
+            // '다시'일 때: 유형이 실제로 바뀌었으면 유형 한 줄 + 새 기한, 아니면 새 기한만
+            const typeActuallyChanged = clockAction === 'again' && (currentManageApp.is_incentive_applicant === true) !== isIncentive;
+            const typeChangeNotice = clockAction === 'again'
+                ? '\n\n🔁 ' + (typeActuallyChanged ? '학생 유형: ' + (isIncentive ? '무료 분석' : '수강 희망') + ' · ' : '')
+                    + `동의 기한 ${_formatKstShort(agreeDeadline(Object.assign({}, currentManageApp, updateData)))}까지로 다시 시작`
                 : '';
             alert('✅ 개별분석이 저장되었습니다!' + alimTalkNotice + typeChangeNotice);
 
@@ -2499,8 +2740,9 @@ function openScheduleModal() {
     // 폼 유효성 사전 체크 — 사용자가 필수 항목을 비운 채로 예약 누르는 것 방지
     const form = document.getElementById('modalAnalysisForm');
     if (!form) return;
-    if (_isIncentiveTypeChanged()) {
-        alert('유형을 바꾼 경우에는 예약발송을 쓸 수 없어요.\n즉시발송이나 조용히수정으로 저장해주세요.');
+    if (!_requireStudentType()) return;
+    if (_currentClockAction() === 'again') {
+        alert('유형이나 기한을 바꾼 경우에는 예약발송을 쓸 수 없어요.\n즉시발송이나 조용히수정으로 저장해주세요.');
         return;
     }
     if (!form.reportValidity()) return;
@@ -2676,7 +2918,8 @@ function previewAnalysis(appId) {
     
     // 현재 페이지의 base URL을 기준으로 상대 경로 생성
     const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '');
-    const previewUrl = `${baseUrl}/analysis.html?id=${appId}`;
+    // 실제 학생 화면(신청서 상세 STEP 2)을 연다. 관리자는 모든 신청서를 볼 수 있다.
+    const previewUrl = `${baseUrl}/application-detail.html?id=${appId}#step2`;
     
     console.log('Preview URL:', previewUrl);
     
@@ -2717,19 +2960,6 @@ function editAnalysis() {
                 c.style.opacity = '1';
             }
         });
-
-        // 학생 유형 스위치 활성화 (체크박스는 위 selector에서 제외돼 있어 별도 처리)
-        //  - 동의 완료·기한 지난 학생은 잠금 유지(_incentiveLockReason)
-        const incentiveToggle = document.getElementById('incentiveToggle');
-        if (incentiveToggle && !(_promoToggleCtx && _promoToggleCtx.lockReason)) {
-            incentiveToggle.removeAttribute('disabled');
-            const incentiveBox = document.getElementById('incentiveToggleBox');
-            if (incentiveBox) {
-                incentiveBox.style.pointerEvents = 'auto';
-                incentiveBox.style.opacity = '1';
-            }
-            bindIncentiveToggle();
-        }
 
         // 결과 선택 컨테이너 활성화
         const statusContainer = document.getElementById('statusOptionsContainer');
@@ -2787,6 +3017,10 @@ function editAnalysis() {
         if (currentStatus === '거부' || currentStatus === '조건부승인') {
             setRejectionUIState(true);
         }
+
+        // 학생 유형·동의 기한 칸은 맨 끝에서 맞춘다(위에서 라디오 전체 해제·예약 버튼 다시 켬·결과 칸 잠금을 한 뒤라야
+        // 잠긴 학생·다시 신청·수강 희망 24 고정·'다시'일 때 예약 막기가 덮어써지지 않는다)
+        _applyTypeWindowState();
 
         alert('💡 수정 모드로 전환되었습니다. 내용을 수정한 후 저장 버튼을 눌러주세요.');
     }

@@ -49,24 +49,15 @@ let bookProgressCache = {};  // user_id → { book_id: progressRow } (책별)
 let bookMemoCountCache = {}; // user_id → { book_id: count } (책별)
 let introBookMeta = {};      // book_id → { track:'regular'|'australia', total_pages }
 
-// ===== 개별분석 동의 마감(절대 ms) 계산 =====
-// analysis_deadline_override(수동 리셋) 있으면 그 절대 시각을 우선 사용,
-// 없으면 최초 저장 시각 + 창(일반 24h / 프로모 5일). 없으면 NaN.
+// ===== 개별분석 동의 마감(절대 ms) — 계산은 restart-shared.js agreeDeadline 한 곳 =====
 function getAnalysisAgreeDeadlineMs(app) {
-    if (app.analysis_deadline_override) {
-        const o = new Date(app.analysis_deadline_override).getTime();
-        if (!isNaN(o)) return o;
-    }
-    const base = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-    if (!base) return NaN;
-    const window = app.is_incentive_applicant ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000);
-    return new Date(base).getTime() + window;
+    return agreeDeadline(app);
 }
 
-// ===== 유도학생 상태 판별 =====
-// 반환값: 'waiting' (동의 대기 또는 분석 전) | 'converted' (동의 완료=매출전환) | 'expired' (5일 만료) | null (유도학생 아님)
+// ===== 무료 분석 학생 상태 판별 (학생 유형은 studentType: 확정값 → 다시 신청 → n8n 추천) =====
+// 반환값: 'waiting' (동의 대기 또는 분석 전) | 'converted' (동의 완료=수강 전환) | 'expired' (기한 지남) | null (무료 분석 아님)
 function getIncentiveStatus(app) {
-    if (!app.is_incentive_applicant) return null;
+    if (studentType(app) !== 'free') return null;
     // 동의 완료 → 매출 전환
     if (app.student_agreed_at) return 'converted';
     // 조건부승인은 아직 협의 단계 → 동의 마감 타이머 없음 (대기로 표시)
@@ -83,35 +74,35 @@ function getIncentiveNameBadge(app) {
     const status = getIncentiveStatus(app);
     if (!status) return '';
     if (status === 'converted') {
-        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">유도전환</span>';
+        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">무료 분석→수강</span>';
     }
     if (status === 'expired') {
-        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">프로모션 만료</span>';
+        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">무료 분석 만료</span>';
     }
     // waiting
-    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">프로모션</span>';
+    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">무료 분석</span>';
 }
 
 // ===== 유도학생 이름 옆 뱃지 (입문서 탭용) =====
 function getIncentiveBookBadge(app) {
-    const isIncentive = app.is_incentive_applicant && app.application_type !== 'book_only';
+    const isIncentive = studentType(app) === 'free' && app.application_type !== 'book_only';
     if (!isIncentive) {
         return '<span style="display:inline-block; background:#ede9fe; color:#7c3aed; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">📖 입문서</span>';
     }
     const status = getIncentiveStatus(app);
     if (status === 'converted') {
-        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 유도전환</span>';
+        return '<span style="display:inline-block; background:#dcfce7; color:#16a34a; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 무료 분석→수강</span>';
     }
     if (status === 'expired') {
-        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 유도 만료</span>';
+        return '<span style="display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 무료 분석 만료</span>';
     }
     // waiting or null (분석 전)
-    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 유도학생</span>';
+    return '<span style="display:inline-block; background:#f59e0b; color:white; font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; white-space:nowrap;">🔀 무료 분석</span>';
 }
 
-// ===== 유도학생 동의 데드라인 타이머 표시 (관리자 상태칸) =====
+// ===== 동의 기한 남은 시간 표시 (관리자 상태칸) — 승인한 모든 학생(무료 분석·수강 희망) =====
 function getIncentiveDeadlineDisplay(app) {
-    if (!app.is_incentive_applicant) return '';
+    if (app.analysis_status !== '승인' || !app.analysis_content) return '';   // 거부·조건부·분석 전에는 타이머 없음
     if (app.student_agreed_at) return ''; // 동의 완료 → 타이머 불필요
     if (app.analysis_status === '조건부승인') return ''; // 조건부승인 단계엔 마감 타이머 미표시
     // 데드라인: override(수동 리셋) 우선, 없으면 최초 저장 + 창
@@ -139,8 +130,8 @@ function getIncentiveDeadlineDisplay(app) {
         timeText = `${minutes}분`;
     }
     
-    // 긴급 (24시간 이내)
-    const isUrgent = remaining <= 24 * 60 * 60 * 1000;
+    // 긴급: 실제 기간의 20% 이하 (24시간 → 4.8시간, 3일 → 14.4시간, 5일 → 24시간)
+    const isUrgent = remaining <= agreeWindowHours(app) * 60 * 60 * 1000 * 0.2;
     const bgColor = isUrgent ? '#fee2e2' : '#fef3c7';
     const textColor = isUrgent ? '#dc2626' : '#92400e';
     const icon = isUrgent ? 'fa-exclamation-circle' : 'fa-clock';
@@ -438,7 +429,7 @@ function updateTabCounts() {
     const challengeCount = allApplications.filter(a => a.application_type !== 'book_only' && notDeleted(a)).length;
     // 입문서 탭: 순수 입문서 신청 + 유도학생 + 입문서 제공 학생
     const bookCount = allApplications.filter(a =>
-        (a.application_type === 'book_only' || a.is_incentive_applicant || a.book_access_enabled) && notDeleted(a)
+        (a.application_type === 'book_only' || studentType(a) === 'free' || a.book_access_enabled) && notDeleted(a)
     ).length;
     
     const elAll = document.getElementById('tabCountAll');
@@ -609,7 +600,7 @@ function applyFilters() {
         baseApplications = allApplications.filter(a => a.application_type !== 'book_only');
     } else if (currentAppTypeTab === 'book_only') {
         // 순수 입문서 신청 + 유도학생 + 입문서 제공 학생
-        baseApplications = allApplications.filter(a => a.application_type === 'book_only' || a.is_incentive_applicant || a.book_access_enabled);
+        baseApplications = allApplications.filter(a => a.application_type === 'book_only' || studentType(a) === 'free' || a.book_access_enabled);
     }
     
     // 필터링
@@ -1225,105 +1216,6 @@ async function bulkSendGuide() {
     }
 }
 
-// ===== 일괄 프로모션 뱃지 ON/OFF =====
-// turnOn: true → 프로모션 ON, false → 프로모션 OFF
-// 처리 대상: 챌린지 신청자 + 학생 동의 전(student_agreed_at 없음)
-// 자동 제외: 입문서 신청(application_type === 'book_only'), 학생 동의 완료
-async function bulkSetIncentive(turnOn) {
-    if (selectedIds.size === 0) {
-        alert('선택된 신청서가 없습니다.');
-        return;
-    }
-
-    // 드롭다운 닫기
-    const dropdown = document.getElementById('bulkDropdown');
-    if (dropdown) dropdown.style.display = 'none';
-
-    // 선택된 신청서 분류
-    const selectedApps = allApplications.filter(a => selectedIds.has(a.id));
-    const bookOnlyApps = selectedApps.filter(a => a.application_type === 'book_only');
-    const agreedApps = selectedApps.filter(a => a.application_type !== 'book_only' && a.student_agreed_at);
-    const targetApps = selectedApps.filter(a => a.application_type !== 'book_only' && !a.student_agreed_at);
-
-    // 변경이 실제로 필요한 대상만 추림 (이미 원하는 상태면 스킵)
-    const needChangeApps = targetApps.filter(a => Boolean(a.is_incentive_applicant) !== Boolean(turnOn));
-    const noChangeApps = targetApps.filter(a => Boolean(a.is_incentive_applicant) === Boolean(turnOn));
-
-    // 처리 가능한 대상이 0명이면 사유 안내 후 종료
-    if (needChangeApps.length === 0) {
-        let msg = '⚠️ 처리할 신청서가 없습니다.\n\n';
-        msg += `선택: ${selectedApps.length}명\n`;
-        if (bookOnlyApps.length > 0) msg += `• 입문서 신청 제외: ${bookOnlyApps.length}명\n`;
-        if (agreedApps.length > 0) msg += `• 학생 동의 완료 제외: ${agreedApps.length}명\n`;
-        if (noChangeApps.length > 0) msg += `• 이미 ${turnOn ? 'ON' : 'OFF'} 상태: ${noChangeApps.length}명`;
-        alert(msg);
-        return;
-    }
-
-    // 확인창 메시지 구성
-    let confirmMsg;
-    if (turnOn) {
-        confirmMsg = `선택한 ${selectedApps.length}명 중 ${needChangeApps.length}명을 프로모션 유도 학생으로 변경합니다.\n\n`;
-        confirmMsg += `처리 대상: ${needChangeApps.length}명 (동의 전인 챌린지 신청자)\n`;
-        const skipParts = [];
-        if (bookOnlyApps.length > 0) skipParts.push(`입문서 신청 ${bookOnlyApps.length}명`);
-        if (agreedApps.length > 0) skipParts.push(`동의 완료 ${agreedApps.length}명`);
-        if (noChangeApps.length > 0) skipParts.push(`이미 ON ${noChangeApps.length}명`);
-        if (skipParts.length > 0) confirmMsg += `제외: ${skipParts.join(' / ')}\n`;
-        confirmMsg += `\n변경 후 적용되는 사항:\n`;
-        confirmMsg += `• 학생 동의 데드라인: 24시간 → 5일\n`;
-        confirmMsg += `• 입문서 탭에 노출됨\n`;
-        confirmMsg += `• 이름 옆 "프로모션" 뱃지 표시\n`;
-        confirmMsg += `• (이후 분석 저장 시) 프로모션 학생 전용 알림톡(개별분석 & 입문서 전송 완료 안내) 자동 발송\n\n`;
-        confirmMsg += `진행하시겠습니까?`;
-    } else {
-        confirmMsg = `선택한 ${selectedApps.length}명 중 ${needChangeApps.length}명의 프로모션 유도 학생 지정을 해제합니다.\n\n`;
-        confirmMsg += `처리 대상: ${needChangeApps.length}명 (동의 전인 챌린지 신청자)\n`;
-        const skipParts = [];
-        if (bookOnlyApps.length > 0) skipParts.push(`입문서 신청 ${bookOnlyApps.length}명`);
-        if (agreedApps.length > 0) skipParts.push(`동의 완료 ${agreedApps.length}명`);
-        if (noChangeApps.length > 0) skipParts.push(`이미 OFF ${noChangeApps.length}명`);
-        if (skipParts.length > 0) confirmMsg += `제외: ${skipParts.join(' / ')}\n`;
-        confirmMsg += `\n변경 후 적용되는 사항:\n`;
-        confirmMsg += `• 학생 동의 데드라인: 5일 → 24시간\n`;
-        confirmMsg += `• 입문서 탭에서 제외됨\n`;
-        confirmMsg += `• "프로모션" 뱃지 제거\n\n`;
-        confirmMsg += `⚠️ 이미 분석이 저장된 학생은 분석 저장 시점부터 24시간 기준으로 재계산되어\n`;
-        confirmMsg += `   이미 24시간이 지났다면 즉시 만료 상태가 됩니다.\n\n`;
-        confirmMsg += `진행하시겠습니까?`;
-    }
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-        const promises = needChangeApps.map(a => {
-            const patch = { is_incentive_applicant: turnOn };
-            if (turnOn) patch.book_access_enabled = true;
-            return supabaseAPI.patch('applications', a.id, patch);
-        });
-
-        await Promise.all(promises);
-
-        // 결과 알림
-        let resultMsg = `✅ ${needChangeApps.length}명 프로모션 ${turnOn ? 'ON' : 'OFF'} 처리 완료`;
-        const skipTotal = bookOnlyApps.length + agreedApps.length + noChangeApps.length;
-        if (skipTotal > 0) {
-            const skipParts = [];
-            if (bookOnlyApps.length > 0) skipParts.push(`입문서 신청 ${bookOnlyApps.length}명`);
-            if (agreedApps.length > 0) skipParts.push(`동의 완료 ${agreedApps.length}명`);
-            if (noChangeApps.length > 0) skipParts.push(`이미 ${turnOn ? 'ON' : 'OFF'} ${noChangeApps.length}명`);
-            resultMsg += `\n⏭️ ${skipTotal}명 제외 (${skipParts.join(' / ')})`;
-        }
-        alert(resultMsg);
-
-        clearSelection();
-        loadApplications();
-    } catch (error) {
-        console.error('Bulk set incentive error:', error);
-        alert('일부 프로모션 설정 변경에 실패했습니다.');
-    }
-}
-
 // ===== 일괄 삭제 처리 (Soft Delete) =====
 async function bulkSoftDelete() {
     if (selectedIds.size === 0) {
@@ -1919,7 +1811,7 @@ function displayBookApplications() {
     const tableHTML = pageApplications.map(app => {
         const isSelected = selectedIds.has(app.id);
         const userId = app.user_id;
-        const isIncentive = app.is_incentive_applicant && app.application_type !== 'book_only';
+        const isIncentive = studentType(app) === 'free' && app.application_type !== 'book_only';
         
         // 진도/메모/완독은 책별로 렌더 (renderBookProgressCell 등)
 

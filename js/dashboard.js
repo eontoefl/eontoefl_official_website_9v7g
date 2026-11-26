@@ -506,22 +506,20 @@ function renderActionItems(app) {
     
     // 2️⃣ 분석 등록 직후 ~ 학생 동의 직전
     if (app.analysis_saved_at && !app.student_agreed_at) {
-        // 마감 = analysis_deadline_override(관리자 리셋) 있으면 그 값, 없으면 최초 저장 + 기본 창(일반 24시간 / 프로모션 5일).
-        // (상세 화면과 동일 기준 → 같은 절대일시). 초시계 없이 절대 일시로 고정 표기.
-        const deadlineAnchor = app.analysis_first_saved_at || app.analysis_completed_at || app.analysis_saved_at;
-        const deadlineMs = app.analysis_deadline_override
-            ? new Date(app.analysis_deadline_override).getTime()
-            : new Date(deadlineAnchor).getTime() + (app.is_incentive_applicant === true ? (5 * 24 * 60 * 60 * 1000) : (24 * 60 * 60 * 1000));
+        // 마감 = restart-shared.js agreeDeadline(다시 열기 우선, 없으면 기준 시각 + 저장 기간). 상세 화면과 같은 절대 일시.
+        const deadlineMs = agreeDeadline(app);
         const remainingMs = deadlineMs - Date.now();
+        // 무료 분석 흐름(배포 뒤 새로 보낸 무료 분석 학생)은 '분석 도착' 카드(대표 확정 11), 그 밖은 지금 그대로
+        const freeFlow = isFreeAnalysisFlow(app);
 
         actionItems.push({
             icon: 'fa-file-signature',
             iconColor: '#f59e0b',
-            title: '개별 분석 결과를 확인하고 동의해주세요',
-            deadline: `마감: ${formatKstDateTimeKo(deadlineMs)}까지`,
+            title: freeFlow ? '개별분석이 도착했어요' : '개별 분석 결과를 확인하고 동의해주세요',
+            deadline: freeFlow ? `추천 과정 확인: ${formatKstDateTimeKo(deadlineMs)}까지` : `마감: ${formatKstDateTimeKo(deadlineMs)}까지`,
             urgent: remainingMs <= (6 * 60 * 60 * 1000),
             link: `application-detail.html?id=${app.id}#step2`,
-            linkText: '분석 결과 보기'
+            linkText: freeFlow ? '분석 보기' : '분석 결과 보기'
         });
     }
     

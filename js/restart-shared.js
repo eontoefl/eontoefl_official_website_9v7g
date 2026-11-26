@@ -139,3 +139,66 @@ function getRestartPricingBox(app, showPaymentNoticeArg) {
         </div>
     `;
 }
+
+/* ================================================
+ * 개별분석 학생 유형·동의 기한 (개별분석 프로모션 분기, 2026-11-26)
+ * ================================================
+ * 학생 화면·목록·대시보드·관리자 창이 같은 규칙으로 계산하도록 한 곳에 둔다.
+ * DB 쪽 같은 규칙: public.analysis_agree_effective_hours(a) / public.analysis_agree_deadline(a)
+ *   - is_incentive_applicant: 대표가 확정한 학생 유형만 담는다. true=무료 분석, false=수강 희망, 빈 값=미정
+ *   - analysis_agree_window_hours: 동의 기간(24/72/120). 비어 있으면 옛 규칙(true면 120, 아니면 24)
+ *   - analysis_deadline_override: 기한 다시 열기(항상 24시간)
+ */
+
+/** 학생 유형: 'free'(무료 분석) | 'enroll'(수강 희망) | null(미정). 확정값 → 다시 신청 → n8n 추천 순. */
+function studentType(app) {
+    if (!app) return null;
+    if (app.is_incentive_applicant === true) return 'free';
+    if (app.is_incentive_applicant === false) return 'enroll';
+    if (isRestartApp(app)) return 'enroll';
+    if (app.auto_analysis_type === 'promotion') return 'free';
+    return null;
+}
+
+/** 저장된 동의 기간(시간). 없으면 옛 규칙. SQL과 같게 원 칸(=== true)을 본다. */
+function agreeBaseHours(app) {
+    const h = Number(app && app.analysis_agree_window_hours);
+    if (h === 24 || h === 72 || h === 120) return h;
+    return (app && app.is_incentive_applicant === true) ? 120 : 24;
+}
+
+function _agreeOverrideMs(app) {
+    if (!app || !app.analysis_deadline_override) return NaN;
+    return new Date(app.analysis_deadline_override).getTime();
+}
+
+/** 지금 실제로 적용되는 기간(시간): 기한을 다시 열었으면 24, 아니면 저장 기간. */
+function agreeWindowHours(app) {
+    return isNaN(_agreeOverrideMs(app)) ? agreeBaseHours(app) : 24;
+}
+
+/** 동의 마감(절대 ms). 다시 열기 시각 우선, 없으면 기준 시각 + 기간. 기준 시각이 없으면 NaN. */
+function agreeDeadline(app) {
+    const o = _agreeOverrideMs(app);
+    if (!isNaN(o)) return o;
+    const raw = app && (app.analysis_first_saved_at || app.analysis_saved_at);
+    if (!raw) return NaN;
+    const base = (typeof raw === 'number' || /^\d+$/.test(String(raw))) ? Number(raw) : new Date(raw).getTime();
+    return isNaN(base) ? NaN : base + agreeBaseHours(app) * 60 * 60 * 1000;
+}
+
+/** 기간 표기: 24시간 / 3일 / 5일 (대표 확정 ⑫⑬) */
+function agreeWindowLabel(hours) {
+    const h = Number(hours);
+    if (h === 72) return '3일';
+    if (h === 120) return '5일';
+    if (h > 24 && h % 24 === 0) return (h / 24) + '일';
+    return h + '시간';
+}
+
+/** 학생 화면의 무료 분석 흐름: 확정 유형 무료 분석 + 결과 승인 + 저장 기간 있음(배포 뒤 새로 보낸 학생, K16). 공개된 칸만 본다. */
+function isFreeAnalysisFlow(app) {
+    if (!app || app.is_incentive_applicant !== true || app.analysis_status !== '승인' || !app.analysis_content) return false;
+    const h = Number(app.analysis_agree_window_hours);
+    return h === 24 || h === 72 || h === 120;
+}
