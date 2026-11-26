@@ -1365,10 +1365,9 @@ function _agreeExpired(app) {
     return !isNaN(dl) && dl <= Date.now();
 }
 
-// 학생을 부르는 이름: 세 글자 한국 이름은 성을 뺀다(홍길동 → 길동). 그 밖에는 그대로.
+// 학생을 부르는 이름: 성과 이름 구분이 분명하지 않을 수 있어 본명 전체를 그대로 쓴다(대표 2026-11-26: "그냥 본명을 다 풀로 부르는게 좋을것 같아").
 function _studentCallName(name) {
-    const n = String(name || '').trim();
-    return /^[가-힣]{3}$/.test(n) ? n.slice(1) : n;
+    return String(name || '').trim();
 }
 
 // #step2-plan(과정·비용)을 볼 수 있는 학생: 무료 분석 흐름 + 동의 전 + 기한 안
