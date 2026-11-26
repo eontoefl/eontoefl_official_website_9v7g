@@ -373,9 +373,17 @@ async function regenerateAnalysis() {
     if (!confirm('입력한 피드백을 반영해서 개별분석을 다시 만들까요?\n\n1~2분 걸리고, 완료되면 위 분석칸이 새 내용으로 바뀝니다. (원본은 저장 전까지 안 바뀌어요)\n\n일정·코스는 지금 관리 화면 칸 값 기준으로 다시 계산돼요. 글 내용 수정만 피드백에 적어주세요.')) return;
 
     const appId = currentManageApp.id;
-    const scheduleOverrides = collectScheduleOverrides(currentManageApp);
     showRegenOverlay(true);
     try {
+        // 0) 신청서를 DB에서 새로 읽어 보낸다. 창을 연 뒤 다른 화면(신청서 수정 등)에서 고친 값(예: 마지막 응시 가능일)이
+        //    옛 값으로 n8n에 가지 않게 한다(2026-11-26 이민하님 사례). 못 읽으면 창을 열 때 읽은 값으로 보낸다.
+        let freshApp = null;
+        try {
+            const row = await supabaseAPI.getById('applications', appId);
+            freshApp = Array.isArray(row) ? row[0] : row;
+        } catch (e) { console.warn('다시 만들기 전 신청서 새로 읽기 실패 — 창을 열 때 값으로 보냄:', e); }
+        const sourceApp = freshApp || currentManageApp;
+        const scheduleOverrides = collectScheduleOverrides(sourceApp);
         // 1) 결과 서랍 비우기
         await supabaseAPI.patch('applications', appId, { analysis_regen_result: null });
         // 2) 재생성 요청 (fire-and-forget: 응답은 안 기다림, 결과는 서랍으로 옴)
@@ -383,7 +391,7 @@ async function regenerateAnalysis() {
         fetch(N8N_REGEN_WEBHOOK, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             // prev_reason: 저장된 값이 아니라 지금 화면의 6번 칸 값(아직 저장 안 한 수정 포함)
-            body: JSON.stringify({ ...currentManageApp, mode: 'regenerate', feedback: fb, prev_analysis: prev, prev_reason: (document.getElementById('analysis_recommend_reason')?.value || ''), schedule_overrides: scheduleOverrides })
+            body: JSON.stringify({ ...sourceApp, mode: 'regenerate', feedback: fb, prev_analysis: prev, prev_reason: (document.getElementById('analysis_recommend_reason')?.value || ''), schedule_overrides: scheduleOverrides })
         }).catch(() => {});
         // 3) 서랍 폴링 (최대 8분)
         const started = Date.now();
