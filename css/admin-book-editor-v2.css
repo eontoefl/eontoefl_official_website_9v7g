@@ -62,3 +62,6 @@ html,body{margin:0;height:100%}
 .be2-float .ic.arw{color:#C3A3DA}
 .be2-float .ic.cmt{color:#E58FAE}
 .be2-float .ic.solo{background:#633D7E;color:#fff;font-size:11px}
+.be2-float .undo{display:flex;gap:2px;padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,.16)}
+.be2-float .undo button{flex:1;padding:0 8px;gap:5px;justify-content:center}
+.be2-float .undo .ic{width:auto;height:auto;font-size:15px;color:#c9c3dc}

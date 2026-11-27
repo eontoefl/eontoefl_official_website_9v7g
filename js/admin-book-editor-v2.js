@@ -109,12 +109,14 @@
       else if (!el.textContent.trim()) el.setAttribute('contenteditable', 'false');
     });
     const remember = () => { S.pre = caretOffset(root, r); };
-    r.addEventListener('compositionstart', () => { S.composing = true; remember(); });
+    r.addEventListener('compositionstart', () => { typingSnap(p, root, r, 'insertText'); S.composing = true; remember(); });
     r.addEventListener('compositionend', () => { S.composing = false; setTimeout(() => check(p, root, r), 0); });
-    r.addEventListener('input', (e) => { S.hlUndo = null; hideBubble(); if (e.isComposing || S.composing) { setDirty(p.id, true); return; } if (e.inputType === 'insertText' && e.data === '>') arrowFix(root); check(p, root, r); });
+    r.addEventListener('input', (e) => { S.hlUndo = null; hideBubble(); if (e.isComposing || S.composing) { setDirty(p.id, true); return; } if (e.inputType === 'insertText' && e.data === '>') arrowFix(p, root, r); check(p, root, r); });
     r.addEventListener('beforeinput', (e) => {
       const t = e.inputType || '';
+      if (t === 'historyUndo' || t === 'historyRedo') { e.preventDefault(); if (t === 'historyUndo') undo(p, root, r); else redo(p, root, r); return; }
       if (!S.composing) remember();
+      if (t.indexOf('format') !== 0 && t !== 'insertParagraph' && t !== 'insertLineBreak' && t !== 'insertFromDrop') typingSnap(p, root, r, t);
       if (t === 'insertParagraph' || t === 'insertLineBreak') { e.preventDefault(); S.imeAt = Date.now(); enterAfterIme(p, root, r); return; }
       if (t.indexOf('format') === 0 || t === 'insertFromDrop') e.preventDefault();
     });
@@ -125,12 +127,13 @@
       if ((e.key === 'Backspace' || e.key === 'Delete') && !mod && joinArrow(p, root, r, e.key === 'Delete')) { e.preventDefault(); return; }
       const k = String(e.key).toLowerCase();
       if (mod && k === 'b') { e.preventDefault(); hlToggle(); return; }
-      if (mod && !e.shiftKey && k === 'z' && S.hlUndo && S.hlUndo.r === r) { e.preventDefault(); hlUndo(); return; }
+      if (mod && !e.shiftKey && k === 'z') { e.preventDefault(); undo(p, root, r); return; }
+      if (mod && ((e.shiftKey && k === 'z') || k === 'y')) { e.preventDefault(); redo(p, root, r); return; }
       if (mod && ['i', 'u'].includes(k)) e.preventDefault();
     });
     r.addEventListener('mouseup', () => setTimeout(showBubble, 0));
     r.addEventListener('keyup', (e) => { if (e.shiftKey || e.key.indexOf('Arrow') === 0) showBubble(); });
-    r.addEventListener('paste', (e) => { e.preventDefault(); remember(); const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || ''; document.execCommand('insertText', false, t.replace(/\s*\r?\n\s*/g, ' ').replace(/->/g, '→')); });
+    r.addEventListener('paste', (e) => { e.preventDefault(); remember(); const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || ''; pushUndo(p, root, r); S.noSnap = true; try { document.execCommand('insertText', false, t.replace(/\s*\r?\n\s*/g, ' ').replace(/->/g, '→')); } finally { S.noSnap = false; } });
     r.addEventListener('drop', (e) => e.preventDefault());
     r.addEventListener('dragstart', (e) => e.preventDefault());
   }
@@ -141,6 +144,7 @@
     const base = S.base.has(p.id) ? S.base.get(p.id) : 0;
     if (ov > base + 0.5) {
       r.innerHTML = S.good.get(r);
+      dropSame(r);
       setCaret(root, r, S.pre);
       toast(MSG_FULL);
       showOver(p.id, BP.overflowOf(root));
@@ -171,7 +175,7 @@
   function firstTextIn(line) { const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (!n.parentElement.closest('[data-be2-mark]')) return n; return null; }
   function splitArrow(p, root, r) {
     const line = arrowLineAt(root, r); if (!line) return false;
-    const sel = selOf(root); S.pre = caretOffset(root, r);
+    const sel = selOf(root); S.pre = caretOffset(root, r); pushUndo(p, root, r);
     const rg0 = sel.getRangeAt(0); if (!rg0.collapsed) rg0.deleteContents();
     const rg = document.createRange(); rg.setStart(sel.focusNode, sel.focusOffset); rg.setEnd(line, line.childNodes.length);
     const frag = rg.extractContents();
@@ -196,7 +200,7 @@
     const other = forward ? line.nextElementSibling : line.previousElementSibling;
     if (!other || !other.matches('p.bt-arrp')) return true; // 화살표 줄이 아닌 곧과는 합치지 않음(키만 먹음)
     const upper = forward ? line : other, lower = forward ? other : line;
-    S.pre = caretOffset(root, r);
+    S.pre = caretOffset(root, r); pushUndo(p, root, r);
     [...upper.childNodes].filter((c) => c.nodeName === 'BR' && !c.nextSibling).forEach((c) => c.remove());
     const at = upper.childNodes.length;
     const lead = leadOf(lower);
@@ -217,13 +221,49 @@
     }, 40);
   }
 
-  function arrowFix(root) {
+  function arrowFix(p, root, r) {
     const sel = selOf(root); if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
     const n = sel.focusNode, o = sel.focusOffset;
     if (!n || n.nodeType !== 3 || o < 2 || n.data.slice(o - 2, o) !== '->') return;
+    pushUndo(p, root, r);   // Ctrl+Z 한 번이면 -> 로 돌아감
     const rg = document.createRange(); rg.setStart(n, o - 2); rg.setEnd(n, o);
     sel.removeAllRanges(); sel.addRange(rg);
-    document.execCommand('insertText', false, '→');
+    S.noSnap = true; try { document.execCommand('insertText', false, '→'); } finally { S.noSnap = false; }
+  }
+
+  // ---------- 되돌리기 / 다시하기 (2026-11-27 대표 요청) ----------
+  // 크롬 기본 되돌리기는 편집기가 쪽 내용을 직접 바꾸면(줄 나누기, 버튼 넣기, 형광펜 등) 끊긴다. 그래서 쪽마다 직접 기록한다.
+  //  - 바뀌기 직전의 쪽 모습(편집 화면 그대로)과 커서 위치를 쌓는다. 쪽마다 100단계
+  //  - 글자 입력은 1초 안에 이어 친 것을 한 묶음(치기와 지우기는 따로). 편집기가 바꾸는 일은 하나씩
+  //  - Ctrl+Z 뒤로, Ctrl+Shift+Z / Ctrl+Y 앞으로. 저장해도 기록은 남고, 새로고침하면 없어진다
+  const UNDO_MAX = 100;
+  function hist(r) { if (!S.hist) S.hist = new Map(); let h = S.hist.get(r); if (!h) { h = { undo: [], redo: [], at: 0, kind: '' }; S.hist.set(r, h); } return h; }
+  function pushUndo(p, root, r) {
+    const h = hist(r); const html = r.innerHTML;
+    if (!h.undo.length || h.undo[h.undo.length - 1].html !== html) { h.undo.push({ html, caret: caretOffset(root, r) }); if (h.undo.length > UNDO_MAX) h.undo.shift(); }
+    h.redo = []; h.kind = 'op'; h.at = Date.now(); S.lastEdit = { p, root, r };
+  }
+  function typingSnap(p, root, r, type) {
+    if (S.noSnap) return;
+    const h = hist(r); const kind = String(type).indexOf('delete') === 0 ? 'del' : 'ins'; const now = Date.now();
+    if (now - h.at > 1000 || h.kind !== kind) { pushUndo(p, root, r); }
+    h.kind = kind; h.at = now; S.lastEdit = { p, root, r };
+  }
+  function dropSame(r) { const h = hist(r); const t = h.undo[h.undo.length - 1]; if (t && t.html === r.innerHTML) h.undo.pop(); }
+  function restoreSnap(p, root, r, s) { r.innerHTML = s.html; S.good.set(r, s.html); hideBubble(); try { r.focus({ preventScroll: true }); } catch (_) {} setCaret(root, r, s.caret); check(p, root, r); S.lastEdit = { p, root, r }; }
+  function undo(p, root, r) {
+    const h = hist(r); if (!h.undo.length) { toast('더 되돌릴 게 없어요.'); return; }
+    const s = h.undo.pop(); h.redo.push({ html: r.innerHTML, caret: caretOffset(root, r) }); h.kind = 'undo'; h.at = 0;
+    restoreSnap(p, root, r, s);
+  }
+  function redo(p, root, r) {
+    const h = hist(r); if (!h.redo.length) { toast('다시 할 게 없어요.'); return; }
+    const s = h.redo.pop(); h.undo.push({ html: r.innerHTML, caret: caretOffset(root, r) }); h.kind = 'redo'; h.at = 0;
+    restoreSnap(p, root, r, s);
+  }
+  function undoFromButton(isRedo) {
+    const c = caretCtx() || S.lastEdit; if (!c) { toast('먼저 고친 쪽에 커서를 두세요.'); return; }
+    if (isRedo) redo(c.p, c.root, c.r); else undo(c.p, c.root, c.r);
   }
   function caretOffset(root, r) {
     const sel = selOf(root); if (!sel || !sel.rangeCount) return null;
@@ -371,6 +411,7 @@
     const f = FMT[k]; const c = selCtx(); if (!c) { toast(f.name + '을(를) 넣을 글자를 먼저 드래그해 주세요.'); return; }
     const before = c.r.innerHTML; S.pre = caretOffset(c.root, c.r);
     const segs = pieces(c); if (!segs.length) return;
+    { const h = hist(c.r); const snap = { html: before, caret: S.pre }; if (!h.undo.length || h.undo[h.undo.length - 1].html !== before) h.undo.push(snap); if (h.undo.length > UNDO_MAX) h.undo.shift(); h.redo = []; h.kind = 'op'; h.at = Date.now(); S.lastEdit = { p: c.p, root: c.root, r: c.r }; }
     segs.forEach((t) => {
       if (on) { if (fmtOf(t, c.r, f.sel)) return; const el = f.make(); t.parentNode.insertBefore(el, t); el.appendChild(t); mergePrev(el); }
       else { let h; let guard = 0; while ((h = fmtOf(t, c.r, f.sel)) && guard++ < 6) liftOut(h, t); }
@@ -379,7 +420,7 @@
     const first = segs[0], last = segs[segs.length - 1];
     if (k === 'ul') alignComments(c.r);
     check(c.p, c.root, c.r);
-    if (c.r.innerHTML === before) { hideBubble(); return; }
+    if (c.r.innerHTML === before) { dropSame(c.r); hideBubble(); return; }
     if (!c.r.contains(first)) { S.hlUndo = null; hideBubble(); return; }   // 넘쳐서 되돌려짐(토스트는 check가 띄움)
     S.hlUndo = { r: c.r, html: before, p: c.p, root: c.root };
     try { const sel = selOf(c.root); const rg = document.createRange(); rg.setStart(first, 0); rg.setEnd(last, last.data.length); sel.removeAllRanges(); sel.addRange(rg); } catch (_) {}
@@ -453,7 +494,7 @@
     if (!art || !art.contains(c.el) || !c.root.querySelector('style[data-v2]')) { toast('이 버튼은 입문서 새 디자인 쪽에서만 쓸 수 있어요.'); return; }
     let blk = c.el; while (blk && blk.parentElement !== art) blk = blk.parentElement;
     if (!blk) { toast('넣을 자리를 찾지 못했어요. 본문 줄 안에 커서를 두세요.'); return; }
-    const before = c.r.innerHTML; S.pre = caretOffset(c.root, c.r);
+    const before = c.r.innerHTML; S.pre = caretOffset(c.root, c.r); pushUndo(c.p, c.root, c.r);
     const { el, text } = newBlock(kind, blk);
     if (blk.classList.contains('book-page-number')) blk.before(el); else blk.after(el);
     if (kind === 'comment') alignComments(c.r);
@@ -483,12 +524,12 @@
   function ensureFloat() {
     if (floatEl) return floatEl;
     floatEl = document.createElement('div'); floatEl.className = 'be2-float';
-    floatEl.innerHTML = '<div class="lab">커서 자리 아래에 넣기</div>'
+    floatEl.innerHTML = '<div class="undo"><button type="button" data-undo="0" title="되돌리기 (Ctrl+Z)"><span class="ic">↶</span>되돌리기</button><button type="button" data-undo="1" title="다시하기 (Ctrl+Shift+Z, Ctrl+Y)"><span class="ic">↷</span>다시</button></div><div class="lab">커서 자리 아래에 넣기</div>'
       + '<button type="button" data-ins="arrow" title="커서가 있는 줄 아래에 화살표 줄"><span class="ic arw">→</span>화살표 줄</button>'
       + '<button type="button" data-ins="comment" title="커서가 있는 줄 아래에 이온암 코멘트. 윗줄에 밑줄이 있으면 화살표가 밑줄 아래로 가요"><span class="ic cmt">↳</span>이온암 코멘트</button>'
       + '<button type="button" data-ins="solo" title="커서가 있는 줄 아래에 단독 소제목(한 중제목 안에 소제목이 하나뿐일 때)"><span class="ic solo">→</span>단독 소제목</button>';
     floatEl.addEventListener('mousedown', (e) => e.preventDefault());
-    floatEl.addEventListener('click', (e) => { const b = e.target.closest('button[data-ins]'); if (b) insertBlock(b.dataset.ins); });
+    floatEl.addEventListener('click', (e) => { const u = e.target.closest('button[data-undo]'); if (u) { undoFromButton(u.dataset.undo === '1'); return; } const b = e.target.closest('button[data-ins]'); if (b) insertBlock(b.dataset.ins); });
     document.body.appendChild(floatEl);
     return floatEl;
   }
