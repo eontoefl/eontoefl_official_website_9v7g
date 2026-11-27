@@ -67,8 +67,8 @@
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
     await new Promise((r) => setTimeout(r, 200));
     S.pages.forEach((p) => { const root = S.roots.get(p.id); const ov = BP.overflowOf(root); S.base.set(p.id, ov); showOver(p.id, ov); root.querySelectorAll('.twp > .page').forEach((r) => S.good.set(r, r.innerHTML)); });
-    buildOutline(); applyScale();
-    status('준비됨 · 보이는 그대로 글자만 고쳐요 · 글자를 드래그하면 형광펜 (저장해야 반영)');
+    buildOutline(); applyScale(); if (S.pages.some((p) => /<style data-v2/.test(p.html))) ensureFloat();
+    status('준비됨 · 글자를 드래그하면 형광펜, 서브텍스트, 밑줄 · 오른쪽 버튼으로 줄 넣기 (저장해야 반영)');
   }
 
   function buildPage(p, i) {
@@ -277,7 +277,7 @@
 
   async function save() {
     const btn = $('btnSave');
-    const targets = S.pages.filter((p) => S.dirty.has(p.id));
+    const targets = S.pages.filter((p) => S.dirty.has(p.id)); targets.forEach((p) => { const root = S.roots.get(p.id); root && root.querySelectorAll('.twp > .page').forEach((r) => alignComments(r)); });
     if (!targets.length) { status('변경 없음'); return; }
     btn.disabled = true; status('저장 중…', 'edit');
     try {
@@ -314,7 +314,9 @@
   const SUB_STYLE = 'font-size:0.78em;color:color-mix(in srgb, currentColor 65%, #fff)';
   const FMT = {
     hl: { sel: 'strong,b,mark', make: () => document.createElement('strong'), name: '형광펜' },
-    sub: { sel: 'span.bp-sub', make: () => { const s = document.createElement('span'); s.className = 'bp-sub'; s.setAttribute('style', SUB_STYLE); return s; }, name: '서브텍스트' }
+    sub: { sel: 'span.bp-sub', make: () => { const s = document.createElement('span'); s.className = 'bp-sub'; s.setAttribute('style', SUB_STYLE); return s; }, name: '서브텍스트' },
+    // 밑줄 = 이온암 코멘트가 다는 핑크 손 밑줄(입문서 v2 정본 CSS .v2-cm). 2026-11-27
+    ul: { sel: 'span.v2-cm', make: () => { const s = document.createElement('span'); s.className = 'v2-cm'; return s; }, name: '밑줄' }
   };
   const HL = FMT.hl.sel;
   let bubble = null;
@@ -375,6 +377,7 @@
     });
     c.r.querySelectorAll(f.sel).forEach((el) => { if (!el.textContent) el.remove(); });
     const first = segs[0], last = segs[segs.length - 1];
+    if (k === 'ul') alignComments(c.r);
     check(c.p, c.root, c.r);
     if (c.r.innerHTML === before) { hideBubble(); return; }
     if (!c.r.contains(first)) { S.hlUndo = null; hideBubble(); return; }   // 넘쳐서 되돌려짐(토스트는 check가 띄움)
@@ -389,7 +392,8 @@
     if (bubble) return bubble;
     bubble = document.createElement('div'); bubble.className = 'be2-hl'; bubble.hidden = true;
     bubble.innerHTML = '<button type="button" data-k="hl" data-on="1" title="고른 글자에 형광펜 (Ctrl+B)"><span class="sw"></span>형광펜</button><button type="button" data-k="hl" data-on="0" title="고른 글자의 형광펜 빼기 (Ctrl+B)">빼기</button>'
-      + '<span class="sep"></span><button type="button" data-k="sub" data-on="1" title="고른 글자를 작고 연하게"><span class="sw sub">가</span>서브텍스트</button><button type="button" data-k="sub" data-on="0" title="서브텍스트 빼기">빼기</button>';
+      + '<span class="sep"></span><button type="button" data-k="sub" data-on="1" title="고른 글자를 작고 연하게"><span class="sw sub">가</span>서브텍스트</button><button type="button" data-k="sub" data-on="0" title="서브텍스트 빼기">빼기</button>'
+      + '<span class="sep"></span><button type="button" data-k="ul" data-on="1" title="고른 글자에 이온암 코멘트용 핑크 손 밑줄"><span class="sw ul"></span>밑줄</button><button type="button" data-k="ul" data-on="0" title="밑줄 빼기">빼기</button>';
     bubble.addEventListener('mousedown', (e) => e.preventDefault());
     bubble.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) fmtApply(b.dataset.k, b.dataset.on === '1'); });
     document.body.appendChild(bubble);
@@ -402,10 +406,91 @@
     const c = selCtx(); const b = ensureBubble(); if (!c) { b.hidden = true; return; }
     const rects = [...c.rg.getClientRects()].filter((x) => x.width > 0); if (!rects.length) { b.hidden = true; return; }
     const top = Math.min(...rects.map((x) => x.top)), left = Math.min(...rects.map((x) => x.left)), right = Math.max(...rects.map((x) => x.right));
-    ['hl', 'sub'].forEach((k) => { const all = allFmt(c, k); b.querySelector('[data-k="' + k + '"][data-on="1"]').classList.toggle('dim', all); b.querySelector('[data-k="' + k + '"][data-on="0"]').classList.toggle('dim', !anyFmt(c, k)); });
+    ['hl', 'sub', 'ul'].forEach((k) => { const all = allFmt(c, k); b.querySelector('[data-k="' + k + '"][data-on="1"]').classList.toggle('dim', all); b.querySelector('[data-k="' + k + '"][data-on="0"]').classList.toggle('dim', !anyFmt(c, k)); });
     b.hidden = false; const bw = b.offsetWidth, bh = b.offsetHeight;
     b.style.left = Math.max(8, Math.min(window.innerWidth - bw - 8, (left + right) / 2 - bw / 2)) + 'px';
     b.style.top = Math.max(64, top - bh - 8) + 'px';
+  }
+
+  // ---------- 오른쪽 버튼 모음: 커서가 있는 줄 바로 아래에 요소를 넣는다 (2026-11-27 대표 요청) ----------
+  //  화살표 줄 / 이온암 코멘트 / 단독 소제목. 입문서 v2 새 디자인 쪽(.bt-book-intro)에서만. 넣은 칸의 임시 글을 골라 두어 바로 고쳐 쓸 수 있다.
+  //  종이가 넘치면 check가 되돌린다. 넣은 직후 Ctrl+Z 한 번이면 빠진다.
+  const CMT_SEL = 'aside.book-callout[data-body-font="ongleip"], .v2-tn';
+  let floatEl = null;
+  function caretCtx() {
+    for (const [id, root] of S.roots) {
+      const sel = selOf(root); if (!sel || !sel.rangeCount) continue;
+      const n = sel.focusNode; const el = n && (n.nodeType === 3 ? n.parentElement : n);
+      const r = el && el.closest && el.closest('[contenteditable="true"]');
+      if (!r || r.getRootNode() !== root) continue;
+      const p = S.pages.find((x) => x.id === id); if (!p) continue;
+      return { p, root, r, el };
+    }
+    return null;
+  }
+  function newBlock(kind, blk) {
+    const indent = blk && (blk.classList.contains('v2-in3') || blk.classList.contains('bt-step-solo')) ? ' v2-in3' : '';
+    let el, text;
+    if (kind === 'arrow') {
+      el = document.createElement('p'); el.setAttribute('data-bt', '1'); el.className = 'bt-arrp' + indent;
+      const lead = document.createElement('span'); lead.className = 'bt-deco bt-arw bt-arw-lead'; lead.setAttribute('contenteditable', 'false'); lead.setAttribute('data-be2-mark', '→ ');
+      text = document.createTextNode('새 줄을 쓰세요'); el.append(lead, text);
+    } else if (kind === 'comment') {
+      el = document.createElement('aside'); el.className = 'book-design book-callout bt-memo-memo';
+      [['data-book-kind', 'callout'], ['data-book-theme', 'writing'], ['data-book-tone', 'info'], ['data-theme', 'writing'], ['data-title', ''], ['data-body-font', 'ongleip'], ['data-bt', '1']].forEach(([k, v]) => el.setAttribute(k, v));
+      const h = document.createElement('h3'); h.className = 'book-design-title';
+      const b = document.createElement('div'); b.className = 'bn-inline-content book-design-body'; b.setAttribute('data-book-font', 'ongleip');
+      text = document.createTextNode('코멘트를 쓰세요'); b.appendChild(text); el.append(h, b);
+    } else {
+      el = document.createElement('p'); el.setAttribute('data-bt', '1'); el.className = 'bt-step bt-step-solo';
+      const t = document.createElement('span'); t.className = 't'; text = document.createTextNode('소제목을 쓰세요'); t.appendChild(text); el.appendChild(t);
+    }
+    return { el, text };
+  }
+  function insertBlock(kind) {
+    const c = caretCtx(); if (!c) { toast('넣을 자리에 먼저 커서를 두세요.'); return; }
+    const art = c.r.querySelector('article.bt-book-intro');
+    if (!art || !art.contains(c.el) || !c.root.querySelector('style[data-v2]')) { toast('이 버튼은 입문서 새 디자인 쪽에서만 쓸 수 있어요.'); return; }
+    let blk = c.el; while (blk && blk.parentElement !== art) blk = blk.parentElement;
+    if (!blk) { toast('넣을 자리를 찾지 못했어요. 본문 줄 안에 커서를 두세요.'); return; }
+    const before = c.r.innerHTML; S.pre = caretOffset(c.root, c.r);
+    const { el, text } = newBlock(kind, blk);
+    if (blk.classList.contains('book-page-number')) blk.before(el); else blk.after(el);
+    if (kind === 'comment') alignComments(c.r);
+    check(c.p, c.root, c.r);
+    if (!c.r.contains(el)) return;   // 넘쳐서 되돌려짐(안내는 check가 띄움)
+    S.hlUndo = { r: c.r, html: before, p: c.p, root: c.root };
+    const rg = document.createRange(); rg.selectNodeContents(text); const sel = selOf(c.root); sel.removeAllRanges(); sel.addRange(rg);
+  }
+  // 이온암 코멘트 화살표를 바로 윗줄 핑크 밑줄(마지막 줄 조각)의 시작점 아래로 (DESIGN 0-4, 정본 CSS --cm-x)
+  //  오른쪽 여백을 넘지 않게 코멘트 글 폭은 최소 260px. 윗줄에 밑줄이 없으면 기본 자리(108px)
+  function alignComments(r) {
+    const art = r.querySelector('article.bt-book-intro'); if (!art) return;
+    const k = art.getBoundingClientRect().width / (art.offsetWidth || 1) || 1;
+    art.querySelectorAll(':scope > ' + CMT_SEL.split(', ').join(', :scope > ')).forEach((c) => {
+      const had = c.style.getPropertyValue('--cm-x');
+      c.style.removeProperty('--cm-x');
+      const prev = c.previousElementSibling; const ul = prev ? [...prev.querySelectorAll('.v2-cm')].pop() : null;
+      if (!ul) { if (!c.getAttribute('style')) c.removeAttribute('style'); return; }
+      const rects = [...ul.getClientRects()].filter((x) => x.width > 1); if (!rects.length) { if (had) c.style.setProperty('--cm-x', had); return; }
+      const aR = art.getBoundingClientRect(), cR = c.getBoundingClientRect(), last = rects[rects.length - 1];
+      const ml0 = parseFloat(getComputedStyle(c).marginLeft) || 108;
+      const delta = ((last.left - aR.left) + 2 * k - (cR.left - aR.left) - 4.5 * k) / k;
+      const ml = Math.min(ml0 + delta, art.offsetWidth - 36 - 260);
+      if (ml - ml0 > 4) c.style.setProperty('--cm-x', Math.round(ml) + 'px'); else if (!c.getAttribute('style')) c.removeAttribute('style');
+    });
+  }
+  function ensureFloat() {
+    if (floatEl) return floatEl;
+    floatEl = document.createElement('div'); floatEl.className = 'be2-float';
+    floatEl.innerHTML = '<div class="lab">커서 자리 아래에 넣기</div>'
+      + '<button type="button" data-ins="arrow" title="커서가 있는 줄 아래에 화살표 줄"><span class="ic arw">→</span>화살표 줄</button>'
+      + '<button type="button" data-ins="comment" title="커서가 있는 줄 아래에 이온암 코멘트. 윗줄에 밑줄이 있으면 화살표가 밑줄 아래로 가요"><span class="ic cmt">↳</span>이온암 코멘트</button>'
+      + '<button type="button" data-ins="solo" title="커서가 있는 줄 아래에 단독 소제목(한 중제목 안에 소제목이 하나뿐일 때)"><span class="ic solo">→</span>단독 소제목</button>';
+    floatEl.addEventListener('mousedown', (e) => e.preventDefault());
+    floatEl.addEventListener('click', (e) => { const b = e.target.closest('button[data-ins]'); if (b) insertBlock(b.dataset.ins); });
+    document.body.appendChild(floatEl);
+    return floatEl;
   }
 
   function buildOutline() {
