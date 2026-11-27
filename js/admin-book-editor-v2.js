@@ -111,7 +111,7 @@
     const remember = () => { S.pre = caretOffset(root, r); };
     r.addEventListener('compositionstart', () => { S.composing = true; remember(); });
     r.addEventListener('compositionend', () => { S.composing = false; setTimeout(() => check(p, root, r), 0); });
-    r.addEventListener('input', (e) => { S.hlUndo = null; hideBubble(); if (e.isComposing || S.composing) { setDirty(p.id, true); return; } check(p, root, r); });
+    r.addEventListener('input', (e) => { S.hlUndo = null; hideBubble(); if (e.isComposing || S.composing) { setDirty(p.id, true); return; } if (e.inputType === 'insertText' && e.data === '>') arrowFix(root); check(p, root, r); });
     r.addEventListener('beforeinput', (e) => {
       const t = e.inputType || '';
       if (!S.composing) remember();
@@ -128,7 +128,7 @@
     });
     r.addEventListener('mouseup', () => setTimeout(showBubble, 0));
     r.addEventListener('keyup', (e) => { if (e.shiftKey || e.key.indexOf('Arrow') === 0) showBubble(); });
-    r.addEventListener('paste', (e) => { e.preventDefault(); remember(); const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || ''; document.execCommand('insertText', false, t.replace(/\s*\r?\n\s*/g, ' ')); });
+    r.addEventListener('paste', (e) => { e.preventDefault(); remember(); const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || ''; document.execCommand('insertText', false, t.replace(/\s*\r?\n\s*/g, ' ').replace(/->/g, '→')); });
     r.addEventListener('drop', (e) => e.preventDefault());
     r.addEventListener('dragstart', (e) => e.preventDefault());
   }
@@ -151,6 +151,17 @@
   }
 
   function selOf(root) { return root.getSelection ? root.getSelection() : document.getSelection(); }
+
+  // -> 를 치면 바로 → 로 바꾼다 (2026-11-25 대표 요청). 붙여넣은 글의 -> 도 바꾼다(paste).
+  // insertText로 바꿔서 Ctrl+Z 한 번이면 -> 로 돌아간다(자동 고침과 같은 동작)
+  function arrowFix(root) {
+    const sel = selOf(root); if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    const n = sel.focusNode, o = sel.focusOffset;
+    if (!n || n.nodeType !== 3 || o < 2 || n.data.slice(o - 2, o) !== '->') return;
+    const rg = document.createRange(); rg.setStart(n, o - 2); rg.setEnd(n, o);
+    sel.removeAllRanges(); sel.addRange(rg);
+    document.execCommand('insertText', false, '→');
+  }
   function caretOffset(root, r) {
     const sel = selOf(root); if (!sel || !sel.rangeCount) return null;
     const rg = document.createRange(); rg.setStart(r, 0);
