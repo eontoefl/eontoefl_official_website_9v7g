@@ -30,7 +30,7 @@
   let toastT = null;
   function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 3400); }
   const MSG_FULL = '이 쪽은 종이(210×280)가 꽉 차서 더 쓸 수 없어요. 다른 글을 줄이면 더 쓸 수 있어요.';
-  const MSG_ENTER = '줄바꿈(Enter)은 이 에디터에서 넣을 수 없어요. 글자만 고칠 수 있어요.';
+  const MSG_ENTER = '줄바꿈(Enter)은 화살표(→) 줄에서만 할 수 있어요. 누르면 아래에 새 화살표 줄이 생겨요.';
 
   // ---------- 책 목록 ----------
   async function showList() {
@@ -115,12 +115,14 @@
     r.addEventListener('beforeinput', (e) => {
       const t = e.inputType || '';
       if (!S.composing) remember();
-      if (t.indexOf('format') === 0 || t === 'insertParagraph' || t === 'insertLineBreak' || t === 'insertFromDrop' || t === 'historyRedo' && false) { e.preventDefault(); if (t === 'insertParagraph' || t === 'insertLineBreak') toast(MSG_ENTER); }
+      if (t === 'insertParagraph' || t === 'insertLineBreak') { e.preventDefault(); S.imeAt = Date.now(); enterAfterIme(p, root, r); return; }
+      if (t.indexOf('format') === 0 || t === 'insertFromDrop') e.preventDefault();
     });
     r.addEventListener('keydown', (e) => {
       if (e.isComposing) return;
-      if (e.key === 'Enter') { e.preventDefault(); toast(MSG_ENTER); return; }
+      if (e.key === 'Enter') { e.preventDefault(); if (Date.now() - (S.imeSplitAt || 0) < 400) return; if (!splitArrow(p, root, r)) toast(MSG_ENTER); return; }
       const mod = e.ctrlKey || e.metaKey;
+      if ((e.key === 'Backspace' || e.key === 'Delete') && !mod && joinArrow(p, root, r, e.key === 'Delete')) { e.preventDefault(); return; }
       const k = String(e.key).toLowerCase();
       if (mod && k === 'b') { e.preventDefault(); hlToggle(); return; }
       if (mod && !e.shiftKey && k === 'z' && S.hlUndo && S.hlUndo.r === r) { e.preventDefault(); hlUndo(); return; }
@@ -154,6 +156,67 @@
 
   // -> 를 치면 바로 → 로 바꾼다 (2026-11-25 대표 요청). 붙여넣은 글의 -> 도 바꾼다(paste).
   // insertText로 바꿔서 Ctrl+Z 한 번이면 -> 로 돌아간다(자동 고침과 같은 동작)
+  // 화살표 줄(p.bt-arrp)에서 Enter: 커서 뒤 글을 아래 새 화살표 줄로 내린다 (2026-11-25 대표 요청)
+  //  - 새 줄은 윗줄과 같은 class(들여쓰기 v2-in3 등)와 맨 앞 화살표 장식을 갖는다. 종이가 넘치면 check가 되돌리고 안내한다
+  //  - 화살표 줄이 아닌 곳의 Enter는 지금처럼 막는다
+  //  - 화살표 줄 맨 앞 Backspace / 맨 끝 Delete: 윗줄(아랫줄)이 화살표 줄이면 한 줄로 합치고 아랫줄 화살표는 없앤다. 화살표 줄이 아니면 합치지 않는다
+  function arrowLineAt(root, r) {
+    const sel = selOf(root); if (!sel || !sel.rangeCount) return null;
+    const n = sel.focusNode; const el = n && (n.nodeType === 3 ? n.parentElement : n);
+    const line = el && el.closest && el.closest('p.bt-arrp');
+    return line && r.contains(line) ? line : null;
+  }
+  const leadOf = (line) => line.querySelector(':scope > .bt-arw-lead');
+  function caretAt(root, node, off) { const rg = document.createRange(); rg.setStart(node, off); rg.collapse(true); const sel = selOf(root); sel.removeAllRanges(); sel.addRange(rg); }
+  function firstTextIn(line) { const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (!n.parentElement.closest('[data-be2-mark]')) return n; return null; }
+  function splitArrow(p, root, r) {
+    const line = arrowLineAt(root, r); if (!line) return false;
+    const sel = selOf(root); S.pre = caretOffset(root, r);
+    const rg0 = sel.getRangeAt(0); if (!rg0.collapsed) rg0.deleteContents();
+    const rg = document.createRange(); rg.setStart(sel.focusNode, sel.focusOffset); rg.setEnd(line, line.childNodes.length);
+    const frag = rg.extractContents();
+    const nl = line.cloneNode(false); nl.removeAttribute('id');
+    const lead = leadOf(line); if (lead) nl.appendChild(lead.cloneNode(true));
+    nl.appendChild(frag);
+    const t0 = firstTextIn(nl); if (t0) t0.data = t0.data.replace(/^[ \u00a0]+/, '');
+    if (!nl.textContent.trim()) nl.appendChild(document.createElement('br'));
+    if (!line.textContent.trim() && !line.querySelector('br')) line.appendChild(document.createElement('br'));
+    line.after(nl); S.lastSplit = Date.now();
+    const t1 = firstTextIn(nl);
+    if (t1 && t1.data.length) caretAt(root, t1, 0); else caretAt(root, nl, [...nl.childNodes].findIndex((c) => c.nodeName === 'BR'));
+    check(p, root, r);
+    return true;
+  }
+  function joinArrow(p, root, r, forward) {
+    const sel = selOf(root); if (!sel || !sel.isCollapsed) return false;
+    const line = arrowLineAt(root, r); if (!line) return false;
+    const rg = document.createRange();
+    if (forward) { rg.setStart(sel.focusNode, sel.focusOffset); rg.setEnd(line, line.childNodes.length); } else { rg.setStart(line, 0); rg.setEnd(sel.focusNode, sel.focusOffset); }
+    if (rg.toString() !== '') return false;
+    const other = forward ? line.nextElementSibling : line.previousElementSibling;
+    if (!other || !other.matches('p.bt-arrp')) return true; // 화살표 줄이 아닌 곧과는 합치지 않음(키만 먹음)
+    const upper = forward ? line : other, lower = forward ? other : line;
+    S.pre = caretOffset(root, r);
+    [...upper.childNodes].filter((c) => c.nodeName === 'BR' && !c.nextSibling).forEach((c) => c.remove());
+    const at = upper.childNodes.length;
+    const lead = leadOf(lower);
+    [...lower.childNodes].forEach((c) => { if (c !== lead && !(c.nodeName === 'BR' && !lower.textContent.trim())) upper.appendChild(c); });
+    lower.remove();
+    caretAt(root, upper, at);
+    check(p, root, r);
+    return true;
+  }
+  // 한글 조합 중 Enter: 조합이 끝난 뒤에 나눈다.
+  // 크롬은 조합 중 Enter에 keydown을 두 번(조합 중, 조합 끝) 보내기도 해서, 그 사이 keydown이 이미 나눴으면 다시 나누지 않는다
+  function enterAfterIme(p, root, r, n = 0) {
+    if (S.composing) { if (n < 60) setTimeout(() => enterAfterIme(p, root, r, n + 1), 15); return; }
+    const at = S.imeAt;
+    setTimeout(() => {
+      if ((S.lastSplit || 0) >= at) return;          // 그사이 두 번째 keydown이 이미 나눴음
+      if (splitArrow(p, root, r)) S.imeSplitAt = Date.now(); else toast(MSG_ENTER);
+    }, 40);
+  }
+
   function arrowFix(root) {
     const sel = selOf(root); if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
     const n = sel.focusNode, o = sel.focusOffset;
